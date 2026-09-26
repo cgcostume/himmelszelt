@@ -1,6 +1,12 @@
 import { earth } from "@himmelszelt/sternzeit";
 import { expect, test } from "@playwright/test";
-import { apparentDirection, atmosphericRefractionFromApparent, refractViewDirection } from "../src/refraction.js";
+import {
+    apparentDirection,
+    atmosphericRefractionFromApparent,
+    refractionAlongRay,
+    refractionThroughAtmosphere,
+    refractViewDirection,
+} from "../src/refraction.js";
 import { evaluateWgsl, gpuDevice, wgslSource } from "./gpu.js";
 
 const refraction = wgslSource("refraction");
@@ -131,6 +137,30 @@ test("apparentDirection undoes refractViewDirection", () => {
         const a = (altitude * Math.PI) / 180;
         const trueDirection: [number, number, number] = [0.6 * Math.cos(a), 0.8 * Math.cos(a), Math.sin(a)];
         const back = refractViewDirection(apparentDirection(trueDirection));
+        for (let c = 0; c < 3; ++c) expect(back[c]).toBeCloseTo(trueDirection[c] as number, 7);
+    }
+});
+
+test("one refraction model: continuous through the horizontal, twice the horizon's from space", () => {
+    const at = (altitude: number, observerHeightM: number) => {
+        const a = (altitude * Math.PI) / 180;
+        return refractionAlongRay(Math.sin(a), Math.cos(a), { observerHeightM });
+    };
+    // Looking down from 10 km, the ray runs out and back in: more than looking straight along the horizontal.
+    expect(at(-1e-6, 10_000)).toBeCloseTo(at(0, 10_000), 6);
+    expect(at(-2, 10_000)).toBeGreaterThan(at(0, 10_000));
+    // Grazing the ground from space: in and out, twice the ~34.5' at the horizon, and gone 100 km up.
+    expect(refractionThroughAtmosphere(0) * 60).toBeCloseTo(2 * 34.48, 1);
+    expect(refractionThroughAtmosphere(100_000)).toBeLessThan(1e-5);
+});
+
+test("apparentDirection holds steady looking down from high up", () => {
+    // From 20 km the horizon lies 4.5 degrees down, where refraction changes faster than the altitude.
+    const conditions = { observerHeightM: 20_000 };
+    for (let altitude = -4.4; altitude < 1; altitude += 0.1) {
+        const a = (altitude * Math.PI) / 180;
+        const trueDirection: [number, number, number] = [Math.cos(a), 0, Math.sin(a)];
+        const back = refractViewDirection(apparentDirection(trueDirection, conditions), conditions);
         for (let c = 0; c < 3; ++c) expect(back[c]).toBeCloseTo(trueDirection[c] as number, 7);
     }
 });

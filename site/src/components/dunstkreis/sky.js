@@ -1,5 +1,5 @@
 import { apparentDirection, createSkyPassApprox, precomputeAtmosphereApprox } from "@himmelszelt/dunstkreis/approx";
-import { earth, fromJulianDay, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
+import { fromJulianDay, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
 import { onDemand } from "../frame.js";
 import { COMPASS } from "../sternzeit/figure.js";
 import { onChange, state } from "../sternzeit/state.js";
@@ -130,20 +130,16 @@ function render() {
     const position = sun.horizontalPosition(time, state);
     const sunDirection = sun.direction(time, state);
     const sunAngularDiameter = sun.apparentAngularDiameter(julianEphemerisDay(time));
-    const apparent =
-        position.altitude + earth.atmosphericRefraction(position.altitude, { observerHeightM: state.heightM });
     const astronomyMs = performance.now() - started;
-    field("sun").textContent =
-        `Sun ${position.altitude.toFixed(2)}° high (${apparent.toFixed(2)}° apparent), ` +
-        `azimuth ${position.azimuth.toFixed(2)}°`;
 
     const refraction = pressed("refraction");
     const debugGrid = pressed("grid");
+    // Where the sun shows, lifted by the same refraction the sky uses when that is on.
+    const [x, y, z] = refraction ? apparentDirection(sunDirection, { observerHeightM: state.heightM }) : sunDirection;
+    field("sun").textContent =
+        `Sun ${position.altitude.toFixed(2)}° high (${(Math.asin(z) / DEG).toFixed(2)}° apparent), ` +
+        `azimuth ${position.azimuth.toFixed(2)}°`;
     if (pressed("lock")) {
-        // Where the sun shows, lifted by refraction when that is on, straight ahead.
-        const [x, y, z] = refraction
-            ? apparentDirection(sunDirection, { observerHeightM: state.heightM })
-            : sunDirection;
         camera.yaw = Math.atan2(x, y);
         camera.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, Math.asin(z)));
     }

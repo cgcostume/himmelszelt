@@ -167,7 +167,7 @@ fn dkSkyFromInside(a: DkAtmosphere, view: vec3f, h: f32) -> DkSkySample {
 }
 
 // The same for an observer above the atmosphere, raymarched per pixel from where the ray enters it; beyond the table,
-// which covers only altitudes inside. No refraction: it bends light near the ground, not towards space.
+// which covers only altitudes inside.
 fn dkSkyFromSpace(a: DkAtmosphere, view: vec3f, altitude: f32) -> DkSkySample {
     var result: DkSkySample;
     result.direction = view;
@@ -194,6 +194,14 @@ fn dkSkyFromSpace(a: DkAtmosphere, view: vec3f, altitude: f32) -> DkSkySample {
     // light crosses the atmosphere symmetrically, twice the way from there to the top.
     let perigee = rc * length(view.xy);
     result.hitsGround = perigee < a.Rg;
+
+    // Refraction in and out of the air bends the ray towards the planet, some 1.2 degrees grazing the ground: the sun
+    // flattens at the planet's rim and shows a little longer behind it. Bent once, at the lowest point.
+    let down = vec3f(0.0, 0.0, -1.0) + view * view.z;
+    if (DK_REFRACTION && !result.hitsGround && length(down) > 1e-6) {
+        let delta = dkRefractionThroughAtmosphere((perigee - a.Rg) * 1000.0, dkParams.temperatureC) * DK_DEG_TO_RAD;
+        result.direction = dkBendRay(view, normalize(down), delta);
+    }
     let half = dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, max(perigee, a.Rg), 0.0);
     result.sunTransmittance = select(half * half, vec3f(0.0), result.hitsGround);
     return result;

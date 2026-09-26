@@ -40,6 +40,8 @@ export {
     airPressureRatio,
     apparentDirection,
     atmosphericRefractionFromApparent,
+    refractionAlongRay,
+    refractionThroughAtmosphere,
     PRESSURE_SCALE_HEIGHT_M,
     refractViewDirection,
 } from "./refraction.js";
