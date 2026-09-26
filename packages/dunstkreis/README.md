@@ -5,10 +5,9 @@ atmosphere rendering of [osgHimmel](https://github.com/cgcostume/osghimmel),
 reimplemented as WebGPU compute shaders writing to storage textures rather
 than the original's OpenGL FBO-ping-pong-through-fragment-shaders approach.
 
-Not a renderer: it is a render component. It never creates a device, a
-canvas, a context, or a render pass. You hand it a `GPUDevice` and record
-into your own pass, or take the WGSL and the bind group layouts and inline
-them yourself.
+Not a renderer: it is a render component. It never creates a device, a canvas or a context. You hand it a
+`GPUDevice`, and it records compute passes into your command encoder, the sky written straight into your target as the
+background, no rasterization involved. Or take the WGSL and inline it yourself.
 
 Takes a sun/moon direction vector and time as plain inputs, no hard
 dependency on [`@himmelszelt/sternzeit`](https://github.com/cgcostume/himmelszelt/tree/main/packages/sternzeit)
@@ -33,7 +32,7 @@ and lower resolution, so "fast vs. precise" holds overall, but it will not alway
 
 ## Observer altitude and refraction
 
-The observer can be anywhere from a millimeter above the ground up into space. Inside the atmosphere the render pass
+The observer can be anywhere from a millimeter above the ground up into space. Inside the atmosphere the sky pass
 looks the sky up in the sky-view table; above it, where that table does not reach, it raymarches every pixel from
 where its ray enters the atmosphere, and the planet shows, lit by the sun.
 
@@ -43,7 +42,7 @@ reaching each point. No fit is involved, so one model covers the observer on the
 space looking through the limb. Bouguer's invariant (n r sin z stays constant along a ray) decides where the ground
 starts, which also lifts the visible horizon by terrestrial refraction; the bending itself is traced, in the same steps
 that integrate the scattering. The sky-view table is indexed by the apparent direction and stores how far each ray
-bent, the transmittance table by the true direction light arrives from, so the render pass looks both up and bends
+bent, the transmittance table by the true direction light arrives from, so the sky pass looks both up and bends
 nothing. Bodies stay visible while geometrically below the horizon, and the sun flattens there, without either being
 special-cased. Near the ground the result lands within a few percent of Bennett's fit (Meeus 16.3), some 10% above it
 at the horizon, where the model's single scale height makes the lowest air denser than the real one.
@@ -51,6 +50,44 @@ at the horizon, where the model's single scale height makes the lowest air dense
 Set `refractivity: 0` to turn it off, which means recomputing the tables. `airRefractivity(temperatureC, pressureHPa)`
 gives the value for other air, and `apparentDirection` traces where a body shows on the CPU. Feed the true sun
 direction: an already refracted one would be lifted twice.
+
+## Units, exposure and tone mapping
+
+The sky comes out in cd/m². `solarIrradiance` is the sun's spectrum, `solarIlluminance` its illuminance above the
+atmosphere, 128 000 lx by default: the solar constant of 1361 W/m² (Kopp & Lean 2011) times sunlight's luminous
+efficacy of about 94 lm/W. `atmosphereUniformData` packs the spectrum scaled to it (`luminanceScale(model)`), so the
+sky-view table holds cd/m² too: half floats keep full precision from 6·10⁻⁵ cd/m², deep into twilight, up to 65 504,
+above the brightest sky around the sun.
+
+Exposure is in EV100, the convention of cameras, Frostbite and Unreal (Lagarde & de Rousiers 2014):
+`exposureFromEV100(ev100)` is 1 / (1.2 · 2^EV100). About 15 for a sunny day, 0 in twilight. A scene in cd/m² exposed at
+the same EV100 looks the same in any renderer that follows it.
+
+`autoExposure: true` exposes by a light meter instead, for a renderer without an exposure of its own or to follow day
+into night. Whenever the sky-view table is rebuilt, a compute pass reads it in directions spread evenly over the sky
+above the horizon and writes the geometric mean luminance to a buffer the sky pass reads, so there is no round trip to
+the CPU: EV100 = log2(L · 100 / 12.5) (`ev100FromLuminance`), held within `autoExposureRange`, [8, 20] by default, less
+`exposureCompensation`. The lower bound keeps night dark: exposed like day, a night sky looks like one. Metering the
+table rather than the frame keeps the reading still as the camera turns and leaves the sun disc out of it. It follows
+at once, with no eye adaptation over time. `meteredEV100()` reads it back, e.g. for a UI.
+
+`autoExposureKeys` shapes the ramp over the day: compensations at sun altitudes, linear in between, and with a `phase`
+of `"rising"` or `"setting"` for mornings and evenings apart, told by whether the sun is east or west of the meridian.
+The metering stays the base, so the ramp still follows a changed atmosphere. `DEFAULT_AUTO_EXPOSURE_KEYS`:
+
+| Sun altitude | Morning | Evening | |
+|---|---|---|---|
+| −18° | −2 | −2 | night, darker |
+| −6° | −1.2 | −1.2 | blue hour, darker |
+| −2° | −0.7 | −0.7 | just before sunrise, just after sunset |
+| 0° | 0 | +0.2 | sunrise, sunset |
+| 6° | +0.2 | +0.3 | golden hour |
+| 60° | 0 | 0 | noon, as metered |
+
+With `toneMap` on, the default, the pass writes display colors for an 8-bit target: exposed, mapped by Narkowicz's
+ACES fit, sRGB encoded and dithered. Off, it writes the exposed luminance, linear and unclamped, for a float target and
+a renderer that tone maps the frame itself. osgHimmel used Bruneton's curve, which had the encoding built in and was
+tuned to its own arbitrary units.
 
 ## Status
 
@@ -138,6 +175,12 @@ Echtzeit"](https://daniellimberger.de/resources/2012%20%E2%80%93%20Mueller%20%28
 - G. G. Bennett, "The Calculation of Astronomical Refraction in Marine Navigation" (1982): the fit the traced
   refraction is tested against.
 - B. Edlén, "The Refractive Index of Air" (Metrologia, 1966): the refractivity of air.
+- G. Kopp, J. L. Lean, "A new, lower value of total solar irradiance" (Geophysical Research Letters, 2011): the
+  solar constant.
+- S. Lagarde, C. de Rousiers, "Moving Frostbite to Physically Based Rendering" (SIGGRAPH course, 2014): EV100 and the
+  light meter's calibration.
+- K. Narkowicz, ["ACES Filmic Tone Mapping Curve"](https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/)
+  (2016): the display tone curve.
 - Maxime Heckel, ["On rendering the sky, sunsets and
   planets"](https://blog.maximeheckel.com/posts/on-rendering-the-sky-sunsets-and-planets/): a WebGL/three.js
   single-scattering raymarcher, and a fine introduction to the topic.

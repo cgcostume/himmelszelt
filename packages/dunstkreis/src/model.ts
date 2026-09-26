@@ -37,10 +37,15 @@ export interface TentLayer {
 export interface AtmosphereModel {
     planet: PlanetGeometry;
     /**
-     * Irradiance arriving at the top of the atmosphere, per channel. Only the ratios between channels and the
-     * overall scale matter; everything downstream is linear in this.
+     * The sun's spectrum at the top of the atmosphere, per channel: Bruneton's spectral irradiance at the three
+     * wavelengths. Only the ratios between the channels count; `solarIlluminance` sets the scale.
      */
     solarIrradiance: readonly [number, number, number];
+    /**
+     * Illuminance of the sun at the top of the atmosphere, in lux, which puts the sky in physical units: luminance in
+     * cd/m², ready for an exposure in EV100. See `luminanceScale`.
+     */
+    solarIlluminance: number;
     /** Average ground reflectance, used for the irradiance ping-pong pass. */
     avgGroundReflectance: number;
     rayleigh: ExponentialLayer & {
@@ -76,6 +81,8 @@ export const DEFAULT_ATMOSPHERE_MODEL: AtmosphereModel = {
     // ground, the atmosphere ends in a visible edge when seen from space.
     planet: { groundRadiusKm: 6360, thicknessKm: 100 },
     solarIrradiance: [1.474, 1.8504, 1.91198],
+    // The solar constant, 1361 W/m² (Kopp & Lean 2011), times sunlight's luminous efficacy of about 94 lm/W.
+    solarIlluminance: 128_000,
     avgGroundReflectance: 0.1,
     rayleigh: {
         scaleHeightKm: 8,
@@ -166,4 +173,14 @@ export const DEFAULT_TEXTURE_CONFIG: PrecomputedTextureConfig = {
 /** Radius of the top of the atmosphere, in km, i.e. `Rt`. */
 export function atmosphereTopRadiusKm(model: AtmosphereModel): number {
     return model.planet.groundRadiusKm + model.planet.thicknessKm;
+}
+
+/**
+ * What the sun's spectrum is multiplied by to give it `solarIlluminance`, weighing the channels as Rec. 709
+ * luminance does: 0.2126, 0.7152, 0.0722. `atmosphereUniformData` packs the spectrum scaled so, and everything the
+ * shaders compute from it is in cd/m².
+ */
+export function luminanceScale(model: AtmosphereModel): number {
+    const [r, g, b] = model.solarIrradiance;
+    return model.solarIlluminance / (0.2126 * r + 0.7152 * g + 0.0722 * b);
 }

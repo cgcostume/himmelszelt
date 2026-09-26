@@ -128,4 +128,33 @@ export const references: Record<string, Reference> = {
         url: "https://nssdc.gsfc.nasa.gov/planetary/planetfact.html",
         note: "Mean radii and similar constants.",
     },
+    edlen1966: {
+        authors: "Bengt Edlén",
+        title: "The Refractive Index of Air",
+        venue: "Metrologia 2(2)",
+        year: 1966,
+        note: "The refractivity of air dunstkreis bends its rays by.",
+    },
+    kopp2011: {
+        authors: "Greg Kopp, Judith L. Lean",
+        title: "A new, lower value of total solar irradiance: Evidence and climate significance",
+        venue: "Geophysical Research Letters 38",
+        year: 2011,
+        note: "The solar constant, 1361 W/m².",
+    },
+    lagarde2014: {
+        authors: "Sébastien Lagarde, Charles de Rousiers",
+        title: "Moving Frostbite to Physically Based Rendering",
+        venue: "SIGGRAPH course notes",
+        year: 2014,
+        note: "Exposure in EV100 and the light meter's calibration.",
+    },
+    narkowicz2016: {
+        authors: "Krzysztof Narkowicz",
+        title: "ACES Filmic Tone Mapping Curve",
+        venue: "knarkowicz.wordpress.com",
+        year: 2016,
+        url: "https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/",
+        note: "The tone curve dunstkreis maps to a display with.",
+    },
 };

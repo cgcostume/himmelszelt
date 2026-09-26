@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { skyOutput } from "../src/wgsl/output.js";
 import { compileWgsl, gpuDevice, wgslSource } from "./gpu.js";
 
 // Each pass, with exactly the fragments it declares a dependency on in its header comment. Compiling them
@@ -9,6 +10,7 @@ const PASSES: Record<string, readonly string[]> = {
     multiscattering: ["atmosphere", "common", "lut", "sampling", "quality", "multiscattering"],
     skyview: ["atmosphere", "common", "lut", "sampling", "raymarch", "quality", "skyview"],
     sky: ["atmosphere", "common", "lut", "sampling", "raymarch", "quality", "sky"],
+    exposure: ["atmosphere", "common", "lut", "exposure"],
 };
 
 for (const [name, fragments] of Object.entries(PASSES)) {
@@ -17,7 +19,8 @@ for (const [name, fragments] of Object.entries(PASSES)) {
         test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
         if (!device) return;
 
-        const errors = await compileWgsl(device, fragments.map(wgslSource).join("\n"));
+        const output = name === "sky" ? [skyOutput("rgba8unorm")] : [];
+        const errors = await compileWgsl(device, [...output, ...fragments.map(wgslSource)].join("\n"));
         expect(errors, `${name}:\n${errors.join("\n")}`).toEqual([]);
     });
 }

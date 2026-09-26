@@ -28,7 +28,7 @@ struct DkAtmosphere {
     // Rayleigh scale height, in km.
     HR: f32,
 
-    // Irradiance at the top of the atmosphere, per channel.
+    // The sun's illuminance above the atmosphere, in lux, per channel: everything computed from it is in cd/m².
     solarIrradiance: vec3f,
     // Mie scale height, in km.
     HM: f32,

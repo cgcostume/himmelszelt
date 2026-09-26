@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { atmosphereTopRadiusKm, DEFAULT_ATMOSPHERE_MODEL, DEFAULT_TEXTURE_CONFIG } from "../src/model.js";
+import {
+    atmosphereTopRadiusKm,
+    DEFAULT_ATMOSPHERE_MODEL,
+    DEFAULT_TEXTURE_CONFIG,
+    luminanceScale,
+} from "../src/model.js";
 import { DEFAULT_QUALITY, pipelineConstants } from "../src/quality.js";
 import { ATMOSPHERE_UNIFORM_SIZE, atmosphereUniformData } from "../src/uniforms.js";
 import { evaluateWgsl, gpuDevice, wgslSource } from "./gpu.js";
@@ -66,7 +71,7 @@ test("the uniform packing matches the DkAtmosphere struct field for field", () =
         mieG: model.mie.g,
         betaOAbs: model.ozone.betaAbsorption,
         HR: model.rayleigh.scaleHeightKm,
-        solarIrradiance: model.solarIrradiance,
+        solarIrradiance: model.solarIrradiance.map((e) => e * luminanceScale(model)),
         HM: model.mie.scaleHeightKm,
         ozoneCenter: model.ozone.centerAltitudeKm,
         ozoneHalfWidth: model.ozone.widthKm / 2,

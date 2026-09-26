@@ -1,8 +1,9 @@
-// The sky render pass: a fullscreen triangle that turns the precomputed tables into pixels. Requires
-// `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`, `sampling.wgsl`, `raymarch.wgsl` and `quality.wgsl`.
+// The sky pass: a compute pass that turns the precomputed tables into pixels, one invocation per pixel of the target,
+// with no rasterization. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`, `sampling.wgsl`, `raymarch.wgsl` and
+// `quality.wgsl`, plus the output binding `dkOutput` at group 1, declared by whoever builds the pipeline since its
+// format has to be spelled out: `skyOutput(format)` in `index.ts` writes it.
 //
-// Records into a render pass the caller owns and has already begun, so the sky composes with whatever else
-// is being drawn under the caller's own blending and depth rules.
+// It writes every pixel, so the sky goes first, as the background the rest of the frame is drawn over.
 
 struct DkSkyParams {
     inverseViewProjection: mat4x4f,
@@ -15,15 +16,27 @@ struct DkSkyParams {
     // osgHimmel's artistic blue-hour tint, on top of the physical model. Intensity 0 skips it.
     lHeureBleueColor: vec3f,
     lHeureBleueIntensity: f32,
+    // What luminance in cd/m² is multiplied by, 1 / (1.2 * 2^EV100), unless it is metered.
     exposure: f32,
     // The Sun's apparent angular radius, in radians.
     sunAngularRadius: f32,
-    _padding0: f32,
-    _padding1: f32,
+    // The lowest EV100 metering may expose with: night stays dark instead of being lifted to day.
+    autoExposureMin: f32,
+    // Added to the metered exposure, in EV: positive brightens. The keys' ramp over the day included.
+    exposureCompensation: f32,
     // Where the sun disc shows, lifted by refraction: the debug overlay's ring goes there.
     apparentSunDirection: vec3f,
     // The projection's d, from 0 (the matrix's own perspective) to 1 (stereographic), see dkProjectRay.
     projectionDistance: f32,
+    // Nonzero to expose by the light meter's reading instead of `exposure`.
+    autoExposure: u32,
+    // The highest EV100 metering may expose with.
+    autoExposureMax: f32,
+}
+
+// The light meter's reading, written by exposure.comp.wgsl.
+struct DkMetering {
+    log2Luminance: f32,
 }
 
 @group(0) @binding(0) var<uniform> dkAtmosphere: DkAtmosphere;
@@ -32,22 +45,7 @@ struct DkSkyParams {
 @group(0) @binding(3) var dkSkyViewLut: texture_2d<f32>;
 @group(0) @binding(4) var dkLutSampler: sampler;
 @group(0) @binding(5) var dkMultiScatteringLut: texture_2d<f32>;
-
-struct DkVertexOutput {
-    @builtin(position) position: vec4f,
-    @location(0) uv: vec2f,
-}
-
-// One oversized triangle rather than two triangles: no seam along the diagonal, and no vertex buffer.
-@vertex
-fn dkSkyVertex(@builtin(vertex_index) index: u32) -> DkVertexOutput {
-    let uv = vec2f(f32((index << 1u) & 2u), f32(index & 2u));
-
-    var out: DkVertexOutput;
-    out.position = vec4f(uv * 2.0 - 1.0, 0.0, 1.0);
-    out.uv = vec2f(uv.x, 1.0 - uv.y);
-    return out;
-}
+@group(0) @binding(6) var<storage, read> dkMetering: DkMetering;
 
 // Triangular noise of one 8-bit step, added before the output is quantized: it trades the sky's smooth gradients'
 // bands for grain too fine to see. A PCG hash of the pixel, so it is stable from frame to frame.
@@ -57,8 +55,7 @@ fn dkHash(p: vec2u) -> f32 {
     return f32((v >> 22u) ^ v) / 4294967295.0;
 }
 
-fn dkDither(color: vec3f, pixel: vec2f) -> vec3f {
-    let p = vec2u(pixel);
+fn dkDither(color: vec3f, p: vec2u) -> vec3f {
     return color + (dkHash(p) - dkHash(p + vec2u(7919u, 104729u))) / 255.0;
 }
 
@@ -70,13 +67,27 @@ fn dkLine(distance: f32, width: f32) -> f32 {
     return 1.0 - smoothstep(0.5 * width, 1.5 * width, distance);
 }
 
-fn dkDebugOverlay(color: vec3f, view: vec3f, apparentSun: vec3f, sunRadius: f32) -> vec3f {
-    let altitude = asin(clamp(view.z, -1.0, 1.0)) / DK_DEG_TO_RAD;
-    let azimuth = atan2(view.x, view.y) / DK_DEG_TO_RAD;
-    // The azimuth jumps by 360 degrees due south, so its derivative is taken from the opposite direction there too.
-    let azimuthWidth = min(fwidth(azimuth), fwidth(atan2(-view.x, -view.y) / DK_DEG_TO_RAD));
-    let altitudeWidth = fwidth(altitude);
-    let pixel = length(fwidth(view));
+fn dkAltitudeDeg(v: vec3f) -> f32 {
+    return asin(clamp(v.z, -1.0, 1.0)) / DK_DEG_TO_RAD;
+}
+
+fn dkAzimuthDeg(v: vec3f) -> f32 {
+    return atan2(v.x, v.y) / DK_DEG_TO_RAD;
+}
+
+// An azimuth difference, wrapped into [-180, 180]: the azimuth jumps by 360 degrees due south.
+fn dkAzimuthStep(first: f32, second: f32) -> f32 {
+    return abs(fract((second - first) / 360.0 + 0.5) - 0.5) * 360.0;
+}
+
+// `right` and `below` are the rays of the neighboring pixels: a compute pass has no fwidth, so the lines' widths come
+// from how much the angles change from one pixel to the next.
+fn dkDebugOverlay(color: vec3f, view: vec3f, right: vec3f, below: vec3f, apparentSun: vec3f, sunRadius: f32) -> vec3f {
+    let altitude = dkAltitudeDeg(view);
+    let azimuth = dkAzimuthDeg(view);
+    let altitudeWidth = abs(dkAltitudeDeg(right) - altitude) + abs(dkAltitudeDeg(below) - altitude);
+    let azimuthWidth = dkAzimuthStep(azimuth, dkAzimuthDeg(right)) + dkAzimuthStep(azimuth, dkAzimuthDeg(below));
+    let pixel = length(abs(right - view) + abs(below - view));
 
     let altitudeLine = dkLine(abs(fract(altitude / 10.0 + 0.5) - 0.5) * 10.0, altitudeWidth);
     let horizonLine = dkLine(abs(altitude), 1.5 * altitudeWidth);
@@ -92,18 +103,23 @@ fn dkDebugOverlay(color: vec3f, view: vec3f, apparentSun: vec3f, sunRadius: f32)
     return mix(mix(color, vec3f(1.0), grid), vec3f(1.0, 0.8, 0.2), 0.7 * ring);
 }
 
-// Bruneton's tone curve, as osgHimmel used it: a gamma ramp in the low range and an exponential rolloff
-// above, which keeps the sun's surroundings from clipping to white while leaving twilight readable.
-fn dkToneMapChannel(value: f32) -> f32 {
-    if (value < 1.413) {
-        return pow(value * 0.38317, 1.0 / 2.2);
+// The exposure luminance in cd/m² is multiplied by. Metered, it is the light meter's EV100, log2(L * 100 / 12.5) for
+// the average luminance L, less the compensation, held within its range.
+fn dkExposure() -> f32 {
+    if (dkParams.autoExposure != 0u) {
+        let metered = dkMetering.log2Luminance + 3.0 - dkParams.exposureCompensation;
+        return 1.0 / (1.2 * exp2(clamp(metered, dkParams.autoExposureMin, dkParams.autoExposureMax)));
     }
-    return 1.0 - exp(-value);
+    return dkParams.exposure;
 }
 
-fn dkToneMap(luminance: vec3f, exposure: f32) -> vec3f {
-    let scaled = luminance * exposure;
-    return vec3f(dkToneMapChannel(scaled.r), dkToneMapChannel(scaled.g), dkToneMapChannel(scaled.b));
+// Narkowicz's fit of the ACES filmic curve: a toe, a straight middle and a shoulder rolling off towards white, so the
+// bright sky around the sun keeps its gradient. Then encoded for sRGB, which an 8-bit canvas expects. osgHimmel used
+// Bruneton's curve, which had the encoding built in and was tuned for its own arbitrary units.
+fn dkToneMap(exposed: vec3f) -> vec3f {
+    let x = max(exposed, vec3f(0.0));
+    let mapped = clamp(x * (2.51 * x + 0.03) / (x * (2.43 * x + 0.59) + 0.14), vec3f(0.0), vec3f(1.0));
+    return select(1.055 * pow(mapped, vec3f(1.0 / 2.4)) - 0.055, mapped * 12.92, mapped <= vec3f(0.0031308));
 }
 
 // Sky and sun disc transmittance for an observer inside the atmosphere, from the sky-view table.
@@ -205,14 +221,22 @@ fn dkProjectRay(inverseViewProjection: mat4x4f, ndc: vec2f, d: f32) -> vec3f {
     return normalize(center) * cosTheta + normalize(offset) * sinTheta;
 }
 
-@fragment
-fn dkSkyFragment(input: DkVertexOutput) -> @location(0) vec4f {
-    let a = dkAtmosphere;
+// The ray through the center of a pixel, top left first. The observer sits at the origin of this frame, so the point on
+// the far plane is the direction.
+fn dkPixelRay(pixel: vec2u, size: vec2u) -> vec3f {
+    let uv = (vec2f(pixel) + 0.5) / vec2f(size);
+    let ndc = vec2f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    return dkProjectRay(dkParams.inverseViewProjection, ndc, clamp(dkParams.projectionDistance, 0.0, 1.0));
+}
 
-    // Fragment back to a world-space ray. The observer sits at the origin of this frame, so the point on the
-    // far plane is the direction.
-    let ndc = vec2f(input.uv.x * 2.0 - 1.0, 1.0 - input.uv.y * 2.0);
-    let view = dkProjectRay(dkParams.inverseViewProjection, ndc, clamp(dkParams.projectionDistance, 0.0, 1.0));
+@compute @workgroup_size(8, 8)
+fn dkSky(@builtin(global_invocation_id) id: vec3u) {
+    let size = textureDimensions(dkOutput);
+    if (id.x >= size.x || id.y >= size.y) {
+        return;
+    }
+    let a = dkAtmosphere;
+    let view = dkPixelRay(id.xy, size);
     let sunDirection = dkParams.sunDirection;
 
     let altitude = max(dkParams.observerAltitude, 0.0);
@@ -235,11 +259,15 @@ fn dkSkyFragment(input: DkVertexOutput) -> @location(0) vec4f {
         luminance = luminance + sky.sunTransmittance * a.solarIrradiance / (DK_PI * sunRadius * sunRadius);
     }
 
-    var color = dkToneMap(luminance, dkParams.exposure);
+    // In cd/m², exposed. Without tone mapping, that is what is written: linear, for the caller's own tone mapping.
+    var color = luminance * dkExposure();
+    if (DK_TONE_MAP) {
+        color = dkToneMap(color);
+    }
 
     // The blue hour, an artistic term rather than a physical one, strongest when the sun sits just below the
     // horizon. The +0.03 keeps a faint blue cast through the night, as in the original.
-    if (dkParams.lHeureBleueIntensity > 0.0 && !sky.hitsGround && !inSpace) {
+    if (DK_TONE_MAP && dkParams.lHeureBleueIntensity > 0.0 && !sky.hitsGround && !inSpace) {
         let falloff = exp(-sunDirection.z * sunDirection.z * 166.0) + 0.03;
         color = color
             + dkParams.lHeureBleueIntensity * dkParams.lHeureBleueColor
@@ -247,10 +275,12 @@ fn dkSkyFragment(input: DkVertexOutput) -> @location(0) vec4f {
     }
 
     if (DK_DEBUG_GRID) {
-        color = dkDebugOverlay(color, view, dkParams.apparentSunDirection, sunRadius);
+        let right = dkPixelRay(id.xy + vec2u(1u, 0u), size);
+        let below = dkPixelRay(id.xy + vec2u(0u, 1u), size);
+        color = dkDebugOverlay(color, view, right, below, dkParams.apparentSunDirection, sunRadius);
     }
-    if (DK_DITHER) {
-        color = dkDither(color, input.position.xy);
+    if (DK_TONE_MAP && DK_DITHER) {
+        color = clamp(dkDither(color, id.xy), vec3f(0.0), vec3f(1.0));
     }
-    return vec4f(color, 1.0);
+    textureStore(dkOutput, vec2i(id.xy), vec4f(color, 1.0));
 }

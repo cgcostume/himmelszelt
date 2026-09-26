@@ -14,16 +14,19 @@
  */
 import atmosphere from "./atmosphere.wgsl";
 import common from "./common.wgsl";
+import exposure from "./exposure.comp.wgsl";
 import lut from "./lut.wgsl";
-import multiscattering from "./multiscattering.wgsl";
+import multiscattering from "./multiscattering.comp.wgsl";
 import quality from "./quality.wgsl";
 import raymarch from "./raymarch.wgsl";
 import sampling from "./sampling.wgsl";
-import sky from "./sky.wgsl";
-import skyview from "./skyview.wgsl";
-import transmittance from "./transmittance.wgsl";
+import sky from "./sky.comp.wgsl";
+import skyview from "./skyview.comp.wgsl";
+import transmittance from "./transmittance.comp.wgsl";
 
-export { atmosphere, common, lut, multiscattering, quality, raymarch, sampling, sky, skyview, transmittance };
+export { skyOutput } from "./output.js";
+
+export { atmosphere, common, exposure, lut, multiscattering, quality, raymarch, sampling, sky, skyview, transmittance };
 
 /** The composable pieces, in the order WGSL needs them declared. No bindings, no entry points. */
 export const scattering = [atmosphere, common, lut, sampling, raymarch].join("\n");

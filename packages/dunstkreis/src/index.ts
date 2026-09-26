@@ -17,10 +17,20 @@ export type {
 } from "./model.js";
 export {
     atmosphereTopRadiusKm,
+    luminanceScale,
     DEFAULT_ATMOSPHERE_MODEL,
     DEFAULT_TEXTURE_CONFIG,
     OSGHIMMEL_ATMOSPHERE_MODEL,
 } from "./model.js";
+
+// Exposure in EV100, for the sky in cd/m².
+export type { AutoExposureKey } from "./exposure.js";
+export {
+    autoExposureCompensation,
+    DEFAULT_AUTO_EXPOSURE_KEYS,
+    ev100FromLuminance,
+    exposureFromEV100,
+} from "./exposure.js";
 
 // Packing the model into the DkAtmosphere uniform block the shaders take.
 export { ATMOSPHERE_UNIFORM_SIZE, atmosphereUniformData } from "./uniforms.js";

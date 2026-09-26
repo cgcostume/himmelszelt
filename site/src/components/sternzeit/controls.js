@@ -10,16 +10,18 @@ const LATLONG_DECIMALS = 7;
 const dateOf = (jd) => toDate(fromJulianDay(jd));
 const julianDayOf = (date) => julianDayUT(fromDate(date));
 
-// Days, weeks, months and years step on the viewer's calendar, keeping the clock time (across daylight saving time too);
-// a month from 31 January is the last of February.
+// Days, weeks, months and years step in UT, so time flows on evenly: across daylight saving time the clock shows an
+// hour more or less instead of the sky jumping. A month from 31 January is the last of February.
 function stepCalendar(jd, unit, sign) {
     const date = dateOf(jd);
-    if (unit === "day" || unit === "week") date.setDate(date.getDate() + sign * (unit === "week" ? 7 : 1));
+    if (unit === "day" || unit === "week") date.setUTCDate(date.getUTCDate() + sign * (unit === "week" ? 7 : 1));
     else {
-        const day = date.getDate();
-        date.setDate(1);
-        date.setMonth(date.getMonth() + sign * (unit === "year" ? 12 : 1));
-        date.setDate(Math.min(day, new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()));
+        const day = date.getUTCDate();
+        date.setUTCDate(1);
+        date.setUTCMonth(date.getUTCMonth() + sign * (unit === "year" ? 12 : 1));
+        date.setUTCDate(
+            Math.min(day, new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate()),
+        );
     }
     return julianDayOf(date);
 }

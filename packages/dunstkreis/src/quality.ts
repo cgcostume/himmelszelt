@@ -16,11 +16,12 @@ export interface QualityConstants {
     DK_SAMPLES_MULTI_SCATTERING: number;
     DK_SAMPLES_SKY_VIEW: number;
     /** WebGPU takes booleans as 0 or 1 in the `constants` record. */
+    DK_TONE_MAP: number;
     DK_DITHER: number;
     DK_DEBUG_GRID: number;
 }
 
-/** osgHimmel's sample counts, fewer for the transmittance, with dithering on and the debug overlay off. */
+/** osgHimmel's sample counts, fewer for the transmittance, tone mapped and dithered, without the debug overlay. */
 export const DEFAULT_QUALITY: QualityConstants = {
     DK_SAMPLES_TRANSMITTANCE: 100,
     DK_SAMPLES_INSCATTER: 50,
@@ -28,6 +29,7 @@ export const DEFAULT_QUALITY: QualityConstants = {
     DK_SAMPLES_INSCATTER_SPHERICAL: 16,
     DK_SAMPLES_MULTI_SCATTERING: 20,
     DK_SAMPLES_SKY_VIEW: 30,
+    DK_TONE_MAP: 1,
     DK_DITHER: 1,
     DK_DEBUG_GRID: 0,
 };
@@ -41,7 +43,7 @@ export const DEFAULT_QUALITY: QualityConstants = {
  */
 export function pipelineConstants(
     config: PrecomputedTextureConfig,
-    options: { dither?: boolean; debugGrid?: boolean } = {},
+    options: { toneMap?: boolean; dither?: boolean; debugGrid?: boolean } = {},
 ): QualityConstants {
     const { integralSamples } = config;
 
@@ -52,6 +54,7 @@ export function pipelineConstants(
         DK_SAMPLES_INSCATTER_SPHERICAL: integralSamples.inscatterSpherical,
         DK_SAMPLES_MULTI_SCATTERING: integralSamples.multiScattering,
         DK_SAMPLES_SKY_VIEW: integralSamples.skyView,
+        DK_TONE_MAP: options.toneMap === false ? 0 : 1,
         DK_DITHER: options.dither === false ? 0 : 1,
         DK_DEBUG_GRID: options.debugGrid ? 1 : 0,
     };

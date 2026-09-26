@@ -46,8 +46,14 @@ async function setup() {
     }
     const device = await adapter.requestDevice();
     const context = canvas.getContext("webgpu");
-    const format = navigator.gpu.getPreferredCanvasFormat();
-    context.configure({ device, format, alphaMode: "opaque" });
+    // The sky is written by a compute pass, straight into the canvas: rgba8unorm, which storage textures take everywhere.
+    const format = "rgba8unorm";
+    context.configure({
+        device,
+        format,
+        alphaMode: "opaque",
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.STORAGE_BINDING,
+    });
     // Which GPU, for the timings: a fallback adapter renders on the CPU, a hundred times slower.
     const { vendor, architecture, description } = adapter.info ?? {};
     const name = description || [vendor, architecture].filter(Boolean).join(" ") || "unknown GPU";
@@ -173,18 +179,33 @@ function render() {
         observerHeightM: state.heightM,
         inverseViewProjection: inverseViewProjection(basis),
         projectionDistance: basis.d,
-        exposure: 10 ** Number(field("exposure").value),
+        ev100: evOfSlider(),
+        autoExposure: pressed("auto"),
     });
 
     const encoder = gpu.device.createCommandEncoder();
-    const renderPass = encoder.beginRenderPass({
-        colorAttachments: [{ view: gpu.context.getCurrentTexture().createView(), loadOp: "clear", storeOp: "store" }],
-    });
-    pass.encode(renderPass);
-    renderPass.end();
+    pass.encode(encoder, gpu.context.getCurrentTexture());
     gpu.device.queue.submit([encoder.finish()]);
     const submitted = performance.now();
     showTiming(astronomyMs, submitted - skyStarted, submitted);
+    showExposure();
+}
+
+// The slider runs brighter to the right, so it holds minus the EV100: a lower EV lets in more light.
+const evOfSlider = () => -Number(field("exposure").value);
+
+// Metered, the slider follows the light meter and waits; by hand, it sets the exposure.
+function showExposure() {
+    const slider = field("exposure");
+    slider.disabled = pressed("auto");
+    if (!pressed("auto")) {
+        field("ev").textContent = evOfSlider().toFixed(1);
+        return;
+    }
+    pass.meteredEV100().then((ev100) => {
+        slider.value = String(-ev100);
+        field("ev").textContent = `${ev100.toFixed(1)} metered`;
+    });
 }
 
 if (gpu) {
@@ -192,7 +213,7 @@ if (gpu) {
     onChange(requestRender);
     new ResizeObserver(requestRender).observe(canvas);
     field("exposure").addEventListener("input", requestRender);
-    for (const name of ["lock", "grid", "refraction"]) {
+    for (const name of ["auto", "lock", "grid", "refraction"]) {
         field(name).addEventListener("click", async () => {
             field(name).setAttribute("aria-pressed", String(!pressed(name)));
             if (name === "refraction") table = await precompute(pressed("refraction"));

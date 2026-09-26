@@ -1,7 +1,7 @@
 // Hillaire's sky-view LUT, recomputed per frame. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`,
 // `sampling.wgsl`, `raymarch.wgsl` and `quality.wgsl`. A pass, so it declares its bindings.
 //
-// Cheap enough to rebuild every frame (a 192x108 table, 30 steps each) and it turns the render pass into a
+// Cheap enough to rebuild every frame (a 192x108 table, 30 steps each) and it turns the sky pass into a
 // single texture fetch per pixel. The sun's position is baked into it, so it has to follow the sun; the
 // transmittance and multiple-scattering tables above it do not, and are only rebuilt when the model changes.
 
@@ -48,8 +48,9 @@ fn dkPrecomputeSkyView(@builtin(global_invocation_id) id: vec3u) {
         a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, vec3f(0.0, 0.0, 1.0), h, direction, sunDirection,
         DK_SAMPLES_SKY_VIEW, false,
     );
-    // Alpha holds how far the ray bent on its way out, as the sine of the angle: the render pass turns the view ray by
+    // Alpha holds how far the ray bent on its way out, as the sine of the angle: the sky pass turns the view ray by
     // it to find where the sun disc shows. Nothing for a ray ending on the ground.
     let bend = select(length(cross(direction, ray.direction)), 0.0, ray.hitsGround);
-    textureStore(dkSkyViewOut, vec2i(id.xy), vec4f(ray.luminance, bend));
+    // In cd/m², which half floats hold from 6e-5, deep into twilight, up to 65504, above the sky around the sun.
+    textureStore(dkSkyViewOut, vec2i(id.xy), vec4f(min(ray.luminance, vec3f(65504.0)), bend));
 }

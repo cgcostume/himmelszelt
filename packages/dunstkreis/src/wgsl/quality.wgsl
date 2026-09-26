@@ -27,9 +27,14 @@ override DK_SAMPLES_MULTI_SCATTERING: u32 = 20u;
 // Raymarch steps for Hillaire's per-frame sky-view LUT. The only one of these on the per-frame path.
 override DK_SAMPLES_SKY_VIEW: u32 = 30u;
 
-// Whether the render pass dithers its output: grain of one 8-bit step against the bands smooth gradients show on an
+// Whether the sky pass tone maps its output for a display: exposed, compressed into [0, 1] and sRGB encoded, for an
+// 8-bit target. Off, it writes the exposed luminance itself, linear and unclamped, for a float target and a renderer
+// that tone maps the whole frame itself.
+override DK_TONE_MAP: bool = true;
+
+// Whether the sky pass dithers its output: grain of one 8-bit step against the bands smooth gradients show on an
 // 8-bit target. Off for a float target, which has no such steps.
 override DK_DITHER: bool = true;
 
-// Whether the render pass draws the debug overlay: altitude lines, the compass directions and a ring around the Sun.
+// Whether the sky pass draws the debug overlay: altitude lines, the compass directions and a ring around the Sun.
 override DK_DEBUG_GRID: bool = false;

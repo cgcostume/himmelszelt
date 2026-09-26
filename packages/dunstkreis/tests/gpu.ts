@@ -15,12 +15,17 @@
 import { readFileSync } from "node:fs";
 
 /**
- * Reads a shader by name from `src/wgsl/`. The tests load the `.wgsl` files directly rather than importing
- * the `src/wgsl/*.ts` wrappers, because those go through the rolldown plugin that inlines them and the test
- * runner has no equivalent. Same bytes either way, so this still tests the shipped shader.
+ * Reads a shader by name from `src/wgsl/`, a compute pass by its `.comp.wgsl`. The tests load the files directly rather
+ * than importing the `src/wgsl/*.ts` wrappers, because those go through the rolldown plugin that inlines them and the
+ * test runner has no equivalent. Same bytes either way, so this still tests the shipped shader.
  */
 export function wgslSource(name: string): string {
-    return readFileSync(new URL(`../src/wgsl/${name}.wgsl`, import.meta.url), "utf8");
+    const read = (file: string) => readFileSync(new URL(`../src/wgsl/${file}`, import.meta.url), "utf8");
+    try {
+        return read(`${name}.wgsl`);
+    } catch {
+        return read(`${name}.comp.wgsl`);
+    }
 }
 
 let devicePromise: Promise<GPUDevice | null> | undefined;

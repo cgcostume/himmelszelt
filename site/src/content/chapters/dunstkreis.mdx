@@ -3,8 +3,15 @@ title: dunstkreis
 package: "@himmelszelt/dunstkreis"
 summary: "Why the sky is blue and the sunset red, computed on the GPU."
 order: 2
+references:
+    - bennett1982
+    - edlen1966
+    - kopp2011
+    - lagarde2014
+    - narkowicz2016
 ---
 
+import Cite from "../../components/Cite.astro";
 import Controls from "../../components/sternzeit/Controls.astro";
 import Planned from "../../components/Planned.astro";
 import Sky from "../../components/dunstkreis/Sky.astro";
@@ -59,6 +66,27 @@ still to come.
 
 ## Bent light
 
+Air slows light down a little, and denser air more: its refractive index exceeds 1 by 2.778 × 10⁻⁴ at the standard
+atmosphere's 15 °C and 1013 hPa <Cite id="edlen1966" />, in proportion to its density. So a ray crossing the atmosphere
+curves towards the denser air below it, and what reaches the eye from the horizon left the atmosphere a little lower.
+Astronomers usually take this from a fit, like Bennett's for the apparent altitude <Cite id="bennett1982" />, which
+sternzeit uses too. It holds for an observer on the ground looking up, and nowhere else.
+
+dunstkreis traces it instead, through the same air it scatters light in: the refractive index follows the density of the
+Rayleigh layer, and every ray bends in the same steps that integrate its scattering, the view rays as well as the
+sunlight reaching each point in the air. Along a bent ray in an atmosphere that is the same in every direction, n r
+sin(z) stays constant, with r the distance from the planet's center and z the angle from the vertical. That alone
+decides where the ground starts, which also lifts the visible horizon: from 10 km up, by 0.2°. The same model covers an
+observer on the ground, one high up looking down, and one in orbit looking through the planet's rim, where a grazing ray
+crosses the air twice and bends by more than a degree.
+
+Near the ground the traced refraction lands within a few percent of Bennett's above 5°. At the horizon it is some 10%
+larger: the model's air thins out with one scale height, the real air more slowly near the ground, where the
+temperature falls with height. The tables store the result: the sky-view table, indexed by where the ray is seen, how
+far it bent; the transmittance table, indexed by where the light comes from, how much of it arrives. So the sky is
+looked up, and the sun disc flattens near the horizon and stays in view after it has geometrically set, without either
+being a special case.
+
 <Planned title="With and without refraction">
     The setting Sun side by side, bent and unbent, zoomed in on the horizon: the disc flattened, still in view while
     geometrically already below the horizon, and the altitude grid to measure it against.
@@ -108,6 +136,35 @@ still to come.
 </Planned>
 
 ## From light to pixels
+
+The sky comes out in physical units: luminance, in candela per square meter. The model's sun has the spectrum
+Bruneton's tables use and the illuminance it has above the atmosphere, 128 000 lux: the solar constant of
+1361 W/m² <Cite id="kopp2011" /> times about 94 lumens per watt for sunlight. That puts a clear midday sky at some
+thousands of cd/m², the sun's disc near 1.6 × 10⁹, and the sky at the end of twilight around a thousandth.
+
+The sky-view table holds cd/m² as well, in 16-bit floats. They keep full precision from 6 × 10⁻⁵ cd/m², deep into
+twilight, up to 65 504, above even the bright sky around the sun. Below that range the values coarsen into steps, which
+an exposure for the night would magnify into colored blocks.
+
+Exposure is set in EV100, as on a camera and in engines like Frostbite and Unreal <Cite id="lagarde2014" />: the
+luminance that just saturates is 1.2 × 2^EV100 cd/m². A sunny day is about EV 15, an overcast one 10, twilight 0,
+moonlight −6. Since the sky is in cd/m², it takes the same exposure as any other scene built on this convention, and
+looks the same under it.
+
+Automatic exposure is an option, for a renderer without an exposure of its own, or to follow day into night. A light
+meter on the GPU reads the sky-view table in directions spread evenly over the sky above the horizon, and takes the
+geometric mean of their luminance, as a camera's averaging meter does: EV100 = log2(L · 100 / 12.5). The sky pass
+reads that straight from the meter's buffer. Metering the table rather than the image means the reading does not change
+as the camera turns, and the sun's disc, which is not in the table, does not darken everything. The meter reads again
+whenever the table is rebuilt; the exposure follows at once, without the eye's slow adaptation. The day meters around
+EV 14, a sunset around 12, and twilight follows down to 8, where it stops: exposed like day, the night would look like
+day, only noisier. On top, a ramp over the day shapes it: compensations at sun altitudes, which by default keep the
+night, the blue hour and the minutes around sunrise and sunset darker than metered, the sunset a little brighter
+than the sunrise, and noon as metered.
+
+For a display, the pass then tone maps: exposed, compressed into the display's range by Narkowicz's fit of the ACES
+filmic curve <Cite id="narkowicz2016" />, and encoded for sRGB, dithered against banding. A renderer with its own HDR
+pipeline turns that off and gets the exposed luminance itself, linear and unclamped, for a float target.
 
 <Planned title="Exposure and tone mapping">
     The eye adapts across some fourteen orders of magnitude, from starlight to the midday Sun, and a screen shows about

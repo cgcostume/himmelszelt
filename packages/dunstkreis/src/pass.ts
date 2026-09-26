@@ -1,3 +1,4 @@
+import type { AutoExposureKey } from "./exposure.js";
 import type { AtmosphereModel, PrecomputedTextureConfig } from "./model.js";
 
 /**
@@ -38,8 +39,30 @@ export interface SkyParams {
      * scale; widen its field of view along with this.
      */
     projectionDistance: number;
-    /** Tone mapping exposure, applied to the physical radiance the model outputs. */
-    exposure: number;
+    /**
+     * Exposure in EV100, for the sky in cd/m²: about 15 for a sunny day, 10 overcast, 0 in twilight, -6 by moonlight.
+     * The same scale as a camera's or another engine's, so a scene exposed alike looks alike. Unused when metered.
+     */
+    ev100: number;
+    /**
+     * Expose by a light meter instead: the geometric mean luminance of the sky above the horizon, measured on the GPU
+     * whenever the sky-view table is rebuilt, and read by the sky pass without a round trip to the CPU. For a renderer
+     * without its own exposure, or to follow day into night.
+     */
+    autoExposure: boolean;
+    /**
+     * The EV100s metering may expose with, after compensation, [8, 20] by default. The lower bound keeps night dark:
+     * exposed like day, a night sky would look like one. The day meters around 14, a sunset around 12, and twilight
+     * follows down to 8.
+     */
+    autoExposureRange: readonly [number, number];
+    /**
+     * The metered exposure's ramp over the day: compensations at sun altitudes, for mornings and evenings apart if
+     * wanted. `DEFAULT_AUTO_EXPOSURE_KEYS` by default; empty for the meter's reading as it is.
+     */
+    autoExposureKeys: readonly AutoExposureKey[];
+    /** Added to the metered exposure on top of the keys, in EV: +1 is twice as bright. */
+    exposureCompensation: number;
     /** The Sun's apparent angular diameter, in degrees, as `@himmelszelt/sternzeit`'s `sun.apparentAngularDiameter`
      *  returns it. About 0.53. */
     sunAngularDiameter: number;
@@ -49,17 +72,22 @@ export interface SkyParams {
 }
 
 /**
- * A sky pass. Records into a render pass the *caller* owns and has already begun, so that the sky composes
- * with whatever else is being drawn (moon, stars, clouds) under the caller's own blending and depth rules.
- * This package never creates a device, a canvas, a context, a render pass or a swap chain.
+ * A sky pass: a compute pass that writes every pixel of a target the caller owns, with no rasterization. It goes
+ * first, as the background the moon, stars, clouds and the rest of the frame are drawn over. This package never
+ * creates a device, a canvas, a context or a swap chain.
  */
 export interface SkyPass {
     /**
-     * The table the render pass reads, rebuilt by `update()`. Exposed so it can be inspected or exported;
+     * The table the sky pass reads, rebuilt by `update()`. Exposed so it can be inspected or exported;
      * nothing in a normal render path needs it.
      */
     readonly skyViewTexture: GPUTexture;
     update(params: Partial<SkyParams>): void;
-    encode(pass: GPURenderPassEncoder): void;
+    /** The EV100 `autoExposure` exposes with: the light meter's latest reading, read back from the GPU, compensated and
+     *  held within `autoExposureRange`. */
+    meteredEV100(): Promise<number>;
+    /** Records the pass into `encoder`, writing all of `target`, which needs `STORAGE_BINDING` usage and the format
+     *  the pass was created for. */
+    encode(encoder: GPUCommandEncoder, target: GPUTexture): void;
     destroy(): void;
 }

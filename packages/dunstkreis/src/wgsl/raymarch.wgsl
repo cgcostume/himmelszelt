@@ -1,6 +1,6 @@
 // Raymarching the sky along one view ray, bent by the air. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl` and
 // `sampling.wgsl`. Binding-free like those: the tables come in as arguments. The sky-view pass fills its table with it,
-// and the render pass calls it per pixel for an observer above the atmosphere, where the table does not reach.
+// and the sky pass calls it per pixel for an observer above the atmosphere, where the table does not reach.
 
 struct DkSkyRay {
     // Scattered light reaching the start of the ray.

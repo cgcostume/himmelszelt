@@ -1,4 +1,4 @@
-import { type AtmosphereModel, atmosphereTopRadiusKm } from "./model.js";
+import { type AtmosphereModel, atmosphereTopRadiusKm, luminanceScale } from "./model.js";
 
 /**
  * Size of the `DkAtmosphere` uniform block, in bytes. Scalars are packed into the tails of the vec3s, which
@@ -28,7 +28,10 @@ export function atmosphereUniformData(model: AtmosphereModel, target?: Float32Ar
     data.set(model.ozone.betaAbsorption, 12);
     data[15] = model.rayleigh.scaleHeightKm;
 
-    data.set(model.solarIrradiance, 16);
+    data.set(
+        model.solarIrradiance.map((e) => e * luminanceScale(model)),
+        16,
+    );
     data[19] = model.mie.scaleHeightKm;
 
     data[20] = model.ozone.centerAltitudeKm;
