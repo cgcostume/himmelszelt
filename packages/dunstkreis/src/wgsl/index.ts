@@ -3,8 +3,8 @@
  * instead of using this package's passes at all.
  *
  * The snippets are deliberately binding-free: `common` takes the `DkAtmosphere` struct from `atmosphere` by
- * value rather than reading a `var<uniform>`, and `refraction` needs neither. So composing is concatenation
- * plus declaring the binding yourself, and nothing here can collide with your own group/binding indices.
+ * value rather than reading a `var<uniform>`, so composing is concatenation plus declaring the binding yourself,
+ * and nothing here can collide with your own group/binding indices.
  * Fill the uniform buffer with `atmosphereUniformData()`. Quality knobs are separate again: `quality` holds
  * WGSL `override` declarations, set at pipeline creation via `pipelineConstants()`, so that loop bounds stay
  * compile-time constants and an unused feature compiles out rather than branching.
@@ -18,25 +18,12 @@ import lut from "./lut.wgsl";
 import multiscattering from "./multiscattering.wgsl";
 import quality from "./quality.wgsl";
 import raymarch from "./raymarch.wgsl";
-import refraction from "./refraction.wgsl";
 import sampling from "./sampling.wgsl";
 import sky from "./sky.wgsl";
 import skyview from "./skyview.wgsl";
 import transmittance from "./transmittance.wgsl";
 
-export {
-    atmosphere,
-    common,
-    lut,
-    multiscattering,
-    quality,
-    raymarch,
-    refraction,
-    sampling,
-    sky,
-    skyview,
-    transmittance,
-};
+export { atmosphere, common, lut, multiscattering, quality, raymarch, sampling, sky, skyview, transmittance };
 
 /** The composable pieces, in the order WGSL needs them declared. No bindings, no entry points. */
 export const scattering = [atmosphere, common, lut, sampling, raymarch].join("\n");

@@ -7,30 +7,48 @@
 @group(0) @binding(0) var<uniform> dkAtmosphere: DkAtmosphere;
 @group(0) @binding(1) var dkTransmittanceOut: texture_storage_2d<rgba16float, write>;
 
-// Optical depth from a point at (r, mu) to the top of the atmosphere, integrated with the trapezoid rule.
-// DK_SAMPLES_TRANSMITTANCE is an override, so this loop bound is a compile-time constant and unrollable.
-fn dkOpticalDepthToTop(a: DkAtmosphere, r: f32, mu: f32) -> vec3f {
-    let distance = dkDistanceToTopAtmosphereBoundary(a, r, mu);
-    let steps = f32(DK_SAMPLES_TRANSMITTANCE);
-
-    var depth = vec3f(0.0);
-    for (var i = 0u; i <= DK_SAMPLES_TRANSMITTANCE; i = i + 1u) {
-        let t = f32(i) / steps * distance;
-
-        // Radius at the sample, by the law of cosines along the ray. Clamped because the expression can dip
-        // marginally below Rg at grazing angles purely through rounding.
-        let ri = max(sqrt(max(t * t + 2.0 * r * mu * t + r * r, 0.0)), a.Rg);
-        let weight = select(1.0, 0.5, i == 0u || i == DK_SAMPLES_TRANSMITTANCE);
-
-        depth = depth + dkExtinction(a, ri - a.Rg) * weight;
-    }
-
-    return depth * (distance / steps);
+struct DkTraceToTop {
+    transmittance: vec3f,
+    // The cosine of the direction the ray leaves the atmosphere in, in its start's frame.
+    exitMu: f32,
 }
 
-/** Fraction of light surviving the path from (r, mu) to the top of the atmosphere. Beer-Lambert. */
-fn dkComputeTransmittanceToTop(a: DkAtmosphere, r: f32, mu: f32) -> vec3f {
-    return exp(-dkOpticalDepthToTop(a, r, mu));
+// Follows a ray from altitude h with the local cosine mu up and out of the atmosphere, bent by the air, and integrates
+// its optical depth by the midpoint rule. DK_SAMPLES_TRANSMITTANCE is an override, so the loop bound is a constant.
+fn dkTraceToTop(a: DkAtmosphere, h: f32, mu: f32) -> DkTraceToTop {
+    var path = dkPathStart(mu);
+    var depth = vec3f(0.0);
+    for (var i = 0u; i < DK_SAMPLES_TRANSMITTANCE; i = i + 1u) {
+        let ds = dkPathRemaining(a, h, path, false) / f32(DK_SAMPLES_TRANSMITTANCE - i);
+        let step = dkPathAdvance(a, h, path, ds);
+        depth = depth + dkExtinction(a, dkPathAltitude(a, h, step.middle.position)) * ds;
+        path = step.next;
+    }
+    return DkTraceToTop(exp(-depth), path.direction.y);
+}
+
+// Sunlight arriving from the true direction trueMu, at altitude h: along the ray that leaves the atmosphere in that
+// direction. Bent rays arrive a little higher than they left, so the local direction is found by bisection, between
+// trueMu and the margin above it. Below the lowest ray that still clears the ground, the planet hides the sun.
+fn dkTransmittanceTowards(a: DkAtmosphere, h: f32, trueMu: f32) -> vec3f {
+    let horizon = dkHorizonMu(a, h) + 1e-6;
+    if (a.refractivity <= 0.0) {
+        return select(vec3f(0.0), dkTraceToTop(a, h, trueMu).transmittance, trueMu >= horizon);
+    }
+    if (dkTraceToTop(a, h, horizon).exitMu > trueMu) {
+        return vec3f(0.0);
+    }
+    var low = max(trueMu, horizon);
+    var high = min(trueMu + dkRefractionMargin(a), 1.0);
+    for (var i = 0u; i < 16u; i = i + 1u) {
+        let middle = 0.5 * (low + high);
+        if (dkTraceToTop(a, h, middle).exitMu < trueMu) {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    return dkTraceToTop(a, h, 0.5 * (low + high)).transmittance;
 }
 
 @compute @workgroup_size(8, 8)
@@ -43,6 +61,6 @@ fn dkPrecomputeTransmittance(@builtin(global_invocation_id) id: vec3u) {
     let uv = (vec2f(f32(id.x), f32(id.y)) + 0.5) / size;
     let rMu = dkTransmittanceRMu(dkAtmosphere, uv, size);
 
-    let transmittance = dkComputeTransmittanceToTop(dkAtmosphere, rMu.x, rMu.y);
+    let transmittance = dkTransmittanceTowards(dkAtmosphere, rMu.z, rMu.y);
     textureStore(dkTransmittanceOut, vec2i(id.xy), vec4f(transmittance, 1.0));
 }

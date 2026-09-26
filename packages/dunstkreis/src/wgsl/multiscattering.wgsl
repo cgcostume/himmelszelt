@@ -27,39 +27,31 @@ struct DkMultiScatterSample {
 fn dkIntegrateMultiScattering(a: DkAtmosphere, h: f32, direction: vec3f, sunDirection: vec3f)
     -> DkMultiScatterSample {
     let isotropicPhase = 1.0 / (4.0 * DK_PI);
-
-    let r = a.Rg + h;
-    let origin = vec3f(0.0, 0.0, r);
-    let mu = direction.z;
-
-    let hitsGround = dkIntersectsGround(a, h, mu);
-    var tMax = dkDistanceToTopAtmosphereBoundary(a, r, mu);
-    if (hitsGround) {
-        tMax = dkDistanceToBottomAtmosphereBoundary(a, h, mu);
-    }
+    let up = vec3f(0.0, 0.0, 1.0);
+    let horizontal = dkPathHorizontal(up, direction);
+    let hitsGround = dkIntersectsGround(a, h, direction.z);
 
     var result: DkMultiScatterSample;
     result.luminance = vec3f(0.0);
     result.transfer = vec3f(0.0);
 
+    var path = dkPathStart(direction.z);
     var throughput = vec3f(1.0);
-    let dt = tMax / f32(DK_SAMPLES_MULTI_SCATTERING);
-
     for (var i = 0u; i < DK_SAMPLES_MULTI_SCATTERING; i = i + 1u) {
-        let t = (f32(i) + 0.5) * dt;
-        let altitude = dkAltitudeAlongRay(a, h, mu, t);
-        let ri = a.Rg + altitude;
-        let muS = clamp(dot(origin + direction * t, sunDirection) / ri, -1.0, 1.0);
+        let ds = dkPathRemaining(a, h, path, hitsGround) / f32(DK_SAMPLES_MULTI_SCATTERING - i);
+        let step = dkPathAdvance(a, h, path, ds);
+        path = step.next;
+
+        let altitude = dkPathAltitude(a, h, step.middle.position);
+        let pointUp = dkPathToWorld(dkPathUp(a, h, step.middle.position), up, horizontal);
+        let muS = clamp(dot(pointUp, sunDirection), -1.0, 1.0);
 
         let scattering = a.betaR * dkDensityRayleigh(a, altitude) + a.betaMSca * dkDensityMie(a, altitude);
         let extinction = max(dkExtinction(a, altitude), vec3f(1e-9));
-        let stepTransmittance = exp(-extinction * dt);
+        let stepTransmittance = exp(-extinction * ds);
 
-        // The planet itself shadows the sample when the sun is below its local horizon.
-        var sunTransmittance = vec3f(0.0);
-        if (!dkIntersectsGround(a, altitude, muS)) {
-            sunTransmittance = dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, ri, muS);
-        }
+        // Zero where the planet shadows the sample, which the table knows.
+        let sunTransmittance = dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, a.Rg + altitude, muS);
 
         // Integrated across the step analytically rather than as a point sample, so few steps suffice. The
         // sunlight scatters towards the ray with the isotropic phase; the transfer term is light scattered
@@ -73,8 +65,8 @@ fn dkIntegrateMultiScattering(a: DkAtmosphere, h: f32, direction: vec3f, sunDire
 
     // Light that reached the ground bounces back up, diffusely and with the ground's albedo.
     if (hitsGround) {
-        let groundPosition = origin + direction * tMax;
-        let muSGround = clamp(dot(normalize(groundPosition), sunDirection), -1.0, 1.0);
+        let groundUp = dkPathToWorld(dkPathUp(a, h, path.position), up, horizontal);
+        let muSGround = clamp(dot(groundUp, sunDirection), -1.0, 1.0);
         if (muSGround > 0.0) {
             let toSun = dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, a.Rg, muSGround);
             result.luminance = result.luminance

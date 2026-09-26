@@ -1,3 +1,5 @@
+import { airRefractivity } from "./refraction.js";
+
 /**
  * Geometry of the planet and its atmosphere. The atmosphere is the shell between `groundRadiusKm` and
  * `groundRadiusKm + thicknessKm`. The observer can be inside it or above it.
@@ -57,6 +59,11 @@ export interface AtmosphereModel {
         /** Ozone absorption coefficient. Ozone only absorbs, so there is no scattering counterpart. */
         betaAbsorption: readonly [number, number, number];
     };
+    /**
+     * Refractivity n - 1 of the air on the ground, see `airRefractivity`. It falls off with the Rayleigh layer's
+     * density, and every ray bends by it: 0 leaves them straight.
+     */
+    refractivity: number;
 }
 
 /**
@@ -91,6 +98,7 @@ export const DEFAULT_ATMOSPHERE_MODEL: AtmosphereModel = {
         widthKm: 30,
         betaAbsorption: [6.5e-4, 1.881e-3, 8.5e-5],
     },
+    refractivity: airRefractivity(),
 };
 
 /**
@@ -146,7 +154,7 @@ export const DEFAULT_TEXTURE_CONFIG: PrecomputedTextureConfig = {
     multiScattering: { width: 32, height: 32 },
     skyView: { width: 192, height: 108 },
     integralSamples: {
-        transmittance: 500,
+        transmittance: 100,
         inscatter: 50,
         irradiance: 32,
         inscatterSpherical: 16,

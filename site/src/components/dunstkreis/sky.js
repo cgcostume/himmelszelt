@@ -1,4 +1,9 @@
-import { apparentDirection, createSkyPassApprox, precomputeAtmosphereApprox } from "@himmelszelt/dunstkreis/approx";
+import {
+    apparentDirection,
+    createSkyPassApprox,
+    DEFAULT_ATMOSPHERE_MODEL,
+    precomputeAtmosphereApprox,
+} from "@himmelszelt/dunstkreis/approx";
 import { fromJulianDay, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
 import { onDemand } from "../frame.js";
 import { COMPASS } from "../sternzeit/figure.js";
@@ -43,13 +48,23 @@ async function setup() {
     const context = canvas.getContext("webgpu");
     const format = navigator.gpu.getPreferredCanvasFormat();
     context.configure({ device, format, alphaMode: "opaque" });
-    const started = performance.now();
-    const luts = await precomputeAtmosphereApprox(device);
     // Which GPU, for the timings: a fallback adapter renders on the CPU, a hundred times slower.
     const { vendor, architecture, description } = adapter.info ?? {};
     const name = description || [vendor, architecture].filter(Boolean).join(" ") || "unknown GPU";
     const adapterName = adapter.isFallbackAdapter ? `${name}, a CPU fallback` : name;
-    return { device, context, format, luts, adapterName, precomputeMs: performance.now() - started };
+    return { device, context, format, adapterName };
+}
+
+// Refraction is part of the model, so switching it recomputes the tables; both sets are kept once computed.
+const MODELS = { true: DEFAULT_ATMOSPHERE_MODEL, false: { ...DEFAULT_ATMOSPHERE_MODEL, refractivity: 0 } };
+const tables = {};
+
+async function precompute(refraction) {
+    if (tables[refraction]) return tables[refraction];
+    const started = performance.now();
+    const luts = await precomputeAtmosphereApprox(gpu.device, { model: MODELS[refraction] });
+    tables[refraction] = { luts, precomputeMs: performance.now() - started };
+    return tables[refraction];
 }
 
 // Zooming out past 100 degrees bends the perspective into a stereographic fisheye, complete at the widest view of
@@ -107,12 +122,13 @@ function placeCompass(basis, width, height) {
 
 const gpu = await setup();
 let pass = null;
-let passKey = "";
+let passFor = {};
+let table = gpu && (await precompute(true));
 
 // Where the time goes, shown with the grid: the astronomy, the sky pass' own CPU work, and when the GPU was done.
 function showTiming(astronomyMs, skyMs, submitted) {
     const text = (doneMs) =>
-        `${gpu.adapterName} · precompute ${gpu.precomputeMs.toFixed(1)} ms · astronomy ${astronomyMs.toFixed(2)} ms · ` +
+        `${gpu.adapterName} · precompute ${table.precomputeMs.toFixed(1)} ms · astronomy ${astronomyMs.toFixed(2)} ms · ` +
         `sky ${skyMs.toFixed(2)} ms · GPU done after ${doneMs.toFixed(2)} ms`;
     gpu.device.queue.onSubmittedWorkDone().then(() => {
         field("timing").textContent = pressed("grid") ? text(performance.now() - submitted) : "";
@@ -132,10 +148,9 @@ function render() {
     const sunAngularDiameter = sun.apparentAngularDiameter(julianEphemerisDay(time));
     const astronomyMs = performance.now() - started;
 
-    const refraction = pressed("refraction");
     const debugGrid = pressed("grid");
-    // Where the sun shows, lifted by the same refraction the sky uses when that is on.
-    const [x, y, z] = refraction ? apparentDirection(sunDirection, { observerHeightM: state.heightM }) : sunDirection;
+    // Where the sun shows, lifted by the same air the sky is traced through.
+    const [x, y, z] = apparentDirection(sunDirection, table.luts.model, state.heightM);
     field("sun").textContent =
         `Sun ${position.altitude.toFixed(2)}° high (${(Math.asin(z) / DEG).toFixed(2)}° apparent), ` +
         `azimuth ${position.azimuth.toFixed(2)}°`;
@@ -144,11 +159,10 @@ function render() {
         camera.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, Math.asin(z)));
     }
     const skyStarted = performance.now();
-    const key = `${refraction},${debugGrid}`;
-    if (key !== passKey) {
+    if (table.luts !== passFor.luts || debugGrid !== passFor.debugGrid) {
         pass?.destroy();
-        pass = createSkyPassApprox(gpu.device, { luts: gpu.luts, format: gpu.format, refraction, debugGrid });
-        passKey = key;
+        pass = createSkyPassApprox(gpu.device, { luts: table.luts, format: gpu.format, debugGrid });
+        passFor = { luts: table.luts, debugGrid };
     }
 
     const basis = cameraBasis(width / height);
@@ -160,7 +174,6 @@ function render() {
         inverseViewProjection: inverseViewProjection(basis),
         projectionDistance: basis.d,
         exposure: 10 ** Number(field("exposure").value),
-        refraction: refraction ? { observerHeightM: state.heightM } : false,
     });
 
     const encoder = gpu.device.createCommandEncoder();
@@ -180,8 +193,9 @@ if (gpu) {
     new ResizeObserver(requestRender).observe(canvas);
     field("exposure").addEventListener("input", requestRender);
     for (const name of ["lock", "grid", "refraction"]) {
-        field(name).addEventListener("click", () => {
+        field(name).addEventListener("click", async () => {
             field(name).setAttribute("aria-pressed", String(!pressed(name)));
+            if (name === "refraction") table = await precompute(pressed("refraction"));
             requestRender();
         });
     }

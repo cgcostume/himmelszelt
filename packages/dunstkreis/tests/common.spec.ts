@@ -51,7 +51,7 @@ test("the uniform packing matches the DkAtmosphere struct field for field", () =
         "ozoneCenter",
         "ozoneHalfWidth",
         "avgGroundReflectance",
-        "_padding",
+        "refractivity",
     ]);
 
     const data = atmosphereUniformData(model);
@@ -71,7 +71,7 @@ test("the uniform packing matches the DkAtmosphere struct field for field", () =
         ozoneCenter: model.ozone.centerAltitudeKm,
         ozoneHalfWidth: model.ozone.widthKm / 2,
         avgGroundReflectance: model.avgGroundReflectance,
-        _padding: 0,
+        refractivity: model.refractivity,
     };
 
     // Walk the struct applying WGSL's uniform layout rules: vec3f has size 12 but alignment 16, which is
@@ -105,13 +105,13 @@ test("pipelineConstants names exactly the overrides quality.wgsl declares", () =
     expect(provided).toEqual(Object.keys(DEFAULT_QUALITY));
 });
 
-test("pipelineConstants carries the configured sample counts and the refraction switch", () => {
+test("pipelineConstants carries the configured sample counts and the dither switch", () => {
     const constants = pipelineConstants(DEFAULT_TEXTURE_CONFIG);
 
     expect(constants.DK_SAMPLES_TRANSMITTANCE).toBe(DEFAULT_TEXTURE_CONFIG.integralSamples.transmittance);
     expect(constants.DK_SAMPLES_SKY_VIEW).toBe(DEFAULT_TEXTURE_CONFIG.integralSamples.skyView);
-    expect(constants.DK_REFRACTION).toBe(1);
-    expect(pipelineConstants(DEFAULT_TEXTURE_CONFIG, { refraction: false }).DK_REFRACTION).toBe(0);
+    expect(constants.DK_DITHER).toBe(1);
+    expect(pipelineConstants(DEFAULT_TEXTURE_CONFIG, { dither: false }).DK_DITHER).toBe(0);
 });
 
 test("ray-sphere distances are consistent from the ground and from the top", async () => {
@@ -248,14 +248,14 @@ test("overrides reach the shader and specialize it", async () => {
     // This is the mechanism the quality presets and the refraction switch ride on, so that loop bounds stay
     // compile-time constants and a disabled feature leaves no code behind rather than branching per pixel.
     const source = wgslSource("quality");
-    const expression = "vec4f(f32(DK_SAMPLES_SKY_VIEW), select(0.0, 1.0, DK_REFRACTION), 0.0, 0.0)";
+    const expression = "vec4f(f32(DK_SAMPLES_SKY_VIEW), select(0.0, 1.0, DK_DITHER), 0.0, 0.0)";
     const input: [number, number, number, number] = [0, 0, 0, 0];
 
     const [on] = await evaluateWgsl(device, source, expression, [input], {
         constants: pipelineConstants(DEFAULT_TEXTURE_CONFIG),
     });
     const [off] = await evaluateWgsl(device, source, expression, [input], {
-        constants: pipelineConstants(DEFAULT_TEXTURE_CONFIG, { refraction: false }),
+        constants: pipelineConstants(DEFAULT_TEXTURE_CONFIG, { dither: false }),
     });
 
     expect(on?.[0]).toBe(DEFAULT_TEXTURE_CONFIG.integralSamples.skyView);

@@ -1,166 +1,76 @@
 import { earth } from "@himmelszelt/sternzeit";
 import { expect, test } from "@playwright/test";
-import {
-    apparentDirection,
-    atmosphericRefractionFromApparent,
-    refractionAlongRay,
-    refractionThroughAtmosphere,
-    refractViewDirection,
-} from "../src/refraction.js";
-import { evaluateWgsl, gpuDevice, wgslSource } from "./gpu.js";
+import { DEFAULT_ATMOSPHERE_MODEL } from "../src/model.js";
+import { airRefractivity, apparentDirection, refractionAngle } from "../src/refraction.js";
 
-const refraction = wgslSource("refraction");
-const ALTITUDES = [0, 0.25, 0.5, 1, 2, 5, 10, 20, 45, 70, 89, 90];
+const model = DEFAULT_ATMOSPHERE_MODEL;
+const GROUND_M = 0.001;
+const standard = { temperatureC: 15 };
+const bennett = (altitude: number) => earth.atmosphericRefractionFromApparent(altitude, standard);
+const traced = (altitude: number, heightM = GROUND_M) => refractionAngle(model, heightM, altitude) as number;
 
-test("refraction is ~34.5' at the horizon and 0 at the zenith", () => {
-    // More than the Sun's own ~32' apparent diameter, which is why a Sun that looks like it is touching the
-    // horizon has geometrically already set. This is Meeus 16.3, distinct from sternzeit's 16.4 (~29').
-    expect(atmosphericRefractionFromApparent(0) * 60).toBeCloseTo(34.48, 2);
-    expect(atmosphericRefractionFromApparent(90) * 60).toBeCloseTo(0, 6);
+test("air's refractivity is Edlén's at the standard atmosphere and follows its density", () => {
+    expect(airRefractivity()).toBeCloseTo(2.778e-4, 7);
+    expect(airRefractivity(-20)).toBeGreaterThan(airRefractivity(30));
+    expect(airRefractivity(15, 500)).toBeCloseTo(airRefractivity() / 2.0265, 7);
 });
 
-test("refraction is the inverse of sternzeit's true-altitude fit", () => {
-    // The pairing the whole split depends on: sternzeit lifts a true altitude to apparent for consumers
-    // correcting a body position, this package takes an apparent camera ray back to true. Round-tripping must
-    // land where it started. Independent empirical fits, so they agree to arcseconds rather than exactly.
-    for (const trueAltitude of ALTITUDES) {
-        const apparent = trueAltitude + earth.atmosphericRefraction(trueAltitude);
-        const back = apparent - atmosphericRefractionFromApparent(apparent);
+test("traced through the model's air, refraction lands near Bennett's fit", () => {
+    // Above a few degrees only the refractivity on the ground matters, and the two agree to a few percent.
+    for (const altitude of [5, 10, 20, 45, 80])
+        expect(Math.abs(traced(altitude) / bennett(altitude) - 1)).toBeLessThan(0.03);
+    // At the horizon the ray crosses the lowest air, where the model's one scale height makes it denser than the real
+    // one, whose temperature falls with height: some 10% more.
+    expect(traced(0) / bennett(0)).toBeGreaterThan(1);
+    expect(traced(0) / bennett(0)).toBeLessThan(1.12);
+    expect(traced(90)).toBeCloseTo(0, 6);
+});
 
-        expect(Math.abs(back - trueAltitude) * 3600).toBeLessThan(5); // arcseconds
+test("without refractivity, nothing bends", () => {
+    const straight = { ...model, refractivity: 0 };
+    expect(refractionAngle(straight, GROUND_M, 0)).toBeCloseTo(0, 9);
+    expect(apparentDirection([0.6, 0.8, 0], straight, GROUND_M)).toEqual([0.6, 0.8, 0]);
+});
+
+test("the horizon rises above its geometric dip, and the ray there bends out and back in", () => {
+    const heightM = 10_000;
+    const dip = (-Math.acos(6360 / 6370) * 180) / Math.PI;
+    let [low, high] = [dip - 1, dip + 1];
+    for (let i = 0; i < 50; ++i) {
+        const middle = (low + high) / 2;
+        if (refractionAngle(model, heightM, middle) === null) low = middle;
+        else high = middle;
     }
+    // Terrestrial refraction, from the same air: some 7% of the dip, as surveyors' k = 0.13 gives.
+    expect(high - dip).toBeGreaterThan(0.05 * -dip);
+    expect(high - dip).toBeLessThan(0.1 * -dip);
+    // Grazing the ground from up there, the ray crosses the lowest air twice.
+    expect(traced(high + 1e-6, heightM)).toBeGreaterThan(1.5 * traced(0));
 });
 
-test("refraction matches sternzeit's own copy of the same fit exactly", () => {
-    // sternzeit carries a TypeScript twin for GPU-less consumers. Deliberate duplication of a two-line
-    // formula across decoupled packages, so it has to be pinned rather than trusted.
-    for (const altitude of ALTITUDES) {
-        expect(atmosphericRefractionFromApparent(altitude)).toBeCloseTo(
-            earth.atmosphericRefractionFromApparent(altitude),
-            15,
-        );
-    }
+test("from space, a ray grazing the ground bends twice the horizon's, and one through thin air hardly at all", () => {
+    const heightM = 400_000;
+    const limb = (-Math.acos(6360 / 6760) * 180) / Math.PI;
+    expect(traced(limb + 0.05, heightM) / traced(0)).toBeGreaterThan(1.5);
+    expect(traced(limb + 2, heightM)).toBeLessThan(1e-3);
+    expect(traced(10, heightM)).toBe(0);
 });
 
-test("refraction falls off with observer height and rises in colder air", () => {
-    expect(atmosphericRefractionFromApparent(0, { observerHeightM: 1000 }) * 60).toBeCloseTo(34.48 * 0.8882, 1);
-    expect(atmosphericRefractionFromApparent(0, { observerHeightM: 60_000 })).toBeLessThan(1e-3);
-    expect(atmosphericRefractionFromApparent(0, { temperatureC: -20 })).toBeGreaterThan(
-        atmosphericRefractionFromApparent(0, { temperatureC: 30 }),
-    );
-});
-
-test("refractViewDirection lowers rays and flattens the disc near the horizon", () => {
-    const altitudeOf = (d: readonly [number, number, number]) => (Math.asin(d[2]) * 180) / Math.PI;
-    const ray = (altitudeDeg: number): [number, number, number] => {
-        const a = (altitudeDeg * Math.PI) / 180;
-        return [Math.cos(a), 0, Math.sin(a)];
-    };
-
-    // Every ray is lowered, and the returned direction stays a unit vector.
-    for (const a of ALTITUDES) {
-        const warped = refractViewDirection(ray(a));
-        expect(Math.hypot(...warped)).toBeCloseTo(1, 6);
-        expect(altitudeOf(warped)).toBeLessThanOrEqual(a + 1e-9);
-    }
-
-    // The flattening, which the original never had. The warp runs apparent -> true, and because dR/da is
-    // steep near the horizon it spreads an apparent span into a wider true one. Inverted, that is the visible
-    // effect: the Sun's ~32' of *true* angular size is squeezed into less than 32' of apparent sky, so the
-    // disc reads as an ellipse. Measured here through the warp itself rather than through its inverse.
-    const sunRadius = 32 / 60 / 2;
-    const flattening = (centre: number) =>
-        (2 * sunRadius) /
-        (altitudeOf(refractViewDirection(ray(centre + sunRadius))) -
-            altitudeOf(refractViewDirection(ray(centre - sunRadius))));
-
-    expect(flattening(0.5)).toBeCloseTo(0.856, 3); // at the horizon: ~14% flatter than it is wide
-    expect(flattening(45)).toBeGreaterThan(0.999); // high up: essentially circular
-    expect(flattening(0.5)).toBeLessThan(flattening(10)); // and it grows steadily as the Sun sets
-});
-
-test("the WGSL refraction matches its TypeScript twin", async () => {
-    const device = await gpuDevice();
-    test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
-    if (!device) return;
-
-    const conditions = { observerHeightM: 1200, temperatureC: -3 };
-    const inputs = ALTITUDES.map(
-        (a) => [a, conditions.observerHeightM, conditions.temperatureC, 0] as [number, number, number, number],
-    );
-
-    const results = await evaluateWgsl(
-        device,
-        refraction,
-        "vec4f(dkAtmosphericRefractionFromApparent(input.x, input.y, input.z), 0.0, 0.0, 0.0)",
-        inputs,
-    );
-
-    ALTITUDES.forEach((altitude, i) => {
-        // f32 on the GPU against f64 in TypeScript, so agreement is to float precision, not to the bit.
-        expect(results[i]?.[0]).toBeCloseTo(atmosphericRefractionFromApparent(altitude, conditions), 6);
-    });
-});
-
-test("the WGSL ray warp matches its TypeScript twin", async () => {
-    const device = await gpuDevice();
-    test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
-    if (!device) return;
-
-    const directions: [number, number, number, number][] = [];
-    for (const altitude of [-30, -1, 0, 0.5, 2, 10, 45, 89.9]) {
-        for (const azimuth of [0, 37, 180, 300]) {
+test("apparentDirection is the inverse of the tracing, and steady looking down from high up", () => {
+    for (const heightM of [GROUND_M, 1000, 20_000, 400_000]) {
+        for (let altitude = -20; altitude < 60; altitude += 0.37) {
             const a = (altitude * Math.PI) / 180;
-            const z = (azimuth * Math.PI) / 180;
-            directions.push([Math.cos(a) * Math.cos(z), Math.cos(a) * Math.sin(z), Math.sin(a), 0]);
+            const apparent = apparentDirection([0.6 * Math.cos(a), 0.8 * Math.cos(a), Math.sin(a)], model, heightM);
+            const apparentAltitude = (Math.asin(apparent[2]) * 180) / Math.PI;
+            const bend = refractionAngle(model, heightM, apparentAltitude);
+            if (bend === null) continue;
+            // Lifted, never by more than the grazing ray from space, and lowered back exactly. Unless the planet hides
+            // it: then it stays on the horizon, just below which the rays end on the ground.
+            expect(apparentAltitude).toBeGreaterThanOrEqual(altitude);
+            expect(apparentAltitude - altitude).toBeLessThan(1.5);
+            const error = (apparentAltitude - bend - altitude) * 3600;
+            expect(error).toBeGreaterThan(-0.1);
+            if (error > 0.1) expect(refractionAngle(model, heightM, apparentAltitude - 0.001)).toBeNull();
         }
-    }
-    directions.push([0, 0, 1, 0]); // straight up, the degenerate case the warp special-cases
-
-    const results = await evaluateWgsl(
-        device,
-        refraction,
-        "vec4f(dkRefractViewDirection(input.xyz, 0.0, 10.0), 0.0)",
-        directions,
-    );
-
-    directions.forEach(([x, y, z], i) => {
-        const expected = refractViewDirection([x, y, z]);
-        const actual = results[i] as [number, number, number, number];
-
-        for (let c = 0; c < 3; ++c) expect(actual[c]).toBeCloseTo(expected[c] as number, 5);
-    });
-});
-
-test("apparentDirection undoes refractViewDirection", () => {
-    for (const altitude of [-0.5, 0, 0.3, 2, 10, 45, 80]) {
-        const a = (altitude * Math.PI) / 180;
-        const trueDirection: [number, number, number] = [0.6 * Math.cos(a), 0.8 * Math.cos(a), Math.sin(a)];
-        const back = refractViewDirection(apparentDirection(trueDirection));
-        for (let c = 0; c < 3; ++c) expect(back[c]).toBeCloseTo(trueDirection[c] as number, 7);
-    }
-});
-
-test("one refraction model: continuous through the horizontal, twice the horizon's from space", () => {
-    const at = (altitude: number, observerHeightM: number) => {
-        const a = (altitude * Math.PI) / 180;
-        return refractionAlongRay(Math.sin(a), Math.cos(a), { observerHeightM });
-    };
-    // Looking down from 10 km, the ray runs out and back in: more than looking straight along the horizontal.
-    expect(at(-1e-6, 10_000)).toBeCloseTo(at(0, 10_000), 6);
-    expect(at(-2, 10_000)).toBeGreaterThan(at(0, 10_000));
-    // Grazing the ground from space: in and out, twice the ~34.5' at the horizon, and gone 100 km up.
-    expect(refractionThroughAtmosphere(0) * 60).toBeCloseTo(2 * 34.48, 1);
-    expect(refractionThroughAtmosphere(100_000)).toBeLessThan(1e-5);
-});
-
-test("apparentDirection holds steady looking down from high up", () => {
-    // From 20 km the horizon lies 4.5 degrees down, where refraction changes faster than the altitude.
-    const conditions = { observerHeightM: 20_000 };
-    for (let altitude = -4.4; altitude < 1; altitude += 0.1) {
-        const a = (altitude * Math.PI) / 180;
-        const trueDirection: [number, number, number] = [Math.cos(a), 0, Math.sin(a)];
-        const back = refractViewDirection(apparentDirection(trueDirection, conditions), conditions);
-        for (let c = 0; c < 3; ++c) expect(back[c]).toBeCloseTo(trueDirection[c] as number, 7);
     }
 });

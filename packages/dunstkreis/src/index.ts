@@ -3,7 +3,7 @@
 // two share everything below and differ only in how they integrate it.
 //
 // The precompute pipeline (transmittance, irradiance, 4D inscatter, N scattering orders) is not implemented
-// yet. What is here is the shared foundation: the model, the refraction correction, and the WGSL layer.
+// yet. What is here is the shared foundation: the model, refraction, and the WGSL layer.
 
 // biome-ignore-all assist/source/organizeImports: exports are hand-grouped by domain, not alphabetical
 
@@ -34,17 +34,8 @@ export { DEFAULT_QUALITY, pipelineConstants } from "./quality.js";
 export type { AtmosphereLUTs, SkyParams, SkyPass } from "./pass.js";
 export { MIN_OBSERVER_HEIGHT_M } from "./pass.js";
 
-// Atmospheric refraction, as a per-ray correction. The CPU twin of the WGSL version, pinned to it by a test.
-export type { RefractionConditions } from "./refraction.js";
-export {
-    airPressureRatio,
-    apparentDirection,
-    atmosphericRefractionFromApparent,
-    refractionAlongRay,
-    refractionThroughAtmosphere,
-    PRESSURE_SCALE_HEIGHT_M,
-    refractViewDirection,
-} from "./refraction.js";
+// Atmospheric refraction, traced through the model's air like the view rays: where the sun shows, on the CPU.
+export { airRefractivity, apparentDirection, refractionAngle } from "./refraction.js";
 
 // Reading a LUT back to the CPU, for inspecting or exporting one.
 export type { TexturePixels } from "./readback.js";

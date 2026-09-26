@@ -1,5 +1,4 @@
 import type { AtmosphereModel, PrecomputedTextureConfig } from "./model.js";
-import type { RefractionConditions } from "./refraction.js";
 
 /**
  * The precomputed lookup tables, owned by this package. Recomputed only when the model parameters change, not
@@ -24,8 +23,8 @@ export interface SkyParams {
     /**
      * Unit vector towards the sun in the observer's ENU frame (x east, y north, z up), as `@himmelszelt/sternzeit`'s
      * `sun.direction` returns it. The shaders only rely on `z` being up; the rest has to match the view rays.
-     * The true (geometric) direction: with `refraction` on, the pass warps the view rays, and an already refracted
-     * direction would lift the sun twice.
+     * The true (geometric) direction: the pass bends the view rays by the model's refractivity, and an already
+     * refracted direction would lift the sun twice.
      */
     sunDirection: readonly [number, number, number];
     /** Observer height above the ground, in meters, at least `MIN_OBSERVER_HEIGHT_M`. Above the atmosphere, the sky is
@@ -44,11 +43,6 @@ export interface SkyParams {
     /** The Sun's apparent angular diameter, in degrees, as `@himmelszelt/sternzeit`'s `sun.apparentAngularDiameter`
      *  returns it. About 0.53. */
     sunAngularDiameter: number;
-    /**
-     * Per-ray atmospheric refraction. Disable it if you already refract your sun/moon directions yourself.
-     * `false` is equivalent to the original's behaviour of correcting only the body directions, CPU-side.
-     */
-    refraction: false | RefractionConditions;
     /** osgHimmel's artistic blue-hour tint: linear RGB plus an intensity, 0 by default. Not physical: the ozone already
      *  turns twilight blue. */
     lHeureBleue: { color: readonly [number, number, number]; intensity: number };

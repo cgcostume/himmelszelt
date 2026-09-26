@@ -1,13 +1,13 @@
 // The sky render pass: a fullscreen triangle that turns the precomputed tables into pixels. Requires
-// `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`, `sampling.wgsl`, `raymarch.wgsl`, `refraction.wgsl` and `quality.wgsl`.
+// `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`, `sampling.wgsl`, `raymarch.wgsl` and `quality.wgsl`.
 //
 // Records into a render pass the caller owns and has already begun, so the sky composes with whatever else
 // is being drawn under the caller's own blending and depth rules.
 
 struct DkSkyParams {
     inverseViewProjection: mat4x4f,
-    // Unit vector towards the sun in the observer's local frame, z up. The TRUE direction: when DK_REFRACTION
-    // is on this pass bends view rays instead, and supplying an already-refracted sun would move it twice.
+    // Unit vector towards the sun in the observer's local frame, z up. The true direction: the view rays are bent
+    // by the air, and an already refracted sun would move twice.
     sunDirection: vec3f,
     // Observer altitude above the ground, in km. Not the radius, which f32 resolves to only ~0.5 m. Above the top of
     // the atmosphere, every pixel is raymarched from where its ray enters it.
@@ -18,9 +18,9 @@ struct DkSkyParams {
     exposure: f32,
     // The Sun's apparent angular radius, in radians.
     sunAngularRadius: f32,
-    observerHeightM: f32,
-    temperatureC: f32,
-    // Where the sun disc shows, lifted by refraction when that is on: the debug overlay's ring goes there.
+    _padding0: f32,
+    _padding1: f32,
+    // Where the sun disc shows, lifted by refraction: the debug overlay's ring goes there.
     apparentSunDirection: vec3f,
     // The projection's d, from 0 (the matrix's own perspective) to 1 (stereographic), see dkProjectRay.
     projectionDistance: f32,
@@ -61,6 +61,8 @@ fn dkDither(color: vec3f, pixel: vec2f) -> vec3f {
     let p = vec2u(pixel);
     return color + (dkHash(p) - dkHash(p + vec2u(7919u, 104729u))) / 255.0;
 }
+
+const DK_DEG_TO_RAD: f32 = 0.01745329251994330;
 
 // Debug overlay, in the apparent (camera) frame: lines of altitude every 10 degrees with the horizon stronger, the
 // eight compass directions up to 80 degrees, and a ring around the sun disc that shows where it is at any exposure.
@@ -110,59 +112,42 @@ struct DkSkySample {
     // Transmittance towards the sun disc along the ray, zero where the planet is in the way.
     sunTransmittance: vec3f,
     hitsGround: bool,
-    // The ray the table was looked up with: the camera ray, bent by refraction where that is on.
+    // The direction the ray leaves the atmosphere in, bent by the air: where the sun has to be to show in it.
     direction: vec3f,
-}
-
-// Terrestrial refraction: a ray to the ground curves with about k = 0.13 of the planet's curvature, the same as a
-// straight ray over a planet of radius Rg / (1 - k). It lifts the visible horizon by about k/2 of its dip: nothing on
-// the ground, some 0.2 degrees from 10 km.
-const DK_TERRESTRIAL_REFRACTION: f32 = 0.13;
-
-fn dkSeesGround(a: DkAtmosphere, h: f32, mu: f32) -> bool {
-    let radius = a.Rg / (1.0 - DK_TERRESTRIAL_REFRACTION);
-    let r = radius + h;
-    return mu < 0.0 && r * r * mu * mu >= h * (2.0 * radius + h);
 }
 
 fn dkSkyFromInside(a: DkAtmosphere, view: vec3f, h: f32) -> DkSkySample {
     var result: DkSkySample;
-    let r = a.Rg + h;
-    // Decided on the camera ray, bent only by terrestrial refraction: the far stronger astronomical refraction bends
-    // light that crossed the whole atmosphere, not the short way to the ground.
-    result.hitsGround = select(dkIntersectsGround(a, h, view.z), dkSeesGround(a, h, view.z), DK_REFRACTION);
-
-    // A camera ray into the sky is an apparent direction, so it is warped to the true one before anything is looked
-    // up. Near the horizon that true direction lies below it: light from there reaches the eye only because it is
-    // bent, so it is looked up at the horizon. An override rather than a branch: with DK_REFRACTION off, none of this
-    // is in the compiled pipeline.
-    result.direction = view;
-    if (DK_REFRACTION && !result.hitsGround) {
-        result.direction = dkRefractViewDirection(view, dkParams.observerHeightM, dkParams.temperatureC);
-    }
-    let direction = result.direction;
-    let mu = select(max(direction.z, dkHorizonMu(a, h)), view.z, result.hitsGround);
+    result.hitsGround = dkIntersectsGround(a, h, view.z);
 
     // Azimuth measured from the sun, the frame the sky-view table is indexed in. Degenerate when either vector points
     // straight up, where azimuth is meaningless and any value gives the same lookup.
     let sunH = dkParams.sunDirection.xy;
     var cosAzimuth = 1.0;
-    if (length(direction.xy) > 1e-6 && length(sunH) > 1e-6) {
-        cosAzimuth = clamp(dot(normalize(direction.xy), normalize(sunH)), -1.0, 1.0);
+    if (length(view.xy) > 1e-6 && length(sunH) > 1e-6) {
+        cosAzimuth = clamp(dot(normalize(view.xy), normalize(sunH)), -1.0, 1.0);
     }
 
     let size = vec2f(textureDimensions(dkSkyViewLut));
-    var uv = dkSkyViewUv(a, h, mu, cosAzimuth, size);
+    var uv = dkSkyViewUv(a, h, view.z, cosAzimuth, size);
     // The table's upper half is sky, the lower half ground, split exactly at the horizon. Kept to its own half, so the
     // linear filter does not blend the last row of sky with the first of ground.
     let half = 0.5 / size.y;
     uv.y = select(min(uv.y, 0.5 - half), max(uv.y, 0.5 + half), result.hitsGround);
-    result.luminance = textureSampleLevel(dkSkyViewLut, dkLutSampler, uv, 0.0).rgb;
+    let texel = textureSampleLevel(dkSkyViewLut, dkLutSampler, uv, 0.0);
+    result.luminance = texel.rgb;
 
-    result.sunTransmittance = vec3f(0.0);
-    if (!result.hitsGround) {
-        result.sunTransmittance = dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, r, mu);
+    // Turned down within its vertical plane by the bending the table traced, stored as its sine.
+    let horizontal = length(view.xy);
+    result.direction = view;
+    if (horizontal > 1e-6 && !result.hitsGround) {
+        let down = vec3f(view.z * view.xy / horizontal, -horizontal);
+        result.direction = view * sqrt(1.0 - texel.a * texel.a) + down * texel.a;
     }
+
+    let sunMu = dkParams.sunDirection.z;
+    let sunTransmittance = dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, a.Rg + h, sunMu);
+    result.sunTransmittance = select(sunTransmittance, vec3f(0.0), result.hitsGround);
     return result;
 }
 
@@ -185,25 +170,14 @@ fn dkSkyFromSpace(a: DkAtmosphere, view: vec3f, altitude: f32) -> DkSkySample {
     }
 
     let entry = vec3f(0.0, 0.0, rc) + view * (-b - sqrt(discriminant));
-    result.luminance = dkRaymarchSky(
-        a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, entry, top, view, dkParams.sunDirection,
+    let ray = dkRaymarchSky(
+        a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, normalize(entry), top, view, dkParams.sunDirection,
         DK_SAMPLES_SKY_VIEW, true,
     );
-
-    // The ray's closest approach to the planet's center: below the ground, the planet hides the sun disc; above, the
-    // light crosses the atmosphere symmetrically, twice the way from there to the top.
-    let perigee = rc * length(view.xy);
-    result.hitsGround = perigee < a.Rg;
-
-    // Refraction in and out of the air bends the ray towards the planet, some 1.2 degrees grazing the ground: the sun
-    // flattens at the planet's rim and shows a little longer behind it. Bent once, at the lowest point.
-    let down = vec3f(0.0, 0.0, -1.0) + view * view.z;
-    if (DK_REFRACTION && !result.hitsGround && length(down) > 1e-6) {
-        let delta = dkRefractionThroughAtmosphere((perigee - a.Rg) * 1000.0, dkParams.temperatureC) * DK_DEG_TO_RAD;
-        result.direction = dkBendRay(view, normalize(down), delta);
-    }
-    let half = dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, max(perigee, a.Rg), 0.0);
-    result.sunTransmittance = select(half * half, vec3f(0.0), result.hitsGround);
+    result.luminance = ray.luminance;
+    result.hitsGround = ray.hitsGround;
+    result.direction = ray.direction;
+    result.sunTransmittance = select(ray.transmittance, vec3f(0.0), ray.hitsGround);
     return result;
 }
 

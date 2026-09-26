@@ -34,7 +34,7 @@ export function atmosphereUniformData(model: AtmosphereModel, target?: Float32Ar
     data[20] = model.ozone.centerAltitudeKm;
     data[21] = model.ozone.widthKm / 2;
     data[22] = model.avgGroundReflectance;
-    data[23] = 0; // _padding
+    data[23] = model.refractivity;
 
     return data;
 }

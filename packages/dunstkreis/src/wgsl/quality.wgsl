@@ -6,10 +6,10 @@
 // for a quality preset switched at most a handful of times, and wrong for something read per frame. Set them
 // through `constants` on the pipeline descriptor; `pipelineConstants()` builds that record.
 
-// Samples along the view ray when integrating optical depth for the transmittance LUT. The single largest
-// quality/cost lever in the precompute, and the reason it is an override: the loop bound has to be a
-// constant for the compiler to unroll it.
-override DK_SAMPLES_TRANSMITTANCE: u32 = 500u;
+// Steps along each ray traced for the transmittance LUT, 18 rays per texel with refraction, to find the one arriving
+// from the texel's direction. The single largest quality/cost lever in the precompute, and the reason it is an
+// override: the loop bound has to be a constant for the compiler to unroll it.
+override DK_SAMPLES_TRANSMITTANCE: u32 = 100u;
 
 // Samples for the single-scattering integral, Bruneton's inscatter1 pass.
 override DK_SAMPLES_INSCATTER: u32 = 50u;
@@ -26,14 +26,6 @@ override DK_SAMPLES_MULTI_SCATTERING: u32 = 20u;
 
 // Raymarch steps for Hillaire's per-frame sky-view LUT. The only one of these on the per-frame path.
 override DK_SAMPLES_SKY_VIEW: u32 = 30u;
-
-// Whether the render pass warps view rays for atmospheric refraction. An override rather than a uniform so
-// that turning it off compiles the work out entirely instead of branching per pixel, and so that a consumer
-// who already feeds refracted sun and moon directions pays nothing for the feature they must not use.
-//
-// Consumed by the render pass, not by `refraction.wgsl`: that snippet stays free of every override and every
-// uniform, so it can be pasted into the moon, star and cloud modules on its own.
-override DK_REFRACTION: bool = true;
 
 // Whether the render pass dithers its output: grain of one 8-bit step against the bands smooth gradients show on an
 // 8-bit target. Off for a float target, which has no such steps.

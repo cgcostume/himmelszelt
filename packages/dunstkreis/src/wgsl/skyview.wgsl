@@ -6,8 +6,8 @@
 // transmittance and multiple-scattering tables above it do not, and are only rebuilt when the model changes.
 
 struct DkSkyViewParams {
-    // Unit vector towards the sun in the observer's local frame, z up. The true direction, not a refracted
-    // one: refraction is applied to view rays at render time, and applying both would move the sun twice.
+    // Unit vector towards the sun in the observer's local frame, z up. The true direction: the table is indexed by
+    // the apparent view direction, and the bending between the two is traced.
     sunDirection: vec3f,
     // Observer altitude above the ground, in km. Not the radius, which f32 resolves to only ~0.5 m.
     observerAltitude: f32,
@@ -44,10 +44,12 @@ fn dkPrecomputeSkyView(@builtin(global_invocation_id) id: vec3u) {
     let muS = clamp(dkParams.sunDirection.z, -1.0, 1.0);
     let sunDirection = vec3f(sqrt(max(1.0 - muS * muS, 0.0)), 0.0, muS);
 
-    let origin = vec3f(0.0, 0.0, a.Rg + h);
-    let steps = DK_SAMPLES_SKY_VIEW;
-    let luminance = dkRaymarchSky(
-        a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, origin, h, direction, sunDirection, steps, false,
+    let ray = dkRaymarchSky(
+        a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, vec3f(0.0, 0.0, 1.0), h, direction, sunDirection,
+        DK_SAMPLES_SKY_VIEW, false,
     );
-    textureStore(dkSkyViewOut, vec2i(id.xy), vec4f(luminance, 1.0));
+    // Alpha holds how far the ray bent on its way out, as the sine of the angle: the render pass turns the view ray by
+    // it to find where the sun disc shows. Nothing for a ray ending on the ground.
+    let bend = select(length(cross(direction, ray.direction)), 0.0, ray.hitsGround);
+    textureStore(dkSkyViewOut, vec2i(id.xy), vec4f(ray.luminance, bend));
 }

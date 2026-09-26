@@ -8,7 +8,7 @@ const PASSES: Record<string, readonly string[]> = {
     transmittance: ["atmosphere", "common", "lut", "quality", "transmittance"],
     multiscattering: ["atmosphere", "common", "lut", "sampling", "quality", "multiscattering"],
     skyview: ["atmosphere", "common", "lut", "sampling", "raymarch", "quality", "skyview"],
-    sky: ["atmosphere", "common", "lut", "sampling", "raymarch", "refraction", "quality", "sky"],
+    sky: ["atmosphere", "common", "lut", "sampling", "raymarch", "quality", "sky"],
 };
 
 for (const [name, fragments] of Object.entries(PASSES)) {
@@ -31,7 +31,4 @@ test("the composable fragments compile without any pass, binding or override", a
     // no dependency on the quality overrides.
     const composable = ["atmosphere", "common", "lut", "sampling", "raymarch"].map(wgslSource).join("\n");
     expect(await compileWgsl(device, composable)).toEqual([]);
-
-    // And refraction on its own, which the moon, star and cloud modules paste in without the rest.
-    expect(await compileWgsl(device, wgslSource("refraction"))).toEqual([]);
 });

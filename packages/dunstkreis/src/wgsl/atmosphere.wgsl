@@ -38,6 +38,6 @@ struct DkAtmosphere {
     ozoneHalfWidth: f32,
     // Average ground reflectance, for the irradiance bounce.
     avgGroundReflectance: f32,
-
-    _padding: f32,
+    // Refractivity n - 1 of the air on the ground, falling off with its density; 0 leaves every ray straight.
+    refractivity: f32,
 }

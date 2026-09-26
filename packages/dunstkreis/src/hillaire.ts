@@ -164,8 +164,6 @@ export interface SkyPassOptions {
     luts: HillaireLUTs;
     /** Format of the render target the caller will draw into. */
     format: GPUTextureFormat;
-    /** Compile the refraction ray warp into the pipeline. Default true. */
-    refraction?: boolean;
     /** Dither the output against banding, for an 8-bit target. Default true; turn it off for a float target. */
     dither?: boolean;
     /** Draw the debug overlay: altitude lines every 10 degrees, the compass directions and a ring around the Sun. */
@@ -184,7 +182,6 @@ const DEFAULTS: SkyParams = {
     exposure: 10,
     sunAngularDiameter: 0.533,
     projectionDistance: 0,
-    refraction: {},
     // Off: added after tone mapping, it paints over the blue the ozone already gives twilight. osgHimmel used 0.5.
     lHeureBleue: { color: [0.08, 0.3, 0.7], intensity: 0 },
 };
@@ -199,8 +196,8 @@ const DEFAULTS: SkyParams = {
 export function createSkyPassApprox(device: GPUDevice, options: SkyPassOptions): SkyPass {
     const { luts, format } = options;
     const { config } = luts;
-    const { refraction = true, dither = true, debugGrid = false } = options;
-    const constants = pipelineConstants(config, { refraction, dither, debugGrid });
+    const { dither = true, debugGrid = false } = options;
+    const constants = pipelineConstants(config, { dither, debugGrid });
 
     const skyView = createLut(device, "dunstkreis:skyView", config.skyView.width, config.skyView.height);
 
@@ -236,16 +233,7 @@ export function createSkyPassApprox(device: GPUDevice, options: SkyPassOptions):
     });
 
     const renderModule = device.createShaderModule({
-        code: [
-            wgsl.quality,
-            wgsl.atmosphere,
-            wgsl.common,
-            wgsl.lut,
-            wgsl.sampling,
-            wgsl.raymarch,
-            wgsl.refraction,
-            wgsl.sky,
-        ].join("\n"),
+        code: [wgsl.quality, wgsl.atmosphere, wgsl.common, wgsl.lut, wgsl.sampling, wgsl.raymarch, wgsl.sky].join("\n"),
     });
     const renderPipeline = device.createRenderPipeline({
         label: "dunstkreis:sky",
@@ -281,6 +269,7 @@ export function createSkyPassApprox(device: GPUDevice, options: SkyPassOptions):
 
     let params: SkyParams = { ...DEFAULTS };
     let skyViewKey = "";
+    let apparentSun: readonly [number, number, number] = params.sunDirection;
 
     return {
         skyViewTexture: skyView,
@@ -294,7 +283,23 @@ export function createSkyPassApprox(device: GPUDevice, options: SkyPassOptions):
             const height = Math.max(params.observerHeightM, MIN_OBSERVER_HEIGHT_M);
             const altitudeKm = Math.min(height / 1000, luts.model.planet.thicknessKm);
 
-            const conditions = params.refraction === false ? {} : params.refraction;
+            // Rebuilding the sky-view table is the expensive part, and it is why the render pass itself is one fetch
+            // per pixel rather than a raymarch. It depends on nothing but the Sun and the observer.
+            const key = `${sx},${sy},${sz},${height}`;
+            if (key !== skyViewKey) {
+                skyViewKey = key;
+                // Where the sun shows, for the debug overlay's ring, traced like the view rays.
+                if (debugGrid) apparentSun = apparentDirection(params.sunDirection, luts.model, height);
+                device.queue.writeBuffer(skyViewParams, 0, new Float32Array([sx, sy, sz, altitudeKm]));
+                const encoder = device.createCommandEncoder({ label: "dunstkreis:skyView" });
+                const pass = encoder.beginComputePass();
+                pass.setPipeline(skyViewPipeline);
+                pass.setBindGroup(0, skyViewBindGroup);
+                pass.dispatchWorkgroups(dispatch(config.skyView.width), dispatch(config.skyView.height));
+                pass.end();
+                device.queue.submit([encoder.finish()]);
+            }
+
             const sky = new Float32Array(SKY_PARAMS_SIZE / 4);
             sky.set(params.inverseViewProjection, 0);
             sky.set([sx, sy, sz], 16);
@@ -303,28 +308,9 @@ export function createSkyPassApprox(device: GPUDevice, options: SkyPassOptions):
             sky[23] = params.lHeureBleue.intensity;
             sky[24] = params.exposure;
             sky[25] = (params.sunAngularDiameter / 2) * (Math.PI / 180);
-            sky[26] = conditions.observerHeightM ?? height;
-            sky[27] = conditions.temperatureC ?? 10;
-            // Where the sun shows, for the debug overlay's ring: lifted by refraction where the pass applies it.
-            const refracts = refraction && params.refraction !== false;
-            const lifted = { observerHeightM: height, ...conditions };
-            sky.set(refracts ? apparentDirection(params.sunDirection, lifted) : [sx, sy, sz], 28);
+            sky.set(apparentSun, 28);
             sky[31] = params.projectionDistance;
             device.queue.writeBuffer(skyParams, 0, sky);
-
-            // Rebuilding the sky-view table is the expensive part, and it is why the render pass itself is one fetch
-            // per pixel rather than a raymarch. It depends on nothing but the Sun and the observer.
-            const key = `${sx},${sy},${sz},${altitudeKm}`;
-            if (key === skyViewKey) return;
-            skyViewKey = key;
-            device.queue.writeBuffer(skyViewParams, 0, new Float32Array([sx, sy, sz, altitudeKm]));
-            const encoder = device.createCommandEncoder({ label: "dunstkreis:skyView" });
-            const pass = encoder.beginComputePass();
-            pass.setPipeline(skyViewPipeline);
-            pass.setBindGroup(0, skyViewBindGroup);
-            pass.dispatchWorkgroups(dispatch(config.skyView.width), dispatch(config.skyView.height));
-            pass.end();
-            device.queue.submit([encoder.finish()]);
         },
 
         encode(pass) {
