@@ -33,15 +33,15 @@ and lower resolution, so "fast vs. precise" holds overall, but it will not alway
 
 ## Observer altitude and refraction
 
-The observer must be *inside* the atmosphere; views from space are not supported. Within that, altitude is
-unrestricted (0 to the top of the atmosphere), since the LUTs are parameterized over the full radius range
-anyway and it costs nothing.
+The observer can be anywhere from a millimeter above the ground up into space. Inside the atmosphere the render pass
+looks the sky up in the sky-view table; above it, where that table does not reach, it raymarches every pixel from
+where its ray enters the atmosphere, and the planet shows, lit by the sun.
 
 Atmospheric refraction is applied per view ray, not as the original's single per-frame direction correction
 (osgHimmel computed one refracted sun/moon vector CPU-side and passed it in as `sunr`/`moonr`; stars were never
 refracted at all). Warping the ray instead produces three things from one function: bodies staying visible
 while geometrically below the horizon, the whole sky compressing slightly near the horizon, and the vertical
-flattening of the sun/moon disc near the horizon, which falls out of the steep `dR/da` there rather than
+flattening of the sun disc and the moon near the horizon, which falls out of the steep `dR/da` there rather than
 needing the disc to be special-cased. Observer altitude enters as the air pressure ratio, so refraction
 naturally falls off with height and vanishes at the top of the atmosphere.
 
@@ -137,16 +137,17 @@ Echtzeit"](https://daniellimberger.de/resources/2012%20%E2%80%93%20Mueller%20%28
 - E. Bruneton, F. Neyret, ["Precomputed Atmospheric Scattering"](https://inria.hal.science/inria-00288758)
   (EGSR 2008): the precise variant, and the model osgHimmel's atmosphere is built on.
 - S. Hillaire, ["A Scalable and Production Ready Sky and Atmosphere Rendering
-  Technique"](https://sebh.github.io/publications/egsr2020.pdf) (EGSR 2020): the fast variant.
+  Technique"](https://sebh.github.io/publications/egsr2020.pdf) (EGSR 2020): the fast variant, and the ozone layer's profile and
+  absorption coefficients.
 - T. Nishita, T. Sirai, K. Tadamura, E. Nakamae, "Display of the Earth Taking into Account Atmospheric
   Scattering" (SIGGRAPH 1993): atmosphere thickness constant.
-- A. Bucholtz, "Rayleigh-scattering calculations for the terrestrial atmosphere" (1995): Rayleigh
-  scattering coefficients.
+- K. Riley, D. S. Ebert, M. Kraus, J. Tessendorf, C. Hansen, "Efficient Rendering of Atmospheric Phenomena"
+  (EGSR 2004): the Rayleigh scattering coefficients, by way of Bruneton & Neyret.
 - G. G. Bennett, "The Calculation of Astronomical Refraction in Marine Navigation" (1982): atmospheric
   refraction.
 - Maxime Heckel, ["On rendering the sky, sunsets and
   planets"](https://blog.maximeheckel.com/posts/on-rendering-the-sky-sunsets-and-planets/): a WebGL/three.js
-  single-scattering raymarcher; the ozone absorption parameterization here follows it.
+  single-scattering raymarcher, and a fine introduction to the topic.
 - Daniel Müller (now Limberger), Juri Engel, Jürgen Döllner,
   ["Single-Pass Rendering of Day and Night Sky Phenomena"](https://diglib.eg.org/items/0b9332fd-d155-452a-b9e0-1c605d557730)
   (VMV 2012).
@@ -161,13 +162,13 @@ pnpm build       # rolldown -> dist/*.js + dist/*.d.ts, for every package
 pnpm typecheck
 pnpm lint        # biome, repo-wide
 pnpm test        # playwright
+pnpm dev         # the site, where this library's chapter lives: http://localhost:4321/himmelszelt/dunstkreis/
 ```
 
 Inside `packages/dunstkreis`:
 
 ```sh
 pnpm test:gpu    # the tests plus the WGSL ones, which execute real shaders via Dawn
-pnpm start       # the interim dev preview at localhost:4173/static/index.html, until the site chapter replaces it
 ```
 
 The `webgpu` package needs its install script to run, which is approved in the root `pnpm-workspace.yaml`.

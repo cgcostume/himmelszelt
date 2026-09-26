@@ -1,0 +1,71 @@
+.sky-view {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    max-height: 80vh;
+    width: 100%;
+    background: #000;
+    touch-action: none;
+    user-select: none;
+}
+.sky-view canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+}
+.sky-view canvas:active {
+    cursor: grabbing;
+}
+.sky-view .vis-credit,
+.sky-overlay {
+    color: #ccc;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+/* Along the bottom edge, lined up with the credit line at the top. */
+.sky-overlay {
+    position: absolute;
+    right: var(--content-inset);
+    bottom: 0.5rem;
+    left: var(--content-inset);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    align-items: center;
+}
+.sky-overlay label {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+.sky-toggles {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+.sky-overlay .view-toggle {
+    position: static;
+}
+/* The compass directions, standing on the horizon: each label's bottom center sits on its point of the horizon. */
+.sky-compass {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+.sky-compass span {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    padding-bottom: 0.2rem;
+    color: #fff;
+    font-size: var(--text-small);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+.sky-error {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    color: #ccc;
+    text-align: center;
+}

@@ -143,20 +143,22 @@ test("the horizon cosine and the ground-intersection test agree", async () => {
     test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
     if (!device) return;
 
-    // At the ground the horizon is exactly horizontal; higher up it dips below, by ~1 degree at 1 km.
-    const [atGround, at1km] = await evaluate("vec4f(dkHorizonMu(atmosphere, input.x))", [
-        [Rg, 0],
-        [Rg + 1, 0],
+    // At the ground the horizon is exactly horizontal; higher up it dips below, by ~1 degree at 1 km. Both take the
+    // altitude, which f32 keeps exact down to a millimeter, where a radius near Rg resolves only ~0.5 m.
+    const [atGround, at1km, at1mm] = await evaluate("vec4f(dkHorizonMu(atmosphere, input.x))", [
+        [0, 0],
+        [1, 0],
+        [1e-6, 0],
     ]);
     expect(atGround).toBeCloseTo(0, 6);
     expect((Math.acos(at1km as number) * 180) / Math.PI - 90).toBeCloseTo(1.02, 1);
+    expect(at1mm).toBeCloseTo(-Math.sqrt(2 * Rg * 1e-6) / Rg, 9);
 
     // Just below the horizon hits ground, just above does not.
-    const r = Rg + 1;
     const mu = at1km as number;
     const [below, above] = await evaluate("vec4f(select(0.0, 1.0, dkIntersectsGround(atmosphere, input.x, input.y)))", [
-        [r, mu - 1e-4],
-        [r, mu + 1e-4],
+        [1, mu - 1e-4],
+        [1, mu + 1e-4],
     ]);
     expect(below).toBe(1);
     expect(above).toBe(0);

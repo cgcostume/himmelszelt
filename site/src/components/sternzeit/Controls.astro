@@ -28,6 +28,7 @@ const heightSteps = [
     { label: "10 m", value: "10", checked: true },
     { label: "100 m", value: "100" },
     { label: "1 km", value: "1000" },
+    { label: "10 km", value: "10000" },
 ];
 ---
 
@@ -108,7 +109,7 @@ const heightSteps = [
         <label for={`${uid}-height`}>Height</label>
         <span class="stepper">
             <button type="button" data-step="-1" aria-label="Height, one step back">&#8722;</button>
-            <input id={`${uid}-height`} data-field="height" class="latlong" type="number" min="0" max="8000" />
+            <input id={`${uid}-height`} data-field="height" class="latlong" type="number" min="0" max="408000" />
             <button type="button" data-step="1" aria-label="Height, one step forward">+</button>
         </span>
         <span class="input-grid-subrow">

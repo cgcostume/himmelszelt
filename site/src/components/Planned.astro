@@ -1,0 +1,32 @@
+---
+/** A figure that is planned but not built yet: what it will show, in a few sentences. Not numbered like a figure. */
+interface Props {
+    title: string;
+}
+const { title } = Astro.props;
+---
+
+<aside class="planned-figure">
+    <p class="planned-figure-title">Planned figure: {title}</p>
+    <slot />
+</aside>
+
+<style>
+    .planned-figure {
+        margin: 1.5rem 0;
+        padding: 0.75rem 1rem;
+        border: 1px dashed var(--muted);
+        border-radius: 6px;
+        color: var(--muted);
+    }
+    .planned-figure-title {
+        margin: 0 0 0.25rem;
+        font-size: var(--text-small);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    .planned-figure :global(p:last-child) {
+        margin-bottom: 0;
+    }
+</style>

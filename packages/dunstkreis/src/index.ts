@@ -38,6 +38,7 @@ export { MIN_OBSERVER_HEIGHT_M } from "./pass.js";
 export type { RefractionConditions } from "./refraction.js";
 export {
     airPressureRatio,
+    apparentDirection,
     atmosphericRefractionFromApparent,
     PRESSURE_SCALE_HEIGHT_M,
     refractViewDirection,

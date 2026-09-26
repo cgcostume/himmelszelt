@@ -14,6 +14,7 @@
     },
     "dependencies": {
         "@astrojs/mdx": "^8.0.1",
+        "@himmelszelt/dunstkreis": "workspace:*",
         "@himmelszelt/sternzeit": "workspace:*",
         "astro": "^7.3.3",
         "zdog": "^1.1.3"

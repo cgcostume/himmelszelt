@@ -1,6 +1,6 @@
 /**
  * Geometry of the planet and its atmosphere. The atmosphere is the shell between `groundRadiusKm` and
- * `groundRadiusKm + thicknessKm`, and the observer must be inside it: views from space are not supported.
+ * `groundRadiusKm + thicknessKm`. The observer can be inside it or above it.
  */
 export interface PlanetGeometry {
     /** Radius of the ground, in km. `Rg` in the original shaders. */
@@ -65,12 +65,14 @@ export interface AtmosphereModel {
  * reproduce the original exactly.
  */
 export const DEFAULT_ATMOSPHERE_MODEL: AtmosphereModel = {
-    planet: { groundRadiusKm: 6360, thicknessKm: 60 },
+    // Hillaire's 100 km rather than Bruneton's 60: cut at 60 km, where the air still has 5e-4 of its density at the
+    // ground, the atmosphere ends in a visible edge when seen from space.
+    planet: { groundRadiusKm: 6360, thicknessKm: 100 },
     solarIrradiance: [1.474, 1.8504, 1.91198],
     avgGroundReflectance: 0.1,
     rayleigh: {
         scaleHeightKm: 8,
-        // Bucholtz, "Rayleigh-scattering calculations for the terrestrial atmosphere" (1995).
+        // Bruneton & Neyret 2008, after Riley et al. 2004.
         beta: [5.8e-3, 1.35e-2, 3.31e-2],
     },
     mie: {
@@ -84,7 +86,7 @@ export const DEFAULT_ATMOSPHERE_MODEL: AtmosphereModel = {
     },
     ozone: {
         // Absent from osgHimmel entirely. Without it twilight goes gray instead of deep blue, because nothing
-        // else removes the green-yellow band from the long, low-sun paths.
+        // else removes the green-yellow band from the long, low-sun paths. Hillaire 2020's values.
         centerAltitudeKm: 25,
         widthKm: 30,
         betaAbsorption: [6.5e-4, 1.881e-3, 8.5e-5],

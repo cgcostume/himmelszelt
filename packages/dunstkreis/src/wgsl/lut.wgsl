@@ -72,8 +72,8 @@ fn dkMultiScatteringRMuS(a: DkAtmosphere, uv: vec2f, size: vec2f) -> vec2f {
 // The sky-view LUT is indexed by view direction, in a frame whose azimuth is measured from the sun. The
 // vertical axis is split at the horizon and square-rooted on each side, spending most of the resolution
 // within a few degrees of it, which is where nearly all of the sky's variation lives.
-fn dkSkyViewUv(a: DkAtmosphere, r: f32, mu: f32, cosLightAzimuth: f32, size: vec2f) -> vec2f {
-    let horizon = dkHorizonMu(a, r);
+fn dkSkyViewUv(a: DkAtmosphere, h: f32, mu: f32, cosLightAzimuth: f32, size: vec2f) -> vec2f {
+    let horizon = dkHorizonMu(a, h);
     let zenithHorizonAngle = acos(clamp(horizon, -1.0, 1.0));
     let viewZenithAngle = acos(clamp(mu, -1.0, 1.0));
 
@@ -86,18 +86,19 @@ fn dkSkyViewUv(a: DkAtmosphere, r: f32, mu: f32, cosLightAzimuth: f32, size: vec
         y = sqrt(t) * 0.5 + 0.5;
     }
 
-    // The sky is symmetric about the sun's meridian, so only half a turn of azimuth has to be stored.
-    let x = sqrt(clamp(cosLightAzimuth * 0.5 + 0.5, 0.0, 1.0));
+    // The sky is symmetric about the sun's meridian, so only half a turn of azimuth has to be stored. The sun
+    // sits at x = 0, where the square root makes x linear in the angle from it: resolution for the Mie glow.
+    let x = sqrt(clamp(0.5 - cosLightAzimuth * 0.5, 0.0, 1.0));
 
     return vec2f(dkUnitToTextureCoord(x, size.x), dkUnitToTextureCoord(y, size.y));
 }
 
 // uv in the sky-view LUT -> (mu, cos of the azimuth from the sun). The exact inverse of the above.
-fn dkSkyViewMuAzimuth(a: DkAtmosphere, r: f32, uv: vec2f, size: vec2f) -> vec2f {
+fn dkSkyViewMuAzimuth(a: DkAtmosphere, h: f32, uv: vec2f, size: vec2f) -> vec2f {
     let x = dkTextureToUnitCoord(uv.x, size.x);
     let y = dkTextureToUnitCoord(uv.y, size.y);
 
-    let horizon = dkHorizonMu(a, r);
+    let horizon = dkHorizonMu(a, h);
     let zenithHorizonAngle = acos(clamp(horizon, -1.0, 1.0));
 
     var viewZenithAngle: f32;
@@ -109,5 +110,5 @@ fn dkSkyViewMuAzimuth(a: DkAtmosphere, r: f32, uv: vec2f, size: vec2f) -> vec2f 
         viewZenithAngle = zenithHorizonAngle + (DK_PI - zenithHorizonAngle) * t * t;
     }
 
-    return vec2f(cos(viewZenithAngle), clamp(x * x, 0.0, 1.0) * 2.0 - 1.0);
+    return vec2f(cos(viewZenithAngle), 1.0 - clamp(x * x, 0.0, 1.0) * 2.0);
 }

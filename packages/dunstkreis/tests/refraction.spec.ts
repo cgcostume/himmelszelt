@@ -1,6 +1,6 @@
 import { earth } from "@himmelszelt/sternzeit";
 import { expect, test } from "@playwright/test";
-import { atmosphericRefractionFromApparent, refractViewDirection } from "../src/refraction.js";
+import { apparentDirection, atmosphericRefractionFromApparent, refractViewDirection } from "../src/refraction.js";
 import { evaluateWgsl, gpuDevice, wgslSource } from "./gpu.js";
 
 const refraction = wgslSource("refraction");
@@ -8,7 +8,7 @@ const ALTITUDES = [0, 0.25, 0.5, 1, 2, 5, 10, 20, 45, 70, 89, 90];
 
 test("refraction is ~34.5' at the horizon and 0 at the zenith", () => {
     // More than the Sun's own ~32' apparent diameter, which is why a Sun that looks like it is touching the
-    // horizon has geometrically already set. This is AA.15.3, distinct from sternzeit's 15.4 (~29').
+    // horizon has geometrically already set. This is Meeus 16.3, distinct from sternzeit's 16.4 (~29').
     expect(atmosphericRefractionFromApparent(0) * 60).toBeCloseTo(34.48, 2);
     expect(atmosphericRefractionFromApparent(90) * 60).toBeCloseTo(0, 6);
 });
@@ -124,4 +124,13 @@ test("the WGSL ray warp matches its TypeScript twin", async () => {
 
         for (let c = 0; c < 3; ++c) expect(actual[c]).toBeCloseTo(expected[c] as number, 5);
     });
+});
+
+test("apparentDirection undoes refractViewDirection", () => {
+    for (const altitude of [-0.5, 0, 0.3, 2, 10, 45, 80]) {
+        const a = (altitude * Math.PI) / 180;
+        const trueDirection: [number, number, number] = [0.6 * Math.cos(a), 0.8 * Math.cos(a), Math.sin(a)];
+        const back = refractViewDirection(apparentDirection(trueDirection));
+        for (let c = 0; c < 3; ++c) expect(back[c]).toBeCloseTo(trueDirection[c] as number, 7);
+    }
 });

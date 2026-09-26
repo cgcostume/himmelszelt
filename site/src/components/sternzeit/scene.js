@@ -1,9 +1,10 @@
 import * as precise from "@himmelszelt/sternzeit";
 import Zdog from "zdog";
+import { onDemand } from "../frame.js";
 import { COMPASS, cssColor, gridLine, labelAboveY, moonSymbol, sunInViewFrame, sunSymbol, svgText } from "./figure.js";
 import { aboveVisibleHorizon } from "./horizon.js";
 import { offPanelArrow, offPanelArrowSvg } from "./offpanel.js";
-import { ephemerisDay, state } from "./state.js";
+import { ephemerisDay, onChange, state } from "./state.js";
 import "./export.js";
 
 const { Illustration, Anchor, Shape, Ellipse, Vector } = Zdog;
@@ -449,6 +450,7 @@ stageEl.addEventListener("pointermove", (e) => {
         lastPointer = { x: e.clientX, y: e.clientY };
         rotY += dx * 0.008;
         rotX += dy * 0.008;
+        requestFrame();
     }
 });
 // preventDefault so the page itself doesn't scroll while zooming the scene; multiplicative (not additive)
@@ -459,6 +461,7 @@ stageEl.addEventListener(
     (e) => {
         e.preventDefault();
         targetZoomFactor = Math.min(ZOOM_FACTOR_MAX, Math.max(ZOOM_FACTOR_MIN, targetZoomFactor * 1.0015 ** -e.deltaY));
+        requestFrame();
     },
     { passive: false },
 );
@@ -611,10 +614,14 @@ function frame() {
     latitudeRing.svgElement?.setAttribute("stroke-dasharray", lineDash);
     meridianRing.svgElement?.setAttribute("stroke-dasharray", lineDash);
 
-    requestAnimationFrame(frame);
+    // Drawn only when something changed; only the zoom's easing keeps asking for frames, until it has arrived.
+    if (Math.abs(targetZoomFactor - zoomFactor) > 1e-4) requestFrame();
 }
 
-requestAnimationFrame(frame);
+const requestFrame = onDemand(frame);
+onChange(requestFrame);
+new ResizeObserver(requestFrame).observe(stageEl);
+requestFrame();
 
 // The labels on Earth's surface ride one circle around it, a fixed gap outside the globe on screen, each in its marker's
 // direction, so rotating the scene swings them around the circle instead of flinging them across the stage. Markers
@@ -718,4 +725,5 @@ labelsButton.addEventListener("click", () => {
     const on = labelsButton.getAttribute("aria-pressed") !== "true";
     labelsButton.setAttribute("aria-pressed", String(on));
     document.querySelector("#scene").classList.toggle("labels-off", !on);
+    requestFrame();
 });

@@ -15,15 +15,34 @@ fn dkDistanceToTopAtmosphereBoundary(a: DkAtmosphere, r: f32, mu: f32) -> f32 {
     return max(-r * mu + sqrt(max(discriminant, 0.0)), 0.0);
 }
 
-// Same, to the ground. A negative discriminant means the ray misses the planet, which is the common case for
-// anything pointing above the horizon, so callers must check dkIntersectsGround first.
-fn dkDistanceToBottomAtmosphereBoundary(a: DkAtmosphere, r: f32, mu: f32) -> f32 {
-    let discriminant = r * r * (mu * mu - 1.0) + a.Rg * a.Rg;
-    return max(-r * mu - sqrt(max(discriminant, 0.0)), 0.0);
+// The functions near the ground take the altitude h instead of the radius: a radius around 6360 km resolves only
+// ~0.5 m in f32, which put a floor under the observer and banded the horizon. With h exact, a millimeter works.
+
+// r^2 - Rg^2, the squared distance to the horizon, from the altitude, where the difference of squares cancels.
+fn dkRhoSquared(a: DkAtmosphere, h: f32) -> f32 {
+    return max(h, 0.0) * (2.0 * a.Rg + max(h, 0.0));
 }
 
-fn dkIntersectsGround(a: DkAtmosphere, r: f32, mu: f32) -> bool {
-    return mu < 0.0 && r * r * (mu * mu - 1.0) + a.Rg * a.Rg >= 0.0;
+// Distance from altitude h to the ground along a ray with cosine mu. A negative discriminant means the ray misses the
+// planet, the common case for anything above the horizon, so callers check dkIntersectsGround first. In the
+// conjugate form, which stays exact for the short grazing distances the textbook form cancels to zero.
+fn dkDistanceToBottomAtmosphereBoundary(a: DkAtmosphere, h: f32, mu: f32) -> f32 {
+    let r = a.Rg + h;
+    let discriminant = r * r * mu * mu - dkRhoSquared(a, h);
+    return dkRhoSquared(a, h) / max(-r * mu + sqrt(max(discriminant, 0.0)), 1e-12);
+}
+
+fn dkIntersectsGround(a: DkAtmosphere, h: f32, mu: f32) -> bool {
+    let r = a.Rg + h;
+    return mu < 0.0 && r * r * mu * mu >= dkRhoSquared(a, h);
+}
+
+// Altitude of the point at distance t along a ray from altitude h with cosine mu, without going through its radius:
+// (r_t^2 - Rg^2) / (r_t + Rg), the numerator expanded so the large terms never meet.
+fn dkAltitudeAlongRay(a: DkAtmosphere, h: f32, mu: f32, t: f32) -> f32 {
+    let r = a.Rg + h;
+    let rt = sqrt(max(t * t + 2.0 * r * mu * t + r * r, 0.0));
+    return max((t * t + 2.0 * r * mu * t + dkRhoSquared(a, h)) / (rt + a.Rg), 0.0);
 }
 
 // Distance from a point at radius r to the horizon, i.e. sqrt(r^2 - Rg^2).
@@ -43,10 +62,10 @@ fn dkHorizonDistanceAtTop(a: DkAtmosphere) -> f32 {
     return sqrt(max(a.Rt - a.Rg, 0.0) * (a.Rt + a.Rg));
 }
 
-// Cosine of the horizon direction as seen from radius r. Everything below this looks at ground rather than
+// Cosine of the horizon direction as seen from altitude h. Everything below this looks at ground rather than
 // sky, and the sky's gradient is steepest right at it, which is why the LUT mappings bias resolution here.
-fn dkHorizonMu(a: DkAtmosphere, r: f32) -> f32 {
-    return -dkRho(a, r) / r;
+fn dkHorizonMu(a: DkAtmosphere, h: f32) -> f32 {
+    return -sqrt(dkRhoSquared(a, h)) / (a.Rg + h);
 }
 
 // Air and aerosols both thin out exponentially, with very different scale heights.

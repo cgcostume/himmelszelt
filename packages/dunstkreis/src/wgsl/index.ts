@@ -17,16 +17,29 @@ import common from "./common.wgsl";
 import lut from "./lut.wgsl";
 import multiscattering from "./multiscattering.wgsl";
 import quality from "./quality.wgsl";
+import raymarch from "./raymarch.wgsl";
 import refraction from "./refraction.wgsl";
 import sampling from "./sampling.wgsl";
 import sky from "./sky.wgsl";
 import skyview from "./skyview.wgsl";
 import transmittance from "./transmittance.wgsl";
 
-export { atmosphere, common, lut, multiscattering, quality, refraction, sampling, sky, skyview, transmittance };
+export {
+    atmosphere,
+    common,
+    lut,
+    multiscattering,
+    quality,
+    raymarch,
+    refraction,
+    sampling,
+    sky,
+    skyview,
+    transmittance,
+};
 
 /** The composable pieces, in the order WGSL needs them declared. No bindings, no entry points. */
-export const scattering = [atmosphere, common, lut, sampling].join("\n");
+export const scattering = [atmosphere, common, lut, sampling, raymarch].join("\n");
 
 /** `scattering` plus the overrides, which the passes below additionally need. */
 export const scatteringWithQuality = [quality, scattering].join("\n");

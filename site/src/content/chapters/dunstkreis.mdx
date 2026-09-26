@@ -5,17 +5,133 @@ summary: "Why the sky is blue and the sunset red, computed on the GPU."
 order: 2
 ---
 
-Atmosphere rendering with precomputed look-up tables, in a precise (Bruneton) and a fast (Hillaire) variant.
+import Controls from "../../components/sternzeit/Controls.astro";
+import Planned from "../../components/Planned.astro";
+import Sky from "../../components/dunstkreis/Sky.astro";
 
-This chapter is a placeholder. The live WebGPU preview from `packages/dunstkreis/static` moves here next.
+This chapter is being written. The sky below is live, and it grows with the chapter; the dashed boxes are the figures
+still to come.
 
-## Look at the sky
+<Sky />
 
-A live WebGPU sky to play with. Not written yet.
+## Pick a moment and a place
 
-## Scattering, step by step
+<Controls open />
 
-How light finds its way through the atmosphere. Not written yet.
+## Why is the sky blue?
+
+<Planned title="A short history of the question">
+    From Leonardo's blue haze in front of distant mountains through Newton, Tyndall's blue light from fine particles and
+    Rayleigh's inverse fourth power to Mie, Smoluchowski and Einstein, after Hoeppe's "Why the Sky Is Blue". A timeline,
+    each step with the one idea it added.
+</Planned>
+
+<Planned title="How strongly each color scatters">
+    The visible spectrum against how much of it a column of air scatters: violet many times more than red. Why the
+    sky is still blue and not violet, from the Sun's spectrum and the eye's sensitivity.
+</Planned>
+
+<Planned title="Molecules, aerosols and ozone">
+    The three actors, illustrated rather than shaded: where a photon goes after meeting an air molecule (Rayleigh, as
+    much forward as back), a droplet or dust grain (Mie, a narrow forward lobe, with its asymmetry to drag) and ozone,
+    which only absorbs. Their phase functions as live polar plots.
+</Planned>
+
+## Why is the sunset red?
+
+<Planned title="The long way through the air">
+    One ray from the observer to the top of the atmosphere, the Sun's elevation to drag: how the path lengthens towards
+    the horizon, what the optical depth along it is, and how much of each color survives. The transmittance table
+    below is the same thing for every height and angle at once.
+</Planned>
+
+<Planned title="Taking the sky apart">
+    The same sunset with Rayleigh, Mie and ozone switched on and off one by one. Without ozone, twilight turns gray.
+</Planned>
+
+## More than one bounce
+
+<Planned title="Scattering orders">
+    Light scattered once, twice, three times, side by side, and the difference each order still makes. Bruneton
+    iterates a fixed number of orders, Hillaire sums all of them at once under the assumption that light scattered more
+    than once no longer has a preferred direction.
+</Planned>
+
+## Bent light
+
+<Planned title="With and without refraction">
+    The setting Sun side by side, bent and unbent, zoomed in on the horizon: the disc flattened, still in view while
+    geometrically already below the horizon, and the altitude grid to measure it against.
+</Planned>
+
+## Luftperspektive
+
+<Planned title="Distance in the air">
+    Mountain ridges one behind another, with and without the air between them: contrast fades and colors shift
+    towards the sky's with every kilometer, the cue painters since Leonardo use to paint depth. A small game: how far
+    away is this ridge?
+</Planned>
+
+<Planned title="Beyond the atmosphere">
+    The Moon, planets or a spaceship behind the atmosphere get the same treatment: dimmed and tinted by the air in
+    front of them, and lit by sunlight that crossed the atmosphere on its way to them.
+</Planned>
+
+## From the ground to orbit
+
+<Planned title="Leaving the ground">
+    The observer from a millimeter above the ground up into orbit: the horizon dips, the sky darkens overhead, and
+    from above the atmosphere the whole planet appears, its thin glowing rim and the terminator between day and night.
+</Planned>
+
+## Tables instead of raymarching
+
+<Planned title="The tables, live">
+    Every table dunstkreis computes, as it is right now: transmittance, multiple scattering and the sky view, later
+    aerial perspective and Bruneton's four-dimensional inscatter table. Over each, the grid of its parameterization;
+    pointing at a texel shows the ray it stands for.
+</Planned>
+
+## Resolution and sampling
+
+<Planned title="Starving the tables">
+    Table sizes and sample counts to turn down, next to a reference computed at high resolution, and a heat map of the
+    difference: where bands and seams appear first, and why the mappings spend their texels near the horizon.
+</Planned>
+
+## Encoding
+
+<Planned title="Storing light">
+    The same table stored as 32-bit and 16-bit float, as RGBE and as 8 bits with a logarithmic or gamma curve: what
+    each keeps and loses. Why lookups aim at texel centers, how four dimensions are packed into a 3D texture, and which
+    of these dunstkreis uses.
+</Planned>
+
+## From light to pixels
+
+<Planned title="Exposure and tone mapping">
+    The eye adapts across some fourteen orders of magnitude, from starlight to the midday Sun, and a screen shows about
+    three. The sky's physical radiance with its exposure to drag, tone curves side by side, and an HDR display where
+    the browser offers one.
+</Planned>
+
+<Planned title="Banding and dithering">
+    A smooth twilight gradient quantized to 8 bits, zoomed in: the bands, and the same with a single step of noise
+    added before quantizing.
+</Planned>
+
+## Precise or approximate?
+
+<Planned title="Bruneton and Hillaire">
+    Both variants side by side at the same moment and place, and their difference.
+</Planned>
+
+## Make your own
+
+<Planned title="The generator">
+    Everything this chapter changed along the way, the atmosphere, the table sizes, the sample counts and the encoding,
+    in one place, previewed, and downloaded as files for your own renderer.
+</Planned>
 
 ## Code examples
 

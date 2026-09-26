@@ -39,7 +39,7 @@ test("the default model deviates from the original only where intended", () => {
 });
 
 test("atmosphereTopRadiusKm is the ground radius plus the shell thickness", () => {
-    expect(atmosphereTopRadiusKm(DEFAULT_ATMOSPHERE_MODEL)).toBe(6420);
+    expect(atmosphereTopRadiusKm(DEFAULT_ATMOSPHERE_MODEL)).toBe(6460);
     expect(atmosphereTopRadiusKm(OSGHIMMEL_ATMOSPHERE_MODEL)).toBe(6456);
 });
 

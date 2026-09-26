@@ -24,17 +24,18 @@ struct DkMultiScatterSample {
 
 // Raymarches one direction, accumulating both terms. Isotropic throughout: no phase function appears, which
 // is precisely the assumption that makes the series summable.
-fn dkIntegrateMultiScattering(a: DkAtmosphere, origin: vec3f, direction: vec3f, sunDirection: vec3f)
+fn dkIntegrateMultiScattering(a: DkAtmosphere, h: f32, direction: vec3f, sunDirection: vec3f)
     -> DkMultiScatterSample {
     let isotropicPhase = 1.0 / (4.0 * DK_PI);
 
-    let r = clamp(length(origin), a.Rg, a.Rt);
-    let mu = dot(origin, direction) / r;
+    let r = a.Rg + h;
+    let origin = vec3f(0.0, 0.0, r);
+    let mu = direction.z;
 
-    let hitsGround = dkIntersectsGround(a, r, mu);
+    let hitsGround = dkIntersectsGround(a, h, mu);
     var tMax = dkDistanceToTopAtmosphereBoundary(a, r, mu);
     if (hitsGround) {
-        tMax = dkDistanceToBottomAtmosphereBoundary(a, r, mu);
+        tMax = dkDistanceToBottomAtmosphereBoundary(a, h, mu);
     }
 
     var result: DkMultiScatterSample;
@@ -45,10 +46,10 @@ fn dkIntegrateMultiScattering(a: DkAtmosphere, origin: vec3f, direction: vec3f, 
     let dt = tMax / f32(DK_SAMPLES_MULTI_SCATTERING);
 
     for (var i = 0u; i < DK_SAMPLES_MULTI_SCATTERING; i = i + 1u) {
-        let position = origin + direction * (f32(i) + 0.5) * dt;
-        let ri = clamp(length(position), a.Rg, a.Rt);
-        let altitude = ri - a.Rg;
-        let muS = clamp(dot(position, sunDirection) / ri, -1.0, 1.0);
+        let t = (f32(i) + 0.5) * dt;
+        let altitude = dkAltitudeAlongRay(a, h, mu, t);
+        let ri = a.Rg + altitude;
+        let muS = clamp(dot(origin + direction * t, sunDirection) / ri, -1.0, 1.0);
 
         let scattering = a.betaR * dkDensityRayleigh(a, altitude) + a.betaMSca * dkDensityMie(a, altitude);
         let extinction = max(dkExtinction(a, altitude), vec3f(1e-9));
@@ -56,21 +57,16 @@ fn dkIntegrateMultiScattering(a: DkAtmosphere, origin: vec3f, direction: vec3f, 
 
         // The planet itself shadows the sample when the sun is below its local horizon.
         var sunTransmittance = vec3f(0.0);
-        if (!dkIntersectsGround(a, ri, muS)) {
+        if (!dkIntersectsGround(a, altitude, muS)) {
             sunTransmittance = dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, ri, muS);
         }
 
-        // Integrating the in-scattered light across the step analytically rather than as a point sample,
-        // which is what lets the step count stay as low as it does.
-        //
-        // Both terms carry the isotropic phase, and both are weighted by the solid angle per direction
-        // outside, so the two factors cancel into a plain average over directions. Leaving the phase off the
-        // transfer term inflates it by 4*pi, which pins the series at its clamp and turns the table into
-        // hundreds of units of almost pure blue instead of a number near one.
+        // Integrated across the step analytically rather than as a point sample, so few steps suffice. The
+        // sunlight scatters towards the ray with the isotropic phase; the transfer term is light scattered
+        // from unit incoming radiance over the whole sphere, whose phase integrates to 1 (Hillaire eq. 7).
         let inScatter = sunTransmittance * scattering * isotropicPhase;
-        let scatteredAway = scattering * isotropicPhase;
         result.luminance = result.luminance + throughput * (inScatter - inScatter * stepTransmittance) / extinction;
-        result.transfer = result.transfer + throughput * (scatteredAway - scatteredAway * stepTransmittance) / extinction;
+        result.transfer = result.transfer + throughput * (scattering - scattering * stepTransmittance) / extinction;
 
         throughput = throughput * stepTransmittance;
     }
@@ -100,9 +96,8 @@ fn dkPrecomputeMultiScattering(@builtin(global_invocation_id) id: vec3u) {
     let uv = (vec2f(f32(id.x), f32(id.y)) + 0.5) / size;
     let rMuS = dkMultiScatteringRMuS(a, uv, size);
 
-    let r = rMuS.x;
+    let h = rMuS.x - a.Rg;
     let muS = rMuS.y;
-    let origin = vec3f(0.0, 0.0, r);
     let sunDirection = vec3f(sqrt(max(1.0 - muS * muS, 0.0)), 0.0, muS);
 
     var luminance = vec3f(0.0);
@@ -116,17 +111,17 @@ fn dkPrecomputeMultiScattering(@builtin(global_invocation_id) id: vec3u) {
             let polar = acos(1.0 - 2.0 * (f32(j) + 0.5) / f32(DK_MS_DIRECTIONS));
             let direction = vec3f(sin(polar) * cos(azimuth), sin(polar) * sin(azimuth), cos(polar));
 
-            let sample = dkIntegrateMultiScattering(a, origin, direction, sunDirection);
+            let sample = dkIntegrateMultiScattering(a, h, direction, sunDirection);
             luminance = luminance + sample.luminance;
             transfer = transfer + sample.transfer;
         }
     }
 
-    // Average over directions, weighted by the solid angle each one stands for.
+    // Both are integrals over the sphere with the isotropic phase, 4 pi / N per direction times 1 / (4 pi):
+    // plain averages over the directions (Hillaire eqs. 5 and 7).
     let directions = f32(DK_MS_DIRECTIONS * DK_MS_DIRECTIONS);
-    let sphereSolidAngle = 4.0 * DK_PI;
-    luminance = luminance * sphereSolidAngle / directions;
-    transfer = transfer * sphereSolidAngle / directions;
+    luminance = luminance / directions;
+    transfer = transfer / directions;
 
     // The geometric series over all remaining orders. Clamped below 1 because a transfer of 1 would mean a
     // perfectly conserving atmosphere and an infinite sum.

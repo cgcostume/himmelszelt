@@ -1,6 +1,6 @@
 /**
- * Reading a LUT back to the CPU. Not needed to render, but needed to look at one: the dev page turns these
- * into downloadable PNGs, and the tests assert on actual texel values rather than on a screenshot.
+ * Reading a LUT back to the CPU. Not needed to render, but needed to look at one: the site turns these
+ * into downloadable images, and the tests assert on actual texel values rather than on a screenshot.
  */
 
 /** Decodes one IEEE 754 binary16 value. WebGPU has no float16 typed array, so the bits arrive as a u16. */

@@ -27,8 +27,8 @@ osghimmel/         read-only reference clone, gitignored
 | npm package | Directory | Status |
 |---|---|---|
 | `@himmelszelt/sternzeit` (astronomy/sidereal time math) | `packages/sternzeit` | Julian Day, sidereal time, sun/moon/earth positions, moon phase, sun direction from the moon, earthshine and librations done (precise + approx), ΔT from IERS observations and Espenak & Meeus; cross-checked against astronomia; stars stubbed |
-| `@himmelszelt/dunstkreis` (WebGPU atmosphere, Bruneton precise + Hillaire fast) | `packages/dunstkreis` | Hillaire pipeline + dev page working; Bruneton, IBL, performance pending |
-| `@himmelszelt/sternwarte` (the website, `private: true`) | `site/` | sternzeit chapter done (figures, glossary tooltips, references, TOC); dunstkreis placeholder, and `planned: true` placeholders for nachtgestirn, sternenheer, gewoelk, rundbild; deployed to GitHub Pages by CI from main |
+| `@himmelszelt/dunstkreis` (WebGPU atmosphere, Bruneton precise + Hillaire fast) | `packages/dunstkreis` | Hillaire pipeline working, live in its chapter; Bruneton, IBL, performance pending |
+| `@himmelszelt/sternwarte` (the website, `private: true`) | `site/` | sternzeit chapter done (figures, glossary tooltips, references, TOC); dunstkreis chapter started (live sky, section skeleton), and `planned: true` placeholders for nachtgestirn, sternenheer, gewoelk, rundbild; deployed to GitHub Pages by CI from main |
 | `@himmelszelt/gewoelk` (clouds) | not created yet | later |
 | `@himmelszelt/sternenheer` (star rendering) | not created yet | later; the old poetic word for the host of stars, and clear of himmelszelt |
 | `@himmelszelt/nachtgestirn` (moon rendering) | not created yet | later |
@@ -52,8 +52,7 @@ Final showpiece: one comprehensive demo
 combining sun, moon, atmosphere, stars, clouds. Audience: developers who want to use the
 libraries; should be a joy to read, educational, and nerdy. Hard requirements, non-negotiable:
 runs locally with a single command, deploys as static files to GitHub Pages, no other hosting.
-The per-package `static/` dev pages are interim and get deleted once their chapter exists in the
-site.
+No per-package dev pages: a library is developed and debugged in its chapter, which imports its source directly.
 
 **No cross-module hard dependencies.** `dunstkreis` doesn't depend on `sternzeit`, it takes a
 sun/moon direction vector + time as plain inputs. Whoever embeds it computes that vector however
@@ -78,8 +77,8 @@ one.
 
 Open this directory as a plain VS Code folder (single root). `pnpm install` at the root installs
 everything; one `pnpm-lock.yaml`, one `biome.json`, one `tsconfig.base.json` (each package's
-`tsconfig.json` extends it). Cross-package dependencies use `workspace:*` (e.g. dunstkreis' dev page
-uses sternzeit), which pnpm rewrites to real version ranges on publish.
+`tsconfig.json` extends it). Cross-package dependencies use `workspace:*` (e.g. dunstkreis' tests
+use sternzeit), which pnpm rewrites to real version ranges on publish.
 
 Root scripts: `pnpm dev` (site at http://localhost:4321/himmelszelt/), `pnpm build`, `pnpm typecheck`, `pnpm test` (recursive), `pnpm lint`, `pnpm format`, `pnpm clean` (removes everything generated, including `node_modules`).
 

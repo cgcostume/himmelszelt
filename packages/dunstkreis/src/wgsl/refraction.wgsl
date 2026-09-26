@@ -36,8 +36,10 @@ fn dkRefractViewDirection(direction: vec3f, observerHeightM: f32, temperatureC: 
     }
 
     let apparentAltitude = atan2(direction.z, horizontal) / DK_DEG_TO_RAD;
-    let refraction = dkAtmosphericRefractionFromApparent(apparentAltitude, observerHeightM, temperatureC);
-    let trueAltitude = (apparentAltitude - refraction) * DK_DEG_TO_RAD;
+    let delta = dkAtmosphericRefractionFromApparent(apparentAltitude, observerHeightM, temperatureC) * DK_DEG_TO_RAD;
 
-    return vec3f(direction.xy / horizontal * cos(trueAltitude), sin(trueAltitude));
+    // Lowered by delta within its vertical plane, towards `down`. A rotation by at most 0.6 degrees, with its sine and
+    // cosine as polynomials: WGSL promises sin and cos only to 2^-11, fifty times the margin of the sun disc's test.
+    let down = vec3f(direction.z * direction.xy / horizontal, -horizontal);
+    return normalize(direction * (1.0 - 0.5 * delta * delta) + down * (delta - delta * delta * delta / 6.0));
 }

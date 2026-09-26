@@ -7,8 +7,8 @@ import { compileWgsl, gpuDevice, wgslSource } from "./gpu.js";
 const PASSES: Record<string, readonly string[]> = {
     transmittance: ["atmosphere", "common", "lut", "quality", "transmittance"],
     multiscattering: ["atmosphere", "common", "lut", "sampling", "quality", "multiscattering"],
-    skyview: ["atmosphere", "common", "lut", "sampling", "quality", "skyview"],
-    sky: ["atmosphere", "common", "lut", "sampling", "refraction", "quality", "sky"],
+    skyview: ["atmosphere", "common", "lut", "sampling", "raymarch", "quality", "skyview"],
+    sky: ["atmosphere", "common", "lut", "sampling", "raymarch", "refraction", "quality", "sky"],
 };
 
 for (const [name, fragments] of Object.entries(PASSES)) {
@@ -29,7 +29,7 @@ test("the composable fragments compile without any pass, binding or override", a
 
     // The property that makes them droppable into someone else's shader: no bindings, no entry points, and
     // no dependency on the quality overrides.
-    const composable = ["atmosphere", "common", "lut", "sampling"].map(wgslSource).join("\n");
+    const composable = ["atmosphere", "common", "lut", "sampling", "raymarch"].map(wgslSource).join("\n");
     expect(await compileWgsl(device, composable)).toEqual([]);
 
     // And refraction on its own, which the moon, star and cloud modules paste in without the rest.

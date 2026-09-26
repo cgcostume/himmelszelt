@@ -4,6 +4,13 @@ import { defineConfig } from "astro/config";
 
 const source = (path) => fileURLToPath(new URL(`../packages/${path}`, import.meta.url));
 
+// dunstkreis' shaders are .wgsl files its own build inlines as strings; the site reads its source, so it does the same.
+const wgsl = {
+    name: "wgsl",
+    transform: (code, id) =>
+        id.endsWith(".wgsl") ? { code: `export default ${JSON.stringify(code)};`, map: null } : null,
+};
+
 // Static output only: served locally by `pnpm dev` and deployed as plain files to GitHub Pages under /himmelszelt.
 export default defineConfig({
     site: "https://cgcostume.github.io",
@@ -26,11 +33,14 @@ export default defineConfig({
         },
     },
     vite: {
+        plugins: [wgsl],
         // The site always shows the libraries' current source, no package build needed in between.
         resolve: {
             alias: [
                 { find: /^@himmelszelt\/sternzeit$/, replacement: source("sternzeit/src/index.ts") },
                 { find: /^@himmelszelt\/sternzeit\/approx$/, replacement: source("sternzeit/src/approx.ts") },
+                { find: /^@himmelszelt\/dunstkreis$/, replacement: source("dunstkreis/src/index.ts") },
+                { find: /^@himmelszelt\/dunstkreis\/approx$/, replacement: source("dunstkreis/src/approx.ts") },
             ],
         },
     },

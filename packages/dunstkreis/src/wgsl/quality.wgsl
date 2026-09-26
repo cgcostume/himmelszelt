@@ -34,3 +34,10 @@ override DK_SAMPLES_SKY_VIEW: u32 = 30u;
 // Consumed by the render pass, not by `refraction.wgsl`: that snippet stays free of every override and every
 // uniform, so it can be pasted into the moon, star and cloud modules on its own.
 override DK_REFRACTION: bool = true;
+
+// Whether the render pass dithers its output: grain of one 8-bit step against the bands smooth gradients show on an
+// 8-bit target. Off for a float target, which has no such steps.
+override DK_DITHER: bool = true;
+
+// Whether the render pass draws the debug overlay: altitude lines, the compass directions and a ring around the Sun.
+override DK_DEBUG_GRID: bool = false;

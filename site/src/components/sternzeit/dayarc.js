@@ -1,5 +1,6 @@
 import * as precise from "@himmelszelt/sternzeit";
 import Zdog from "zdog";
+import { onDemand } from "../frame.js";
 import { COMPASS, cssColor, gridLine, labelAboveY, svgText } from "./figure.js";
 import { aboveVisibleHorizon } from "./horizon.js";
 import { onChange, state } from "./state.js";
@@ -340,6 +341,7 @@ frameEl.addEventListener("pointermove", (event) => {
         Math.max(TILT_MIN, rotation.x - (event.clientY - dragFrom.y) * DRAG_RADIANS_PER_PX),
     );
     dragFrom = { x: event.clientX, y: event.clientY };
+    requestFrame();
 });
 frameEl.addEventListener("pointerup", () => {
     dragFrom = null;
@@ -363,12 +365,15 @@ function frame() {
         shape.svgElement.setAttribute("stroke-linecap", "round");
     }
     placeCompass();
-    requestAnimationFrame(frame);
 }
+
+// Drawn only when something changed: a drag, a resize or the moment and place.
+const requestFrame = onDemand(frame);
 
 function update() {
     rebuildPaths();
     renderAnalemma();
+    requestFrame();
 }
 
 onChange(update);
@@ -377,6 +382,7 @@ onChange(update);
 new ResizeObserver(() => {
     renderAnalemma();
     measurePanel();
+    requestFrame();
 }).observe(analemmaSvg);
+new ResizeObserver(requestFrame).observe(frameEl);
 update();
-requestAnimationFrame(frame);

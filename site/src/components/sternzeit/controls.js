@@ -155,9 +155,10 @@ for (const root of roots) {
     // Both angles step by the same unit, from one group of buttons.
     wireStepping(latitude, field("latlongStep"), commitLatLong, LATLONG_DECIMALS);
     wireStepping(longitude, field("latlongStep"), commitLatLong, LATLONG_DECIMALS);
-    // The formulas take heights within the atmosphere they model; the input keeps to that range.
+    // Up to the International Space Station's orbit: parallax and horizon dip hold at any height, refraction fades
+    // out with the air.
     const commitHeight = () => {
-        height.value = Math.min(8000, Math.max(0, Number(height.value) || 0));
+        height.value = Math.min(Number(height.max), Math.max(0, Number(height.value) || 0));
         update({ heightM: Number(height.value) }, root);
     };
     wireStepping(height, field("heightStep"), commitHeight, 0);

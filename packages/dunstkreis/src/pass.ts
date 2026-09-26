@@ -13,43 +13,44 @@ export interface AtmosphereLUTs {
 }
 
 /**
- * Smallest observer height above the ground, in metres, that the passes will use. At exactly ground level
- * the geometry degenerates: the distance to the horizon is zero, so the horizon cosine is zero, and every
- * downward ray hits the ground at distance zero and integrates nothing, leaving a black band.
- *
- * One metre is also about the smallest height that survives the trip through the uniform block. The observer
- * radius is an f32 near 6360, where one ulp is roughly half a metre, so anything below that rounds back to
- * the ground radius exactly and the degeneracy returns. Do not lower this without changing that
- * representation: it is a numeric floor, not a stylistic one.
+ * Smallest observer height above the ground, in meters, that the passes will use. At exactly ground level the horizon
+ * is exactly horizontal and every downward ray hits the ground at distance zero. The shaders take the altitude rather
+ * than the radius, which f32 resolves to only ~0.5 m, so a millimeter is enough.
  */
-export const MIN_OBSERVER_HEIGHT_M = 1;
+export const MIN_OBSERVER_HEIGHT_M = 0.001;
 
 /** Everything that can change per frame. */
 export interface SkyParams {
     /**
-     * Unit vector towards the sun, in the observer's local ENU frame (x east, y north, z up), the frame
-     * `@himmelszelt/sternzeit`'s `horizontalToDirection` returns. The shaders only rely on `z` being up; the rest just
-     * has to match the view rays. This must be the *true* (geometric)
-     * direction: if `refraction` is enabled the pass warps view rays instead, and feeding an already-refracted
-     * direction as well would lift the sun twice.
+     * Unit vector towards the sun in the observer's ENU frame (x east, y north, z up), as `@himmelszelt/sternzeit`'s
+     * `sun.direction` returns it. The shaders only rely on `z` being up; the rest has to match the view rays.
+     * The true (geometric) direction: with `refraction` on, the pass warps the view rays, and an already refracted
+     * direction would lift the sun twice.
      */
     sunDirection: readonly [number, number, number];
-    /**
-     * Observer height above the ground, in metres. Clamped into
-     * [`MIN_OBSERVER_HEIGHT_M`, top of the atmosphere]: this package assumes an observer inside the
-     * atmosphere, and standing exactly on the ground is a degenerate case rather than a valid one.
-     */
+    /** Observer height above the ground, in meters, at least `MIN_OBSERVER_HEIGHT_M`. Above the atmosphere, the sky is
+     *  raymarched per pixel instead of looked up, and the planet shows, lit by the sun. */
     observerHeightM: number;
     /** Inverse view-projection matrix, column-major, used to turn fragment coordinates back into rays. */
     inverseViewProjection: Float32Array;
+    /**
+     * Bends the matrix's projection towards a fisheye: 0 keeps its own perspective, 1 is stereographic, which shows
+     * the whole sky as a disc looking up and a small planet looking down. The matrix still gives the camera's axis and
+     * scale; widen its field of view along with this.
+     */
+    projectionDistance: number;
     /** Tone mapping exposure, applied to the physical radiance the model outputs. */
     exposure: number;
+    /** The Sun's apparent angular diameter, in degrees, as `@himmelszelt/sternzeit`'s `sun.apparentAngularDiameter`
+     *  returns it. About 0.53. */
+    sunAngularDiameter: number;
     /**
      * Per-ray atmospheric refraction. Disable it if you already refract your sun/moon directions yourself.
      * `false` is equivalent to the original's behaviour of correcting only the body directions, CPU-side.
      */
     refraction: false | RefractionConditions;
-    /** osgHimmel's artistic blue-hour tint: linear RGB plus an intensity. Set the intensity to 0 to skip it. */
+    /** osgHimmel's artistic blue-hour tint: linear RGB plus an intensity, 0 by default. Not physical: the ozone already
+     *  turns twilight blue. */
     lHeureBleue: { color: readonly [number, number, number]; intensity: number };
 }
 

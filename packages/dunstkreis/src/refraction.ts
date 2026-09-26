@@ -1,7 +1,7 @@
 /**
  * Atmospheric refraction, as a correction to a view ray.
  *
- * This is the CPU twin of `wgsl/refraction.ts`; both implement the same fit and are pinned to each other by a
+ * This is the CPU twin of `wgsl/refraction.wgsl`; both implement the same fit and are pinned to each other by a
  * test. Having it here too lets a consumer do the correction on their own rays, and lets the shader's version
  * be verified without a screenshot.
  *
@@ -74,9 +74,37 @@ export function refractViewDirection(
     if (horizontal < 1e-9) return [x, y, Math.sign(z) || 1]; // straight up or down, nothing to bend
 
     const apparentAltitude = Math.atan2(z, horizontal) / DEG_TO_RAD;
-    const trueAltitude =
-        (apparentAltitude - atmosphericRefractionFromApparent(apparentAltitude, conditions)) * DEG_TO_RAD;
+    const delta = atmosphericRefractionFromApparent(apparentAltitude, conditions) * DEG_TO_RAD;
 
-    const cosAltitude = Math.cos(trueAltitude);
-    return [(x / horizontal) * cosAltitude, (y / horizontal) * cosAltitude, Math.sin(trueAltitude)];
+    // Lowered by delta within its vertical plane, as the WGSL does it: a small rotation with polynomial sine and cosine.
+    const c = 1 - 0.5 * delta * delta;
+    const s = delta - (delta * delta * delta) / 6;
+    const [vx, vy, vz] = [
+        x * c + ((z * x) / horizontal) * s,
+        y * c + ((z * y) / horizontal) * s,
+        z * c - horizontal * s,
+    ];
+    const length = Math.hypot(vx, vy, vz);
+    return [vx / length, vy / length, vz / length];
+}
+
+/**
+ * The inverse of `refractViewDirection`: where a body in the true direction appears, lifted by refraction. Iterated,
+ * since the fit takes the apparent altitude it is to produce; it converges to well below an arcsecond in a few steps.
+ * For pointing a camera at the sun, or marking where it shows.
+ */
+export function apparentDirection(
+    direction: readonly [number, number, number],
+    conditions: RefractionConditions = {},
+): [number, number, number] {
+    const [x, y, z] = direction;
+    const horizontal = Math.hypot(x, y);
+    if (horizontal < 1e-9) return [x, y, Math.sign(z) || 1];
+
+    const trueAltitude = Math.atan2(z, horizontal) / DEG_TO_RAD;
+    let altitude = trueAltitude;
+    for (let i = 0; i < 10; ++i) altitude = trueAltitude + atmosphericRefractionFromApparent(altitude, conditions);
+
+    const cosAltitude = Math.cos(altitude * DEG_TO_RAD);
+    return [(x / horizontal) * cosAltitude, (y / horizontal) * cosAltitude, Math.sin(altitude * DEG_TO_RAD)];
 }
