@@ -6,6 +6,7 @@ order: 2
 references:
     - bennett1982
     - edlen1966
+    - fritsch1980
     - kopp2011
     - lagarde2014
     - narkowicz2016
@@ -15,6 +16,7 @@ import Cite from "../../components/Cite.astro";
 import Controls from "../../components/sternzeit/Controls.astro";
 import Planned from "../../components/Planned.astro";
 import Sky from "../../components/dunstkreis/Sky.astro";
+import Tables from "../../components/dunstkreis/Tables.astro";
 
 This chapter is being written. The sky below is live, and it grows with the chapter; the dashed boxes are the figures
 still to come.
@@ -114,10 +116,18 @@ being a special case.
 
 ## Tables instead of raymarching
 
-<Planned title="The tables, live">
-    Every table dunstkreis computes, as it is right now: transmittance, multiple scattering and the sky view, later
-    aerial perspective and Bruneton's four-dimensional inscatter table. Over each, the grid of its parameterization;
-    pointing at a texel shows the ray it stands for.
+Three tables carry the sky. Transmittance says how much light gets through the air along any ray, multiple scattering
+how much light arrives after more than one bounce, and the sky view holds the whole sky as seen from where the observer
+stands, rebuilt whenever the Sun or the observer moves. The sky pass then only looks up one texel per pixel. Their
+sizes and sample counts are open here to play with; the sky above follows.
+
+<Tables />
+
+<Controls open />
+
+<Planned title="The tables, explained">
+    Over each table, the grid of its parameterization; pointing at a texel shows the ray it stands for. Later aerial
+    perspective, and Bruneton's four-dimensional inscatter table for comparison.
 </Planned>
 
 ## Resolution and sampling
@@ -153,14 +163,22 @@ looks the same under it.
 
 Automatic exposure is an option, for a renderer without an exposure of its own, or to follow day into night. A light
 meter on the GPU reads the sky-view table in directions spread evenly over the sky above the horizon, and takes the
-geometric mean of their luminance, as a camera's averaging meter does: EV100 = log2(L · 100 / 12.5). The sky pass
-reads that straight from the meter's buffer. Metering the table rather than the image means the reading does not change
-as the camera turns, and the sun's disc, which is not in the table, does not darken everything. The meter reads again
-whenever the table is rebuilt; the exposure follows at once, without the eye's slow adaptation. The day meters around
-EV 14, a sunset around 12, and twilight follows down to 8, where it stops: exposed like day, the night would look like
-day, only noisier. On top, a ramp over the day shapes it: compensations at sun altitudes, which by default keep the
-night, the blue hour and the minutes around sunrise and sunset darker than metered, the sunset a little brighter
-than the sunrise, and noon as metered.
+geometric mean of their luminance, as a camera's averaging meter does: EV100 = log2(L · 100 / 12.5). It meters the
+directions below the horizon apart and takes the brighter: on the ground that is the sky, high up the lit air below,
+while the sky above turns black, and from space the lit planet, raymarched like the view. The sky pass reads that
+straight from the meter's buffer. Metering the table rather than the image means the reading does not change as the
+camera turns, and the sun's disc, which is not in the table, does not darken everything. The meter reads again whenever
+the table is rebuilt; the exposure follows at once, without the eye's slow adaptation. The day meters around EV 14, a
+sunset around 12, and twilight follows down to 8, where it stops: exposed like day, the night would look like day, only
+noisier. On top, a ramp over the day shapes it: compensations at sun altitudes above the observer's horizon, which sinks
+as the observer rises, joined by a smooth curve that never overshoots them <Cite id="fritsch1980" />. By default they
+keep the night and the minutes around sunrise and sunset darker than metered, lift the blue hour a little so its blue
+shows, make the sunset a little brighter than the sunrise, and leave noon as metered. Mornings and evenings may differ,
+though the model's air is the same for both.
+
+The floor of EV 8 is for now. A camera exposes a landscape by full moon at about EV −3 and the Milky Way at about −6
+to −7. Once the moon lights the air and the stars are drawn, the floor drops and the night follows. Exposed that far
+today, the sky would show only the sun's last twilight, amplified beyond what the table can hold.
 
 For a display, the pass then tone maps: exposed, compressed into the display's range by Narkowicz's fit of the ACES
 filmic curve <Cite id="narkowicz2016" />, and encoded for sRGB, dithered against banding. A renderer with its own HDR

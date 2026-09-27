@@ -16,19 +16,20 @@ renderer.
 
 New to terms like inscatter, optical depth, or scale height? The [himmelszelt site](https://github.com/cgcostume/himmelszelt) explains every one of them, right where it is used.
 
-## Two variants
+## Hillaire at the core
 
-Both are provided, in the same spirit as `@himmelszelt/sternzeit`'s precise/approximate pairs.
+The sky follows Hillaire 2020 on the model osgHimmel took from Bruneton & Neyret 2008:
 
-| export | technique | LUTs |
+| table | size | computed |
 |---|---|---|
-| `@himmelszelt/dunstkreis` | Bruneton & Neyret 2008, the faithful osgHimmel port | transmittance 256x64, irradiance 64x16, 4D inscatter 32x128x32x8, N scattering orders |
-| `@himmelszelt/dunstkreis/approx` | Hillaire 2020 | transmittance 256x64, multiscattering 32x32, sky-view 192x108 per frame |
+| transmittance | 256x64 | once per model, `precomputeAtmosphere()` |
+| multiple scattering | 32x32 | once per model, `precomputeAtmosphere()` |
+| sky view | 192x108 | whenever the Sun or the observer moves, by the pass from `createSkyPass()` |
 
-`approx` is a slight misnomer, kept for consistency with `sternzeit`'s naming: Hillaire is not a cheaper
-approximation *of* Bruneton but a different decomposition, and its multiple-scattering term is infinite-order
-(under an isotropic assumption) where Bruneton's is a fixed number of orders. It is much cheaper to precompute
-and lower resolution, so "fast vs. precise" holds overall, but it will not always look worse.
+Hillaire's multiple-scattering term is infinite-order under an isotropic assumption, where Bruneton's is a fixed number
+of orders; for the Earth's air the two look nearly alike. Bruneton's four-dimensional inscatter table (32x128x32x8,
+osgHimmel's) holds every sun position at once and gives aerial perspective between any two points. It may come later,
+as another way to fill the sky-view table, rather than as a second renderer.
 
 ## Observer altitude and refraction
 
@@ -65,24 +66,40 @@ the same EV100 looks the same in any renderer that follows it.
 
 `autoExposure: true` exposes by a light meter instead, for a renderer without an exposure of its own or to follow day
 into night. Whenever the sky-view table is rebuilt, a compute pass reads it in directions spread evenly over the sky
-above the horizon and writes the geometric mean luminance to a buffer the sky pass reads, so there is no round trip to
-the CPU: EV100 = log2(L · 100 / 12.5) (`ev100FromLuminance`), held within `autoExposureRange`, [8, 20] by default, less
-`exposureCompensation`. The lower bound keeps night dark: exposed like day, a night sky looks like one. Metering the
-table rather than the frame keeps the reading still as the camera turns and leaves the sun disc out of it. It follows
-at once, with no eye adaptation over time. `meteredEV100()` reads it back, e.g. for a UI.
+above the horizon and, apart, below it, and writes the brighter of the two geometric mean luminances to a buffer the sky
+pass reads, so there is no round trip to the CPU. On the ground that is the sky; the air towards the near ground is dim.
+High up it is the lit air below, while the sky above turns black. Above the atmosphere, beyond the table, the meter
+raymarches its directions instead and so reads the lit planet. The reading is EV100 = log2(L · 100 / 12.5)
+(`ev100FromLuminance`), held within `autoExposureRange`, [8, 20] by default, less `exposureCompensation`. The lower
+bound keeps night dark: exposed like day, a night sky looks like one. Metering the table rather than the frame keeps the
+reading still as the camera turns and leaves the sun disc out of it. It follows at once, with no eye adaptation over
+time. `meteredEV100()` reads it back, e.g. for a UI.
 
-`autoExposureKeys` shapes the ramp over the day: compensations at sun altitudes, linear in between, and with a `phase`
-of `"rising"` or `"setting"` for mornings and evenings apart, told by whether the sun is east or west of the meridian.
-The metering stays the base, so the ramp still follows a changed atmosphere. `DEFAULT_AUTO_EXPOSURE_KEYS`:
+`autoExposureKeys` shapes the ramp over the day: compensations at sun altitudes above the observer's horizon, which
+sinks with height (some 10° at 100 km, so a sun 5° below the horizontal still shines on the observer and is keyed so),
+joined by a monotone cubic (Fritsch & Carlson) that is smooth and never overshoots a key. A key's compensation is one
+value, or a pair `{ rising, setting }` for mornings and evenings apart, told by whether the sun is east or west of the
+meridian and blended across it so noon does not jump. The model's air is the same morning and evening, so the pair is a
+matter of taste, e.g. for hazier evenings. The metering stays the base, so the ramp still follows a changed atmosphere.
+`DEFAULT_AUTO_EXPOSURE_KEYS`:
 
 | Sun altitude | Morning | Evening | |
 |---|---|---|---|
 | −18° | −2 | −2 | night, darker |
-| −6° | −1.2 | −1.2 | blue hour, darker |
-| −2° | −0.7 | −0.7 | just before sunrise, just after sunset |
+| −8° | −1.5 | −1.5 | end of the blue hour |
+| −5° | −0.8 | −0.8 | blue hour, lifted so its blue shows |
+| −2° | −0.9 | −0.9 | before sunrise, after sunset |
+| −1° | −0.7 | −0.7 | just before sunrise, just after sunset |
 | 0° | 0 | +0.2 | sunrise, sunset |
 | 6° | +0.2 | +0.3 | golden hour |
 | 60° | 0 | 0 | noon, as metered |
+
+Night is yet to come. A camera exposes a landscape by full moon at about EV100 −3 and the Milky Way at about −6 to
+−7, some 11 to 15 stops below the floor of 8. The floor stays until the night sky has light of its own: the moon's
+scattered light, airglow, zodiacal light and the stars. Exposed that far now, the sky would show only the sun's last
+twilight, amplified to where the f16 table runs out of precision. Then the floor drops and the night key follows.
+
+To do: high up, and from space, the metered exposure still looks too bright, if only subjectively.
 
 With `toneMap` on, the default, the pass writes display colors for an 8-bit target: exposed, mapped by Narkowicz's
 ACES fit, sRGB encoded and dithered. Off, it writes the exposed luminance, linear and unclamped, for a float target and
@@ -91,7 +108,7 @@ tuned to its own arbitrary units.
 
 ## Status
 
-Early port in progress. Implemented so far, all shared by both variants:
+Implemented so far:
 
 - `src/model.ts`: the physical model and LUT configuration, with `OSGHIMMEL_ATMOSPHERE_MODEL` reproducing
   the original's `t_modelCfg` exactly and the defaults moved to modern values (thinner aerosol layer,
@@ -101,9 +118,12 @@ Early port in progress. Implemented so far, all shared by both variants:
 - `src/wgsl/quality.wgsl` and `src/quality.ts`: the pipeline-overridable constants for sample counts and
   feature switches.
 - `src/wgsl/common.wgsl`: ray-sphere geometry, rays bent by the air, density profiles and phase functions.
-- `src/pass.ts`: the `SkyPass`/`AtmosphereLUTs` interfaces both variants implement.
+- `src/pass.ts`: the `SkyPass`/`AtmosphereLUTs` interfaces.
+- `src/luts.ts`: the transmittance and multiple-scattering tables, `precomputeAtmosphere()`.
+- `src/sky.ts`: the sky-view table, the light meter and the sky pass, `createSkyPass()`.
+- `src/exposure.ts`: EV100 and the automatic exposure's ramp.
 
-The compute pipelines follow next, Hillaire first, then Bruneton.
+Aerial perspective, Bruneton's table as another filler, and the lit ground seen from inside follow.
 
 ### Composing the shaders
 
@@ -164,10 +184,10 @@ Echtzeit"](https://daniellimberger.de/resources/2012%20%E2%80%93%20Mueller%20%28
 (2012, German).
 
 - E. Bruneton, F. Neyret, ["Precomputed Atmospheric Scattering"](https://inria.hal.science/inria-00288758)
-  (EGSR 2008): the precise variant, and the model osgHimmel's atmosphere is built on.
+  (EGSR 2008): the model osgHimmel's atmosphere is built on.
 - S. Hillaire, ["A Scalable and Production Ready Sky and Atmosphere Rendering
-  Technique"](https://sebh.github.io/publications/egsr2020.pdf) (EGSR 2020): the fast variant, and the ozone layer's profile and
-  absorption coefficients.
+  Technique"](https://sebh.github.io/publications/egsr2020.pdf) (EGSR 2020): the tables and the sky pass, and the
+  ozone layer's profile and absorption coefficients.
 - T. Nishita, T. Sirai, K. Tadamura, E. Nakamae, "Display of the Earth Taking into Account Atmospheric
   Scattering" (SIGGRAPH 1993): atmosphere thickness constant.
 - K. Riley, D. S. Ebert, M. Kraus, J. Tessendorf, C. Hansen, "Efficient Rendering of Atmospheric Phenomena"
@@ -175,6 +195,8 @@ Echtzeit"](https://daniellimberger.de/resources/2012%20%E2%80%93%20Mueller%20%28
 - G. G. Bennett, "The Calculation of Astronomical Refraction in Marine Navigation" (1982): the fit the traced
   refraction is tested against.
 - B. Edlén, "The Refractive Index of Air" (Metrologia, 1966): the refractivity of air.
+- F. N. Fritsch, R. E. Carlson, "Monotone Piecewise Cubic Interpolation" (SIAM J. Numer. Anal., 1980): the curve
+  through the exposure keys.
 - G. Kopp, J. L. Lean, "A new, lower value of total solar irradiance" (Geophysical Research Letters, 2011): the
   solar constant.
 - S. Lagarde, C. de Rousiers, "Moving Frostbite to Physically Based Rendering" (SIGGRAPH course, 2014): EV100 and the

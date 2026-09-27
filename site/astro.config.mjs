@@ -40,7 +40,6 @@ export default defineConfig({
                 { find: /^@himmelszelt\/sternzeit$/, replacement: source("sternzeit/src/index.ts") },
                 { find: /^@himmelszelt\/sternzeit\/approx$/, replacement: source("sternzeit/src/approx.ts") },
                 { find: /^@himmelszelt\/dunstkreis$/, replacement: source("dunstkreis/src/index.ts") },
-                { find: /^@himmelszelt\/dunstkreis\/approx$/, replacement: source("dunstkreis/src/approx.ts") },
             ],
         },
     },

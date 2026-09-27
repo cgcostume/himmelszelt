@@ -1,7 +1,7 @@
 // Mappings between physical parameters and LUT texture coordinates. Requires `atmosphere.wgsl` and
 // `common.wgsl`. Like those, this declares no bindings and takes the struct by value.
 //
-// The transmittance mapping is Bruneton's, shared by both variants. It is not a linear remap of (r, mu):
+// The transmittance mapping is Bruneton's. It is not a linear remap of (r, mu):
 // it is built around the distance to the top of the atmosphere, which concentrates resolution near the
 // horizon where the sky's gradient is steep, and it is exactly invertible, which is what lets the precompute
 // pass and the sampling path agree.

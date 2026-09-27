@@ -125,7 +125,7 @@ fn dkToneMap(exposed: vec3f) -> vec3f {
 // Sky and sun disc transmittance for an observer inside the atmosphere, from the sky-view table.
 struct DkSkySample {
     luminance: vec3f,
-    // Transmittance towards the sun disc along the ray, zero where the planet is in the way.
+    // Transmittance along the ray towards the sun disc, zero where the planet is in the way.
     sunTransmittance: vec3f,
     hitsGround: bool,
     // The direction the ray leaves the atmosphere in, bent by the air: where the sun has to be to show in it.
@@ -161,7 +161,8 @@ fn dkSkyFromInside(a: DkAtmosphere, view: vec3f, h: f32) -> DkSkySample {
         result.direction = view * sqrt(1.0 - texel.a * texel.a) + down * texel.a;
     }
 
-    let sunMu = dkParams.sunDirection.z;
+    // Per ray rather than for the sun's center, so a disc half below the bent horizon still shows its upper half.
+    let sunMu = result.direction.z;
     let sunTransmittance = dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, a.Rg + h, sunMu);
     result.sunTransmittance = select(sunTransmittance, vec3f(0.0), result.hitsGround);
     return result;
@@ -170,26 +171,11 @@ fn dkSkyFromInside(a: DkAtmosphere, view: vec3f, h: f32) -> DkSkySample {
 // The same for an observer above the atmosphere, raymarched per pixel from where the ray enters it; beyond the table,
 // which covers only altitudes inside.
 fn dkSkyFromSpace(a: DkAtmosphere, view: vec3f, altitude: f32) -> DkSkySample {
-    var result: DkSkySample;
-    result.direction = view;
-    result.hitsGround = false;
-    result.luminance = vec3f(0.0);
-    result.sunTransmittance = vec3f(1.0);
-
-    let top = a.Rt - a.Rg;
-    let rc = a.Rg + altitude;
-    let b = rc * view.z;
-    // The discriminant of the ray and the atmosphere's sphere, rc^2 - Rt^2 factored as for dkRhoSquared.
-    let discriminant = b * b - (altitude - top) * (rc + a.Rt);
-    if (discriminant < 0.0 || b >= 0.0) {
-        return result;
-    }
-
-    let entry = vec3f(0.0, 0.0, rc) + view * (-b - sqrt(discriminant));
-    let ray = dkRaymarchSky(
-        a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, normalize(entry), top, view, dkParams.sunDirection,
-        DK_SAMPLES_SKY_VIEW, true,
+    let ray = dkRaymarchFromSpace(
+        a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, altitude, view, dkParams.sunDirection,
+        DK_SAMPLES_SKY_VIEW,
     );
+    var result: DkSkySample;
     result.luminance = ray.luminance;
     result.hitsGround = ray.hitsGround;
     result.direction = ray.direction;

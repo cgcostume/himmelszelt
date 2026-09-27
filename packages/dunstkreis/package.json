@@ -26,10 +26,6 @@
         ".": {
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
-        },
-        "./approx": {
-            "types": "./dist/approx.d.ts",
-            "import": "./dist/approx.js"
         }
     },
     "files": [

@@ -1,4 +1,4 @@
-// Transmittance LUT precompute, shared by both variants. Requires `atmosphere.wgsl`, `common.wgsl`,
+// Transmittance LUT precompute. Requires `atmosphere.wgsl`, `common.wgsl`,
 // `lut.wgsl` and `quality.wgsl`.
 //
 // Unlike those snippets, this is a pass: it owns an entry point and therefore has to declare its bindings.

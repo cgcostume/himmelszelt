@@ -22,17 +22,33 @@ test("the luminance scale gives the sun its illuminance", () => {
     expect(luminance * luminanceScale(DEFAULT_ATMOSPHERE_MODEL)).toBeCloseTo(128_000, 6);
 });
 
-test("the keys ramp the compensation with the sun, mornings and evenings apart", () => {
-    const at = (altitude: number, east: boolean) => {
+test("the keys ramp the compensation smoothly with the sun, mornings and evenings apart, and lifts the blue hour", () => {
+    const at = (altitude: number, east: number) => {
         const a = (altitude * Math.PI) / 180;
-        return autoExposureCompensation(DEFAULT_AUTO_EXPOSURE_KEYS, [(east ? 1 : -1) * Math.cos(a), 0, Math.sin(a)]);
+        const [e, n] = [Math.sin(east), -Math.cos(east)];
+        return autoExposureCompensation(DEFAULT_AUTO_EXPOSURE_KEYS, [e * Math.cos(a), n * Math.cos(a), Math.sin(a)]);
     };
-    expect(at(-40, true)).toBe(-2);
-    expect(at(-12, false)).toBeCloseTo(-1.6, 12);
-    expect(at(-1, true)).toBeCloseTo(-0.35, 12);
-    expect(at(0, true)).toBeCloseTo(0, 12);
-    expect(at(0, false)).toBeCloseTo(0.2, 12);
-    expect(at(3, false)).toBeCloseTo(0.25, 12);
-    expect(at(80, true)).toBe(0);
+    const [east, west] = [Math.PI / 2, -Math.PI / 2];
+    expect(at(-40, east)).toBe(-2);
+    expect(at(-1, east)).toBeCloseTo(-0.7, 12);
+    expect(at(0, east)).toBeCloseTo(0, 12);
+    expect(at(0, west)).toBeCloseTo(0.2, 12);
+    expect(at(-12, west)).toBeGreaterThan(-2);
+    expect(at(-12, west)).toBeLessThan(-1.5);
+    expect(at(-5, west)).toBeCloseTo(-0.8, 12);
+    expect(at(-3, west)).toBeLessThan(-0.8);
+    expect(at(3, west)).toBeGreaterThan(0.2);
+    expect(at(3, west)).toBeLessThan(0.3);
+    expect(at(80, east)).toBe(0);
     expect(autoExposureCompensation([], [0, 0, 1])).toBe(0);
+    // High up, the horizon sinks: a sun 5° below the horizontal is 5° above a horizon 10° down.
+    const low = [0, Math.cos((5 * Math.PI) / 180), -Math.sin((5 * Math.PI) / 180)] as const;
+    expect(autoExposureCompensation(DEFAULT_AUTO_EXPOSURE_KEYS, low, 10)).toBeCloseTo(at(5, 0), 12);
+    // No jumps: not over the altitudes, nor where morning turns into evening across the meridian.
+    for (let altitude = -30; altitude < 70; altitude += 0.01) {
+        expect(Math.abs(at(altitude + 0.01, east) - at(altitude, east))).toBeLessThan(0.01);
+    }
+    for (let azimuth = -Math.PI; azimuth < Math.PI; azimuth += 0.001) {
+        expect(Math.abs(at(3, azimuth + 0.001) - at(3, azimuth))).toBeLessThan(0.001);
+    }
 });

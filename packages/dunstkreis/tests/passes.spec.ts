@@ -10,7 +10,7 @@ const PASSES: Record<string, readonly string[]> = {
     multiscattering: ["atmosphere", "common", "lut", "sampling", "quality", "multiscattering"],
     skyview: ["atmosphere", "common", "lut", "sampling", "raymarch", "quality", "skyview"],
     sky: ["atmosphere", "common", "lut", "sampling", "raymarch", "quality", "sky"],
-    exposure: ["atmosphere", "common", "lut", "exposure"],
+    exposure: ["atmosphere", "common", "lut", "sampling", "raymarch", "exposure"],
 };
 
 for (const [name, fragments] of Object.entries(PASSES)) {

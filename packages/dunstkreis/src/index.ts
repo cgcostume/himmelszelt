@@ -1,13 +1,11 @@
-// The precise variant: Bruneton & Neyret, "Precomputed Atmospheric Scattering" (2008), the model osgHimmel's
-// atmosphere is built on. Use `@himmelszelt/dunstkreis/approx` for the cheaper Hillaire 2020 decomposition; the
-// two share everything below and differ only in how they integrate it.
-//
-// The precompute pipeline (transmittance, irradiance, 4D inscatter, N scattering orders) is not implemented
-// yet. What is here is the shared foundation: the model, refraction, and the WGSL layer.
+// The sky after Hillaire, "A Scalable and Production Ready Sky and Atmosphere Rendering Technique" (EGSR 2020), on the
+// model osgHimmel took from Bruneton & Neyret: small tables precomputed per model, one of the whole sky per sun, and a
+// compute pass that writes it into the caller's target. Bruneton's four-dimensional table may come later as another
+// way to fill the sky-view table.
 
 // biome-ignore-all assist/source/organizeImports: exports are hand-grouped by domain, not alphabetical
 
-// The physical model, shared by both variants.
+// The physical model.
 export type {
     AtmosphereModel,
     ExponentialLayer,
@@ -38,6 +36,12 @@ export { ATMOSPHERE_UNIFORM_SIZE, atmosphereUniformData } from "./uniforms.js";
 // Pipeline-overridable constants, for specializing a shader at pipeline creation.
 export type { QualityConstants } from "./quality.js";
 export { DEFAULT_QUALITY, pipelineConstants } from "./quality.js";
+
+// Precomputing the tables and rendering the sky with them.
+export type { PrecomputeOptions } from "./luts.js";
+export { precomputeAtmosphere } from "./luts.js";
+export type { SkyPassOptions } from "./sky.js";
+export { createSkyPass } from "./sky.js";
 
 // Pass and LUT interfaces. This package records into passes the caller owns; it creates no device, canvas,
 // context or render pass of its own.

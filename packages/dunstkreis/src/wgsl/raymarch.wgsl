@@ -1,6 +1,6 @@
 // Raymarching the sky along one view ray, bent by the air. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl` and
 // `sampling.wgsl`. Binding-free like those: the tables come in as arguments. The sky-view pass fills its table with it,
-// and the sky pass calls it per pixel for an observer above the atmosphere, where the table does not reach.
+// and the sky pass and the light meter call it for an observer above the atmosphere, where the table does not reach.
 
 struct DkSkyRay {
     // Scattered light reaching the start of the ray.
@@ -75,4 +75,36 @@ fn dkRaymarchSky(
         }
     }
     return result;
+}
+
+// The same for an observer at an altitude above the atmosphere, from where `direction` enters it, with the planet lit.
+// Black, with nothing in the way, where the ray misses the atmosphere.
+fn dkRaymarchFromSpace(
+    a: DkAtmosphere,
+    transmittanceLut: texture_2d<f32>,
+    multiScatteringLut: texture_2d<f32>,
+    lutSampler: sampler,
+    altitude: f32,
+    direction: vec3f,
+    sunDirection: vec3f,
+    steps: u32,
+) -> DkSkyRay {
+    var result: DkSkyRay;
+    result.luminance = vec3f(0.0);
+    result.transmittance = vec3f(1.0);
+    result.direction = direction;
+    result.hitsGround = false;
+
+    let top = a.Rt - a.Rg;
+    let rc = a.Rg + altitude;
+    let b = rc * direction.z;
+    // The discriminant of the ray and the atmosphere's sphere, rc^2 - Rt^2 factored as for dkRhoSquared.
+    let discriminant = b * b - (altitude - top) * (rc + a.Rt);
+    if (discriminant < 0.0 || b >= 0.0) {
+        return result;
+    }
+    let entry = vec3f(0.0, 0.0, rc) + direction * (-b - sqrt(discriminant));
+    return dkRaymarchSky(
+        a, transmittanceLut, multiScatteringLut, lutSampler, normalize(entry), top, direction, sunDirection, steps, true,
+    );
 }

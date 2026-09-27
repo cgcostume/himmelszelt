@@ -135,6 +135,13 @@ export const references: Record<string, Reference> = {
         year: 1966,
         note: "The refractivity of air dunstkreis bends its rays by.",
     },
+    fritsch1980: {
+        authors: "F. N. Fritsch, R. E. Carlson",
+        title: "Monotone Piecewise Cubic Interpolation",
+        venue: "SIAM Journal on Numerical Analysis 17(2)",
+        year: 1980,
+        note: "The smooth curve the automatic exposure's keys are joined with.",
+    },
     kopp2011: {
         authors: "Greg Kopp, Judith L. Lean",
         title: "A new, lower value of total solar irradiance: Evidence and climate significance",

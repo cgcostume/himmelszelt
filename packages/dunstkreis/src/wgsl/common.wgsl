@@ -1,4 +1,4 @@
-// Geometry, density profiles and phase functions, shared by both variants. Requires `atmosphere.wgsl` for the
+// Geometry, density profiles and phase functions. Requires `atmosphere.wgsl` for the
 // DkAtmosphere struct, which every function takes by value rather than reading from a binding, so that this
 // composes into an existing pipeline without dictating group or binding indices.
 //

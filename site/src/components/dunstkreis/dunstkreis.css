@@ -69,3 +69,130 @@
     color: #ccc;
     text-align: center;
 }
+/* The tables figure: a bar of switches, then each table with its controls over it. */
+.lut-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+.lut-bar .view-toggle {
+    position: static;
+}
+.lut {
+    margin-bottom: 1.25rem;
+}
+.lut p {
+    margin: 0 0 0.4rem;
+}
+.lut-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.75rem;
+    align-items: center;
+    font-size: var(--text-small);
+}
+.lut-controls label {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+.lut-controls output {
+    min-width: 3ch;
+    font-variant-numeric: tabular-nums;
+}
+.lut-controls input[type="number"] {
+    width: 7ch;
+    font-variant-numeric: tabular-nums;
+}
+/* The canvas with its axes: the y axis read bottom up along the left, the x axis under it. */
+.lut-plot {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.25rem 0.4rem;
+}
+/* Start, title and end of each axis, with a hairline on either side of the title filling the space between them. In
+   logical sizes, so the same rules hold for the y axis, whose text runs vertically. */
+.lut-axis {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    color: var(--muted);
+    font-size: var(--text-small);
+    white-space: nowrap;
+}
+.lut-axis > span:nth-child(2) {
+    display: flex;
+    flex: 1;
+    gap: 0.6rem;
+    align-items: center;
+}
+.lut-axis > span:nth-child(2)::before,
+.lut-axis > span:nth-child(2)::after {
+    content: "";
+    flex: 1;
+    block-size: 1px;
+    background: var(--line);
+}
+.lut-y {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    flex-direction: row-reverse;
+}
+.lut-x {
+    grid-column: 2;
+}
+.lut-presets {
+    gap: 0.4rem 1rem;
+}
+/* The table drawn texel by texel, an overlay for the highlight, and the tooltip over both. */
+.lut-stage {
+    position: relative;
+    width: 100%;
+    background: #000;
+}
+.lut-stage canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+.lut-stage canvas[data-field="image"] {
+    cursor: crosshair;
+}
+.lut-stage canvas[data-field="overlay"],
+.lut-tip {
+    pointer-events: none;
+}
+.lut-tip {
+    position: absolute;
+    z-index: 2;
+    padding: 0.35rem 0.55rem;
+    border: var(--border);
+    border-radius: var(--radius-small);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
+    white-space: pre;
+}
+/* Where the pointed texel sits on each axis, over the axis' own line and labels. */
+.lut-axis {
+    position: relative;
+}
+.lut-mark {
+    position: absolute;
+    padding-inline: 0.4rem;
+    background: var(--bg);
+    color: var(--accent);
+    font-family: var(--font-mono);
+}
+.lut-x .lut-mark {
+    transform: translateX(-50%);
+}
+.lut-y .lut-mark {
+    transform: translateY(-50%);
+}

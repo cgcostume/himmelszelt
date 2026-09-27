@@ -28,8 +28,8 @@ export interface TentLayer {
 }
 
 /**
- * Physical parameters of the atmosphere. Shared by both variants (Bruneton and Hillaire): they differ in how
- * they integrate this model, not in the model itself.
+ * Physical parameters of the atmosphere, the same for Hillaire's tables and Bruneton's: they differ in how they
+ * integrate this model, not in the model itself.
  *
  * Coefficients are per RGB channel and in `1/km`, at sea level. They are wavelength-dependent in reality, so
  * an RGB triple is already an approximation of a spectral quantity, picked for (680, 550, 440) nm.
@@ -129,8 +129,8 @@ export const OSGHIMMEL_ATMOSPHERE_MODEL: AtmosphereModel = {
  * Resolution and sampling configuration for the precomputed LUTs. The original generated these via multi-pass
  * FBO renders; here they become compute shader dispatch and storage texture sizes.
  *
- * `transmittance` is shared by both variants. `irradiance`/`inscatter` belong to Bruneton, `multiScattering`
- * and `skyView` to Hillaire; each variant ignores the other's fields.
+ * `irradiance`, `inscatter` and `scatteringOrders` are held for Bruneton's tables, which are not built yet; the
+ * rest is what `precomputeAtmosphere()` and `createSkyPass()` use.
  */
 export interface PrecomputedTextureConfig {
     transmittance: { width: number; height: number };

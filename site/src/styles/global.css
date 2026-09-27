@@ -295,6 +295,61 @@ input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
+/* Sliders: the part left of the thumb a 3px rail in the accent, the rest a 1px line, both with round outer ends. The
+   thumb is a plain disc ringed in the background color, which reads as a gap between the two rails. --range-fill, from
+   range.js, is how far along the value is; the rail ends under the thumb's center, which never reaches the edges. */
+input[type="range"] {
+    --range-thumb: 18px;
+    --range-gap: var(--bg);
+    --range-left: calc(var(--range-fill, 0.5) * (100% - var(--range-thumb)) + var(--range-thumb) / 2);
+    appearance: none;
+    height: var(--range-thumb);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+    height: 3px;
+    border-radius: 1.5px;
+    background:
+        linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) 3px no-repeat,
+        linear-gradient(var(--line), var(--line)) right center / 100% 1px no-repeat;
+}
+input[type="range"]::-moz-range-track {
+    height: 3px;
+    border-radius: 1.5px;
+    background:
+        linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) 3px no-repeat,
+        linear-gradient(var(--line), var(--line)) right center / 100% 1px no-repeat;
+}
+input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: var(--range-thumb);
+    height: var(--range-thumb);
+    margin-top: calc((3px - var(--range-thumb)) / 2);
+    border: 3px solid var(--range-gap);
+    border-radius: 50%;
+    background: var(--accent);
+}
+input[type="range"]::-moz-range-thumb {
+    width: var(--range-thumb);
+    height: var(--range-thumb);
+    border: 3px solid var(--range-gap);
+    border-radius: 50%;
+    background: var(--accent);
+}
+input[type="range"]:focus-visible {
+    outline: none;
+}
+/* Focus tints the gap around the thumb rather than drawing a ring of its own: the thumb keeps its size and shape. */
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--range-gap));
+}
+input[type="range"]:focus-visible::-moz-range-thumb {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--range-gap));
+}
 /* Breaks out of the reading column to the full site width, for scenes, controls and tables that need the room. */
 .wide {
     --wide-width: min(var(--wide), 100vw - 3rem);

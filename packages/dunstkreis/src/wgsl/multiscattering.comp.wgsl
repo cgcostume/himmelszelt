@@ -12,7 +12,7 @@
 @group(0) @binding(3) var dkMultiScatteringOut: texture_storage_2d<rgba16float, write>;
 
 // Directions sampled per axis, so 64 in total. Hillaire's own value. Quadratic, and this pass is the whole
-// precompute cost in the fast variant, so it is not an override: 64 is cheap and there is little to gain.
+// precompute cost, so it is not an override: 64 is cheap and there is little to gain.
 const DK_MS_DIRECTIONS: u32 = 8u;
 
 struct DkMultiScatterSample {

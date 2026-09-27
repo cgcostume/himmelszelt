@@ -3,12 +3,16 @@ import type { AtmosphereModel, PrecomputedTextureConfig } from "./model.js";
 
 /**
  * The precomputed lookup tables, owned by this package. Recomputed only when the model parameters change, not
- * per frame. Which textures are present depends on the variant that produced them.
+ * per frame.
  */
 export interface AtmosphereLUTs {
     readonly model: AtmosphereModel;
     readonly config: PrecomputedTextureConfig;
     readonly transmittance: GPUTexture;
+    readonly multiScattering: GPUTexture;
+    /** The sampler the tables are read with, and the model packed as the shaders take it, for the passes to reuse. */
+    readonly sampler: GPUSampler;
+    readonly atmosphereBuffer: GPUBuffer;
     destroy(): void;
 }
 

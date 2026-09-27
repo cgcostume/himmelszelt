@@ -1,168 +1,12 @@
 import { autoExposureCompensation, DEFAULT_AUTO_EXPOSURE_KEYS, exposureFromEV100 } from "./exposure.js";
-import {
-    type AtmosphereModel,
-    DEFAULT_ATMOSPHERE_MODEL,
-    DEFAULT_TEXTURE_CONFIG,
-    type PrecomputedTextureConfig,
-} from "./model.js";
+import { createLut, dispatch } from "./luts.js";
 import { type AtmosphereLUTs, MIN_OBSERVER_HEIGHT_M, type SkyParams, type SkyPass } from "./pass.js";
 import { pipelineConstants } from "./quality.js";
 import { apparentDirection } from "./refraction.js";
-import { ATMOSPHERE_UNIFORM_SIZE, atmosphereUniformData } from "./uniforms.js";
 import * as wgsl from "./wgsl/index.js";
 
-/** rgba16float everywhere: enough range for physical radiance, half the bandwidth of rgba32float. */
-const LUT_FORMAT: GPUTextureFormat = "rgba16float";
-
-const WORKGROUP = 8;
-const dispatch = (n: number) => Math.ceil(n / WORKGROUP);
-
-export interface PrecomputeOptions {
-    model?: AtmosphereModel;
-    config?: PrecomputedTextureConfig;
-}
-
-/** The tables the fast variant needs, plus the pieces a sky pass built on them has to reuse. */
-export interface HillaireLUTs extends AtmosphereLUTs {
-    readonly multiScattering: GPUTexture;
-    readonly sampler: GPUSampler;
-    readonly atmosphereBuffer: GPUBuffer;
-}
-
-function createLut(device: GPUDevice, label: string, width: number, height: number): GPUTexture {
-    // GPUTextureUsage and friends are read inside functions, never at module scope: importing this package
-    // must not require the WebGPU globals to exist yet, so it stays safe to import in Node or during SSR.
-    const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC;
-
-    return device.createTexture({ label, size: { width, height }, format: LUT_FORMAT, usage });
-}
-
-/**
- * Precomputes the transmittance and multiple-scattering tables, Hillaire 2020. Cheap enough to re-run
- * whenever a model parameter changes, which is the practical reason to prefer this variant over Bruneton's.
- *
- * Neither table depends on the sun or the observer, so this runs once per model, not per frame.
- */
-export async function precomputeAtmosphereApprox(
-    device: GPUDevice,
-    options: PrecomputeOptions = {},
-): Promise<HillaireLUTs> {
-    const model = options.model ?? DEFAULT_ATMOSPHERE_MODEL;
-    const config = options.config ?? DEFAULT_TEXTURE_CONFIG;
-    const constants = pipelineConstants(config);
-
-    const transmittance = createLut(
-        device,
-        "dunstkreis:transmittance",
-        config.transmittance.width,
-        config.transmittance.height,
-    );
-    const multiScattering = createLut(
-        device,
-        "dunstkreis:multiScattering",
-        config.multiScattering.width,
-        config.multiScattering.height,
-    );
-
-    const sampler = device.createSampler({
-        magFilter: "linear",
-        minFilter: "linear",
-        addressModeU: "clamp-to-edge",
-        addressModeV: "clamp-to-edge",
-    });
-
-    const atmosphereBuffer = device.createBuffer({
-        label: "dunstkreis:atmosphere",
-        size: ATMOSPHERE_UNIFORM_SIZE,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-    device.queue.writeBuffer(atmosphereBuffer, 0, atmosphereUniformData(model));
-
-    const transmittancePipeline = device.createComputePipeline({
-        label: "dunstkreis:transmittance",
-        layout: "auto",
-        compute: {
-            module: device.createShaderModule({
-                code: [wgsl.quality, wgsl.atmosphere, wgsl.common, wgsl.lut, wgsl.transmittance].join("\n"),
-            }),
-            entryPoint: "dkPrecomputeTransmittance",
-            constants,
-        },
-    });
-
-    const multiScatteringPipeline = device.createComputePipeline({
-        label: "dunstkreis:multiScattering",
-        layout: "auto",
-        compute: {
-            module: device.createShaderModule({
-                code: [wgsl.quality, wgsl.atmosphere, wgsl.common, wgsl.lut, wgsl.sampling, wgsl.multiscattering].join(
-                    "\n",
-                ),
-            }),
-            entryPoint: "dkPrecomputeMultiScattering",
-            constants,
-        },
-    });
-
-    const encoder = device.createCommandEncoder({ label: "dunstkreis:precompute" });
-
-    // Transmittance first: the multiple-scattering pass reads it, and both run in one submission because
-    // WebGPU orders passes within a queue, so no explicit barrier is needed between them.
-    const transmittancePass = encoder.beginComputePass();
-    transmittancePass.setPipeline(transmittancePipeline);
-    transmittancePass.setBindGroup(
-        0,
-        device.createBindGroup({
-            layout: transmittancePipeline.getBindGroupLayout(0),
-            entries: [
-                { binding: 0, resource: { buffer: atmosphereBuffer } },
-                { binding: 1, resource: transmittance.createView() },
-            ],
-        }),
-    );
-    transmittancePass.dispatchWorkgroups(dispatch(config.transmittance.width), dispatch(config.transmittance.height));
-    transmittancePass.end();
-
-    const multiScatteringPass = encoder.beginComputePass();
-    multiScatteringPass.setPipeline(multiScatteringPipeline);
-    multiScatteringPass.setBindGroup(
-        0,
-        device.createBindGroup({
-            layout: multiScatteringPipeline.getBindGroupLayout(0),
-            entries: [
-                { binding: 0, resource: { buffer: atmosphereBuffer } },
-                { binding: 1, resource: transmittance.createView() },
-                { binding: 2, resource: sampler },
-                { binding: 3, resource: multiScattering.createView() },
-            ],
-        }),
-    );
-    multiScatteringPass.dispatchWorkgroups(
-        dispatch(config.multiScattering.width),
-        dispatch(config.multiScattering.height),
-    );
-    multiScatteringPass.end();
-
-    device.queue.submit([encoder.finish()]);
-    await device.queue.onSubmittedWorkDone();
-
-    return {
-        model,
-        config,
-        transmittance,
-        multiScattering,
-        sampler,
-        atmosphereBuffer,
-        destroy() {
-            transmittance.destroy();
-            multiScattering.destroy();
-            atmosphereBuffer.destroy();
-        },
-    };
-}
-
 export interface SkyPassOptions {
-    luts: HillaireLUTs;
+    luts: AtmosphereLUTs;
     /**
      * Format of the target the pass writes into, which needs `STORAGE_BINDING` usage: rgba8unorm for a display (a
      * canvas configured with it), bgra8unorm with the "bgra8unorm-storage" feature, rgba16float or rgba32float for
@@ -202,13 +46,13 @@ const DEFAULTS: SkyParams = {
 };
 
 /**
- * A sky pass for the fast variant. Owns the per-frame sky-view table and the compute pipelines, and nothing
+ * A sky pass. Owns the per-frame sky-view table and the compute pipelines, and nothing
  * else: no device, no canvas, no context of its own.
  *
  * `update()` rebuilds the sky-view table only when the sun or the observer moved; a camera move just rewrites the
  * uniforms. `encode()` then costs one texture fetch per pixel.
  */
-export function createSkyPassApprox(device: GPUDevice, options: SkyPassOptions): SkyPass {
+export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPass {
     const { luts, format } = options;
     const { config } = luts;
     const { toneMap = true, dither = true, debugGrid = false } = options;
@@ -218,6 +62,12 @@ export function createSkyPassApprox(device: GPUDevice, options: SkyPassOptions):
 
     const skyViewParams = device.createBuffer({
         label: "dunstkreis:skyViewParams",
+        size: SKY_VIEW_PARAMS_SIZE,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    // The light meter's own, with the observer's altitude unclamped: above the atmosphere it raymarches.
+    const meterParams = device.createBuffer({
+        label: "dunstkreis:meterParams",
         size: SKY_VIEW_PARAMS_SIZE,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
@@ -308,7 +158,7 @@ export function createSkyPassApprox(device: GPUDevice, options: SkyPassOptions):
         layout: "auto",
         compute: {
             module: device.createShaderModule({
-                code: [wgsl.atmosphere, wgsl.common, wgsl.lut, wgsl.exposure].join("\n"),
+                code: [wgsl.atmosphere, wgsl.common, wgsl.lut, wgsl.sampling, wgsl.raymarch, wgsl.exposure].join("\n"),
             }),
             entryPoint: "dkMeterSky",
         },
@@ -317,10 +167,12 @@ export function createSkyPassApprox(device: GPUDevice, options: SkyPassOptions):
         layout: meterPipeline.getBindGroupLayout(0),
         entries: [
             { binding: 0, resource: { buffer: luts.atmosphereBuffer } },
-            { binding: 1, resource: { buffer: skyViewParams } },
+            { binding: 1, resource: { buffer: meterParams } },
             { binding: 2, resource: skyView.createView() },
             { binding: 3, resource: luts.sampler },
             { binding: 4, resource: { buffer: metering } },
+            { binding: 5, resource: luts.transmittance.createView() },
+            { binding: 6, resource: luts.multiScattering.createView() },
         ],
     });
 
@@ -349,6 +201,7 @@ export function createSkyPassApprox(device: GPUDevice, options: SkyPassOptions):
                 // Where the sun shows, for the debug overlay's ring, traced like the view rays.
                 if (debugGrid) apparentSun = apparentDirection(params.sunDirection, luts.model, height);
                 device.queue.writeBuffer(skyViewParams, 0, new Float32Array([sx, sy, sz, altitudeKm]));
+                device.queue.writeBuffer(meterParams, 0, new Float32Array([sx, sy, sz, height / 1000]));
                 const encoder = device.createCommandEncoder({ label: "dunstkreis:skyView" });
                 const pass = encoder.beginComputePass();
                 pass.setPipeline(skyViewPipeline);
@@ -373,8 +226,10 @@ export function createSkyPassApprox(device: GPUDevice, options: SkyPassOptions):
             sky[24] = exposureFromEV100(params.ev100);
             sky[25] = (params.sunAngularDiameter / 2) * (Math.PI / 180);
             sky[26] = params.autoExposureRange[0];
+            const { groundRadiusKm } = luts.model.planet;
+            const dip = (Math.acos(groundRadiusKm / (groundRadiusKm + height / 1000)) * 180) / Math.PI;
             compensation =
-                params.exposureCompensation + autoExposureCompensation(params.autoExposureKeys, [sx, sy, sz]);
+                params.exposureCompensation + autoExposureCompensation(params.autoExposureKeys, [sx, sy, sz], dip);
             sky[27] = compensation;
             sky.set(apparentSun, 28);
             sky[31] = params.projectionDistance;
@@ -411,6 +266,7 @@ export function createSkyPassApprox(device: GPUDevice, options: SkyPassOptions):
         destroy() {
             skyView.destroy();
             skyViewParams.destroy();
+            meterParams.destroy();
             skyParams.destroy();
             metering.destroy();
         },

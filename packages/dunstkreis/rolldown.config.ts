@@ -19,7 +19,6 @@ export const wgsl = (): Plugin => ({
 export default defineConfig({
     input: {
         index: "src/index.ts",
-        approx: "src/approx.ts",
     },
     plugins: [wgsl(), dts()],
     output: {

@@ -43,7 +43,7 @@ test("atmosphereTopRadiusKm is the ground radius plus the shell thickness", () =
     expect(atmosphereTopRadiusKm(OSGHIMMEL_ATMOSPHERE_MODEL)).toBe(6456);
 });
 
-test("the texture config keeps osgHimmel's precompute resolution for the precise variant", () => {
+test("the texture config keeps osgHimmel's precompute resolution for Bruneton's tables", () => {
     expect(DEFAULT_TEXTURE_CONFIG.transmittance).toEqual({ width: 256, height: 64 });
     expect(DEFAULT_TEXTURE_CONFIG.irradiance).toEqual({ width: 64, height: 16 });
     expect(DEFAULT_TEXTURE_CONFIG.inscatter).toEqual({ resR: 32, resMu: 128, resMuS: 32, resNu: 8 });
