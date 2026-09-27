@@ -214,3 +214,34 @@
     font-size: var(--text-small);
     font-variant-numeric: tabular-nums;
 }
+
+/* The lighting figure's choices in rows: what it shows, and how finely it samples. A little wider than the text, so
+   each row fits on one line. */
+.lighting-overlay {
+    right: max(1rem, calc(var(--content-inset) - 3rem));
+    left: max(1rem, calc(var(--content-inset) - 3rem));
+    flex-direction: column;
+    align-items: stretch;
+}
+.lighting-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    align-items: center;
+}
+.toggle-separator {
+    align-self: stretch;
+    width: 1px;
+    margin: 0.2rem 0.25rem;
+    background: currentColor;
+    opacity: 0.4;
+}
+.lighting-toggles {
+    margin-left: 0;
+}
+/* A figure's readout, right under its view, as the Moon's in sternzeit. */
+.view-status {
+    margin: 0.5rem 0 0;
+    padding-inline: var(--content-inset);
+    font-size: var(--text-meta);
+}

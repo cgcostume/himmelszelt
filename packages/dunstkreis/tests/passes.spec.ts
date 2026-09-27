@@ -13,9 +13,14 @@ const PASSES: Record<string, readonly string[]> = {
     skyCube: ["atmosphere", "common", "lut", "sampling", "raymarch", "cube", "goldenset", "quality", "sky"],
     exposure: ["atmosphere", "common", "lut", "sampling", "raymarch", "exposure"],
     irradiance: ["cube", "irradiance"],
+    mipmap: ["mipmap"],
 };
 // The output the sky pass leaves to whoever builds its pipeline.
-const OUTPUTS: Record<string, string> = { sky: skyOutput("rgba8unorm"), skyCube: skyCubeOutput("rgba16float") };
+const OUTPUTS: Record<string, string> = {
+    sky: skyOutput("rgba8unorm"),
+    skyCube: skyCubeOutput("rgba16float"),
+    mipmap: skyCubeOutput("rgba16float"),
+};
 
 for (const [name, fragments] of Object.entries(PASSES)) {
     test(`the ${name} pass compiles from its declared fragments`, async () => {

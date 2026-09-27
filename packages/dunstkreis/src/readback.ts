@@ -24,14 +24,21 @@ export interface TexturePixels {
 }
 
 /**
- * Copies one layer of an `rgba16float` or `rgba32float` texture back and decodes it, e.g. a face of a cube map. The
- * texture must have been created with `COPY_SRC`; every LUT this package makes is.
+ * Copies one layer of an `rgba16float` or `rgba32float` texture back and decodes it, e.g. a face of a cube map, from
+ * mip level `mipLevel`, 0 by default. The texture must have been created with `COPY_SRC`; every LUT this package
+ * makes is.
  *
  * Rows are padded to 256 bytes in the intermediate buffer, as WebGPU requires, and unpacked here, so the
  * returned data is tightly packed regardless of width.
  */
-export async function readTexture(device: GPUDevice, texture: GPUTexture, layer = 0): Promise<TexturePixels> {
-    const { width, height } = texture;
+export async function readTexture(
+    device: GPUDevice,
+    texture: GPUTexture,
+    layer = 0,
+    mipLevel = 0,
+): Promise<TexturePixels> {
+    const width = Math.max(1, texture.width >> mipLevel);
+    const height = Math.max(1, texture.height >> mipLevel);
     const full = texture.format === "rgba32float";
     const bytesPerTexel = full ? 16 : 8;
     const bytesPerRow = Math.ceil((width * bytesPerTexel) / 256) * 256;
@@ -43,7 +50,7 @@ export async function readTexture(device: GPUDevice, texture: GPUTexture, layer 
 
     const encoder = device.createCommandEncoder({ label: "dunstkreis:readback" });
     encoder.copyTextureToBuffer(
-        { texture, origin: { x: 0, y: 0, z: layer } },
+        { texture, mipLevel, origin: { x: 0, y: 0, z: layer } },
         { buffer, bytesPerRow },
         { width, height, depthOrArrayLayers: 1 },
     );

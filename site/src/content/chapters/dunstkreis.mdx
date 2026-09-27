@@ -32,7 +32,7 @@ still to come.
 
 ## Why is the sky blue?
 
-<Planned title="A short history of the question">
+<Planned title="A short history of the question" plan="keep, as a timeline.">
     From Leonardo's blue haze in front of distant mountains through Newton, Tyndall's blue light from fine particles and
     Rayleigh's inverse fourth power to Mie, Smoluchowski and Einstein, after Hoeppe's "Why the Sky Is Blue". A timeline,
     each step with the one idea it added.
@@ -57,13 +57,13 @@ still to come.
     below is the same thing for every height and angle at once.
 </Planned>
 
-<Planned title="Taking the sky apart">
+<Planned title="Taking the sky apart" plan="merge with Scattering orders into one figure, Rayleigh, Mie, ozone and each order as switches.">
     The same sunset with Rayleigh, Mie and ozone switched on and off one by one. Without ozone, twilight turns gray.
 </Planned>
 
 ## More than one bounce
 
-<Planned title="Scattering orders">
+<Planned title="Scattering orders" plan="merge into Taking the sky apart.">
     Light scattered once, twice, three times, side by side, and the difference each order still makes. Bruneton
     iterates a fixed number of orders, Hillaire sums all of them at once under the assumption that light scattered more
     than once no longer has a preferred direction.
@@ -92,27 +92,27 @@ far it bent; the transmittance table, indexed by where the light comes from, how
 looked up, and the sun disc flattens near the horizon and stays in view after it has geometrically set, without either
 being a special case.
 
-<Planned title="With and without refraction">
+<Planned title="With and without refraction" plan="keep, perhaps as a split view of the sky figure above rather than a figure of its own.">
     The setting Sun side by side, bent and unbent, zoomed in on the horizon: the disc flattened, still in view while
     geometrically already below the horizon, and the altitude grid to measure it against.
 </Planned>
 
 ## Luftperspektive
 
-<Planned title="Distance in the air">
+<Planned title="Distance in the air" plan="keep, once the aerial perspective volume is in.">
     Mountain ridges one behind another, with and without the air between them: contrast fades and colors shift
     towards the sky's with every kilometer, the cue painters since Leonardo use to paint depth. A small game: how far
     away is this ridge?
 </Planned>
 
-<Planned title="Beyond the atmosphere">
+<Planned title="Beyond the atmosphere" plan="move to nachtgestirn or the final demo, where there is a Moon to put behind the air.">
     The Moon, planets or a spaceship behind the atmosphere get the same treatment: dimmed and tinted by the air in
     front of them, and lit by sunlight that crossed the atmosphere on its way to them.
 </Planned>
 
 ## From the ground to orbit
 
-<Planned title="Leaving the ground">
+<Planned title="Leaving the ground" plan="drop as a figure: presets for eye level, an airliner and the ISS in the sky figure above, the text stays.">
     The observer from eye level up to the orbit of the International Space Station: the horizon dips, the sky darkens overhead, and
     from above the atmosphere the whole planet appears, its thin glowing rim and the terminator between day and night.
 </Planned>
@@ -128,6 +128,8 @@ sizes and sample counts are open here to play with; the sky above follows.
 
 <Controls open />
 
+## Lighting a scene
+
 The same sky can light a scene. The sky pass writes it into the six faces of a cube map, in cd/m² and without the
 sun's disc, and a second pass projects that onto nine spherical harmonics coefficients, which give the irradiance for
 any surface's orientation <Cite id="ramamoorthi2001" />. The sun lights the scene apart, as a light of its own, with what the air leaves of it.
@@ -138,14 +140,14 @@ any surface's orientation <Cite id="ramamoorthi2001" />. The sun lights the scen
 
 <Controls />
 
-<Planned title="The tables, explained">
+<Planned title="The tables, explained" plan="drop: the tables figure shows the axes and reads out every texel already; Bruneton's four-dimensional table goes to Bruneton and Hillaire.">
     Over each table, the grid of its parameterization; pointing at a texel shows the ray it stands for. Later aerial
     perspective, and Bruneton's four-dimensional inscatter table for comparison.
 </Planned>
 
 ## Resolution and sampling
 
-<Planned title="Starving the tables">
+<Planned title="Starving the tables" plan="merge into the tables figure, a high-resolution reference and the difference heat map as a switch there.">
     Table sizes and sample counts to turn down, next to a reference computed at high resolution, and a heat map of the
     difference: where bands and seams appear first, and why the mappings spend their texels near the horizon.
 </Planned>
@@ -203,20 +205,20 @@ pipeline turns that off and gets the exposed luminance itself, linear and unclam
     the browser offers one.
 </Planned>
 
-<Planned title="Banding and dithering">
+<Planned title="Banding and dithering" plan="merge into Exposure and tone mapping, as a zoomed-in switch.">
     A smooth twilight gradient quantized to 8 bits, zoomed in: the bands, and the same with a single step of noise
     added before quantizing.
 </Planned>
 
 ## Precise or approximate?
 
-<Planned title="Bruneton and Hillaire">
+<Planned title="Bruneton and Hillaire" plan="keep, with Bruneton's four-dimensional table next to Hillaire's three.">
     Both variants side by side at the same moment and place, and their difference.
 </Planned>
 
 ## Make your own
 
-<Planned title="The generator">
+<Planned title="The generator" plan="keep; exports: the tables as files, the nine coefficients, and the sky and irradiance maps as RGBE (.hdr), which any engine reads.">
     Everything this chapter changed along the way, the atmosphere, the table sizes, the sample counts and the encoding,
     in one place, previewed, and downloaded as files for your own renderer.
 </Planned>

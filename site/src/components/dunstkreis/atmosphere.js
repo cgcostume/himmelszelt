@@ -107,6 +107,7 @@ async function buildEnvironment() {
         cube = device.createTexture({
             label: "sternwarte:skyCube",
             size: { width: environment.size, height: environment.size, depthOrArrayLayers: 6 },
+            mipLevelCount: Math.floor(Math.log2(environment.size)) + 1,
             format: "rgba16float",
             usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
             textureBindingViewDimension: "cube",

@@ -35,6 +35,9 @@ fn dkSHBasis(d: vec3f) -> array<f32, 9> {
 @compute @workgroup_size(64)
 fn dkProjectSH(@builtin(local_invocation_index) index: u32) {
     let total = f32(DK_SH_THREADS * DK_SH_SAMPLES);
+    // The level whose faces hold about as many texels as there are samples, 6 x 26², or the finest there is.
+    let levels = f32(textureNumLevels(dkSource) - 1u);
+    let level = clamp(log2(f32(textureDimensions(dkSource).x) / 26.0), 0.0, levels);
     var sums: array<vec3f, 9>;
     for (var i = 0u; i < DK_SH_SAMPLES; i = i + 1u) {
         // A Fibonacci spiral over the whole sphere: even in solid angle.
@@ -43,7 +46,7 @@ fn dkProjectSH(@builtin(local_invocation_index) index: u32) {
         let azimuth = k * 2.399963229728653;
         let horizontal = sqrt(max(1.0 - z * z, 0.0));
         let d = vec3f(horizontal * cos(azimuth), horizontal * sin(azimuth), z);
-        let radiance = textureSampleLevel(dkSource, dkSourceSampler, d, 0.0).rgb;
+        let radiance = textureSampleLevel(dkSource, dkSourceSampler, d, level).rgb;
         var basis = dkSHBasis(d);
         for (var c = 0u; c < 9u; c = c + 1u) {
             sums[c] = sums[c] + radiance * basis[c];

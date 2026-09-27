@@ -1,6 +1,6 @@
 import { clampObserverHeight, createSkyPass } from "@himmelszelt/dunstkreis";
 import { onDemand } from "../frame.js";
-import { cameraFrame, createScene, SCENE_FRAMES } from "../scene/scene.js";
+import { cameraFrame, createScene } from "../scene/scene.js";
 import { environment, gpu, onEnvironment, onTables, quality, tables } from "./atmosphere.js";
 
 const DEG = Math.PI / 180;
@@ -10,18 +10,18 @@ const canvas = field("canvas");
 const pressed = (name) => field(name).getAttribute("aria-pressed") === "true";
 
 // Orbiting the solids' center, looking from the south-east and a little above.
-const camera = { yaw: 150 * DEG, pitch: 18 * DEG, distance: 9, fov: 50 * DEG };
+const camera = { yaw: 150 * DEG, pitch: 18 * DEG, distance: 6, fov: 50 * DEG };
 
 let context = null;
 let scene = null;
 // The turning solids' clock, running only while they turn.
 let seconds = 0;
 let last = null;
-// Frames summed since the last change; the sum runs on by itself up to SCENE_FRAMES, then rests.
-let frame = 0;
 const chosen = (name, fallback) => root.querySelector(`input[name="${name}"]:checked`)?.value ?? fallback;
 const shadowRays = () => Number(chosen("lighting-shadows", 8));
+const occlusionRays = () => Number(chosen("lighting-occlusion", 8));
 const liveSky = () => chosen("lighting-background", "atmosphere") === "atmosphere";
+const ground = () => chosen("lighting-ground", "backdrop");
 
 // The atmosphere behind the solids, rendered live through the scene's camera by a sky pass of the scene's own, linear
 // and unexposed: the sky map's texels blur the horizon with the unlit planet below it.
@@ -31,13 +31,13 @@ let background = null;
 
 function renderBackground(encoder, width, height) {
     const { luts } = tables();
-    const sunDisc = pressed("sunDisc");
     const { groundSamples } = quality;
-    if (skyPassFor.luts !== luts || skyPassFor.sunDisc !== sunDisc || skyPassFor.groundSamples !== groundSamples) {
+    // Without the sun disc: the scene draws it itself, after tone mapping, to smooth its edge.
+    if (skyPassFor.luts !== luts || skyPassFor.groundSamples !== groundSamples) {
         skyPass?.destroy();
-        const options = { luts, format: "rgba16float", toneMap: false, dither: false, sunDisc, groundSamples };
+        const options = { luts, format: "rgba16float", toneMap: false, dither: false, sunDisc: false, groundSamples };
         skyPass = createSkyPass(gpu.device, options);
-        skyPassFor = { luts, sunDisc, groundSamples };
+        skyPassFor = { luts, groundSamples };
     }
     if (background?.width !== width || background?.height !== height) {
         background?.destroy();
@@ -91,8 +91,7 @@ function render() {
 
     const { cube, ibl, sun, ev100, sky } = environment;
     const encoder = gpu.device.createCommandEncoder({ label: "sternwarte:lighting" });
-    // The background only changes with the frame's start, not over the running sum.
-    const live = liveSky() ? (frame === 0 ? renderBackground(encoder, width, height) : background) : null;
+    const live = liveSky() ? renderBackground(encoder, width, height) : null;
     scene.encode(encoder, context.getCurrentTexture(), {
         background: live,
         cube,
@@ -103,35 +102,31 @@ function render() {
         sunIlluminance: sun,
         ev100,
         sunDisc: pressed("sunDisc"),
-        occlusionRays: pressed("occlusion") ? 16 : 0,
+        bloom: { off: 0, light: 0.35, strong: 1 }[chosen("lighting-bloom", "strong")],
+        godRaySteps: Number(chosen("lighting-godrays", 8)),
+        // The air thins with a scale height of 8 km, the haze in it with 1.2 km.
+        airDensity: Math.exp(-cameraFrame(camera).eye[2] / 8000),
+        hazeDensity: Math.exp(-cameraFrame(camera).eye[2] / 1200),
+        occlusionRays: occlusionRays(),
         shadowRays: shadowRays(),
         sunLight: pressed("sunLight"),
         skyLight: pressed("skyLight"),
+        ground: ground(),
         seconds,
-        frame,
     });
     gpu.device.queue.submit([encoder.finish()]);
     const lux = 0.2126 * sun[0] + 0.7152 * sun[1] + 0.0722 * sun[2];
     const altitude = cameraFrame(camera).eye[2];
-    field("info").textContent =
-        `camera ${altitude < 1000 ? `${altitude.toFixed(1)} m` : `${(altitude / 1000).toFixed(2)} km`} up · ` +
-        `sunlight ${Math.round(lux).toLocaleString("en")} lux · EV ${ev100.toFixed(1)} metered`;
-    // Turning runs on by itself while asked to, each frame a new start; otherwise the sum runs on until it is done.
-    if (pressed("rotate")) {
-        frame = 0;
-        requestRender();
-    } else if (frame + 1 < SCENE_FRAMES) {
-        frame += 1;
-        requestRender();
-    }
+    const up = altitude < 1000 ? `${altitude.toFixed(1)} m` : `${(altitude / 1000).toFixed(2)} km`;
+    field("info").innerHTML =
+        `<span class="status-title">camera</span> ${up} up; ` +
+        `<span class="status-title">sunlight</span> ${Math.round(lux).toLocaleString("en")} lux; ` +
+        `<span class="status-title">exposure</span> EV ${ev100.toFixed(1)}, metered`;
+    // One frame per change; only turning runs on by itself, while asked to.
+    if (pressed("rotate")) requestRender();
 }
 
 const requestRender = onDemand(render);
-/** Anything that changes the picture starts the sum over. */
-function restart() {
-    frame = 0;
-    requestRender();
-}
 
 if (gpu.error) {
     canvas.replaceWith(
@@ -146,15 +141,17 @@ if (gpu.error) {
         usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.STORAGE_BINDING,
     });
     scene = createScene(gpu.device);
-    onEnvironment(restart);
-    onTables(restart);
-    new ResizeObserver(restart).observe(canvas);
-    for (const radio of root.querySelectorAll('input[name="lighting-shadows"], input[name="lighting-background"]'))
-        radio.addEventListener("change", restart);
-    for (const name of ["rotate", "sunDisc", "occlusion", "sunLight", "skyLight"]) {
+    onEnvironment(requestRender);
+    onTables(requestRender);
+    new ResizeObserver(requestRender).observe(canvas);
+    for (const radio of root.querySelectorAll(
+        'input[name="lighting-shadows"], input[name="lighting-background"], input[name="lighting-ground"], input[name="lighting-occlusion"], input[name="lighting-godrays"], input[name="lighting-bloom"]',
+    ))
+        radio.addEventListener("change", requestRender);
+    for (const name of ["rotate", "sunDisc", "sunLight", "skyLight"]) {
         field(name).addEventListener("click", () => {
             field(name).setAttribute("aria-pressed", String(!pressed(name)));
-            restart();
+            requestRender();
         });
     }
     canvas.addEventListener("pointerdown", (event) => {
@@ -164,7 +161,7 @@ if (gpu.error) {
             const perPixel = camera.fov / canvas.clientHeight;
             camera.yaw = start.yaw + (e.clientX - start.x) * perPixel;
             camera.pitch = Math.max(-5 * DEG, Math.min(89 * DEG, start.pitch + (e.clientY - start.y) * perPixel));
-            restart();
+            requestRender();
         };
         canvas.addEventListener("pointermove", move);
         canvas.addEventListener("pointerup", () => canvas.removeEventListener("pointermove", move), { once: true });
@@ -173,10 +170,10 @@ if (gpu.error) {
         "wheel",
         (event) => {
             event.preventDefault();
-            camera.distance = Math.max(3, Math.min(1e6, camera.distance * Math.exp(event.deltaY * 0.002)));
-            restart();
+            camera.distance = Math.max(1.5, Math.min(1e6, camera.distance * Math.exp(event.deltaY * 0.002)));
+            requestRender();
         },
         { passive: false },
     );
-    restart();
+    requestRender();
 }

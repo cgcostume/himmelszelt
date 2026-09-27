@@ -238,6 +238,47 @@ export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPa
         return entry;
     }
 
+    // Averaging a cube map down its mip levels, one pipeline per format; the layout spelled out, as rgba32float is
+    // not filterable and "auto" would expect it to be.
+    const mipPipelines = new Map<string, GPUComputePipeline>();
+    function mipPipeline(cubeFormat: GPUTextureFormat) {
+        let pipeline = mipPipelines.get(cubeFormat);
+        if (!pipeline) {
+            const source = device.createBindGroupLayout({
+                entries: [
+                    {
+                        binding: 0,
+                        visibility: GPUShaderStage.COMPUTE,
+                        texture: { sampleType: "unfilterable-float", viewDimension: "2d-array" },
+                    },
+                ],
+            });
+            const output = device.createBindGroupLayout({
+                entries: [
+                    {
+                        binding: 0,
+                        visibility: GPUShaderStage.COMPUTE,
+                        storageTexture: { format: cubeFormat, viewDimension: "2d-array" },
+                    },
+                ],
+            });
+            pipeline = device.createComputePipeline({
+                label: "dunstkreis:cubeMipmap",
+                layout: device.createPipelineLayout({ bindGroupLayouts: [source, output] }),
+                compute: {
+                    module: device.createShaderModule({
+                        code: [wgsl.skyCubeOutput(cubeFormat), wgsl.mipmap].join("\n"),
+                    }),
+                    entryPoint: "dkDownsample",
+                },
+            });
+            mipPipelines.set(cubeFormat, pipeline);
+        }
+        return pipeline;
+    }
+    const cubeLevel = (target: GPUTexture, level: number) =>
+        target.createView({ dimension: "2d-array", baseMipLevel: level, mipLevelCount: 1 });
+
     const meterPipeline = device.createComputePipeline({
         label: "dunstkreis:meter",
         layout: "auto",
@@ -375,13 +416,26 @@ export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPa
             const { pipeline, bindGroup } = cubePipeline(target.format, sunDisc, samples);
             const output = device.createBindGroup({
                 layout: pipeline.getBindGroupLayout(1),
-                entries: [{ binding: 0, resource: target.createView({ dimension: "2d-array" }) }],
+                entries: [{ binding: 0, resource: cubeLevel(target, 0) }],
             });
             const pass = encoder.beginComputePass({ label: "dunstkreis:skyCube" });
             pass.setPipeline(pipeline);
             pass.setBindGroup(0, bindGroup);
             pass.setBindGroup(1, output);
             pass.dispatchWorkgroups(dispatch(width), dispatch(width), 6);
+            const mips = mipPipeline(target.format);
+            for (let level = 1; level < target.mipLevelCount; ++level) {
+                const size = Math.max(1, width >> level);
+                pass.setPipeline(mips);
+                for (const [group, view] of [cubeLevel(target, level - 1), cubeLevel(target, level)].entries()) {
+                    const entries = [{ binding: 0, resource: view }];
+                    pass.setBindGroup(
+                        group,
+                        device.createBindGroup({ layout: mips.getBindGroupLayout(group), entries }),
+                    );
+                }
+                pass.dispatchWorkgroups(dispatch(size), dispatch(size), 6);
+            }
             pass.end();
         },
 

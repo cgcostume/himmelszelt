@@ -19,6 +19,7 @@ import exposure from "./exposure.comp.wgsl";
 import goldenset from "./goldenset.wgsl";
 import irradiance from "./irradiance.comp.wgsl";
 import lut from "./lut.wgsl";
+import mipmap from "./mipmap.comp.wgsl";
 import multiscattering from "./multiscattering.comp.wgsl";
 import quality from "./quality.wgsl";
 import raymarch from "./raymarch.wgsl";
@@ -37,6 +38,7 @@ export {
     goldenset,
     irradiance,
     lut,
+    mipmap,
     multiscattering,
     quality,
     raymarch,

@@ -103,7 +103,7 @@ fn dkDebugOverlay(color: vec3f, view: vec3f, right: vec3f, below: vec3f, apparen
     let ring = dkLine(abs(sunAngle - max(sunRadius * 1.5, 6.0 * pixel)), pixel);
 
     let grid = max(max(0.1 * altitudeLine, 0.3 * horizonLine), 0.15 * compassLine);
-    return mix(mix(color, vec3f(1.0), grid), vec3f(1.0, 0.8, 0.2), 0.7 * ring);
+    return mix(color, vec3f(1.0), max(grid, 0.7 * ring));
 }
 
 // The exposure luminance in cd/m² is multiplied by. Metered, it is the light meter's EV100, log2(L * 100 / 12.5) for
@@ -228,15 +228,26 @@ fn dkSkyAt(view: vec3f) -> DkSkySample {
     return dkSkyFromInside(a, view, altitude);
 }
 
-// The sun disc, attenuated by the air between it and the observer. Its radiance is the irradiance spread over the
-// disc's solid angle, some 15000 times brighter than the sky. Tested by the chord between the two unit vectors, which
-// equals the angle this close: a test against cos(radius) would need cos to 1e-5, and WGSL promises it only to 2^-11.
-fn dkSunDisc(sky: DkSkySample) -> vec3f {
+// The sun disc's luminance, attenuated by the air between it and the observer: the irradiance spread over the disc's
+// solid angle, some 15000 times brighter than the sky.
+fn dkSunDiscLuminance(sky: DkSkySample) -> vec3f {
     let sunRadius = dkParams.sunAngularRadius;
-    if (length(sky.direction - dkParams.sunDirection) < sunRadius) {
-        return sky.sunTransmittance * dkAtmosphere.solarIrradiance / (DK_PI * sunRadius * sunRadius);
+    return sky.sunTransmittance * dkAtmosphere.solarIrradiance / (DK_PI * sunRadius * sunRadius);
+}
+
+// How much of a pixel `footprint` radians across the disc covers, the ray through its center bent to `sky.direction`;
+// with no footprint, whether the ray hits it. Measured by the chord between the two unit vectors, which equals the
+// angle this close: a test against cos(radius) would need cos to 1e-5, and WGSL promises it only to 2^-11.
+fn dkSunDiscCoverage(sky: DkSkySample, footprint: f32) -> f32 {
+    let distance = length(sky.direction - dkParams.sunDirection);
+    if (footprint <= 0.0) {
+        return select(0.0, 1.0, distance < dkParams.sunAngularRadius);
     }
-    return vec3f(0.0);
+    return clamp((dkParams.sunAngularRadius - distance) / footprint + 0.5, 0.0, 1.0);
+}
+
+fn dkSunDisc(sky: DkSkySample) -> vec3f {
+    return dkSunDiscLuminance(sky) * dkSunDiscCoverage(sky, 0.0);
 }
 
 @compute @workgroup_size(8, 8, 1)
@@ -269,16 +280,22 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
     let inSpace = dkParams.observerAltitude > dkAtmosphere.Rt - dkAtmosphere.Rg;
     let sky = dkSkyAt(view);
     let direction = sky.direction;
-    var luminance = sky.luminance;
-    if (DK_SUN_DISC) {
-        luminance = luminance + dkSunDisc(sky);
-    }
     let sunRadius = dkParams.sunAngularRadius;
+    let right = dkPixelRay(id.xy + vec2u(1u, 0u), size);
 
     // In cd/m², exposed. Without tone mapping, that is what is written: linear, for the caller's own tone mapping.
-    var color = luminance * dkExposure();
+    var color = sky.luminance * dkExposure();
+    // The disc by how much of the pixel it covers. Tone mapped, sky and disc apart and mixed after, since the disc is
+    // far beyond white: mixed before, a pixel it barely touches would turn white, and its edge would step.
+    var disc = 0.0;
+    if (DK_SUN_DISC) {
+        disc = dkSunDiscCoverage(sky, length(right - view));
+    }
     if (DK_TONE_MAP) {
-        color = dkToneMap(color);
+        let withDisc = dkToneMap(color + dkSunDiscLuminance(sky) * dkExposure());
+        color = mix(dkToneMap(color), withDisc, disc);
+    } else {
+        color = color + dkSunDiscLuminance(sky) * dkExposure() * disc;
     }
 
     // The blue hour, an artistic term rather than a physical one, strongest when the sun sits just below the
@@ -291,7 +308,6 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
     }
 
     if (DK_DEBUG_GRID) {
-        let right = dkPixelRay(id.xy + vec2u(1u, 0u), size);
         let below = dkPixelRay(id.xy + vec2u(0u, 1u), size);
         color = dkDebugOverlay(color, view, right, below, dkParams.apparentSunDirection, sunRadius);
     }

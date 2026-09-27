@@ -17,9 +17,7 @@ const source = [goldenSet("goldenSet8", GOLDEN_SET_8), goldenSet("goldenSet64", 
  */
 
 const DEG = Math.PI / 180;
-const PARAMS_SIZE = 320;
-/** Frames the running sum of the lighting takes. */
-export const SCENE_FRAMES = 64;
+const PARAMS_SIZE = 480;
 
 /** Rotation about a unit axis by an angle, as a column-major 3x3 matrix padded to WGSL's mat3x3f: 12 floats. */
 function rotation([x, y, z], angle) {
@@ -34,19 +32,36 @@ function rotation([x, y, z], angle) {
     ];
 }
 
-// Each solid turns about its own tilted axis, at its own pace, so they never line up.
+// Each polyhedron turns about its own tilted axis, at its own pace, so they never line up: tetrahedron, cube,
+// octahedron, dodecahedron, icosahedron.
 const SPINS = [
     { axis: [0.3, 0.2, 0.93], speed: 0.21, start: 0.4 },
     { axis: [-0.2, 0.35, 0.91], speed: -0.17, start: 0.7 },
+    { axis: [0.35, 0.3, 0.89], speed: 0.19, start: 1.1 },
+    { axis: [-0.3, -0.25, 0.92], speed: -0.14, start: 0.5 },
     { axis: [0.25, -0.3, 0.92], speed: 0.13, start: 0.2 },
-    { axis: [0, 0, 1], speed: 0.1, start: 0 },
 ];
+
+// The polyhedra on a pentagon around the sphere, 0.7 above the ground, circling it together, each on an orbit tilted a
+// few degrees its own way: they rise and sink a little as they go round, and so do their shadows.
+const ORBIT = { radius: 1.3, height: 0.7, speed: 0.05, tilt: 6 * DEG };
+
+/** Where each solid is after `seconds`, the five polyhedra and the sphere, as vec4f: 24 floats. */
+function centers(seconds) {
+    const polyhedra = SPINS.map((_, i) => {
+        const angle = (i * 2 * Math.PI) / 5 + ORBIT.speed * seconds;
+        const node = i * 2.1;
+        const rise = ORBIT.radius * Math.sin(ORBIT.tilt) * Math.sin(angle - node);
+        return [ORBIT.radius * Math.cos(angle), ORBIT.radius * Math.sin(angle), ORBIT.height + rise, 0];
+    });
+    return [...polyhedra, [0, 0, ORBIT.height, 0]].flat();
+}
 const normalized = (v) => v.map((c) => c / Math.hypot(...v));
 
-/** Where an orbiting `camera` stands and how it is turned: it looks at the solids' center, 1 above the ground. */
+/** Where an orbiting `camera` stands and how it is turned: it looks at the solids' center, 0.6 above the ground. */
 export function cameraFrame({ yaw, pitch, distance }) {
     const forward = [-Math.cos(pitch) * Math.sin(yaw), -Math.cos(pitch) * Math.cos(yaw), -Math.sin(pitch)];
-    const eye = [-forward[0] * distance, -forward[1] * distance, 1 - forward[2] * distance];
+    const eye = [-forward[0] * distance, -forward[1] * distance, 0.6 - forward[2] * distance];
     const right = normalized([forward[1], -forward[0], 0]);
     const up = [
         right[1] * forward[2] - right[2] * forward[1],
@@ -63,8 +78,7 @@ export function createScene(device) {
         compute: { module: device.createShaderModule({ code: source }), entryPoint: "render" },
     });
     const params = device.createBuffer({ size: PARAMS_SIZE, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    const sampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
-    let sum = null;
+    const sampler = device.createSampler({ magFilter: "linear", minFilter: "linear", mipmapFilter: "linear" });
     const blueNoiseTexture = device.createTexture({
         label: "sternwarte:blueNoise",
         size: { width: 64, height: 64 },
@@ -87,12 +101,15 @@ export function createScene(device) {
     return {
         /**
          * Records the scene into `target` (rgba8unorm, storage). `camera` orbits the scene's center: yaw from north
-         * through east, pitch, distance, vertical field of view, all angles in radians. `seconds` turns the solids.
-         * `frame` counts the frames since anything changed, 0 to start the running sum over; `shadowRays` over the sun
-         * disc, 8 or 64 for soft shadows, anything else for hard ones. `background`, a texture of the target's size
+         * through east, pitch, distance, vertical field of view, all angles in radians. `seconds` turns the solids and
+         * moves them along their orbits. `shadowRays` over the sun disc, 8 or 64 for soft shadows, 0 for none, anything else for hard ones. `background`, a texture of the target's size
          * holding the sky in cd/m² through the same camera, replaces the sky map behind the solids. `groundRadius`, in
          * scene units, sizes the round ground, which fades out over its outer half. `sunLight` and `skyLight`, both on
-         * by default, switch the direct sunlight and the sky's light from the coefficients.
+         * by default, switch the direct sunlight and the sky's light from the coefficients. `ground` is "floor" by
+         * default, a round floor of the scene's own; "backdrop" shows the backdrop's ground with the solids' shadows.
+         * `bloom`, 0 to 1, how strong the sun's veil is, `godRaySteps`, 8 or 64, haze lit by the sun
+         * with the solids' shadows through it, 0 for none. `airDensity` and `hazeDensity`, around the camera relative to
+         * the ground's, 1 by default, thin the veil and the haze.
          */
         encode(
             encoder,
@@ -109,22 +126,22 @@ export function createScene(device) {
             data.set(sunIlluminance, 20);
             const flags = new Uint32Array(data.buffer);
             flags[19] = rest.sunDisc ? 1 : 0;
-            flags[23] = rest.occlusionRays ?? 16;
-            flags[72] = rest.frame ?? 0;
-            flags[73] = rest.shadowRays ?? 0;
-            flags[74] = rest.background ? 1 : 0;
-            data[75] = rest.groundRadius ?? 72;
-            flags[76] = (rest.sunLight === false ? 0 : 1) | (rest.skyLight === false ? 0 : 2);
+            flags[23] = rest.occlusionRays ?? 8;
             const seconds = rest.seconds ?? 0;
             SPINS.forEach(({ axis, speed, start }, i) => {
                 data.set(rotation(normalized(axis), start + speed * seconds), 24 + i * 12);
             });
+            data.set(centers(seconds), 84);
+            flags[108] = rest.shadowRays ?? 0;
+            flags[109] = rest.background ? 1 : 0;
+            data[110] = rest.groundRadius ?? 36;
+            flags[111] = (rest.sunLight === false ? 0 : 1) | (rest.skyLight === false ? 0 : 2);
+            flags[112] = rest.ground === "backdrop" ? 1 : 0;
+            data[113] = rest.bloom ?? 0;
+            flags[114] = rest.godRaySteps ?? 0;
+            data[115] = rest.airDensity ?? 1;
+            data[116] = rest.hazeDensity ?? 1;
             device.queue.writeBuffer(params, 0, data);
-            const bytes = target.width * target.height * 16;
-            if (sum?.size !== bytes) {
-                sum?.destroy();
-                sum = device.createBuffer({ label: "sternwarte:sceneSum", size: bytes, usage: GPUBufferUsage.STORAGE });
-            }
 
             const bindGroup = device.createBindGroup({
                 layout: pipeline.getBindGroupLayout(0),
@@ -134,9 +151,8 @@ export function createScene(device) {
                     { binding: 2, resource: sampler },
                     { binding: 3, resource: { buffer: sh } },
                     { binding: 4, resource: target.createView() },
-                    { binding: 5, resource: { buffer: sum } },
-                    { binding: 6, resource: (rest.background ?? placeholder).createView() },
-                    { binding: 7, resource: blueNoiseTexture.createView() },
+                    { binding: 5, resource: (rest.background ?? placeholder).createView() },
+                    { binding: 6, resource: blueNoiseTexture.createView() },
                 ],
             });
             const pass = encoder.beginComputePass({ label: "sternwarte:scene" });
@@ -148,7 +164,6 @@ export function createScene(device) {
 
         destroy() {
             params.destroy();
-            sum?.destroy();
             placeholder.destroy();
             blueNoiseTexture.destroy();
         },

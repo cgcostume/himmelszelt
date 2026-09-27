@@ -109,7 +109,8 @@ export interface SkyPass {
      * rgba32float, with `STORAGE_BINDING` usage. It holds the luminance in cd/m², linear, neither exposed nor tone
      * mapped, indexed by ENU directions: a y-up engine samples it with (x, -z, y). Without the sun disc by default, to
      * light a scene with; with `sunDisc`, for a background, which needs rgba32float. `samples` per texel, 1, 8 or 64,
-     * spread by the golden sets, smooth the edges a texel straddles: the horizon's, and the sun disc's.
+     * spread by the golden sets, smooth the edges a texel straddles: the horizon's, and the sun disc's. A target with
+     * more than one mip level gets them all, each texel the mean of the four below it.
      */
     encodeCube(
         encoder: GPUCommandEncoder,

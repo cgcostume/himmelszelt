@@ -3,8 +3,16 @@ import "../sternzeit/sternzeit.css";
 import "./dunstkreis.css";
 
 const PANELS = [
-    { name: "sky", title: "Sky", note: "cube map in cd/m², without the sun disc" },
-    { name: "irradiance", title: "Irradiance", note: "for every normal, in lux, from the nine coefficients" },
+    {
+        name: "sky",
+        title: "Sky",
+        note: "cube map in cd/m², without the sun disc; lower levels the mean of four texels",
+    },
+    {
+        name: "irradiance",
+        title: "Irradiance",
+        note: "for every normal, in lux, from the nine coefficients; every level computed from them",
+    },
 ];
 ---
 
@@ -28,6 +36,10 @@ const PANELS = [
             <section class="lut" data-panel={panel.name}>
                 <p class="lut-head">
                     <strong>{panel.title}</strong> <span class="note">{panel.note}</span>
+                </p>
+                <p class="lut-controls">
+                    <span class="note">mip level</span>
+                    <span class="steps" role="radiogroup" aria-label={`${panel.title} mip level`} data-field="levels" />
                 </p>
                 <div class="lut-plot">
                     <span class="lut-axis lut-y">

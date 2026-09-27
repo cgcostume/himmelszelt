@@ -1,14 +1,19 @@
 ---
-/** A figure that is planned but not built yet: what it will show, in a few sentences. Not numbered like a figure. */
+/**
+ * A figure that is planned but not built yet: what it will show, in a few sentences. Not numbered like a figure. `plan`
+ * notes what is likely to happen to it: merged into another figure, dropped or moved elsewhere.
+ */
 interface Props {
     title: string;
+    plan?: string;
 }
-const { title } = Astro.props;
+const { title, plan } = Astro.props;
 ---
 
 <aside class="planned-figure">
     <p class="planned-figure-title">Planned figure: {title}</p>
     <slot />
+    {plan && <p class="planned-figure-plan">Plan: {plan}</p>}
 </aside>
 
 <style>
@@ -25,6 +30,10 @@ const { title } = Astro.props;
         font-weight: 700;
         letter-spacing: 0.04em;
         text-transform: uppercase;
+    }
+    .planned-figure-plan {
+        font-size: var(--text-small);
+        font-style: normal;
     }
     .planned-figure :global(p:last-child) {
         margin-bottom: 0;

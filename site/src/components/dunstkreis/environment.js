@@ -4,6 +4,38 @@ import { gpu, onEnvironment, setEnvironmentSize } from "./atmosphere.js";
 const root = document.querySelector("#environment");
 const field = (name) => root.querySelector(`[data-field="${name}"]`);
 const panel = (name) => root.querySelector(`[data-panel="${name}"] canvas`);
+const levels = (name) => root.querySelector(`[data-panel="${name}"] [data-field="levels"]`);
+// The mip level each panel shows.
+const shown = { sky: 0, irradiance: 0 };
+
+/** One button per mip level of `texture`, labeled with its face size. */
+function offerLevels(name, texture) {
+    const group = levels(name);
+    if (group.childElementCount === texture.mipLevelCount && group.dataset.size === String(texture.width)) return;
+    group.dataset.size = String(texture.width);
+    shown[name] = Math.min(shown[name], texture.mipLevelCount - 1);
+    group.replaceChildren(
+        ...Array.from({ length: texture.mipLevelCount }, (_, level) => {
+            const label = document.createElement("label");
+            const input = Object.assign(document.createElement("input"), {
+                type: "radio",
+                name: `environment-${name}-level`,
+                value: level,
+                checked: level === shown[name],
+            });
+            input.addEventListener("change", () => {
+                shown[name] = level;
+                if (last) draw(last);
+            });
+            const text = Object.assign(document.createElement("span"), {
+                textContent: Math.max(1, texture.width >> level),
+            });
+            text.title = `level ${level}`;
+            label.append(input, text);
+            return label;
+        }),
+    );
+}
 
 const srgb = (c) => {
     const v = Math.min(Math.max(c, 0), 1);
@@ -63,20 +95,28 @@ function drawPanorama(canvas, faces) {
     canvas.getContext("2d").putImageData(image, 0, 0);
 }
 
-const readFaces = (texture) => Promise.all([0, 1, 2, 3, 4, 5].map((layer) => readTexture(gpu.device, texture, layer)));
+const readFaces = (texture, level) =>
+    Promise.all([0, 1, 2, 3, 4, 5].map((layer) => readTexture(gpu.device, texture, layer, level)));
 
 let drawing = false;
+let last = null;
 let next = null;
 
 // One at a time, drawing only the latest environment once the one before is done.
 async function draw(environment) {
     next = environment;
+    last = environment;
     if (drawing) return;
     drawing = true;
     while (next) {
         const { cube, ibl, sh, sun, buildMs } = next;
         next = null;
-        const [sky, irradiance] = await Promise.all([readFaces(cube), readFaces(ibl.irradiance)]);
+        offerLevels("sky", cube);
+        offerLevels("irradiance", ibl.irradiance);
+        const [sky, irradiance] = await Promise.all([
+            readFaces(cube, shown.sky),
+            readFaces(ibl.irradiance, shown.irradiance),
+        ]);
         field("timing").textContent = `built in ${buildMs.toFixed(1)} ms`;
         drawPanorama(panel("sky"), sky);
         drawPanorama(panel("irradiance"), irradiance);

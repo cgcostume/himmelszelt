@@ -1,53 +1,103 @@
 ---
 import "../sternzeit/sternzeit.css";
+import Choice from "./Choice.astro";
 import "./dunstkreis.css";
+
+// The choices over the scene: what it shows, in the first row, and how finely it is sampled, in the second.
+const GROUPS = {
+    background: {
+        label: "Background",
+        title: "Behind the solids: the atmosphere rendered live for every pixel, or the sky map the lighting comes from",
+        options: [
+            ["atmosphere", "atmosphere"],
+            ["sky map", "sky map"],
+        ],
+        checked: "atmosphere",
+    },
+    ground: {
+        label: "Ground",
+        title: "Under the solids: a round floor of their own, lit like them and fading out, or the backdrop's own ground with their shadows taken out of it",
+        options: [
+            ["floor", "floor"],
+            ["backdrop", "backdrop"],
+        ],
+        checked: "backdrop",
+    },
+    bloom: {
+        label: "Bloom",
+        title: "The air's wide, soft veil around the sun, thinning with height, gone in space: none, light or strong",
+        options: [
+            ["off", "no bloom"],
+            ["light", "light"],
+            ["strong", "strong"],
+        ],
+        checked: "strong",
+    },
+    shadows: {
+        label: "Shadow rays over the sun disc",
+        title: "Shadow rays over the sun disc: none, one to its center for hard shadows, or 8 or 64 spread over it for soft ones",
+        options: [
+            ["0", "no shadows"],
+            ["1", "hard"],
+            ["8", "8"],
+            ["64", "64"],
+        ],
+        checked: "8",
+    },
+    occlusion: {
+        label: "Occlusion rays",
+        title: "Rays per pixel over the hemisphere that dim the sky's light where the solids hide the sky: none, 8 or 64",
+        options: [
+            ["0", "no occlusion"],
+            ["8", "8"],
+            ["64", "64"],
+        ],
+        checked: "8",
+    },
+    godrays: {
+        label: "God ray steps",
+        title: "Haze in front of the scene, lit by the sun where the solids leave it lit, brighter towards the sun, with their shadows as dark shafts through it: none, or 8 or 64 steps along each pixel's ray",
+        options: [
+            ["0", "no god rays"],
+            ["8", "8"],
+            ["64", "64"],
+        ],
+        checked: "8",
+    },
+};
+const group = (name: keyof typeof GROUPS) => ({ name, ...GROUPS[name] });
+const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
 ---
 
 <figure class="scene-frame wide" id="lighting">
     <div class="sky-view">
-        <canvas data-field="canvas" aria-label="Four solids lit by the sky and the sun at the chosen moment and place"></canvas>
-        <div class="sky-overlay">
-            <span class="note" data-field="info"></span>
-            <span class="steps" role="radiogroup" aria-label="Background" title="Behind the solids: the atmosphere rendered live for every pixel, or the sky map the lighting comes from">
-                {
-                    ["atmosphere", "sky map"].map((value) => (
-                        <label>
-                            <input type="radio" name="lighting-background" value={value} checked={value === "atmosphere"} />
-                            <span>{value}</span>
-                        </label>
-                    ))
-                }
-            </span>
-            <span class="steps" role="radiogroup" aria-label="Shadow rays over the sun disc" title="Shadow rays over the sun disc: one to its center for hard shadows, or 8 or 64 spread over it for soft ones">
-                {
-                    [
-                        ["1", "hard"],
-                        ["8", "8"],
-                        ["64", "64"],
-                    ].map(([value, label]) => (
-                        <label>
-                            <input type="radio" name="lighting-shadows" value={value} checked={value === "8"} />
-                            <span>{label}</span>
-                        </label>
-                    ))
-                }
-            </span>
-            <span class="sky-toggles">
-                <button type="button" class="view-toggle" data-field="sunLight" aria-pressed="true" title="Light the solids by the sun directly, with its shadows">sunlight</button>
-                <button type="button" class="view-toggle" data-field="skyLight" aria-pressed="true" title="Light the solids by the sky, image-based, from the nine coefficients of the sky map">sky light</button>
-                <button type="button" class="view-toggle" data-field="rotate" aria-pressed="false" title="Turn the solids slowly">rotate</button>
-                <button type="button" class="view-toggle" data-field="sunDisc" aria-pressed="true" title="Draw the sun disc in the background">sun disc</button>
-                <button type="button" class="view-toggle" data-field="occlusion" aria-pressed="true" title="Dim the sky's light where the solids hide the sky, by sixteen rays per pixel">occlusion</button>
-            </span>
+        <canvas data-field="canvas" aria-label="The five Platonic solids and a sphere, lit by the sky and the sun at the chosen moment and place"></canvas>
+        <div class="sky-overlay lighting-overlay">
+            <div class="lighting-row">
+                {[group("background"), group("ground")].map((choice) => <Choice {...choice} />)}
+                <span class="sky-toggles lighting-toggles">
+                    <button type="button" class="view-toggle" data-field="sunDisc" aria-pressed="true" title="Draw the sun disc in the background">sun disc</button>
+                    <button type="button" class="view-toggle" data-field="sunLight" aria-pressed="true" title="Light the solids by the sun directly, with its shadows">sunlight</button>
+                    <button type="button" class="view-toggle" data-field="skyLight" aria-pressed="true" title="Light the solids by the sky, image-based, from the nine coefficients of the sky map">sky light</button>
+                    <span class="toggle-separator" aria-hidden="true"></span>
+                    <button type="button" class="view-toggle" data-field="rotate" aria-pressed="false" title="Turn the solids slowly, and send them round the sphere on slightly tilted orbits">rotate</button>
+                </span>
+            </div>
+            <div class="lighting-row">
+                {SAMPLING.map((choice) => <Choice {...choice} />)}
+                <Choice {...group("bloom")} />
+            </div>
         </div>
         <p class="vis-credit footnote">Drag to turn around, scroll to move closer or far out. Raytraced with WebGPU.</p>
     </div>
+    <p class="view-status" data-field="info"></p>
     <figcaption class="figure-caption">
-        A tetrahedron, a cube, an icosahedron and a sphere, lit by the sky above: the sun as a light of its own, with its
+        The five Platonic solids, on a pentagon around a sphere, lit by the sky above: the sun as a light of its own, with its
         shadows, soft from rays spread over its disc, and the sky's light from its nine coefficients, dimmed where the
-        solids hide the sky. Raytraced, not a triangle in it, four rays per pixel,
-        with the lighting refined over 64 frames while nothing moves. Every surface is
-        white but the ground, a darker gray; the colors are the light's. Exposed like the sky.
+        solids hide the sky. Raytraced, not a triangle in it, four rays per pixel. Every surface is white but the
+        ground, a darker gray; the colors are the light's. The ground is either a round floor of their own or
+        the backdrop's own ground below the horizon with their shadows taken out of it.
+        Exposed like the sky.
     </figcaption>
 </figure>
 

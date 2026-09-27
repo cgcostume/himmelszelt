@@ -18,9 +18,15 @@ export interface IrradiancePass {
      * as `array<vec4f, 9>` to shade with them directly.
      */
     readonly sh: GPUBuffer;
-    /** The irradiance in lux for every normal, a cube map, rgba16float. A white Lambertian surface shows it over pi. */
+    /**
+     * The irradiance in lux for every normal, a cube map, rgba16float, with every mip level down to 1 texel, each computed
+     * from the coefficients rather than averaged. A white Lambertian surface shows it over pi.
+     */
     readonly irradiance: GPUTexture;
-    /** Records the projection of `source`, a cube map with `TEXTURE_BINDING` usage, and the irradiance from it. */
+    /**
+     * Records the projection of `source`, a cube map with `TEXTURE_BINDING` usage, and the irradiance from it. With mip
+     * levels, the projection reads the one about as fine as its 4096 samples, rather than skipping texels in between.
+     */
     encode(encoder: GPUCommandEncoder, source: GPUTexture): void;
     /** The nine coefficients, read back from the GPU: 27 floats, rgb after rgb. */
     readSH(): Promise<Float32Array>;
@@ -50,18 +56,24 @@ export function createIrradiancePass(device: GPUDevice, options: IrradiancePassO
     const irradiance = device.createTexture({
         label: "dunstkreis:irradiance",
         size: { width: size, height: size, depthOrArrayLayers: 6 },
+        mipLevelCount: Math.floor(Math.log2(size)) + 1,
         format: "rgba16float",
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
         textureBindingViewDimension: "cube",
     });
-    const sampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
-    const convolveBindGroup = device.createBindGroup({
-        layout: convolve.getBindGroupLayout(0),
-        entries: [
-            { binding: 2, resource: { buffer: sh } },
-            { binding: 3, resource: irradiance.createView({ dimension: "2d-array" }) },
-        ],
-    });
+    const sampler = device.createSampler({ magFilter: "linear", minFilter: "linear", mipmapFilter: "linear" });
+    const convolveBindGroups = Array.from({ length: irradiance.mipLevelCount }, (_, level) =>
+        device.createBindGroup({
+            layout: convolve.getBindGroupLayout(0),
+            entries: [
+                { binding: 2, resource: { buffer: sh } },
+                {
+                    binding: 3,
+                    resource: irradiance.createView({ dimension: "2d-array", baseMipLevel: level, mipLevelCount: 1 }),
+                },
+            ],
+        }),
+    );
 
     return {
         sh,
@@ -81,8 +93,10 @@ export function createIrradiancePass(device: GPUDevice, options: IrradiancePassO
             pass.setBindGroup(0, projectBindGroup);
             pass.dispatchWorkgroups(1);
             pass.setPipeline(convolve);
-            pass.setBindGroup(0, convolveBindGroup);
-            pass.dispatchWorkgroups(dispatch(size), dispatch(size), 6);
+            convolveBindGroups.forEach((bindGroup, level) => {
+                pass.setBindGroup(0, bindGroup);
+                pass.dispatchWorkgroups(dispatch(size >> level), dispatch(size >> level), 6);
+            });
             pass.end();
         },
 
