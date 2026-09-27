@@ -1,5 +1,9 @@
+import blueNoiseUrl from "./bluenoise.bin?url";
 import { GOLDEN_SET_8, GOLDEN_SET_64 } from "./goldenset.js";
 import scene from "./scene.comp.wgsl";
+
+// 64x64 texels of blue noise, two channels, from scripts/bluenoise.mjs.
+const blueNoise = new Uint8Array(await (await fetch(blueNoiseUrl)).arrayBuffer());
 
 const goldenSet = (name, set) =>
     `var<private> ${name}: array<vec2f, ${set.length}> = array<vec2f, ${set.length}>(` +
@@ -13,7 +17,7 @@ const source = [goldenSet("goldenSet8", GOLDEN_SET_8), goldenSet("goldenSet64", 
  */
 
 const DEG = Math.PI / 180;
-const PARAMS_SIZE = 304;
+const PARAMS_SIZE = 320;
 /** Frames the running sum of the lighting takes. */
 export const SCENE_FRAMES = 64;
 
@@ -61,6 +65,18 @@ export function createScene(device) {
     const params = device.createBuffer({ size: PARAMS_SIZE, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const sampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
     let sum = null;
+    const blueNoiseTexture = device.createTexture({
+        label: "sternwarte:blueNoise",
+        size: { width: 64, height: 64 },
+        format: "rg8unorm",
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture(
+        { texture: blueNoiseTexture },
+        blueNoise,
+        { bytesPerRow: 128 },
+        { width: 64, height: 64 },
+    );
     // Bound in place of a live background when the sky map shows.
     const placeholder = device.createTexture({
         size: { width: 1, height: 1 },
@@ -75,7 +91,8 @@ export function createScene(device) {
          * `frame` counts the frames since anything changed, 0 to start the running sum over; `shadowRays` over the sun
          * disc, 8 or 64 for soft shadows, anything else for hard ones. `background`, a texture of the target's size
          * holding the sky in cd/m² through the same camera, replaces the sky map behind the solids. `groundRadius`, in
-         * scene units, sizes the round ground, which fades out over its outer half.
+         * scene units, sizes the round ground, which fades out over its outer half. `sunLight` and `skyLight`, both on
+         * by default, switch the direct sunlight and the sky's light from the coefficients.
          */
         encode(
             encoder,
@@ -97,6 +114,7 @@ export function createScene(device) {
             flags[73] = rest.shadowRays ?? 0;
             flags[74] = rest.background ? 1 : 0;
             data[75] = rest.groundRadius ?? 72;
+            flags[76] = (rest.sunLight === false ? 0 : 1) | (rest.skyLight === false ? 0 : 2);
             const seconds = rest.seconds ?? 0;
             SPINS.forEach(({ axis, speed, start }, i) => {
                 data.set(rotation(normalized(axis), start + speed * seconds), 24 + i * 12);
@@ -118,6 +136,7 @@ export function createScene(device) {
                     { binding: 4, resource: target.createView() },
                     { binding: 5, resource: { buffer: sum } },
                     { binding: 6, resource: (rest.background ?? placeholder).createView() },
+                    { binding: 7, resource: blueNoiseTexture.createView() },
                 ],
             });
             const pass = encoder.beginComputePass({ label: "sternwarte:scene" });
@@ -131,6 +150,7 @@ export function createScene(device) {
             params.destroy();
             sum?.destroy();
             placeholder.destroy();
+            blueNoiseTexture.destroy();
         },
     };
 }

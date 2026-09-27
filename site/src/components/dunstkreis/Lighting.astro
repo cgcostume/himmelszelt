@@ -33,6 +33,8 @@ import "./dunstkreis.css";
                 }
             </span>
             <span class="sky-toggles">
+                <button type="button" class="view-toggle" data-field="sunLight" aria-pressed="true" title="Light the solids by the sun directly, with its shadows">sunlight</button>
+                <button type="button" class="view-toggle" data-field="skyLight" aria-pressed="true" title="Light the solids by the sky, image-based, from the nine coefficients of the sky map">sky light</button>
                 <button type="button" class="view-toggle" data-field="rotate" aria-pressed="false" title="Turn the solids slowly">rotate</button>
                 <button type="button" class="view-toggle" data-field="sunDisc" aria-pressed="true" title="Draw the sun disc in the background">sun disc</button>
                 <button type="button" class="view-toggle" data-field="occlusion" aria-pressed="true" title="Dim the sky's light where the solids hide the sky, by sixteen rays per pixel">occlusion</button>

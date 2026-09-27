@@ -38,6 +38,8 @@ struct Params {
     background: u32,
     // Radius of the round ground, in scene units: it fades out over its outer half into what lies behind it.
     groundRadius: f32,
+    // Which lights shine on the scene: 1 the sun directly, 2 the sky by its coefficients.
+    lights: u32,
 }
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -49,6 +51,7 @@ struct Params {
 @group(0) @binding(5) var<storage, read_write> sum: array<vec4f>;
 // The sky rendered live through the same camera, linear in cd/m², one texel per pixel.
 @group(0) @binding(6) var background: texture_2d<f32>;
+@group(0) @binding(7) var blueNoiseTexture: texture_2d<f32>;
 
 const PI: f32 = 3.14159265358979;
 const PHI: f32 = 1.61803398874989;
@@ -192,10 +195,13 @@ fn skyIrradiance(n: vec3f) -> vec3f {
     return max(irradiance, vec3f(0.0));
 }
 
-// A pseudo-random number in [0, 1] per point, from webgl-operate's sampling.glsl: it varies the sampling from pixel to
-// pixel, so what one pattern repeats everywhere turns into fine noise, which the running sum smooths out.
-fn rand(co: vec2f) -> f32 {
-    return fract(sin(dot(co, vec2f(12.9898, 78.233))) * 43758.5453);
+// Blue noise per pixel, two channels in [0, 1): 64x64 texels tiled over the image, from scripts/bluenoise.mjs, moved
+// on each frame by the R2 sequence's steps (Roberts 2018), so it stays evenly spread over time as well as space. It
+// turns the shadow and occlusion rays from pixel to pixel: what one pattern would repeat everywhere becomes fine grain
+// without clumps, which the running sum smooths out.
+fn blueNoise(pixel: vec2u) -> vec2f {
+    let texel = textureLoad(blueNoiseTexture, vec2i(pixel % 64u), 0).rg;
+    return fract(texel + f32(params.frame) * vec2f(0.7548776662, 0.5698402910));
 }
 
 // Turns a 2D offset by an angle.
@@ -215,7 +221,7 @@ fn openness(p: vec3f, n: vec3f, pixel: vec2u) -> f32 {
     let helper = select(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 1.0, 0.0), abs(n.x) > 0.9);
     let tangent = normalize(cross(helper, n));
     let bitangent = cross(n, tangent);
-    let turn = (rand(vec2f(pixel)) + f32(params.frame) * 0.618034) * 2.0 * PI;
+    let turn = blueNoise(pixel).x * 2.0 * PI;
     var open = 0.0;
     for (var i = 0u; i < count; i = i + 1u) {
         let u = (f32(i) + 0.5) / f32(count);
@@ -242,7 +248,7 @@ fn sunVisibility(p: vec3f, pixel: vec2u) -> f32 {
     let tangent = normalize(cross(helper, sun));
     let bitangent = cross(sun, tangent);
     let diameter = 2.0 * params.sunAngularRadius;
-    let turn = (rand(vec2f(pixel) + 17.0) + f32(params.frame) * 0.618034) * 2.0 * PI;
+    let turn = blueNoise(pixel).y * 2.0 * PI;
     var visible = 0.0;
     for (var i = 0u; i < count; i = i + 1u) {
         let offset = turned(select(goldenSet64[i], goldenSet8[i % 8u], count == 8u), turn) * diameter;
@@ -295,10 +301,13 @@ fn trace(pixel: vec2u, size: vec2u, subsample: vec2f) -> vec3f {
     let p = params.eye + direction * hit.t + hit.normal * max(1e-3, hit.t * 1e-5);
     let facing = max(dot(hit.normal, params.sunDirection), 0.0);
     var sunlight = vec3f(0.0);
-    if (facing > 0.0) {
+    if (facing > 0.0 && (params.lights & 1u) != 0u) {
         sunlight = params.sunIlluminance * facing * sunVisibility(p, pixel);
     }
-    let skylight = skyIrradiance(hit.normal) * openness(p, hit.normal, pixel);
+    var skylight = vec3f(0.0);
+    if ((params.lights & 2u) != 0u) {
+        skylight = skyIrradiance(hit.normal) * openness(p, hit.normal, pixel);
+    }
     // A Lambertian surface: albedo over pi of the irradiance, in cd/m².
     var luminance = hit.albedo / PI * (sunlight + skylight);
     // The round ground fades out over its outer half into what lies behind it, the planet's own ground, colored and
@@ -329,7 +338,8 @@ fn render(@builtin(global_invocation_id) id: vec3u) {
     }
     sum[index] = vec4f(total, 1.0);
     var color = toneMap(total / f32(params.frame + 1u) * params.exposure);
-    let noise = rand(vec2f(id.xy) + f32(params.frame)) - rand(vec2f(id.xy) + vec2f(7.31, 3.17) + f32(params.frame));
+    // Triangular dither of one 8-bit step, the difference of the two channels.
+    let noise = dot(blueNoise(id.xy), vec2f(1.0, -1.0));
     color = clamp(color + noise / 255.0, vec3f(0.0), vec3f(1.0));
     textureStore(output, vec2i(id.xy), vec4f(color, 1.0));
 }

@@ -105,6 +105,8 @@ function render() {
         sunDisc: pressed("sunDisc"),
         occlusionRays: pressed("occlusion") ? 16 : 0,
         shadowRays: shadowRays(),
+        sunLight: pressed("sunLight"),
+        skyLight: pressed("skyLight"),
         seconds,
         frame,
     });
@@ -149,7 +151,7 @@ if (gpu.error) {
     new ResizeObserver(restart).observe(canvas);
     for (const radio of root.querySelectorAll('input[name="lighting-shadows"], input[name="lighting-background"]'))
         radio.addEventListener("change", restart);
-    for (const name of ["rotate", "sunDisc", "occlusion"]) {
+    for (const name of ["rotate", "sunDisc", "occlusion", "sunLight", "skyLight"]) {
         field(name).addEventListener("click", () => {
             field(name).setAttribute("aria-pressed", String(!pressed(name)));
             restart();
