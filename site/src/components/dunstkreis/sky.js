@@ -1,4 +1,4 @@
-import { apparentDirection, createSkyPass } from "@himmelszelt/dunstkreis";
+import { apparentDirection, clampObserverHeight, createSkyPass } from "@himmelszelt/dunstkreis";
 import { fromJulianDay, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
 import { onDemand } from "../frame.js";
 import { paintRange } from "../range.js";
@@ -126,7 +126,7 @@ function render() {
     const debugGrid = pressed("grid");
     const table = tables();
     // Where the sun shows, lifted by the same air the sky is traced through.
-    const [x, y, z] = apparentDirection(sunDirection, table.luts.model, state.heightM);
+    const [x, y, z] = apparentDirection(sunDirection, table.luts.model, clampObserverHeight(state.heightM));
     field("sun").textContent =
         `Sun ${position.altitude.toFixed(2)}° high (${(Math.asin(z) / DEG).toFixed(2)}° apparent), ` +
         `azimuth ${position.azimuth.toFixed(2)}°`;
@@ -135,11 +135,12 @@ function render() {
         camera.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, Math.asin(z)));
     }
     const skyStarted = performance.now();
-    if (table.luts !== passFor.luts || debugGrid !== passFor.debugGrid) {
+    const { groundSamples } = quality;
+    if (table.luts !== passFor.luts || debugGrid !== passFor.debugGrid || groundSamples !== passFor.groundSamples) {
         pass?.destroy();
         if (passFor.luts && passFor.luts !== table.luts) passFor.luts.destroy();
-        pass = createSkyPass(gpu.device, { luts: table.luts, format: gpu.format, debugGrid });
-        passFor = { luts: table.luts, debugGrid };
+        pass = createSkyPass(gpu.device, { luts: table.luts, format: gpu.format, debugGrid, groundSamples });
+        passFor = { luts: table.luts, debugGrid, groundSamples };
     }
 
     const basis = cameraBasis(width / height);
@@ -162,7 +163,7 @@ function render() {
     if (skyViewKey !== skyViewFor || pass !== passFor.notified) {
         skyViewFor = skyViewKey;
         passFor.notified = pass;
-        skyViewChanged(pass);
+        skyViewChanged({ pass, sunDirection, apparentSun: [x, y, z], sunAngularDiameter });
     }
     showTiming(astronomyMs, submitted - skyStarted, submitted);
     showExposure();

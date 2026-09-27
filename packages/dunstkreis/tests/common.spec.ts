@@ -55,8 +55,9 @@ test("the uniform packing matches the DkAtmosphere struct field for field", () =
         "HM",
         "ozoneCenter",
         "ozoneHalfWidth",
-        "avgGroundReflectance",
         "refractivity",
+        "groundAlbedo",
+        "_padding",
     ]);
 
     const data = atmosphereUniformData(model);
@@ -75,8 +76,9 @@ test("the uniform packing matches the DkAtmosphere struct field for field", () =
         HM: model.mie.scaleHeightKm,
         ozoneCenter: model.ozone.centerAltitudeKm,
         ozoneHalfWidth: model.ozone.widthKm / 2,
-        avgGroundReflectance: model.avgGroundReflectance,
         refractivity: model.refractivity,
+        groundAlbedo: model.groundAlbedo,
+        _padding: 0,
     };
 
     // Walk the struct applying WGSL's uniform layout rules: vec3f has size 12 but alignment 16, which is

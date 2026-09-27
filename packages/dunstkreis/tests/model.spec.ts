@@ -9,7 +9,7 @@ import {
 test("the osgHimmel preset reproduces the original's t_modelCfg defaults", () => {
     const m = OSGHIMMEL_ATMOSPHERE_MODEL;
 
-    expect(m.avgGroundReflectance).toBe(0.1);
+    expect(m.groundAlbedo).toEqual([0.3, 0.3, 0.3]);
     expect(m.rayleigh.scaleHeightKm).toBe(8);
     expect(m.rayleigh.beta).toEqual([5.8e-3, 1.35e-2, 3.31e-2]);
     expect(m.mie.scaleHeightKm).toBe(6);
@@ -28,7 +28,7 @@ test("the default model deviates from the original only where intended", () => {
 
     // Unchanged: Rayleigh is settled physics, and the ground reflectance was never contentious.
     expect(d.rayleigh).toEqual(o.rayleigh);
-    expect(d.avgGroundReflectance).toBe(o.avgGroundReflectance);
+    expect(d.groundAlbedo).toEqual(o.groundAlbedo);
 
     // Changed: the aerosol layer is far thinner and more forward-scattering than the original assumed, and
     // ozone is present. The original's own source carries 1.2 as a commented-out alternative to its 6.

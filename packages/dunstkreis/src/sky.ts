@@ -1,6 +1,12 @@
 import { autoExposureCompensation, DEFAULT_AUTO_EXPOSURE_KEYS, exposureFromEV100 } from "./exposure.js";
 import { createLut, dispatch } from "./luts.js";
-import { type AtmosphereLUTs, MIN_OBSERVER_HEIGHT_M, type SkyParams, type SkyPass } from "./pass.js";
+import {
+    type AtmosphereLUTs,
+    clampObserverHeight,
+    MIN_OBSERVER_HEIGHT_M,
+    type SkyParams,
+    type SkyPass,
+} from "./pass.js";
 import { pipelineConstants } from "./quality.js";
 import { apparentDirection } from "./refraction.js";
 import * as wgsl from "./wgsl/index.js";
@@ -23,6 +29,13 @@ export interface SkyPassOptions {
     dither?: boolean;
     /** Draw the debug overlay: altitude lines every 10 degrees, the compass directions and a ring around the Sun. */
     debugGrid?: boolean;
+    /** Draw the sun disc. Default true. */
+    sunDisc?: boolean;
+    /**
+     * Samples of the sky gathering its light on the ground, 8 or 64 by default, spread by the golden sets: the ground
+     * below the horizon is then lit by the sky as well as the sun. 0 leaves it lit by the sun alone.
+     */
+    groundSamples?: 0 | 8 | 64;
 }
 
 /** Byte size of DkSkyParams: a mat4x4, three vec3-plus-scalar pairs, four loose scalars and a flag, padded. */
@@ -55,8 +68,30 @@ const DEFAULTS: SkyParams = {
 export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPass {
     const { luts, format } = options;
     const { config } = luts;
-    const { toneMap = true, dither = true, debugGrid = false } = options;
-    const constants = pipelineConstants(config, { toneMap, dither, debugGrid });
+    const { toneMap = true, dither = true, debugGrid = false, sunDisc = true, groundSamples = 64 } = options;
+    if (![0, 8, 64].includes(groundSamples))
+        throw new Error("dunstkreis: 0, 8 or 64 samples of the sky's light on the ground");
+    const constants = pipelineConstants(config, {
+        toneMap,
+        dither,
+        debugGrid,
+        sunDisc,
+        groundSamples: groundSamples === 8 ? 8 : 64,
+    });
+    // Everything but the output, which differs between an image and a cube map.
+    const skySource = (output: string) =>
+        [
+            wgsl.quality,
+            wgsl.atmosphere,
+            wgsl.common,
+            wgsl.lut,
+            wgsl.sampling,
+            wgsl.raymarch,
+            wgsl.cube,
+            wgsl.goldenset,
+            output,
+            wgsl.sky,
+        ].join("\n");
 
     const skyView = createLut(device, "dunstkreis:skyView", config.skyView.width, config.skyView.height);
 
@@ -71,10 +106,10 @@ export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPa
         size: SKY_VIEW_PARAMS_SIZE,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    // The light meter's reading, written on the GPU and read there by the sky pass.
+    // The light meter's reading and the sun's illuminance, written on the GPU and read there by the sky pass.
     const metering = device.createBuffer({
         label: "dunstkreis:metering",
-        size: 16,
+        size: 32,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     });
     const skyParams = device.createBuffer({
@@ -83,24 +118,38 @@ export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPa
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    const skyViewPipeline = device.createComputePipeline({
-        label: "dunstkreis:skyView",
-        layout: "auto",
-        compute: {
-            module: device.createShaderModule({
-                code: [
-                    wgsl.quality,
-                    wgsl.atmosphere,
-                    wgsl.common,
-                    wgsl.lut,
-                    wgsl.sampling,
-                    wgsl.raymarch,
-                    wgsl.skyview,
-                ].join("\n"),
-            }),
-            entryPoint: "dkPrecomputeSkyView",
-            constants,
-        },
+    // The sky-view table in up to three steps: the table with the ground lit by the sun, the sky's light on the ground
+    // gathered from it, and the ground again with both. See skyview.comp.wgsl.
+    const skyViewModule = device.createShaderModule({
+        code: [
+            wgsl.quality,
+            wgsl.atmosphere,
+            wgsl.common,
+            wgsl.lut,
+            wgsl.sampling,
+            wgsl.raymarch,
+            wgsl.goldenset,
+            wgsl.skyview,
+        ].join("\n"),
+    });
+    const skyViewStep = (entryPoint: string, groundLight: boolean) =>
+        device.createComputePipeline({
+            label: `dunstkreis:${entryPoint}`,
+            layout: "auto",
+            compute: {
+                module: skyViewModule,
+                entryPoint,
+                constants: { ...constants, ...(groundLight ? { DK_GROUND_LIGHT: 1 } : {}) },
+            },
+        });
+    const skyViewPipeline = skyViewStep("dkPrecomputeSkyView", false);
+    const groundLit = groundSamples !== 0;
+    const groundIrradiancePipeline = groundLit ? skyViewStep("dkGroundIrradiance", false) : null;
+    const groundPipeline = groundLit ? skyViewStep("dkPrecomputeSkyView", true) : null;
+    const groundLight = device.createBuffer({
+        label: "dunstkreis:groundLight",
+        size: 16,
+        usage: GPUBufferUsage.STORAGE,
     });
 
     const storable = ["rgba8unorm", "rgba16float", "rgba32float"].includes(format);
@@ -111,47 +160,83 @@ export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPa
         label: "dunstkreis:sky",
         layout: "auto",
         compute: {
-            module: device.createShaderModule({
-                code: [
-                    wgsl.quality,
-                    wgsl.atmosphere,
-                    wgsl.common,
-                    wgsl.lut,
-                    wgsl.sampling,
-                    wgsl.raymarch,
-                    wgsl.skyOutput(format),
-                    wgsl.sky,
-                ].join("\n"),
-            }),
+            module: device.createShaderModule({ code: skySource(wgsl.skyOutput(format)) }),
             entryPoint: "dkSky",
             constants,
         },
     });
 
+    const skyViewEntries: GPUBindGroupEntry[] = [
+        { binding: 0, resource: { buffer: luts.atmosphereBuffer } },
+        { binding: 1, resource: { buffer: skyViewParams } },
+        { binding: 2, resource: luts.transmittance.createView() },
+        { binding: 3, resource: luts.multiScattering.createView() },
+        { binding: 4, resource: luts.sampler },
+        { binding: 5, resource: skyView.createView() },
+        { binding: 6, resource: { buffer: groundLight } },
+    ];
     const skyViewBindGroup = device.createBindGroup({
         layout: skyViewPipeline.getBindGroupLayout(0),
-        entries: [
-            { binding: 0, resource: { buffer: luts.atmosphereBuffer } },
-            { binding: 1, resource: { buffer: skyViewParams } },
-            { binding: 2, resource: luts.transmittance.createView() },
-            { binding: 3, resource: luts.multiScattering.createView() },
-            { binding: 4, resource: luts.sampler },
-            { binding: 5, resource: skyView.createView() },
-        ],
+        entries: skyViewEntries,
     });
+    const groundBindGroup =
+        groundPipeline &&
+        device.createBindGroup({ layout: groundPipeline.getBindGroupLayout(0), entries: skyViewEntries });
+    const groundIrradianceBindGroup =
+        groundIrradiancePipeline &&
+        device.createBindGroup({
+            layout: groundIrradiancePipeline.getBindGroupLayout(0),
+            entries: [
+                { binding: 0, resource: { buffer: luts.atmosphereBuffer } },
+                { binding: 1, resource: { buffer: skyViewParams } },
+                { binding: 4, resource: luts.sampler },
+                { binding: 6, resource: { buffer: groundLight } },
+                { binding: 7, resource: skyView.createView() },
+            ],
+        });
 
-    const skyBindGroup = device.createBindGroup({
-        layout: skyPipeline.getBindGroupLayout(0),
-        entries: [
-            { binding: 0, resource: { buffer: luts.atmosphereBuffer } },
-            { binding: 1, resource: { buffer: skyParams } },
-            { binding: 2, resource: luts.transmittance.createView() },
-            { binding: 3, resource: skyView.createView() },
-            { binding: 4, resource: luts.sampler },
-            { binding: 5, resource: luts.multiScattering.createView() },
-            { binding: 6, resource: { buffer: metering } },
-        ],
-    });
+    // One bind group per pipeline: layouts derived by "auto" never match another pipeline's.
+    const skyBindGroupFor = (pipeline: GPUComputePipeline) =>
+        device.createBindGroup({
+            layout: pipeline.getBindGroupLayout(0),
+            entries: [
+                { binding: 0, resource: { buffer: luts.atmosphereBuffer } },
+                { binding: 1, resource: { buffer: skyParams } },
+                { binding: 2, resource: luts.transmittance.createView() },
+                { binding: 3, resource: skyView.createView() },
+                { binding: 4, resource: luts.sampler },
+                { binding: 5, resource: luts.multiScattering.createView() },
+                { binding: 6, resource: { buffer: metering } },
+            ],
+        });
+    const skyBindGroup = skyBindGroupFor(skyPipeline);
+
+    // The cube map pipelines, made on first use, one per format and with or without the sun disc.
+    const cubePipelines = new Map<string, { pipeline: GPUComputePipeline; bindGroup: GPUBindGroup }>();
+    function cubePipeline(cubeFormat: GPUTextureFormat, sunDisc: boolean, cubeSamples: 1 | 8 | 64) {
+        const key = `${cubeFormat},${sunDisc},${cubeSamples}`;
+        let entry = cubePipelines.get(key);
+        if (!entry) {
+            const pipeline = device.createComputePipeline({
+                label: "dunstkreis:skyCube",
+                layout: "auto",
+                compute: {
+                    module: device.createShaderModule({ code: skySource(wgsl.skyCubeOutput(cubeFormat)) }),
+                    entryPoint: "dkSky",
+                    constants: pipelineConstants(config, {
+                        toneMap: false,
+                        dither: false,
+                        cube: true,
+                        cubeSamples,
+                        sunDisc,
+                    }),
+                },
+            });
+            entry = { pipeline, bindGroup: skyBindGroupFor(pipeline) };
+            cubePipelines.set(key, entry);
+        }
+        return entry;
+    }
 
     const meterPipeline = device.createComputePipeline({
         label: "dunstkreis:meter",
@@ -190,7 +275,7 @@ export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPa
             const [sx, sy, sz] = params.sunDirection;
             // Held off the ground, which is degenerate. Above the atmosphere the sky pass raymarches per pixel; the
             // table, which only it reads, is then left at the top.
-            const height = Math.max(params.observerHeightM, MIN_OBSERVER_HEIGHT_M);
+            const height = clampObserverHeight(params.observerHeightM);
             const altitudeKm = Math.min(height / 1000, luts.model.planet.thicknessKm);
 
             // Rebuilding the sky-view table is the expensive part, and it is why the sky pass itself is one fetch
@@ -208,6 +293,18 @@ export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPa
                 pass.setBindGroup(0, skyViewBindGroup);
                 pass.dispatchWorkgroups(dispatch(config.skyView.width), dispatch(config.skyView.height));
                 pass.end();
+                if (groundPipeline && groundBindGroup && groundIrradiancePipeline && groundIrradianceBindGroup) {
+                    const gather = encoder.beginComputePass();
+                    gather.setPipeline(groundIrradiancePipeline);
+                    gather.setBindGroup(0, groundIrradianceBindGroup);
+                    gather.dispatchWorkgroups(1);
+                    gather.end();
+                    const ground = encoder.beginComputePass();
+                    ground.setPipeline(groundPipeline);
+                    ground.setBindGroup(0, groundBindGroup);
+                    ground.dispatchWorkgroups(dispatch(config.skyView.width), dispatch(config.skyView.height));
+                    ground.end();
+                }
                 // The light meter reads the table just built, so its reading always matches the sky.
                 const meter = encoder.beginComputePass();
                 meter.setPipeline(meterPipeline);
@@ -250,6 +347,44 @@ export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPa
             return Math.min(Math.max(log2Luminance + 3 - compensation, min), max);
         },
 
+        async sunIlluminance() {
+            const staging = device.createBuffer({ size: 12, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+            const encoder = device.createCommandEncoder({ label: "dunstkreis:sunReadback" });
+            encoder.copyBufferToBuffer(metering, 16, staging, 0, 12);
+            device.queue.submit([encoder.finish()]);
+            await staging.mapAsync(GPUMapMode.READ);
+            const [r, g, b] = new Float32Array(staging.getMappedRange());
+            staging.destroy();
+            return [r as number, g as number, b as number];
+        },
+
+        encodeCube(encoder, target, { sunDisc = false, samples = 1 } = {}) {
+            const { width, height, depthOrArrayLayers } = target;
+            if (target.dimension !== "2d" || depthOrArrayLayers !== 6 || width !== height) {
+                throw new Error("dunstkreis: a cube map is a square 2D texture with six layers");
+            }
+            if (target.format !== "rgba16float" && target.format !== "rgba32float") {
+                throw new Error(`dunstkreis: the sky's cube map is rgba16float or rgba32float, not ${target.format}`);
+            }
+            if (sunDisc && target.format !== "rgba32float") {
+                throw new Error(
+                    "dunstkreis: the sun disc needs rgba32float, being far brighter than rgba16float holds",
+                );
+            }
+            if (![1, 8, 64].includes(samples)) throw new Error("dunstkreis: 1, 8 or 64 samples per cube map texel");
+            const { pipeline, bindGroup } = cubePipeline(target.format, sunDisc, samples);
+            const output = device.createBindGroup({
+                layout: pipeline.getBindGroupLayout(1),
+                entries: [{ binding: 0, resource: target.createView({ dimension: "2d-array" }) }],
+            });
+            const pass = encoder.beginComputePass({ label: "dunstkreis:skyCube" });
+            pass.setPipeline(pipeline);
+            pass.setBindGroup(0, bindGroup);
+            pass.setBindGroup(1, output);
+            pass.dispatchWorkgroups(dispatch(width), dispatch(width), 6);
+            pass.end();
+        },
+
         encode(encoder, target) {
             const output = device.createBindGroup({
                 layout: skyPipeline.getBindGroupLayout(1),
@@ -266,6 +401,7 @@ export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPa
         destroy() {
             skyView.destroy();
             skyViewParams.destroy();
+            groundLight.destroy();
             meterParams.destroy();
             skyParams.destroy();
             metering.destroy();

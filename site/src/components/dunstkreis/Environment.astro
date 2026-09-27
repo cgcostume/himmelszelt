@@ -1,0 +1,61 @@
+---
+import "../sternzeit/sternzeit.css";
+import "./dunstkreis.css";
+
+const PANELS = [
+    { name: "sky", title: "Sky", note: "cube map in cd/m², without the sun disc" },
+    { name: "irradiance", title: "Irradiance", note: "for every normal, in lux, from the nine coefficients" },
+];
+---
+
+<figure class="scene-frame" id="environment">
+    <div class="lut-bar">
+        <span class="note">faces</span>
+        <span class="steps" role="radiogroup" aria-label="Cube map face size">
+            {
+                [32, 64, 128, 256, 512].map((n) => (
+                    <label>
+                        <input type="radio" name="environment-size" value={n} checked={n === 128} />
+                        <span>{n}</span>
+                    </label>
+                ))
+            }
+        </span>
+        <span class="note" data-field="timing"></span>
+    </div>
+    {
+        PANELS.map((panel) => (
+            <section class="lut" data-panel={panel.name}>
+                <p class="lut-head">
+                    <strong>{panel.title}</strong> <span class="note">{panel.note}</span>
+                </p>
+                <div class="lut-plot">
+                    <span class="lut-axis lut-y">
+                        <span>zenith</span>
+                        <span>altitude, the horizon in the middle</span>
+                        <span>nadir</span>
+                    </span>
+                    <div class="lut-stage" style="aspect-ratio: 2 / 1">
+                        <canvas data-field="image" aria-label={`The ${panel.title.toLowerCase()} cube map, unrolled`} />
+                    </div>
+                    <span class="lut-axis lut-x">
+                        <span>N</span>
+                        <span>E · azimuth · S · W</span>
+                        <span>N</span>
+                    </span>
+                </div>
+            </section>
+        ))
+    }
+    <p class="lut-values" data-field="sun"></p>
+    <pre class="lut-values" data-field="sh"></pre>
+    <figcaption class="figure-caption">
+        Lighting a scene by this sky: the sky as a cube map, unrolled here into a panorama, the nine spherical harmonics
+        coefficients of it, the irradiance they give every surface, and the sunlight that reaches the observer, which
+        lights the scene as a light of its own. Tone mapped, each by its own scale.
+    </figcaption>
+</figure>
+
+<script>
+    import "./environment.js";
+</script>

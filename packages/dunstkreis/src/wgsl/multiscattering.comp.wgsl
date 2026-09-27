@@ -70,7 +70,7 @@ fn dkIntegrateMultiScattering(a: DkAtmosphere, h: f32, direction: vec3f, sunDire
         if (muSGround > 0.0) {
             let toSun = dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, a.Rg, muSGround);
             result.luminance = result.luminance
-                + throughput * toSun * muSGround * a.avgGroundReflectance / DK_PI;
+                + throughput * toSun * muSGround * a.groundAlbedo / DK_PI;
         }
     }
 

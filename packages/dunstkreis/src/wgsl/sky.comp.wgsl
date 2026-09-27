@@ -1,9 +1,11 @@
 // The sky pass: a compute pass that turns the precomputed tables into pixels, one invocation per pixel of the target,
-// with no rasterization. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`, `sampling.wgsl`, `raymarch.wgsl` and
-// `quality.wgsl`, plus the output binding `dkOutput` at group 1, declared by whoever builds the pipeline since its
-// format has to be spelled out: `skyOutput(format)` in `index.ts` writes it.
+// with no rasterization. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`, `sampling.wgsl`, `raymarch.wgsl`,
+// `cube.wgsl`, `goldenset.wgsl` and `quality.wgsl`, plus the output at group 1, `dkOutputSize` and `dkOutputStore`, declared by whoever
+// builds the pipeline since its format has to be spelled out: `skyOutput(format)` for an image, `skyCubeOutput(format)`
+// for the six faces of a cube map.
 //
-// It writes every pixel, so the sky goes first, as the background the rest of the frame is drawn over.
+// For an image, it writes every pixel, so the sky goes first, as the background the rest of the frame is drawn over.
+// For a cube map, with DK_CUBE, it writes the luminance itself, in cd/m², neither exposed nor tone mapped.
 
 struct DkSkyParams {
     inverseViewProjection: mat4x4f,
@@ -37,6 +39,7 @@ struct DkSkyParams {
 // The light meter's reading, written by exposure.comp.wgsl.
 struct DkMetering {
     log2Luminance: f32,
+    sunIlluminance: vec3f,
 }
 
 @group(0) @binding(0) var<uniform> dkAtmosphere: DkAtmosphere;
@@ -215,35 +218,62 @@ fn dkPixelRay(pixel: vec2u, size: vec2u) -> vec3f {
     return dkProjectRay(dkParams.inverseViewProjection, ndc, clamp(dkParams.projectionDistance, 0.0, 1.0));
 }
 
-@compute @workgroup_size(8, 8)
+// What the sky shows along a view ray, from the table inside the atmosphere or raymarched from above it.
+fn dkSkyAt(view: vec3f) -> DkSkySample {
+    let a = dkAtmosphere;
+    let altitude = max(dkParams.observerAltitude, 0.0);
+    if (altitude > a.Rt - a.Rg) {
+        return dkSkyFromSpace(a, view, altitude);
+    }
+    return dkSkyFromInside(a, view, altitude);
+}
+
+// The sun disc, attenuated by the air between it and the observer. Its radiance is the irradiance spread over the
+// disc's solid angle, some 15000 times brighter than the sky. Tested by the chord between the two unit vectors, which
+// equals the angle this close: a test against cos(radius) would need cos to 1e-5, and WGSL promises it only to 2^-11.
+fn dkSunDisc(sky: DkSkySample) -> vec3f {
+    let sunRadius = dkParams.sunAngularRadius;
+    if (length(sky.direction - dkParams.sunDirection) < sunRadius) {
+        return sky.sunTransmittance * dkAtmosphere.solarIrradiance / (DK_PI * sunRadius * sunRadius);
+    }
+    return vec3f(0.0);
+}
+
+@compute @workgroup_size(8, 8, 1)
 fn dkSky(@builtin(global_invocation_id) id: vec3u) {
-    let size = textureDimensions(dkOutput);
+    let size = dkOutputSize();
     if (id.x >= size.x || id.y >= size.y) {
         return;
     }
-    let a = dkAtmosphere;
+    if (DK_CUBE) {
+        var luminance = vec3f(0.0);
+        for (var i = 0u; i < DK_CUBE_SAMPLES; i = i + 1u) {
+            var offset = vec2f(0.0);
+            if (DK_CUBE_SAMPLES == 8u) {
+                offset = dkGoldenSet8[i];
+            } else if (DK_CUBE_SAMPLES == 64u) {
+                offset = dkGoldenSet64[i];
+            }
+            let sky = dkSkyAt(dkCubeDirectionAt(id.z, vec2f(id.xy) + 0.5 + offset, size.x));
+            luminance = luminance + sky.luminance;
+            if (DK_SUN_DISC) {
+                luminance = luminance + dkSunDisc(sky);
+            }
+        }
+        dkOutputStore(id.xy, id.z, vec4f(luminance / f32(DK_CUBE_SAMPLES), 1.0));
+        return;
+    }
+
     let view = dkPixelRay(id.xy, size);
     let sunDirection = dkParams.sunDirection;
-
-    let altitude = max(dkParams.observerAltitude, 0.0);
-    let inSpace = altitude > a.Rt - a.Rg;
-    var sky: DkSkySample;
-    if (inSpace) {
-        sky = dkSkyFromSpace(a, view, altitude);
-    } else {
-        sky = dkSkyFromInside(a, view, altitude);
-    }
+    let inSpace = dkParams.observerAltitude > dkAtmosphere.Rt - dkAtmosphere.Rg;
+    let sky = dkSkyAt(view);
     let direction = sky.direction;
     var luminance = sky.luminance;
-
-    // The sun disc, attenuated by the air between it and the observer. Its radiance is the irradiance spread over the
-    // disc's solid angle, some 15000 times brighter than the sky. Tested by the chord between the two unit vectors,
-    // which equals the angle this close: a test against cos(radius) would need cos to 1e-5, and WGSL promises it only
-    // to 2^-11.
-    let sunRadius = dkParams.sunAngularRadius;
-    if (length(direction - sunDirection) < sunRadius) {
-        luminance = luminance + sky.sunTransmittance * a.solarIrradiance / (DK_PI * sunRadius * sunRadius);
+    if (DK_SUN_DISC) {
+        luminance = luminance + dkSunDisc(sky);
     }
+    let sunRadius = dkParams.sunAngularRadius;
 
     // In cd/m², exposed. Without tone mapping, that is what is written: linear, for the caller's own tone mapping.
     var color = luminance * dkExposure();
@@ -268,5 +298,5 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
     if (DK_TONE_MAP && DK_DITHER) {
         color = clamp(dkDither(color, id.xy), vec3f(0.0), vec3f(1.0));
     }
-    textureStore(dkOutput, vec2i(id.xy), vec4f(color, 1.0));
+    dkOutputStore(id.xy, 0u, vec4f(color, 1.0));
 }

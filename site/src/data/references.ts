@@ -142,6 +142,13 @@ export const references: Record<string, Reference> = {
         year: 1980,
         note: "The smooth curve the automatic exposure's keys are joined with.",
     },
+    ramamoorthi2001: {
+        authors: "Ravi Ramamoorthi, Pat Hanrahan",
+        title: "An Efficient Representation for Irradiance Environment Maps",
+        venue: "SIGGRAPH 2001",
+        year: 2001,
+        note: "Nine spherical harmonics coefficients hold the diffuse light of an environment.",
+    },
     kopp2011: {
         authors: "Greg Kopp, Judith L. Lean",
         title: "A new, lower value of total solar irradiance: Evidence and climate significance",

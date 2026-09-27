@@ -33,9 +33,10 @@ as another way to fill the sky-view table, rather than as a second renderer.
 
 ## Observer altitude and refraction
 
-The observer can be anywhere from a millimeter above the ground up into space. Inside the atmosphere the sky pass
-looks the sky up in the sky-view table; above it, where that table does not reach, it raymarches every pixel from
-where its ray enters the atmosphere, and the planet shows, lit by the sun.
+The observer can be anywhere from 1 m above the ground, eye level give or take, up to the International Space Station's
+408 km (`clampObserverHeight`). Inside the atmosphere the sky pass looks the sky up in the sky-view table; above it,
+where that table does not reach, it raymarches every pixel from where its ray enters the atmosphere, and the planet
+shows, lit by the sun.
 
 Atmospheric refraction is part of the model: the air's refractive index follows its density, `refractivity` times
 the Rayleigh layer's, and every ray bends towards the denser air below it, the view rays as well as the sunlight
@@ -67,13 +68,13 @@ the same EV100 looks the same in any renderer that follows it.
 `autoExposure: true` exposes by a light meter instead, for a renderer without an exposure of its own or to follow day
 into night. Whenever the sky-view table is rebuilt, a compute pass reads it in directions spread evenly over the sky
 above the horizon and, apart, below it, and writes the brighter of the two geometric mean luminances to a buffer the sky
-pass reads, so there is no round trip to the CPU. On the ground that is the sky; the air towards the near ground is dim.
-High up it is the lit air below, while the sky above turns black. Above the atmosphere, beyond the table, the meter
-raymarches its directions instead and so reads the lit planet. The reading is EV100 = log2(L · 100 / 12.5)
-(`ev100FromLuminance`), held within `autoExposureRange`, [8, 20] by default, less `exposureCompensation`. The lower
-bound keeps night dark: exposed like day, a night sky looks like one. Metering the table rather than the frame keeps the
-reading still as the camera turns and leaves the sun disc out of it. It follows at once, with no eye adaptation over
-time. `meteredEV100()` reads it back, e.g. for a UI.
+pass reads, so there is no round trip to the CPU. On the ground that is mostly the sky; the ground below is darker,
+except, as for a camera, over snow. High up it is the lit air below, while the sky above turns black. Above the
+atmosphere, beyond the table, the meter raymarches its directions instead and so reads the lit planet. The reading is
+EV100 = log2(L · 100 / 12.5) (`ev100FromLuminance`), held within `autoExposureRange`, [8, 20] by default, less
+`exposureCompensation`. The lower bound keeps night dark: exposed like day, a night sky looks like one. Metering the
+table rather than the frame keeps the reading still as the camera turns and leaves the sun disc out of it. It follows at
+once, with no eye adaptation over time. `meteredEV100()` reads it back, e.g. for a UI.
 
 `autoExposureKeys` shapes the ramp over the day: compensations at sun altitudes above the observer's horizon, which
 sinks with height (some 10° at 100 km, so a sun 5° below the horizontal still shines on the observer and is keyed so),
@@ -106,6 +107,32 @@ ACES fit, sRGB encoded and dithered. Off, it writes the exposed luminance, linea
 a renderer that tone maps the frame itself. osgHimmel used Bruneton's curve, which had the encoding built in and was
 tuned to its own arbitrary units.
 
+## The ground
+
+Below the horizon the sky-view table shows the ground, in its albedo `groundAlbedo` (linear RGB, 0.3 by default, the
+Earth's average, where Bruneton and Hillaire used 0.1), lit by the sun and by the sky: after the table is built, its upper half is sampled
+over the hemisphere, cosine-weighted, for the sky's irradiance on the ground, and the lower half is built again with it.
+`groundSamples` on `createSkyPass` sets how many samples, 8 or 64 (the default), spread by the golden sets of
+webgl-operate, or 0 for the sun alone. The sky is read from the observer's altitude, which is close enough near the
+ground and too dark high up.
+
+## Lighting a scene
+
+The sun and the sky light a scene apart, the usual split for image-based lighting:
+
+- The sun as a directional light, from its apparent direction (`apparentDirection`), with `sunIlluminance()`: the
+  sunlight that reaches the observer through the air, per channel in lux, measured by the light meter on the GPU.
+- The sky as a cube map, `encodeCube(encoder, cube)`: the six faces of a square rgba16float texture with six layers,
+  in cd/m², linear, indexed by ENU directions, so a y-up engine samples it with (x, -z, y). Without the sun disc by
+  default: some 10^9 cd/m² in a few texels would outshine the whole sky in every filtered lookup. With
+  `{ sunDisc: true }`, for a background, it needs rgba32float, being far beyond what rgba16float holds. `samples`, 1, 8
+  or 64 per texel, spread by the golden sets of webgl-operate, smooth the edges a texel straddles, the horizon's and
+  the sun disc's.
+- The sky's diffuse light from `createIrradiancePass(device)`: `encode(encoder, cube)` projects any cube map onto the
+  nine real spherical harmonics up to order 2 (Ramamoorthi & Hanrahan), in a storage buffer to shade with directly,
+  and writes an irradiance cube map from them, 32x32 per face, in lux. It takes any cube map, the sky's or an HDR
+  environment's, and may move to `@himmelszelt/rundbild` once that exists.
+
 ## Status
 
 Implemented so far:
@@ -122,6 +149,7 @@ Implemented so far:
 - `src/luts.ts`: the transmittance and multiple-scattering tables, `precomputeAtmosphere()`.
 - `src/sky.ts`: the sky-view table, the light meter and the sky pass, `createSkyPass()`.
 - `src/exposure.ts`: EV100 and the automatic exposure's ramp.
+- `src/ibl.ts`: spherical harmonics and irradiance from a cube map, `createIrradiancePass()`.
 
 Aerial perspective, Bruneton's table as another filler, and the lit ground seen from inside follow.
 
@@ -144,7 +172,7 @@ ${wgsl.scattering}                                        // DkAtmosphere + the 
     ...
 }` });
 
-device.queue.writeBuffer(buffer, 0, atmosphereUniformData(DEFAULT_ATMOSPHERE_MODEL)); // 96 bytes
+device.queue.writeBuffer(buffer, 0, atmosphereUniformData(DEFAULT_ATMOSPHERE_MODEL)); // 112 bytes
 ```
 
 Three properties make this composable:
@@ -154,7 +182,7 @@ first argument rather than reading a `var<uniform>`, so nothing here can collide
 indices, and you decide where the data lives.
 
 **Parameters are a uniform block, not string substitution.** `atmosphereUniformData()` packs a model into the
-96-byte layout `atmosphere.wgsl` declares. A test parses that struct, walks it applying WGSL's uniform layout
+112-byte layout `atmosphere.wgsl` declares. A test parses that struct, walks it applying WGSL's uniform layout
 rules, and checks the packer writes the right value at every offset, since nothing in the toolchain would
 otherwise catch the two drifting apart.
 
@@ -197,6 +225,8 @@ Echtzeit"](https://daniellimberger.de/resources/2012%20%E2%80%93%20Mueller%20%28
 - B. Edlén, "The Refractive Index of Air" (Metrologia, 1966): the refractivity of air.
 - F. N. Fritsch, R. E. Carlson, "Monotone Piecewise Cubic Interpolation" (SIAM J. Numer. Anal., 1980): the curve
   through the exposure keys.
+- R. Ramamoorthi, P. Hanrahan, "An Efficient Representation for Irradiance Environment Maps" (SIGGRAPH 2001): the
+  nine spherical harmonics coefficients of diffuse image-based lighting.
 - G. Kopp, J. L. Lean, "A new, lower value of total solar irradiance" (Geophysical Research Letters, 2011): the
   solar constant.
 - S. Lagarde, C. de Rousiers, "Moving Frostbite to Physically Based Rendering" (SIGGRAPH course, 2014): EV100 and the

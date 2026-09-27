@@ -17,11 +17,19 @@ export interface AtmosphereLUTs {
 }
 
 /**
- * Smallest observer height above the ground, in meters, that the passes will use. At exactly ground level the horizon
- * is exactly horizontal and every downward ray hits the ground at distance zero. The shaders take the altitude rather
- * than the radius, which f32 resolves to only ~0.5 m, so a millimeter is enough.
+ * Lowest observer height above the ground, in meters, that the passes will use: eye level, give or take. Right at the
+ * ground the horizon is exactly horizontal, every downward ray ends at once, and the sky looks nothing like the one
+ * a person sees.
  */
-export const MIN_OBSERVER_HEIGHT_M = 0.001;
+export const MIN_OBSERVER_HEIGHT_M = 1;
+
+/** Highest observer height, in meters: the International Space Station's orbit, some 408 km up. */
+export const MAX_OBSERVER_HEIGHT_M = 408_000;
+
+/** An observer height in meters, held within `MIN_OBSERVER_HEIGHT_M` and `MAX_OBSERVER_HEIGHT_M`. */
+export function clampObserverHeight(heightM: number): number {
+    return Math.min(Math.max(heightM, MIN_OBSERVER_HEIGHT_M), MAX_OBSERVER_HEIGHT_M);
+}
 
 /** Everything that can change per frame. */
 export interface SkyParams {
@@ -32,8 +40,8 @@ export interface SkyParams {
      * refracted direction would lift the sun twice.
      */
     sunDirection: readonly [number, number, number];
-    /** Observer height above the ground, in meters, at least `MIN_OBSERVER_HEIGHT_M`. Above the atmosphere, the sky is
-     *  raymarched per pixel instead of looked up, and the planet shows, lit by the sun. */
+    /** Observer height above the ground, in meters, held within 1 m and 408 km (`clampObserverHeight`). Above the
+     *  atmosphere, the sky is raymarched per pixel instead of looked up, and the planet shows, lit by the sun. */
     observerHeightM: number;
     /** Inverse view-projection matrix, column-major, used to turn fragment coordinates back into rays. */
     inverseViewProjection: Float32Array;
@@ -90,6 +98,24 @@ export interface SkyPass {
     /** The EV100 `autoExposure` exposes with: the light meter's latest reading, read back from the GPU, compensated and
      *  held within `autoExposureRange`. */
     meteredEV100(): Promise<number>;
+    /**
+     * The sun's illuminance at the observer, per channel in lux, read back from the GPU: the sunlight left after the
+     * air, zero once the planet hides the sun. For lighting a scene by the sun as a directional light of its own, from
+     * its apparent direction (`apparentDirection`), next to the sky's diffuse light from `createIrradiancePass`.
+     */
+    sunIlluminance(): Promise<[number, number, number]>;
+    /**
+     * Records the sky into the six faces of `target`, a cube map: a square 2D texture with six layers, rgba16float or
+     * rgba32float, with `STORAGE_BINDING` usage. It holds the luminance in cd/m², linear, neither exposed nor tone
+     * mapped, indexed by ENU directions: a y-up engine samples it with (x, -z, y). Without the sun disc by default, to
+     * light a scene with; with `sunDisc`, for a background, which needs rgba32float. `samples` per texel, 1, 8 or 64,
+     * spread by the golden sets, smooth the edges a texel straddles: the horizon's, and the sun disc's.
+     */
+    encodeCube(
+        encoder: GPUCommandEncoder,
+        target: GPUTexture,
+        options?: { sunDisc?: boolean; samples?: 1 | 8 | 64 },
+    ): void;
     /** Records the pass into `encoder`, writing all of `target`, which needs `STORAGE_BINDING` usage and the format
      *  the pass was created for. */
     encode(encoder: GPUCommandEncoder, target: GPUTexture): void;

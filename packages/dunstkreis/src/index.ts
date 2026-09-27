@@ -43,10 +43,14 @@ export { precomputeAtmosphere } from "./luts.js";
 export type { SkyPassOptions } from "./sky.js";
 export { createSkyPass } from "./sky.js";
 
+// Diffuse image-based lighting from a cube map: spherical harmonics and an irradiance cube map.
+export type { IrradiancePass, IrradiancePassOptions } from "./ibl.js";
+export { createIrradiancePass } from "./ibl.js";
+
 // Pass and LUT interfaces. This package records into passes the caller owns; it creates no device, canvas,
 // context or render pass of its own.
 export type { AtmosphereLUTs, SkyParams, SkyPass } from "./pass.js";
-export { MIN_OBSERVER_HEIGHT_M } from "./pass.js";
+export { clampObserverHeight, MAX_OBSERVER_HEIGHT_M, MIN_OBSERVER_HEIGHT_M } from "./pass.js";
 
 // Atmospheric refraction, traced through the model's air like the view rays: where the sun shows, on the CPU.
 export { airRefractivity, apparentDirection, refractionAngle } from "./refraction.js";

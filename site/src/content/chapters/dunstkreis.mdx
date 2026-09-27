@@ -10,6 +10,7 @@ references:
     - kopp2011
     - lagarde2014
     - narkowicz2016
+    - ramamoorthi2001
 ---
 
 import Cite from "../../components/Cite.astro";
@@ -17,6 +18,8 @@ import Controls from "../../components/sternzeit/Controls.astro";
 import Planned from "../../components/Planned.astro";
 import Sky from "../../components/dunstkreis/Sky.astro";
 import Tables from "../../components/dunstkreis/Tables.astro";
+import Environment from "../../components/dunstkreis/Environment.astro";
+import Lighting from "../../components/dunstkreis/Lighting.astro";
 
 This chapter is being written. The sky below is live, and it grows with the chapter; the dashed boxes are the figures
 still to come.
@@ -110,7 +113,7 @@ being a special case.
 ## From the ground to orbit
 
 <Planned title="Leaving the ground">
-    The observer from a millimeter above the ground up into orbit: the horizon dips, the sky darkens overhead, and
+    The observer from eye level up to the orbit of the International Space Station: the horizon dips, the sky darkens overhead, and
     from above the atmosphere the whole planet appears, its thin glowing rim and the terminator between day and night.
 </Planned>
 
@@ -124,6 +127,16 @@ sizes and sample counts are open here to play with; the sky above follows.
 <Tables />
 
 <Controls open />
+
+The same sky can light a scene. The sky pass writes it into the six faces of a cube map, in cd/m² and without the
+sun's disc, and a second pass projects that onto nine spherical harmonics coefficients, which give the irradiance for
+any surface's orientation <Cite id="ramamoorthi2001" />. The sun lights the scene apart, as a light of its own, with what the air leaves of it.
+
+<Environment />
+
+<Lighting />
+
+<Controls />
 
 <Planned title="The tables, explained">
     Over each table, the grid of its parameterization; pointing at a texel shows the ray it stands for. Later aerial

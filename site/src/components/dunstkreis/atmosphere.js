@@ -1,4 +1,9 @@
-import { DEFAULT_ATMOSPHERE_MODEL, DEFAULT_TEXTURE_CONFIG, precomputeAtmosphere } from "@himmelszelt/dunstkreis";
+import {
+    createIrradiancePass,
+    DEFAULT_ATMOSPHERE_MODEL,
+    DEFAULT_TEXTURE_CONFIG,
+    precomputeAtmosphere,
+} from "@himmelszelt/dunstkreis";
 
 /**
  * The GPU and the tables the whole page shares: the sky renders with them, the tables figure configures and shows
@@ -31,8 +36,11 @@ async function acquire() {
 
 export const gpu = await acquire();
 
-/** What the tables are computed with: refraction on or off, and their sizes and sample counts. */
-export const quality = { refraction: true, config: structuredClone(DEFAULT_TEXTURE_CONFIG) };
+/**
+ * What the tables are computed with: refraction on or off, sizes and sample counts, and the samples of the sky that
+ * light the ground in the sky-view table, 0, 8 or 64.
+ */
+export const quality = { refraction: true, config: structuredClone(DEFAULT_TEXTURE_CONFIG), groundSamples: 64 };
 
 const events = new EventTarget();
 let current = null;
@@ -42,12 +50,79 @@ let again = false;
 /** The tables computed last, with how long that took: `{ luts, precomputeMs }`. */
 export const tables = () => current;
 
-/** Calls `listener` whenever new tables are in. */
+/** Calls `listener` whenever new tables are in, or the sky passes built on them have to be made anew. */
 export const onTables = (listener) => events.addEventListener("tables", () => listener(current));
 
-/** Calls `listener(pass)` whenever the sky pass may have rebuilt its sky-view table. */
+/** Sets how many samples of the sky light the ground, 0, 8 or 64: a matter of the sky passes, not the tables. */
+export function setGroundSamples(samples) {
+    quality.groundSamples = samples;
+    events.dispatchEvent(new Event("tables"));
+}
+
+/**
+ * Calls `listener({ pass, sunDirection, apparentSun, sunAngularDiameter })` whenever the sky pass may have rebuilt its
+ * sky-view table: the pass, where the sun is, where it shows, and how large.
+ */
 export const onSkyView = (listener) => events.addEventListener("skyView", (event) => listener(event.detail));
-export const skyViewChanged = (pass) => events.dispatchEvent(new CustomEvent("skyView", { detail: pass }));
+export function skyViewChanged(sky) {
+    events.dispatchEvent(new CustomEvent("skyView", { detail: sky }));
+    lastSky = sky;
+    pendingSky = sky;
+    buildEnvironment();
+}
+
+/**
+ * The sky as an environment to light a scene with, rebuilt along with the sky view: its cube map, without the sun
+ * disc, the irradiance pass holding its nine coefficients and irradiance cube map, the coefficients read back, the
+ * sunlight at the observer in lux, the metered EV100, and the sky it was built from.
+ */
+export const environment = { size: 128, cube: null, ibl: null, sh: null, sun: [0, 0, 0], ev100: 14, sky: null };
+export const onEnvironment = (listener) => events.addEventListener("environment", () => listener(environment));
+
+let lastSky = null;
+let pendingSky = null;
+let building = false;
+let retired = null;
+
+/** Rebuilds the environment with cube map faces of `size` texels. */
+export function setEnvironmentSize(size) {
+    environment.size = size;
+    pendingSky = lastSky;
+    buildEnvironment();
+}
+
+// One build at a time: while the sky moves on, only its latest state is built next.
+async function buildEnvironment() {
+    if (building || !pendingSky) return;
+    building = true;
+    const sky = pendingSky;
+    pendingSky = null;
+    const started = performance.now();
+    const { device } = gpu;
+    let { cube } = environment;
+    if (cube?.width !== environment.size) {
+        // Kept one build longer: whoever still reads the old one finishes first.
+        retired?.destroy();
+        retired = cube;
+        cube = device.createTexture({
+            label: "sternwarte:skyCube",
+            size: { width: environment.size, height: environment.size, depthOrArrayLayers: 6 },
+            format: "rgba16float",
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
+            textureBindingViewDimension: "cube",
+        });
+    }
+    const ibl = environment.ibl ?? createIrradiancePass(device);
+    const encoder = device.createCommandEncoder({ label: "sternwarte:environment" });
+    sky.pass.encodeCube(encoder, cube, { samples: 8 });
+    ibl.encode(encoder, cube);
+    device.queue.submit([encoder.finish()]);
+    const [sh, sun, ev100] = await Promise.all([ibl.readSH(), sky.pass.sunIlluminance(), sky.pass.meteredEV100()]);
+    Object.assign(environment, { cube, ibl, sh, sun, ev100, sky, buildMs: performance.now() - started });
+    events.dispatchEvent(new Event("environment"));
+    building = false;
+    buildEnvironment();
+}
 
 /** Recomputes the tables for `quality`; changes made while it runs are picked up by one more run after it. */
 export async function recompute() {

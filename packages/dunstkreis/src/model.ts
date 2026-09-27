@@ -46,8 +46,12 @@ export interface AtmosphereModel {
      * cd/m², ready for an exposure in EV100. See `luminanceScale`.
      */
     solarIlluminance: number;
-    /** Average ground reflectance, used for the irradiance ping-pong pass. */
-    avgGroundReflectance: number;
+    /**
+     * The ground's albedo per channel, linear rather than sRGB: the share of the light it receives that it reflects,
+     * diffusely. It lights the air from below and shows as the ground itself, lit by the sun and the sky. 0.3 by default,
+     * the Earth's average; Bruneton's and Hillaire's work used 0.1, fresh snow reflects 0.8 or more.
+     */
+    groundAlbedo: readonly [number, number, number];
     rayleigh: ExponentialLayer & {
         /** Rayleigh scattering coefficient. Equals the extinction coefficient: air molecules do not absorb. */
         beta: readonly [number, number, number];
@@ -83,7 +87,8 @@ export const DEFAULT_ATMOSPHERE_MODEL: AtmosphereModel = {
     solarIrradiance: [1.474, 1.8504, 1.91198],
     // The solar constant, 1361 W/m² (Kopp & Lean 2011), times sunlight's luminous efficacy of about 94 lm/W.
     solarIlluminance: 128_000,
-    avgGroundReflectance: 0.1,
+    // The Earth's average, rather than the 0.1 of Bruneton's and Hillaire's work, which is dark soil or forest.
+    groundAlbedo: [0.3, 0.3, 0.3],
     rayleigh: {
         scaleHeightKm: 8,
         // Bruneton & Neyret 2008, after Riley et al. 2004.

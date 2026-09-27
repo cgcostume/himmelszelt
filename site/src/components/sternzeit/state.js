@@ -4,13 +4,45 @@ import { fromDate, julianDayUT, julianEphemerisDay } from "@himmelszelt/sternzei
  * The one moment and place the whole page shows. Every set of controls writes here, and the tables and the scene
  * read from here, so any number of controls on the page stay in sync by construction.
  */
-export const state = { jd: 0, latitude: 52.3920607, longitude: 13.0925765, heightM: 0, live: false, animate: false };
+export const state = { jd: 0, latitude: 52.3920607, longitude: 13.0925765, heightM: 1, live: false, animate: false };
 
 const changes = new EventTarget();
+
+// The moment and place are kept in the browser, so the page opens where it was left, on any chapter. Only a
+// convenience: without storage, e.g. in a private window, it opens at the defaults.
+const STORAGE_KEY = "sternwarte:momentAndPlace";
+const STORED = ["jd", "latitude", "longitude", "heightM", "live"];
+let saveTimer = null;
+
+function save() {
+    clearTimeout(saveTimer);
+    // Live and animated moments change many times a second; the last one a moment later is enough.
+    saveTimer = setTimeout(() => {
+        try {
+            localStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify(Object.fromEntries(STORED.map((key) => [key, state[key]]))),
+            );
+        } catch {}
+    }, 500);
+}
+
+function restore() {
+    try {
+        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
+        if (!stored || typeof stored !== "object") return;
+        for (const key of STORED) {
+            const value = stored[key];
+            if (key === "live" ? typeof value === "boolean" : Number.isFinite(value)) state[key] = value;
+        }
+        state.heightM = Math.min(Math.max(state.heightM, 1), 408_000);
+    } catch {}
+}
 
 /** Applies `patch` and notifies every listener; `source` is the controls element the change came from, if any. */
 export function update(patch, source = null) {
     Object.assign(state, patch);
+    save();
     changes.dispatchEvent(new CustomEvent("change", { detail: source }));
 }
 
@@ -27,6 +59,9 @@ export function julianDayNow() {
 }
 
 state.jd = julianDayNow();
+restore();
+// Live goes on from now, not from when the page was left.
+if (state.live) state.jd = julianDayNow();
 
 /** The page's moments are UT; the orbits take ephemeris time, a minute or so ahead today (see deltaT). */
 export const ephemerisDay = (jd) => julianEphemerisDay(jd);

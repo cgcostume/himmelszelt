@@ -6,7 +6,7 @@
 // existing pipeline. Declare the `var<uniform>` yourself, at whatever group and binding suit you.
 //
 // Scalars are packed into the tails of the vec3s, which WGSL's 16-byte vec3 alignment leaves free, giving
-// a 96-byte block. `atmosphereUniformData()` writes exactly this layout and a test pins the two together.
+// a 112-byte block. `atmosphereUniformData()` writes exactly this layout and a test pins the two together.
 struct DkAtmosphere {
     // Rayleigh scattering coefficient, per km, per channel. Doubles as its extinction: air does not absorb.
     betaR: vec3f,
@@ -36,8 +36,10 @@ struct DkAtmosphere {
     // Centre altitude of the ozone layer, in km, and half its linear falloff width.
     ozoneCenter: f32,
     ozoneHalfWidth: f32,
-    // Average ground reflectance, for the irradiance bounce.
-    avgGroundReflectance: f32,
     // Refractivity n - 1 of the air on the ground, falling off with its density; 0 leaves every ray straight.
     refractivity: f32,
+
+    // The ground's albedo per channel, linear: how much of the light it receives it reflects, diffusely.
+    groundAlbedo: vec3f,
+    _padding: f32,
 }

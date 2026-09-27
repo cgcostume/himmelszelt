@@ -14,7 +14,10 @@
  */
 import atmosphere from "./atmosphere.wgsl";
 import common from "./common.wgsl";
+import cube from "./cube.wgsl";
 import exposure from "./exposure.comp.wgsl";
+import goldenset from "./goldenset.wgsl";
+import irradiance from "./irradiance.comp.wgsl";
 import lut from "./lut.wgsl";
 import multiscattering from "./multiscattering.comp.wgsl";
 import quality from "./quality.wgsl";
@@ -24,9 +27,24 @@ import sky from "./sky.comp.wgsl";
 import skyview from "./skyview.comp.wgsl";
 import transmittance from "./transmittance.comp.wgsl";
 
-export { skyOutput } from "./output.js";
+export { skyCubeOutput, skyOutput } from "./output.js";
 
-export { atmosphere, common, exposure, lut, multiscattering, quality, raymarch, sampling, sky, skyview, transmittance };
+export {
+    atmosphere,
+    common,
+    cube,
+    exposure,
+    goldenset,
+    irradiance,
+    lut,
+    multiscattering,
+    quality,
+    raymarch,
+    sampling,
+    sky,
+    skyview,
+    transmittance,
+};
 
 /** The composable pieces, in the order WGSL needs them declared. No bindings, no entry points. */
 export const scattering = [atmosphere, common, lut, sampling, raymarch].join("\n");

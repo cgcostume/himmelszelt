@@ -38,3 +38,20 @@ override DK_DITHER: bool = true;
 
 // Whether the sky pass draws the debug overlay: altitude lines, the compass directions and a ring around the Sun.
 override DK_DEBUG_GRID: bool = false;
+
+// Whether the sky pass writes the six faces of a cube map, in cd/m², rather than an image through the camera.
+override DK_CUBE: bool = false;
+
+// Whether the sky-view pass redoes the table's lower half with the ground lit by the sky as well as the sun.
+override DK_GROUND_LIGHT: bool = false;
+
+// Samples of the sky gathering its light on the ground, 8 or 64, spread by the golden sets.
+override DK_GROUND_SAMPLES: u32 = 64u;
+
+// Samples per texel of a cube map, spread over it by the golden sets: 1, 8 or 64. More smooth the edges a texel
+// straddles, the horizon's and the sun disc's.
+override DK_CUBE_SAMPLES: u32 = 1u;
+
+// Whether the sky pass draws the sun disc. Off for a cube map lighting a scene, which takes the sun as a light of its
+// own: a disc of some 10^9 cd/m² in a few texels would outshine the whole sky in every filtered lookup.
+override DK_SUN_DISC: bool = true;

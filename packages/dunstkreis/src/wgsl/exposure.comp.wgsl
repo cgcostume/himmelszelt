@@ -5,8 +5,9 @@
 // moves, and holds every direction, so the reading does not change as the camera turns, and the sun disc, which is not
 // in it, does not pull the exposure down. Directions are spread evenly over the sky above the horizon and, apart, over
 // the directions below it, and the brighter of the two geometric means is written for the sky pass, which reads it
-// without a round trip to the CPU. On the ground that is the sky, as a camera pointed at it meters it: below, the air
-// towards the near, dark ground is dim, and would expose the sky far too bright. High up it is the lit air below,
+// without a round trip to the CPU. On the ground that is mostly the sky, as a camera pointed at it meters it: below lies
+// the ground, dark but where the sun lights it, which would expose the sky too bright. Over snow it may be the ground,
+// as for a camera. High up it is the lit air below,
 // while the sky above turns black. Above the atmosphere, where the table does not reach, it raymarches what the
 // observer sees instead: the lit planet and its rim of air.
 //
@@ -20,6 +21,9 @@ struct DkMeterParams {
 struct DkMetering {
     // log2 of the geometric mean luminance, in cd/m².
     log2Luminance: f32,
+    // The sun's illuminance at the observer, per channel in lux: what reaches it through the air, for a renderer that
+    // lights its scene by the sun as a light of its own.
+    sunIlluminance: vec3f,
 }
 
 @group(0) @binding(0) var<uniform> dkAtmosphere: DkAtmosphere;
@@ -59,6 +63,19 @@ fn dkMeterLog2(a: DkAtmosphere, h: f32, mu: f32, azimuth: f32, size: vec2f) -> f
     return log2(max(dot(rgb, vec3f(0.2126, 0.7152, 0.0722)), DK_METER_FLOOR));
 }
 
+// Transmittance from the sun to the observer: by the table inside the atmosphere, raymarched from above it, where the
+// sunlight may still graze the air or be hidden by the planet.
+fn dkSunTransmittance(a: DkAtmosphere, h: f32) -> vec3f {
+    let sun = dkParams.sunDirection;
+    if (h > a.Rt - a.Rg) {
+        let ray = dkRaymarchFromSpace(
+            a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, h, sun, sun, DK_METER_STEPS,
+        );
+        return select(ray.transmittance, vec3f(0.0), ray.hitsGround);
+    }
+    return dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, a.Rg + h, sun.z);
+}
+
 @compute @workgroup_size(256)
 fn dkMeterSky(@builtin(local_invocation_index) index: u32) {
     let a = dkAtmosphere;
@@ -87,5 +104,6 @@ fn dkMeterSky(@builtin(local_invocation_index) index: u32) {
     }
     if (index == 0u) {
         dkMeteringOut.log2Luminance = max(dkMeterSums[0].x, dkMeterSums[0].y) / total;
+        dkMeteringOut.sunIlluminance = a.solarIrradiance * dkSunTransmittance(a, h);
     }
 }

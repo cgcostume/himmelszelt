@@ -19,9 +19,14 @@ export interface QualityConstants {
     DK_TONE_MAP: number;
     DK_DITHER: number;
     DK_DEBUG_GRID: number;
+    DK_CUBE: number;
+    DK_CUBE_SAMPLES: number;
+    DK_GROUND_LIGHT: number;
+    DK_GROUND_SAMPLES: number;
+    DK_SUN_DISC: number;
 }
 
-/** osgHimmel's sample counts, fewer for the transmittance, tone mapped and dithered, without the debug overlay. */
+/** osgHimmel's sample counts, fewer for the transmittance, tone mapped and dithered, an image with the sun disc. */
 export const DEFAULT_QUALITY: QualityConstants = {
     DK_SAMPLES_TRANSMITTANCE: 100,
     DK_SAMPLES_INSCATTER: 50,
@@ -32,6 +37,11 @@ export const DEFAULT_QUALITY: QualityConstants = {
     DK_TONE_MAP: 1,
     DK_DITHER: 1,
     DK_DEBUG_GRID: 0,
+    DK_CUBE: 0,
+    DK_CUBE_SAMPLES: 1,
+    DK_GROUND_LIGHT: 0,
+    DK_GROUND_SAMPLES: 64,
+    DK_SUN_DISC: 1,
 };
 
 /**
@@ -43,7 +53,16 @@ export const DEFAULT_QUALITY: QualityConstants = {
  */
 export function pipelineConstants(
     config: PrecomputedTextureConfig,
-    options: { toneMap?: boolean; dither?: boolean; debugGrid?: boolean } = {},
+    options: {
+        toneMap?: boolean;
+        dither?: boolean;
+        debugGrid?: boolean;
+        cube?: boolean;
+        cubeSamples?: 1 | 8 | 64;
+        groundLight?: boolean;
+        groundSamples?: 8 | 64;
+        sunDisc?: boolean;
+    } = {},
 ): QualityConstants {
     const { integralSamples } = config;
 
@@ -57,5 +76,10 @@ export function pipelineConstants(
         DK_TONE_MAP: options.toneMap === false ? 0 : 1,
         DK_DITHER: options.dither === false ? 0 : 1,
         DK_DEBUG_GRID: options.debugGrid ? 1 : 0,
+        DK_CUBE: options.cube ? 1 : 0,
+        DK_CUBE_SAMPLES: options.cubeSamples ?? 1,
+        DK_GROUND_LIGHT: options.groundLight ? 1 : 0,
+        DK_GROUND_SAMPLES: options.groundSamples ?? 64,
+        DK_SUN_DISC: options.sunDisc === false ? 0 : 1,
     };
 }

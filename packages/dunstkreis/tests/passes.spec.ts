@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { skyOutput } from "../src/wgsl/output.js";
+import { skyCubeOutput, skyOutput } from "../src/wgsl/output.js";
 import { compileWgsl, gpuDevice, wgslSource } from "./gpu.js";
 
 // Each pass, with exactly the fragments it declares a dependency on in its header comment. Compiling them
@@ -8,10 +8,14 @@ import { compileWgsl, gpuDevice, wgslSource } from "./gpu.js";
 const PASSES: Record<string, readonly string[]> = {
     transmittance: ["atmosphere", "common", "lut", "quality", "transmittance"],
     multiscattering: ["atmosphere", "common", "lut", "sampling", "quality", "multiscattering"],
-    skyview: ["atmosphere", "common", "lut", "sampling", "raymarch", "quality", "skyview"],
-    sky: ["atmosphere", "common", "lut", "sampling", "raymarch", "quality", "sky"],
+    skyview: ["atmosphere", "common", "lut", "sampling", "raymarch", "goldenset", "quality", "skyview"],
+    sky: ["atmosphere", "common", "lut", "sampling", "raymarch", "cube", "goldenset", "quality", "sky"],
+    skyCube: ["atmosphere", "common", "lut", "sampling", "raymarch", "cube", "goldenset", "quality", "sky"],
     exposure: ["atmosphere", "common", "lut", "sampling", "raymarch", "exposure"],
+    irradiance: ["cube", "irradiance"],
 };
+// The output the sky pass leaves to whoever builds its pipeline.
+const OUTPUTS: Record<string, string> = { sky: skyOutput("rgba8unorm"), skyCube: skyCubeOutput("rgba16float") };
 
 for (const [name, fragments] of Object.entries(PASSES)) {
     test(`the ${name} pass compiles from its declared fragments`, async () => {
@@ -19,8 +23,8 @@ for (const [name, fragments] of Object.entries(PASSES)) {
         test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
         if (!device) return;
 
-        const output = name === "sky" ? [skyOutput("rgba8unorm")] : [];
-        const errors = await compileWgsl(device, [...output, ...fragments.map(wgslSource)].join("\n"));
+        const output = OUTPUTS[name] ?? "";
+        const errors = await compileWgsl(device, [output, ...fragments.map(wgslSource)].join("\n"));
         expect(errors, `${name}:\n${errors.join("\n")}`).toEqual([]);
     });
 }

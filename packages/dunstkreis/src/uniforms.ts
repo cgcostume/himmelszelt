@@ -2,9 +2,9 @@ import { type AtmosphereModel, atmosphereTopRadiusKm, luminanceScale } from "./m
 
 /**
  * Size of the `DkAtmosphere` uniform block, in bytes. Scalars are packed into the tails of the vec3s, which
- * WGSL's 16-byte vec3 alignment leaves free, so the whole model fits in 96 bytes.
+ * WGSL's 16-byte vec3 alignment leaves free, so the whole model fits in 112 bytes.
  */
-export const ATMOSPHERE_UNIFORM_SIZE = 96;
+export const ATMOSPHERE_UNIFORM_SIZE = 112;
 
 /**
  * Packs a model into the `DkAtmosphere` layout declared by `wgsl/atmosphere.wgsl`, ready for `writeBuffer`.
@@ -36,8 +36,9 @@ export function atmosphereUniformData(model: AtmosphereModel, target?: Float32Ar
 
     data[20] = model.ozone.centerAltitudeKm;
     data[21] = model.ozone.widthKm / 2;
-    data[22] = model.avgGroundReflectance;
-    data[23] = model.refractivity;
+    data[22] = model.refractivity;
+
+    data.set(model.groundAlbedo, 24);
 
     return data;
 }

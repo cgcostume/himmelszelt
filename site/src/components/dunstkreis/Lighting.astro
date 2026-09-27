@@ -1,0 +1,54 @@
+---
+import "../sternzeit/sternzeit.css";
+import "./dunstkreis.css";
+---
+
+<figure class="scene-frame wide" id="lighting">
+    <div class="sky-view">
+        <canvas data-field="canvas" aria-label="Four solids lit by the sky and the sun at the chosen moment and place"></canvas>
+        <div class="sky-overlay">
+            <span class="note" data-field="info"></span>
+            <span class="steps" role="radiogroup" aria-label="Background" title="Behind the solids: the atmosphere rendered live for every pixel, or the sky map the lighting comes from">
+                {
+                    ["atmosphere", "sky map"].map((value) => (
+                        <label>
+                            <input type="radio" name="lighting-background" value={value} checked={value === "atmosphere"} />
+                            <span>{value}</span>
+                        </label>
+                    ))
+                }
+            </span>
+            <span class="steps" role="radiogroup" aria-label="Shadow rays over the sun disc" title="Shadow rays over the sun disc: one to its center for hard shadows, or 8 or 64 spread over it for soft ones">
+                {
+                    [
+                        ["1", "hard"],
+                        ["8", "8"],
+                        ["64", "64"],
+                    ].map(([value, label]) => (
+                        <label>
+                            <input type="radio" name="lighting-shadows" value={value} checked={value === "8"} />
+                            <span>{label}</span>
+                        </label>
+                    ))
+                }
+            </span>
+            <span class="sky-toggles">
+                <button type="button" class="view-toggle" data-field="rotate" aria-pressed="false" title="Turn the solids slowly">rotate</button>
+                <button type="button" class="view-toggle" data-field="sunDisc" aria-pressed="true" title="Draw the sun disc in the background">sun disc</button>
+                <button type="button" class="view-toggle" data-field="occlusion" aria-pressed="true" title="Dim the sky's light where the solids hide the sky, by sixteen rays per pixel">occlusion</button>
+            </span>
+        </div>
+        <p class="vis-credit footnote">Drag to turn around, scroll to move closer or far out. Raytraced with WebGPU.</p>
+    </div>
+    <figcaption class="figure-caption">
+        A tetrahedron, a cube, an icosahedron and a sphere, lit by the sky above: the sun as a light of its own, with its
+        shadows, soft from rays spread over its disc, and the sky's light from its nine coefficients, dimmed where the
+        solids hide the sky. Raytraced, not a triangle in it, four rays per pixel,
+        with the lighting refined over 64 frames while nothing moves. Every surface is
+        white but the ground, a darker gray; the colors are the light's. Exposed like the sky.
+    </figcaption>
+</figure>
+
+<script>
+    import "./lighting.js";
+</script>

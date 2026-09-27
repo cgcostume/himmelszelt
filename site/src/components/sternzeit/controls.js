@@ -157,10 +157,10 @@ for (const root of roots) {
     // Both angles step by the same unit, from one group of buttons.
     wireStepping(latitude, field("latlongStep"), commitLatLong, LATLONG_DECIMALS);
     wireStepping(longitude, field("latlongStep"), commitLatLong, LATLONG_DECIMALS);
-    // Up to the International Space Station's orbit: parallax and horizon dip hold at any height, refraction fades
-    // out with the air.
+    // From eye level, give or take, up to the International Space Station's orbit: parallax and horizon dip hold at
+    // any height, refraction fades out with the air.
     const commitHeight = () => {
-        height.value = Math.min(Number(height.max), Math.max(0, Number(height.value) || 0));
+        height.value = Math.min(Number(height.max), Math.max(Number(height.min), Number(height.value) || 0));
         update({ heightM: Number(height.value) }, root);
     };
     wireStepping(height, field("heightStep"), commitHeight, 0);
@@ -198,7 +198,7 @@ for (const root of roots) {
                 update({ latitude, longitude });
                 const elevation = await lookupElevation(latitude, longitude);
                 if (elevation === null) status.textContent = "height lookup failed, set it by hand";
-                else update({ heightM: elevation });
+                else update({ heightM: Math.max(1, elevation) });
             },
             (err) => {
                 status.textContent = `geolocation failed: ${err.message}`;
@@ -233,6 +233,8 @@ function sync(source) {
 }
 
 onChange(sync);
+// A page restored in live mode keeps going live.
+if (state.live && liveIntervalId === null) setLive(true, null);
 // Anything else on the page may end live mode or the animation, e.g. the eclipse views jumping to an example moment.
 onChange(() => {
     if (!state.live && liveIntervalId !== null) setLive(false, null);

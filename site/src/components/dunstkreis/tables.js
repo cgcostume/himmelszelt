@@ -1,7 +1,7 @@
-import { DEFAULT_TEXTURE_CONFIG, readTexture } from "@himmelszelt/dunstkreis";
+import { clampObserverHeight, DEFAULT_TEXTURE_CONFIG, readTexture } from "@himmelszelt/dunstkreis";
 import { paintRange } from "../range.js";
 import { state } from "../sternzeit/state.js";
-import { gpu, onSkyView, onTables, quality, recompute, tables } from "./atmosphere.js";
+import { gpu, onSkyView, onTables, quality, recompute, setGroundSamples, tables } from "./atmosphere.js";
 
 const root = document.querySelector("#tables");
 const field = (name) => root.querySelector(`[data-field="${name}"]`);
@@ -38,7 +38,7 @@ const part = (name, field) => lut(name).querySelector(`[data-field="${field}"]`)
 
 async function show(name, texture) {
     const model = tables().luts.model;
-    const heightKm = state.heightM / 1000;
+    const heightKm = clampObserverHeight(state.heightM) / 1000;
     const { width, height, data } = await readTexture(gpu.device, texture);
     // Tone mapped once per readback, in display order, four bytes a texel.
     const scale = SCALES[name](data);
@@ -54,7 +54,7 @@ async function show(name, texture) {
         }
     }
     shown[name] = { width, height, data, colors, model, heightKm };
-    part(name, "image").parentElement.style.aspectRatio = `${width} / ${Math.max(height, width / 8)}`;
+    part(name, "image").parentElement.style.aspectRatio = `${width} / ${height}`;
     part(name, "info").textContent =
         `${width}×${height} ${texture.format}, ${((width * height * 8) / 1024).toFixed(0)} KiB`;
     paint(name);
@@ -268,6 +268,9 @@ function write(key, value) {
 
 function showControls() {
     field("refraction").setAttribute("aria-pressed", String(quality.refraction));
+    for (const radio of root.querySelectorAll('input[name="ground-light"]')) {
+        radio.checked = Number(radio.value) === quality.groundSamples;
+    }
     for (const radio of root.querySelectorAll("[data-preset]")) {
         radio.checked = Number(radio.value) === read(radio.dataset.preset);
     }
@@ -289,7 +292,7 @@ if (gpu.error) {
         show("transmittance", luts.transmittance);
         show("multiScattering", luts.multiScattering);
     });
-    onSkyView((pass) => show("skyView", pass.skyViewTexture));
+    onSkyView(({ pass }) => show("skyView", pass.skyViewTexture));
     const { luts } = tables();
     show("transmittance", luts.transmittance);
     show("multiScattering", luts.multiScattering);
@@ -329,7 +332,11 @@ if (gpu.error) {
         image.addEventListener("pointerleave", () => leave(name));
         new ResizeObserver(() => paint(name)).observe(image);
     }
+    for (const radio of root.querySelectorAll('input[name="ground-light"]')) {
+        radio.addEventListener("change", () => setGroundSamples(Number(radio.value)));
+    }
     field("reset").addEventListener("click", () => {
+        quality.groundSamples = 64;
         quality.config = structuredClone(DEFAULT_TEXTURE_CONFIG);
         recompute();
     });

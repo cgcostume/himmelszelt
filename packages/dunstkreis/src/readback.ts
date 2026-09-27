@@ -24,15 +24,17 @@ export interface TexturePixels {
 }
 
 /**
- * Copies an `rgba16float` texture back and decodes it. The texture must have been created with
- * `COPY_SRC`; every LUT this package makes is.
+ * Copies one layer of an `rgba16float` or `rgba32float` texture back and decodes it, e.g. a face of a cube map. The
+ * texture must have been created with `COPY_SRC`; every LUT this package makes is.
  *
  * Rows are padded to 256 bytes in the intermediate buffer, as WebGPU requires, and unpacked here, so the
  * returned data is tightly packed regardless of width.
  */
-export async function readTexture(device: GPUDevice, texture: GPUTexture): Promise<TexturePixels> {
+export async function readTexture(device: GPUDevice, texture: GPUTexture, layer = 0): Promise<TexturePixels> {
     const { width, height } = texture;
-    const bytesPerRow = Math.ceil((width * 8) / 256) * 256;
+    const full = texture.format === "rgba32float";
+    const bytesPerTexel = full ? 16 : 8;
+    const bytesPerRow = Math.ceil((width * bytesPerTexel) / 256) * 256;
 
     const buffer = device.createBuffer({
         size: bytesPerRow * height,
@@ -40,19 +42,25 @@ export async function readTexture(device: GPUDevice, texture: GPUTexture): Promi
     });
 
     const encoder = device.createCommandEncoder({ label: "dunstkreis:readback" });
-    encoder.copyTextureToBuffer({ texture }, { buffer, bytesPerRow }, { width, height });
+    encoder.copyTextureToBuffer(
+        { texture, origin: { x: 0, y: 0, z: layer } },
+        { buffer, bytesPerRow },
+        { width, height, depthOrArrayLayers: 1 },
+    );
     device.queue.submit([encoder.finish()]);
 
     await buffer.mapAsync(GPUMapMode.READ);
-    const raw = new Uint16Array(buffer.getMappedRange().slice(0));
+    const bytes = buffer.getMappedRange().slice(0);
     buffer.unmap();
     buffer.destroy();
 
     const data = new Float32Array(width * height * 4);
-    const halvesPerRow = bytesPerRow / 2;
+    const perRow = bytesPerRow / (full ? 4 : 2);
+    const raw = full ? new Float32Array(bytes) : new Uint16Array(bytes);
     for (let y = 0; y < height; ++y) {
         for (let x = 0; x < width * 4; ++x) {
-            data[y * width * 4 + x] = decodeHalf(raw[y * halvesPerRow + x] as number);
+            const value = raw[y * perRow + x] as number;
+            data[y * width * 4 + x] = full ? value : decodeHalf(value);
         }
     }
 

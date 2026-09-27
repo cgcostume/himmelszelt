@@ -107,10 +107,18 @@
     font-variant-numeric: tabular-nums;
 }
 /* The canvas with its axes: the y axis read bottom up along the left, the x axis under it. */
+/* The table as wide as the text, its y axis in the margin left of it; on a narrow screen there is no margin to spare. */
 .lut-plot {
+    --lut-axis: 1.1rem;
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: var(--lut-axis) 1fr;
     gap: 0.25rem 0.4rem;
+    margin-left: calc(-1 * (var(--lut-axis) + 0.4rem));
+}
+@media (max-width: 40rem) {
+    .lut-plot {
+        margin-left: 0;
+    }
 }
 /* Start, title and end of each axis, with a hairline on either side of the title filling the space between them. In
    logical sizes, so the same rules hold for the y axis, whose text runs vertically. */
@@ -135,7 +143,10 @@
     block-size: 1px;
     background: var(--line);
 }
+/* Sized by the table, never the other way: a flat table's long label runs over rather than stretching it. */
 .lut-y {
+    contain: size;
+    overflow: visible;
     writing-mode: vertical-rl;
     transform: rotate(180deg);
     flex-direction: row-reverse;
@@ -195,4 +206,11 @@
 }
 .lut-y .lut-mark {
     transform: translateY(-50%);
+}
+/* The values under the environment figure: the sunlight in a line, the coefficients as a small table. */
+.lut-values {
+    margin: 0 0 0.75rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    font-variant-numeric: tabular-nums;
 }

@@ -27,7 +27,7 @@ osghimmel/         read-only reference clone, gitignored
 | npm package | Directory | Status |
 |---|---|---|
 | `@himmelszelt/sternzeit` (astronomy/sidereal time math) | `packages/sternzeit` | Julian Day, sidereal time, sun/moon/earth positions, moon phase, sun direction from the moon, earthshine and librations done (precise + approx), ΔT from IERS observations and Espenak & Meeus; cross-checked against astronomia; stars stubbed |
-| `@himmelszelt/dunstkreis` (WebGPU atmosphere after Hillaire, on Bruneton's model) | `packages/dunstkreis` | tables, sky pass, traced refraction and exposure working, live in its chapter; aerial perspective, Bruneton as another sky-view filler, IBL pending |
+| `@himmelszelt/dunstkreis` (WebGPU atmosphere after Hillaire, on Bruneton's model) | `packages/dunstkreis` | tables, sky pass, traced refraction, exposure, sky cube map and diffuse IBL (SH9, irradiance cube) working, live in its chapter; aerial perspective, specular IBL, Bruneton as another sky-view filler pending |
 | `@himmelszelt/sternwarte` (the website, `private: true`) | `site/` | sternzeit chapter done (figures, glossary tooltips, references, TOC); dunstkreis chapter started (live sky, section skeleton), and `planned: true` placeholders for nachtgestirn, sternenheer, gewoelk, rundbild; deployed to GitHub Pages by CI from main |
 | `@himmelszelt/gewoelk` (clouds) | not created yet | later |
 | `@himmelszelt/sternenheer` (star rendering) | not created yet | later; the old poetic word for the host of stars, and clear of himmelszelt |

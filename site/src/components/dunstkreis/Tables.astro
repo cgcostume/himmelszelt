@@ -58,6 +58,21 @@ const TABLES = [
 <figure class="scene-frame" id="tables">
     <div class="lut-bar">
         <button type="button" class="view-toggle" data-field="refraction" aria-pressed="true" title="Let the air bend the light, recomputing the tables">refraction</button>
+        <span class="note">ground light</span>
+        <span class="steps" role="radiogroup" aria-label="Ground light" title="Samples of the sky lighting the ground below the horizon, as well as the sun: none, or 8 or 64 spread over the sky above by the golden sets">
+            {
+                [
+                    [0, "none"],
+                    [8, "8"],
+                    [64, "64"],
+                ].map(([value, label]) => (
+                    <label>
+                        <input type="radio" name="ground-light" value={value} checked={value === 64} />
+                        <span>{label}</span>
+                    </label>
+                ))
+            }
+        </span>
         <button type="button" class="view-toggle" data-field="reset" title="Back to dunstkreis' defaults">defaults</button>
         <span class="note" data-field="timing"></span>
     </div>

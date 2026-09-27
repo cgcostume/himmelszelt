@@ -14,7 +14,8 @@ struct DkSkyRay {
 
 // Scattered light reaching a point at altitude h, with local up `up`, along `direction`: single scattering with its
 // phase functions, plus the precomputed multiple-scattering term. With `ground`, a ray that ends on the planet adds the
-// sunlight the ground reflects, which is what shows the planet from space.
+// sunlight the ground reflects, by its albedo: the ground itself, below the horizon or seen from space. Only the
+// sun's: the sky's light on the ground is left out, so the ground goes dark once the sun is down.
 fn dkRaymarchSky(
     a: DkAtmosphere,
     transmittanceLut: texture_2d<f32>,
@@ -71,7 +72,7 @@ fn dkRaymarchSky(
         if (muS > 0.0) {
             let toSun = dkSampleTransmittanceToTop(a, transmittanceLut, lutSampler, a.Rg, muS);
             result.luminance = result.luminance
-                + result.transmittance * a.solarIrradiance * toSun * muS * a.avgGroundReflectance / DK_PI;
+                + result.transmittance * a.solarIrradiance * toSun * muS * a.groundAlbedo / DK_PI;
         }
     }
     return result;
