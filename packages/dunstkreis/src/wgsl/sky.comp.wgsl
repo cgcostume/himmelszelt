@@ -102,8 +102,9 @@ fn dkDebugOverlay(color: vec3f, view: vec3f, right: vec3f, below: vec3f, apparen
     let sunAngle = length(view - apparentSun);
     let ring = dkLine(abs(sunAngle - max(sunRadius * 1.5, 6.0 * pixel)), pixel);
 
-    let grid = max(max(0.1 * altitudeLine, 0.3 * horizonLine), 0.15 * compassLine);
-    return mix(color, vec3f(1.0), max(grid, 0.7 * ring));
+    // The ring as strong as the compass lines: part of the same grid.
+    let grid = max(max(0.1 * altitudeLine, 0.3 * horizonLine), 0.15 * max(compassLine, ring));
+    return mix(color, vec3f(1.0), grid);
 }
 
 // The exposure luminance in cd/m² is multiplied by. Metered, it is the light meter's EV100, log2(L * 100 / 12.5) for
