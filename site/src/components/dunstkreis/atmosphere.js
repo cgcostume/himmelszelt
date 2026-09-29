@@ -53,10 +53,18 @@ export const tables = () => current;
 /** Calls `listener` whenever new tables are in, or the sky passes built on them have to be made anew. */
 export const onTables = (listener) => events.addEventListener("tables", () => listener(current));
 
-/** Sets how many samples of the sky light the ground, 0, 8 or 64: a matter of the sky passes, not the tables. */
-export function setGroundSamples(samples) {
-    quality.groundSamples = samples;
-    events.dispatchEvent(new Event("tables"));
+/**
+ * A refraction button, one of several over the page: every table and cube map is traced through the bent air, so
+ * pressing any one recomputes them all, and every button follows.
+ */
+export function bindRefractionToggle(button) {
+    const show = () => button.setAttribute("aria-pressed", String(quality.refraction));
+    show();
+    onTables(show);
+    button.addEventListener("click", () => {
+        quality.refraction = !quality.refraction;
+        recompute();
+    });
 }
 
 /**
@@ -76,13 +84,48 @@ export function skyViewChanged(sky) {
  * disc, the irradiance pass holding its nine coefficients and irradiance cube map, the coefficients read back, the
  * sunlight at the observer in lux, the metered EV100, and the sky it was built from.
  */
-export const environment = { size: 128, cube: null, ibl: null, sh: null, sun: [0, 0, 0], ev100: 14, sky: null };
+export const environment = {
+    size: 128,
+    irradianceSize: 32,
+    cubify: false,
+    cube: null,
+    ibl: null,
+    sh: null,
+    sun: [0, 0, 0],
+    ev100: 14,
+    sky: null,
+};
 export const onEnvironment = (listener) => events.addEventListener("environment", () => listener(environment));
 
 let lastSky = null;
 let pendingSky = null;
 let building = false;
 let retired = null;
+let retiredIbl = null;
+
+const cubifyToggles = new Set();
+
+/** Rebuilds the environment with its cube map cubified or not: texels spread evenly over the sphere, see cube.wgsl. */
+export function setEnvironmentCubify(cubify) {
+    environment.cubify = cubify;
+    for (const button of cubifyToggles) button.setAttribute("aria-pressed", String(cubify));
+    pendingSky = lastSky;
+    buildEnvironment();
+}
+
+/** A cubified button, one of several: the sky cube is built cubified, and whoever samples it follows. */
+export function bindCubifyToggle(button) {
+    cubifyToggles.add(button);
+    button.setAttribute("aria-pressed", String(environment.cubify));
+    button.addEventListener("click", () => setEnvironmentCubify(!environment.cubify));
+}
+
+/** Rebuilds the environment with an irradiance cube map of faces of `size` texels. */
+export function setIrradianceSize(size) {
+    environment.irradianceSize = size;
+    pendingSky = lastSky;
+    buildEnvironment();
+}
 
 /** Rebuilds the environment with cube map faces of `size` texels. */
 export function setEnvironmentSize(size) {
@@ -113,13 +156,29 @@ async function buildEnvironment() {
             textureBindingViewDimension: "cube",
         });
     }
-    const ibl = environment.ibl ?? createIrradiancePass(device);
+    let { ibl } = environment;
+    if (ibl?.irradiance.width !== environment.irradianceSize) {
+        // Like the cube, the old one is kept one build longer.
+        retiredIbl?.destroy();
+        retiredIbl = ibl;
+        ibl = createIrradiancePass(device, { size: environment.irradianceSize });
+    }
     const encoder = device.createCommandEncoder({ label: "sternwarte:environment" });
-    sky.pass.encodeCube(encoder, cube, { samples: 8 });
-    ibl.encode(encoder, cube);
+    const { cubify } = environment;
+    sky.pass.encodeCube(encoder, cube, { samples: 8, cubify });
+    ibl.encode(encoder, cube, { cubified: cubify });
     device.queue.submit([encoder.finish()]);
     const [sh, sun, ev100] = await Promise.all([ibl.readSH(), sky.pass.sunIlluminance(), sky.pass.meteredEV100()]);
-    Object.assign(environment, { cube, ibl, sh, sun, ev100, sky, buildMs: performance.now() - started });
+    Object.assign(environment, {
+        cube,
+        cubified: cubify,
+        ibl,
+        sh,
+        sun,
+        ev100,
+        sky,
+        buildMs: performance.now() - started,
+    });
     events.dispatchEvent(new Event("environment"));
     building = false;
     buildEnvironment();

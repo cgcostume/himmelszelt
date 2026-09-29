@@ -26,8 +26,9 @@ export interface IrradiancePass {
     /**
      * Records the projection of `source`, a cube map with `TEXTURE_BINDING` usage, and the irradiance from it. With mip
      * levels, the projection reads the one about as fine as its 4096 samples, rather than skipping texels in between.
+     * `cubified` for a source written with `SkyPass.encodeCube`'s `cubify`; the irradiance cube map is a plain one.
      */
-    encode(encoder: GPUCommandEncoder, source: GPUTexture): void;
+    encode(encoder: GPUCommandEncoder, source: GPUTexture, options?: { cubified?: boolean }): void;
     /** The nine coefficients, read back from the GPU: 27 floats, rgb after rgb. */
     readSH(): Promise<Float32Array>;
     destroy(): void;
@@ -37,11 +38,13 @@ export interface IrradiancePass {
 export function createIrradiancePass(device: GPUDevice, options: IrradiancePassOptions = {}): IrradiancePass {
     const { size = 32 } = options;
     const module = device.createShaderModule({ code: [wgsl.cube, wgsl.irradiance].join("\n") });
-    const project = device.createComputePipeline({
-        label: "dunstkreis:projectSH",
-        layout: "auto",
-        compute: { module, entryPoint: "dkProjectSH" },
-    });
+    const projectPipeline = (cubified: boolean) =>
+        device.createComputePipeline({
+            label: "dunstkreis:projectSH",
+            layout: "auto",
+            compute: { module, entryPoint: "dkProjectSH", constants: { DK_SOURCE_CUBIFIED: cubified ? 1 : 0 } },
+        });
+    const projects = [projectPipeline(false), projectPipeline(true)] as const;
     const convolve = device.createComputePipeline({
         label: "dunstkreis:irradianceCube",
         layout: "auto",
@@ -79,7 +82,8 @@ export function createIrradiancePass(device: GPUDevice, options: IrradiancePassO
         sh,
         irradiance,
 
-        encode(encoder, source) {
+        encode(encoder, source, { cubified = false } = {}) {
+            const project = projects[cubified ? 1 : 0];
             const projectBindGroup = device.createBindGroup({
                 layout: project.getBindGroupLayout(0),
                 entries: [

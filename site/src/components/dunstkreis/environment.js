@@ -1,128 +1,137 @@
-import { readTexture } from "@himmelszelt/dunstkreis";
-import { gpu, onEnvironment, setEnvironmentSize } from "./atmosphere.js";
+import { showCode } from "../code.js";
+import { paintRange } from "../range.js";
+import {
+    bindCubifyToggle,
+    bindRefractionToggle,
+    gpu,
+    onEnvironment,
+    quality,
+    setEnvironmentSize,
+    setIrradianceSize,
+} from "./atmosphere.js";
+import { formatBytes, saveHdr, savePng } from "./download.js";
+import { createPreview, renderPixels, SCALE } from "./preview.js";
 
 const root = document.querySelector("#environment");
 const field = (name) => root.querySelector(`[data-field="${name}"]`);
 const panel = (name) => root.querySelector(`[data-panel="${name}"] canvas`);
 const levels = (name) => root.querySelector(`[data-panel="${name}"] [data-field="levels"]`);
-// The mip level each panel shows.
+// The mip level each panel shows, and how: texel by texel, or interpolated between texel centers as a sampler does.
 const shown = { sky: 0, irradiance: 0 };
+const filters = { sky: "nearest", irradiance: "nearest" };
 
-/** One button per mip level of `texture`, labeled with its face size. */
+const levelPart = (name, field) => root.querySelector(`[data-panel="${name}"] [data-field="${field}"]`);
+
+/** The mip level slider fitted to `texture`: its range, and the level and the face size it stands for beside it. */
 function offerLevels(name, texture) {
-    const group = levels(name);
-    if (group.childElementCount === texture.mipLevelCount && group.dataset.size === String(texture.width)) return;
-    group.dataset.size = String(texture.width);
+    const slider = levels(name);
     shown[name] = Math.min(shown[name], texture.mipLevelCount - 1);
-    group.replaceChildren(
-        ...Array.from({ length: texture.mipLevelCount }, (_, level) => {
-            const label = document.createElement("label");
-            const input = Object.assign(document.createElement("input"), {
-                type: "radio",
-                name: `environment-${name}-level`,
-                value: level,
-                checked: level === shown[name],
-            });
-            input.addEventListener("change", () => {
-                shown[name] = level;
-                if (last) draw(last);
-            });
-            const text = Object.assign(document.createElement("span"), {
-                textContent: Math.max(1, texture.width >> level),
-            });
-            text.title = `level ${level}`;
-            label.append(input, text);
-            return label;
-        }),
-    );
+    slider.max = String(texture.mipLevelCount - 1);
+    slider.value = String(shown[name]);
+    slider.dataset.size = String(texture.width);
+    paintRange(slider);
+    showLevel(name);
 }
 
-const srgb = (c) => {
-    const v = Math.min(Math.max(c, 0), 1);
-    return 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
-};
+function showLevel(name) {
+    const size = Number(levels(name).dataset.size);
+    levelPart(name, "level").textContent = `mip level ${shown[name]}`;
+    levelPart(name, "resolution").textContent = `${Math.max(1, size >> shown[name])}²`;
+}
+
+/** Shows mip `level` of a panel, held within its levels. */
+function setLevel(name, level) {
+    const slider = levels(name);
+    const next = Math.min(Math.max(level, 0), Number(slider.max));
+    if (next === shown[name]) return;
+    shown[name] = next;
+    slider.value = String(next);
+    paintRange(slider);
+    showLevel(name);
+    if (last) draw(last);
+}
+
 const luminance = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
-/** The face and texel an ENU direction falls on: the inverse of cube.wgsl's dkCubeDirection. */
-function cubeTexel([x, y, z], size) {
-    const [ax, ay, az] = [Math.abs(x), Math.abs(y), Math.abs(z)];
-    let face;
-    let s;
-    let t;
-    if (ax >= ay && ax >= az) [face, s, t] = x > 0 ? [0, -z / ax, -y / ax] : [1, z / ax, -y / ax];
-    else if (ay >= az) [face, s, t] = y > 0 ? [2, x / ay, z / ay] : [3, x / ay, -z / ay];
-    else [face, s, t] = z > 0 ? [4, x / az, -y / az] : [5, -x / az, -y / az];
-    const texel = (v) => Math.min(Math.floor(((v + 1) / 2) * size), size - 1);
-    return [face, texel(s), texel(t)];
-}
-
-// Unrolled into a panorama, azimuth from north through east across, altitude up, tone mapped around its mean.
-function drawPanorama(canvas, faces) {
-    const size = faces[0].width;
-    const dpr = window.devicePixelRatio || 1;
-    const W = Math.max(1, Math.round(canvas.clientWidth * dpr));
-    const H = Math.max(1, Math.round(canvas.clientHeight * dpr));
-    Object.assign(canvas, { width: W, height: H });
-    const values = new Float32Array(W * H * 3);
-    let sum = 0;
-    for (let py = 0; py < H; ++py) {
-        const altitude = Math.PI / 2 - ((py + 0.5) / H) * Math.PI;
-        for (let px = 0; px < W; ++px) {
-            const azimuth = ((px + 0.5) / W) * 2 * Math.PI;
-            const d = [
-                Math.cos(altitude) * Math.sin(azimuth),
-                Math.cos(altitude) * Math.cos(azimuth),
-                Math.sin(altitude),
-            ];
-            const [face, tx, ty] = cubeTexel(d, size);
-            const i = (ty * size + tx) * 4;
-            const data = faces[face].data;
-            const o = (py * W + px) * 3;
-            values.set([data[i], data[i + 1], data[i + 2]], o);
-            sum += Math.log2(Math.max(luminance(data[i], data[i + 1], data[i + 2]), 1e-6));
-        }
-    }
-    const key = 0.18 / 2 ** (sum / (W * H));
-    const image = new ImageData(W, H);
-    for (let p = 0; p < W * H; ++p) {
-        const [r, g, b] = [values[p * 3], values[p * 3 + 1], values[p * 3 + 2]];
-        const l = luminance(r, g, b) * key;
-        [r, g, b].forEach((c, k) => {
-            image.data[p * 4 + k] = srgb((c * key) / (1 + l));
-        });
-        image.data[p * 4 + 3] = 255;
-    }
-    canvas.getContext("2d").putImageData(image, 0, 0);
-}
-
-const readFaces = (texture, level) =>
-    Promise.all([0, 1, 2, 3, 4, 5].map((layer) => readTexture(gpu.device, texture, layer, level)));
-
-let drawing = false;
+const previews = {};
 let last = null;
-let next = null;
 
-// One at a time, drawing only the latest environment once the one before is done.
-async function draw(environment) {
-    next = environment;
+const textures = ({ cube, cubified, ibl }) => ({
+    sky: { texture: cube, cubified },
+    irradiance: { texture: ibl.irradiance, cubified: false },
+});
+const previewOptions = (name, cubified) => ({
+    cube: true,
+    filter: filters[name],
+    scale: SCALE.mean,
+    level: shown[name],
+    cubified,
+});
+
+/** Bytes of a cube map of rgba16float, every mip level included. */
+function cubeBytes({ width, mipLevelCount }) {
+    let bytes = 0;
+    for (let level = 0; level < mipLevelCount; ++level) bytes += Math.max(1, width >> level) ** 2 * 6 * 8;
+    return bytes;
+}
+
+// The calls that compute each cube map as it is shown, with the settings it was computed with.
+const CALLS = {
+    sky: ({ cube, cubified }) => [
+        "const cube = device.createTexture({",
+        `    size: [${cube.width}, ${cube.width}, 6],`,
+        `    mipLevelCount: ${cube.mipLevelCount}, // each filled, the mean of four above; 1 for none`,
+        '    format: "rgba16float",',
+        "    usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,",
+        '    textureBindingViewDimension: "cube",',
+        "});",
+        `sky.encodeCube(encoder, cube, { samples: 8${cubified ? ", cubify: true" : ""} });`,
+    ],
+    irradiance: ({ ibl, cubified }) => [
+        "// Every mip level, each from the nine coefficients.",
+        `const ibl = createIrradiancePass(device, { size: ${ibl.irradiance.width} });`,
+        `ibl.encode(encoder, cube${cubified ? ", { cubified: true }" : ""});`,
+        "ibl.irradiance; // and ibl.sh, the nine coefficients",
+    ],
+};
+
+// Both cube maps unrolled into panoramas on the GPU, tone mapped around their geometric means.
+function draw(environment) {
     last = environment;
-    if (drawing) return;
-    drawing = true;
-    while (next) {
-        const { cube, ibl, sh, sun, buildMs } = next;
-        next = null;
-        offerLevels("sky", cube);
-        offerLevels("irradiance", ibl.irradiance);
-        const [sky, irradiance] = await Promise.all([
-            readFaces(cube, shown.sky),
-            readFaces(ibl.irradiance, shown.irradiance),
-        ]);
-        field("timing").textContent = `built in ${buildMs.toFixed(1)} ms`;
-        drawPanorama(panel("sky"), sky);
-        drawPanorama(panel("irradiance"), irradiance);
-        showValues(sh, sun);
+    const { sh, sun, buildMs } = environment;
+    for (const [name, { texture, cubified }] of Object.entries(textures(environment))) {
+        offerLevels(name, texture);
+        showCode(levelPart(name, "call"), CALLS[name](environment).join("\n"));
+        // The settings folded into one line: what the cube map is computed with, then how it is shown.
+        const built =
+            name === "sky" ? [cubified ? "cubified" : "plain", quality.refraction ? "refracted" : "straight"] : [];
+        levelPart(name, "summary").textContent = [
+            `faces ${texture.width}`,
+            ...built,
+            `mip level ${shown[name]}`,
+            filters[name],
+        ].join(", ");
+        previews[name] ??= createPreview(panel(name));
+        previews[name].draw(texture, previewOptions(name, cubified));
+        root.querySelector(`[data-panel="${name}"] [data-field="info"]`).textContent =
+            `${texture.format}, 6 faces, ${texture.mipLevelCount} levels, ${formatBytes(cubeBytes(texture))}`;
     }
-    drawing = false;
+    field("timing").textContent = `built in ${buildMs.toFixed(1)} ms`;
+    showValues(sh, sun);
+}
+
+// The shown level unrolled into a panorama, four texels of a face across a quarter turn, up to 4096 by 2048: tone mapped
+// for PNG, the values themselves for HDR.
+async function download(name, format) {
+    if (!last) return;
+    const { texture, cubified } = textures(last)[name];
+    const face = Math.max(1, texture.width >> shown[name]);
+    const width = Math.min(4 * face, 4096);
+    const height = width / 2;
+    const pixels = await renderPixels(texture, previewOptions(name, cubified), width, height, format === "hdr");
+    const file = `himmelszelt-dunstkreis-${name}-${face}${cubified ? "-cubified" : ""}-panorama`;
+    if (format === "hdr") saveHdr(pixels, width, height, file);
+    else savePng(pixels, width, height, file);
 }
 
 const NAMES = ["0, 0", "1, −1", "1, 0", "1, 1", "2, −2", "2, −1", "2, 0", "2, 1", "2, 2"];
@@ -142,7 +151,39 @@ if (gpu.error) {
     root.querySelector(".lut-bar").insertAdjacentHTML("afterend", `<p class="note">${gpu.error}</p>`);
 } else {
     onEnvironment(draw);
-    for (const radio of root.querySelectorAll('input[name="environment-size"]')) {
-        radio.addEventListener("change", () => setEnvironmentSize(Number(radio.value)));
+    for (const button of root.querySelectorAll("[data-refraction]")) bindRefractionToggle(button);
+    for (const name of ["sky", "irradiance"]) {
+        new ResizeObserver(() => {
+            if (last) draw(last);
+        }).observe(panel(name));
+    }
+    for (const radio of root.querySelectorAll("[data-filter]")) {
+        radio.checked = radio.value === filters[radio.dataset.filter];
+        radio.addEventListener("change", () => {
+            filters[radio.dataset.filter] = radio.value;
+            if (last) draw(last);
+        });
+    }
+    for (const name of ["sky", "irradiance"]) {
+        levels(name).addEventListener("input", () => setLevel(name, Number(levels(name).value)));
+        // The wheel steps a level at a time, over the slider and over both labels: down to the coarser levels.
+        for (const target of [levels(name), levelPart(name, "level"), levelPart(name, "resolution")]) {
+            target.addEventListener(
+                "wheel",
+                (event) => {
+                    event.preventDefault();
+                    if (event.deltaY !== 0) setLevel(name, shown[name] + Math.sign(event.deltaY));
+                },
+                { passive: false },
+            );
+        }
+    }
+    for (const radio of root.querySelectorAll("[data-size]")) {
+        const set = radio.dataset.size === "sky" ? setEnvironmentSize : setIrradianceSize;
+        radio.addEventListener("change", () => set(Number(radio.value)));
+    }
+    for (const button of root.querySelectorAll("[data-cubify]")) bindCubifyToggle(button);
+    for (const button of root.querySelectorAll("[data-download]")) {
+        button.addEventListener("click", () => download(button.dataset.panelName, button.dataset.download));
     }
 }

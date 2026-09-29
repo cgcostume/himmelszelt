@@ -12,6 +12,9 @@
 @group(0) @binding(2) var<storage, read_write> dkSH: array<vec4f, 9>;
 @group(0) @binding(3) var dkIrradiance: texture_storage_2d_array<rgba16float, write>;
 
+// Whether the source cube map is cubified, see cube.wgsl. The irradiance cube map it writes is a plain one either way.
+override DK_SOURCE_CUBIFIED: bool = false;
+
 const DK_SH_THREADS: u32 = 64u;
 const DK_SH_SAMPLES: u32 = 64u;
 
@@ -46,7 +49,7 @@ fn dkProjectSH(@builtin(local_invocation_index) index: u32) {
         let azimuth = k * 2.399963229728653;
         let horizontal = sqrt(max(1.0 - z * z, 0.0));
         let d = vec3f(horizontal * cos(azimuth), horizontal * sin(azimuth), z);
-        let radiance = textureSampleLevel(dkSource, dkSourceSampler, d, level).rgb;
+        let radiance = textureSampleLevel(dkSource, dkSourceSampler, select(d, dkCubeFromSphere(d), DK_SOURCE_CUBIFIED), level).rgb;
         var basis = dkSHBasis(d);
         for (var c = 0u; c < 9u; c = c + 1u) {
             sums[c] = sums[c] + radiance * basis[c];

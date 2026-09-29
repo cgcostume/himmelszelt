@@ -108,14 +108,17 @@ export interface SkyPass {
      * Records the sky into the six faces of `target`, a cube map: a square 2D texture with six layers, rgba16float or
      * rgba32float, with `STORAGE_BINDING` usage. It holds the luminance in cd/m², linear, neither exposed nor tone
      * mapped, indexed by ENU directions: a y-up engine samples it with (x, -z, y). Without the sun disc by default, to
-     * light a scene with; with `sunDisc`, for a background, which needs rgba32float. `samples` per texel, 1, 8 or 64,
+     * light a scene with, and to show behind it with the disc drawn over it by `dkSunDisc` from `wgsl.sun`; with
+     * `sunDisc`, for exporting it as one image, which needs rgba32float. `samples` per texel, 1, 8 or 64,
      * spread by the golden sets, smooth the edges a texel straddles: the horizon's, and the sun disc's. A target with
-     * more than one mip level gets them all, each texel the mean of the four below it.
+     * more than one mip level gets them all, each texel the mean of the four below it. With `cubify`, the texels are
+     * spread evenly over the sphere, as osgHimmel's `CubeMappedHimmel` did: sample it with `dkCubeFromSphere(d)` from
+     * `wgsl.cube` rather than d, and hand `IrradiancePass.encode` the same flag.
      */
     encodeCube(
         encoder: GPUCommandEncoder,
         target: GPUTexture,
-        options?: { sunDisc?: boolean; samples?: 1 | 8 | 64 },
+        options?: { sunDisc?: boolean; samples?: 1 | 8 | 64; cubify?: boolean },
     ): void;
     /** Records the pass into `encoder`, writing all of `target`, which needs `STORAGE_BINDING` usage and the format
      *  the pass was created for. */

@@ -66,6 +66,48 @@ const current = Astro.url.pathname.replace(/\/$/, "");
             <span>The accent blue is modeled on a step of Saussure's <Term of="Cyanometer">cyanometer</Term>.</span>
         </footer>
         <script>
+            // A copy button on every code block, the chapters' own and those a figure builds later: wrapped, so the button
+            // stays in the corner while the block scrolls sideways under it.
+            const COPY_ICON =
+                '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />' +
+                '<path d="M10.5 3.5v-1a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h1" /></svg>';
+            const addCopy = (pre: HTMLPreElement) => {
+                if (pre.parentElement?.classList.contains("code-block")) return;
+                const block = Object.assign(document.createElement("div"), { className: "code-block" });
+                pre.replaceWith(block);
+                const button = Object.assign(document.createElement("button"), {
+                    type: "button",
+                    className: "code-copy",
+                    title: "Copy the code",
+                    innerHTML: COPY_ICON,
+                });
+                button.setAttribute("aria-label", "Copy the code");
+                button.addEventListener("click", async () => {
+                    try {
+                        await navigator.clipboard.writeText(pre.innerText.replace(/\n$/, ""));
+                        button.title = "Copied";
+                    } catch {
+                        button.title = "Copying failed, this browser did not allow it";
+                    }
+                    button.toggleAttribute("data-copied", true);
+                    setTimeout(() => {
+                        button.removeAttribute("data-copied");
+                        button.title = "Copy the code";
+                    }, 1500);
+                });
+                block.append(pre, button);
+            };
+            const addCopies = (root: ParentNode) => root.querySelectorAll<HTMLPreElement>("pre.astro-code").forEach(addCopy);
+            addCopies(document);
+            new MutationObserver((records) => {
+                for (const record of records) {
+                    for (const node of record.addedNodes) {
+                        if (node instanceof HTMLPreElement && node.matches(".astro-code")) addCopy(node);
+                        else if (node instanceof Element) addCopies(node);
+                    }
+                }
+            }).observe(document.body, { childList: true, subtree: true });
+
             // Figure references get the numbers the captions count in CSS: figures with a caption, in page order.
             const figures = [...document.querySelectorAll("figure[id]:has(> .figure-caption)")].map((f) => f.id);
             for (const ref of document.querySelectorAll<HTMLAnchorElement>("a.figref")) {

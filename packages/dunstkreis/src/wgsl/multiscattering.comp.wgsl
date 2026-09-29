@@ -53,7 +53,7 @@ fn dkIntegrateMultiScattering(a: DkAtmosphere, h: f32, direction: vec3f, sunDire
         // Zero where the planet shadows the sample, which the table knows.
         let sunTransmittance = dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, a.Rg + altitude, muS);
 
-        // Integrated across the step analytically rather than as a point sample, so few steps suffice. The
+        // Integrated across the step analytically rather than as a point sample, so few samples suffice. The
         // sunlight scatters towards the ray with the isotropic phase; the transfer term is light scattered
         // from unit incoming radiance over the whole sphere, whose phase integrates to 1 (Hillaire eq. 7).
         let inScatter = sunTransmittance * scattering * isotropicPhase;

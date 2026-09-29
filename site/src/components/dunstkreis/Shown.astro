@@ -1,0 +1,32 @@
+---
+/**
+ * A panel's display options, under what it is computed with: anything the panel adds (a mip level), nearest or linear
+ * filtering, and the downloads, PNG as shown and HDR with the values themselves. Changing any of it computes nothing.
+ */
+interface Props {
+    name: string;
+    title: string;
+}
+const { name, title } = Astro.props;
+---
+
+<p class="lut-controls">
+    <span class="lut-role">shown</span>
+    <slot />
+    <span class="note">filter</span>
+    <span class="steps" role="radiogroup" aria-label={`${title} filtering`} title="Texel by texel, or interpolated between texel centers as a linear sampler does">
+        {
+            ["nearest", "linear"].map((filter) => (
+                <label>
+                    <input type="radio" name={`${name}-filter`} value={filter} data-filter={name} />
+                    <span>{filter}</span>
+                </label>
+            ))
+        }
+    </span>
+    <span class="lut-downloads">
+        <span class="note">download</span>
+        <button type="button" class="view-toggle" data-download="png" data-panel-name={name} title="Download as shown, tone mapped, as PNG">png</button>
+        <button type="button" class="view-toggle" data-download="hdr" data-panel-name={name} title="Download the values themselves, linear, as Radiance HDR">hdr</button>
+    </span>
+</p>

@@ -1,7 +1,7 @@
 import { clampObserverHeight, createSkyPass } from "@himmelszelt/dunstkreis";
 import { onDemand } from "../frame.js";
 import { cameraFrame, createScene } from "../scene/scene.js";
-import { environment, gpu, onEnvironment, onTables, quality, tables } from "./atmosphere.js";
+import { bindCubifyToggle, environment, gpu, onEnvironment, onTables, quality, tables } from "./atmosphere.js";
 
 const DEG = Math.PI / 180;
 const root = document.querySelector("#lighting");
@@ -95,6 +95,7 @@ function render() {
     scene.encode(encoder, context.getCurrentTexture(), {
         background: live,
         cube,
+        cubified: environment.cubified,
         sh: ibl.sh,
         camera,
         sunDirection: sky.apparentSun,
@@ -103,7 +104,7 @@ function render() {
         ev100,
         sunDisc: pressed("sunDisc"),
         bloom: { off: 0, light: 0.35, strong: 1 }[chosen("lighting-bloom", "strong")],
-        godRaySteps: Number(chosen("lighting-godrays", 8)),
+        godRaySamples: Number(chosen("lighting-godrays", 8)),
         // The air thins with a scale height of 8 km, the haze in it with 1.2 km.
         airDensity: Math.exp(-cameraFrame(camera).eye[2] / 8000),
         hazeDensity: Math.exp(-cameraFrame(camera).eye[2] / 1200),
@@ -142,6 +143,8 @@ if (gpu.error) {
     });
     scene = createScene(gpu.device);
     onEnvironment(requestRender);
+    // Rebuilds the sky map, which renders anew once it is in.
+    bindCubifyToggle(root.querySelector("[data-cubify]"));
     onTables(requestRender);
     new ResizeObserver(requestRender).observe(canvas);
     for (const radio of root.querySelectorAll(

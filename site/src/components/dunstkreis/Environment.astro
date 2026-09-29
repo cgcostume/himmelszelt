@@ -1,34 +1,28 @@
 ---
 import "../sternzeit/sternzeit.css";
 import "./dunstkreis.css";
+import Shown from "./Shown.astro";
 
 const PANELS = [
     {
         name: "sky",
         title: "Sky",
         note: "cube map in cd/m², without the sun disc; lower levels the mean of four texels",
+        sizes: [128, 256, 512, 1024, 2048, 4096],
+        size: 128,
     },
     {
         name: "irradiance",
         title: "Irradiance",
-        note: "for every normal, in lux, from the nine coefficients; every level computed from them",
+        note: "for every normal, in lux, from the sky's nine coefficients; every level computed from them",
+        sizes: [8, 16, 32, 64, 128],
+        size: 32,
     },
 ];
 ---
 
 <figure class="scene-frame" id="environment">
     <div class="lut-bar">
-        <span class="note">faces</span>
-        <span class="steps" role="radiogroup" aria-label="Cube map face size">
-            {
-                [32, 64, 128, 256, 512].map((n) => (
-                    <label>
-                        <input type="radio" name="environment-size" value={n} checked={n === 128} />
-                        <span>{n}</span>
-                    </label>
-                ))
-            }
-        </span>
         <span class="note" data-field="timing"></span>
     </div>
     {
@@ -37,10 +31,7 @@ const PANELS = [
                 <p class="lut-head">
                     <strong>{panel.title}</strong> <span class="note">{panel.note}</span>
                 </p>
-                <p class="lut-controls">
-                    <span class="note">mip level</span>
-                    <span class="steps" role="radiogroup" aria-label={`${panel.title} mip level`} data-field="levels" />
-                </p>
+                <div class="lut-call" data-field="call" />
                 <div class="lut-plot">
                     <span class="lut-axis lut-y">
                         <span>zenith</span>
@@ -56,6 +47,39 @@ const PANELS = [
                         <span>N</span>
                     </span>
                 </div>
+                <details class="lut-fold">
+                    <summary>
+                        <span class="moment-title">Settings</span> <span class="note" data-field="summary" />
+                    </summary>
+                    <p class="lut-controls">
+                        <span class="lut-role">computed</span>
+                        <span class="note">faces</span>
+                        <span class="steps" role="radiogroup" aria-label={`${panel.title} face size`}>
+                            {panel.sizes.map((n) => (
+                                <label>
+                                    <input type="radio" name={`${panel.name}-size`} value={n} data-size={panel.name} checked={n === panel.size} />
+                                    <span>{n >= 1024 ? `${n / 1024}K` : n}</span>
+                                </label>
+                            ))}
+                        </span>
+                        {panel.name === "sky" && (
+                            <>
+                                <button type="button" class="view-toggle" data-cubify aria-pressed="false" title="Texels spread evenly over the sphere, as osgHimmel's CubeMappedHimmel did, within a factor of 1.3 in solid angle rather than 5. Whoever samples the sky cube follows">cubified</button>
+                                <button type="button" class="view-toggle" data-refraction aria-pressed="true" title="Traced through the air, bending the light. Switches it for the whole page, recomputing every table and cube map">refracted</button>
+                            </>
+                        )}
+                    </p>
+                    <p class="lut-controls lut-indent">
+                        <span class="note" data-field="info" />
+                    </p>
+                    <Shown name={panel.name} title={panel.title}>
+                        <span class="lut-level" title="Mip level: drag, or turn the mouse wheel over the slider or either label">
+                            <output data-field="level">mip level 0</output>
+                            <input type="range" data-field="levels" min="0" max="0" step="1" value="0" aria-label={`${panel.title} mip level`} />
+                            <output data-field="resolution" />
+                        </span>
+                    </Shown>
+                </details>
             </section>
         ))
     }

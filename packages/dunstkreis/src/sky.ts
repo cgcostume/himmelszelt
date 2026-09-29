@@ -89,6 +89,7 @@ export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPa
             wgsl.raymarch,
             wgsl.cube,
             wgsl.goldenset,
+            wgsl.sun,
             output,
             wgsl.sky,
         ].join("\n");
@@ -213,8 +214,8 @@ export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPa
 
     // The cube map pipelines, made on first use, one per format and with or without the sun disc.
     const cubePipelines = new Map<string, { pipeline: GPUComputePipeline; bindGroup: GPUBindGroup }>();
-    function cubePipeline(cubeFormat: GPUTextureFormat, sunDisc: boolean, cubeSamples: 1 | 8 | 64) {
-        const key = `${cubeFormat},${sunDisc},${cubeSamples}`;
+    function cubePipeline(cubeFormat: GPUTextureFormat, sunDisc: boolean, cubeSamples: 1 | 8 | 64, cubify: boolean) {
+        const key = `${cubeFormat},${sunDisc},${cubeSamples},${cubify}`;
         let entry = cubePipelines.get(key);
         if (!entry) {
             const pipeline = device.createComputePipeline({
@@ -228,6 +229,7 @@ export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPa
                         dither: false,
                         cube: true,
                         cubeSamples,
+                        cubify,
                         sunDisc,
                     }),
                 },
@@ -399,7 +401,7 @@ export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPa
             return [r as number, g as number, b as number];
         },
 
-        encodeCube(encoder, target, { sunDisc = false, samples = 1 } = {}) {
+        encodeCube(encoder, target, { sunDisc = false, samples = 1, cubify = false } = {}) {
             const { width, height, depthOrArrayLayers } = target;
             if (target.dimension !== "2d" || depthOrArrayLayers !== 6 || width !== height) {
                 throw new Error("dunstkreis: a cube map is a square 2D texture with six layers");
@@ -413,7 +415,7 @@ export function createSkyPass(device: GPUDevice, options: SkyPassOptions): SkyPa
                 );
             }
             if (![1, 8, 64].includes(samples)) throw new Error("dunstkreis: 1, 8 or 64 samples per cube map texel");
-            const { pipeline, bindGroup } = cubePipeline(target.format, sunDisc, samples);
+            const { pipeline, bindGroup } = cubePipeline(target.format, sunDisc, samples, cubify);
             const output = device.createBindGroup({
                 layout: pipeline.getBindGroupLayout(1),
                 entries: [{ binding: 0, resource: cubeLevel(target, 0) }],

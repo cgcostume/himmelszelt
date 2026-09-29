@@ -1,97 +1,106 @@
 import { clampObserverHeight, DEFAULT_TEXTURE_CONFIG, readTexture } from "@himmelszelt/dunstkreis";
+import { showCode } from "../code.js";
 import { paintRange } from "../range.js";
 import { state } from "../sternzeit/state.js";
-import { gpu, onSkyView, onTables, quality, recompute, setGroundSamples, tables } from "./atmosphere.js";
+import { bindRefractionToggle, gpu, onSkyView, onTables, quality, recompute, tables } from "./atmosphere.js";
+import { formatBytes, saveHdr, savePng } from "./download.js";
+import { createPreview, renderPixels, SCALE, texelOf } from "./preview.js";
 
 const root = document.querySelector("#tables");
 const field = (name) => root.querySelector(`[data-field="${name}"]`);
 const lut = (name) => root.querySelector(`[data-lut="${name}"]`);
 
-const srgb = (c) => {
-    const v = Math.min(Math.max(c, 0), 1);
-    return 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
-};
 const luminance = (d, i) => 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
 
 // Each table by its own scale: transmittance as it is, multiple scattering by its maximum, the sky view tone mapped
 // around its geometric mean, since it spans from night to the sun's glow.
-const SCALES = {
-    transmittance: () => (c) => c,
-    multiScattering: (d) => {
-        let max = 1e-12;
-        for (let i = 0; i < d.length; i += 4) max = Math.max(max, d[i], d[i + 1], d[i + 2]);
-        return (c) => c / max;
-    },
-    skyView: (d) => {
-        let sum = 0;
-        for (let i = 0; i < d.length; i += 4) sum += Math.log2(Math.max(luminance(d, i), 1e-6));
-        const key = 0.18 / 2 ** (sum / (d.length / 4));
-        return (c, l) => (c * key) / (1 + l * key);
-    },
-};
+const SCALES = { transmittance: SCALE.none, multiScattering: SCALE.max, skyView: SCALE.mean };
 
 const DEG = 180 / Math.PI;
 const shown = {};
+const previews = {};
+// How each table is shown: texel by texel, or interpolated between texel centers as the shaders sample it.
+const filters = { transmittance: "nearest", multiScattering: "nearest", skyView: "nearest" };
 // Altitude up, like a plot; the sky view as seen, the zenith at the top.
 const flipped = (name) => name !== "skyView";
 const part = (name, field) => lut(name).querySelector(`[data-field="${field}"]`);
 
-async function show(name, texture) {
+const modelLine = () =>
+    quality.refraction
+        ? "const model = DEFAULT_ATMOSPHERE_MODEL;"
+        : "const model = { ...DEFAULT_ATMOSPHERE_MODEL, refractivity: 0 }; // straight rays";
+const configLines = (name, { width, height }) => [
+    "const config = structuredClone(DEFAULT_TEXTURE_CONFIG);",
+    `config.${name} = { width: ${width}, height: ${height} };`,
+    `config.integralSamples.${name} = ${quality.config.integralSamples[name]};`,
+];
+const fixed3 = (v) => Number(v.toFixed(3));
+let lastSky = null;
+
+// The calls that compute each table as it is shown, with the settings it was computed with.
+const CALLS = {
+    transmittance: (size) => [
+        modelLine(),
+        ...configLines("transmittance", size),
+        "const luts = await precomputeAtmosphere(device, { model, config });",
+        "luts.transmittance;",
+    ],
+    multiScattering: (size) => [
+        modelLine(),
+        ...configLines("multiScattering", size),
+        "// Computed with the transmittance, which it reads.",
+        "const luts = await precomputeAtmosphere(device, { model, config });",
+        "luts.multiScattering;",
+    ],
+    skyView: (size) => [
+        modelLine(),
+        ...configLines("skyView", size),
+        "const luts = await precomputeAtmosphere(device, { model, config });",
+        'const sky = createSkyPass(device, { luts, format: "rgba8unorm" });',
+        "// Rebuilds the table only when the sun or the observer moved.",
+        `sky.update({ sunDirection: [${(lastSky?.sunDirection ?? [0, 0, 1]).map(fixed3).join(", ")}], observerHeightM: ${fixed3(clampObserverHeight(state.heightM))} });`,
+        "sky.skyViewTexture;",
+    ],
+};
+
+function show(name, texture) {
+    showCode(part(name, "call"), CALLS[name](texture).join("\n"));
+    const { width, height } = texture;
     const model = tables().luts.model;
     const heightKm = clampObserverHeight(state.heightM) / 1000;
-    const { width, height, data } = await readTexture(gpu.device, texture);
-    // Tone mapped once per readback, in display order, four bytes a texel.
-    const scale = SCALES[name](data);
-    const colors = new Uint8ClampedArray(width * height * 4);
-    const flip = flipped(name);
-    for (let y = 0; y < height; ++y) {
-        for (let x = 0; x < width; ++x) {
-            const i = (y * width + x) * 4;
-            const o = ((flip ? height - 1 - y : y) * width + x) * 4;
-            const l = luminance(data, i);
-            for (let c = 0; c < 3; ++c) colors[o + c] = srgb(scale(data[i + c], l));
-            colors[o + 3] = 255;
-        }
-    }
-    shown[name] = { width, height, data, colors, model, heightKm };
+    // Read back only when pointed at, for the readouts.
+    shown[name] = { texture, width, height, data: null, model, heightKm };
     part(name, "image").parentElement.style.aspectRatio = `${width} / ${height}`;
-    part(name, "info").textContent =
-        `${width}×${height} ${texture.format}, ${((width * height * 8) / 1024).toFixed(0)} KiB`;
+    part(name, "info").textContent = `${texture.format}, ${formatBytes(width * height * 8)}`;
     paint(name);
 }
 
-/**
- * Which texel each device pixel shows, and where each texel starts: texel i covers the pixels from round(i · P / n) to
- * the next one's start. The image, the highlight and the pointer all go through these, so they never disagree.
- */
+/** Which texel each device pixel shows, as the preview picks it, and where each texel starts. */
 function cells(n, pixels) {
-    const start = Array.from({ length: n + 1 }, (_, i) => Math.round((i * pixels) / n));
-    const texel = new Int32Array(pixels);
-    for (let i = 0; i < n; ++i) texel.fill(i, start[i], start[i + 1]);
+    const texel = Int32Array.from({ length: pixels }, (_, p) => texelOf(p, n, pixels));
+    const start = new Array(n + 1).fill(pixels);
+    for (let p = pixels - 1; p >= 0; --p) start[texel[p]] = p;
+    // A texel no pixel shows, when there are more texels than pixels, starts where the next one does.
+    for (let i = n - 1; i >= 0; --i) start[i] = Math.min(start[i], start[i + 1]);
     return { start, texel };
 }
 
-// Drawn in device pixels, texel by texel, rather than scaled by the browser, whose rounding is its own.
+// Drawn on the GPU in device pixels; the highlight and the pointer go through the same texel mapping.
 function paint(name) {
     const table = shown[name];
     if (!table) return;
     const image = part(name, "image");
-    const dpr = window.devicePixelRatio || 1;
-    const W = Math.max(1, Math.round(image.clientWidth * dpr));
-    const H = Math.max(1, Math.round(image.clientHeight * dpr));
-    table.columns = cells(table.width, W);
-    table.rows = cells(table.height, H);
-    const pixels = new ImageData(W, H);
-    for (let py = 0; py < H; ++py) {
-        const row = table.rows.texel[py] * table.width;
-        for (let px = 0; px < W; ++px) {
-            const i = (row + table.columns.texel[px]) * 4;
-            const o = (py * W + px) * 4;
-            pixels.data.set(table.colors.subarray(i, i + 4), o);
-        }
-    }
-    for (const canvas of [image, part(name, "overlay")]) Object.assign(canvas, { width: W, height: H });
-    image.getContext("2d").putImageData(pixels, 0, 0);
+    previews[name] ??= createPreview(image);
+    previews[name].draw(table.texture, previewOptions(name));
+    // The settings folded into one line: what the table is computed with, then how it is shown.
+    const samples = quality.config.integralSamples[name];
+    part(name, "summary").textContent =
+        `${table.width}×${table.height}, ${samples} samples, ${quality.refraction ? "refracted" : "straight"}, ` +
+        `${filters[name]}`;
+    const overlay = part(name, "overlay");
+    Object.assign(overlay, { width: image.width, height: image.height });
+    table.columns = cells(table.width, image.width);
+    table.rows = cells(table.height, image.height);
     if (table.hover) highlight(name, table.hover);
 }
 
@@ -216,6 +225,15 @@ function mark(name, axis, fraction, text) {
 function hover(name, event) {
     const table = shown[name];
     if (!table?.columns) return;
+    if (!table.data) {
+        // The texels, read back once per table, then the readout for wherever the pointer is by then.
+        table.pointer = event;
+        table.reading ??= readTexture(gpu.device, table.texture).then(({ data }) => {
+            table.data = data;
+            if (shown[name] === table && table.pointer) hover(name, table.pointer);
+        });
+        return;
+    }
     const image = part(name, "image");
     const rect = image.getBoundingClientRect();
     const px = Math.floor(((event.clientX - rect.left) / rect.width) * image.width);
@@ -248,9 +266,33 @@ function hover(name, event) {
     tip.style.bottom = below ? "" : `${rect.height - top + 16}px`;
 }
 
+const previewOptions = (name) => ({
+    filter: filters[name],
+    scale: SCALES[name],
+    flip: flipped(name),
+    split: name === "skyView",
+});
+
+// A texel a pixel, the rows as shown: tone mapped for PNG, the values themselves for HDR.
+async function download(name, format) {
+    const table = shown[name];
+    if (!table) return;
+    const { texture, width, height } = table;
+    const pixels = await renderPixels(
+        texture,
+        { ...previewOptions(name), filter: "nearest" },
+        width,
+        height,
+        format === "hdr",
+    );
+    const file = `himmelszelt-dunstkreis-${name}-${width}x${height}`;
+    if (format === "hdr") saveHdr(pixels, width, height, file);
+    else savePng(pixels, width, height, file);
+}
+
 function leave(name) {
     const table = shown[name];
-    if (table) table.hover = null;
+    if (table) Object.assign(table, { hover: null, pointer: null });
     const overlay = part(name, "overlay");
     overlay.getContext("2d").clearRect(0, 0, overlay.width, overlay.height);
     part(name, "tip").hidden = true;
@@ -267,10 +309,6 @@ function write(key, value) {
 }
 
 function showControls() {
-    field("refraction").setAttribute("aria-pressed", String(quality.refraction));
-    for (const radio of root.querySelectorAll('input[name="ground-light"]')) {
-        radio.checked = Number(radio.value) === quality.groundSamples;
-    }
     for (const radio of root.querySelectorAll("[data-preset]")) {
         radio.checked = Number(radio.value) === read(radio.dataset.preset);
     }
@@ -292,7 +330,10 @@ if (gpu.error) {
         show("transmittance", luts.transmittance);
         show("multiScattering", luts.multiScattering);
     });
-    onSkyView(({ pass }) => show("skyView", pass.skyViewTexture));
+    onSkyView((sky) => {
+        lastSky = sky;
+        show("skyView", sky.pass.skyViewTexture);
+    });
     const { luts } = tables();
     show("transmittance", luts.transmittance);
     show("multiScattering", luts.multiScattering);
@@ -322,21 +363,24 @@ if (gpu.error) {
             input.dispatchEvent(new Event("change"));
         });
     }
-    field("refraction").addEventListener("click", () => {
-        quality.refraction = !quality.refraction;
-        recompute();
-    });
+    for (const button of root.querySelectorAll("[data-refraction]")) bindRefractionToggle(button);
     for (const name of Object.keys(READOUTS)) {
         const image = part(name, "image");
         image.addEventListener("pointermove", (event) => hover(name, event));
         image.addEventListener("pointerleave", () => leave(name));
         new ResizeObserver(() => paint(name)).observe(image);
     }
-    for (const radio of root.querySelectorAll('input[name="ground-light"]')) {
-        radio.addEventListener("change", () => setGroundSamples(Number(radio.value)));
+    for (const radio of root.querySelectorAll("[data-filter]")) {
+        radio.checked = radio.value === filters[radio.dataset.filter];
+        radio.addEventListener("change", () => {
+            filters[radio.dataset.filter] = radio.value;
+            paint(radio.dataset.filter);
+        });
+    }
+    for (const button of root.querySelectorAll("[data-download]")) {
+        button.addEventListener("click", () => download(button.dataset.panelName, button.dataset.download));
     }
     field("reset").addEventListener("click", () => {
-        quality.groundSamples = 64;
         quality.config = structuredClone(DEFAULT_TEXTURE_CONFIG);
         recompute();
     });

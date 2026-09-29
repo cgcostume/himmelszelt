@@ -21,6 +21,7 @@ export interface QualityConstants {
     DK_DEBUG_GRID: number;
     DK_CUBE: number;
     DK_CUBE_SAMPLES: number;
+    DK_CUBIFY: number;
     DK_GROUND_LIGHT: number;
     DK_GROUND_SAMPLES: number;
     DK_SUN_DISC: number;
@@ -39,6 +40,7 @@ export const DEFAULT_QUALITY: QualityConstants = {
     DK_DEBUG_GRID: 0,
     DK_CUBE: 0,
     DK_CUBE_SAMPLES: 1,
+    DK_CUBIFY: 0,
     DK_GROUND_LIGHT: 0,
     DK_GROUND_SAMPLES: 64,
     DK_SUN_DISC: 1,
@@ -59,6 +61,7 @@ export function pipelineConstants(
         debugGrid?: boolean;
         cube?: boolean;
         cubeSamples?: 1 | 8 | 64;
+        cubify?: boolean;
         groundLight?: boolean;
         groundSamples?: 8 | 64;
         sunDisc?: boolean;
@@ -78,6 +81,7 @@ export function pipelineConstants(
         DK_DEBUG_GRID: options.debugGrid ? 1 : 0,
         DK_CUBE: options.cube ? 1 : 0,
         DK_CUBE_SAMPLES: options.cubeSamples ?? 1,
+        DK_CUBIFY: options.cubify ? 1 : 0,
         DK_GROUND_LIGHT: options.groundLight ? 1 : 0,
         DK_GROUND_SAMPLES: options.groundSamples ?? 64,
         DK_SUN_DISC: options.sunDisc === false ? 0 : 1,

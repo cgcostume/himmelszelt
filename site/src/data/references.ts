@@ -142,6 +142,22 @@ export const references: Record<string, Reference> = {
         year: 1980,
         note: "The smooth curve the automatic exposure's keys are joined with.",
     },
+    nowell2005: {
+        authors: "Philip Nowell",
+        title: "Mapping a Cube to a Sphere",
+        venue: "Math Proofs (blog)",
+        year: 2005,
+        url: "http://mathproofs.blogspot.com/2005/07/mapping-cube-to-sphere.html",
+        note: "The mapping a cubified cube map places its texels by, its inverse the one it is looked up with.",
+    },
+    brown2017: {
+        authors: "Chip Brown",
+        title: "Bringing pixels front and center in VR video",
+        venue: "Google Blog",
+        year: 2017,
+        url: "https://blog.google/products/google-ar-vr/bringing-pixels-front-and-center-vr-video/",
+        note: "The equi-angular cube map, the common alternative to cubified.",
+    },
     ramamoorthi2001: {
         authors: "Ravi Ramamoorthi, Pat Hanrahan",
         title: "An Efficient Representation for Irradiance Environment Maps",

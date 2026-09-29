@@ -81,7 +81,7 @@
     position: static;
 }
 .lut {
-    margin-bottom: 1.25rem;
+    margin-bottom: 2rem;
 }
 .lut p {
     margin: 0 0 0.4rem;
@@ -244,4 +244,83 @@
     margin: 0.5rem 0 0;
     padding-inline: var(--content-inset);
     font-size: var(--text-meta);
+}
+/* A panel's controls in two groups, what it is computed with and how it is shown, each row led by its role. The buttons
+   sit in the row's flow, not in a corner as over the scenes. */
+.lut-controls .view-toggle {
+    position: static;
+}
+/* Accent colored like the status titles and the "Figure" before a caption: no style of its own. */
+.lut-role {
+    min-width: 4.25rem;
+    color: var(--accent);
+}
+.lut-indent {
+    padding-left: calc(4.25rem + 0.75rem);
+}
+.lut-downloads {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    margin-left: auto;
+}
+@media (max-width: 40rem) {
+    .lut-indent {
+        padding-left: 0;
+    }
+}
+/* The mip level slider, the level left of it and the face size right of it, each turning with the mouse wheel. */
+.lut-level {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.lut-level output {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    cursor: ns-resize;
+}
+.lut-level output:last-child {
+    min-width: 3.5rem;
+}
+.lut-level input[type="range"] {
+    width: 6rem;
+}
+/* What a panel's texture comes to, format and bytes: a fact, not a control, so dimmer than the labels. */
+.lut [data-field="info"] {
+    opacity: 0.6;
+}
+/* The calls that compute a panel's result, over it: the chapter's code blocks, closer to what they describe. */
+.lut-call .code-block {
+    margin: 0 0 0.6rem;
+}
+/* A panel's settings under its result, folded by default and drawn like the moment and place, a rule down the left and
+   a line saying what they are, but a class of its own: sternzeit's controls take every .moment for theirs. */
+.lut-fold {
+    margin: 0.5rem 0 0 -0.9rem;
+    padding-left: 0.9rem;
+    border-left: 2px solid var(--accent);
+}
+.lut-fold > summary {
+    cursor: pointer;
+    list-style: none;
+}
+.lut-fold > summary::-webkit-details-marker {
+    display: none;
+}
+.lut-fold > summary::before {
+    content: "+";
+    display: inline-block;
+    width: 1.2em;
+    color: var(--muted);
+}
+.lut-fold[open] > summary::before {
+    content: "\2212";
+}
+.lut-fold[open] > summary {
+    margin-bottom: 0.5rem;
+}
+.lut-fold .lut-controls:last-child {
+    margin-bottom: 0;
 }

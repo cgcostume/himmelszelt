@@ -55,8 +55,8 @@ const GROUPS = {
         checked: "8",
     },
     godrays: {
-        label: "God ray steps",
-        title: "Haze in front of the scene, lit by the sun where the solids leave it lit, brighter towards the sun, with their shadows as dark shafts through it: none, or 8 or 64 steps along each pixel's ray",
+        label: "God ray samples",
+        title: "Haze in front of the scene, lit by the sun where the solids leave it lit, brighter towards the sun, with their shadows as dark shafts through it: none, or 8 or 64 samples along each pixel's ray",
         options: [
             ["0", "no god rays"],
             ["8", "8"],
@@ -76,6 +76,8 @@ const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
             <div class="lighting-row">
                 {[group("background"), group("ground")].map((choice) => <Choice {...choice} />)}
                 <span class="sky-toggles lighting-toggles">
+                    <button type="button" class="view-toggle" data-cubify aria-pressed="false" title="The sky map as the environment figure builds it: cubified, its texels spread evenly over the sphere, sampled through the inverse mapping. The same switch as there">cubified</button>
+                    <span class="toggle-separator" aria-hidden="true"></span>
                     <button type="button" class="view-toggle" data-field="sunDisc" aria-pressed="true" title="Draw the sun disc in the background">sun disc</button>
                     <button type="button" class="view-toggle" data-field="sunLight" aria-pressed="true" title="Light the solids by the sun directly, with its shadows">sunlight</button>
                     <button type="button" class="view-toggle" data-field="skyLight" aria-pressed="true" title="Light the solids by the sky, image-based, from the nine coefficients of the sky map">sky light</button>

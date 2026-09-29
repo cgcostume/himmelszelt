@@ -25,7 +25,7 @@ fn dkRaymarchSky(
     h: f32,
     direction: vec3f,
     sunDirection: vec3f,
-    steps: u32,
+    samples: u32,
     ground: bool,
 ) -> DkSkyRay {
     let horizontal = dkPathHorizontal(up, direction);
@@ -37,8 +37,8 @@ fn dkRaymarchSky(
     result.transmittance = vec3f(1.0);
 
     var path = dkPathStart(mu);
-    for (var i = 0u; i < steps; i = i + 1u) {
-        let ds = dkPathRemaining(a, h, path, result.hitsGround) / f32(steps - i);
+    for (var i = 0u; i < samples; i = i + 1u) {
+        let ds = dkPathRemaining(a, h, path, result.hitsGround) / f32(samples - i);
         let step = dkPathAdvance(a, h, path, ds);
         path = step.next;
 
@@ -88,7 +88,7 @@ fn dkRaymarchFromSpace(
     altitude: f32,
     direction: vec3f,
     sunDirection: vec3f,
-    steps: u32,
+    samples: u32,
 ) -> DkSkyRay {
     var result: DkSkyRay;
     result.luminance = vec3f(0.0);
@@ -106,6 +106,6 @@ fn dkRaymarchFromSpace(
     }
     let entry = vec3f(0.0, 0.0, rc) + direction * (-b - sqrt(discriminant));
     return dkRaymarchSky(
-        a, transmittanceLut, multiScatteringLut, lutSampler, normalize(entry), top, direction, sunDirection, steps, true,
+        a, transmittanceLut, multiScatteringLut, lutSampler, normalize(entry), top, direction, sunDirection, samples, true,
     );
 }

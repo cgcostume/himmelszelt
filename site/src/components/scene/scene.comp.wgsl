@@ -44,12 +44,14 @@ struct Params {
     ground: u32,
     // How strong the sun's veil is, 0 for none to 1 for full: light ones are fainter and narrower.
     bloom: f32,
-    // Steps along each camera ray through the haze for god rays, 0 for none.
-    godRaySteps: u32,
+    // Samples along each camera ray through the haze for god rays, 0 for none.
+    godRaySamples: u32,
     // The air's density around the camera relative to the ground's, and the haze's: the veil and the god rays thin out
     // with height and are gone in space.
     airDensity: f32,
     hazeDensity: f32,
+    // Nonzero when the sky map is cubified, sampled through dkCubeFromSphere from dunstkreis' cube.wgsl.
+    cubified: u32,
 }
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -313,15 +315,15 @@ fn backdrop(pixel: vec2u, direction: vec3f) -> vec3f {
     let pixelAngle = 2.0 * params.tanHalfFov / f32(textureDimensions(output).y);
     let texelAngle = 0.5 * PI / f32(textureDimensions(sky).x);
     let level = clamp(log2(pixelAngle / texelAngle), 0.0, f32(textureNumLevels(sky) - 1u));
-    return textureSampleLevel(sky, skySampler, direction, level).rgb;
+    let lookup = select(direction, dkCubeFromSphere(normalize(direction)), params.cubified != 0u);
+    return textureSampleLevel(sky, skySampler, lookup, level).rgb;
 }
 
 // How much of the sun disc a camera ray covers, as the share of its part of a pixel inside the disc's rim: the four rays
 // of a pixel each stand for a quarter of it, about half a pixel across.
 fn discCoverage(direction: vec3f, size: vec2u) -> f32 {
     let halfPixel = params.tanHalfFov / f32(size.y);
-    let distance = 2.0 * asin(min(length(direction - params.sunDirection) / 2.0, 1.0));
-    return clamp((params.sunAngularRadius - distance) / halfPixel + 0.5, 0.0, 1.0);
+    return dkSunDiscCoverage(direction, params.sunDirection, params.sunAngularRadius, halfPixel);
 }
 
 // The backdrop's own ground where a camera ray meets the plane z = 0, `t` along it, with what the solids keep from it
@@ -380,15 +382,15 @@ fn bloom(direction: vec3f) -> vec3f {
 }
 
 // The haze's light along a camera ray up to `end`: the sun's light it scatters towards the camera, wherever the solids
-// leave it lit, marched in steps set off by blue noise, forward-peaked by Henyey and Greenstein's phase function. Where
+// leave it lit, sampled along it, the samples set off by blue noise, forward-peaked by Henyey and Greenstein's phase function. Where
 // a solid's shadow crosses the ray, the haze stays dark: the shafts. Returns the light and the transmittance to `end`.
 fn haze(pixel: vec2u, direction: vec3f, end: f32) -> vec4f {
-    let steps = params.godRaySteps;
+    let samples = params.godRaySamples;
     let depth = min(end, HAZE_DEPTH);
-    let step = depth / f32(steps);
+    let step = depth / f32(samples);
     let offset = blueNoise(pixel).x;
     var lit = 0.0;
-    for (var i = 0u; i < steps; i = i + 1u) {
+    for (var i = 0u; i < samples; i = i + 1u) {
         let p = params.eye + direction * (step * (f32(i) + offset));
         if (p.z > 0.0 && intersectSolids(p, params.sunDirection, FAR).albedo < 0.0) {
             lit = lit + step;
@@ -462,7 +464,7 @@ fn render(@builtin(global_invocation_id) id: vec3u) {
     subsample = 0u;
     let center = cameraRay(id.xy, size, vec2f(0.0));
     // The haze, marched once per pixel along its center: god rays are soft, they need no four.
-    if (params.godRaySteps > 0u && params.sunDirection.z > 0.0) {
+    if (params.godRaySamples > 0u && params.sunDirection.z > 0.0) {
         let air = haze(id.xy, center, rayLength(center));
         luminance = luminance * air.w + air.rgb;
     }
@@ -473,8 +475,8 @@ fn render(@builtin(global_invocation_id) id: vec3u) {
     // The sun disc, far beyond white in most exposures: mixed in after tone mapping, by how much of the pixel it
     // covers, so its edge is smooth rather than a pixel's worth of white wherever it touches.
     if (disc > 0.0) {
-        let radius = params.sunAngularRadius;
-        color = mix(color, toneMap(params.sunIlluminance / (PI * radius * radius) * params.exposure), disc);
+        let sun = dkSunDiscLuminance(params.sunIlluminance, params.sunAngularRadius);
+        color = mix(color, toneMap(sun * params.exposure), disc);
     }
     // Triangular dither of one 8-bit step, the difference of the two channels.
     let noise = dot(blueNoise(id.xy), vec2f(1.0, -1.0));

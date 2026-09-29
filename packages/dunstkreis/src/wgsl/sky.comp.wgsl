@@ -1,6 +1,6 @@
 // The sky pass: a compute pass that turns the precomputed tables into pixels, one invocation per pixel of the target,
 // with no rasterization. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`, `sampling.wgsl`, `raymarch.wgsl`,
-// `cube.wgsl`, `goldenset.wgsl` and `quality.wgsl`, plus the output at group 1, `dkOutputSize` and `dkOutputStore`, declared by whoever
+// `cube.wgsl`, `goldenset.wgsl`, `sun.wgsl` and `quality.wgsl`, plus the output at group 1, `dkOutputSize` and `dkOutputStore`, declared by whoever
 // builds the pipeline since its format has to be spelled out: `skyOutput(format)` for an image, `skyCubeOutput(format)`
 // for the six faces of a cube map.
 //
@@ -229,26 +229,13 @@ fn dkSkyAt(view: vec3f) -> DkSkySample {
     return dkSkyFromInside(a, view, altitude);
 }
 
-// The sun disc's luminance, attenuated by the air between it and the observer: the irradiance spread over the disc's
-// solid angle, some 15000 times brighter than the sky.
-fn dkSunDiscLuminance(sky: DkSkySample) -> vec3f {
-    let sunRadius = dkParams.sunAngularRadius;
-    return sky.sunTransmittance * dkAtmosphere.solarIrradiance / (DK_PI * sunRadius * sunRadius);
+// The sun disc along a sampled ray, attenuated by the air between it and the observer, from sun.wgsl.
+fn dkSkySunLuminance(sky: DkSkySample) -> vec3f {
+    return dkSunDiscLuminance(sky.sunTransmittance * dkAtmosphere.solarIrradiance, dkParams.sunAngularRadius);
 }
 
-// How much of a pixel `footprint` radians across the disc covers, the ray through its center bent to `sky.direction`;
-// with no footprint, whether the ray hits it. Measured by the chord between the two unit vectors, which equals the
-// angle this close: a test against cos(radius) would need cos to 1e-5, and WGSL promises it only to 2^-11.
-fn dkSunDiscCoverage(sky: DkSkySample, footprint: f32) -> f32 {
-    let distance = length(sky.direction - dkParams.sunDirection);
-    if (footprint <= 0.0) {
-        return select(0.0, 1.0, distance < dkParams.sunAngularRadius);
-    }
-    return clamp((dkParams.sunAngularRadius - distance) / footprint + 0.5, 0.0, 1.0);
-}
-
-fn dkSunDisc(sky: DkSkySample) -> vec3f {
-    return dkSunDiscLuminance(sky) * dkSunDiscCoverage(sky, 0.0);
+fn dkSkySunCoverage(sky: DkSkySample, footprint: f32) -> f32 {
+    return dkSunDiscCoverage(sky.direction, dkParams.sunDirection, dkParams.sunAngularRadius, footprint);
 }
 
 @compute @workgroup_size(8, 8, 1)
@@ -266,10 +253,11 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
             } else if (DK_CUBE_SAMPLES == 64u) {
                 offset = dkGoldenSet64[i];
             }
-            let sky = dkSkyAt(dkCubeDirectionAt(id.z, vec2f(id.xy) + 0.5 + offset, size.x));
+            let point = dkCubePointAt(id.z, vec2f(id.xy) + 0.5 + offset, size.x);
+            let sky = dkSkyAt(select(normalize(point), dkSphereFromCube(point), DK_CUBIFY));
             luminance = luminance + sky.luminance;
             if (DK_SUN_DISC) {
-                luminance = luminance + dkSunDisc(sky);
+                luminance = luminance + dkSkySunLuminance(sky) * dkSkySunCoverage(sky, 0.0);
             }
         }
         dkOutputStore(id.xy, id.z, vec4f(luminance / f32(DK_CUBE_SAMPLES), 1.0));
@@ -290,13 +278,13 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
     // far beyond white: mixed before, a pixel it barely touches would turn white, and its edge would step.
     var disc = 0.0;
     if (DK_SUN_DISC) {
-        disc = dkSunDiscCoverage(sky, length(right - view));
+        disc = dkSkySunCoverage(sky, length(right - view));
     }
     if (DK_TONE_MAP) {
-        let withDisc = dkToneMap(color + dkSunDiscLuminance(sky) * dkExposure());
+        let withDisc = dkToneMap(color + dkSkySunLuminance(sky) * dkExposure());
         color = mix(dkToneMap(color), withDisc, disc);
     } else {
-        color = color + dkSunDiscLuminance(sky) * dkExposure() * disc;
+        color = color + dkSkySunLuminance(sky) * dkExposure() * disc;
     }
 
     // The blue hour, an artistic term rather than a physical one, strongest when the sun sits just below the

@@ -38,8 +38,8 @@ const DK_METER_THREADS: u32 = 256u;
 const DK_METER_SAMPLES: u32 = 16u;
 // Below the darkest night sky, so a black direction counts as very dark rather than as minus infinity.
 const DK_METER_FLOOR: f32 = 1e-10;
-// Steps per ray from space: the meter averages thousands of them, so each can be coarse.
-const DK_METER_STEPS: u32 = 16u;
+// Samples per ray from space: the meter averages thousands of rays, so each can be coarse.
+const DK_METER_RAY_SAMPLES: u32 = 16u;
 
 var<workgroup> dkMeterSums: array<vec2f, DK_METER_THREADS>;
 
@@ -54,7 +54,7 @@ fn dkMeterLog2(a: DkAtmosphere, h: f32, mu: f32, azimuth: f32, size: vec2f) -> f
         let d = sin(azimuth);
         let direction = vec3f(horizontal * (c * s.x - d * s.y), horizontal * (c * s.y + d * s.x), mu);
         let ray = dkRaymarchFromSpace(
-            a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, h, direction, sun, DK_METER_STEPS,
+            a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, h, direction, sun, DK_METER_RAY_SAMPLES,
         );
         rgb = ray.luminance;
     } else {
@@ -69,7 +69,7 @@ fn dkSunTransmittance(a: DkAtmosphere, h: f32) -> vec3f {
     let sun = dkParams.sunDirection;
     if (h > a.Rt - a.Rg) {
         let ray = dkRaymarchFromSpace(
-            a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, h, sun, sun, DK_METER_STEPS,
+            a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, h, sun, sun, DK_METER_RAY_SAMPLES,
         );
         return select(ray.transmittance, vec3f(0.0), ray.hitsGround);
     }

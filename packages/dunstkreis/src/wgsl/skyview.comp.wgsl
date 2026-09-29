@@ -6,7 +6,7 @@
 // with DK_GROUND_LIGHT, the lower half again with both. The sky's rays never reach the ground, so the upper half does
 // not depend on the lower one.
 //
-// Cheap enough to rebuild every frame (a 192x108 table, 30 steps each) and it turns the sky pass into a
+// Cheap enough to rebuild every frame (a 192x108 table, 30 samples each) and it turns the sky pass into a
 // single texture fetch per pixel. The sun's position is baked into it, so it has to follow the sun; the
 // transmittance and multiple-scattering tables above it do not, and are only rebuilt when the model changes.
 

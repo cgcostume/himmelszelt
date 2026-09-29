@@ -1,3 +1,4 @@
+import { wgsl } from "@himmelszelt/dunstkreis";
 import blueNoiseUrl from "./bluenoise.bin?url";
 import { GOLDEN_SET_8, GOLDEN_SET_64 } from "./goldenset.js";
 import scene from "./scene.comp.wgsl";
@@ -8,7 +9,13 @@ const blueNoise = new Uint8Array(await (await fetch(blueNoiseUrl)).arrayBuffer()
 const goldenSet = (name, set) =>
     `var<private> ${name}: array<vec2f, ${set.length}> = array<vec2f, ${set.length}>(` +
     `${set.map(([x, y]) => `vec2f(${x}, ${y})`).join(", ")});`;
-const source = [goldenSet("goldenSet8", GOLDEN_SET_8), goldenSet("goldenSet64", GOLDEN_SET_64), scene].join("\n");
+const source = [
+    goldenSet("goldenSet8", GOLDEN_SET_8),
+    goldenSet("goldenSet64", GOLDEN_SET_64),
+    wgsl.cube,
+    wgsl.sun,
+    scene,
+].join("\n");
 
 /**
  * A small raytraced scene lit by an environment, for any chapter that makes one: a cube map in cd/m² as the
@@ -103,11 +110,11 @@ export function createScene(device) {
          * Records the scene into `target` (rgba8unorm, storage). `camera` orbits the scene's center: yaw from north
          * through east, pitch, distance, vertical field of view, all angles in radians. `seconds` turns the solids and
          * moves them along their orbits. `shadowRays` over the sun disc, 8 or 64 for soft shadows, 0 for none, anything else for hard ones. `background`, a texture of the target's size
-         * holding the sky in cd/m² through the same camera, replaces the sky map behind the solids. `groundRadius`, in
+         * holding the sky in cd/m² through the same camera, replaces the sky map behind the solids. `cubified` for a sky map written cubified. `groundRadius`, in
          * scene units, sizes the round ground, which fades out over its outer half. `sunLight` and `skyLight`, both on
          * by default, switch the direct sunlight and the sky's light from the coefficients. `ground` is "floor" by
          * default, a round floor of the scene's own; "backdrop" shows the backdrop's ground with the solids' shadows.
-         * `bloom`, 0 to 1, how strong the sun's veil is, `godRaySteps`, 8 or 64, haze lit by the sun
+         * `bloom`, 0 to 1, how strong the sun's veil is, `godRaySamples`, 8 or 64, haze lit by the sun
          * with the solids' shadows through it, 0 for none. `airDensity` and `hazeDensity`, around the camera relative to
          * the ground's, 1 by default, thin the veil and the haze.
          */
@@ -138,9 +145,10 @@ export function createScene(device) {
             flags[111] = (rest.sunLight === false ? 0 : 1) | (rest.skyLight === false ? 0 : 2);
             flags[112] = rest.ground === "backdrop" ? 1 : 0;
             data[113] = rest.bloom ?? 0;
-            flags[114] = rest.godRaySteps ?? 0;
+            flags[114] = rest.godRaySamples ?? 0;
             data[115] = rest.airDensity ?? 1;
             data[116] = rest.hazeDensity ?? 1;
+            flags[117] = rest.cubified ? 1 : 0;
             device.queue.writeBuffer(params, 0, data);
 
             const bindGroup = device.createBindGroup({

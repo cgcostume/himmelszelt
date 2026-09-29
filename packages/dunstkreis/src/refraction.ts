@@ -19,7 +19,7 @@ export function airRefractivity(temperatureC = 15, pressureHPa = 1013.25): numbe
 type Vec2 = [number, number];
 
 /** Enough for well below an arcsecond: the path bends by at most a degree, mostly around its lowest point. */
-const STEPS = 200;
+const SAMPLES = 200;
 
 /** An upper bound on the bending in radians, as in the transmittance table: 1.1 times twice the horizon's. */
 function refractionMargin(model: AtmosphereModel): number {
@@ -62,12 +62,12 @@ function bending(model: AtmosphereModel, h: number, mu: number): number | null {
 
     let position: Vec2 = [0, 0];
     let direction: Vec2 = [Math.sqrt(Math.max(1 - mu * mu, 0)), mu];
-    for (let i = 0; i < STEPS; ++i) {
+    for (let i = 0; i < SAMPLES; ++i) {
         const r = rg + altitudeAt(position);
         const [ux, uy] = upAt(position);
         const localMu = ux * direction[0] + uy * direction[1];
         const remaining = Math.max(-r * localMu + Math.sqrt(Math.max(r * r * (localMu * localMu - 1) + rt * rt, 0)), 0);
-        const ds = remaining / (STEPS - i);
+        const ds = remaining / (SAMPLES - i);
 
         const [tx, ty] = turn(position, direction);
         const middle = normalize([direction[0] + tx * 0.5 * ds, direction[1] + ty * 0.5 * ds]);

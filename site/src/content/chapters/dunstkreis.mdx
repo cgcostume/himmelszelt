@@ -5,11 +5,14 @@ summary: "Why the sky is blue and the sunset red, computed on the GPU."
 order: 2
 references:
     - bennett1982
+    - brown2017
     - edlen1966
     - fritsch1980
     - kopp2011
     - lagarde2014
+    - mueller2012thesis
     - narkowicz2016
+    - nowell2005
     - ramamoorthi2001
 ---
 
@@ -78,7 +81,7 @@ Astronomers usually take this from a fit, like Bennett's for the apparent altitu
 sternzeit uses too. It holds for an observer on the ground looking up, and nowhere else.
 
 dunstkreis traces it instead, through the same air it scatters light in: the refractive index follows the density of the
-Rayleigh layer, and every ray bends in the same steps that integrate its scattering, the view rays as well as the
+Rayleigh layer, and every ray bends between the same samples that integrate its scattering, the view rays as well as the
 sunlight reaching each point in the air. Along a bent ray in an atmosphere that is the same in every direction, n r
 sin(z) stays constant, with r the distance from the planet's center and z the angle from the vertical. That alone
 decides where the ground starts, which also lifts the visible horizon: from 10 km up, by 0.2°. The same model covers an
@@ -122,7 +125,9 @@ being a special case.
 Three tables carry the sky. Transmittance says how much light gets through the air along any ray, multiple scattering
 how much light arrives after more than one bounce, and the sky view holds the whole sky as seen from where the observer
 stands, rebuilt whenever the Sun or the observer moves. The sky pass then only looks up one texel per pixel. Their
-sizes and sample counts are open here to play with; the sky above follows.
+sizes and sample counts are open here to play with; the sky above follows. Every table is traced through the bent air of
+the section before, and each has a switch for it: off, the rays run straight. It is one setting for the whole page, so
+every table, cube map and figure follows it.
 
 <Tables />
 
@@ -132,7 +137,38 @@ sizes and sample counts are open here to play with; the sky above follows.
 
 The same sky can light a scene. The sky pass writes it into the six faces of a cube map, in cd/m² and without the
 sun's disc, and a second pass projects that onto nine spherical harmonics coefficients, which give the irradiance for
-any surface's orientation <Cite id="ramamoorthi2001" />. The sun lights the scene apart, as a light of its own, with what the air leaves of it.
+any surface's orientation <Cite id="ramamoorthi2001" />. The disc stays out on purpose: at some two billion cd/m² it is
+far brighter than a half float holds, and at half a degree smaller than a texel of all but the largest cube maps, so it
+would be one blocky texel, smeared by the mip levels, and the coefficients would ring with it. Wherever the cube map is
+shown, the disc is drawn over it instead, sharp at any resolution. The sun lights the scene apart, as a light of its own,
+with what the air leaves of it.
+
+Why a cube map, rather than the atmosphere itself for every pixel and every surface? Because the sky hardly changes from
+one frame to the next. The Sun moves by a quarter of a degree a minute, its own diameter in about two, and at 60 frames
+per second that is thousands of frames each computing the same sky again. So the cube map is built once whenever the Sun
+or the observer has moved, and every frame after that only samples it: one filtered fetch per direction, for the
+background as for a reflection, and nine coefficients for all of the diffuse light. Lighting needs the whole sky anyway,
+not only the part the camera sees. At 128 texels a face, a build computes 98,304 texels, a twentieth of the pixels of a
+full HD frame; how long it takes shows above the figure.
+
+A cube map's faces are six perspective views, and a perspective crowds the most directions into its middle: a texel at a
+face's corner covers only a fifth of the solid angle of one at its center. So the sky is resolved five times as finely
+towards the corners as in the middle of a face, and where two faces meet, the texel grid turns abruptly, which can show
+in gradients as smooth as the sky's. Cubified, as osgHimmel's `CubeMappedHimmel` did it <Cite id="mueller2012thesis" />,
+the texels are placed by Nowell's mapping of a cube onto a sphere <Cite id="nowell2005" /> instead. The largest then
+covers 1.31 times the solid angle of the smallest, a little more even than the equi-angular cube map YouTube streams
+video in, at 1.41 <Cite id="brown2017" />. It costs a few instructions per lookup, and whoever samples the cube map has
+to know: it looks up the point on the cube that maps to its direction, not the direction itself. Filtering across the
+faces' edges and the mip levels work as before. The two figures below switch it together.
+
+The cube map comes with its mip levels, each texel the mean of four in the level above, down to a single texel a face.
+They cost a third more memory and a few cheap passes, and they are optional: `encodeCube` fills as many levels as the
+texture was created with, so a `mipLevelCount` of 1 leaves them out. Two
+readers need them here. The projection onto the coefficients takes 4,096 directions; from a face of 1,024 texels it would
+see only one texel in some 1,500 and miss whatever lies between, so it reads the level whose texels are about as many as
+its directions. And a background showing the cube map through a wide lens spans several texels with each pixel, so it
+reads the level where a texel is about a pixel wide, instead of picking one texel of many and flickering as the view
+turns.
 
 <Environment />
 

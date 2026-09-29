@@ -6,7 +6,7 @@
 // for a quality preset switched at most a handful of times, and wrong for something read per frame. Set them
 // through `constants` on the pipeline descriptor; `pipelineConstants()` builds that record.
 
-// Steps along each ray traced for the transmittance LUT, 18 rays per texel with refraction, to find the one arriving
+// Samples along each ray traced for the transmittance LUT, 18 rays per texel with refraction, to find the one arriving
 // from the texel's direction. The single largest quality/cost lever in the precompute, and the reason it is an
 // override: the loop bound has to be a constant for the compiler to unroll it.
 override DK_SAMPLES_TRANSMITTANCE: u32 = 100u;
@@ -24,7 +24,7 @@ override DK_SAMPLES_INSCATTER_SPHERICAL: u32 = 16u;
 // Samples for Hillaire's multiple-scattering LUT.
 override DK_SAMPLES_MULTI_SCATTERING: u32 = 20u;
 
-// Raymarch steps for Hillaire's per-frame sky-view LUT. The only one of these on the per-frame path.
+// Raymarch samples for Hillaire's per-frame sky-view LUT. The only one of these on the per-frame path.
 override DK_SAMPLES_SKY_VIEW: u32 = 30u;
 
 // Whether the sky pass tone maps its output for a display: exposed, compressed into [0, 1] and sRGB encoded, for an
@@ -51,6 +51,9 @@ override DK_GROUND_SAMPLES: u32 = 64u;
 // Samples per texel of a cube map, spread over it by the golden sets: 1, 8 or 64. More smooth the edges a texel
 // straddles, the horizon's and the sun disc's.
 override DK_CUBE_SAMPLES: u32 = 1u;
+
+// Whether the cube map is cubified, its texels spread evenly over the sphere: see cube.wgsl.
+override DK_CUBIFY: bool = false;
 
 // Whether the sky pass draws the sun disc. Off for a cube map lighting a scene, which takes the sun as a light of its
 // own: a disc of some 10^9 cd/m² in a few texels would outshine the whole sky in every filtered lookup.
