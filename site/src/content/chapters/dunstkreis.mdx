@@ -33,6 +33,11 @@ still to come.
 
 <Controls open />
 
+dunstkreis knows nothing of dates: it takes the Sun as a plain direction, here from sternzeit's `sun.direction`. That is
+already where the Sun shows rather than where it is, its light 8 minutes 20 seconds underway, as
+[sternzeit explains](../sternzeit/#the-sun). It is the true direction nonetheless, not yet bent by the air: dunstkreis
+traces the refraction itself. How to hand it over is the first of the [code examples](#code-examples).
+
 ## Why is the sky blue?
 
 <Planned title="A short history of the question" plan="keep, as a timeline.">
@@ -261,4 +266,38 @@ pipeline turns that off and gets the exposed luminance itself, linear and unclam
 
 ## Code examples
 
-Not written yet.
+dunstkreis records into a command encoder you own, writing into a texture you own. It creates no device, no canvas and
+no render pass of its own, so it slots in before whatever else your frame draws. Every further example builds on this
+one.
+
+**Feed it a sky.** Precompute the tables once per atmosphere, create a sky pass for your target, and hand it the Sun and
+a camera. The Sun's direction is any unit vector in ENU: sternzeit computes it here, but dunstkreis does not depend on
+it, and a fixed vector or your engine's own light does just as well.
+
+```ts
+import { createSkyPass, precomputeAtmosphere } from "@himmelszelt/dunstkreis";
+import { fromDate, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
+
+// Once per atmosphere: the transmittance and multiple scattering tables.
+const luts = await precomputeAtmosphere(device);
+// Into a canvas configured with rgba8unorm and STORAGE_BINDING usage.
+const sky = createSkyPass(device, { luts, format: "rgba8unorm" });
+
+// Whenever the moment, the place or the camera changes.
+const time = fromDate(new Date());
+const observer = { latitude: 52.39, longitude: 13.13, heightM: 10 };
+sky.update({
+    // Unit vectors in ENU: x east, y north, z up. True, not refracted.
+    sunDirection: sun.direction(time, observer),
+    sunAngularDiameter: sun.apparentAngularDiameter(julianEphemerisDay(time)),
+    observerHeightM: observer.heightM,
+    inverseViewProjection, // your camera's, column-major
+    autoExposure: true,
+});
+const encoder = device.createCommandEncoder();
+sky.encode(encoder, context.getCurrentTexture());
+device.queue.submit([encoder.finish()]);
+```
+
+`update` only rewrites a few numbers when just the camera moves. A new Sun or a new height also rebuilds the table of
+the whole sky, which the pass then reads once per pixel.

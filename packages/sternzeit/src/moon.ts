@@ -227,7 +227,7 @@ export function positionApprox(t: JulianDay): EclipticalCoords {
 }
 
 /** Apparent geocentric equatorial position, per Meeus ch. 47: {@link position} moved to the true equinox of the date by
- *  the nutation in longitude (Δψ), at the true obliquity. The Moon's aberration is below 0.001" and left out. */
+ *  the nutation in longitude (Δψ), at the true obliquity. The Moon's light time of ~1.3 s (~0.7") is left out. */
 export function apparentPosition(t: JulianDay): EquatorialCoords {
     const { longitude, latitude } = position(t);
     return eclipticalToEquatorial(

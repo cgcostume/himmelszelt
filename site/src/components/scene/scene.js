@@ -24,7 +24,7 @@ const source = [
  */
 
 const DEG = Math.PI / 180;
-const PARAMS_SIZE = 480;
+const PARAMS_SIZE = 512;
 
 /** Rotation about a unit axis by an angle, as a column-major 3x3 matrix padded to WGSL's mat3x3f: 12 floats. */
 function rotation([x, y, z], angle) {
@@ -116,7 +116,9 @@ export function createScene(device) {
          * default, a round floor of the scene's own; "backdrop" shows the backdrop's ground with the solids' shadows.
          * `bloom`, 0 to 1, how strong the sun's veil is, `godRaySamples`, 8 or 64, haze lit by the sun
          * with the solids' shadows through it, 0 for none. `airDensity` and `hazeDensity`, around the camera relative to
-         * the ground's, 1 by default, thin the veil and the haze.
+         * the ground's, 1 by default, thin the veil and the haze. `discDirection` and `discIlluminance`, the sun as the
+         * camera sees it from its own height, the sun's by default, place and light the disc and its veil; `horizonZ`,
+         * the planet's horizon as the camera sees it, hides the disc below it, -1 by default for none.
          */
         encode(
             encoder,
@@ -149,6 +151,9 @@ export function createScene(device) {
             data[115] = rest.airDensity ?? 1;
             data[116] = rest.hazeDensity ?? 1;
             flags[117] = rest.cubified ? 1 : 0;
+            data.set(rest.discDirection ?? sunDirection, 120);
+            data[123] = rest.horizonZ ?? -1;
+            data.set(rest.discIlluminance ?? sunIlluminance, 124);
             device.queue.writeBuffer(params, 0, data);
 
             const bindGroup = device.createBindGroup({

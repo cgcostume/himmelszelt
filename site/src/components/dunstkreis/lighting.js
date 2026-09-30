@@ -1,4 +1,4 @@
-import { clampObserverHeight, createSkyPass } from "@himmelszelt/dunstkreis";
+import { apparentDirection, clampObserverHeight, createSkyPass } from "@himmelszelt/dunstkreis";
 import { onDemand } from "../frame.js";
 import { cameraFrame, createScene } from "../scene/scene.js";
 import { bindCubifyToggle, environment, gpu, onEnvironment, onTables, quality, tables } from "./atmosphere.js";
@@ -28,8 +28,38 @@ const ground = () => chosen("lighting-ground", "backdrop");
 let skyPass = null;
 let skyPassFor = {};
 let background = null;
+// The sun as the camera sees it from its own height, read back from the scene's sky pass: `key` for which sun, height
+// and tables, `illuminance` null until the first reading is in.
+let discSun = { key: null, illuminance: null };
 
-function renderBackground(encoder, width, height) {
+/** Where the camera sees the sun, how bright, and where it sees the planet's horizon, all from the camera's own height,
+ *  behind the live atmosphere and the sky map alike. Needs the scene's sky pass updated for this frame. */
+function sunSeen() {
+    const { sky } = environment;
+    const { luts } = tables();
+    const height = clampObserverHeight(cameraFrame(camera).eye[2]);
+    const r = luts.model.planet.groundRadiusKm;
+    const h = height / 1000;
+    const horizonZ = -Math.sqrt(h * (2 * r + h)) / (r + h);
+    const key = `${sky.sunDirection},${height}`;
+    if (discSun.key !== key || discSun.luts !== luts) {
+        discSun = { ...discSun, key, luts, direction: apparentDirection(sky.sunDirection, luts.model, height) };
+        const reading = discSun;
+        // The sky pass metered when it was updated for this sun and height, so the reading is this frame's.
+        skyPass
+            .sunIlluminance()
+            .then((illuminance) => {
+                if (discSun !== reading) return;
+                discSun.illuminance = illuminance;
+                requestRender();
+            })
+            .catch(() => {});
+    }
+    return { discDirection: discSun.direction, discIlluminance: discSun.illuminance ?? environment.sun, horizonZ };
+}
+
+// Updates the scene's sky pass for the camera: it meters the sun there even when only the sky map shows.
+function updateSkyPass(width, height) {
     const { luts } = tables();
     const { groundSamples } = quality;
     // Without the sun disc: the scene draws it itself, after tone mapping, to smooth its edge.
@@ -38,15 +68,6 @@ function renderBackground(encoder, width, height) {
         const options = { luts, format: "rgba16float", toneMap: false, dither: false, sunDisc: false, groundSamples };
         skyPass = createSkyPass(gpu.device, options);
         skyPassFor = { luts, groundSamples };
-    }
-    if (background?.width !== width || background?.height !== height) {
-        background?.destroy();
-        background = gpu.device.createTexture({
-            label: "sternwarte:lightingBackground",
-            size: { width, height },
-            format: "rgba16float",
-            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
-        });
     }
     const { eye, forward, right, up } = cameraFrame(camera);
     const ty = Math.tan(camera.fov / 2);
@@ -74,6 +95,18 @@ function renderBackground(encoder, width, height) {
         ev100: -Math.log2(1.2),
         autoExposure: false,
     });
+}
+
+function renderBackground(encoder, width, height) {
+    if (background?.width !== width || background?.height !== height) {
+        background?.destroy();
+        background = gpu.device.createTexture({
+            label: "sternwarte:lightingBackground",
+            size: { width, height },
+            format: "rgba16float",
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+        });
+    }
     skyPass.encode(encoder, background);
     return background;
 }
@@ -91,7 +124,9 @@ function render() {
 
     const { cube, ibl, sun, ev100, sky } = environment;
     const encoder = gpu.device.createCommandEncoder({ label: "sternwarte:lighting" });
+    updateSkyPass(width, height);
     const live = liveSky() ? renderBackground(encoder, width, height) : null;
+    const seen = sunSeen();
     scene.encode(encoder, context.getCurrentTexture(), {
         background: live,
         cube,
@@ -101,6 +136,7 @@ function render() {
         sunDirection: sky.apparentSun,
         sunAngularDiameter: sky.sunAngularDiameter,
         sunIlluminance: sun,
+        ...seen,
         ev100,
         sunDisc: pressed("sunDisc"),
         bloom: { off: 0, light: 0.35, strong: 1 }[chosen("lighting-bloom", "strong")],

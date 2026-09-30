@@ -166,6 +166,15 @@ Earth's own orbital speed, to get the <Term of="Apparent position">apparent posi
 <Term of="Equatorial coordinates">right ascension and declination</Term>, the sky's own latitude and longitude. From
 there, the topocentric and the horizontal position bring it to the observer, as described under Earth.
 
+Aberration hides a nice detail. The Sun's light takes 8 minutes 20 seconds to reach us, so we see the Sun where it was
+back then. Yet it does not lag the 2° the sky turns in that time: that turning is Earth spinning under the light, which
+changes nothing about where the light comes from. Only the Sun's own drift against the stars counts, Earth's orbit
+mirrored, and in 8 minutes 20 seconds that is 20.5" <Cite id="meeus1998" />, under a ninetieth of the Sun's disc. The
+true longitude leaves it out; the apparent position adds it, and so does everything built on it: the topocentric and
+the horizontal position, and `sun.direction`. The Moon's light is underway for 1.3 seconds, in which the Moon moves
+some 0.7", and sternzeit leaves that out. So `sun.direction` points where the Sun shows, which is just what
+[dunstkreis](../dunstkreis/) wants to light its sky by.
+
 <DayArc />
 <Controls />
 

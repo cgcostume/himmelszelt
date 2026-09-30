@@ -52,6 +52,12 @@ struct Params {
     hazeDensity: f32,
     // Nonzero when the sky map is cubified, sampled through dkCubeFromSphere from dunstkreis' cube.wgsl.
     cubified: u32,
+    // The sun as the camera sees it, which may be far above the scene's ground: where its disc shows, and its
+    // illuminance there, per channel in lux.
+    discDirection: vec3f,
+    // The z of the planet's horizon as the camera sees it: the backdrop shows ground below it, and hides the disc.
+    horizonZ: f32,
+    discIlluminance: vec3f,
 }
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -323,7 +329,7 @@ fn backdrop(pixel: vec2u, direction: vec3f) -> vec3f {
 // of a pixel each stand for a quarter of it, about half a pixel across.
 fn discCoverage(direction: vec3f, size: vec2u) -> f32 {
     let halfPixel = params.tanHalfFov / f32(size.y);
-    return dkSunDiscCoverage(direction, params.sunDirection, params.sunAngularRadius, halfPixel);
+    return dkSunDiscCoverage(direction, params.discDirection, params.sunAngularRadius, halfPixel);
 }
 
 // The backdrop's own ground where a camera ray meets the plane z = 0, `t` along it, with what the solids keep from it
@@ -361,7 +367,7 @@ fn veil(angle: f32, width: f32) -> f32 {
 // far as the solids hide the sun from the eye, which eight fixed rays over its disc tell.
 fn bloom(direction: vec3f) -> vec3f {
     var visible = 0.0;
-    let sun = params.sunDirection;
+    let sun = params.discDirection;
     let helper = select(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 1.0, 0.0), abs(sun.x) > 0.9);
     let tangent = normalize(cross(helper, sun));
     let bitangent = cross(sun, tangent);
@@ -378,7 +384,7 @@ fn bloom(direction: vec3f) -> vec3f {
     // The veil is the air's, scattering forward around the sun: it thins with the air around the camera, gone in space.
     let width = GLARE_VEIL.y * mix(0.5, 1.0, params.bloom);
     let spread = GLARE_VEIL.x * params.bloom * params.airDensity * veil(angle, width);
-    return params.sunIlluminance * spread * visible;
+    return params.discIlluminance * spread * visible;
 }
 
 // The haze's light along a camera ray up to `end`: the sun's light it scatters towards the camera, wherever the solids
@@ -416,10 +422,12 @@ fn shade(pixel: vec2u, direction: vec3f) -> vec4f {
     let hit = intersectScene(params.eye, direction);
     if (hit.t >= FAR) {
         let t = -params.eye.z / direction.z;
+        // The backdrop's ground plane is flat, the planet is not: from high up, the sky reaches below z = 0.
+        let sky = select(0.0, 1.0, direction.z > params.horizonZ);
         if (params.ground != 0u && direction.z < 0.0 && t > 0.0) {
-            return vec4f(backdropGround(pixel, direction, t), 0.0);
+            return vec4f(backdropGround(pixel, direction, t), sky);
         }
-        return vec4f(backdrop(pixel, direction), 1.0);
+        return vec4f(backdrop(pixel, direction), sky);
     }
 
     // Off the surface by a little more the farther away it is, where f32 resolves positions more coarsely.
@@ -468,14 +476,14 @@ fn render(@builtin(global_invocation_id) id: vec3u) {
         let air = haze(id.xy, center, rayLength(center));
         luminance = luminance * air.w + air.rgb;
     }
-    if (params.bloom > 0.0 && params.sunIlluminance.g > 0.0) {
+    if (params.bloom > 0.0 && params.discIlluminance.g > 0.0) {
         luminance = luminance + bloom(center);
     }
     var color = toneMap(luminance * params.exposure);
     // The sun disc, far beyond white in most exposures: mixed in after tone mapping, by how much of the pixel it
     // covers, so its edge is smooth rather than a pixel's worth of white wherever it touches.
     if (disc > 0.0) {
-        let sun = dkSunDiscLuminance(params.sunIlluminance, params.sunAngularRadius);
+        let sun = dkSunDiscLuminance(params.discIlluminance, params.sunAngularRadius);
         color = mix(color, toneMap(sun * params.exposure), disc);
     }
     // Triangular dither of one 8-bit step, the difference of the two channels.
