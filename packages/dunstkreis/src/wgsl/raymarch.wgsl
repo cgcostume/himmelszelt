@@ -52,14 +52,14 @@ fn dkRaymarchSky(
         let scattering = a.betaR * densityR + a.betaMSca * densityM;
         let extinction = max(dkExtinction(a, altitude), vec3f(1e-9));
         let stepTransmittance = exp(-extinction * ds);
-        let sunTransmittance = dkSampleTransmittanceToTop(a, transmittanceLut, lutSampler, a.Rg + altitude, muS);
+        let sunTransmittance = dkSampleTransmittanceToTop(a, transmittanceLut, lutSampler, altitude, muS);
 
         // Single scattering carries the phase functions, which is what puts the glow around the sun and the
         // blue overhead. The multiple-scattering term does not: it was built isotropically on purpose.
         let phases = a.betaR * densityR * dkPhaseRayleigh(nu) + a.betaMSca * densityM * dkPhaseMie(a, nu);
-        let multiple = dkSampleMultiScattering(a, multiScatteringLut, lutSampler, a.Rg + altitude, muS) * scattering;
+        let multiple = dkSampleMultiScattering(a, multiScatteringLut, lutSampler, altitude, muS) * scattering;
 
-        let inScatter = a.solarIrradiance * (sunTransmittance * phases + multiple);
+        let inScatter = a.solarIlluminance * (sunTransmittance * phases + multiple);
         result.luminance = result.luminance
             + result.transmittance * (inScatter - inScatter * stepTransmittance) / extinction;
         result.transmittance = result.transmittance * stepTransmittance;
@@ -70,9 +70,9 @@ fn dkRaymarchSky(
     if (ground && result.hitsGround) {
         let muS = dot(dkPathToWorld(dkPathUp(a, h, path.position), up, horizontal), sunDirection);
         if (muS > 0.0) {
-            let toSun = dkSampleTransmittanceToTop(a, transmittanceLut, lutSampler, a.Rg, muS);
+            let toSun = dkSampleTransmittanceToTop(a, transmittanceLut, lutSampler, 0.0, muS);
             result.luminance = result.luminance
-                + result.transmittance * a.solarIrradiance * toSun * muS * a.groundAlbedo / DK_PI;
+                + result.transmittance * a.solarIlluminance * toSun * muS * a.groundAlbedo / DK_PI;
         }
     }
     return result;

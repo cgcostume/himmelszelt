@@ -1,5 +1,5 @@
 // The sun disc, drawn wherever the sky is shown rather than stored in it: in the sky pass, and over a sky cube map, which
-// holds the sky without it (see `SkyPass.encodeCube`). Binding-free.
+// holds the sky without it (see `SkyPass.createCubePass`). Binding-free.
 //
 // Kept out of the cube map on purpose. At some 2e9 cd/m², the disc is far beyond what rgba16float holds, and at 0.53° it
 // is smaller than a texel of any cube map but a very large one: stored, it would be a blocky texel, smeared by the mip

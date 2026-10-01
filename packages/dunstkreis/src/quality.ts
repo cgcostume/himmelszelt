@@ -1,89 +1,88 @@
-import type { PrecomputedTextureConfig } from "./model.js";
+import type { AtmosphereModel, PrecomputedTextureConfig } from "./model.js";
 
 /**
- * The pipeline-overridable constants declared by `wgsl/quality.wgsl`, as a typed record. These specialize a
- * shader at pipeline creation rather than being read at runtime, which lets the compiler unroll the
- * integration loops, and is why the sample counts are not part of the uniform block.
+ * The sample counts declared by `wgsl/quality.wgsl`, as a typed record for a pipeline descriptor's `constants`. They
+ * specialize a shader at pipeline creation rather than being read at runtime, which lets the compiler unroll the
+ * integration loops, and is why they are not part of the uniform block.
  */
 export interface QualityConstants {
     /** Indexable, since this is handed straight to a pipeline descriptor's `constants` record. */
     [name: string]: number;
 
     DK_SAMPLES_TRANSMITTANCE: number;
-    DK_SAMPLES_INSCATTER: number;
-    DK_SAMPLES_IRRADIANCE: number;
-    DK_SAMPLES_INSCATTER_SPHERICAL: number;
     DK_SAMPLES_MULTI_SCATTERING: number;
     DK_SAMPLES_SKY_VIEW: number;
-    /** WebGPU takes booleans as 0 or 1 in the `constants` record. */
-    DK_TONE_MAP: number;
-    DK_DITHER: number;
-    DK_DEBUG_GRID: number;
-    DK_CUBE: number;
-    DK_CUBE_SAMPLES: number;
-    DK_CUBIFY: number;
-    DK_GROUND_LIGHT: number;
-    DK_GROUND_SAMPLES: number;
-    DK_SUN_DISC: number;
+    DK_SAMPLES_GROUND: number;
+    DK_SAMPLES_CUBE: number;
 }
 
-/** osgHimmel's sample counts, fewer for the transmittance, tone mapped and dithered, an image with the sun disc. */
+/** The defaults `quality.wgsl` declares: osgHimmel's sample counts, fewer for the transmittance. */
 export const DEFAULT_QUALITY: QualityConstants = {
     DK_SAMPLES_TRANSMITTANCE: 100,
-    DK_SAMPLES_INSCATTER: 50,
-    DK_SAMPLES_IRRADIANCE: 32,
-    DK_SAMPLES_INSCATTER_SPHERICAL: 16,
     DK_SAMPLES_MULTI_SCATTERING: 20,
     DK_SAMPLES_SKY_VIEW: 30,
-    DK_TONE_MAP: 1,
-    DK_DITHER: 1,
-    DK_DEBUG_GRID: 0,
-    DK_CUBE: 0,
-    DK_CUBE_SAMPLES: 1,
-    DK_CUBIFY: 0,
-    DK_GROUND_LIGHT: 0,
-    DK_GROUND_SAMPLES: 64,
-    DK_SUN_DISC: 1,
+    DK_SAMPLES_GROUND: 64,
+    DK_SAMPLES_CUBE: 1,
 };
 
 /**
  * Builds the `constants` record for a pipeline descriptor from a texture configuration, i.e.
- * `{ compute: { module, entryPoint, constants: pipelineConstants(config) } }`.
- *
- * Every key must match an `override` declared in `wgsl/quality.wgsl`, or pipeline creation fails; a test
- * pins the two lists together.
+ * `{ compute: { module, entryPoint, constants: pipelineConstants(config) } }`, with the samples of the sky's light on
+ * the ground and per cube map texel if given. Every key matches an `override` in `wgsl/quality.wgsl`, or pipeline
+ * creation fails; a test pins the two lists together.
  */
 export function pipelineConstants(
     config: PrecomputedTextureConfig,
-    options: {
-        toneMap?: boolean;
-        dither?: boolean;
-        debugGrid?: boolean;
-        cube?: boolean;
-        cubeSamples?: 1 | 8 | 64;
-        cubify?: boolean;
-        groundLight?: boolean;
-        groundSamples?: 8 | 64;
-        sunDisc?: boolean;
-    } = {},
+    samples: { ground?: number; cube?: number } = {},
 ): QualityConstants {
     const { integralSamples } = config;
-
     return {
         DK_SAMPLES_TRANSMITTANCE: integralSamples.transmittance,
-        DK_SAMPLES_INSCATTER: integralSamples.inscatter,
-        DK_SAMPLES_IRRADIANCE: integralSamples.irradiance,
-        DK_SAMPLES_INSCATTER_SPHERICAL: integralSamples.inscatterSpherical,
         DK_SAMPLES_MULTI_SCATTERING: integralSamples.multiScattering,
         DK_SAMPLES_SKY_VIEW: integralSamples.skyView,
-        DK_TONE_MAP: options.toneMap === false ? 0 : 1,
-        DK_DITHER: options.dither === false ? 0 : 1,
-        DK_DEBUG_GRID: options.debugGrid ? 1 : 0,
-        DK_CUBE: options.cube ? 1 : 0,
-        DK_CUBE_SAMPLES: options.cubeSamples ?? 1,
-        DK_CUBIFY: options.cubify ? 1 : 0,
-        DK_GROUND_LIGHT: options.groundLight ? 1 : 0,
-        DK_GROUND_SAMPLES: options.groundSamples ?? 64,
-        DK_SUN_DISC: options.sunDisc === false ? 0 : 1,
+        DK_SAMPLES_GROUND: samples.ground ?? DEFAULT_QUALITY.DK_SAMPLES_GROUND,
+        DK_SAMPLES_CUBE: samples.cube ?? DEFAULT_QUALITY.DK_SAMPLES_CUBE,
     };
 }
+
+/** The passes' switches, `wgsl/features.wgsl`, as their defaults there. */
+export interface Features {
+    toneMap: boolean;
+    dither: boolean;
+    autoExposure: boolean;
+    debugGrid: boolean;
+    sunDisc: boolean;
+    cube: boolean;
+    cubify: boolean;
+    /** Which rows of the sky-view table a dispatch writes: 0 all, 1 the sky, 2 the ground lit by the sky too. */
+    skyViewRows: 0 | 1 | 2;
+}
+
+export const DEFAULT_FEATURES: Features = {
+    toneMap: true,
+    dither: true,
+    autoExposure: false,
+    debugGrid: false,
+    sunDisc: true,
+    cube: false,
+    cubify: false,
+    skyViewRows: 0,
+};
+
+/** The `constants` record for `features.wgsl`; a test pins its keys to the overrides declared there. */
+export function featureConstants(features: Partial<Features> = {}): Record<string, number> {
+    const f = { ...DEFAULT_FEATURES, ...features };
+    return {
+        DK_TONE_MAP: Number(f.toneMap),
+        DK_DITHER: Number(f.dither),
+        DK_AUTO_EXPOSURE: Number(f.autoExposure),
+        DK_DEBUG_GRID: Number(f.debugGrid),
+        DK_SUN_DISC: Number(f.sunDisc),
+        DK_CUBE: Number(f.cube),
+        DK_CUBIFY: Number(f.cubify),
+        DK_SKY_VIEW_ROWS: f.skyViewRows,
+    };
+}
+
+/** `common.wgsl`'s own switch: the straight march for a model whose air does not bend. */
+export const refractionConstants = (model: AtmosphereModel) => ({ DK_REFRACTION: model.refractivity > 0 ? 1 : 0 });

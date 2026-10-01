@@ -65,11 +65,12 @@ function cameraBasis(aspect) {
 }
 
 /**
- * The inverse view-projection the pass turns fragments back into rays with, built directly: a clip-space point
- * (x, y) on the far plane maps to forward + x·tx·right + y·ty·up. Column major, like WGSL.
+ * The inverse view-projection the pass turns pixels back into rays with, built directly: of a reversed-z projection with
+ * an infinite far plane, the near plane at 1, without translation. A clip-space point (x, y) maps to the direction
+ * forward + x·tx·right + y·ty·up. Column major, like WGSL.
  */
 function inverseViewProjection({ f, r, u, tx, ty }) {
-    return new Float32Array([...r.map((c) => c * tx), 0, ...u.map((c) => c * ty), 0, ...f, 0, 0, 0, 0, 1]);
+    return new Float32Array([...r.map((c) => c * tx), 0, ...u.map((c) => c * ty), 0, 0, 0, 0, 1, ...f, 0]);
 }
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -136,6 +137,25 @@ let view = null;
 let pass = null;
 let passFor = {};
 let skyViewFor = "";
+// The settings of the pass being compiled, which takes its place once it is in.
+let building = null;
+const requestRender = onDemand(render);
+
+/** Makes the pass for `settings` without blocking; the last one asked for takes over, and the old tables go with it. */
+function buildPass(settings) {
+    if (building && Object.entries(settings).every(([key, value]) => building[key] === value)) return;
+    building = settings;
+    const { luts, ...features } = settings;
+    createSkyPass(gpu.device, { luts, format: gpu.format, ...features }).then((next) => {
+        if (building !== settings) return next.destroy();
+        pass?.destroy();
+        if (passFor.luts && passFor.luts !== luts) passFor.luts.destroy();
+        pass = next;
+        passFor = settings;
+        building = null;
+        requestRender();
+    });
+}
 
 // Where the time goes, shown with the grid: the astronomy, the sky pass' own CPU work, and when the GPU was done.
 function showTiming(astronomyMs, skyMs, submitted) {
@@ -162,6 +182,7 @@ function render() {
 
     const debugGrid = pressed("grid");
     const dither = pressed("dither");
+    const autoExposure = pressed("auto");
     const table = tables();
     // Where the sun shows, lifted by the same air the sky is traced through.
     const [x, y, z] = apparentDirection(sunDirection, table.luts.model, clampObserverHeight(state.heightM));
@@ -173,14 +194,11 @@ function render() {
         camera.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, Math.asin(z)));
     }
     const skyStarted = performance.now();
-    const { groundSamples } = quality;
-    const changed =
-        debugGrid !== passFor.debugGrid || groundSamples !== passFor.groundSamples || dither !== passFor.dither;
-    if (table.luts !== passFor.luts || changed) {
-        pass?.destroy();
-        if (passFor.luts && passFor.luts !== table.luts) passFor.luts.destroy();
-        pass = createSkyPass(gpu.device, { luts: table.luts, format: gpu.format, debugGrid, groundSamples, dither });
-        passFor = { luts: table.luts, debugGrid, groundSamples, dither };
+    const settings = { luts: table.luts, debugGrid, groundSamples: quality.groundSamples, dither, autoExposure };
+    if (Object.entries(settings).some(([key, value]) => passFor[key] !== value)) {
+        // Shown once it is compiled; until then the canvas keeps the last frame.
+        buildPass(settings);
+        return;
     }
 
     const basis = cameraBasis(width / height);
@@ -194,7 +212,6 @@ function render() {
         inverseViewProjection: inverseViewProjection(basis),
         projectionDistance: basis.d,
         ev100: evOfSlider(),
-        autoExposure: pressed("auto"),
     });
 
     const encoder = gpu.device.createCommandEncoder();
@@ -231,7 +248,6 @@ function showExposure() {
 }
 
 if (gpu) {
-    const requestRender = onDemand(render);
     onChange(requestRender);
     onTables(() => {
         field("refraction").setAttribute("aria-pressed", String(quality.refraction));

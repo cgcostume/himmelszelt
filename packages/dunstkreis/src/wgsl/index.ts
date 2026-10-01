@@ -5,9 +5,10 @@
  * The snippets are deliberately binding-free: `common` takes the `DkAtmosphere` struct from `atmosphere` by
  * value rather than reading a `var<uniform>`, so composing is concatenation plus declaring the binding yourself,
  * and nothing here can collide with your own group/binding indices.
- * Fill the uniform buffer with `atmosphereUniformData()`. Quality knobs are separate again: `quality` holds
+ * Fill the uniform buffer with `atmosphereUniformData()`. Sample counts are separate again: `quality` holds
  * WGSL `override` declarations, set at pipeline creation via `pipelineConstants()`, so that loop bounds stay
- * compile-time constants and an unused feature compiles out rather than branching.
+ * compile-time constants. `features` holds the passes' switches the same way, so an unused feature compiles out
+ * rather than branching. `common` declares one override of its own, `DK_REFRACTION`, on by default.
  *
  * Every identifier is prefixed `dk` (or `DK_` for constants) so several `@himmelszelt/*` fragments can share one
  * shader module.
@@ -16,7 +17,8 @@ import atmosphere from "./atmosphere.wgsl";
 import common from "./common.wgsl";
 import cube from "./cube.wgsl";
 import exposure from "./exposure.comp.wgsl";
-import goldenset from "./goldenset.wgsl";
+import features from "./features.wgsl";
+import frame from "./frame.wgsl";
 import irradiance from "./irradiance.comp.wgsl";
 import lut from "./lut.wgsl";
 import mipmap from "./mipmap.comp.wgsl";
@@ -36,7 +38,8 @@ export {
     common,
     cube,
     exposure,
-    goldenset,
+    features,
+    frame,
     irradiance,
     lut,
     mipmap,
@@ -53,5 +56,5 @@ export {
 /** The composable pieces, in the order WGSL needs them declared. No bindings, no entry points. */
 export const scattering = [atmosphere, common, lut, sampling, raymarch].join("\n");
 
-/** `scattering` plus the overrides, which the passes below additionally need. */
+/** `scattering` plus the sample counts, which the passes below additionally need. */
 export const scatteringWithQuality = [quality, scattering].join("\n");

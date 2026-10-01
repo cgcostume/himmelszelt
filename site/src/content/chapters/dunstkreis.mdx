@@ -181,7 +181,7 @@ to know: it looks up the point on the cube that maps to its direction, not the d
 faces' edges and the mip levels work as before. The two figures below switch it together.
 
 The cube map comes with its mip levels, each texel the mean of four in the level above, down to a single texel a face.
-They cost a third more memory and a few cheap passes, and they are optional: `encodeCube` fills as many levels as the
+They cost a third more memory and a few cheap passes, and they are optional: the cube pass fills as many levels as the
 texture was created with, so a `mipLevelCount` of 1 leaves them out. Two
 readers need them here. The projection onto the coefficients takes 4,096 directions; from a face of 1,024 texels it would
 see only one texel in some 1,500 and miss whatever lies between, so it reads the level whose texels are about as many as
@@ -290,7 +290,7 @@ import { fromDate, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
 // Once per atmosphere: the transmittance and multiple scattering tables.
 const luts = await precomputeAtmosphere(device);
 // Into a canvas configured with rgba8unorm and STORAGE_BINDING usage.
-const sky = createSkyPass(device, { luts, format: "rgba8unorm" });
+const sky = await createSkyPass(device, { luts, format: "rgba8unorm", autoExposure: true });
 
 // Whenever the moment, the place or the camera changes.
 const time = fromDate(new Date());
@@ -300,8 +300,7 @@ sky.update({
     sunDirection: sun.direction(time, observer),
     sunAngularDiameter: sun.apparentAngularDiameter(julianEphemerisDay(time)),
     observerHeightM: observer.heightM,
-    inverseViewProjection, // your camera's, column-major
-    autoExposure: true,
+    inverseViewProjection, // your camera's without translation, column-major; reversed-z works too
 });
 const encoder = device.createCommandEncoder();
 sky.encode(encoder, context.getCurrentTexture());

@@ -33,9 +33,13 @@ export {
 // Packing the model into the DkAtmosphere uniform block the shaders take.
 export { ATMOSPHERE_UNIFORM_SIZE, atmosphereUniformData } from "./uniforms.js";
 
-// Pipeline-overridable constants, for specializing a shader at pipeline creation.
+// Pipeline-overridable sample counts, for specializing a shader at pipeline creation.
 export type { QualityConstants } from "./quality.js";
 export { DEFAULT_QUALITY, pipelineConstants } from "./quality.js";
+
+// What a device needs: the features and limits to request it with, and what one lacks.
+export type { DeviceRequirements, RequirementOptions } from "./requirements.js";
+export { skyRequirements, unmetRequirements } from "./requirements.js";
 
 // Precomputing the tables and rendering the sky with them.
 export type { PrecomputeOptions } from "./luts.js";
@@ -49,7 +53,7 @@ export { createIrradiancePass } from "./ibl.js";
 
 // Pass and LUT interfaces. This package records into passes the caller owns; it creates no device, canvas,
 // context or render pass of its own.
-export type { AtmosphereLUTs, SkyParams, SkyPass } from "./pass.js";
+export type { AtmosphereLUTs, SkyCubeOptions, SkyCubePass, SkyParams, SkyPass } from "./pass.js";
 export { clampObserverHeight, MAX_OBSERVER_HEIGHT_M, MIN_OBSERVER_HEIGHT_M } from "./pass.js";
 
 // Atmospheric refraction, traced through the model's air like the view rays: where the sun shows, on the CPU.

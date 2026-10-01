@@ -5,7 +5,7 @@ import {
     type PrecomputedTextureConfig,
 } from "./model.js";
 import type { AtmosphereLUTs } from "./pass.js";
-import { pipelineConstants } from "./quality.js";
+import { pipelineConstants, refractionConstants } from "./quality.js";
 import { ATMOSPHERE_UNIFORM_SIZE, atmosphereUniformData } from "./uniforms.js";
 import * as wgsl from "./wgsl/index.js";
 
@@ -32,7 +32,9 @@ export function createLut(device: GPUDevice, label: string, width: number, heigh
  * Precomputes the transmittance and multiple-scattering tables, after Hillaire 2020. Cheap enough to re-run
  * whenever a model parameter changes.
  *
- * Neither table depends on the sun or the observer, so this runs once per model, not per frame.
+ * Neither table depends on the sun or the observer, so this runs once per model, not per frame. Resolves once the
+ * pipelines are compiled, without blocking on them, and the work is submitted; whatever reads the tables after it is
+ * queued behind it, so there is nothing to wait for. `device.queue.onSubmittedWorkDone()` tells when it ran.
  */
 export async function precomputeAtmosphere(
     device: GPUDevice,
@@ -40,7 +42,7 @@ export async function precomputeAtmosphere(
 ): Promise<AtmosphereLUTs> {
     const model = options.model ?? DEFAULT_ATMOSPHERE_MODEL;
     const config = options.config ?? DEFAULT_TEXTURE_CONFIG;
-    const constants = pipelineConstants(config);
+    const constants = { ...pipelineConstants(config), ...refractionConstants(model) };
 
     const transmittance = createLut(
         device,
@@ -69,7 +71,7 @@ export async function precomputeAtmosphere(
     });
     device.queue.writeBuffer(atmosphereBuffer, 0, atmosphereUniformData(model));
 
-    const transmittancePipeline = device.createComputePipeline({
+    const transmittancePipeline = device.createComputePipelineAsync({
         label: "dunstkreis:transmittance",
         layout: "auto",
         compute: {
@@ -81,7 +83,7 @@ export async function precomputeAtmosphere(
         },
     });
 
-    const multiScatteringPipeline = device.createComputePipeline({
+    const multiScatteringPipeline = device.createComputePipelineAsync({
         label: "dunstkreis:multiScattering",
         layout: "auto",
         compute: {
@@ -95,16 +97,20 @@ export async function precomputeAtmosphere(
         },
     });
 
+    const [transmittanceStep, multiScatteringStep] = await Promise.all([
+        transmittancePipeline,
+        multiScatteringPipeline,
+    ]);
     const encoder = device.createCommandEncoder({ label: "dunstkreis:precompute" });
 
     // Transmittance first: the multiple-scattering pass reads it, and both run in one submission because
     // WebGPU orders passes within a queue, so no explicit barrier is needed between them.
     const transmittancePass = encoder.beginComputePass();
-    transmittancePass.setPipeline(transmittancePipeline);
+    transmittancePass.setPipeline(transmittanceStep);
     transmittancePass.setBindGroup(
         0,
         device.createBindGroup({
-            layout: transmittancePipeline.getBindGroupLayout(0),
+            layout: transmittanceStep.getBindGroupLayout(0),
             entries: [
                 { binding: 0, resource: { buffer: atmosphereBuffer } },
                 { binding: 1, resource: transmittance.createView() },
@@ -115,11 +121,11 @@ export async function precomputeAtmosphere(
     transmittancePass.end();
 
     const multiScatteringPass = encoder.beginComputePass();
-    multiScatteringPass.setPipeline(multiScatteringPipeline);
+    multiScatteringPass.setPipeline(multiScatteringStep);
     multiScatteringPass.setBindGroup(
         0,
         device.createBindGroup({
-            layout: multiScatteringPipeline.getBindGroupLayout(0),
+            layout: multiScatteringStep.getBindGroupLayout(0),
             entries: [
                 { binding: 0, resource: { buffer: atmosphereBuffer } },
                 { binding: 1, resource: transmittance.createView() },
@@ -135,7 +141,6 @@ export async function precomputeAtmosphere(
     multiScatteringPass.end();
 
     device.queue.submit([encoder.finish()]);
-    await device.queue.onSubmittedWorkDone();
 
     return {
         model,

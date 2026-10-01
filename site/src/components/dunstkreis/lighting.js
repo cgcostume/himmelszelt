@@ -36,6 +36,7 @@ const ground = () => chosen("lighting-ground", "backdrop");
 // and unexposed: the sky map's texels blur the horizon with the unlit planet below it.
 let skyPass = null;
 let skyPassFor = {};
+let building = null;
 let background = null;
 /** The camera's height above sea level: the scene stands where the observer does, the camera that far above it. */
 const cameraHeight = () => clampObserverHeight(environment.sky.observerHeightM + cameraFrame(camera).eye[2]);
@@ -63,17 +64,27 @@ function sunSeen(live) {
     return { discDirection: apparentFor.direction, discIlluminance: environment.sun, horizonZ };
 }
 
-function updateSkyPass(width, height) {
+/** Whether the sky pass is ready for the current settings; if not, it is compiled, and renders once it is in. */
+function readySkyPass() {
     const { luts } = tables();
-    const { groundSamples } = quality;
     // With the sun disc, drawn along every bent ray, as the sky figure draws it.
-    const sunDisc = pressed("sunDisc");
-    if (skyPassFor.luts !== luts || skyPassFor.groundSamples !== groundSamples || skyPassFor.sunDisc !== sunDisc) {
+    const settings = { luts, groundSamples: quality.groundSamples, sunDisc: pressed("sunDisc") };
+    const same = (other) => Object.entries(settings).every(([key, value]) => other?.[key] === value);
+    if (same(skyPassFor)) return true;
+    if (same(building)) return false;
+    building = settings;
+    createSkyPass(gpu.device, { ...settings, format: "rgba16float", toneMap: false }).then((next) => {
+        if (building !== settings) return next.destroy();
         skyPass?.destroy();
-        const options = { luts, format: "rgba16float", toneMap: false, dither: false, sunDisc, groundSamples };
-        skyPass = createSkyPass(gpu.device, options);
-        skyPassFor = { luts, groundSamples, sunDisc };
-    }
+        skyPass = next;
+        skyPassFor = settings;
+        building = null;
+        requestRender();
+    });
+    return false;
+}
+
+function updateSkyPass(width, height) {
     const { forward, right, up } = cameraFrame(camera);
     const ty = Math.tan(camera.fov / 2);
     const tx = ty * (width / height);
@@ -83,22 +94,22 @@ function updateSkyPass(width, height) {
         sunAngularDiameter: sky.sunAngularDiameter,
         // Where the camera is, not where the observer stands: moving out lifts it into the air.
         observerHeightM: cameraHeight(),
+        // A reversed-z projection's with an infinite far plane, the near plane at 1, as the sky figure's.
         inverseViewProjection: new Float32Array([
             ...right.map((c) => c * tx),
             0,
             ...up.map((c) => c * ty),
             0,
-            ...forward,
-            0,
             0,
             0,
             0,
             1,
+            ...forward,
+            0,
         ]),
         projectionDistance: 0,
         // An exposure of exactly 1: the luminance itself.
         ev100: -Math.log2(1.2),
-        autoExposure: false,
     });
 }
 
@@ -129,6 +140,7 @@ function render() {
     last = pressed("rotate") ? now : null;
 
     const { cube, ibl, sun, ev100, sky } = environment;
+    if (liveSky() && !readySkyPass()) return;
     const encoder = gpu.device.createCommandEncoder({ label: "sternwarte:lighting" });
     const live = liveSky() ? renderBackground(encoder, width, height) : null;
     const seen = sunSeen(live !== null);

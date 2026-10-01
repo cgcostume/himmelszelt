@@ -43,14 +43,10 @@ test("atmosphereTopRadiusKm is the ground radius plus the shell thickness", () =
     expect(atmosphereTopRadiusKm(OSGHIMMEL_ATMOSPHERE_MODEL)).toBe(6456);
 });
 
-test("the texture config keeps osgHimmel's precompute resolution for Bruneton's tables", () => {
+test("the texture config keeps osgHimmel's transmittance resolution", () => {
     expect(DEFAULT_TEXTURE_CONFIG.transmittance).toEqual({ width: 256, height: 64 });
-    expect(DEFAULT_TEXTURE_CONFIG.irradiance).toEqual({ width: 64, height: 16 });
-    expect(DEFAULT_TEXTURE_CONFIG.inscatter).toEqual({ resR: 32, resMu: 128, resMuS: 32, resNu: 8 });
-    expect(DEFAULT_TEXTURE_CONFIG.scatteringOrders).toBe(4);
 
-    // Hillaire's tables, which replace the 4D one: three orders of magnitude smaller.
-    const inscatterTexels = 32 * 128 * 32 * 8;
+    // Hillaire's tables, which replace Bruneton's 4D one of 32 x 128 x 32 x 8: far smaller.
     const hillaireTexels = 32 * 32 + 192 * 108;
-    expect(hillaireTexels).toBeLessThan(inscatterTexels / 10);
+    expect(hillaireTexels).toBeLessThan((32 * 128 * 32 * 8) / 10);
 });

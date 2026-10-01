@@ -85,12 +85,13 @@ const CALLS = {
         "    usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,",
         '    textureBindingViewDimension: "cube",',
         "});",
-        `sky.encodeCube(encoder, cube, { samples: 8${cubified ? ", cubify: true" : ""} });`,
+        `const cubePass = await sky.createCubePass({ format: "rgba16float", samples: 8${cubified ? ", cubify: true" : ""} });`,
+        "cubePass.encode(encoder, cube);",
     ],
     irradiance: ({ ibl, cubified }) => [
         "// Every mip level, each from the nine coefficients.",
-        `const ibl = createIrradiancePass(device, { size: ${ibl.irradiance.width} });`,
-        `ibl.encode(encoder, cube${cubified ? ", { cubified: true }" : ""});`,
+        `const ibl = await createIrradiancePass(device, { size: ${ibl.irradiance.width}${cubified ? ", cubified: true" : ""} });`,
+        "ibl.encode(encoder, cube);",
         "ibl.irradiance; // and ibl.sh, the nine coefficients",
     ],
 };

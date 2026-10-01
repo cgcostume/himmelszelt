@@ -4,6 +4,13 @@ import * as wgsl from "./wgsl/index.js";
 export interface IrradiancePassOptions {
     /** Edge of each face of the irradiance cube map, in texels, 32 by default: irradiance is smooth. */
     size?: number;
+    /** Whether the source cube maps are cubified, written by a sky cube pass with `cubify`. */
+    cubified?: boolean;
+    /**
+     * The source cube maps' format, rgba16float by default. rgba32float is read through a nearest sampler unless the
+     * device has the "float32-filterable" feature.
+     */
+    sourceFormat?: GPUTextureFormat;
 }
 
 /**
@@ -24,32 +31,55 @@ export interface IrradiancePass {
      */
     readonly irradiance: GPUTexture;
     /**
-     * Records the projection of `source`, a cube map with `TEXTURE_BINDING` usage, and the irradiance from it. With mip
-     * levels, the projection reads the one about as fine as its 4096 samples, rather than skipping texels in between.
-     * `cubified` for a source written with `SkyPass.encodeCube`'s `cubify`; the irradiance cube map is a plain one.
+     * Records the projection of `source`, a cube map of the pass' source format with `TEXTURE_BINDING` usage, and the
+     * irradiance from it. With mip levels, the projection reads the one about as fine as its 4096 samples, rather than
+     * skipping texels in between. The irradiance cube map is a plain one, whether the source is cubified or not.
      */
-    encode(encoder: GPUCommandEncoder, source: GPUTexture, options?: { cubified?: boolean }): void;
+    encode(encoder: GPUCommandEncoder, source: GPUTexture): void;
     /** The nine coefficients, read back from the GPU: 27 floats, rgb after rgb. */
     readSH(): Promise<Float32Array>;
     destroy(): void;
 }
 
-/** Creates the pass and its outputs. `source` cube maps are sampled linearly, so any size works. */
-export function createIrradiancePass(device: GPUDevice, options: IrradiancePassOptions = {}): IrradiancePass {
-    const { size = 32 } = options;
+/**
+ * Creates the pass and its outputs, its pipelines compiled without blocking. Source cube maps are sampled linearly,
+ * so any size works.
+ */
+export async function createIrradiancePass(
+    device: GPUDevice,
+    options: IrradiancePassOptions = {},
+): Promise<IrradiancePass> {
+    const { size = 32, cubified = false, sourceFormat = "rgba16float" } = options;
+    const filterable = sourceFormat !== "rgba32float" || device.features.has("float32-filterable");
     const module = device.createShaderModule({ code: [wgsl.cube, wgsl.irradiance].join("\n") });
-    const projectPipeline = (cubified: boolean) =>
-        device.createComputePipeline({
-            label: "dunstkreis:projectSH",
-            layout: "auto",
-            compute: { module, entryPoint: "dkProjectSH", constants: { DK_SOURCE_CUBIFIED: cubified ? 1 : 0 } },
-        });
-    const projects = [projectPipeline(false), projectPipeline(true)] as const;
-    const convolve = device.createComputePipeline({
-        label: "dunstkreis:irradianceCube",
-        layout: "auto",
-        compute: { module, entryPoint: "dkIrradianceCube" },
+    // The source's layout spelled out, since "auto" would take any float texture as filterable.
+    const sourceLayout = device.createBindGroupLayout({
+        entries: [
+            {
+                binding: 0,
+                visibility: GPUShaderStage.COMPUTE,
+                texture: { sampleType: filterable ? "float" : "unfilterable-float", viewDimension: "cube" },
+            },
+            {
+                binding: 1,
+                visibility: GPUShaderStage.COMPUTE,
+                sampler: { type: filterable ? "filtering" : "non-filtering" },
+            },
+            { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
+        ],
     });
+    const [project, convolve] = await Promise.all([
+        device.createComputePipelineAsync({
+            label: "dunstkreis:projectSH",
+            layout: device.createPipelineLayout({ bindGroupLayouts: [sourceLayout] }),
+            compute: { module, entryPoint: "dkProjectSH", constants: { DK_SOURCE_CUBIFIED: cubified ? 1 : 0 } },
+        }),
+        device.createComputePipelineAsync({
+            label: "dunstkreis:irradianceCube",
+            layout: "auto",
+            compute: { module, entryPoint: "dkIrradianceCube" },
+        }),
+    ]);
 
     const sh = device.createBuffer({
         label: "dunstkreis:sh",
@@ -64,7 +94,8 @@ export function createIrradiancePass(device: GPUDevice, options: IrradiancePassO
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
         textureBindingViewDimension: "cube",
     });
-    const sampler = device.createSampler({ magFilter: "linear", minFilter: "linear", mipmapFilter: "linear" });
+    const linear = filterable ? "linear" : "nearest";
+    const sampler = device.createSampler({ magFilter: linear, minFilter: linear, mipmapFilter: linear });
     const convolveBindGroups = Array.from({ length: irradiance.mipLevelCount }, (_, level) =>
         device.createBindGroup({
             layout: convolve.getBindGroupLayout(0),
@@ -82,8 +113,10 @@ export function createIrradiancePass(device: GPUDevice, options: IrradiancePassO
         sh,
         irradiance,
 
-        encode(encoder, source, { cubified = false } = {}) {
-            const project = projects[cubified ? 1 : 0];
+        encode(encoder, source) {
+            if (source.format !== sourceFormat) {
+                throw new Error(`dunstkreis: this irradiance pass reads ${sourceFormat}, not ${source.format}`);
+            }
             const projectBindGroup = device.createBindGroup({
                 layout: project.getBindGroupLayout(0),
                 entries: [

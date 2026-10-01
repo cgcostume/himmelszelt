@@ -21,24 +21,25 @@ fn dkTextureToUnitCoord(u: f32, n: f32) -> f32 {
 // of the ray it arrives along: refraction bends one into the other. So it reaches below the geometric horizon, down to
 // where no bent ray can come from, by an upper bound on the bending: twice the horizon's refraction, 1.1 times.
 fn dkRefractionMargin(a: DkAtmosphere) -> f32 {
-    return 1.1 * a.refractivity * sqrt(2.0 * DK_PI * a.Rg / a.HR);
+    return 1.1 * dkGroundRefractivity(a) * sqrt(2.0 * DK_PI * a.Rg / a.HR);
 }
 
-// The lowest true mu the table holds at radius r: the geometric horizon, lowered by the margin. Its sine and cosine as
-// polynomials, since WGSL's are only good to 2^-11.
-fn dkTransmittanceMuMin(a: DkAtmosphere, r: f32) -> f32 {
+// The lowest true mu the table holds at altitude h: the geometric horizon, lowered by the margin. Its sine and cosine
+// as polynomials, since WGSL's are only good to 2^-11.
+fn dkTransmittanceMuMin(a: DkAtmosphere, h: f32) -> f32 {
     let m = dkRefractionMargin(a);
-    return -dkRho(a, r) / r * (1.0 - 0.5 * m * m) - a.Rg / r * (m - m * m * m / 6.0);
+    let r = a.Rg + h;
+    return -sqrt(dkRhoSquared(a, h)) / r * (1.0 - 0.5 * m * m) - a.Rg / r * (m - m * m * m / 6.0);
 }
 
-// (r, mu) -> uv in the transmittance LUT.
-fn dkTransmittanceUv(a: DkAtmosphere, r: f32, mu: f32, size: vec2f) -> vec2f {
+// (altitude h, mu) -> uv in the transmittance LUT.
+fn dkTransmittanceUv(a: DkAtmosphere, h: f32, mu: f32, size: vec2f) -> vec2f {
     let H = dkHorizonDistanceAtTop(a);
-    let rho = dkRho(a, r);
+    let rho = sqrt(dkRhoSquared(a, h));
 
-    let d = dkDistanceToTopAtmosphereBoundary(a, r, mu);
-    let dMin = a.Rt - r;
-    let dMax = dkDistanceToTopAtmosphereBoundary(a, r, dkTransmittanceMuMin(a, r));
+    let d = dkDistanceToTopAtmosphereBoundary(a, h, mu);
+    let dMin = a.Rt - a.Rg - h;
+    let dMax = dkDistanceToTopAtmosphereBoundary(a, h, dkTransmittanceMuMin(a, h));
 
     let xMu = select(0.0, (d - dMin) / max(dMax - dMin, 1e-6), dMax > dMin);
     let xR = rho / max(H, 1e-6);
@@ -55,9 +56,10 @@ fn dkTransmittanceRMu(a: DkAtmosphere, uv: vec2f, size: vec2f) -> vec3f {
     let H = dkHorizonDistanceAtTop(a);
     let rho = H * clamp(xR, 0.0, 1.0);
     let r = sqrt(rho * rho + a.Rg * a.Rg);
+    let h = rho * rho / (r + a.Rg);
 
-    let dMin = a.Rt - r;
-    let dMax = dkDistanceToTopAtmosphereBoundary(a, r, dkTransmittanceMuMin(a, r));
+    let dMin = a.Rt - a.Rg - h;
+    let dMax = dkDistanceToTopAtmosphereBoundary(a, h, dkTransmittanceMuMin(a, h));
     let d = dMin + clamp(xMu, 0.0, 1.0) * (dMax - dMin);
 
     var mu = 1.0;
@@ -65,23 +67,24 @@ fn dkTransmittanceRMu(a: DkAtmosphere, uv: vec2f, size: vec2f) -> vec3f {
         mu = (H * H - rho * rho - d * d) / (2.0 * r * d);
     }
 
-    return vec3f(r, clamp(mu, -1.0, 1.0), rho * rho / (r + a.Rg));
+    return vec3f(r, clamp(mu, -1.0, 1.0), h);
 }
 
-// Hillaire's multiple-scattering LUT is indexed by the sun's elevation and the observer's altitude, both
-// linearly: the table is small and smooth, so there is nothing to concentrate resolution on.
-fn dkMultiScatteringUv(a: DkAtmosphere, r: f32, muS: f32, size: vec2f) -> vec2f {
+// Hillaire's multiple-scattering LUT is indexed by the sun's elevation and the altitude h, both linearly: the table
+// is small and smooth, so there is nothing to concentrate resolution on.
+fn dkMultiScatteringUv(a: DkAtmosphere, h: f32, muS: f32, size: vec2f) -> vec2f {
     let xMuS = clamp(muS * 0.5 + 0.5, 0.0, 1.0);
-    let xR = clamp((r - a.Rg) / max(a.Rt - a.Rg, 1e-6), 0.0, 1.0);
+    let xH = clamp(h / max(a.Rt - a.Rg, 1e-6), 0.0, 1.0);
 
-    return vec2f(dkUnitToTextureCoord(xMuS, size.x), dkUnitToTextureCoord(xR, size.y));
+    return vec2f(dkUnitToTextureCoord(xMuS, size.x), dkUnitToTextureCoord(xH, size.y));
 }
 
-fn dkMultiScatteringRMuS(a: DkAtmosphere, uv: vec2f, size: vec2f) -> vec2f {
+// uv in the multiple-scattering LUT -> (altitude, muS).
+fn dkMultiScatteringAltitudeMuS(a: DkAtmosphere, uv: vec2f, size: vec2f) -> vec2f {
     let xMuS = dkTextureToUnitCoord(uv.x, size.x);
-    let xR = dkTextureToUnitCoord(uv.y, size.y);
+    let xH = dkTextureToUnitCoord(uv.y, size.y);
 
-    return vec2f(a.Rg + clamp(xR, 0.0, 1.0) * (a.Rt - a.Rg), clamp(xMuS, 0.0, 1.0) * 2.0 - 1.0);
+    return vec2f(clamp(xH, 0.0, 1.0) * (a.Rt - a.Rg), clamp(xMuS, 0.0, 1.0) * 2.0 - 1.0);
 }
 
 // The sky-view LUT is indexed by view direction, in a frame whose azimuth is measured from the sun. The vertical axis

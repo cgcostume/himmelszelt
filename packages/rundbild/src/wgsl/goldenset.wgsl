@@ -1,6 +1,10 @@
 // Subpixel offsets for supersampling, in pixels within [-0.5, 0.5]: the golden sets of webgl-operate
 // (github.com/cginternals/webgl-operate, source/data/goldenset08.json and goldenset64.json), points on a golden-angle
 // spiral. Binding-free.
+//
+// Parked here from dunstkreis, which now spreads its samples by R2 and Vogel's spiral, for rundbild's downsampling of
+// equirectangular HDR images into (cubified) cube maps. `var<private>` copies the table into every invocation; make it
+// `const` when it is used again.
 
 var<private> dkGoldenSet8: array<vec2f, 8> = array<vec2f, 8>(
     vec2f( 0.201114,  0.016597), vec2f(-0.090682, -0.219471), vec2f(-0.180852,  0.162495), vec2f( 0.055216,  0.398563),

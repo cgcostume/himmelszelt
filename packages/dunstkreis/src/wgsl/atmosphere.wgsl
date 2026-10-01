@@ -29,7 +29,7 @@ struct DkAtmosphere {
     HR: f32,
 
     // The sun's illuminance above the atmosphere, in lux, per channel: everything computed from it is in cd/m².
-    solarIrradiance: vec3f,
+    solarIlluminance: vec3f,
     // Mie scale height, in km.
     HM: f32,
 

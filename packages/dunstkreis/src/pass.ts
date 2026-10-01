@@ -43,7 +43,11 @@ export interface SkyParams {
     /** Observer height above the ground, in meters, held within 1 m and 408 km (`clampObserverHeight`). Above the
      *  atmosphere, the sky is raymarched per pixel instead of looked up, and the planet shows, lit by the sun. */
     observerHeightM: number;
-    /** Inverse view-projection matrix, column-major, used to turn fragment coordinates back into rays. */
+    /**
+     * Inverse view-projection matrix, column-major, used to turn pixels back into rays. Any perspective projection:
+     * depth in [0, 1] or [-1, 1], reversed-z, an infinite far plane. Leave the view's translation out, as for a skybox:
+     * the sky is at infinity, and f32 would lose the rays' precision to it.
+     */
     inverseViewProjection: Float32Array;
     /**
      * Bends the matrix's projection towards a fisheye: 0 keeps its own perspective, 1 is stereographic, which shows
@@ -56,12 +60,6 @@ export interface SkyParams {
      * The same scale as a camera's or another engine's, so a scene exposed alike looks alike. Unused when metered.
      */
     ev100: number;
-    /**
-     * Expose by a light meter instead: the geometric mean luminance of the sky above the horizon, measured on the GPU
-     * whenever the sky-view table is rebuilt, and read by the sky pass without a round trip to the CPU. For a renderer
-     * without its own exposure, or to follow day into night.
-     */
-    autoExposure: boolean;
     /**
      * The EV100s metering may expose with, after compensation, [8, 20] by default. The lower bound keeps night dark:
      * exposed like day, a night sky would look like one. The day meters around 14, a sunset around 12, and twilight
@@ -78,9 +76,36 @@ export interface SkyParams {
     /** The Sun's apparent angular diameter, in degrees, as `@himmelszelt/sternzeit`'s `sun.apparentAngularDiameter`
      *  returns it. About 0.53. */
     sunAngularDiameter: number;
-    /** osgHimmel's artistic blue-hour tint: linear RGB plus an intensity, 0 by default. Not physical: the ozone already
-     *  turns twilight blue. */
-    lHeureBleue: { color: readonly [number, number, number]; intensity: number };
+}
+
+/** A sky cube map's settings, fixed when its pass is made. */
+export interface SkyCubeOptions {
+    /** rgba16float, or rgba32float, which the sun disc needs, being far brighter than rgba16float holds. */
+    format: "rgba16float" | "rgba32float";
+    /** Rays per texel, spread over it by the R2 sequence, 1 by default: more smooth the edges a texel straddles, the
+     *  horizon's and the sun disc's. */
+    samples?: number;
+    /**
+     * Spread the texels evenly over the sphere, as osgHimmel's `CubeMappedHimmel` did: sample it with
+     * `dkCubeFromSphere(d)` from `wgsl.cube` rather than d, and make the irradiance pass with `cubified` too.
+     */
+    cubify?: boolean;
+    /** Draw the sun disc into it, for exporting it as one image; off by default, to light a scene with. */
+    sunDisc?: boolean;
+}
+
+/**
+ * A pass that writes the sky of its sky pass into a cube map: the luminance in cd/m², linear, neither exposed nor tone
+ * mapped, indexed by ENU directions, so a y-up engine samples it with (x, -z, y). It reads the sky pass' sky-view
+ * table, so it follows its `update()`.
+ */
+export interface SkyCubePass {
+    /**
+     * Records the sky into the six faces of `target`: a square 2D texture with six layers, of the pass' format, with
+     * `STORAGE_BINDING` usage. One with more than one mip level gets them all, each texel the mean of the four below
+     * it, which reads the level above as a cube: it needs `TEXTURE_BINDING` usage too.
+     */
+    encode(encoder: GPUCommandEncoder, target: GPUTexture): void;
 }
 
 /**
@@ -105,21 +130,10 @@ export interface SkyPass {
      */
     sunIlluminance(): Promise<[number, number, number]>;
     /**
-     * Records the sky into the six faces of `target`, a cube map: a square 2D texture with six layers, rgba16float or
-     * rgba32float, with `STORAGE_BINDING` usage. It holds the luminance in cd/m², linear, neither exposed nor tone
-     * mapped, indexed by ENU directions: a y-up engine samples it with (x, -z, y). Without the sun disc by default, to
-     * light a scene with, and to show behind it with the disc drawn over it by `dkSunDisc` from `wgsl.sun`; with
-     * `sunDisc`, for exporting it as one image, which needs rgba32float. `samples` per texel, 1, 8 or 64,
-     * spread by the golden sets, smooth the edges a texel straddles: the horizon's, and the sun disc's. A target with
-     * more than one mip level gets them all, each texel the mean of the four below it. With `cubify`, the texels are
-     * spread evenly over the sphere, as osgHimmel's `CubeMappedHimmel` did: sample it with `dkCubeFromSphere(d)` from
-     * `wgsl.cube` rather than d, and hand `IrradiancePass.encode` the same flag.
+     * Makes a pass that writes this sky into a cube map, its pipelines compiled without blocking. Without the sun disc,
+     * a cube map lights a scene, and shows behind it with the disc drawn over it by `dkSunDisc` from `wgsl.sun`.
      */
-    encodeCube(
-        encoder: GPUCommandEncoder,
-        target: GPUTexture,
-        options?: { sunDisc?: boolean; samples?: 1 | 8 | 64; cubify?: boolean },
-    ): void;
+    createCubePass(options: SkyCubeOptions): Promise<SkyCubePass>;
     /** Records the pass into `encoder`, writing all of `target`, which needs `STORAGE_BINDING` usage and the format
      *  the pass was created for. */
     encode(encoder: GPUCommandEncoder, target: GPUTexture): void;

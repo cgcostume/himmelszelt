@@ -53,7 +53,7 @@ const CALLS = {
         modelLine(),
         ...configLines("skyView", size),
         "const luts = await precomputeAtmosphere(device, { model, config });",
-        'const sky = createSkyPass(device, { luts, format: "rgba8unorm" });',
+        'const sky = await createSkyPass(device, { luts, format: "rgba8unorm" });',
         "// Rebuilds the table only when the sun or the observer moved.",
         `sky.update({ sunDirection: [${(lastSky?.sunDirection ?? [0, 0, 1]).map(fixed3).join(", ")}], observerHeightM: ${fixed3(clampObserverHeight(state.heightM))} });`,
         "sky.skyViewTexture;",

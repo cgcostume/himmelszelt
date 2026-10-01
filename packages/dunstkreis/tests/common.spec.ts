@@ -5,7 +5,7 @@ import {
     DEFAULT_TEXTURE_CONFIG,
     luminanceScale,
 } from "../src/model.js";
-import { DEFAULT_QUALITY, pipelineConstants } from "../src/quality.js";
+import { DEFAULT_QUALITY, featureConstants, pipelineConstants } from "../src/quality.js";
 import { ATMOSPHERE_UNIFORM_SIZE, atmosphereUniformData } from "../src/uniforms.js";
 import { evaluateWgsl, gpuDevice, wgslSource } from "./gpu.js";
 
@@ -51,7 +51,7 @@ test("the uniform packing matches the DkAtmosphere struct field for field", () =
         "mieG",
         "betaOAbs",
         "HR",
-        "solarIrradiance",
+        "solarIlluminance",
         "HM",
         "ozoneCenter",
         "ozoneHalfWidth",
@@ -72,7 +72,7 @@ test("the uniform packing matches the DkAtmosphere struct field for field", () =
         mieG: model.mie.g,
         betaOAbs: model.ozone.betaAbsorption,
         HR: model.rayleigh.scaleHeightKm,
-        solarIrradiance: model.solarIrradiance.map((e) => e * luminanceScale(model)),
+        solarIlluminance: model.solarSpectrum.map((e) => e * luminanceScale(model)),
         HM: model.mie.scaleHeightKm,
         ozoneCenter: model.ozone.centerAltitudeKm,
         ozoneHalfWidth: model.ozone.widthKm / 2,
@@ -112,13 +112,19 @@ test("pipelineConstants names exactly the overrides quality.wgsl declares", () =
     expect(provided).toEqual(Object.keys(DEFAULT_QUALITY));
 });
 
-test("pipelineConstants carries the configured sample counts and the dither switch", () => {
-    const constants = pipelineConstants(DEFAULT_TEXTURE_CONFIG);
+test("featureConstants names exactly the overrides features.wgsl declares", () => {
+    const declared = [...wgslSource("features").matchAll(/^override\s+(\w+)\s*:/gm)].map((m) => m[1] as string);
+    expect(new Set(Object.keys(featureConstants()))).toEqual(new Set(declared));
+});
+
+test("pipelineConstants carries the configured sample counts, featureConstants the switches", () => {
+    const constants = pipelineConstants(DEFAULT_TEXTURE_CONFIG, { ground: 8 });
 
     expect(constants.DK_SAMPLES_TRANSMITTANCE).toBe(DEFAULT_TEXTURE_CONFIG.integralSamples.transmittance);
     expect(constants.DK_SAMPLES_SKY_VIEW).toBe(DEFAULT_TEXTURE_CONFIG.integralSamples.skyView);
-    expect(constants.DK_DITHER).toBe(1);
-    expect(pipelineConstants(DEFAULT_TEXTURE_CONFIG, { dither: false }).DK_DITHER).toBe(0);
+    expect(constants.DK_SAMPLES_GROUND).toBe(8);
+    expect(featureConstants().DK_DITHER).toBe(1);
+    expect(featureConstants({ dither: false }).DK_DITHER).toBe(0);
 });
 
 test("ray-sphere distances are consistent from the ground and from the top", async () => {
@@ -130,9 +136,9 @@ test("ray-sphere distances are consistent from the ground and from the top", asy
     const [upFromGround, downFromTop, grazing] = await evaluate(
         "vec4f(dkDistanceToTopAtmosphereBoundary(atmosphere, input.x, input.y))",
         [
-            [Rg, 1],
-            [Rt, -1],
-            [Rg, 0],
+            [0, 1],
+            [Rt - Rg, -1],
+            [0, 0],
         ],
     );
 
@@ -254,15 +260,15 @@ test("overrides reach the shader and specialize it", async () => {
     // Proves the override plumbing end to end: same module, two pipelines, different compiled-in values.
     // This is the mechanism the quality presets and the refraction switch ride on, so that loop bounds stay
     // compile-time constants and a disabled feature leaves no code behind rather than branching per pixel.
-    const source = wgslSource("quality");
+    const source = `${wgslSource("quality")}\n${wgslSource("features")}`;
     const expression = "vec4f(f32(DK_SAMPLES_SKY_VIEW), select(0.0, 1.0, DK_DITHER), 0.0, 0.0)";
     const input: [number, number, number, number] = [0, 0, 0, 0];
 
     const [on] = await evaluateWgsl(device, source, expression, [input], {
-        constants: pipelineConstants(DEFAULT_TEXTURE_CONFIG),
+        constants: { ...pipelineConstants(DEFAULT_TEXTURE_CONFIG), ...featureConstants() },
     });
     const [off] = await evaluateWgsl(device, source, expression, [input], {
-        constants: pipelineConstants(DEFAULT_TEXTURE_CONFIG, { dither: false }),
+        constants: { ...pipelineConstants(DEFAULT_TEXTURE_CONFIG), ...featureConstants({ dither: false }) },
     });
 
     expect(on?.[0]).toBe(DEFAULT_TEXTURE_CONFIG.integralSamples.skyView);

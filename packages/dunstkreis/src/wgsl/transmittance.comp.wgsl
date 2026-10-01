@@ -32,7 +32,7 @@ fn dkTraceToTop(a: DkAtmosphere, h: f32, mu: f32) -> DkTraceToTop {
 // trueMu and the margin above it. Below the lowest ray that still clears the ground, the planet hides the sun.
 fn dkTransmittanceTowards(a: DkAtmosphere, h: f32, trueMu: f32) -> vec3f {
     let horizon = dkHorizonMu(a, h) + 1e-6;
-    if (a.refractivity <= 0.0) {
+    if (dkGroundRefractivity(a) <= 0.0) {
         return select(vec3f(0.0), dkTraceToTop(a, h, trueMu).transmittance, trueMu >= horizon);
     }
     if (dkTraceToTop(a, h, horizon).exitMu > trueMu) {

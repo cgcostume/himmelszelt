@@ -7,16 +7,27 @@
 
 const DK_PI: f32 = 3.141592653589793;
 
-// Distance from a point at radius r to the top of the atmosphere along a ray with cosine mu, assuming the
-// point is inside the atmosphere. The discriminant cannot go negative there, but is clamped anyway: the
-// caller is often a fullscreen pass evaluating directions that never made physical sense.
-fn dkDistanceToTopAtmosphereBoundary(a: DkAtmosphere, r: f32, mu: f32) -> f32 {
-    let discriminant = r * r * (mu * mu - 1.0) + a.Rt * a.Rt;
-    return max(-r * mu + sqrt(max(discriminant, 0.0)), 0.0);
+// Whether rays bend in the air. Off, they run straight and the model's refractivity is taken as 0, whatever it holds:
+// the cheaper march, for a model without refraction. On by default, which is right for either.
+override DK_REFRACTION: bool = true;
+
+// The model's refractivity on the ground, or 0 with DK_REFRACTION off.
+fn dkGroundRefractivity(a: DkAtmosphere) -> f32 {
+    return select(0.0, a.refractivity, DK_REFRACTION);
 }
 
 // The functions near the ground take the altitude h instead of the radius: a radius around 6360 km resolves only
-// ~0.5 m in f32, which put a floor under the observer and banded the horizon. With h exact, a millimeter works.
+// ~0.5 m in f32, which put a floor under the observer, banded the horizon and jittered the sun's cutoff at it. With h
+// exact, a millimeter works.
+
+// Distance from altitude h to the top of the atmosphere along a ray with cosine mu, from inside it. Rt^2 - r^2 factored
+// from the altitude, as for dkRhoSquared. Clamped anyway: the caller is often a pass evaluating directions that never
+// made physical sense.
+fn dkDistanceToTopAtmosphereBoundary(a: DkAtmosphere, h: f32, mu: f32) -> f32 {
+    let r = a.Rg + h;
+    let discriminant = r * r * mu * mu + (a.Rt - a.Rg - h) * (a.Rt + r);
+    return max(-r * mu + sqrt(max(discriminant, 0.0)), 0.0);
+}
 
 // r^2 - Rg^2, the squared distance to the horizon, from the altitude, where the difference of squares cancels.
 fn dkRhoSquared(a: DkAtmosphere, h: f32) -> f32 {
@@ -39,7 +50,7 @@ fn dkLineIntersectsGround(a: DkAtmosphere, h: f32, mu: f32) -> bool {
 
 // Air's refractivity n - 1 at an altitude, proportional to its density, which the Rayleigh layer describes.
 fn dkRefractivity(a: DkAtmosphere, altitudeKm: f32) -> f32 {
-    return a.refractivity * dkDensityRayleigh(a, altitudeKm);
+    return dkGroundRefractivity(a) * dkDensityRayleigh(a, altitudeKm);
 }
 
 // Along a ray bent by the air, n r sin(z) stays constant (Bouguer's invariant, from the spherical symmetry). A ray from
@@ -50,26 +61,16 @@ fn dkHorizonSquared(a: DkAtmosphere, h: f32) -> f32 {
     let x = max(h, 0.0) / a.HR;
     // exp(-x) - 1, by its series where exp would lose it.
     let decay = select(exp(-x) - 1.0, x * (x * (0.5 - x / 6.0) - 1.0), x < 1e-3);
-    let n = 1.0 + a.refractivity * (1.0 + decay);
-    let difference = max(h, 0.0) * n + a.Rg * a.refractivity * decay;
-    return max(difference, 0.0) * (n * (a.Rg + h) + (1.0 + a.refractivity) * a.Rg);
+    let k = dkGroundRefractivity(a);
+    let n = 1.0 + k * (1.0 + decay);
+    let difference = max(h, 0.0) * n + a.Rg * k * decay;
+    return max(difference, 0.0) * (n * (a.Rg + h) + (1.0 + k) * a.Rg);
 }
 
 // Whether a ray from altitude h with cosine mu, bent by the air, ends on the ground.
 fn dkIntersectsGround(a: DkAtmosphere, h: f32, mu: f32) -> bool {
     let nr = (1.0 + dkRefractivity(a, h)) * (a.Rg + h);
     return mu < 0.0 && nr * nr * mu * mu >= dkHorizonSquared(a, h);
-}
-
-// Distance from a point at radius r to the horizon, i.e. sqrt(r^2 - Rg^2).
-//
-// Factored as (r - Rg)(r + Rg) rather than the textbook difference of squares. At f32, Rg^2 is far past the
-// 24-bit mantissa, so the textbook form subtracts two nearly equal rounded numbers and the sqrt amplifies
-// what is left: near the ground it returns garbage on the order of 1e-4 instead of 0, exactly where the
-// sky's gradient is steepest and the LUT mappings spend their resolution. Factoring keeps the small quantity
-// (the altitude) exact. Every radius-difference in this package is written this way for the same reason.
-fn dkRho(a: DkAtmosphere, r: f32) -> f32 {
-    return sqrt(max(r - a.Rg, 0.0) * (r + a.Rg));
 }
 
 // Distance from the ground to the top of the atmosphere along a horizontal ray, sqrt(Rt^2 - Rg^2). The
@@ -121,9 +122,14 @@ struct DkPathStep {
 }
 
 fn dkPathAdvance(a: DkAtmosphere, h0: f32, path: DkPath, ds: f32) -> DkPathStep {
+    var step: DkPathStep;
+    if (!DK_REFRACTION) {
+        step.middle = DkPath(path.position + path.direction * (0.5 * ds), path.direction);
+        step.next = DkPath(path.position + path.direction * ds, path.direction);
+        return step;
+    }
     let turn = dkPathTurn(a, h0, path.position, path.direction);
     let direction = normalize(path.direction + turn * (0.5 * ds));
-    var step: DkPathStep;
     step.middle = DkPath(path.position + direction * (0.5 * ds), direction);
     let middleTurn = dkPathTurn(a, h0, step.middle.position, direction);
     step.next = DkPath(path.position + direction * ds, normalize(path.direction + middleTurn * ds));
@@ -138,7 +144,7 @@ fn dkPathRemaining(a: DkAtmosphere, h0: f32, path: DkPath, hitsGround: bool) -> 
     let mu = dot(path.direction, dkPathUp(a, h0, path.position));
     let r = a.Rg + h;
     if (!hitsGround) {
-        return dkDistanceToTopAtmosphereBoundary(a, r, mu);
+        return dkDistanceToTopAtmosphereBoundary(a, h, mu);
     }
     if (dkLineIntersectsGround(a, h, mu)) {
         return dkDistanceToBottomAtmosphereBoundary(a, h, mu);

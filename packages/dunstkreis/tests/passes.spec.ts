@@ -8,12 +8,24 @@ import { compileWgsl, gpuDevice, wgslSource } from "./gpu.js";
 const PASSES: Record<string, readonly string[]> = {
     transmittance: ["atmosphere", "common", "lut", "quality", "transmittance"],
     multiscattering: ["atmosphere", "common", "lut", "sampling", "quality", "multiscattering"],
-    skyview: ["atmosphere", "common", "lut", "sampling", "raymarch", "goldenset", "quality", "skyview"],
-    sky: ["atmosphere", "common", "lut", "sampling", "raymarch", "cube", "goldenset", "quality", "sky"],
-    skyCube: ["atmosphere", "common", "lut", "sampling", "raymarch", "cube", "goldenset", "quality", "sky"],
-    exposure: ["atmosphere", "common", "lut", "sampling", "raymarch", "exposure"],
+    skyview: ["atmosphere", "common", "lut", "sampling", "raymarch", "frame", "quality", "features", "skyview"],
+    sky: ["atmosphere", "common", "lut", "sampling", "raymarch", "cube", "sun", "frame", "quality", "features", "sky"],
+    skyCube: [
+        "atmosphere",
+        "common",
+        "lut",
+        "sampling",
+        "raymarch",
+        "cube",
+        "sun",
+        "frame",
+        "quality",
+        "features",
+        "sky",
+    ],
+    exposure: ["atmosphere", "common", "lut", "sampling", "raymarch", "frame", "exposure"],
     irradiance: ["cube", "irradiance"],
-    mipmap: ["mipmap"],
+    mipmap: ["cube", "mipmap"],
 };
 // The output the sky pass leaves to whoever builds its pipeline.
 const OUTPUTS: Record<string, string> = {

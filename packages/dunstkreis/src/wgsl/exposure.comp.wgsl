@@ -1,5 +1,5 @@
 // A light meter for the sky, for automatic exposure. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`,
-// `sampling.wgsl` and `raymarch.wgsl`. A pass, so it declares its bindings.
+// `sampling.wgsl`, `raymarch.wgsl` and `frame.wgsl`. A pass, so it declares its bindings.
 //
 // Reads the sky-view table rather than the rendered image: it is small, rebuilt only when the sun or the observer
 // moves, and holds every direction, so the reading does not change as the camera turns, and the sun disc, which is not
@@ -13,29 +13,17 @@
 //
 // TODO: high up, and from space, it still exposes too bright, if only subjectively.
 
-struct DkMeterParams {
-    sunDirection: vec3f,
-    observerAltitude: f32,
-}
-
-struct DkMetering {
-    // log2 of the geometric mean luminance, in cd/m².
-    log2Luminance: f32,
-    // The sun's illuminance at the observer, per channel in lux: what reaches it through the air, for a renderer that
-    // lights its scene by the sun as a light of its own.
-    sunIlluminance: vec3f,
-}
-
 @group(0) @binding(0) var<uniform> dkAtmosphere: DkAtmosphere;
-@group(0) @binding(1) var<uniform> dkParams: DkMeterParams;
+@group(0) @binding(1) var<uniform> dkParams: DkSkyParams;
 @group(0) @binding(2) var dkSkyViewLut: texture_2d<f32>;
 @group(0) @binding(3) var dkLutSampler: sampler;
 @group(0) @binding(4) var<storage, read_write> dkMeteringOut: DkMetering;
 @group(0) @binding(5) var dkTransmittanceLut: texture_2d<f32>;
 @group(0) @binding(6) var dkMultiScatteringLut: texture_2d<f32>;
 
-const DK_METER_THREADS: u32 = 256u;
-const DK_METER_SAMPLES: u32 = 16u;
+// 128 threads, the most WebGPU's compatibility mode allows per workgroup.
+const DK_METER_THREADS: u32 = 128u;
+const DK_METER_SAMPLES: u32 = 32u;
 // Below the darkest night sky, so a black direction counts as very dark rather than as minus infinity.
 const DK_METER_FLOOR: f32 = 1e-10;
 // Samples per ray from space: the meter averages thousands of rays, so each can be coarse.
@@ -73,10 +61,10 @@ fn dkSunTransmittance(a: DkAtmosphere, h: f32) -> vec3f {
         );
         return select(ray.transmittance, vec3f(0.0), ray.hitsGround);
     }
-    return dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, a.Rg + h, sun.z);
+    return dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, h, sun.z);
 }
 
-@compute @workgroup_size(256)
+@compute @workgroup_size(128)
 fn dkMeterSky(@builtin(local_invocation_index) index: u32) {
     let a = dkAtmosphere;
     let h = max(dkParams.observerAltitude, 0.0);
@@ -104,6 +92,6 @@ fn dkMeterSky(@builtin(local_invocation_index) index: u32) {
     }
     if (index == 0u) {
         dkMeteringOut.log2Luminance = max(dkMeterSums[0].x, dkMeterSums[0].y) / total;
-        dkMeteringOut.sunIlluminance = a.solarIrradiance * dkSunTransmittance(a, h);
+        dkMeteringOut.sunIlluminance = a.solarIlluminance * dkSunTransmittance(a, h);
     }
 }

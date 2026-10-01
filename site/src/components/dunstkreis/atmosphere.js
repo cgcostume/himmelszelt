@@ -102,6 +102,8 @@ let pendingSky = null;
 let building = false;
 let retired = null;
 let retiredIbl = null;
+// The cube pass, made for the sky pass and the cubify it was asked for.
+let cubePassFor = {};
 
 const cubifyToggles = new Set();
 
@@ -156,17 +158,21 @@ async function buildEnvironment() {
             textureBindingViewDimension: "cube",
         });
     }
+    const { cubify } = environment;
     let { ibl } = environment;
-    if (ibl?.irradiance.width !== environment.irradianceSize) {
+    if (ibl?.irradiance.width !== environment.irradianceSize || environment.cubified !== cubify) {
         // Like the cube, the old one is kept one build longer.
         retiredIbl?.destroy();
         retiredIbl = ibl;
-        ibl = createIrradiancePass(device, { size: environment.irradianceSize });
+        ibl = await createIrradiancePass(device, { size: environment.irradianceSize, cubified: cubify });
+    }
+    if (cubePassFor.pass !== sky.pass || cubePassFor.cubify !== cubify) {
+        const cubePass = await sky.pass.createCubePass({ format: "rgba16float", samples: 8, cubify });
+        cubePassFor = { pass: sky.pass, cubify, cubePass };
     }
     const encoder = device.createCommandEncoder({ label: "sternwarte:environment" });
-    const { cubify } = environment;
-    sky.pass.encodeCube(encoder, cube, { samples: 8, cubify });
-    ibl.encode(encoder, cube, { cubified: cubify });
+    cubePassFor.cubePass.encode(encoder, cube);
+    ibl.encode(encoder, cube);
     device.queue.submit([encoder.finish()]);
     const [sh, sun, ev100] = await Promise.all([ibl.readSH(), sky.pass.sunIlluminance(), sky.pass.meteredEV100()]);
     Object.assign(environment, {
@@ -197,6 +203,8 @@ export async function recompute() {
             const model = refraction ? DEFAULT_ATMOSPHERE_MODEL : { ...DEFAULT_ATMOSPHERE_MODEL, refractivity: 0 };
             const started = performance.now();
             const luts = await precomputeAtmosphere(gpu.device, { model, config });
+            // Until the tables are computed, not just queued.
+            await gpu.device.queue.onSubmittedWorkDone();
             current = { luts, precomputeMs: performance.now() - started };
             events.dispatchEvent(new Event("tables"));
         } while (again);

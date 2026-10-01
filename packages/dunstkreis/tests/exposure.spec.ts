@@ -17,7 +17,7 @@ test("EV100 follows the photographic convention", () => {
 });
 
 test("the luminance scale gives the sun its illuminance", () => {
-    const [r, g, b] = DEFAULT_ATMOSPHERE_MODEL.solarIrradiance;
+    const [r, g, b] = DEFAULT_ATMOSPHERE_MODEL.solarSpectrum;
     const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     expect(luminance * luminanceScale(DEFAULT_ATMOSPHERE_MODEL)).toBeCloseTo(128_000, 6);
 });

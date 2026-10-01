@@ -40,7 +40,7 @@ export interface AtmosphereModel {
      * The sun's spectrum at the top of the atmosphere, per channel: Bruneton's spectral irradiance at the three
      * wavelengths. Only the ratios between the channels count; `solarIlluminance` sets the scale.
      */
-    solarIrradiance: readonly [number, number, number];
+    solarSpectrum: readonly [number, number, number];
     /**
      * Illuminance of the sun at the top of the atmosphere, in lux, which puts the sky in physical units: luminance in
      * cd/m², ready for an exposure in EV100. See `luminanceScale`.
@@ -84,7 +84,7 @@ export const DEFAULT_ATMOSPHERE_MODEL: AtmosphereModel = {
     // Hillaire's 100 km rather than Bruneton's 60: cut at 60 km, where the air still has 5e-4 of its density at the
     // ground, the atmosphere ends in a visible edge when seen from space.
     planet: { groundRadiusKm: 6360, thicknessKm: 100 },
-    solarIrradiance: [1.474, 1.8504, 1.91198],
+    solarSpectrum: [1.474, 1.8504, 1.91198],
     // The solar constant, 1361 W/m² (Kopp & Lean 2011), times sunlight's luminous efficacy of about 94 lm/W.
     solarIlluminance: 128_000,
     // The Earth's average, rather than the 0.1 of Bruneton's and Hillaire's work, which is dark soil or forest.
@@ -131,48 +131,23 @@ export const OSGHIMMEL_ATMOSPHERE_MODEL: AtmosphereModel = {
 };
 
 /**
- * Resolution and sampling configuration for the precomputed LUTs. The original generated these via multi-pass
- * FBO renders; here they become compute shader dispatch and storage texture sizes.
- *
- * `irradiance`, `inscatter` and `scatteringOrders` are held for Bruneton's tables, which are not built yet; the
- * rest is what `precomputeAtmosphere()` and `createSkyPass()` use.
+ * Sizes and sample counts of the tables: compute shader dispatch and storage texture sizes, where the original rendered
+ * them in multi-pass FBO renders. Bruneton's tables would add theirs when they come.
  */
 export interface PrecomputedTextureConfig {
     transmittance: { width: number; height: number };
-    irradiance: { width: number; height: number };
-    /** Dimensions of Bruneton's 4D inscatter LUT (r, mu, muS, nu), packed into a 3D texture. */
-    inscatter: { resR: number; resMu: number; resMuS: number; resNu: number };
-    /** Number of scattering orders Bruneton's algorithm 4.1 iterates. osgHimmel used 4. */
-    scatteringOrders: number;
-    /** Hillaire's multiple-scattering LUT (r, muS), which replaces the 4D inscatter table entirely. */
+    /** Hillaire's multiple-scattering LUT (h, muS), which replaces Bruneton's 4D inscatter table entirely. */
     multiScattering: { width: number; height: number };
     /** Hillaire's per-frame sky-view LUT, over view direction with a horizon-biased latitude mapping. */
     skyView: { width: number; height: number };
-    integralSamples: {
-        transmittance: number;
-        inscatter: number;
-        irradiance: number;
-        inscatterSpherical: number;
-        multiScattering: number;
-        skyView: number;
-    };
+    integralSamples: { transmittance: number; multiScattering: number; skyView: number };
 }
 
 export const DEFAULT_TEXTURE_CONFIG: PrecomputedTextureConfig = {
     transmittance: { width: 256, height: 64 },
-    irradiance: { width: 64, height: 16 },
-    inscatter: { resR: 32, resMu: 128, resMuS: 32, resNu: 8 },
-    scatteringOrders: 4,
     multiScattering: { width: 32, height: 32 },
     skyView: { width: 192, height: 108 },
-    integralSamples: {
-        transmittance: 100,
-        inscatter: 50,
-        irradiance: 32,
-        inscatterSpherical: 16,
-        multiScattering: 20,
-        skyView: 30,
-    },
+    integralSamples: { transmittance: 100, multiScattering: 20, skyView: 30 },
 };
 
 /** Radius of the top of the atmosphere, in km, i.e. `Rt`. */
@@ -186,6 +161,6 @@ export function atmosphereTopRadiusKm(model: AtmosphereModel): number {
  * shaders compute from it is in cd/m².
  */
 export function luminanceScale(model: AtmosphereModel): number {
-    const [r, g, b] = model.solarIrradiance;
+    const [r, g, b] = model.solarSpectrum;
     return model.solarIlluminance / (0.2126 * r + 0.7152 * g + 0.0722 * b);
 }

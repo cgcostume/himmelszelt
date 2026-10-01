@@ -49,13 +49,14 @@ nothing. Bodies stay visible while geometrically below the horizon, and the sun 
 special-cased. Near the ground the result lands within a few percent of Bennett's fit (Meeus 16.3), some 10% above it
 at the horizon, where the model's single scale height makes the lowest air denser than the real one.
 
-Set `refractivity: 0` to turn it off, which means recomputing the tables. `airRefractivity(temperatureC, pressureHPa)`
+Set `refractivity: 0` to turn it off, which means recomputing the tables; the passes then compile the straight march
+(`DK_REFRACTION` off), which skips the bending's two exponentials per step. `airRefractivity(temperatureC, pressureHPa)`
 gives the value for other air, and `apparentDirection` traces where a body shows on the CPU. Feed the true sun
 direction: an already refracted one would be lifted twice.
 
 ## Units, exposure and tone mapping
 
-The sky comes out in cd/m². `solarIrradiance` is the sun's spectrum, `solarIlluminance` its illuminance above the
+The sky comes out in cd/m². `solarSpectrum` is the sun's spectrum, `solarIlluminance` its illuminance above the
 atmosphere, 128 000 lx by default: the solar constant of 1361 W/m² (Kopp & Lean 2011) times sunlight's luminous
 efficacy of about 94 lm/W. `atmosphereUniformData` packs the spectrum scaled to it (`luminanceScale(model)`), so the
 sky-view table holds cd/m² too: half floats keep full precision from 6·10⁻⁵ cd/m², deep into twilight, up to 65 504,
@@ -65,7 +66,7 @@ Exposure is in EV100, the convention of cameras, Frostbite and Unreal (Lagarde &
 `exposureFromEV100(ev100)` is 1 / (1.2 · 2^EV100). About 15 for a sunny day, 0 in twilight. A scene in cd/m² exposed at
 the same EV100 looks the same in any renderer that follows it.
 
-`autoExposure: true` exposes by a light meter instead, for a renderer without an exposure of its own or to follow day
+`autoExposure: true` on `createSkyPass` exposes by a light meter instead, for a renderer without an exposure of its own or to follow day
 into night. Whenever the sky-view table is rebuilt, a compute pass reads it in directions spread evenly over the sky
 above the horizon and, apart, below it, and writes the brighter of the two geometric mean luminances to a buffer the sky
 pass reads, so there is no round trip to the CPU. On the ground that is mostly the sky; the ground below is darker,
@@ -103,7 +104,8 @@ twilight, amplified to where the f16 table runs out of precision. Then the floor
 To do: high up, and from space, the metered exposure still looks too bright, if only subjectively.
 
 With `toneMap` on, the default, the pass writes display colors for an 8-bit target: exposed, mapped by Narkowicz's
-ACES fit, sRGB encoded and dithered. Off, it writes the exposed luminance, linear and unclamped, for a float target and
+ACES fit, sRGB encoded and, for an 8-bit target, dithered by interleaved gradient noise (Jimenez 2014), remapped to a
+triangular distribution, from the pixel alone, without a texture. Off, it writes the exposed luminance, linear and unclamped, for a float target and
 a renderer that tone maps the frame itself. osgHimmel used Bruneton's curve, which had the encoding built in and was
 tuned to its own arbitrary units.
 
@@ -112,8 +114,8 @@ tuned to its own arbitrary units.
 Below the horizon the sky-view table shows the ground, in its albedo `groundAlbedo` (linear RGB, 0.3 by default, the
 Earth's average, where Bruneton and Hillaire used 0.1), lit by the sun and by the sky: after the table is built, its upper half is sampled
 over the hemisphere, cosine-weighted, for the sky's irradiance on the ground, and the lower half is built again with it.
-`groundSamples` on `createSkyPass` sets how many samples, 8 or 64 (the default), spread by the golden sets of
-webgl-operate, or 0 for the sun alone. The sky is read from the observer's altitude, which is close enough near the
+`groundSamples` on `createSkyPass` sets how many samples, 64 by default, spread over the disc by Vogel's spiral and
+lifted onto the hemisphere (Malley's method), or 0 for the sun alone, which saves a dispatch per rebuild. The sky is read from the observer's altitude, which is close enough near the
 ground and too dark high up.
 
 ## Lighting a scene
@@ -122,16 +124,34 @@ The sun and the sky light a scene apart, the usual split for image-based lightin
 
 - The sun as a directional light, from its apparent direction (`apparentDirection`), with `sunIlluminance()`: the
   sunlight that reaches the observer through the air, per channel in lux, measured by the light meter on the GPU.
-- The sky as a cube map, `encodeCube(encoder, cube)`: the six faces of a square rgba16float texture with six layers,
-  in cd/m², linear, indexed by ENU directions, so a y-up engine samples it with (x, -z, y). Without the sun disc by
-  default: some 10^9 cd/m² in a few texels would outshine the whole sky in every filtered lookup. With
-  `{ sunDisc: true }`, for a background, it needs rgba32float, being far beyond what rgba16float holds. `samples`, 1, 8
-  or 64 per texel, spread by the golden sets of webgl-operate, smooth the edges a texel straddles, the horizon's and
-  the sun disc's.
-- The sky's diffuse light from `createIrradiancePass(device)`: `encode(encoder, cube)` projects any cube map onto the
+- The sky as a cube map, from a cube pass made once, `await sky.createCubePass({ format: "rgba16float" })`, then
+  `encode(encoder, cube)` per update: the six faces of a square texture with six layers, in cd/m², linear, indexed by
+  ENU directions, so a y-up engine samples it with (x, -z, y). Without the sun disc by default: some 10^9 cd/m² in a
+  few texels would outshine the whole sky in every filtered lookup. With `sunDisc: true`, for a background, it needs
+  rgba32float, being far beyond what rgba16float holds. `samples` per texel, spread by the R2 sequence, smooth the
+  edges a texel straddles, the horizon's and the sun disc's. Mip levels need `TEXTURE_BINDING` usage too.
+- The sky's diffuse light from `await createIrradiancePass(device, { cubified, sourceFormat })`: `encode(encoder, cube)` projects any cube map onto the
   nine real spherical harmonics up to order 2 (Ramamoorthi & Hanrahan), in a storage buffer to shade with directly,
   and writes an irradiance cube map from them, 32x32 per face, in lux. It takes any cube map, the sky's or an HDR
-  environment's, and may move to `@himmelszelt/rundbild` once that exists.
+  environment's, and may move to `@himmelszelt/rundbild` once that exists. An rgba32float source is read through a
+  nearest sampler unless the device has "float32-filterable".
+
+## Device requirements
+
+Everything stays within WebGPU's default limits; only bgra8unorm output needs a feature, "bgra8unorm-storage", for
+`getPreferredCanvasFormat()` on Windows and macOS (or configure the canvas as rgba8unorm). `skyRequirements(options)`
+gives the features and limits to request a device with, `unmetRequirements(adapterOrDevice, options)` what one lacks,
+in words:
+
+```js
+const options = { format: "rgba8unorm", outputSize: 4096, cube: { format: "rgba16float", irradiance: true } };
+const unmet = unmetRequirements(adapter, options);
+if (unmet.length) throw new Error(unmet.join("; "));
+const device = await adapter.requestDevice(skyRequirements(options));
+```
+
+The light meter's 128 threads also fit WebGPU's compatibility mode; the irradiance pass asks for 9 KiB of workgroup
+memory. Pass creation is asynchronous throughout (`createComputePipelineAsync`), so compiling never blocks a frame.
 
 ## Status
 
@@ -142,12 +162,14 @@ Implemented so far:
   stronger forward scattering, ozone).
 - `src/refraction.ts`: the refraction the shaders trace, on the CPU, for where the sun shows.
 - `src/wgsl/atmosphere.wgsl` and `src/uniforms.ts`: the `DkAtmosphere` uniform block and its packer.
-- `src/wgsl/quality.wgsl` and `src/quality.ts`: the pipeline-overridable constants for sample counts and
-  feature switches.
+- `src/wgsl/quality.wgsl`, `src/wgsl/features.wgsl` and `src/quality.ts`: the pipeline-overridable sample counts and
+  the passes' switches.
+- `src/wgsl/frame.wgsl`: the per-frame uniform and the light meter's buffer, which the per-frame passes share.
+- `src/requirements.ts`: the device features and limits, `skyRequirements()` and `unmetRequirements()`.
 - `src/wgsl/common.wgsl`: ray-sphere geometry, rays bent by the air, density profiles and phase functions.
 - `src/pass.ts`: the `SkyPass`/`AtmosphereLUTs` interfaces.
 - `src/luts.ts`: the transmittance and multiple-scattering tables, `precomputeAtmosphere()`.
-- `src/sky.ts`: the sky-view table, the light meter and the sky pass, `createSkyPass()`.
+- `src/sky.ts`: the sky-view table, the light meter, the sky pass and its cube pass, `createSkyPass()`.
 - `src/exposure.ts`: EV100 and the automatic exposure's ramp.
 - `src/ibl.ts`: spherical harmonics and irradiance from a cube map, `createIrradiancePass()`.
 
@@ -168,7 +190,7 @@ ${wgsl.scattering}                                        // DkAtmosphere + the 
 
 @fragment fn fs(@location(0) ray: vec3f) -> @location(0) vec4f {
     let mu = dot(normalize(ray), up);
-    let horizon = dkHorizonMu(sky, r);
+    let horizon = dkHorizonMu(sky, h);   // altitude in km, not the radius
     ...
 }` });
 
@@ -186,11 +208,12 @@ indices, and you decide where the data lives.
 rules, and checks the packer writes the right value at every offset, since nothing in the toolchain would
 otherwise catch the two drifting apart.
 
-**Quality is specialized with `override`s, not uniforms.** Sample counts and feature switches live in
-`quality.wgsl` as pipeline-overridable constants, set through `constants` on the pipeline descriptor via
-`pipelineConstants(config)`. Integration loop bounds stay compile-time constants so the compiler can unroll
-them, and a disabled feature leaves no code behind rather than branching per pixel, like dithering with
-`pipelineConstants(config, { dither: false })`.
+**Quality is specialized with `override`s, not uniforms.** Sample counts live in `quality.wgsl` as
+pipeline-overridable constants, set through `constants` on the pipeline descriptor via `pipelineConstants(config)`,
+and the passes' switches (tone mapping, dithering, auto exposure, the sun disc, the cube map) in `features.wgsl`.
+Integration loop bounds stay compile-time constants so the compiler can unroll them, and a disabled feature leaves no
+code behind rather than branching per pixel. `common.wgsl` declares one of its own, `DK_REFRACTION`, on by default,
+which is right either way. The uniforms keep only what changes per frame: 112 bytes for the sky.
 
 Every identifier is prefixed `dk`/`DK_` so several `@himmelszelt/*` fragments can share one shader module.
 Rolldown inlines the `.wgsl` files at build time, so `dist` reads nothing from disk and stays browser-safe.
@@ -231,6 +254,14 @@ Echtzeit"](https://daniellimberger.de/resources/2012%20%E2%80%93%20Mueller%20%28
   solar constant.
 - S. Lagarde, C. de Rousiers, "Moving Frostbite to Physically Based Rendering" (SIGGRAPH course, 2014): EV100 and the
   light meter's calibration.
+- J. Jimenez, ["Next Generation Post Processing in Call of Duty: Advanced
+  Warfare"](https://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare/) (SIGGRAPH course,
+  2014): interleaved gradient noise, the dither.
+- M. Roberts, ["The Unreasonable Effectiveness of Quasirandom
+  Sequences"](https://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/) (2018): the R2
+  sequence, the cube map's samples per texel.
+- H. Vogel, "A better way to construct the sunflower head" (Mathematical Biosciences, 1979): the spiral the ground's
+  light is gathered on.
 - K. Narkowicz, ["ACES Filmic Tone Mapping Curve"](https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/)
   (2016): the display tone curve.
 - Maxime Heckel, ["On rendering the sky, sunsets and

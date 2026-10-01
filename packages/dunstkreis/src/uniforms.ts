@@ -29,7 +29,7 @@ export function atmosphereUniformData(model: AtmosphereModel, target?: Float32Ar
     data[15] = model.rayleigh.scaleHeightKm;
 
     data.set(
-        model.solarIrradiance.map((e) => e * luminanceScale(model)),
+        model.solarSpectrum.map((e) => e * luminanceScale(model)),
         16,
     );
     data[19] = model.mie.scaleHeightKm;

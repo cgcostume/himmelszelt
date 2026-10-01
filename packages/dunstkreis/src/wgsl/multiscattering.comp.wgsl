@@ -51,7 +51,7 @@ fn dkIntegrateMultiScattering(a: DkAtmosphere, h: f32, direction: vec3f, sunDire
         let stepTransmittance = exp(-extinction * ds);
 
         // Zero where the planet shadows the sample, which the table knows.
-        let sunTransmittance = dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, a.Rg + altitude, muS);
+        let sunTransmittance = dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, altitude, muS);
 
         // Integrated across the step analytically rather than as a point sample, so few samples suffice. The
         // sunlight scatters towards the ray with the isotropic phase; the transfer term is light scattered
@@ -68,7 +68,7 @@ fn dkIntegrateMultiScattering(a: DkAtmosphere, h: f32, direction: vec3f, sunDire
         let groundUp = dkPathToWorld(dkPathUp(a, h, path.position), up, horizontal);
         let muSGround = clamp(dot(groundUp, sunDirection), -1.0, 1.0);
         if (muSGround > 0.0) {
-            let toSun = dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, a.Rg, muSGround);
+            let toSun = dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, 0.0, muSGround);
             result.luminance = result.luminance
                 + throughput * toSun * muSGround * a.groundAlbedo / DK_PI;
         }
@@ -86,10 +86,9 @@ fn dkPrecomputeMultiScattering(@builtin(global_invocation_id) id: vec3u) {
 
     let a = dkAtmosphere;
     let uv = (vec2f(f32(id.x), f32(id.y)) + 0.5) / size;
-    let rMuS = dkMultiScatteringRMuS(a, uv, size);
-
-    let h = rMuS.x - a.Rg;
-    let muS = rMuS.y;
+    let altitudeMuS = dkMultiScatteringAltitudeMuS(a, uv, size);
+    let h = altitudeMuS.x;
+    let muS = altitudeMuS.y;
     let sunDirection = vec3f(sqrt(max(1.0 - muS * muS, 0.0)), 0.0, muS);
 
     var luminance = vec3f(0.0);
