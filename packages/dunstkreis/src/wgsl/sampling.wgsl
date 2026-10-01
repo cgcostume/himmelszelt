@@ -12,6 +12,11 @@ fn dkSampleTransmittanceToTop(
     r: f32,
     mu: f32,
 ) -> vec3f {
+    // Below the table's lowest direction no light arrives: without refraction that is the horizon itself, where the
+    // lookup would otherwise clamp to the edge column's grazing light.
+    if (mu < dkTransmittanceMuMin(a, r)) {
+        return vec3f(0.0);
+    }
     let size = vec2f(textureDimensions(lut));
     return textureSampleLevel(lut, lutSampler, dkTransmittanceUv(a, r, mu, size), 0.0).rgb;
 }

@@ -60,6 +60,20 @@
     font-size: var(--text-small);
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
+/* The view ray the lookup and tables figures follow, where it shows in the sky. */
+.sky-pick {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    transform: translate(-50%, -50%);
+    border: 2px solid var(--lookup-skyView);
+    border-radius: 50%;
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+    pointer-events: none;
+}
+.sky-pick[hidden] {
+    display: none;
+}
 .sky-error {
     position: absolute;
     inset: 0;
@@ -120,6 +134,16 @@
         margin-left: 0;
     }
 }
+/* The square multiple scattering table as small as the Moon's view in sternzeit, centered, its y axis beside it. */
+.lut[data-lut="multiScattering"] .lut-plot {
+    max-width: calc(26rem + var(--lut-axis) + 0.4rem);
+    margin-inline: auto;
+}
+@media (max-width: 48rem) {
+    .lut[data-lut="multiScattering"] .lut-plot {
+        max-width: none;
+    }
+}
 /* Start, title and end of each axis, with a hairline on either side of the title filling the space between them. In
    logical sizes, so the same rules hold for the y axis, whose text runs vertically. */
 .lut-axis {
@@ -174,6 +198,20 @@
 }
 .lut-stage canvas[data-field="overlay"],
 .lut-tip {
+    pointer-events: none;
+}
+/* The table's own size over its top right corner: the frame keeps the default size's shape. */
+.lut-size {
+    position: absolute;
+    top: 0.3rem;
+    right: 0.3rem;
+    padding: 0.05rem 0.35rem;
+    border-radius: var(--radius-small);
+    background: color-mix(in srgb, var(--bg) 70%, transparent);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    line-height: 1.4;
     pointer-events: none;
 }
 .lut-tip {
@@ -279,7 +317,7 @@
     color: var(--muted);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-    cursor: ns-resize;
+    cursor: var(--cursor-wheel);
 }
 .lut-level output:last-child {
     min-width: 3.5rem;
@@ -323,4 +361,95 @@
 }
 .lut-fold .lut-controls:last-child {
     margin-bottom: 0;
+}
+
+/* The lookups, in every figure that shows them: towards the sun through the transmittance table, the multiple
+   scattering, and the sky view a view ray ends in. */
+:root {
+    --lookup-transmittance: var(--accent);
+    --lookup-multiScattering: hsl(32 80% 62%);
+    --lookup-skyView: var(--text);
+}
+/* Laid out like the sun path diagram: the scene fills the frame, the three tables float on its right, as wide as the
+   analemma there, and below it in a row where the page is narrow. Equal boxes: their axes are parameters, so their
+   proportions say nothing; the tables figure shows their own. */
+.lookup-panel {
+    position: absolute;
+    right: 1.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: grid;
+    gap: 0.5rem;
+    width: 38cqh;
+}
+.lookup-table {
+    aspect-ratio: 2 / 1;
+    border: var(--border);
+    border-radius: var(--radius-small);
+    overflow: hidden;
+}
+/* The observer's place and height, left of its dot. */
+.lookup-observer {
+    position: absolute;
+    transform: translate(calc(-100% - 0.7rem), -50%);
+    text-shadow:
+        0 0 3px var(--bg),
+        0 0 6px var(--bg);
+    font-size: var(--text-small);
+    line-height: 1.3;
+    color: var(--text);
+    text-align: right;
+    white-space: pre;
+}
+/* Which way the Sun is, beside its fading line. */
+.lookup-sun {
+    position: absolute;
+    transform: translate(0.6rem, -50%);
+    font-size: var(--text-small);
+    line-height: 1;
+    color: var(--muted);
+    white-space: nowrap;
+    text-shadow:
+        0 0 3px var(--bg),
+        0 0 6px var(--bg);
+}
+.lookup-controls {
+    margin: 0.5rem 0 0 var(--content-inset);
+}
+/* What the picked ray is, at the scene's foot, lined up with its credit line at the top. */
+.lookup-info {
+    position: absolute;
+    bottom: 0.5rem;
+    left: var(--content-inset);
+    right: calc(38cqh + 3rem);
+    margin: 0;
+    font-size: var(--text-small);
+    pointer-events: none;
+}
+/* The scene is a size container, which scopes counters to it: the letters count from here. */
+.lookup-panel {
+    counter-reset: subfigure;
+}
+.lookup-caption {
+    display: block;
+    margin-top: 0.25em;
+    font-size: var(--text-small);
+    line-height: 1.3;
+    color: var(--muted);
+}
+@media (max-width: 48rem) {
+    .lookup-info {
+        position: static;
+        order: 1;
+        margin-top: 0.5rem;
+    }
+    .lookup-panel {
+        position: relative;
+        top: auto;
+        right: auto;
+        transform: none;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+        margin-top: 0.75rem;
+    }
 }

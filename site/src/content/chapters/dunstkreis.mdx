@@ -23,6 +23,8 @@ import Sky from "../../components/dunstkreis/Sky.astro";
 import Tables from "../../components/dunstkreis/Tables.astro";
 import Environment from "../../components/dunstkreis/Environment.astro";
 import Lighting from "../../components/dunstkreis/Lighting.astro";
+import Lookup from "../../components/dunstkreis/Lookup.astro";
+import Fig from "../../components/Fig.astro";
 
 This chapter is being written. The sky below is live, and it grows with the chapter; the dashed boxes are the figures
 still to come.
@@ -129,10 +131,22 @@ being a special case.
 
 Three tables carry the sky. Transmittance says how much light gets through the air along any ray, multiple scattering
 how much light arrives after more than one bounce, and the sky view holds the whole sky as seen from where the observer
-stands, rebuilt whenever the Sun or the observer moves. The sky pass then only looks up one texel per pixel. Their
-sizes and sample counts are open here to play with; the sky above follows. Every table is traced through the bent air of
-the section before, and each has a switch for it: off, the rays run straight. It is one setting for the whole page, so
-every table, cube map and figure follows it.
+stands, rebuilt whenever the Sun or the observer moves. The sky pass then only looks up one texel per pixel.
+
+<Fig id="lookup" /> follows one of those pixels back. Its view ray is marched from the eye in 30 steps. At each, sunlight
+comes in from the side: how much of it made it through the air is a transmittance lookup, by the step's altitude and
+the Sun's angle there, and the light that bounced more than once is a multiple scattering lookup, by the same two. How
+much of all that still reaches the eye is summed up along the way, step by step. Sixty lookups end up in a single texel
+of the sky view, and the sky pass reads just that one. Click a pixel in <Fig id="sky" />, or point at a texel below or
+in <Fig id="tables" />, and all of them follow the same ray.
+
+<Lookup />
+
+<Controls />
+
+The tables' sizes and sample counts are open here to play with; the sky above follows. Every table is traced through
+the bent air of the section before, and each has a switch for it: off, the rays run straight. It is one setting for the
+whole page, so every table, cube map and figure follows it.
 
 <Tables />
 
@@ -180,11 +194,6 @@ turns.
 <Lighting />
 
 <Controls />
-
-<Planned title="The tables, explained" plan="drop: the tables figure shows the axes and reads out every texel already; Bruneton's four-dimensional table goes to Bruneton and Hillaire.">
-    Over each table, the grid of its parameterization; pointing at a texel shows the ray it stands for. Later aerial
-    perspective, and Bruneton's four-dimensional inscatter table for comparison.
-</Planned>
 
 ## Resolution and sampling
 

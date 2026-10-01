@@ -1,0 +1,57 @@
+---
+import "../sternzeit/sternzeit.css";
+import "./dunstkreis.css";
+
+const TABLES = [
+    { name: "transmittance", title: "Transmittance", axes: "view angle × altitude" },
+    { name: "multiScattering", title: "Multiple scattering", axes: "sun angle × altitude" },
+    { name: "skyView", title: "Sky view", axes: "azimuth from the sun × angle from the horizon" },
+];
+---
+
+<figure class="scene-frame wide" id="lookup">
+    <div class="dome-scene lookup-scene">
+        <svg class="dome-layer" data-field="scene" aria-label="A view ray through the air, its samples and their lookups"></svg>
+        <div class="dome-compass" data-field="compass" aria-hidden="true"></div>
+        <div class="lookup-panel">
+            {
+                TABLES.map((table) => (
+                    <div class="lookup-sub">
+                        <div class="lookup-table lut-stage" data-lut={table.name}>
+                            <canvas data-field="image" aria-label={`The ${table.title.toLowerCase()} table`} />
+                            <canvas data-field="overlay" aria-hidden="true" />
+                        </div>
+                        <span class="lookup-caption">
+                            <span class="subfigure-title">{table.title.toLowerCase()}</span>: {table.axes}
+                        </span>
+                    </div>
+                ))
+            }
+        </div>
+        <p class="note lookup-info" data-field="info"></p>
+        <p class="vis-credit footnote">
+            Drag to rotate. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
+        </p>
+    </div>
+    <p class="lut-controls lookup-controls">
+        <label title="Integration samples along each of the sky view's view rays, dunstkreis' own setting: changing it here recomputes the sky view, as in the tables figure below">
+            samples per view ray
+            <input type="range" data-field="samples" min="1" max="128" step="1" />
+            <output data-field="samplesValue"></output>
+        </label>
+    </p>
+    <figcaption class="figure-caption">
+        One pixel of sky, traced back: the view ray from the eye (white), its samples, and at each the two lookups it
+        was built from, the transmittance towards the Sun (blue) and the multiple scattering (orange). The Sun is a
+        direction, not a place: its light arrives in parallel. (c) The sky-view table keeps what the whole ray
+        gathered, in one texel, read with (a) the transmittance and (b) the multiple scattering at every sample. The
+        texels the kept ray reads are marked solid, the one under the pointer dashed; point at a texel to see what it
+        stands for, click to keep it. A schematic: the air drawn far thicker than it is, the planet curving one and a
+        half times as fast, every ray straight and three times as steep; the marks in the tables come from the true
+        ray, bent by the air.
+    </figcaption>
+</figure>
+
+<script>
+    import "./lookup.js";
+</script>

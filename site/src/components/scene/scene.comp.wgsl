@@ -52,6 +52,8 @@ struct Params {
     hazeDensity: f32,
     // Nonzero when the sky map is cubified, sampled through dkCubeFromSphere from dunstkreis' cube.wgsl.
     cubified: u32,
+    // Nonzero to dither the 8-bit output against banding.
+    dither: u32,
     // The sun as the camera sees it, which may be far above the scene's ground: where its disc shows, and its
     // illuminance there, per channel in lux.
     discDirection: vec3f,
@@ -487,7 +489,10 @@ fn render(@builtin(global_invocation_id) id: vec3u) {
         color = mix(color, toneMap(sun * params.exposure), disc);
     }
     // Triangular dither of one 8-bit step, the difference of the two channels.
-    let noise = dot(blueNoise(id.xy), vec2f(1.0, -1.0));
-    color = clamp(color + noise / 255.0, vec3f(0.0), vec3f(1.0));
+    if (params.dither != 0u) {
+        let noise = dot(blueNoise(id.xy), vec2f(1.0, -1.0));
+        color = color + noise / 255.0;
+    }
+    color = clamp(color, vec3f(0.0), vec3f(1.0));
     textureStore(output, vec2i(id.xy), vec4f(color, 1.0));
 }

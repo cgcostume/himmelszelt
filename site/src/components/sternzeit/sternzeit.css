@@ -324,13 +324,10 @@ tbody tr:hover {
 .figure-sun {
     fill: var(--text);
     stroke: var(--text);
-    stroke-width: 1;
 }
 .figure-sun-ray {
     stroke: var(--text);
-    stroke-width: 1;
     stroke-linecap: round;
-    stroke-dasharray: 0.1 3;
 }
 /* The Moon wherever it stands as a symbol: the lit part in the Sun's own shade, the night side in the earthshine it
    is actually seen by, which is at its bluest around new moon and gone by full moon (--earthshine, 0 to 1). */
@@ -590,9 +587,6 @@ figure[id] {
 }
 .analemma-tick {
     fill: var(--muted);
-}
-.analemma-sun {
-    fill: var(--text);
 }
 .figure-grid-label {
     fill: var(--muted);

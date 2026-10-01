@@ -229,6 +229,15 @@ fn dkSkyAt(view: vec3f) -> DkSkySample {
     return dkSkyFromInside(a, view, altitude);
 }
 
+// `view` turned up or down within its vertical plane to the cosine `mu`.
+fn dkWithMu(view: vec3f, mu: f32) -> vec3f {
+    let horizontal = length(view.xy);
+    if (horizontal < 1e-6) {
+        return view;
+    }
+    return vec3f(view.xy / horizontal * sqrt(max(1.0 - mu * mu, 0.0)), mu);
+}
+
 // The sun disc along a sampled ray, attenuated by the air between it and the observer, from sun.wgsl.
 fn dkSkySunLuminance(sky: DkSkySample) -> vec3f {
     return dkSunDiscLuminance(sky.sunTransmittance * dkAtmosphere.solarIrradiance, dkParams.sunAngularRadius);
@@ -267,18 +276,37 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
     let view = dkPixelRay(id.xy, size);
     let sunDirection = dkParams.sunDirection;
     let inSpace = dkParams.observerAltitude > dkAtmosphere.Rt - dkAtmosphere.Rg;
-    let sky = dkSkyAt(view);
-    let direction = sky.direction;
     let sunRadius = dkParams.sunAngularRadius;
     let right = dkPixelRay(id.xy + vec2u(1u, 0u), size);
+    let footprint = length(right - view);
+
+    // The horizon by how much of the pixel lies below it, like the disc's edge: a pixel it crosses mixes the sky just
+    // above it with the ground just below. Decided per pixel center, it would step a row at a time, and cut the disc
+    // resting on it with every step.
+    var sky = dkSkyAt(view);
+    var ground = select(0.0, 1.0, sky.hitsGround);
+    var luminance = sky.luminance;
+    if (!inSpace) {
+        let horizon = dkHorizonMu(dkAtmosphere, max(dkParams.observerAltitude, 0.0));
+        let below = clamp((horizon - view.z) / footprint + 0.5, 0.0, 1.0);
+        if (below > 0.0 && below < 1.0) {
+            let above = dkSkyAt(dkWithMu(view, horizon + 0.25 * footprint));
+            let under = dkSkyAt(dkWithMu(view, horizon - 0.25 * footprint));
+            sky = above;
+            ground = below;
+            luminance = mix(above.luminance, under.luminance, below);
+        }
+    }
+    let direction = sky.direction;
 
     // In cd/m², exposed. Without tone mapping, that is what is written: linear, for the caller's own tone mapping.
-    var color = sky.luminance * dkExposure();
-    // The disc by how much of the pixel it covers. Tone mapped, sky and disc apart and mixed after, since the disc is
-    // far beyond white: mixed before, a pixel it barely touches would turn white, and its edge would step.
+    var color = luminance * dkExposure();
+    // The disc by how much of the pixel it covers, on the sky's part of it. Tone mapped, sky and disc apart and mixed
+    // after, since the disc is far beyond white: mixed before, a pixel it barely touches would turn white, and its edge
+    // would step.
     var disc = 0.0;
     if (DK_SUN_DISC) {
-        disc = dkSkySunCoverage(sky, length(right - view));
+        disc = dkSkySunCoverage(sky, footprint) * (1.0 - ground);
     }
     if (DK_TONE_MAP) {
         let withDisc = dkToneMap(color + dkSkySunLuminance(sky) * dkExposure());
@@ -289,11 +317,11 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
 
     // The blue hour, an artistic term rather than a physical one, strongest when the sun sits just below the
     // horizon. The +0.03 keeps a faint blue cast through the night, as in the original.
-    if (DK_TONE_MAP && dkParams.lHeureBleueIntensity > 0.0 && !sky.hitsGround && !inSpace) {
+    if (DK_TONE_MAP && dkParams.lHeureBleueIntensity > 0.0 && ground < 1.0 && !inSpace) {
         let falloff = exp(-sunDirection.z * sunDirection.z * 166.0) + 0.03;
         color = color
             + dkParams.lHeureBleueIntensity * dkParams.lHeureBleueColor
-            * (dot(direction, sunDirection) + 1.5) * falloff;
+            * (dot(direction, sunDirection) + 1.5) * falloff * (1.0 - ground);
     }
 
     if (DK_DEBUG_GRID) {

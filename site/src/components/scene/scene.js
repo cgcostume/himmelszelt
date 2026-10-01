@@ -118,7 +118,8 @@ export function createScene(device) {
          * with the solids' shadows through it, 0 for none. `airDensity` and `hazeDensity`, around the camera relative to
          * the ground's, 1 by default, thin the veil and the haze. `discDirection` and `discIlluminance`, the sun as the
          * camera sees it from its own height, the sun's by default, place and light the disc and its veil; `horizonZ`,
-         * the planet's horizon as the camera sees it, hides the disc below it, -1 by default for none.
+         * the planet's horizon as the camera sees it, hides the disc below it, -1 by default for none. `dither`, on by
+         * default, dithers the 8-bit output against banding.
          */
         encode(
             encoder,
@@ -151,6 +152,7 @@ export function createScene(device) {
             data[115] = rest.airDensity ?? 1;
             data[116] = rest.hazeDensity ?? 1;
             flags[117] = rest.cubified ? 1 : 0;
+            flags[118] = rest.dither === false ? 0 : 1;
             data.set(rest.discDirection ?? sunDirection, 120);
             data[123] = rest.horizonZ ?? -1;
             data.set(rest.discIlluminance ?? sunIlluminance, 124);

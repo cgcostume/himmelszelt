@@ -32,18 +32,41 @@ export function labelAboveY(y, unitsPerPx) {
     return y - (2 + SMALL_TEXT_PX / 2) * unitsPerPx;
 }
 
-// The Sun wherever it appears as a symbol rather than a disc to scale (the locked views, the Moon's own view): a
-// filled disc with a ring of dotted rays around it, one motif the reader learns once.
-const SUN_RAY_COUNT = 8;
+/**
+ * The Sun wherever it appears as a symbol rather than a disc to scale, in the locked views, the sun path diagram and
+ * dunstkreis' figures: a filled disc with a ring of dotted rays, one motif the reader learns once, the same size in
+ * screen pixels everywhere. The rays start `gap` past the disc, are `length` long, and dotted by `dash`.
+ */
+export const SUN_SYMBOL = { radius: 8.5, gap: 5, length: 8.5, rays: 8, stroke: 1.7, dash: [0.1, 5.2] };
 
-/** The Sun as a symbol at (x, y): a disc of `radius`, its rays starting `gap` past it and `length` long. */
-export function sunSymbol(x, y, radius, gap, length) {
+/** The symbol's rays as segments around its center, in screen pixels. */
+export function sunRays() {
+    const { radius, gap, length, rays } = SUN_SYMBOL;
     const [inner, outer] = [radius + gap, radius + gap + length];
-    let svg = `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${radius}" class="figure-sun"/>`;
-    for (let i = 0; i < SUN_RAY_COUNT; i++) {
-        const [c, s] = [Math.cos((i / SUN_RAY_COUNT) * 2 * Math.PI), Math.sin((i / SUN_RAY_COUNT) * 2 * Math.PI)];
-        const [x1, y1, x2, y2] = [x + inner * c, y + inner * s, x + outer * c, y + outer * s].map((n) => n.toFixed(2));
-        svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="figure-sun-ray"/>`;
+    return Array.from({ length: rays }, (_, i) => {
+        const [c, s] = [Math.cos((i / rays) * 2 * Math.PI), Math.sin((i / rays) * 2 * Math.PI)];
+        return [
+            { x: inner * c, y: inner * s },
+            { x: outer * c, y: outer * s },
+        ];
+    });
+}
+
+/** The Sun as a symbol at (x, y) in an SVG drawn at `unitsPerPx` of its units to a screen pixel. */
+export function sunSymbol(x, y, unitsPerPx) {
+    const { radius, stroke, dash } = SUN_SYMBOL;
+    const f = (n) => (n * unitsPerPx).toFixed(2);
+    const width = `stroke-width="${f(stroke)}"`;
+    let svg = `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${f(radius)}" ${width} class="figure-sun"/>`;
+    for (const [a, b] of sunRays()) {
+        const [x1, y1, x2, y2] = [
+            x + a.x * unitsPerPx,
+            y + a.y * unitsPerPx,
+            x + b.x * unitsPerPx,
+            y + b.y * unitsPerPx,
+        ];
+        const points = `x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}"`;
+        svg += `<line ${points} ${width} stroke-dasharray="${f(dash[0])} ${f(dash[1])}" class="figure-sun-ray"/>`;
     }
     return svg;
 }

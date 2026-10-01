@@ -300,6 +300,18 @@ input[type="number"]::-webkit-outer-spin-button {
 /* Sliders: the part left of the thumb a 3px rail in the accent, the rest a 1px line, both with round outer ends. The
    thumb is a plain disc ringed in the background color, which reads as a gap between the two rails. --range-fill, from
    range.js, is how far along the value is; the rail ends under the thumb's center, which never reaches the edges. */
+/* Every slider turns with the mouse wheel, over itself and its label (see range.js): a cursor of an arrow up, a circle
+   and an arrow down says so. */
+:root {
+    --cursor-wheel:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><g fill='white' stroke='black' stroke-width='1.2' stroke-linejoin='round'><path d='M12 1.5 17 7.5H7Z'/><path d='M12 22.5 17 16.5H7Z'/><circle cx='12' cy='12' r='2.6'/></g></svg>")
+        12 12,
+        ns-resize;
+}
+input[type="range"]:not(:disabled),
+label:has(> input[type="range"]:not(:disabled)) {
+    cursor: var(--cursor-wheel);
+}
 input[type="range"] {
     --range-thumb: 18px;
     --range-gap: var(--bg);
@@ -310,7 +322,6 @@ input[type="range"] {
     border: 0;
     border-radius: 0;
     background: transparent;
-    cursor: pointer;
 }
 input[type="range"]::-webkit-slider-runnable-track {
     height: 3px;
@@ -346,6 +357,26 @@ input[type="range"]:focus-visible {
     outline: none;
 }
 /* Focus tints the gap around the thumb rather than drawing a ring of its own: the thumb keeps its size and shape. */
+/* The thumb is dragged, so it takes the hand; the wheel cursor is for the rail and the label around it. */
+input[type="range"]:not(:disabled)::-webkit-slider-container,
+input[type="range"]:not(:disabled)::-webkit-slider-runnable-track {
+    cursor: var(--cursor-wheel);
+}
+input[type="range"]:not(:disabled)::-moz-range-track {
+    cursor: var(--cursor-wheel);
+}
+input[type="range"]:not(:disabled)::-webkit-slider-thumb {
+    cursor: grab;
+}
+input[type="range"]:not(:disabled)::-moz-range-thumb {
+    cursor: grab;
+}
+input[type="range"]:not(:disabled):active::-webkit-slider-thumb {
+    cursor: grabbing;
+}
+input[type="range"]:not(:disabled):active::-moz-range-thumb {
+    cursor: grabbing;
+}
 input[type="range"]:focus-visible::-webkit-slider-thumb {
     border-color: color-mix(in srgb, var(--accent) 40%, var(--range-gap));
 }

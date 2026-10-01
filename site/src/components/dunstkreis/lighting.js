@@ -148,6 +148,7 @@ function render() {
         shadowRays: shadowRays(),
         sunLight: pressed("sunLight"),
         skyLight: pressed("skyLight"),
+        dither: pressed("dither"),
         ground: ground(),
         seconds,
     });
@@ -187,7 +188,7 @@ if (gpu.error) {
         'input[name="lighting-shadows"], input[name="lighting-background"], input[name="lighting-ground"], input[name="lighting-occlusion"], input[name="lighting-godrays"], input[name="lighting-bloom"]',
     ))
         radio.addEventListener("change", requestRender);
-    for (const name of ["rotate", "sunDisc", "sunLight", "skyLight"]) {
+    for (const name of ["rotate", "sunDisc", "sunLight", "skyLight", "dither"]) {
         field(name).addEventListener("click", () => {
             field(name).setAttribute("aria-pressed", String(!pressed(name)));
             requestRender();

@@ -7,6 +7,7 @@ import "./dunstkreis.css";
     <div class="sky-view">
         <canvas data-field="canvas" aria-label="The sky at the chosen moment and place"></canvas>
         <div class="sky-compass" data-field="compass"></div>
+        <div class="sky-pick" data-field="pick" title="The view ray the lookup and tables figures follow" hidden></div>
         <div class="sky-overlay">
             <span class="note" data-field="sun"></span>
             <label class="note">EV<sub>100</sub> <input data-field="exposure" type="range" min="-20" max="8" step="0.1" value="-14" title="Brighter to the right: a lower EV lets in more light" /> <output data-field="ev"></output></label>
@@ -15,10 +16,11 @@ import "./dunstkreis.css";
                 <button type="button" class="view-toggle" data-field="auto" aria-pressed="true" title="Expose by a light meter reading the whole sky">auto</button>
                 <button type="button" class="view-toggle" data-field="lock" aria-pressed="true" title="Keep the view on the Sun; dragging lets go">sun-locked</button>
                 <button type="button" class="view-toggle" data-field="grid" aria-pressed="true" title="Lines of altitude every 10°, the compass directions, a ring around the sun disc and timings">grid</button>
+                <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="Dither the 8-bit output by a step of noise, against banding in the sky's smooth gradients">dither</button>
                 <button type="button" class="view-toggle" data-field="refraction" aria-pressed="true" title="Traced through the air, bending the light. Switches it for the whole page, recomputing every table and cube map">refracted</button>
             </span>
         </div>
-        <p class="vis-credit footnote">Drag to look around, scroll to zoom. Rendered with WebGPU.</p>
+        <p class="vis-credit footnote">Drag to look around, scroll to zoom, click to follow a pixel's view ray through the tables. Rendered with WebGPU.</p>
     </div>
     <figcaption class="figure-caption">
         The sky at the chosen moment and place: every pixel one lookup into a table of the whole sky, rebuilt whenever

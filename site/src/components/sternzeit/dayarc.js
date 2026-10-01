@@ -1,7 +1,7 @@
 import * as precise from "@himmelszelt/sternzeit";
 import Zdog from "zdog";
 import { onDemand } from "../frame.js";
-import { COMPASS, cssColor, gridLine, labelAboveY, svgText } from "./figure.js";
+import { COMPASS, cssColor, gridLine, labelAboveY, SUN_SYMBOL, sunRays, sunSymbol, svgText } from "./figure.js";
 import { aboveVisibleHorizon } from "./horizon.js";
 import { onChange, state } from "./state.js";
 import "./export.js";
@@ -17,8 +17,9 @@ const SAMPLES_PER_HOUR = 6;
 const HOURS = 24;
 // The analemma: the Sun at the same time of day, on every day of the half year before and after the moment.
 const ANALEMMA_DAYS = 182;
-// Half the analemma panel's width in degrees; its height always spans the full 180 degrees from zenith to nadir.
-const ANALEMMA_HALF_WIDTH = 35;
+// Half the analemma panel's width and its height in degrees: some 47 degrees of analemma, with room around it.
+const ANALEMMA_HALF_WIDTH = 25;
+const ANALEMMA_HEIGHT = 130;
 // The dome sits below the frame's middle: seen from high up it reaches as far above the horizon plane as the sky
 // grid does, and centered it would be cut off at the top.
 const CENTER_SHIFT = 0.04;
@@ -196,13 +197,8 @@ function addDot(horizontal, color, strokePx) {
 }
 
 // The Sun and the Moon are the same size here; the Sun is told apart by the same ring of dotted rays it wears in the
-// locked views, at the same size in screen pixels, and always square to the viewer (see frame()).
-const BODY_DOT_PX = 17;
-const SUN_RADIUS_PX = BODY_DOT_PX / 2;
-const SUN_RAY_COUNT = 8;
-const SUN_RAY_GAP_PX = 5;
-const SUN_RAY_LENGTH_PX = 9;
-const SUN_RAY_DOTS = [0.1, 3];
+// locked views (SUN_SYMBOL), always square to the viewer (see frame()).
+const BODY_DOT_PX = 2 * SUN_SYMBOL.radius;
 const billboards = [];
 
 function addSunRays(horizontal) {
@@ -210,15 +206,8 @@ function addSunRays(horizontal) {
     const yaw = new Anchor({ addTo: at });
     const face = new Anchor({ addTo: yaw });
     billboards.push({ yaw, face });
-    const [inner, outer] = [SUN_RADIUS_PX + SUN_RAY_GAP_PX, SUN_RADIUS_PX + SUN_RAY_GAP_PX + SUN_RAY_LENGTH_PX];
-    for (let i = 0; i < SUN_RAY_COUNT; i++) {
-        const [c, s] = [Math.cos((i / SUN_RAY_COUNT) * 2 * Math.PI), Math.sin((i / SUN_RAY_COUNT) * 2 * Math.PI)];
-        const path = [
-            { x: inner * c, y: inner * s },
-            { x: outer * c, y: outer * s },
-        ];
-        styled(new Shape({ addTo: face, path, color: INK }), 1, SUN_RAY_DOTS);
-    }
+    for (const path of sunRays())
+        styled(new Shape({ addTo: face, path, color: INK }), SUN_SYMBOL.stroke, SUN_SYMBOL.dash);
 }
 
 function rebuildPaths() {
@@ -258,15 +247,19 @@ function renderAnalemma() {
         const firstOfMonth = new Date((jd + day - 2440587.5) * 86400000).getUTCDate() === 1;
         points.push({ day, firstOfMonth, x: deltaAzimuth * Math.cos(altitude * DEG), y: -altitude });
     }
-    // A fixed scale, zenith to nadir with the horizon in the middle, so analemmas from different places compare directly.
-    // The viewBox is fitted into the panel keeping its aspect ratio, so the larger of the two scales applies.
+    // A fixed scale, so analemmas from different places compare directly, centered on the analemma and kept between
+    // zenith and nadir. The viewBox is fitted into the panel keeping its aspect ratio, so the larger scale applies.
     const unitsPerPx = Math.max(
         (2 * ANALEMMA_HALF_WIDTH) / (analemmaSvg.clientWidth || 1),
-        180 / (analemmaSvg.clientHeight || 1),
+        ANALEMMA_HEIGHT / (analemmaSvg.clientHeight || 1),
     );
     const xs = points.map((p) => p.x);
+    const ys = points.map((p) => p.y);
     const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
-    analemmaSvg.setAttribute("viewBox", `${centerX - ANALEMMA_HALF_WIDTH} -90 ${2 * ANALEMMA_HALF_WIDTH} 180`);
+    const reach = 90 - ANALEMMA_HEIGHT / 2;
+    const centerY = Math.min(Math.max((Math.min(...ys) + Math.max(...ys)) / 2, -reach), reach);
+    const [x0, y0] = [centerX - ANALEMMA_HALF_WIDTH, centerY - ANALEMMA_HEIGHT / 2];
+    analemmaSvg.setAttribute("viewBox", `${x0} ${y0} ${2 * ANALEMMA_HALF_WIDTH} ${ANALEMMA_HEIGHT}`);
 
     const f = (n) => n.toFixed(3);
     // The panel may be wider than the viewBox's aspect ratio, so the ground and lines reach well past it.
@@ -292,7 +285,7 @@ function renderAnalemma() {
         if (!p.firstOfMonth) continue;
         svg += `<circle cx="${f(p.x)}" cy="${f(p.y)}" r="0.9" class="analemma-tick"/>`;
     }
-    svg += `<circle cx="0" cy="${f(-today.altitude)}" r="2.4" class="analemma-sun"/>`;
+    svg += sunSymbol(0, -today.altitude, unitsPerPx);
     analemmaSvg.innerHTML = svg;
     analemmaNote.textContent = points.every((p) => p.y > 0) ? ", below the horizon at this hour" : "";
 }

@@ -10,6 +10,15 @@ import { gpu } from "./atmosphere.js";
 /** How a preview scales the values it shows: as they are, by their maximum, or around their geometric mean. */
 export const SCALE = { none: 0, max: 1, mean: 2 };
 
+/** How each table is shown: transmittance as it is, multiple scattering by its maximum, the sky view tone mapped around
+ *  its geometric mean, since it spans from night to the sun's glow. Altitude up, like a plot; the sky view as seen, the
+ *  zenith at the top and its halves apart. */
+export const TABLE_PREVIEW = {
+    transmittance: { scale: SCALE.none, flip: true },
+    multiScattering: { scale: SCALE.max, flip: true },
+    skyView: { scale: SCALE.mean, flip: false, split: true },
+};
+
 /** The texel device pixel `p` of `pixels` shows in nearest filtering, exactly as the preview shader picks it. */
 export const texelOf = (p, n, pixels) => Math.floor(((2 * p + 1) * n) / (2 * pixels));
 

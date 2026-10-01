@@ -1,7 +1,17 @@
 import * as precise from "@himmelszelt/sternzeit";
 import Zdog from "zdog";
 import { onDemand } from "../frame.js";
-import { COMPASS, cssColor, gridLine, labelAboveY, moonSymbol, sunInViewFrame, sunSymbol, svgText } from "./figure.js";
+import {
+    COMPASS,
+    cssColor,
+    gridLine,
+    labelAboveY,
+    moonSymbol,
+    SUN_SYMBOL,
+    sunInViewFrame,
+    sunSymbol,
+    svgText,
+} from "./figure.js";
 import { aboveVisibleHorizon } from "./horizon.js";
 import { offPanelArrow, offPanelArrowSvg } from "./offpanel.js";
 import { ephemerisDay, onChange, state } from "./state.js";
@@ -306,20 +316,15 @@ function tangentPx(degreesFromCenter) {
 // The horizon's fixed height, in panel units (0 = panel center, positive = downward): where the horizon line is drawn
 // and the compass labels sit (see updateAltAzPanel).
 const ALTAZ_HORIZON_Y = -tangentPx(-ALTAZ_LOOK_UP_DEG);
-const ALTAZ_DOT_RADIUS = 5;
 const ALTAZ_GRID_ALTITUDES = [30, 60];
-// Mini versions of the main scene's sunrays (see SUN_RAY_COUNT above): cheaper to read at a glance than an
-// "S"/"M" text label, and reuses a motif the viewer already knows means "this one's the sun" from the main
-// scene, rather than introducing a new convention.
-const ALTAZ_SUN_RAY_GAP = 3;
-const ALTAZ_SUN_RAY_LENGTH = 5;
 
 // A fixed per-species look, regardless of anchor/other role: the sun is a white disc plus rays, the moon carries its
 // phase, lit towards wherever the sun stands in the same panel. The anchor/other role is legible from position alone
 // (the anchor always sits at dead-center horizontally).
-function altAzBody(point, isSun, towardsSun, lit, earthshine) {
-    if (isSun) return sunSymbol(point.x, point.y, ALTAZ_DOT_RADIUS, ALTAZ_SUN_RAY_GAP, ALTAZ_SUN_RAY_LENGTH);
-    return moonSymbol(point.x, point.y, ALTAZ_DOT_RADIUS, lit, towardsSun.x, towardsSun.y, earthshine);
+function altAzBody(point, isSun, unitsPerPx, towardsSun, lit, earthshine) {
+    if (isSun) return sunSymbol(point.x, point.y, unitsPerPx);
+    const radius = SUN_SYMBOL.radius * unitsPerPx;
+    return moonSymbol(point.x, point.y, radius, lit, towardsSun.x, towardsSun.y, earthshine);
 }
 
 function makeAltAzPanel(elementSelector, anchorIsSun) {
@@ -384,7 +389,7 @@ function updateAltAzPanel(panel, anchorHorizontal, otherHorizontal, lit, earthsh
         svg += svgText(tangentPx(d), labelAboveY(ALTAZ_HORIZON_Y, unitsPerPx), label, "figure-label", unitsPerPx);
     });
     // The sun before the moon, whichever is the anchor, so the moon renders in front whenever the two nearly overlap.
-    svg += altAzBody(sunPoint, true) + altAzBody(moonPoint, false, towardsSun, lit, earthshine);
+    svg += altAzBody(sunPoint, true, unitsPerPx) + altAzBody(moonPoint, false, unitsPerPx, towardsSun, lit, earthshine);
     // A body outside the panel, usually far below the horizon, gets the shared off-panel arrow (see offpanel.js).
     for (const [point, isSun] of [
         [sunPoint, true],

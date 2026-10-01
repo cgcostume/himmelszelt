@@ -4,7 +4,9 @@ import { paintRange } from "../range.js";
 import { state } from "../sternzeit/state.js";
 import { bindRefractionToggle, gpu, onSkyView, onTables, quality, recompute, tables } from "./atmosphere.js";
 import { formatBytes, saveHdr, savePng } from "./download.js";
-import { createPreview, renderPixels, SCALE, texelOf } from "./preview.js";
+import { geometry, multiScatteringAt, skyViewAt, transmittanceAt } from "./lutmap.js";
+import { pick, picked, unpoint } from "./pick.js";
+import { createPreview, renderPixels, TABLE_PREVIEW, texelOf } from "./preview.js";
 
 const root = document.querySelector("#tables");
 const field = (name) => root.querySelector(`[data-field="${name}"]`);
@@ -12,17 +14,12 @@ const lut = (name) => root.querySelector(`[data-lut="${name}"]`);
 
 const luminance = (d, i) => 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
 
-// Each table by its own scale: transmittance as it is, multiple scattering by its maximum, the sky view tone mapped
-// around its geometric mean, since it spans from night to the sun's glow.
-const SCALES = { transmittance: SCALE.none, multiScattering: SCALE.max, skyView: SCALE.mean };
-
 const DEG = 180 / Math.PI;
 const shown = {};
 const previews = {};
 // How each table is shown: texel by texel, or interpolated between texel centers as the shaders sample it.
 const filters = { transmittance: "nearest", multiScattering: "nearest", skyView: "nearest" };
-// Altitude up, like a plot; the sky view as seen, the zenith at the top.
-const flipped = (name) => name !== "skyView";
+const flipped = (name) => TABLE_PREVIEW[name].flip;
 const part = (name, field) => lut(name).querySelector(`[data-field="${field}"]`);
 
 const modelLine = () =>
@@ -70,7 +67,11 @@ function show(name, texture) {
     const heightKm = clampObserverHeight(state.heightM) / 1000;
     // Read back only when pointed at, for the readouts.
     shown[name] = { texture, width, height, data: null, model, heightKm };
-    part(name, "image").parentElement.style.aspectRatio = `${width} / ${height}`;
+    // Framed in the default size's shape whatever the size, so resizing a table does not move the page; its own size
+    // on top.
+    const shape = DEFAULT_TEXTURE_CONFIG[name];
+    part(name, "image").parentElement.style.aspectRatio = `${shape.width} / ${shape.height}`;
+    part(name, "size").textContent = `${width}×${height}`;
     part(name, "info").textContent = `${texture.format}, ${formatBytes(width * height * 8)}`;
     paint(name);
 }
@@ -101,49 +102,19 @@ function paint(name) {
     Object.assign(overlay, { width: image.width, height: image.height });
     table.columns = cells(table.width, image.width);
     table.rows = cells(table.height, image.height);
-    if (table.hover) highlight(name, table.hover);
+    drawOverlay(name);
 }
 
-// The tables' mappings inverted, in double precision: what a texel stands for. Twins of lut.wgsl's.
-function geometry(model) {
-    const Rg = model.planet.groundRadiusKm;
-    const Rt = Rg + model.planet.thicknessKm;
-    const HR = model.rayleigh.scaleHeightKm;
-    const n = (h) => 1 + model.refractivity * Math.exp(-h / HR);
-    const toTop = (r, mu) => -r * mu + Math.sqrt(Math.max(r * r * (mu * mu - 1) + Rt * Rt, 0));
-    return {
-        Rg,
-        Rt,
-        top: Rt - Rg,
-        toTop,
-        horizonMu(h) {
-            const nr = n(h) * (Rg + h);
-            const n0 = n(0) * Rg;
-            return -Math.sqrt(Math.max(nr * nr - n0 * n0, 0)) / nr;
-        },
-        muMin(r) {
-            const m = 1.1 * model.refractivity * Math.sqrt((2 * Math.PI * Rg) / HR);
-            const rho = Math.sqrt(r * r - Rg * Rg);
-            return (-rho / r) * Math.cos(m) - (Rg / r) * Math.sin(m);
-        },
-    };
-}
-
-const unit = (i, n) => (n > 1 ? i / (n - 1) : 0);
 const fixed = (v, digits) => v.toFixed(digits);
 const rgb = (d, i, digits) => `${fixed(d[i], digits)} ${fixed(d[i + 1], digits)} ${fixed(d[i + 2], digits)}`;
 const exp = (v) => v.toExponential(2);
 
 // What a texel stands for: short values for the two axes, and the lines of the tooltip.
 const READOUTS = {
-    transmittance({ width, height, data, model }, x, y, i) {
-        const g = geometry(model);
-        const H = Math.sqrt(g.Rt * g.Rt - g.Rg * g.Rg);
-        const rho = H * unit(y, height);
-        const r = Math.sqrt(rho * rho + g.Rg * g.Rg);
-        const dMin = g.Rt - r;
-        const d = dMin + unit(x, width) * (g.toTop(r, g.muMin(r)) - dMin);
-        const mu = d > 0 ? Math.min(Math.max((H * H - rho * rho - d * d) / (2 * r * d), -1), 1) : 1;
+    transmittance(table, x, y, i) {
+        const g = geometry(table.model);
+        const { r, mu, d } = transmittanceAt(g, table, x, y);
+        const { data } = table;
         const angle = Math.asin(mu) * DEG;
         return {
             x: `${fixed(angle, 2)}°`,
@@ -156,29 +127,25 @@ const READOUTS = {
             ],
         };
     },
-    multiScattering({ width, height, data, model }, x, y, i) {
-        const g = geometry(model);
-        const muS = unit(x, width) * 2 - 1;
-        const altitude = unit(y, height) * g.top;
+    multiScattering(table, x, y, i) {
+        const { altitude, muS } = multiScatteringAt(geometry(table.model), table, x, y);
+        const { data } = table;
         return {
             x: `${fixed(Math.asin(muS) * DEG, 1)}°`,
             y: `${fixed(altitude, 1)} km`,
             lines: [
                 `altitude ${fixed(altitude, 2)} km`,
                 `sun ${fixed(Math.asin(muS) * DEG, 2)}° high, μs ${fixed(muS, 4)}`,
-                `per unit of sunlight and scattering ${rgb(data, i, 4)}`,
+                `per unit of sunlight and scattering ${exp(data[i])} ${exp(data[i + 1])} ${exp(data[i + 2])}`,
             ],
         };
     },
-    skyView({ width, height, data, model, heightKm }, x, y, i) {
-        const g = geometry(model);
-        const h = Math.min(Math.max(heightKm, 1e-6), g.top);
-        const zenithHorizon = Math.acos(g.horizonMu(h));
-        const v = unit(y, height);
-        const t = v < 0.5 ? 1 - v * 2 : v * 2 - 1;
-        const below = v < 0.5 ? -zenithHorizon * t * t : (Math.PI - zenithHorizon) * t * t;
-        const s = unit(x, width);
-        const azimuth = Math.acos(Math.min(Math.max(1 - 2 * s * s, -1), 1)) * DEG;
+    skyView(table, x, y, i) {
+        const g = geometry(table.model);
+        const h = Math.min(Math.max(table.heightKm, 1e-6), g.top);
+        const { below, zenithHorizon, ...view } = skyViewAt(g, table, h, x, y);
+        const azimuth = view.azimuth * DEG;
+        const { data } = table;
         const bend = Math.asin(Math.min(Math.max(data[i + 3], -1), 1)) * DEG * 60;
         return {
             x: `${fixed(azimuth, 1)}°`,
@@ -196,11 +163,14 @@ const READOUTS = {
 };
 
 // The hovered texel's row and column lit faintly, the texel itself outlined.
-function highlight(name, { column, row }) {
+function drawOverlay(name) {
     const table = shown[name];
+    if (!table?.columns) return;
     const overlay = part(name, "overlay");
     const context = overlay.getContext("2d");
     context.clearRect(0, 0, overlay.width, overlay.height);
+    if (!table.hover) return;
+    const { column, row } = table.hover;
     const [x0, x1] = [table.columns.start[column], table.columns.start[column + 1]];
     const [y0, y1] = [table.rows.start[row], table.rows.start[row + 1]];
     context.fillStyle = "rgba(255, 255, 255, 0.14)";
@@ -209,6 +179,22 @@ function highlight(name, { column, row }) {
     context.strokeStyle = getComputedStyle(root).getPropertyValue("--accent");
     context.lineWidth = Math.max(1, window.devicePixelRatio || 1);
     context.strokeRect(x0 - 0.5, y0 - 0.5, x1 - x0 + 1, y1 - y0 + 1);
+}
+
+// What the texel under the pointer stands for, as a ray to pick: the other tables and figures follow it.
+function rayAt(name, x, y) {
+    const table = shown[name];
+    const g = geometry(table.model);
+    if (name === "transmittance") {
+        const { r, mu } = transmittanceAt(g, table, x, y);
+        return { kind: name, r, mu };
+    }
+    if (name === "multiScattering") return { kind: name, ...multiScatteringAt(g, table, x, y) };
+    const h = Math.min(Math.max(table.heightKm, 1e-6), g.top);
+    const { mu, azimuth } = skyViewAt(g, table, h, x, y);
+    // The table holds one side of the sun; the ray stays on the side it was on.
+    const current = picked();
+    return { kind: "view", mu, azimuth: current.kind === "view" && current.azimuth < 0 ? -azimuth : azimuth };
 }
 
 // Marks on the axes where the texel sits, with its values, like the axes' own end labels.
@@ -222,9 +208,24 @@ function mark(name, axis, fraction, text) {
     marker.style.insetInlineStart = `${(axis === "y" ? 1 - fraction : fraction) * 100}%`;
 }
 
+/** The texel under the pointer: its column and row as shown, and its coordinates as stored. */
+function texelAt(name, event) {
+    const table = shown[name];
+    const image = part(name, "image");
+    const rect = image.getBoundingClientRect();
+    const px = Math.floor(((event.clientX - rect.left) / rect.width) * image.width);
+    const py = Math.floor(((event.clientY - rect.top) / rect.height) * image.height);
+    const column = table.columns.texel[Math.min(Math.max(px, 0), image.width - 1)];
+    const row = table.rows.texel[Math.min(Math.max(py, 0), image.height - 1)];
+    return { column, row, x: column, y: flipped(name) ? table.height - 1 - row : row };
+}
+
 function hover(name, event) {
     const table = shown[name];
     if (!table?.columns) return;
+    const { column, row, x, y } = texelAt(name, event);
+    table.hover = { column, row };
+    pick(rayAt(name, x, y));
     if (!table.data) {
         // The texels, read back once per table, then the readout for wherever the pointer is by then.
         table.pointer = event;
@@ -234,17 +235,7 @@ function hover(name, event) {
         });
         return;
     }
-    const image = part(name, "image");
-    const rect = image.getBoundingClientRect();
-    const px = Math.floor(((event.clientX - rect.left) / rect.width) * image.width);
-    const py = Math.floor(((event.clientY - rect.top) / rect.height) * image.height);
-    const column = table.columns.texel[Math.min(Math.max(px, 0), image.width - 1)];
-    const row = table.rows.texel[Math.min(Math.max(py, 0), image.height - 1)];
-    table.hover = { column, row };
-    highlight(name, table.hover);
-
-    const x = column;
-    const y = flipped(name) ? table.height - 1 - row : row;
+    const rect = part(name, "image").getBoundingClientRect();
     const readout = READOUTS[name](table, x, y, (y * table.width + x) * 4);
     const center = (start, i, n) => (start[i] + start[i + 1]) / 2 / start[n];
     mark(name, "x", center(table.columns.start, column, table.width), readout.x);
@@ -266,12 +257,7 @@ function hover(name, event) {
     tip.style.bottom = below ? "" : `${rect.height - top + 16}px`;
 }
 
-const previewOptions = (name) => ({
-    filter: filters[name],
-    scale: SCALES[name],
-    flip: flipped(name),
-    split: name === "skyView",
-});
+const previewOptions = (name) => ({ ...TABLE_PREVIEW[name], filter: filters[name] });
 
 // A texel a pixel, the rows as shown: tone mapped for PNG, the values themselves for HDR.
 async function download(name, format) {
@@ -293,8 +279,8 @@ async function download(name, format) {
 function leave(name) {
     const table = shown[name];
     if (table) Object.assign(table, { hover: null, pointer: null });
-    const overlay = part(name, "overlay");
-    overlay.getContext("2d").clearRect(0, 0, overlay.width, overlay.height);
+    unpoint();
+    drawOverlay(name);
     part(name, "tip").hidden = true;
     mark(name, "x", 0, null);
     mark(name, "y", 0, null);
@@ -368,6 +354,11 @@ if (gpu.error) {
         const image = part(name, "image");
         image.addEventListener("pointermove", (event) => hover(name, event));
         image.addEventListener("pointerleave", () => leave(name));
+        image.addEventListener("click", (event) => {
+            if (!shown[name]?.columns) return;
+            const { x, y } = texelAt(name, event);
+            pick(rayAt(name, x, y), true);
+        });
         new ResizeObserver(() => paint(name)).observe(image);
     }
     for (const radio of root.querySelectorAll("[data-filter]")) {
