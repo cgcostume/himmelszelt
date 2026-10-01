@@ -1,9 +1,10 @@
 // The passes' switches, pipeline-overridable like the sample counts in `quality.wgsl`: set once when a pass is made,
 // so what is off compiles out instead of branching per pixel, and the uniforms keep only what changes per frame.
 
-// Tone map for a display: exposed, compressed into [0, 1] and sRGB encoded, for an 8-bit target. Off, the sky pass
-// writes the exposed luminance itself, linear and unclamped, for a float target and a renderer that tone maps the frame.
-override DK_TONE_MAP: bool = true;
+// Tone map for a display: exposed, compressed into [0, 1] and sRGB encoded, for an 8-bit target, by Khronos PBR Neutral
+// (1) or AgX (2), see tonemap.wgsl. Off (0), the sky pass writes the exposed luminance itself, linear and unclamped,
+// for a float target and a renderer that tone maps the frame.
+override DK_TONE_MAP: u32 = 1u;
 
 // Dither the tone mapped output by one 8-bit step against the bands smooth gradients show on an 8-bit target.
 override DK_DITHER: bool = true;

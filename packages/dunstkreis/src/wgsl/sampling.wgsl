@@ -31,5 +31,5 @@ fn dkSampleMultiScattering(
     muS: f32,
 ) -> vec3f {
     let size = vec2f(textureDimensions(lut));
-    return textureSampleLevel(lut, lutSampler, dkMultiScatteringUv(a, h, muS, size), 0.0).rgb;
+    return dkMultiScatteringDecode(textureSampleLevel(lut, lutSampler, dkMultiScatteringUv(a, h, muS, size), 0.0).rgb);
 }

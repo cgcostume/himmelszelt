@@ -9,7 +9,7 @@ import {
     type SkyParams,
     type SkyPass,
 } from "./pass.js";
-import { type Features, featureConstants, pipelineConstants, refractionConstants } from "./quality.js";
+import { type Features, featureConstants, pipelineConstants, refractionConstants, type ToneCurve } from "./quality.js";
 import * as wgsl from "./wgsl/index.js";
 
 export interface SkyPassOptions {
@@ -21,11 +21,11 @@ export interface SkyPassOptions {
      */
     format: GPUTextureFormat;
     /**
-     * Tone map for a display: exposed, compressed into [0, 1] and sRGB encoded, for an 8-bit target. Default true. Off,
-     * the pass writes the exposed luminance itself, linear and unclamped, for a float target and a renderer that tone
-     * maps the whole frame.
+     * Tone map for a display: exposed, compressed into [0, 1] and sRGB encoded, for an 8-bit target, by "neutral", the
+     * default, or "agx" (`ToneCurve`). `false` writes the exposed luminance itself, linear and unclamped, for a float
+     * target and a renderer that tone maps the whole frame, with `wgsl.tonemap` if it likes.
      */
-    toneMap?: boolean;
+    toneMap?: ToneCurve | false;
     /** Dither the tone mapped output against banding, by default for an 8-bit target only. */
     dither?: boolean;
     /**
@@ -39,8 +39,10 @@ export interface SkyPassOptions {
     /** Draw the sun disc. Default true. */
     sunDisc?: boolean;
     /**
-     * Samples of the sky gathering its light on the ground, 64 by default, spread by Vogel's spiral: the ground below the
-     * horizon is then lit by the sky as well as the sun. 0 leaves it lit by the sun alone, a sky-view dispatch cheaper.
+     * Samples of the sky gathering its light on the ground, 1024 by default, spread by Vogel's spiral: the ground below
+     * the horizon is then lit by the sky as well as the sun. 0.2% off; 256 is 1.2% off, 64 up to 12% with a low sun,
+     * whose glow few samples hit or miss; no better beyond 2048. Gathered by a workgroup, it costs next to nothing. 0
+     * leaves the ground lit by the sun alone, a sky-view dispatch cheaper.
      */
     groundSamples?: number;
 }
@@ -74,8 +76,14 @@ const EIGHT_BIT = ["rgba8unorm", "bgra8unorm"];
 export async function createSkyPass(device: GPUDevice, options: SkyPassOptions): Promise<SkyPass> {
     const { luts, format } = options;
     const { config, model } = luts;
-    const { toneMap = true, autoExposure = false, debugGrid = false, sunDisc = true, groundSamples = 64 } = options;
-    const dither = options.dither ?? (toneMap && EIGHT_BIT.includes(format));
+    const {
+        toneMap = "neutral",
+        autoExposure = false,
+        debugGrid = false,
+        sunDisc = true,
+        groundSamples = 1024,
+    } = options;
+    const dither = options.dither ?? (toneMap !== false && EIGHT_BIT.includes(format));
     if (!Number.isInteger(groundSamples) || groundSamples < 0) {
         throw new Error("dunstkreis: groundSamples is a count, 0 for none");
     }
@@ -99,7 +107,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         wgsl.frame,
     ];
     // Everything but the output, which differs between an image and a cube map.
-    const skySource = (output: string) => [...prelude, wgsl.cube, wgsl.sun, output, wgsl.sky].join("\n");
+    const skySource = (output: string) => [...prelude, wgsl.cube, wgsl.sun, wgsl.tonemap, output, wgsl.sky].join("\n");
 
     const skyView = createLut(device, "dunstkreis:skyView", config.skyView.width, config.skyView.height);
     // Everything that changes per frame, read by every pass here: the sky-view table, the meter and the sky pass.
@@ -118,7 +126,9 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
 
     // The sky-view table in one step, or with the ground lit by the sky in three: the sky, the sky's light on the
     // ground gathered from it, the ground. See skyview.comp.wgsl.
-    const skyViewModule = device.createShaderModule({ code: [...prelude, wgsl.skyview].join("\n") });
+    const skyViewModule = device.createShaderModule({
+        code: [wgsl.workgroupSum(64, device.features.has("subgroups")), ...prelude, wgsl.skyview].join("\n"),
+    });
     const groundLit = groundSamples > 0;
     const skyViewStep = (entryPoint: string, skyViewRows: 0 | 1 | 2) =>
         device.createComputePipelineAsync({

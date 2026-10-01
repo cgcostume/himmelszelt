@@ -1,13 +1,13 @@
 // Hillaire's sky-view LUT, recomputed per frame. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`,
-// `sampling.wgsl`, `raymarch.wgsl`, `frame.wgsl`, `quality.wgsl` and `features.wgsl`. A pass, so it declares its
-// bindings.
+// `sampling.wgsl`, `raymarch.wgsl`, `frame.wgsl`, `quality.wgsl`, `features.wgsl` and `workgroupSum(64, ...)` from
+// `reduce.ts`, first. A pass, so it declares its bindings.
 //
 // The ground below the horizon is lit by the sky as well as the sun, in three steps: the table's upper half, the sky,
 // with DK_SKY_VIEW_ROWS 1; then `dkGroundIrradiance` gathers the sky's light on the ground from it; then the lower
 // half with both, DK_SKY_VIEW_ROWS 2. The sky's rays never reach the ground, so the upper half does not depend on the
 // lower one. Without the sky's light on the ground, one dispatch writes all of it, DK_SKY_VIEW_ROWS 0.
 //
-// Cheap enough to rebuild every frame (a 192x108 table, 30 samples each) and it turns the sky pass into a
+// Cheap enough to rebuild every frame (a 256x144 table, 30 samples each) and it turns the sky pass into a
 // single texture fetch per pixel. The sun's position is baked into it, so it has to follow the sun; the
 // transmittance and multiple-scattering tables above it do not, and are only rebuilt when the model changes.
 
@@ -71,14 +71,14 @@ fn dkPrecomputeSkyView(@builtin(global_invocation_id) id: vec3u) {
 // The sky's irradiance on the ground: its luminance over the hemisphere above, cosine-weighted, from points spread
 // evenly over the unit disc by Vogel's spiral and lifted onto the hemisphere (Malley's method), so the plain mean times
 // pi is the irradiance. Read from the table, so from the observer's altitude: close enough near the ground, too dark
-// high up, where less sky is above than above the ground.
-@compute @workgroup_size(1)
-fn dkGroundIrradiance() {
+// high up, where less sky is above than above the ground. The 64 invocations of one workgroup share the points.
+@compute @workgroup_size(64)
+fn dkGroundIrradiance(@builtin(local_invocation_index) index: u32) {
     let a = dkAtmosphere;
     let h = clamp(dkParams.observerAltitude, 0.0, a.Rt - a.Rg);
     let size = vec2f(textureDimensions(dkSkyViewIn));
     var sum = vec3f(0.0);
-    for (var i = 0u; i < DK_SAMPLES_GROUND; i = i + 1u) {
+    for (var i = index; i < DK_SAMPLES_GROUND; i = i + 64u) {
         // The squared radius is uniform over the disc: the sine of the angle from the zenith, squared.
         let r2 = (f32(i) + 0.5) / f32(DK_SAMPLES_GROUND);
         let mu = sqrt(1.0 - r2);
@@ -86,5 +86,8 @@ fn dkGroundIrradiance() {
         let uv = dkSkyViewUv(a, h, mu, cosAzimuth, size);
         sum = sum + textureSampleLevel(dkSkyViewIn, dkLutSampler, vec2f(uv.x, min(uv.y, 0.5 - 0.5 / size.y)), 0.0).rgb;
     }
-    dkMetering.groundLight = DK_PI * sum / f32(DK_SAMPLES_GROUND);
+    let total = dkWorkgroupSum(vec4f(sum, 0.0), index);
+    if (index == 0u) {
+        dkMetering.groundLight = DK_PI * total.rgb / f32(DK_SAMPLES_GROUND);
+    }
 }

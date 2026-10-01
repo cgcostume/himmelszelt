@@ -12,6 +12,12 @@ import * as wgsl from "./wgsl/index.js";
 /** rgba16float everywhere: enough range for physical radiance, half the bandwidth of rgba32float. */
 const LUT_FORMAT: GPUTextureFormat = "rgba16float";
 
+/**
+ * The multiple-scattering table holds log2 of its values plus this, see `dkMultiScatteringEncode` in lut.wgsl: a value
+ * read back is `2 ** (stored - MULTI_SCATTERING_LOG2_OFFSET)`.
+ */
+export const MULTI_SCATTERING_LOG2_OFFSET = 12;
+
 const WORKGROUP = 8;
 export const dispatch = (n: number) => Math.ceil(n / WORKGROUP);
 

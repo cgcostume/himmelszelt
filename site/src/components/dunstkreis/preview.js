@@ -1,4 +1,4 @@
-import { wgsl } from "@himmelszelt/dunstkreis";
+import { MULTI_SCATTERING_LOG2_OFFSET, wgsl } from "@himmelszelt/dunstkreis";
 import { gpu } from "./atmosphere.js";
 
 /**
@@ -15,7 +15,8 @@ export const SCALE = { none: 0, max: 1, mean: 2 };
  *  zenith at the top and its halves apart. */
 export const TABLE_PREVIEW = {
     transmittance: { scale: SCALE.none, flip: true },
-    multiScattering: { scale: SCALE.max, flip: true },
+    // Stored as log2, decoded to the values themselves.
+    multiScattering: { scale: SCALE.max, flip: true, log2: true },
     skyView: { scale: SCALE.mean, flip: false, split: true },
 };
 
@@ -34,6 +35,12 @@ struct Params {
     // Cube: the mip level, and whether it is cubified.
     level: f32,
     cubified: u32,
+    // Stored as log2 plus an offset, as dunstkreis' multiple-scattering table.
+    log2: u32,
+}
+
+fn decoded(c: vec3f) -> vec3f {
+    return select(c, exp2(c - ${MULTI_SCATTERING_LOG2_OFFSET}.0), params.log2 != 0u);
 }
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -77,7 +84,7 @@ fn reduce(@builtin(local_invocation_index) index: u32) {
             : `let size = textureDimensions(source);
     count = size.x * size.y;
     for (var i = index; i < count; i = i + THREADS) {
-        sum = gather(textureLoad(source, vec2u(i % size.x, i / size.x), 0).rgb, sum);
+        sum = gather(decoded(textureLoad(source, vec2u(i % size.x, i / size.x), 0).rgb), sum);
     }`
     }
     sums[index] = sum;
@@ -135,7 +142,8 @@ fn display(@builtin(global_invocation_id) id: vec3u) {
             uv.y = select(max(uv.y, 0.5 + half), min(uv.y, 0.5 - half), fraction.y < 0.5);
         }
         c = textureSampleLevel(source, linearSampler, uv, 0.0).rgb;
-    }`
+    }
+    c = decoded(c);`
     }
     textureStore(output, vec2i(id.xy), vec4f(${format === "rgba8unorm" ? "toneMap(c)" : "c"}, 1.0));
 }
@@ -168,14 +176,15 @@ let samplers = null;
 function encode(encoder, texture, options, output, width, height, format, buffers) {
     const { device } = gpu;
     const { cube = false, filter = "nearest", scale = SCALE.none, flip = false, split = false } = options;
-    const { level = 0, cubified = false } = options;
+    const { level = 0, cubified = false, log2 = false } = options;
     samplers ??= {
         linear: device.createSampler({ magFilter: "linear", minFilter: "linear" }),
         nearest: device.createSampler(),
     };
     const { reduce, display } = pipelinesFor(cube, format);
     const data = new ArrayBuffer(32);
-    new Uint32Array(data).set([scale, filter === "linear" ? 1 : 0, flip ? 1 : 0, split ? 1 : 0, 0, cubified ? 1 : 0]);
+    const flags = [scale, filter === "linear" ? 1 : 0, flip ? 1 : 0, split ? 1 : 0, 0, cubified ? 1 : 0, log2 ? 1 : 0];
+    new Uint32Array(data).set(flags);
     new Float32Array(data)[4] = level;
     device.queue.writeBuffer(buffers.params, 0, data);
     const all = [
@@ -196,7 +205,7 @@ function encode(encoder, texture, options, output, width, height, format, buffer
     // The linear output needs no scale; the tone mapped one reads it in every mode but "none".
     if (scale !== SCALE.none && format === "rgba8unorm") {
         pass.setPipeline(reduce);
-        pass.setBindGroup(0, bindGroup(reduce, cube ? [0, 1, 2, 4] : [1, 4]));
+        pass.setBindGroup(0, bindGroup(reduce, cube ? [0, 1, 2, 4] : [0, 1, 4]));
         pass.dispatchWorkgroups(1);
     }
     pass.setPipeline(display);

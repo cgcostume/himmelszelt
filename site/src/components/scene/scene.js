@@ -14,6 +14,7 @@ const source = [
     goldenSet("goldenSet64", GOLDEN_SET_64),
     wgsl.cube,
     wgsl.sun,
+    wgsl.tonemap,
     scene,
 ].join("\n");
 
@@ -119,7 +120,7 @@ export function createScene(device) {
          * the ground's, 1 by default, thin the veil and the haze. `discDirection` and `discIlluminance`, the sun as the
          * camera sees it from its own height, the sun's by default, place and light the disc and its veil; `horizonZ`,
          * the planet's horizon as the camera sees it, hides the disc below it, -1 by default for none. `dither`, on by
-         * default, dithers the 8-bit output against banding.
+         * default, dithers the 8-bit output against banding. `toneCurve`, "neutral" by default or "agx", as dunstkreis'.
          */
         encode(
             encoder,
@@ -153,6 +154,7 @@ export function createScene(device) {
             data[116] = rest.hazeDensity ?? 1;
             flags[117] = rest.cubified ? 1 : 0;
             flags[118] = rest.dither === false ? 0 : 1;
+            flags[119] = rest.toneCurve === "agx" ? 2 : 1;
             data.set(rest.discDirection ?? sunDirection, 120);
             data[123] = rest.horizonZ ?? -1;
             data.set(rest.discIlluminance ?? sunIlluminance, 124);

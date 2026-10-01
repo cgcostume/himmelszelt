@@ -32,6 +32,7 @@ import sampling from "./sampling.wgsl";
 import sky from "./sky.comp.wgsl";
 import skyview from "./skyview.comp.wgsl";
 import sun from "./sun.wgsl";
+import tonemap from "./tonemap.wgsl";
 import transmittance from "./transmittance.comp.wgsl";
 
 export { skyCubeOutput, skyOutput } from "./output.js";
@@ -54,6 +55,7 @@ export {
     sky,
     skyview,
     sun,
+    tonemap,
     transmittance,
 };
 

@@ -23,8 +23,8 @@ The sky follows Hillaire 2020 on the model osgHimmel took from Bruneton & Neyret
 | table | size | computed |
 |---|---|---|
 | transmittance | 256x64 | once per model, `precomputeAtmosphere()` |
-| multiple scattering | 32x32 | once per model, `precomputeAtmosphere()` |
-| sky view | 192x108 | whenever the Sun or the observer moves, by the pass from `createSkyPass()` |
+| multiple scattering | 64x64 | once per model, `precomputeAtmosphere()` |
+| sky view | 256x144 | whenever the Sun or the observer moves, by the pass from `createSkyPass()` |
 
 Hillaire's multiple-scattering term is infinite-order under an isotropic assumption, where Bruneton's is a fixed number
 of orders; for the Earth's air the two look nearly alike. Bruneton's four-dimensional inscatter table (32x128x32x8,
@@ -103,11 +103,11 @@ twilight, amplified to where the f16 table runs out of precision. Then the floor
 
 To do: high up, and from space, the metered exposure still looks too bright, if only subjectively.
 
-With `toneMap` on, the default, the pass writes display colors for an 8-bit target: exposed, mapped by Narkowicz's
-ACES fit, sRGB encoded and, for an 8-bit target, dithered by interleaved gradient noise (Jimenez 2014), remapped to a
+With `toneMap`, the pass writes display colors for an 8-bit target: exposed, mapped by Khronos PBR Neutral (`"neutral"`, the
+default), which keeps colors as they are up to 0.76 and compresses only above, or AgX (`"agx"`), whose bright colors
+fade towards white as film does, flatter and greyer by day, sRGB encoded and, for an 8-bit target, dithered by interleaved gradient noise (Jimenez 2014), remapped to a
 triangular distribution, from the pixel alone, without a texture. Off, it writes the exposed luminance, linear and unclamped, for a float target and
-a renderer that tone maps the frame itself. osgHimmel used Bruneton's curve, which had the encoding built in and was
-tuned to its own arbitrary units.
+a renderer that tone maps the frame itself, with `wgsl.tonemap` if it likes.
 
 ## The ground
 
@@ -135,6 +135,36 @@ The sun and the sky light a scene apart, the usual split for image-based lightin
   and writes an irradiance cube map from them, 32x32 per face, in lux. It takes any cube map, the sky's or an HDR
   environment's, and may move to `@himmelszelt/rundbild` once that exists. An rgba32float source is read through a
   nearest sampler unless the device has "float32-filterable".
+
+## Quality and cost
+
+Every sample count and table size is a parameter (`PrecomputedTextureConfig`, `groundSamples` and the cube pass'
+`samples`). Measured on the luminance against references with many more samples or four times the texels, over a sun
+1.7° up, 5.7° and 12° down and 45° up. Errors are mean and worst; GPU time on an RX 7900 XT, which an integrated or
+mobile GPU may take 20 to 50 times as long for.
+
+| parameter | default | faster | quality | no better beyond | error at the default | cost |
+|---|---|---|---|---|---|---|
+| transmittance samples | 100 | 40: 0.08%, the sun's horizon cutoff off by a texel here and there | 100 | 128 | 0.01%, 0.13% | 0.9 ms once, linear |
+| multiple-scattering samples | 40 | 20: 0.26%, 4.9% | 40 | 64 (half floats) | 0.1%, 5% | 0.35 ms once |
+| sky-view samples | 30 | 15 to 20: 0.2%, 3% | 40: 0.09%, 0.7% | 64 | 0.14%, 1.2% | 0.07 ms per rebuild |
+| ground samples | 1024 | 256: 1.2% | 1024 | 2048 | 0.2% | negligible |
+
+| table | default | its effect on the sky at the default | larger | cost |
+|---|---|---|---|---|
+| transmittance | 256x64 | 0.09%, 3.6% in deep twilight | 512x128: halves both | 0.9 to 2 ms once |
+| multiple scattering | 64x64 | 0.9% with the sun 12° down, where 32x32 is 9% off | | 0.35 ms once, 0.11 at 32x32 |
+| sky view | 256x144 | 0.07%, 1% for the worst hundredth, around the sun; 192x108 doubles both | 384x216: halves both | 0.07 ms per rebuild, 0.12 at 384x216 |
+
+All three tables are read bilinearly, so their error is that of linear interpolation between texels: it shrinks with
+the square of the spacing where the values are smooth, and only where the mappings put texels sparse does it show.
+The multiple-scattering table stores log2 of its values (`MULTI_SCATTERING_LOG2_OFFSET`): they fall by orders of
+magnitude across the terminator, within a texel, and interpolated linearly the lit side's light leaked into the
+shadow, which made skies some 12° after sunset several times too bright. Interpolating the log2s is geometric, as the
+falloff is.
+
+Rays that go up march in steps growing with the square of the distance, dense at the eye, where the haze is: at 30
+samples that cut the sky view's worst error from 12% to 1.2%.
 
 ## Device requirements
 
@@ -223,11 +253,9 @@ Rolldown inlines the `.wgsl` files at build time, so `dist` reads nothing from d
 ### A note on testing shaders
 
 The WGSL is tested by executing it, against the TypeScript twins, via Dawn in-process (`tests/gpu.ts`), not
-in a browser: Playwright's bundled Chromium exposes no `navigator.gpu` at all, in any launch mode or behind
-any flag. Those tests are opt-in (`pnpm test:gpu`) because the `webgpu` package aborts or deadlocks the
-process in roughly one run in three, in plain node as much as under Playwright and regardless of the
-workload. It has never produced a *wrong* value, only crashes, so the pure-TypeScript tests carry the
-baseline and the GPU tests are run deliberately when touching WGSL.
+in a browser. Those tests are opt-in (`pnpm test:gpu`), since a CI runner has no GPU, so the pure-TypeScript
+tests carry the baseline there; run them when touching WGSL. The crashes and deadlocks they used to suffer were not
+the binding's: the GPU instance from `create()` went unreferenced and was collected, taking the device with it.
 
 ## References
 
@@ -264,8 +292,10 @@ Echtzeit"](https://daniellimberger.de/resources/2012%20%E2%80%93%20Mueller%20%28
   sequence, the cube map's samples per texel.
 - H. Vogel, "A better way to construct the sunflower head" (Mathematical Biosciences, 1979): the spiral the ground's
   light is gathered on.
-- K. Narkowicz, ["ACES Filmic Tone Mapping Curve"](https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/)
-  (2016): the display tone curve.
+- T. Sobotka, [AgX](https://github.com/sobotka/AgX) (2023), in B. Wrensch's minimal fit,
+  ["Minimal AgX Implementation"](https://iolite-engine.com/blog_posts/minimal_agx_implementation) (2023): a display
+  tone curve.
+- Khronos Group, ["PBR Neutral"](https://github.com/KhronosGroup/ToneMapping/tree/main/PBR_Neutral) (2024): the other.
 - Maxime Heckel, ["On rendering the sky, sunsets and
   planets"](https://blog.maximeheckel.com/posts/on-rendering-the-sky-sunsets-and-planets/): a WebGL/three.js
   single-scattering raymarcher, and a fine introduction to the topic.

@@ -1,5 +1,5 @@
-// The sky after Hillaire, "A Scalable and Production Ready Sky and Atmosphere Rendering Technique" (EGSR 2020), on the
-// model osgHimmel took from Bruneton & Neyret: small tables precomputed per model, one of the whole sky per sun, and a
+// The sky after Hillaire, "A Scalable and Production Ready Sky and Atmosphere Rendering Technique" (EGSR 2020), on
+// Bruneton & Neyret's model: small tables precomputed per model, one of the whole sky per sun, and a
 // compute pass that writes it into the caller's target. Bruneton's four-dimensional table may come later as another
 // way to fill the sky-view table.
 
@@ -34,7 +34,7 @@ export {
 export { ATMOSPHERE_UNIFORM_SIZE, atmosphereUniformData } from "./uniforms.js";
 
 // Pipeline-overridable sample counts, for specializing a shader at pipeline creation.
-export type { QualityConstants } from "./quality.js";
+export type { QualityConstants, ToneCurve } from "./quality.js";
 export { DEFAULT_QUALITY, pipelineConstants } from "./quality.js";
 
 // What a device needs: the features and limits to request it with, and what one lacks.
@@ -43,7 +43,7 @@ export { skyRequirements, unmetRequirements } from "./requirements.js";
 
 // Precomputing the tables and rendering the sky with them.
 export type { PrecomputeOptions } from "./luts.js";
-export { precomputeAtmosphere } from "./luts.js";
+export { MULTI_SCATTERING_LOG2_OFFSET, precomputeAtmosphere } from "./luts.js";
 export type { SkyPassOptions } from "./sky.js";
 export { createSkyPass } from "./sky.js";
 

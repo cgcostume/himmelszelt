@@ -4,7 +4,7 @@
 //
 // This is what replaces Bruneton's 4D inscatter table and its ping-pong over scattering orders. The trick is
 // to assume multiply scattered light is isotropic, which makes each order a fixed fraction of the one before
-// it, so the whole infinite series collapses into a geometric sum: L2 / (1 - f). A 32x32 texture then holds
+// it, so the whole infinite series collapses into a geometric sum: L2 / (1 - f). A 64x64 texture then holds
 // every order at once, and there is nothing to iterate.
 
 @group(0) @binding(0) var<uniform> dkAtmosphere: DkAtmosphere;
@@ -78,7 +78,7 @@ fn dkIntegrateMultiScattering(a: DkAtmosphere, h: f32, direction: vec3f, sunDire
 }
 
 // One workgroup per texel, as in Hillaire's own: its 64 invocations trace a direction each, and the sums over them are
-// shared. Rather than one invocation tracing all 64, which leaves the GPU nearly idle on a 32x32 table.
+// shared. Rather than one invocation tracing all 64, which leaves the GPU nearly idle on a table this small.
 @compute @workgroup_size(64)
 fn dkPrecomputeMultiScattering(
     @builtin(workgroup_id) texel: vec3u,
@@ -112,6 +112,6 @@ fn dkPrecomputeMultiScattering(
     // perfectly conserving atmosphere and an infinite sum.
     let series = 1.0 / (1.0 - min(transfer, vec3f(0.999)));
     if (index == 0u) {
-        textureStore(dkMultiScatteringOut, vec2i(texel.xy), vec4f(luminance * series, 1.0));
+        textureStore(dkMultiScatteringOut, vec2i(texel.xy), vec4f(dkMultiScatteringEncode(luminance * series), 1.0));
     }
 }

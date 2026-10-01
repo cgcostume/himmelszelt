@@ -1,7 +1,17 @@
 import { apparentDirection, clampObserverHeight, createSkyPass } from "@himmelszelt/dunstkreis";
 import { onDemand } from "../frame.js";
 import { cameraFrame, createScene } from "../scene/scene.js";
-import { bindCubifyToggle, environment, gpu, onEnvironment, onTables, quality, tables } from "./atmosphere.js";
+import {
+    bindCubifyToggle,
+    display,
+    environment,
+    gpu,
+    onDisplay,
+    onEnvironment,
+    onTables,
+    quality,
+    tables,
+} from "./atmosphere.js";
 import { geometry } from "./lutmap.js";
 
 const DEG = Math.PI / 180;
@@ -167,6 +177,7 @@ function render() {
         sunLight: pressed("sunLight"),
         skyLight: pressed("skyLight"),
         dither: pressed("dither"),
+        toneCurve: display.toneCurve,
         ground: ground(),
         seconds,
     });
@@ -201,6 +212,7 @@ if (gpu.error) {
     // Rebuilds the sky map, which renders anew once it is in.
     bindCubifyToggle(root.querySelector("[data-cubify]"));
     onTables(requestRender);
+    onDisplay(requestRender);
     new ResizeObserver(requestRender).observe(canvas);
     for (const radio of root.querySelectorAll(
         'input[name="lighting-shadows"], input[name="lighting-background"], input[name="lighting-ground"], input[name="lighting-occlusion"], input[name="lighting-godrays"], input[name="lighting-bloom"]',

@@ -156,16 +156,20 @@ test("the horizon cosine and the ground-intersection test agree", async () => {
     test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
     if (!device) return;
 
-    // At the ground the horizon is exactly horizontal; higher up it dips below, by ~1 degree at 1 km. Both take the
-    // altitude, which f32 keeps exact down to a millimeter, where a radius near Rg resolves only ~0.5 m.
+    // At the ground the horizon is exactly horizontal; higher up it dips below, by ~1 degree at 1 km, less the air's
+    // bending: 0.90 degrees. Bouguer's invariant n r sin(z) in double precision gives it. Both take the altitude, which
+    // f32 keeps exact down to a millimeter, where a radius near Rg resolves only ~0.5 m.
+    const n = (h: number) => 1 + model.refractivity * Math.exp(-h / model.rayleigh.scaleHeightKm);
+    const horizonMu = (h: number) => -Math.sqrt((n(h) * (Rg + h)) ** 2 - (n(0) * Rg) ** 2) / (n(h) * (Rg + h));
     const [atGround, at1km, at1mm] = await evaluate("vec4f(dkHorizonMu(atmosphere, input.x))", [
         [0, 0],
         [1, 0],
         [1e-6, 0],
     ]);
     expect(atGround).toBeCloseTo(0, 6);
-    expect((Math.acos(at1km as number) * 180) / Math.PI - 90).toBeCloseTo(1.02, 1);
-    expect(at1mm).toBeCloseTo(-Math.sqrt(2 * Rg * 1e-6) / Rg, 9);
+    expect((Math.acos(at1km as number) * 180) / Math.PI - 90).toBeCloseTo(0.9, 1);
+    expect(at1km).toBeCloseTo(horizonMu(1), 6);
+    expect(at1mm).toBeCloseTo(horizonMu(1e-6), 9);
 
     // Just below the horizon hits ground, just above does not.
     const mu = at1km as number;

@@ -40,11 +40,28 @@ export const gpu = await acquire();
 
 /**
  * What the tables are computed with: refraction on or off, sizes and sample counts, and the samples of the sky that
- * light the ground in the sky-view table, 0, 8 or 64.
+ * light the ground in the sky-view table, 0 for none.
  */
-export const quality = { refraction: true, config: structuredClone(DEFAULT_TEXTURE_CONFIG), groundSamples: 64 };
+export const quality = { refraction: true, config: structuredClone(DEFAULT_TEXTURE_CONFIG), groundSamples: 1024 };
 
 const events = new EventTarget();
+
+/** How the page's figures show the sky on a display: the tone curve, "agx" or "neutral", shared by all of them. */
+export const display = { toneCurve: "neutral" };
+export const onDisplay = (listener) => events.addEventListener("display", () => listener(display));
+
+/** A tone curve button, one of several over the page: it shows the curve and switches every figure to the other. */
+export function bindToneCurveToggle(button) {
+    const show = () => {
+        button.textContent = display.toneCurve === "agx" ? "AgX" : "neutral";
+    };
+    show();
+    onDisplay(show);
+    button.addEventListener("click", () => {
+        display.toneCurve = display.toneCurve === "agx" ? "neutral" : "agx";
+        events.dispatchEvent(new Event("display"));
+    });
+}
 let current = null;
 let running = null;
 let again = false;

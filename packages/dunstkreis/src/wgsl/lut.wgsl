@@ -79,6 +79,18 @@ fn dkMultiScatteringUv(a: DkAtmosphere, h: f32, muS: f32, size: vec2f) -> vec2f 
     return vec2f(dkUnitToTextureCoord(xMuS, size.x), dkUnitToTextureCoord(xH, size.y));
 }
 
+// The table holds log2 of its values: they fall by orders of magnitude across the terminator, within a texel, and the
+// linear filter between log2s interpolates geometrically, as an exponential falloff does. Linear values would leak the
+// lit side's light into the shadow, making twilight skies several times too bright. Offset towards half floats'
+// finest steps; floored far below any twilight.
+fn dkMultiScatteringEncode(luminance: vec3f) -> vec3f {
+    return log2(max(luminance, vec3f(1e-12))) + 12.0;
+}
+
+fn dkMultiScatteringDecode(stored: vec3f) -> vec3f {
+    return exp2(stored - 12.0);
+}
+
 // uv in the multiple-scattering LUT -> (altitude, muS).
 fn dkMultiScatteringAltitudeMuS(a: DkAtmosphere, uv: vec2f, size: vec2f) -> vec2f {
     let xMuS = dkTextureToUnitCoord(uv.x, size.x);

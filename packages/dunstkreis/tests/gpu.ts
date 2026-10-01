@@ -1,16 +1,11 @@
 /**
  * A minimal WebGPU harness for the tests, backed by Dawn through the `webgpu` package rather than a browser.
  *
- * Playwright's bundled Chromium has no `navigator.gpu` at all, in any launch mode or behind any flag, so
- * browser-based GPU tests would need a system Chrome that CI may or may not have. Dawn in-process avoids
- * that: these stay plain Playwright tests that never touch the `page` fixture, while executing real,
- * compiled WGSL.
+ * Browser-based GPU tests would need a Chromium with WebGPU flags and a real GPU behind it. Dawn in-process avoids
+ * that: these stay plain Playwright tests that never touch the `page` fixture, while executing real, compiled WGSL.
  *
- * Opt-in, via DUNSTKREIS_GPU=1 (`pnpm test:gpu`). The `webgpu` package is not reliable enough to gate the
- * suite on: it aborts or deadlocks the process in roughly one run in three, in plain node as much as under
- * Playwright, regardless of the shader or the workload size. Rather than let that flake the whole suite,
- * the GPU tests skip by default and the pure-TypeScript tests carry the baseline. Run them explicitly when
- * touching WGSL, and re-evaluate making them default if the binding stabilizes.
+ * Opt-in, via DUNSTKREIS_GPU=1 (`pnpm test:gpu`), since a CI runner has no GPU; the pure-TypeScript tests carry the
+ * baseline there. Run them when touching WGSL.
  */
 import { readFileSync } from "node:fs";
 
@@ -29,6 +24,9 @@ export function wgslSource(name: string): string {
 }
 
 let devicePromise: Promise<GPUDevice | null> | undefined;
+// The binding's GPU instance, held for the life of the process: collected, it takes the device with it, and the next
+// call into Dawn crashes the worker.
+let instance: GPU | undefined;
 
 /** True when the GPU tests are enabled. See the note above. */
 export const GPU_ENABLED = process.env.DUNSTKREIS_GPU === "1";
@@ -42,7 +40,8 @@ export function gpuDevice(): Promise<GPUDevice | null> {
         const { create, globals } = await import("webgpu");
         Object.assign(globalThis, globals);
 
-        const adapter = await create([]).requestAdapter();
+        instance = create([]);
+        const adapter = await instance.requestAdapter();
         if (!adapter) return null;
 
         return adapter.requestDevice();
@@ -70,10 +69,7 @@ export async function compileWgsl(device: GPUDevice, code: string): Promise<stri
  * way a real pass would: the tests exercise the uniform path rather than a separate baked-constant one, so
  * what they verify is what ships. `options.constants` sets pipeline overrides.
  *
- * Capped at one dispatch over one set of resources. The Dawn binding is not robust under churn: repeatedly
- * creating shader modules and buffers aborts the process non-deterministically, and repeatedly mapping one
- * buffer deadlocks it. Both are properties of the binding, not of any shader under test, so the harness
- * simply stays inside what it handles reliably and refuses anything larger.
+ * Capped at one dispatch over one set of resources, 4096 inputs.
  */
 export const MAX_INPUTS = 4096;
 

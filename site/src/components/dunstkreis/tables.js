@@ -1,4 +1,9 @@
-import { clampObserverHeight, DEFAULT_TEXTURE_CONFIG, readTexture } from "@himmelszelt/dunstkreis";
+import {
+    clampObserverHeight,
+    DEFAULT_TEXTURE_CONFIG,
+    MULTI_SCATTERING_LOG2_OFFSET,
+    readTexture,
+} from "@himmelszelt/dunstkreis";
 import { showCode } from "../code.js";
 import { paintRange } from "../range.js";
 import { state } from "../sternzeit/state.js";
@@ -230,7 +235,9 @@ function hover(name, event) {
         // The texels, read back once per table, then the readout for wherever the pointer is by then.
         table.pointer = event;
         table.reading ??= readTexture(gpu.device, table.texture).then(({ data }) => {
-            table.data = data;
+            // The multiple scattering as the values themselves, not their stored log2.
+            const log2 = TABLE_PREVIEW[name].log2;
+            table.data = log2 ? data.map((v, i) => (i % 4 === 3 ? v : 2 ** (v - MULTI_SCATTERING_LOG2_OFFSET))) : data;
             if (shown[name] === table && table.pointer) hover(name, table.pointer);
         });
         return;

@@ -4,7 +4,17 @@ import { onDemand } from "../frame.js";
 import { paintRange } from "../range.js";
 import { COMPASS } from "../sternzeit/figure.js";
 import { onChange, state } from "../sternzeit/state.js";
-import { onTables, quality, recompute, gpu as shared, skyViewChanged, tables } from "./atmosphere.js";
+import {
+    bindToneCurveToggle,
+    display,
+    onDisplay,
+    onTables,
+    quality,
+    recompute,
+    gpu as shared,
+    skyViewChanged,
+    tables,
+} from "./atmosphere.js";
 import { azimuthFromSun, viewDirection } from "./lutmap.js";
 import { onPick, pick, picked } from "./pick.js";
 
@@ -194,7 +204,15 @@ function render() {
         camera.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, Math.asin(z)));
     }
     const skyStarted = performance.now();
-    const settings = { luts: table.luts, debugGrid, groundSamples: quality.groundSamples, dither, autoExposure };
+    const { toneCurve: toneMap } = display;
+    const settings = {
+        luts: table.luts,
+        debugGrid,
+        groundSamples: quality.groundSamples,
+        dither,
+        autoExposure,
+        toneMap,
+    };
     if (Object.entries(settings).some(([key, value]) => passFor[key] !== value)) {
         // Shown once it is compiled; until then the canvas keeps the last frame.
         buildPass(settings);
@@ -248,6 +266,8 @@ function showExposure() {
 }
 
 if (gpu) {
+    bindToneCurveToggle(field("tone"));
+    onDisplay(requestRender);
     onChange(requestRender);
     onTables(() => {
         field("refraction").setAttribute("aria-pressed", String(quality.refraction));

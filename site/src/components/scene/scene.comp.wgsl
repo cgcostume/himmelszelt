@@ -54,6 +54,8 @@ struct Params {
     cubified: u32,
     // Nonzero to dither the 8-bit output against banding.
     dither: u32,
+    // The tone curve, from dunstkreis' tonemap.wgsl: 1 Khronos PBR Neutral, 2 AgX.
+    toneCurve: u32,
     // The sun as the camera sees it, which may be far above the scene's ground: where its disc shows, and its
     // illuminance there, per channel in lux.
     discDirection: vec3f,
@@ -301,11 +303,12 @@ fn sunVisibility(p: vec3f, pixel: vec2u) -> f32 {
     return visible / f32(count);
 }
 
-// Narkowicz's fit of the ACES filmic curve, then the sRGB encoding, as the sky pass does.
+// The sky pass' tone curves, sRGB encoded.
 fn toneMap(exposed: vec3f) -> vec3f {
-    let x = max(exposed, vec3f(0.0));
-    let mapped = clamp(x * (2.51 * x + 0.03) / (x * (2.43 * x + 0.59) + 0.14), vec3f(0.0), vec3f(1.0));
-    return select(1.055 * pow(mapped, vec3f(1.0 / 2.4)) - 0.055, mapped * 12.92, mapped <= vec3f(0.0031308));
+    if (params.toneCurve == 2u) {
+        return dkToneMapAgx(exposed);
+    }
+    return dkToneMapNeutral(exposed);
 }
 
 // Four rays per pixel on a rotated grid, as 4x multisampling places its samples: edges come out smooth in one frame.

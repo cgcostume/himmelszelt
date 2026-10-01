@@ -16,12 +16,12 @@ export interface QualityConstants {
     DK_SAMPLES_CUBE: number;
 }
 
-/** The defaults `quality.wgsl` declares: osgHimmel's sample counts, fewer for the transmittance. */
+/** The defaults `quality.wgsl` declares, `DEFAULT_TEXTURE_CONFIG`'s. */
 export const DEFAULT_QUALITY: QualityConstants = {
     DK_SAMPLES_TRANSMITTANCE: 100,
-    DK_SAMPLES_MULTI_SCATTERING: 20,
+    DK_SAMPLES_MULTI_SCATTERING: 40,
     DK_SAMPLES_SKY_VIEW: 30,
-    DK_SAMPLES_GROUND: 64,
+    DK_SAMPLES_GROUND: 1024,
     DK_SAMPLES_CUBE: 1,
 };
 
@@ -45,9 +45,15 @@ export function pipelineConstants(
     };
 }
 
+/**
+ * A tone curve for a display: "neutral", Khronos PBR Neutral, which keeps colors as they are up to 0.76 and compresses
+ * only above, or "agx", Sobotka's, whose bright colors fade towards white as film does, flatter and greyer by day.
+ */
+export type ToneCurve = "agx" | "neutral";
+
 /** The passes' switches, `wgsl/features.wgsl`, as their defaults there. */
 export interface Features {
-    toneMap: boolean;
+    toneMap: ToneCurve | false;
     dither: boolean;
     autoExposure: boolean;
     debugGrid: boolean;
@@ -59,7 +65,7 @@ export interface Features {
 }
 
 export const DEFAULT_FEATURES: Features = {
-    toneMap: true,
+    toneMap: "neutral",
     dither: true,
     autoExposure: false,
     debugGrid: false,
@@ -73,7 +79,7 @@ export const DEFAULT_FEATURES: Features = {
 export function featureConstants(features: Partial<Features> = {}): Record<string, number> {
     const f = { ...DEFAULT_FEATURES, ...features };
     return {
-        DK_TONE_MAP: Number(f.toneMap),
+        DK_TONE_MAP: f.toneMap === false ? 0 : f.toneMap === "neutral" ? 1 : 2,
         DK_DITHER: Number(f.dither),
         DK_AUTO_EXPOSURE: Number(f.autoExposure),
         DK_DEBUG_GRID: Number(f.debugGrid),

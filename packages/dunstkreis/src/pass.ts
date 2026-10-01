@@ -9,6 +9,7 @@ export interface AtmosphereLUTs {
     readonly model: AtmosphereModel;
     readonly config: PrecomputedTextureConfig;
     readonly transmittance: GPUTexture;
+    /** log2 of the values plus `MULTI_SCATTERING_LOG2_OFFSET`, so the linear filter interpolates them geometrically. */
     readonly multiScattering: GPUTexture;
     /** The sampler the tables are read with, and the model packed as the shaders take it, for the passes to reuse. */
     readonly sampler: GPUSampler;
@@ -83,7 +84,7 @@ export interface SkyCubeOptions {
     /** rgba16float, or rgba32float, which the sun disc needs, being far brighter than rgba16float holds. */
     format: "rgba16float" | "rgba32float";
     /** Rays per texel, spread over it by the R2 sequence, 1 by default: more smooth the edges a texel straddles, the
-     *  horizon's and the sun disc's. */
+     *  horizon's and the sun disc's, and cost as many times the rays. 8 smooths them for a background or export. */
     samples?: number;
     /**
      * Spread the texels evenly over the sphere, as osgHimmel's `CubeMappedHimmel` did: sample it with

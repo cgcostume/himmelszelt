@@ -1,6 +1,6 @@
 // The sky pass: a compute pass that turns the precomputed tables into pixels, one invocation per pixel of the target,
 // with no rasterization. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`, `sampling.wgsl`, `raymarch.wgsl`,
-// `cube.wgsl`, `sun.wgsl`, `frame.wgsl`, `quality.wgsl` and `features.wgsl`, plus the output at group 1,
+// `cube.wgsl`, `sun.wgsl`, `tonemap.wgsl`, `frame.wgsl`, `quality.wgsl` and `features.wgsl`, plus the output at group 1,
 // `dkOutputSize` and `dkOutputStore`, declared by whoever builds the pipeline since its format has to be spelled out:
 // `skyOutput(format)` for an image, `skyCubeOutput(format)` for the six faces of a cube map.
 //
@@ -86,13 +86,12 @@ fn dkExposure() -> f32 {
     return dkParams.exposure;
 }
 
-// Narkowicz's fit of the ACES filmic curve: a toe, a straight middle and a shoulder rolling off towards white, so the
-// bright sky around the sun keeps its gradient. Then encoded for sRGB, which an 8-bit canvas expects. osgHimmel used
-// Bruneton's curve, which had the encoding built in and was tuned for its own arbitrary units.
+// The tone curve the pass was made with, from tonemap.wgsl, sRGB encoded for an 8-bit target.
 fn dkToneMap(exposed: vec3f) -> vec3f {
-    let x = max(exposed, vec3f(0.0));
-    let mapped = clamp(x * (2.51 * x + 0.03) / (x * (2.43 * x + 0.59) + 0.14), vec3f(0.0), vec3f(1.0));
-    return select(1.055 * pow(mapped, vec3f(1.0 / 2.4)) - 0.055, mapped * 12.92, mapped <= vec3f(0.0031308));
+    if (DK_TONE_MAP == 2u) {
+        return dkToneMapAgx(exposed);
+    }
+    return dkToneMapNeutral(exposed);
 }
 
 // What the sky shows along a view ray.
@@ -292,7 +291,7 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
             sun = dkSkySunLuminance(sky) * exposure;
         }
     }
-    if (DK_TONE_MAP) {
+    if (DK_TONE_MAP != 0u) {
         var mapped = dkToneMap(color);
         if (disc > 0.0) {
             mapped = mix(mapped, dkToneMap(color + sun), disc);
@@ -307,7 +306,7 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
         let sunAngle = length(sky.direction - dkParams.sunDirection);
         color = dkDebugOverlay(color, view, right, below, sunAngle, dkParams.sunAngularRadius);
     }
-    if (DK_TONE_MAP && DK_DITHER) {
+    if (DK_TONE_MAP != 0u && DK_DITHER) {
         color = clamp(dkDither(color, id.xy), vec3f(0.0), vec3f(1.0));
     }
     dkOutputStore(id.xy, 0u, vec4f(color, 1.0));

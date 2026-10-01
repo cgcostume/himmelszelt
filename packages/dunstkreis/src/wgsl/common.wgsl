@@ -190,16 +190,10 @@ fn dkPhaseRayleigh(nu: f32) -> f32 {
     return 3.0 / (16.0 * DK_PI) * (1.0 + nu * nu);
 }
 
-// Mie phase function, Cornette-Shanks rather than plain Henyey-Greenstein, matching the original's
-// phaseFunctionM. Strongly forward-biased, which is what puts the bright glow around the sun.
+// Mie phase function, Cornette-Shanks rather than plain Henyey-Greenstein, as Hillaire's. Strongly forward-biased,
+// which is what puts the bright glow around the sun.
 fn dkPhaseMie(a: DkAtmosphere, nu: f32) -> f32 {
     let g2 = a.mieG * a.mieG;
     return 1.5 / (4.0 * DK_PI) * (1.0 - g2) * pow(1.0 + g2 - 2.0 * a.mieG * nu, -1.5)
          * (1.0 + nu * nu) / (2.0 + g2);
-}
-
-// Recovers the Mie inscatter from the packed RGB-plus-Mie-red representation Bruneton stores, exploiting that
-// Mie scattering is very nearly wavelength-independent. The original's getMie.
-fn dkGetMie(a: DkAtmosphere, rayMie: vec4f) -> vec3f {
-    return rayMie.rgb * rayMie.w / max(rayMie.r, 1e-4) * (a.betaR.r / a.betaR);
 }

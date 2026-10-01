@@ -8,12 +8,14 @@ references:
     - brown2017
     - edlen1966
     - fritsch1980
+    - khronos2024
     - kopp2011
     - lagarde2014
     - mueller2012thesis
-    - narkowicz2016
     - nowell2005
     - ramamoorthi2001
+    - sobotka2023
+    - wrensch2023
 ---
 
 import Cite from "../../components/Cite.astro";
@@ -246,8 +248,12 @@ The floor of EV 8 is for now. A camera exposes a landscape by full moon at about
 to −7. Once the moon lights the air and the stars are drawn, the floor drops and the night follows. Exposed that far
 today, the sky would show only the sun's last twilight, amplified beyond what the table can hold.
 
-For a display, the pass then tone maps: exposed, compressed into the display's range by Narkowicz's fit of the ACES
-filmic curve <Cite id="narkowicz2016" />, and encoded for sRGB, dithered against banding. A renderer with its own HDR
+For a display, the pass then tone maps: exposed, compressed into the display's range, and encoded for sRGB, dithered
+against banding. Khronos PBR Neutral <Cite id="khronos2024" /> keeps colors exactly as they are up to three quarters of
+white and compresses only the brightest, so the sky's blue stays the blue the model computes. AgX <Cite id="sobotka2023" />,
+in Wrensch's fit <Cite id="wrensch2023" />, fades bright colors towards white as film does: the glow around the sun and
+a sunset's brightest band turn white instead of clipping to a flat hue, but the daytime sky comes out flatter and
+greyer. The button in <Fig id="sky" /> switches every figure between the two. A renderer with its own HDR
 pipeline turns that off and gets the exposed luminance itself, linear and unclamped, for a float target.
 
 <Planned title="Exposure and tone mapping">
