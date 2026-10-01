@@ -3,6 +3,8 @@ import {
     DEFAULT_TEXTURE_CONFIG,
     MULTI_SCATTERING_LOG2_OFFSET,
     readTexture,
+    refractionAngle,
+    spectrumToRgb,
 } from "@himmelszelt/dunstkreis";
 import { showCode } from "../code.js";
 import { paintRange } from "../range.js";
@@ -17,7 +19,11 @@ const root = document.querySelector("#tables");
 const field = (name) => root.querySelector(`[data-field="${name}"]`);
 const lut = (name) => root.querySelector(`[data-lut="${name}"]`);
 
-const luminance = (d, i) => 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+/** The luminance of a texel's four wavelengths, through the model's matrix to RGB. */
+function luminance(model, d, i) {
+    const [r, g, b] = spectrumToRgb(model).map((row) => row.reduce((sum, m, j) => sum + m * d[i + j], 0));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
 
 const DEG = 180 / Math.PI;
 const shown = {};
@@ -111,8 +117,10 @@ function paint(name) {
 }
 
 const fixed = (v, digits) => v.toFixed(digits);
-const rgb = (d, i, digits) => `${fixed(d[i], digits)} ${fixed(d[i + 1], digits)} ${fixed(d[i + 2], digits)}`;
 const exp = (v) => v.toExponential(2);
+/** A texel's four wavelengths, labelled by them. */
+const spectral = (model, d, i, format) =>
+    `at ${model.wavelengths.join(", ")} nm: ${[0, 1, 2, 3].map((c) => format(d[i + c])).join(", ")}`;
 
 // What a texel stands for: short values for the two axes, and the lines of the tooltip.
 const READOUTS = {
@@ -128,7 +136,7 @@ const READOUTS = {
                 `altitude ${fixed(r - g.Rg, 3)} km`,
                 `light from ${fixed(angle, 3)}° above the horizontal, μ ${fixed(mu, 5)}`,
                 `${fixed(d, 1)} km to the top`,
-                `transmittance ${rgb(data, i, 4)}`,
+                `transmittance ${spectral(table.model, data, i, (v) => fixed(v, 4))}`,
             ],
         };
     },
@@ -141,7 +149,7 @@ const READOUTS = {
             lines: [
                 `altitude ${fixed(altitude, 2)} km`,
                 `sun ${fixed(Math.asin(muS) * DEG, 2)}° high, μs ${fixed(muS, 4)}`,
-                `per unit of sunlight and scattering ${exp(data[i])} ${exp(data[i + 1])} ${exp(data[i + 2])}`,
+                `per unit of sunlight and scattering ${spectral(table.model, data, i, exp)}`,
             ],
         };
     },
@@ -151,7 +159,8 @@ const READOUTS = {
         const { below, zenithHorizon, ...view } = skyViewAt(g, table, h, x, y);
         const azimuth = view.azimuth * DEG;
         const { data } = table;
-        const bend = Math.asin(Math.min(Math.max(data[i + 3], -1), 1)) * DEG * 60;
+        const altitude = 90 - (zenithHorizon + below) * DEG;
+        const bent = below < 0 ? refractionAngle(table.model, h * 1000, altitude) : null;
         return {
             x: `${fixed(azimuth, 1)}°`,
             y: `${fixed(-below * DEG, 2)}°`,
@@ -159,9 +168,9 @@ const READOUTS = {
                 `azimuth ${fixed(azimuth, 2)}° from the sun`,
                 `${fixed(90 - (zenithHorizon + below) * DEG, 3)}° above the horizontal`,
                 `${fixed(-below * DEG, 3)}° above the visible horizon, seen from ${fixed(h, 3)} km`,
-                `luminance ${exp(luminance(data, i))} cd/m²`,
-                `rgb ${exp(data[i])} ${exp(data[i + 1])} ${exp(data[i + 2])}`,
-                `bent by ${fixed(bend, 2)}′`,
+                `luminance ${exp(luminance(table.model, data, i))} cd/m²`,
+                spectral(table.model, data, i, exp),
+                bent === null ? "ends on the ground" : `bent by ${fixed(bent * 60, 2)}′`,
             ],
         };
     },

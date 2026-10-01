@@ -1,5 +1,5 @@
-// Diffuse image-based lighting from any cube map in cd/m², the sky's or an HDR environment's. Requires `cube.wgsl` and
-// `workgroupSum(64, ...)` from `reduce.ts`, first. A pass, so it declares its bindings.
+// Diffuse image-based lighting from any cube map in cd/m², the sky's or an HDR environment's. Requires `cube.wgsl`,
+// `spiral.wgsl` and `workgroupSum(64, ...)` from `reduce.ts`, first. A pass, so it declares its bindings.
 //
 // Two entry points, run one after the other. `dkProjectSH` projects the cube map onto the nine real spherical
 // harmonics up to order 2, from directions spread evenly over the sphere. `dkIrradianceCube` then writes, for every
@@ -42,9 +42,10 @@ fn dkProjectSH(@builtin(local_invocation_index) index: u32) {
     var sums: array<vec3f, 9>;
     for (var i = 0u; i < DK_SH_SAMPLES; i = i + 1u) {
         // A Fibonacci spiral over the whole sphere: even in solid angle.
-        let k = f32(index * DK_SH_SAMPLES + i) + 0.5;
+        let j = index * DK_SH_SAMPLES + i;
+        let k = f32(j) + 0.5;
         let z = 1.0 - 2.0 * k / total;
-        let azimuth = k * 2.399963229728653;
+        let azimuth = dkGoldenAzimuth(j);
         let horizontal = sqrt(max(1.0 - z * z, 0.0));
         let d = vec3f(horizontal * cos(azimuth), horizontal * sin(azimuth), z);
         let radiance = textureSampleLevel(dkSource, dkSourceSampler, select(d, dkCubeFromSphere(d), DK_SOURCE_CUBIFIED), level).rgb;

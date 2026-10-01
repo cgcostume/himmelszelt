@@ -9,7 +9,18 @@ import { compileWgsl, gpuDevice, wgslSource } from "./gpu.js";
 const PASSES: Record<string, readonly string[]> = {
     transmittance: ["atmosphere", "common", "lut", "quality", "transmittance"],
     multiscattering: ["atmosphere", "common", "lut", "sampling", "quality", "multiscattering"],
-    skyview: ["atmosphere", "common", "lut", "sampling", "raymarch", "frame", "quality", "features", "skyview"],
+    skyview: [
+        "atmosphere",
+        "common",
+        "lut",
+        "sampling",
+        "raymarch",
+        "spiral",
+        "frame",
+        "quality",
+        "features",
+        "skyview",
+    ],
     sky: [
         "atmosphere",
         "common",
@@ -38,8 +49,8 @@ const PASSES: Record<string, readonly string[]> = {
         "features",
         "sky",
     ],
-    exposure: ["atmosphere", "common", "lut", "sampling", "raymarch", "frame", "exposure"],
-    irradiance: ["cube", "irradiance"],
+    exposure: ["atmosphere", "common", "lut", "sampling", "raymarch", "spiral", "frame", "exposure"],
+    irradiance: ["cube", "spiral", "irradiance"],
     mipmap: ["cube", "mipmap"],
 };
 // What the passes leave to whoever builds their pipelines: the sky pass' output, and the sums over a workgroup, here

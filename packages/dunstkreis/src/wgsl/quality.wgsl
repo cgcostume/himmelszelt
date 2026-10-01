@@ -16,9 +16,6 @@ override DK_SAMPLES_MULTI_SCATTERING: u32 = 40u;
 // Raymarch samples for Hillaire's per-frame sky-view LUT. The only one of these on the per-frame path.
 override DK_SAMPLES_SKY_VIEW: u32 = 30u;
 
-// Samples of the sky gathering its light on the ground, on Vogel's spiral.
-override DK_SAMPLES_GROUND: u32 = 1024u;
-
 // Samples per texel of a cube map, spread over it by the R2 sequence. More smooth the edges a texel straddles, the
 // horizon's and the sun disc's.
 override DK_SAMPLES_CUBE: u32 = 1u;

@@ -17,9 +17,9 @@ const DK_MS_DIRECTIONS: u32 = 8u;
 
 struct DkMultiScatterSample {
     // Second-order scattered light: what arrives after exactly one further bounce.
-    luminance: vec3f,
+    luminance: vec4f,
     // The fraction of light a bounce hands on to the next order, the ratio of the geometric series.
-    transfer: vec3f,
+    transfer: vec4f,
 }
 
 // Raymarches one direction, accumulating both terms. Isotropic throughout: no phase function appears, which
@@ -32,11 +32,11 @@ fn dkIntegrateMultiScattering(a: DkAtmosphere, h: f32, direction: vec3f, sunDire
     let hitsGround = dkIntersectsGround(a, h, direction.z);
 
     var result: DkMultiScatterSample;
-    result.luminance = vec3f(0.0);
-    result.transfer = vec3f(0.0);
+    result.luminance = vec4f(0.0);
+    result.transfer = vec4f(0.0);
 
     var path = dkPathStart(direction.z);
-    var throughput = vec3f(1.0);
+    var throughput = vec4f(1.0);
     for (var i = 0u; i < DK_SAMPLES_MULTI_SCATTERING; i = i + 1u) {
         let ds = dkPathRemaining(a, h, path, hitsGround) / f32(DK_SAMPLES_MULTI_SCATTERING - i);
         let step = dkPathAdvance(a, h, path, ds);
@@ -47,7 +47,7 @@ fn dkIntegrateMultiScattering(a: DkAtmosphere, h: f32, direction: vec3f, sunDire
         let muS = clamp(dot(pointUp, sunDirection), -1.0, 1.0);
 
         let scattering = a.betaR * dkDensityRayleigh(a, altitude) + a.betaMSca * dkDensityMie(a, altitude);
-        let extinction = max(dkExtinction(a, altitude), vec3f(1e-9));
+        let extinction = max(dkExtinction(a, altitude), vec4f(1e-9));
         let stepTransmittance = exp(-extinction * ds);
 
         // Zero where the planet shadows the sample, which the table knows.
@@ -105,13 +105,13 @@ fn dkPrecomputeMultiScattering(
     // Both are integrals over the sphere with the isotropic phase, 4 pi / N per direction times 1 / (4 pi):
     // plain averages over the directions (Hillaire eqs. 5 and 7).
     let directions = f32(DK_MS_DIRECTIONS * DK_MS_DIRECTIONS);
-    let luminance = dkWorkgroupSum(vec4f(sample.luminance, 0.0), index).rgb / directions;
-    let transfer = dkWorkgroupSum(vec4f(sample.transfer, 0.0), index).rgb / directions;
+    let luminance = dkWorkgroupSum(sample.luminance, index) / directions;
+    let transfer = dkWorkgroupSum(sample.transfer, index) / directions;
 
     // The geometric series over all remaining orders. Clamped below 1 because a transfer of 1 would mean a
     // perfectly conserving atmosphere and an infinite sum.
-    let series = 1.0 / (1.0 - min(transfer, vec3f(0.999)));
+    let series = 1.0 / (1.0 - min(transfer, vec4f(0.999)));
     if (index == 0u) {
-        textureStore(dkMultiScatteringOut, vec2i(texel.xy), vec4f(dkMultiScatteringEncode(luminance * series), 1.0));
+        textureStore(dkMultiScatteringOut, vec2i(texel.xy), dkMultiScatteringEncode(luminance * series));
     }
 }

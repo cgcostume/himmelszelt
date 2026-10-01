@@ -1,5 +1,5 @@
 // A light meter for the sky, for automatic exposure. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`,
-// `sampling.wgsl`, `raymarch.wgsl`, `frame.wgsl` and `workgroupSum(128, ...)` from `reduce.ts`, first. A pass, so it
+// `sampling.wgsl`, `raymarch.wgsl`, `spiral.wgsl`, `frame.wgsl` and `workgroupSum(128, ...)` from `reduce.ts`, first. A pass, so it
 // declares its bindings.
 //
 // Reads the sky-view table rather than the rendered image: it is small, rebuilt only when the sun or the observer
@@ -43,22 +43,23 @@ fn dkMeterLog2(a: DkAtmosphere, h: f32, mu: f32, azimuth: f32, size: vec2f) -> f
         let ray = dkRaymarchFromSpace(
             a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, h, direction, sun, DK_METER_RAY_SAMPLES,
         );
-        rgb = ray.luminance;
+        rgb = dkToRgb(a, ray.luminance);
     } else {
-        rgb = textureSampleLevel(dkSkyViewLut, dkLutSampler, dkSkyViewUv(a, h, mu, cos(azimuth), size), 0.0).rgb;
+        let uv = dkSkyViewUv(a, h, mu, cos(azimuth), size);
+        rgb = dkToRgb(a, textureSampleLevel(dkSkyViewLut, dkLutSampler, uv, 0.0));
     }
     return log2(max(dot(rgb, vec3f(0.2126, 0.7152, 0.0722)), DK_METER_FLOOR));
 }
 
 // Transmittance from the sun to the observer: by the table inside the atmosphere, raymarched from above it, where the
 // sunlight may still graze the air or be hidden by the planet.
-fn dkSunTransmittance(a: DkAtmosphere, h: f32) -> vec3f {
+fn dkSunTransmittance(a: DkAtmosphere, h: f32) -> vec4f {
     let sun = dkParams.sunDirection;
     if (h > a.Rt - a.Rg) {
         let ray = dkRaymarchFromSpace(
             a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, h, sun, sun, DK_METER_RAY_SAMPLES,
         );
-        return select(ray.transmittance, vec3f(0.0), ray.hitsGround);
+        return select(ray.transmittance, vec4f(0.0), ray.hitsGround);
     }
     return dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, h, sun.z);
 }
@@ -74,8 +75,9 @@ fn dkMeterSky(@builtin(local_invocation_index) index: u32) {
     // Fibonacci spirals over the caps above and below the horizon: even in solid angle, the table's own spacing is not.
     var sum = vec2f(0.0);
     for (var i = 0u; i < DK_METER_SAMPLES; i = i + 1u) {
-        let k = f32(index * DK_METER_SAMPLES + i) + 0.5;
-        let azimuth = k * 2.399963229728653;
+        let j = index * DK_METER_SAMPLES + i;
+        let k = f32(j) + 0.5;
+        let azimuth = dkGoldenAzimuth(j);
         let above = dkMeterLog2(a, h, 1.0 - (1.0 - horizon) * k / total, azimuth, size);
         let below = dkMeterLog2(a, h, -1.0 + (1.0 + horizon) * k / total, azimuth, size);
         sum = sum + vec2f(above, below);
@@ -83,6 +85,6 @@ fn dkMeterSky(@builtin(local_invocation_index) index: u32) {
     let sums = dkWorkgroupSum(vec4f(sum, 0.0, 0.0), index);
     if (index == 0u) {
         dkMeteringOut.log2Luminance = max(sums.x, sums.y) / total;
-        dkMeteringOut.sunIlluminance = a.solarIlluminance * dkSunTransmittance(a, h);
+        dkMeteringOut.sunIlluminance = dkToRgb(a, a.solarIlluminance * dkSunTransmittance(a, h));
     }
 }

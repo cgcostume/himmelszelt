@@ -56,38 +56,49 @@ fn dkPrecomputeSkyView(@builtin(global_invocation_id) id: vec3u) {
         a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, vec3f(0.0, 0.0, 1.0), h, direction, sunDirection,
         DK_SAMPLES_SKY_VIEW, true,
     );
-    // Alpha holds how far the ray bent on its way out, as the sine of the angle: the sky pass turns the view ray by
-    // it to find where the sun disc shows. Nothing for a ray ending on the ground.
-    let bend = select(length(cross(direction, ray.direction)), 0.0, ray.hitsGround);
+    // How far the ray bent on its way out, as the sine of the angle, the same for every azimuth: one per row. Nothing
+    // for a ray ending on the ground.
+    if (id.x == 0u) {
+        dkMetering.bend[row] = select(length(cross(direction, ray.direction)), 0.0, ray.hitsGround);
+    }
     var luminance = ray.luminance;
     if (DK_SKY_VIEW_ROWS == 2u && ray.hitsGround) {
         // The sky's light on the ground, reflected diffusely by its albedo and dimmed by the air on the way here.
         luminance = luminance + ray.transmittance * a.groundAlbedo / DK_PI * dkMetering.groundLight;
     }
-    // In cd/m², which half floats hold from 6e-5, deep into twilight, up to 65504, above the sky around the sun.
-    textureStore(dkSkyViewOut, vec2i(i32(id.x), i32(row)), vec4f(min(luminance, vec3f(65504.0)), bend));
+    // At the four wavelengths, in units `toRgb` turns into cd/m², which half floats hold from 6e-5, deep into twilight,
+    // up to 65504, above the sky around the sun.
+    textureStore(dkSkyViewOut, vec2i(i32(id.x), i32(row)), min(luminance, vec4f(65504.0)));
 }
 
-// The sky's irradiance on the ground: its luminance over the hemisphere above, cosine-weighted, from points spread
-// evenly over the unit disc by Vogel's spiral and lifted onto the hemisphere (Malley's method), so the plain mean times
-// pi is the irradiance. Read from the table, so from the observer's altitude: close enough near the ground, too dark
-// high up, where less sky is above than above the ground. The 64 invocations of one workgroup share the points.
+// The sky's irradiance on the ground, ∫ L μ dω over the hemisphere above: the table's upper half summed texel by
+// texel, each texel's luminance times the cosine-weighted solid angle it covers above the horizontal, ∫ μ dμ dφ over
+// its extent, on both sides of the sun's meridian, which the table holds once. Exact for the table, where points spread
+// over the hemisphere hit or miss the thin band of glow twilight leaves at the horizon. Read from the table, so from the
+// observer's altitude: close enough near the ground, too dark high up, where less sky is above than above the ground.
 @compute @workgroup_size(64)
 fn dkGroundIrradiance(@builtin(local_invocation_index) index: u32) {
     let a = dkAtmosphere;
     let h = clamp(dkParams.observerAltitude, 0.0, a.Rt - a.Rg);
-    let size = vec2f(textureDimensions(dkSkyViewIn));
-    var sum = vec3f(0.0);
-    for (var i = index; i < DK_SAMPLES_GROUND; i = i + 64u) {
-        // The squared radius is uniform over the disc: the sine of the angle from the zenith, squared.
-        let r2 = (f32(i) + 0.5) / f32(DK_SAMPLES_GROUND);
-        let mu = sqrt(1.0 - r2);
-        let cosAzimuth = cos(f32(i) * 2.399963229728653);
-        let uv = dkSkyViewUv(a, h, mu, cosAzimuth, size);
-        sum = sum + textureSampleLevel(dkSkyViewIn, dkLutSampler, vec2f(uv.x, min(uv.y, 0.5 - 0.5 / size.y)), 0.0).rgb;
+    let texels = textureDimensions(dkSkyViewIn);
+    let last = vec2f(texels - 1u);
+    let zenithHorizon = acos(clamp(dkHorizonMu(a, h), -1.0, 1.0));
+    var sum = vec4f(0.0);
+    for (var k = index; k < texels.x * dkSkyRows(texels.y); k = k + 64u) {
+        let texel = vec2u(k % texels.x, k / texels.x);
+        // The texel's extent in the table's unit coordinates, where its center is at texel / (size - 1).
+        let low = clamp((vec2f(texel) - 0.5) / last, vec2f(0.0), vec2f(1.0, 0.5));
+        let high = clamp((vec2f(texel) + 0.5) / last, vec2f(0.0), vec2f(1.0, 0.5));
+        // The azimuth from the sun, x = sin(φ / 2); the zenith angle, the horizon's times 1 - t² with t = 1 - 2y.
+        let azimuth = 2.0 * (asin(high.x) - asin(low.x));
+        let t = 1.0 - 2.0 * vec2f(low.y, high.y);
+        let mu = max(cos(zenithHorizon * (1.0 - t * t)), vec2f(0.0));
+        // ∫ μ dμ = (μ0² - μ1²) / 2, twice for both sides of the meridian.
+        let weight = azimuth * (mu.x * mu.x - mu.y * mu.y);
+        sum = sum + textureLoad(dkSkyViewIn, texel, 0) * weight;
     }
-    let total = dkWorkgroupSum(vec4f(sum, 0.0), index);
+    let total = dkWorkgroupSum(sum, index);
     if (index == 0u) {
-        dkMetering.groundLight = DK_PI * total.rgb / f32(DK_SAMPLES_GROUND);
+        dkMetering.groundLight = total;
     }
 }

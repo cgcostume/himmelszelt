@@ -31,6 +31,7 @@ import raymarch from "./raymarch.wgsl";
 import sampling from "./sampling.wgsl";
 import sky from "./sky.comp.wgsl";
 import skyview from "./skyview.comp.wgsl";
+import spiral from "./spiral.wgsl";
 import sun from "./sun.wgsl";
 import tonemap from "./tonemap.wgsl";
 import transmittance from "./transmittance.comp.wgsl";
@@ -54,6 +55,7 @@ export {
     sampling,
     sky,
     skyview,
+    spiral,
     sun,
     tonemap,
     transmittance,

@@ -12,7 +12,6 @@ export interface QualityConstants {
     DK_SAMPLES_TRANSMITTANCE: number;
     DK_SAMPLES_MULTI_SCATTERING: number;
     DK_SAMPLES_SKY_VIEW: number;
-    DK_SAMPLES_GROUND: number;
     DK_SAMPLES_CUBE: number;
 }
 
@@ -21,35 +20,31 @@ export const DEFAULT_QUALITY: QualityConstants = {
     DK_SAMPLES_TRANSMITTANCE: 100,
     DK_SAMPLES_MULTI_SCATTERING: 40,
     DK_SAMPLES_SKY_VIEW: 30,
-    DK_SAMPLES_GROUND: 1024,
     DK_SAMPLES_CUBE: 1,
 };
 
 /**
  * Builds the `constants` record for a pipeline descriptor from a texture configuration, i.e.
- * `{ compute: { module, entryPoint, constants: pipelineConstants(config) } }`, with the samples of the sky's light on
- * the ground and per cube map texel if given. Every key matches an `override` in `wgsl/quality.wgsl`, or pipeline
+ * `{ compute: { module, entryPoint, constants: pipelineConstants(config) } }`, with the samples per cube map texel if
+ * given. Every key matches an `override` in `wgsl/quality.wgsl`, or pipeline
  * creation fails; a test pins the two lists together.
  */
-export function pipelineConstants(
-    config: PrecomputedTextureConfig,
-    samples: { ground?: number; cube?: number } = {},
-): QualityConstants {
+export function pipelineConstants(config: PrecomputedTextureConfig, samples: { cube?: number } = {}): QualityConstants {
     const { integralSamples } = config;
     return {
         DK_SAMPLES_TRANSMITTANCE: integralSamples.transmittance,
         DK_SAMPLES_MULTI_SCATTERING: integralSamples.multiScattering,
         DK_SAMPLES_SKY_VIEW: integralSamples.skyView,
-        DK_SAMPLES_GROUND: samples.ground ?? DEFAULT_QUALITY.DK_SAMPLES_GROUND,
         DK_SAMPLES_CUBE: samples.cube ?? DEFAULT_QUALITY.DK_SAMPLES_CUBE,
     };
 }
 
 /**
  * A tone curve for a display: "neutral", Khronos PBR Neutral, which keeps colors as they are up to 0.76 and compresses
- * only above, or "agx", Sobotka's, whose bright colors fade towards white as film does, flatter and greyer by day.
+ * only above; "agx", Sobotka's, whose bright colors fade towards white as film does, flatter and greyer by day; or
+ * "aces", Narkowicz's fit of the ACES filmic curve, saturated, shifting bright hues towards yellow.
  */
-export type ToneCurve = "agx" | "neutral";
+export type ToneCurve = "neutral" | "agx" | "aces";
 
 /** The passes' switches, `wgsl/features.wgsl`, as their defaults there. */
 export interface Features {
@@ -79,7 +74,7 @@ export const DEFAULT_FEATURES: Features = {
 export function featureConstants(features: Partial<Features> = {}): Record<string, number> {
     const f = { ...DEFAULT_FEATURES, ...features };
     return {
-        DK_TONE_MAP: f.toneMap === false ? 0 : f.toneMap === "neutral" ? 1 : 2,
+        DK_TONE_MAP: f.toneMap === false ? 0 : { neutral: 1, agx: 2, aces: 3 }[f.toneMap],
         DK_DITHER: Number(f.dither),
         DK_AUTO_EXPOSURE: Number(f.autoExposure),
         DK_DEBUG_GRID: Number(f.debugGrid),

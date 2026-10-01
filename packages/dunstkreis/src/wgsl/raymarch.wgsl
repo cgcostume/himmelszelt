@@ -4,9 +4,9 @@
 
 struct DkSkyRay {
     // Scattered light reaching the start of the ray.
-    luminance: vec3f,
+    luminance: vec4f,
     // Transmittance along the whole ray: what reaches its start of the light from where it ends.
-    transmittance: vec3f,
+    transmittance: vec4f,
     // The direction it leaves the atmosphere in, bent; unused where it ends on the ground.
     direction: vec3f,
     hitsGround: bool,
@@ -33,8 +33,8 @@ fn dkRaymarchSky(
 
     var result: DkSkyRay;
     result.hitsGround = dkIntersectsGround(a, h, mu);
-    result.luminance = vec3f(0.0);
-    result.transmittance = vec3f(1.0);
+    result.luminance = vec4f(0.0);
+    result.transmittance = vec4f(1.0);
 
     // A ray going up meets its densest air first, the aerosols within a km or two: its steps grow with the square of
     // the distance, t_k = T (k / N)^2, dense where it starts. Uniform for the rest, whose densest air lies along it.
@@ -56,7 +56,7 @@ fn dkRaymarchSky(
         let densityR = dkDensityRayleigh(a, altitude);
         let densityM = dkDensityMie(a, altitude);
         let scattering = a.betaR * densityR + a.betaMSca * densityM;
-        let extinction = max(dkExtinction(a, altitude), vec3f(1e-9));
+        let extinction = max(dkExtinction(a, altitude), vec4f(1e-9));
         let stepTransmittance = exp(-extinction * ds);
         let sunTransmittance = dkSampleTransmittanceToTop(a, transmittanceLut, lutSampler, altitude, muS);
 
@@ -97,8 +97,8 @@ fn dkRaymarchFromSpace(
     samples: u32,
 ) -> DkSkyRay {
     var result: DkSkyRay;
-    result.luminance = vec3f(0.0);
-    result.transmittance = vec3f(1.0);
+    result.luminance = vec4f(0.0);
+    result.transmittance = vec4f(1.0);
     result.direction = direction;
     result.hitsGround = false;
 

@@ -11,14 +11,14 @@ fn dkSampleTransmittanceToTop(
     lutSampler: sampler,
     h: f32,
     mu: f32,
-) -> vec3f {
+) -> vec4f {
     // Below the table's lowest direction no light arrives: without refraction that is the horizon itself, where the
     // lookup would otherwise clamp to the edge column's grazing light.
     if (mu < dkTransmittanceMuMin(a, h)) {
-        return vec3f(0.0);
+        return vec4f(0.0);
     }
     let size = vec2f(textureDimensions(lut));
-    return textureSampleLevel(lut, lutSampler, dkTransmittanceUv(a, h, mu, size), 0.0).rgb;
+    return textureSampleLevel(lut, lutSampler, dkTransmittanceUv(a, h, mu, size), 0.0);
 }
 
 // Hillaire's multiple-scattering term: the light that reached this point after more than one bounce, summed
@@ -29,7 +29,7 @@ fn dkSampleMultiScattering(
     lutSampler: sampler,
     h: f32,
     muS: f32,
-) -> vec3f {
+) -> vec4f {
     let size = vec2f(textureDimensions(lut));
-    return dkMultiScatteringDecode(textureSampleLevel(lut, lutSampler, dkMultiScatteringUv(a, h, muS, size), 0.0).rgb);
+    return dkMultiScatteringDecode(textureSampleLevel(lut, lutSampler, dkMultiScatteringUv(a, h, muS, size), 0.0));
 }

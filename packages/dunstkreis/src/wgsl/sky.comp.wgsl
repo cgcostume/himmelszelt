@@ -91,18 +91,21 @@ fn dkToneMap(exposed: vec3f) -> vec3f {
     if (DK_TONE_MAP == 2u) {
         return dkToneMapAgx(exposed);
     }
+    if (DK_TONE_MAP == 3u) {
+        return dkToneMapAces(exposed);
+    }
     return dkToneMapNeutral(exposed);
 }
 
-// What the sky shows along a view ray.
+// What the sky shows along a view ray, in linear sRGB.
 struct DkSkySample {
     luminance: vec3f,
     hitsGround: bool,
     // The direction the ray leaves the atmosphere in, bent by the air: where the sun has to be to show in it.
     direction: vec3f,
-    // Transmittance along the whole ray, raymarched from space; inside the atmosphere it is looked up only where the
-    // disc shows, by dkSkySunTransmittance.
-    transmittance: vec3f,
+    // Transmittance along the whole ray at the four wavelengths, raymarched from space; inside the atmosphere it is
+    // looked up only where the disc shows, by dkSkySunTransmittance.
+    transmittance: vec4f,
 }
 
 fn dkInSpace() -> bool {
@@ -128,15 +131,18 @@ fn dkSkyFromInside(a: DkAtmosphere, view: vec3f, h: f32) -> DkSkySample {
     // linear filter does not blend the last row of sky with the first of ground.
     let half = 0.5 / size.y;
     uv.y = select(min(uv.y, 0.5 - half), max(uv.y, 0.5 + half), result.hitsGround);
-    let texel = textureSampleLevel(dkSkyViewLut, dkLutSampler, uv, 0.0);
-    result.luminance = texel.rgb;
+    result.luminance = dkToRgb(a, textureSampleLevel(dkSkyViewLut, dkLutSampler, uv, 0.0));
 
-    // Turned down within its vertical plane by the bending the table traced, stored as its sine.
+    // Turned down within its vertical plane by the bending the table traced, stored per row as its sine, and read
+    // between rows as the filter would.
     let horizontal = length(view.xy);
     result.direction = view;
     if (horizontal > 1e-6 && !result.hitsGround) {
+        let row = clamp(uv.y * size.y - 0.5, 0.0, size.y - 1.0);
+        let first = u32(row);
+        let bend = mix(dkMetering.bend[first], dkMetering.bend[min(first + 1u, u32(size.y) - 1u)], fract(row));
         let down = vec3f(view.z * view.xy / horizontal, -horizontal);
-        result.direction = view * sqrt(1.0 - texel.a * texel.a) + down * texel.a;
+        result.direction = view * sqrt(1.0 - bend * bend) + down * bend;
     }
     return result;
 }
@@ -148,7 +154,7 @@ fn dkSkyFromSpace(a: DkAtmosphere, view: vec3f, altitude: f32) -> DkSkySample {
         a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, altitude, view, dkParams.sunDirection,
         DK_SAMPLES_SKY_VIEW,
     );
-    return DkSkySample(ray.luminance, ray.hitsGround, ray.direction, ray.transmittance);
+    return DkSkySample(dkToRgb(a, ray.luminance), ray.hitsGround, ray.direction, ray.transmittance);
 }
 
 fn dkSkyAt(view: vec3f) -> DkSkySample {
@@ -161,9 +167,9 @@ fn dkSkyAt(view: vec3f) -> DkSkySample {
 
 // Transmittance towards the sun along a sampled ray, zero where the planet is in the way. Per ray rather than for the
 // sun's center, so a disc half below the bent horizon still shows its upper half.
-fn dkSkySunTransmittance(sky: DkSkySample) -> vec3f {
+fn dkSkySunTransmittance(sky: DkSkySample) -> vec4f {
     if (sky.hitsGround) {
-        return vec3f(0.0);
+        return vec4f(0.0);
     }
     if (dkInSpace()) {
         return sky.transmittance;
@@ -174,7 +180,7 @@ fn dkSkySunTransmittance(sky: DkSkySample) -> vec3f {
 
 // The sun disc's luminance along a sampled ray, attenuated by the air between it and the observer, from sun.wgsl.
 fn dkSkySunLuminance(sky: DkSkySample) -> vec3f {
-    let illuminance = dkSkySunTransmittance(sky) * dkAtmosphere.solarIlluminance;
+    let illuminance = dkToRgb(dkAtmosphere, dkSkySunTransmittance(sky) * dkAtmosphere.solarIlluminance);
     return dkSunDiscLuminance(illuminance, dkParams.sunAngularRadius);
 }
 

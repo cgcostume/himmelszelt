@@ -54,7 +54,7 @@ struct Params {
     cubified: u32,
     // Nonzero to dither the 8-bit output against banding.
     dither: u32,
-    // The tone curve, from dunstkreis' tonemap.wgsl: 1 Khronos PBR Neutral, 2 AgX.
+    // The tone curve, from dunstkreis' tonemap.wgsl: 1 Khronos PBR Neutral, 2 AgX, 3 Narkowicz's ACES fit.
     toneCurve: u32,
     // The sun as the camera sees it, which may be far above the scene's ground: where its disc shows, and its
     // illuminance there, per channel in lux.
@@ -307,6 +307,9 @@ fn sunVisibility(p: vec3f, pixel: vec2u) -> f32 {
 fn toneMap(exposed: vec3f) -> vec3f {
     if (params.toneCurve == 2u) {
         return dkToneMapAgx(exposed);
+    }
+    if (params.toneCurve == 3u) {
+        return dkToneMapAces(exposed);
     }
     return dkToneMapNeutral(exposed);
 }

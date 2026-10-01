@@ -23,7 +23,7 @@ The sky follows Hillaire 2020 on the model osgHimmel took from Bruneton & Neyret
 | table | size | computed |
 |---|---|---|
 | transmittance | 256x64 | once per model, `precomputeAtmosphere()` |
-| multiple scattering | 64x64 | once per model, `precomputeAtmosphere()` |
+| multiple scattering | 128x64 | once per model, `precomputeAtmosphere()` |
 | sky view | 128x256 | whenever the Sun or the observer moves, by the pass from `createSkyPass()` |
 
 Hillaire's multiple-scattering term is infinite-order under an isotropic assumption, where Bruneton's is a fixed number
@@ -105,18 +105,18 @@ To do: high up, and from space, the metered exposure still looks too bright, if 
 
 With `toneMap`, the pass writes display colors for an 8-bit target: exposed, mapped by Khronos PBR Neutral (`"neutral"`, the
 default), which keeps colors as they are up to 0.76 and compresses only above, or AgX (`"agx"`), whose bright colors
-fade towards white as film does, flatter and greyer by day, sRGB encoded and, for an 8-bit target, dithered by interleaved gradient noise (Jimenez 2014), remapped to a
+fade towards white as film does, flatter and greyer by day, or Narkowicz's ACES fit (`"aces"`), the earlier default, sRGB encoded and, for an 8-bit target, dithered by interleaved gradient noise (Jimenez 2014), remapped to a
 triangular distribution, from the pixel alone, without a texture. Off, it writes the exposed luminance, linear and unclamped, for a float target and
 a renderer that tone maps the frame itself, with `wgsl.tonemap` if it likes.
 
 ## The ground
 
 Below the horizon the sky-view table shows the ground, in its albedo `groundAlbedo` (linear RGB, 0.3 by default, the
-Earth's average, where Bruneton and Hillaire used 0.1), lit by the sun and by the sky: after the table is built, its upper half is sampled
-over the hemisphere, cosine-weighted, for the sky's irradiance on the ground, and the lower half is built again with it.
-`groundSamples` on `createSkyPass` sets how many samples, 64 by default, spread over the disc by Vogel's spiral and
-lifted onto the hemisphere (Malley's method), or 0 for the sun alone, which saves a dispatch per rebuild. The sky is read from the observer's altitude, which is close enough near the
-ground and too dark high up.
+Earth's average, where Bruneton and Hillaire used 0.1), lit by the sun and by the sky: after the table's upper half is
+built, the sky's irradiance on the ground is integrated over it texel by texel, each texel's luminance times the
+cosine-weighted solid angle it covers, and the lower half is built with it. `groundLight: false` on `createSkyPass`
+leaves the sun alone, a dispatch cheaper per rebuild. The sky is read from the observer's altitude, which is close
+enough near the ground and too dark high up.
 
 ## Lighting a scene
 
@@ -138,38 +138,10 @@ The sun and the sky light a scene apart, the usual split for image-based lightin
 
 ## Quality and cost
 
-Every sample count and table size is a parameter (`PrecomputedTextureConfig`, `groundSamples` and the cube pass'
-`samples`). Measured on the luminance against references with many more samples or four times the texels, over a sun
-1.7° up, 5.7° and 12° down and 45° up. Errors are mean and worst; GPU time on an RX 7900 XT, which an integrated or
-mobile GPU may take 20 to 50 times as long for.
-
-| parameter | default | faster | quality | no better beyond | error at the default | cost |
-|---|---|---|---|---|---|---|
-| transmittance samples | 100 | 40: 0.08%, the sun's horizon cutoff off by a texel here and there | 100 | 128 | 0.01%, 0.13% | 0.9 ms once, linear |
-| multiple-scattering samples | 40 | 20: 0.26%, 4.9% | 40 | 64 (half floats) | 0.1%, 5% | 0.35 ms once |
-| sky-view samples | 30 | 15 to 20: 0.2%, 3% | 40: 0.09%, 0.7% | 64 | 0.14%, 1.2% | 0.07 ms per rebuild |
-| ground samples | 1024 | 256: 1.2% | 1024 | 2048 | 0.2% | negligible |
-
-| table | default | its effect on the sky at the default | larger | cost |
-|---|---|---|---|---|
-| transmittance | 256x64 | 0.09%, 3.6% in deep twilight | 512x128: halves both | 0.9 to 2 ms once |
-| multiple scattering | 64x64 | 0.9% with the sun 12° down, where 32x32 is 9% off | | 0.35 ms once, 0.11 at 32x32 |
-| sky view | 128x256 | 0.03%, 0.34% for the worst hundredth; Hillaire's 192x108, as many texels, 4x and 6x that | 128x512: halves both | 0.07 ms per rebuild, 0.13 at 128x512 |
-
-The sky view is taller than wide: its columns, half a turn of azimuth from the sun, square-rooted towards it, need far
-fewer texels than its rows, the angle from the horizon. With the same texels, 144x256 is three times as accurate as
-256x144, and 64x256 still twice as accurate as 192x108 with fewer. The other two tables' shapes measured best as they
-are.
-
-All three tables are read bilinearly, so their error is that of linear interpolation between texels: it shrinks with
-the square of the spacing where the values are smooth, and only where the mappings put texels sparse does it show.
-The multiple-scattering table stores log2 of its values (`MULTI_SCATTERING_LOG2_OFFSET`): they fall by orders of
-magnitude across the terminator, within a texel, and interpolated linearly the lit side's light leaked into the
-shadow, which made skies some 12° after sunset several times too bright. Interpolating the log2s is geometric, as the
-falloff is.
-
-Rays that go up march in steps growing with the square of the distance, dense at the eye, where the haze is: at 30
-samples that cut the sky view's worst error from 12% to 1.2%.
+Every sample count and table size is a parameter (`PrecomputedTextureConfig` and the cube pass' `samples`), and the
+defaults hold the luminance within a fraction of a percent of references with far more of either, for well under a
+millisecond per sky-view rebuild on a desktop GPU. What each costs and gains, how the defaults were chosen, and the
+experiments behind the four wavelengths, the table shapes and the rest are in [research/](research/README.md).
 
 ## Device requirements
 
@@ -300,7 +272,9 @@ Echtzeit"](https://daniellimberger.de/resources/2012%20%E2%80%93%20Mueller%20%28
 - T. Sobotka, [AgX](https://github.com/sobotka/AgX) (2023), in B. Wrensch's minimal fit,
   ["Minimal AgX Implementation"](https://iolite-engine.com/blog_posts/minimal_agx_implementation) (2023): a display
   tone curve.
-- Khronos Group, ["PBR Neutral"](https://github.com/KhronosGroup/ToneMapping/tree/main/PBR_Neutral) (2024): the other.
+- Khronos Group, ["PBR Neutral"](https://github.com/KhronosGroup/ToneMapping/tree/main/PBR_Neutral) (2024): the default.
+- K. Narkowicz, ["ACES Filmic Tone Mapping Curve"](https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/)
+  (2016): the third.
 - Maxime Heckel, ["On rendering the sky, sunsets and
   planets"](https://blog.maximeheckel.com/posts/on-rendering-the-sky-sunsets-and-planets/): a WebGL/three.js
   single-scattering raymarcher, and a fine introduction to the topic.

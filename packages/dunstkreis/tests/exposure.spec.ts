@@ -5,7 +5,7 @@ import {
     ev100FromLuminance,
     exposureFromEV100,
 } from "../src/exposure.js";
-import { DEFAULT_ATMOSPHERE_MODEL, luminanceScale } from "../src/model.js";
+import { DEFAULT_ATMOSPHERE_MODEL, luminanceScale, spectrumToRgb } from "../src/model.js";
 
 test("EV100 follows the photographic convention", () => {
     // At EV 0, 1.2 cd/m² just saturates; each EV halves the exposure.
@@ -16,10 +16,11 @@ test("EV100 follows the photographic convention", () => {
     expect(4096 * exposureFromEV100(ev100FromLuminance(4096))).toBeCloseTo(1 / 9.6, 12);
 });
 
-test("the luminance scale gives the sun its illuminance", () => {
-    const [r, g, b] = DEFAULT_ATMOSPHERE_MODEL.solarSpectrum;
-    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    expect(luminance * luminanceScale(DEFAULT_ATMOSPHERE_MODEL)).toBeCloseTo(128_000, 6);
+test("the luminance scale gives the sun its illuminance, once its four wavelengths are turned into RGB", () => {
+    const model = DEFAULT_ATMOSPHERE_MODEL;
+    const sun = model.solarSpectrum.map((e) => e * luminanceScale(model));
+    const [r, g, b] = spectrumToRgb(model).map((row) => row.reduce((sum, m, j) => sum + m * (sun[j] as number), 0));
+    expect(0.2126 * (r as number) + 0.7152 * (g as number) + 0.0722 * (b as number)).toBeCloseTo(128_000, 6);
 });
 
 test("the keys ramp the compensation smoothly with the sun, mornings and evenings apart, and lifts the blue hour", () => {

@@ -1,20 +1,21 @@
 ---
-/** A row of buttons of which one is chosen, over the lighting figure: a radio group styled as steps. */
+/** A row of buttons of which one is chosen, over a figure: a radio group styled as steps, named `${figure}-${name}`. */
 interface Props {
+    figure?: string;
     name: string;
     label: string;
     title: string;
     options: string[][];
     checked: string;
 }
-const { name, label, title, options, checked } = Astro.props;
+const { figure = "lighting", name, label, title, options, checked } = Astro.props;
 ---
 
 <span class="steps" role="radiogroup" aria-label={label} title={title}>
     {
         options.map(([value, text]) => (
             <label>
-                <input type="radio" name={`lighting-${name}`} value={value} checked={value === checked} />
+                <input type="radio" name={`${figure}-${name}`} value={value} checked={value === checked} />
                 <span>{text}</span>
             </label>
         ))

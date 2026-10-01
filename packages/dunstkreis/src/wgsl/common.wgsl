@@ -179,7 +179,7 @@ fn dkDensityOzone(a: DkAtmosphere, altitudeKm: f32) -> f32 {
 // Total extinction at an altitude: everything that removes light from a beam. Rayleigh scattering doubles as
 // its own extinction (air molecules do not absorb visible light), Mie has a separate extinction coefficient,
 // and ozone contributes absorption only.
-fn dkExtinction(a: DkAtmosphere, altitudeKm: f32) -> vec3f {
+fn dkExtinction(a: DkAtmosphere, altitudeKm: f32) -> vec4f {
     return a.betaR * dkDensityRayleigh(a, altitudeKm)
          + a.betaMEx * dkDensityMie(a, altitudeKm)
          + a.betaOAbs * dkDensityOzone(a, altitudeKm);

@@ -27,6 +27,9 @@ struct DkMetering {
     // The sun's illuminance at the observer, per channel in lux: what reaches it through the air, for a renderer that
     // lights its scene by the sun as a light of its own.
     sunIlluminance: vec3f,
-    // The sky's irradiance on the ground in lux, rgb, gathered by dkGroundIrradiance.
-    groundLight: vec3f,
+    // The sky's irradiance on the ground at the four wavelengths, gathered by dkGroundIrradiance.
+    groundLight: vec4f,
+    // How far the sky-view table's rays bent on their way out, per row, as the sine of the angle: the same for every
+    // azimuth. The sky pass turns a view ray by it to find where the sun disc shows; 0 for rows on the ground.
+    bend: array<f32>,
 }

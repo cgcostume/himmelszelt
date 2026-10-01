@@ -22,7 +22,7 @@ export interface SkyPassOptions {
     format: GPUTextureFormat;
     /**
      * Tone map for a display: exposed, compressed into [0, 1] and sRGB encoded, for an 8-bit target, by "neutral", the
-     * default, or "agx" (`ToneCurve`). `false` writes the exposed luminance itself, linear and unclamped, for a float
+     * default, "agx" or "aces" (`ToneCurve`). `false` writes the exposed luminance itself, linear and unclamped, for a float
      * target and a renderer that tone maps the whole frame, with `wgsl.tonemap` if it likes.
      */
     toneMap?: ToneCurve | false;
@@ -39,17 +39,15 @@ export interface SkyPassOptions {
     /** Draw the sun disc. Default true. */
     sunDisc?: boolean;
     /**
-     * Samples of the sky gathering its light on the ground, 1024 by default, spread by Vogel's spiral: the ground below
-     * the horizon is then lit by the sky as well as the sun. 0.2% off; 256 is 1.2% off, 64 up to 12% with a low sun,
-     * whose glow few samples hit or miss; no better beyond 2048. Gathered by a workgroup, it costs next to nothing. 0
-     * leaves the ground lit by the sun alone, a sky-view dispatch cheaper.
+     * Light the ground below the horizon by the sky as well as the sun, true by default: the sky's irradiance on it,
+     * integrated over the table texel by texel, exactly. Off, it is lit by the sun alone, a sky-view dispatch cheaper.
      */
-    groundSamples?: number;
+    groundLight?: boolean;
 }
 
 /** Byte size of DkSkyParams in frame.wgsl: a vec3 and a scalar, a mat4x4, four scalars and a vec2, padded. */
 const SKY_PARAMS_SIZE = 112;
-/** Byte size of DkMetering: a scalar, then two vec3s, each aligned to 16. */
+/** Byte size of DkMetering before its bend per sky-view row: a scalar, a vec3 and a vec4, each aligned to 16. */
 const METERING_SIZE = 48;
 
 const DEFAULTS: SkyParams = {
@@ -81,18 +79,15 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         autoExposure = false,
         debugGrid = false,
         sunDisc = true,
-        groundSamples = 1024,
+        groundLight = true,
     } = options;
     const dither = options.dither ?? (toneMap !== false && EIGHT_BIT.includes(format));
-    if (!Number.isInteger(groundSamples) || groundSamples < 0) {
-        throw new Error("dunstkreis: groundSamples is a count, 0 for none");
-    }
     const storable = ["rgba8unorm", "rgba16float", "rgba32float"].includes(format);
     if (!storable && !(format === "bgra8unorm" && device.features.has("bgra8unorm-storage"))) {
         throw new Error(`dunstkreis: the sky pass writes ${format} as a storage texture, which this device cannot`);
     }
     const constants = (features: Partial<Features>, samples: { cube?: number } = {}) => ({
-        ...pipelineConstants(config, { ground: groundSamples, ...samples }),
+        ...pipelineConstants(config, samples),
         ...featureConstants(features),
         ...refractionConstants(model),
     });
@@ -120,7 +115,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     // there.
     const metering = device.createBuffer({
         label: "dunstkreis:metering",
-        size: METERING_SIZE,
+        size: METERING_SIZE + 4 * config.skyView.height,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     });
 
@@ -129,7 +124,6 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     const skyViewModule = device.createShaderModule({
         code: [wgsl.workgroupSum(64, device.features.has("subgroups")), ...prelude, wgsl.skyview].join("\n"),
     });
-    const groundLit = groundSamples > 0;
     const skyViewStep = (entryPoint: string, skyViewRows: 0 | 1 | 2) =>
         device.createComputePipelineAsync({
             label: `dunstkreis:${entryPoint}`,
@@ -144,14 +138,15 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             wgsl.lut,
             wgsl.sampling,
             wgsl.raymarch,
+            wgsl.spiral,
             wgsl.frame,
             wgsl.exposure,
         ].join("\n"),
     });
     const [skyViewPipeline, groundIrradiancePipeline, groundPipeline, meterPipeline, skyPipeline] = await Promise.all([
-        skyViewStep("dkPrecomputeSkyView", groundLit ? 1 : 0),
-        groundLit ? skyViewStep("dkGroundIrradiance", 0) : null,
-        groundLit ? skyViewStep("dkPrecomputeSkyView", 2) : null,
+        skyViewStep("dkPrecomputeSkyView", groundLight ? 1 : 0),
+        groundLight ? skyViewStep("dkGroundIrradiance", 0) : null,
+        groundLight ? skyViewStep("dkPrecomputeSkyView", 2) : null,
         device.createComputePipelineAsync({
             label: "dunstkreis:meter",
             layout: "auto",
@@ -186,7 +181,6 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         bindGroup(groundIrradiancePipeline, [
             { binding: 0, resource: { buffer: luts.atmosphereBuffer } },
             { binding: 1, resource: { buffer: skyParams } },
-            { binding: 4, resource: luts.sampler },
             { binding: 6, resource: { buffer: metering } },
             { binding: 7, resource: skyView.createView() },
         ]);

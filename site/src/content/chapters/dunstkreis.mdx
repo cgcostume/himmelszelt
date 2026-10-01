@@ -6,16 +6,20 @@ order: 2
 references:
     - bennett1982
     - brown2017
+    - bruneton2008
+    - bruneton2017
     - edlen1966
     - fritsch1980
     - khronos2024
     - kopp2011
     - lagarde2014
     - mueller2012thesis
+    - narkowicz2016
     - nowell2005
     - ramamoorthi2001
     - sobotka2023
     - wrensch2023
+    - wyman2013
 ---
 
 import Cite from "../../components/Cite.astro";
@@ -72,6 +76,25 @@ traces the refraction itself. How to hand it over is the first of the [code exam
 <Planned title="Taking the sky apart" plan="merge with Scattering orders into one figure, Rayleigh, Mie, ozone and each order as switches.">
     The same sunset with Rayleigh, Mie and ozone switched on and off one by one. Without ozone, twilight turns gray.
 </Planned>
+
+## Four wavelengths
+
+Scattering, absorption and the Sun's own light all change with the wavelength, so the sky is computed per wavelength,
+not per color. A color on a screen is something else: its red, green and blue each sum the whole spectrum, weighted by
+how the eye responds to it <Cite id="wyman2013" />. Bruneton and Neyret computed three wavelengths, 680, 550 and 440 nm,
+and showed them as red, green and blue <Cite id="bruneton2008" />, as real-time skies have mostly done since, osgHimmel's
+included. Weighted by the eye instead, the same light comes out 5% off in hue on average, and 14% in deep twilight,
+where ozone takes out the orange around 600 nm that none of the three samples sees. Bruneton's later implementation
+computes some fifteen wavelengths and converts them exactly <Cite id="bruneton2017" />, at about five times the cost.
+
+dunstkreis takes a middle road. It computes four wavelengths, one per channel of its tables, which have four anyway,
+and turns them into red, green and blue by a matrix fitted for it: by least squares, to 85 sky spectra built from the
+model's own physics, sunlight through every depth of air and ozone, scattered by molecules or by haze, with the Sun
+itself held white. Which four was a search: every set on 10 nm steps between 420 and 690 nm, 4,788 of them, each fitted
+and then tested on 72 skies it was not fitted to. 630, 580, 510 and 440 nm came out best, 0.6% off on average and 1.7%
+at worst, and the GPU does not notice: it computes on four components either way. We have not found this middle road
+described before. The model choice in <Fig id="sky" /> shows the sky as it was colored before, Bruneton's three
+wavelengths taken as red, green and blue, and as osgHimmel computed it.
 
 ## More than one bounce
 
@@ -253,7 +276,10 @@ against banding. Khronos PBR Neutral <Cite id="khronos2024" /> keeps colors exac
 white and compresses only the brightest, so the sky's blue stays the blue the model computes. AgX <Cite id="sobotka2023" />,
 in Wrensch's fit <Cite id="wrensch2023" />, fades bright colors towards white as film does: the glow around the sun and
 a sunset's brightest band turn white instead of clipping to a flat hue, but the daytime sky comes out flatter and
-greyer. The button in <Fig id="sky" /> switches every figure between the two. A renderer with its own HDR
+greyer. Narkowicz's fit of the ACES filmic curve <Cite id="narkowicz2016" />, which dunstkreis used first, is the third:
+saturated, and it pushes bright hues towards yellow. The exposure follows a camera's convention, which puts a metered
+average at about a tenth of white, where ACES expects it; Neutral and AgX expect the scene's middle gray at 0.18, and
+are lifted by the difference. The tone curve choice in <Fig id="sky" /> switches every figure between them. A renderer with its own HDR
 pipeline turns that off and gets the exposed luminance itself, linear and unclamped, for a float target.
 
 <Planned title="Exposure and tone mapping">

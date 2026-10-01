@@ -78,7 +78,7 @@ function sunSeen(live) {
 function readySkyPass() {
     const { luts } = tables();
     // With the sun disc, drawn along every bent ray, as the sky figure draws it.
-    const settings = { luts, groundSamples: quality.groundSamples, sunDisc: pressed("sunDisc") };
+    const settings = { luts, groundLight: quality.groundLight, sunDisc: pressed("sunDisc") };
     const same = (other) => Object.entries(settings).every(([key, value]) => other?.[key] === value);
     if (same(skyPassFor)) return true;
     if (same(building)) return false;

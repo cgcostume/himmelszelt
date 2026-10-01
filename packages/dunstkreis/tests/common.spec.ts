@@ -4,8 +4,10 @@ import {
     DEFAULT_ATMOSPHERE_MODEL,
     DEFAULT_TEXTURE_CONFIG,
     luminanceScale,
+    spectrumToRgb,
 } from "../src/model.js";
 import { DEFAULT_QUALITY, featureConstants, pipelineConstants } from "../src/quality.js";
+import { reflectanceAt } from "../src/spectral.js";
 import { ATMOSPHERE_UNIFORM_SIZE, atmosphereUniformData } from "../src/uniforms.js";
 import { evaluateWgsl, gpuDevice, wgslSource } from "./gpu.js";
 
@@ -38,66 +40,62 @@ test("the uniform packing matches the DkAtmosphere struct field for field", () =
     // thing that would silently corrupt every shader is these two drifting apart. Parse the struct and check
     // the packing writes the expected value at each field's offset.
     const struct = wgslSource("atmosphere").slice(wgslSource("atmosphere").indexOf("struct DkAtmosphere"));
-    const fields = [...struct.matchAll(/^\s{4}(\w+):\s*(vec3f|f32),/gm)].map(
+    const fields = [...struct.matchAll(/^\s{4}(\w+):\s*(vec4f|mat4x3f|f32),/gm)].map(
         (m) => [m[1] as string, m[2] as string] as const,
     );
 
     expect(fields.map(([name]) => name)).toEqual([
         "betaR",
-        "Rg",
         "betaMSca",
-        "Rt",
         "betaMEx",
-        "mieG",
         "betaOAbs",
-        "HR",
         "solarIlluminance",
+        "groundAlbedo",
+        "toRgb",
+        "Rg",
+        "Rt",
+        "mieG",
+        "HR",
         "HM",
         "ozoneCenter",
         "ozoneHalfWidth",
         "refractivity",
-        "groundAlbedo",
-        "_padding",
     ]);
 
     const data = atmosphereUniformData(model);
     expect(data.byteLength).toBe(ATMOSPHERE_UNIFORM_SIZE);
 
+    const matrix = spectrumToRgb(model);
     const expected: Record<string, number | readonly number[]> = {
         betaR: model.rayleigh.beta,
-        Rg: model.planet.groundRadiusKm,
         betaMSca: model.mie.betaScattering,
-        Rt: atmosphereTopRadiusKm(model),
         betaMEx: model.mie.betaExtinction,
-        mieG: model.mie.g,
         betaOAbs: model.ozone.betaAbsorption,
-        HR: model.rayleigh.scaleHeightKm,
         solarIlluminance: model.solarSpectrum.map((e) => e * luminanceScale(model)),
+        groundAlbedo: model.wavelengths.map((w) => reflectanceAt(model.groundAlbedo, w)),
+        // Column-major, each column a vec3 padded to four floats.
+        toRgb: [0, 1, 2, 3].flatMap((j) => [0, 1, 2].map((i) => matrix[i]?.[j] as number).concat(0)),
+        Rg: model.planet.groundRadiusKm,
+        Rt: atmosphereTopRadiusKm(model),
+        mieG: model.mie.g,
+        HR: model.rayleigh.scaleHeightKm,
         HM: model.mie.scaleHeightKm,
         ozoneCenter: model.ozone.centerAltitudeKm,
         ozoneHalfWidth: model.ozone.widthKm / 2,
         refractivity: model.refractivity,
-        groundAlbedo: model.groundAlbedo,
-        _padding: 0,
     };
 
-    // Walk the struct applying WGSL's uniform layout rules: vec3f has size 12 but alignment 16, which is
-    // exactly the packing the scalars in the tails rely on.
+    // Walk the struct by WGSL's uniform layout: vec4f and mat4x3f align to 16 bytes, f32 to 4. Float32Array rounds the
+    // f64 model values, and Math.fround is that exact rounding, so this is strict equality, not a tolerance.
     let offset = 0;
     for (const [name, type] of fields) {
-        if (type === "vec3f") {
-            offset = Math.ceil(offset / 4) * 4;
-            const actual = Array.from(data.slice(offset, offset + 3));
-            // Float32Array, so the f64 model values land rounded. Math.fround is that exact rounding, which
-            // makes this a strict equality rather than a tolerance that could hide a genuine mismatch.
-            (expected[name] as number[]).forEach((v, c) => {
-                expect(actual[c], `${name}.${c}`).toBe(Math.fround(v));
-            });
-            offset += 3;
-        } else {
-            expect(data[offset], name).toBe(Math.fround(expected[name] as number));
-            offset += 1;
-        }
+        const length = { vec4f: 4, mat4x3f: 16, f32: 1 }[type] as number;
+        if (type !== "f32") offset = Math.ceil(offset / 4) * 4;
+        const values = [expected[name]].flat() as number[];
+        values.forEach((v, c) => {
+            expect(data[offset + c], `${name}.${c}`).toBe(Math.fround(v));
+        });
+        offset += length;
     }
     expect(offset).toBe(ATMOSPHERE_UNIFORM_SIZE / 4);
 });
@@ -118,11 +116,11 @@ test("featureConstants names exactly the overrides features.wgsl declares", () =
 });
 
 test("pipelineConstants carries the configured sample counts, featureConstants the switches", () => {
-    const constants = pipelineConstants(DEFAULT_TEXTURE_CONFIG, { ground: 8 });
+    const constants = pipelineConstants(DEFAULT_TEXTURE_CONFIG, { cube: 8 });
 
     expect(constants.DK_SAMPLES_TRANSMITTANCE).toBe(DEFAULT_TEXTURE_CONFIG.integralSamples.transmittance);
     expect(constants.DK_SAMPLES_SKY_VIEW).toBe(DEFAULT_TEXTURE_CONFIG.integralSamples.skyView);
-    expect(constants.DK_SAMPLES_GROUND).toBe(8);
+    expect(constants.DK_SAMPLES_CUBE).toBe(8);
     expect(featureConstants().DK_DITHER).toBe(1);
     expect(featureConstants({ dither: false }).DK_DITHER).toBe(0);
 });

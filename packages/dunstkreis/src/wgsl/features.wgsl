@@ -2,7 +2,7 @@
 // so what is off compiles out instead of branching per pixel, and the uniforms keep only what changes per frame.
 
 // Tone map for a display: exposed, compressed into [0, 1] and sRGB encoded, for an 8-bit target, by Khronos PBR Neutral
-// (1) or AgX (2), see tonemap.wgsl. Off (0), the sky pass writes the exposed luminance itself, linear and unclamped,
+// (1), AgX (2) or Narkowicz's ACES fit (3), see tonemap.wgsl. Off (0), the sky pass writes the exposed luminance itself, linear and unclamped,
 // for a float target and a renderer that tone maps the frame.
 override DK_TONE_MAP: u32 = 1u;
 

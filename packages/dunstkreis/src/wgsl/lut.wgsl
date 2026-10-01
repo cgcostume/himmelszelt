@@ -83,11 +83,11 @@ fn dkMultiScatteringUv(a: DkAtmosphere, h: f32, muS: f32, size: vec2f) -> vec2f 
 // linear filter between log2s interpolates geometrically, as an exponential falloff does. Linear values would leak the
 // lit side's light into the shadow, making twilight skies several times too bright. Offset towards half floats'
 // finest steps; floored far below any twilight.
-fn dkMultiScatteringEncode(luminance: vec3f) -> vec3f {
-    return log2(max(luminance, vec3f(1e-12))) + 12.0;
+fn dkMultiScatteringEncode(luminance: vec4f) -> vec4f {
+    return log2(max(luminance, vec4f(1e-12))) + 12.0;
 }
 
-fn dkMultiScatteringDecode(stored: vec3f) -> vec3f {
+fn dkMultiScatteringDecode(stored: vec4f) -> vec4f {
     return exp2(stored - 12.0);
 }
 

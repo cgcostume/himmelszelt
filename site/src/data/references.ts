@@ -120,6 +120,22 @@ export const references: Record<string, Reference> = {
         year: 2008,
         url: "https://inria.hal.science/inria-00288758",
     },
+    bruneton2017: {
+        authors: "Eric Bruneton",
+        title: "Precomputed Atmospheric Scattering: a New Implementation",
+        venue: "ebruneton.github.io",
+        year: 2017,
+        url: "https://ebruneton.github.io/precomputed_atmospheric_scattering/",
+        note: "Spectral rendering over many wavelengths, and the solar spectrum and ozone cross-section dunstkreis uses.",
+    },
+    wyman2013: {
+        authors: "Chris Wyman, Peter-Pike Sloan, Peter Shirley",
+        title: "Simple Analytic Approximations to the CIE XYZ Color Matching Functions",
+        venue: "Journal of Computer Graphics Techniques 2(2)",
+        year: 2013,
+        url: "https://jcgt.org/published/0002/02/01/",
+        note: "The eye's response, as dunstkreis fits its four wavelengths to RGB against it.",
+    },
     nssdc: {
         authors: "NASA Space Science Data Coordinated Archive",
         title: "Planetary Fact Sheets: Earth, Moon, Sun",
@@ -178,6 +194,14 @@ export const references: Record<string, Reference> = {
         venue: "SIGGRAPH course notes",
         year: 2014,
         note: "Exposure in EV100 and the light meter's calibration.",
+    },
+    narkowicz2016: {
+        authors: "Krzysztof Narkowicz",
+        title: "ACES Filmic Tone Mapping Curve",
+        venue: "knarkowicz.wordpress.com",
+        year: 2016,
+        url: "https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/",
+        note: "The third tone curve, the one dunstkreis used first.",
     },
     sobotka2023: {
         authors: "Troy Sobotka",

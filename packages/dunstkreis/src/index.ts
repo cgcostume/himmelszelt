@@ -11,15 +11,29 @@ export type {
     ExponentialLayer,
     PlanetGeometry,
     PrecomputedTextureConfig,
+    Spectral,
     TentLayer,
 } from "./model.js";
 export {
     atmosphereTopRadiusKm,
     luminanceScale,
+    spectrumToRgb,
     DEFAULT_ATMOSPHERE_MODEL,
     DEFAULT_TEXTURE_CONFIG,
     OSGHIMMEL_ATMOSPHERE_MODEL,
+    RGB_ATMOSPHERE_MODEL,
 } from "./model.js";
+
+// The four wavelengths the light is computed at, the spectral data behind the model, and the fitted matrix to RGB.
+export {
+    DEFAULT_WAVELENGTHS,
+    fitSpectrumToRgb,
+    ozoneAbsorptionAt,
+    rayleighAt,
+    reflectanceAt,
+    rgbOfSpectrum,
+    solarIrradianceAt,
+} from "./spectral.js";
 
 // Exposure in EV100, for the sky in cd/m².
 export type { AutoExposureKey } from "./exposure.js";

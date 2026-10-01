@@ -2,7 +2,9 @@ import {
     createIrradiancePass,
     DEFAULT_ATMOSPHERE_MODEL,
     DEFAULT_TEXTURE_CONFIG,
+    OSGHIMMEL_ATMOSPHERE_MODEL,
     precomputeAtmosphere,
+    RGB_ATMOSPHERE_MODEL,
     skyRequirements,
 } from "@himmelszelt/dunstkreis";
 
@@ -39,10 +41,15 @@ async function acquire() {
 export const gpu = await acquire();
 
 /**
- * What the tables are computed with: refraction on or off, sizes and sample counts, and the samples of the sky that
- * light the ground in the sky-view table, 0 for none.
+ * What the tables are computed with: the model, four wavelengths or three as RGB or osgHimmel's, refraction on or off, sizes and sample counts, and whether the sky lights the
+ * ground in the sky-view table.
  */
-export const quality = { refraction: true, config: structuredClone(DEFAULT_TEXTURE_CONFIG), groundSamples: 1024 };
+export const quality = {
+    model: "fitted",
+    refraction: true,
+    config: structuredClone(DEFAULT_TEXTURE_CONFIG),
+    groundLight: true,
+};
 
 const events = new EventTarget();
 
@@ -50,17 +57,28 @@ const events = new EventTarget();
 export const display = { toneCurve: "neutral" };
 export const onDisplay = (listener) => events.addEventListener("display", () => listener(display));
 
-/** A tone curve button, one of several over the page: it shows the curve and switches every figure to the other. */
-export function bindToneCurveToggle(button) {
-    const show = () => {
-        button.textContent = display.toneCurve === "agx" ? "AgX" : "neutral";
-    };
-    show();
-    onDisplay(show);
-    button.addEventListener("click", () => {
-        display.toneCurve = display.toneCurve === "agx" ? "neutral" : "agx";
-        events.dispatchEvent(new Event("display"));
-    });
+/** Tone curve radios, `name="…"` inputs of the curves' values: choosing one switches every figure. */
+export function bindToneCurveChoice(inputs) {
+    for (const input of inputs) {
+        input.checked = input.value === display.toneCurve;
+        input.addEventListener("change", () => {
+            display.toneCurve = input.value;
+            events.dispatchEvent(new Event("display"));
+        });
+    }
+}
+
+const MODELS = { fitted: DEFAULT_ATMOSPHERE_MODEL, rgb: RGB_ATMOSPHERE_MODEL, osghimmel: OSGHIMMEL_ATMOSPHERE_MODEL };
+
+/** Model radios: four wavelengths, three as RGB or osgHimmel's; choosing one recomputes every table on the page. */
+export function bindModelChoice(inputs) {
+    for (const input of inputs) {
+        input.checked = input.value === quality.model;
+        input.addEventListener("change", () => {
+            quality.model = input.value;
+            recompute();
+        });
+    }
 }
 let current = null;
 let running = null;
@@ -219,7 +237,8 @@ export async function recompute() {
         do {
             again = false;
             const { refraction, config } = structuredClone(quality);
-            const model = refraction ? DEFAULT_ATMOSPHERE_MODEL : { ...DEFAULT_ATMOSPHERE_MODEL, refractivity: 0 };
+            const base = MODELS[quality.model];
+            const model = refraction ? base : { ...base, refractivity: 0 };
             const started = performance.now();
             const luts = await precomputeAtmosphere(gpu.device, { model, config });
             // Until the tables are computed, not just queued.

@@ -5,7 +5,8 @@ import { paintRange } from "../range.js";
 import { COMPASS } from "../sternzeit/figure.js";
 import { onChange, state } from "../sternzeit/state.js";
 import {
-    bindToneCurveToggle,
+    bindModelChoice,
+    bindToneCurveChoice,
     display,
     onDisplay,
     onTables,
@@ -208,7 +209,7 @@ function render() {
     const settings = {
         luts: table.luts,
         debugGrid,
-        groundSamples: quality.groundSamples,
+        groundLight: quality.groundLight,
         dither,
         autoExposure,
         toneMap,
@@ -266,7 +267,8 @@ function showExposure() {
 }
 
 if (gpu) {
-    bindToneCurveToggle(field("tone"));
+    bindToneCurveChoice(root.querySelectorAll('input[name="sky-tone"]'));
+    bindModelChoice(root.querySelectorAll('input[name="sky-model"]'));
     onDisplay(requestRender);
     onChange(requestRender);
     onTables(() => {

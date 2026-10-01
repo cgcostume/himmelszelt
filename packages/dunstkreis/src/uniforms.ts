@@ -1,10 +1,8 @@
-import { type AtmosphereModel, atmosphereTopRadiusKm, luminanceScale } from "./model.js";
+import { type AtmosphereModel, atmosphereTopRadiusKm, luminanceScale, spectrumToRgb } from "./model.js";
+import { reflectanceAt } from "./spectral.js";
 
-/**
- * Size of the `DkAtmosphere` uniform block, in bytes. Scalars are packed into the tails of the vec3s, which
- * WGSL's 16-byte vec3 alignment leaves free, so the whole model fits in 112 bytes.
- */
-export const ATMOSPHERE_UNIFORM_SIZE = 112;
+/** Size of the `DkAtmosphere` uniform block, in bytes: six vec4s, a mat4x3, eight scalars. */
+export const ATMOSPHERE_UNIFORM_SIZE = 192;
 
 /**
  * Packs a model into the `DkAtmosphere` layout declared by `wgsl/atmosphere.wgsl`, ready for `writeBuffer`.
@@ -15,30 +13,36 @@ export const ATMOSPHERE_UNIFORM_SIZE = 112;
  */
 export function atmosphereUniformData(model: AtmosphereModel, target?: Float32Array): Float32Array {
     const data = target ?? new Float32Array(ATMOSPHERE_UNIFORM_SIZE / 4);
+    const scale = luminanceScale(model);
 
     data.set(model.rayleigh.beta, 0);
-    data[3] = model.planet.groundRadiusKm;
-
     data.set(model.mie.betaScattering, 4);
-    data[7] = atmosphereTopRadiusKm(model);
-
     data.set(model.mie.betaExtinction, 8);
-    data[11] = model.mie.g;
-
     data.set(model.ozone.betaAbsorption, 12);
-    data[15] = model.rayleigh.scaleHeightKm;
-
     data.set(
-        model.solarSpectrum.map((e) => e * luminanceScale(model)),
+        model.solarSpectrum.map((e) => e * scale),
         16,
     );
-    data[19] = model.mie.scaleHeightKm;
+    data.set(
+        model.wavelengths.map((w) => reflectanceAt(model.groundAlbedo, w)),
+        20,
+    );
+    // mat4x3f: four columns, one per wavelength, each a vec3 padded to 16 bytes.
+    const matrix = spectrumToRgb(model);
+    for (let j = 0; j < 4; ++j)
+        data.set(
+            [0, 1, 2].map((i) => matrix[i]?.[j] as number),
+            24 + j * 4,
+        );
 
-    data[20] = model.ozone.centerAltitudeKm;
-    data[21] = model.ozone.widthKm / 2;
-    data[22] = model.refractivity;
-
-    data.set(model.groundAlbedo, 24);
+    data[40] = model.planet.groundRadiusKm;
+    data[41] = atmosphereTopRadiusKm(model);
+    data[42] = model.mie.g;
+    data[43] = model.rayleigh.scaleHeightKm;
+    data[44] = model.mie.scaleHeightKm;
+    data[45] = model.ozone.centerAltitudeKm;
+    data[46] = model.ozone.widthKm / 2;
+    data[47] = model.refractivity;
 
     return data;
 }
