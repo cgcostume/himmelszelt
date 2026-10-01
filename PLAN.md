@@ -5,17 +5,10 @@ into a decision into CLAUDE.md.
 
 ## Bugs
 
-- **Fig. 5 (lighting), the sun is wrong.** To pin down: position, brightness or visibility, and from which height.
-  The disc is placed and lit from the camera's height (its own sky pass, read back), the solids are lit from the
-  observer's (`environment.sun`, `sky.apparentSun`).
-- **Fig. 5, sometimes black with refraction on and the sun under the horizon.** Not reproduced yet. Suspects: the
-  disc illuminance read back as zero while the refracted disc should still show; `apparentDirection` putting a hidden
-  sun on the horizon.
-- **Fig. 5, observer and camera height disagree.** The background and the sun disc follow the camera, the sky map,
-  the spherical harmonics, the sunlight on the solids and the metered exposure follow the observer. Decide which
-  height the scene stands for, and use it everywhere, or say in the caption why they differ.
-- **The sun disc vanishes whole** once its true center sinks below the horizon seen from the camera, though a sliver
-  of the refracted disc should still show: the meter measures `sunIlluminance` at the center only.
+- **Fig. 5 with the sky map: the sun disc vanishes whole** once its true center sinks below the observer's horizon,
+  though a sliver of the refracted disc should still show: the scene draws that disc itself, lit by `sunIlluminance`,
+  which the meter measures at the center only, and as a round disc, not flattened by the air. Behind the live
+  atmosphere the sky pass draws it, along every bent ray, as in Fig. 1.
 
 ## Lookup figure (dunstkreis Fig. 2)
 

@@ -205,7 +205,8 @@ function render() {
     if (skyViewKey !== skyViewFor || pass !== passFor.notified) {
         skyViewFor = skyViewKey;
         passFor.notified = pass;
-        skyViewChanged({ pass, sunDirection, apparentSun: [x, y, z], sunAngularDiameter });
+        const observerHeightM = clampObserverHeight(state.heightM);
+        skyViewChanged({ pass, sunDirection, apparentSun: [x, y, z], sunAngularDiameter, observerHeightM });
     }
     showTiming(astronomyMs, submitted - skyStarted, submitted);
     showExposure();

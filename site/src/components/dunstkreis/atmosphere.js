@@ -68,8 +68,8 @@ export function bindRefractionToggle(button) {
 }
 
 /**
- * Calls `listener({ pass, sunDirection, apparentSun, sunAngularDiameter })` whenever the sky pass may have rebuilt its
- * sky-view table: the pass, where the sun is, where it shows, and how large.
+ * Calls `listener({ pass, sunDirection, apparentSun, sunAngularDiameter, observerHeightM })` whenever the sky pass may
+ * have rebuilt its sky-view table: the pass, where the sun is, where it shows, how large, and from how high.
  */
 export const onSkyView = (listener) => events.addEventListener("skyView", (event) => listener(event.detail));
 export function skyViewChanged(sky) {

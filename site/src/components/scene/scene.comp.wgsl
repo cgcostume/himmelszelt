@@ -482,11 +482,12 @@ fn render(@builtin(global_invocation_id) id: vec3u) {
         luminance = luminance + bloom(center);
     }
     var color = toneMap(luminance * params.exposure);
-    // The sun disc, far beyond white in most exposures: mixed in after tone mapping, by how much of the pixel it
-    // covers, so its edge is smooth rather than a pixel's worth of white wherever it touches.
+    // The sun disc, far beyond white in most exposures: added to what lies behind it, tone mapped apart and mixed in by
+    // how much of the pixel it covers, so its edge is smooth rather than a pixel's worth of white wherever it touches.
+    // A disc no light reaches adds nothing: it never darkens the sky.
     if (disc > 0.0) {
         let sun = dkSunDiscLuminance(params.discIlluminance, params.sunAngularRadius);
-        color = mix(color, toneMap(sun * params.exposure), disc);
+        color = mix(color, toneMap((luminance + sun) * params.exposure), disc);
     }
     // Triangular dither of one 8-bit step, the difference of the two channels.
     if (params.dither != 0u) {
