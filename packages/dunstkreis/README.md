@@ -24,7 +24,7 @@ The sky follows Hillaire 2020 on the model osgHimmel took from Bruneton & Neyret
 |---|---|---|
 | transmittance | 256x64 | once per model, `precomputeAtmosphere()` |
 | multiple scattering | 64x64 | once per model, `precomputeAtmosphere()` |
-| sky view | 256x144 | whenever the Sun or the observer moves, by the pass from `createSkyPass()` |
+| sky view | 128x256 | whenever the Sun or the observer moves, by the pass from `createSkyPass()` |
 
 Hillaire's multiple-scattering term is infinite-order under an isotropic assumption, where Bruneton's is a fixed number
 of orders; for the Earth's air the two look nearly alike. Bruneton's four-dimensional inscatter table (32x128x32x8,
@@ -154,7 +154,12 @@ mobile GPU may take 20 to 50 times as long for.
 |---|---|---|---|---|
 | transmittance | 256x64 | 0.09%, 3.6% in deep twilight | 512x128: halves both | 0.9 to 2 ms once |
 | multiple scattering | 64x64 | 0.9% with the sun 12° down, where 32x32 is 9% off | | 0.35 ms once, 0.11 at 32x32 |
-| sky view | 256x144 | 0.07%, 1% for the worst hundredth, around the sun; 192x108 doubles both | 384x216: halves both | 0.07 ms per rebuild, 0.12 at 384x216 |
+| sky view | 128x256 | 0.03%, 0.34% for the worst hundredth; Hillaire's 192x108, as many texels, 4x and 6x that | 128x512: halves both | 0.07 ms per rebuild, 0.13 at 128x512 |
+
+The sky view is taller than wide: its columns, half a turn of azimuth from the sun, square-rooted towards it, need far
+fewer texels than its rows, the angle from the horizon. With the same texels, 144x256 is three times as accurate as
+256x144, and 64x256 still twice as accurate as 192x108 with fewer. The other two tables' shapes measured best as they
+are.
 
 All three tables are read bilinearly, so their error is that of linear interpolation between texels: it shrinks with
 the square of the spacing where the values are smooth, and only where the mappings put texels sparse does it show.

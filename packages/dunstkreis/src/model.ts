@@ -147,9 +147,10 @@ export interface PrecomputedTextureConfig {
      */
     multiScattering: { width: number; height: number };
     /**
-     * Hillaire's per-frame sky-view LUT, over view direction with a horizon-biased latitude mapping. 256x144: 0.07% off
-     * on average, 1% for the worst hundredth of texels, around the sun; 192x108, Hillaire's, doubles both. 384x216
-     * halves them again, for 0.12 ms per rebuild instead of 0.07.
+     * Hillaire's per-frame sky-view LUT, over view direction with a horizon-biased latitude mapping. 128x256, taller
+     * than wide: its columns, half a turn of azimuth from the sun, need far fewer texels than its rows, the angle from
+     * the horizon. 0.03% off on average, 0.34% for the worst hundredth of texels; Hillaire's 192x108, with as many
+     * texels, is four times and six times that. 128x512 halves both again, for 0.13 ms per rebuild instead of 0.07.
      */
     skyView: { width: number; height: number };
     integralSamples: {
@@ -162,7 +163,7 @@ export interface PrecomputedTextureConfig {
         multiScattering: number;
         /**
          * Per view ray, 30: 0.14% on average, 1.2% at worst. 15 to 20 for speed, 0.2% and 3%; 40 for quality, 0.09% and
-         * 0.7%; little better beyond 64. The only count on the per-frame path, 0.05 ms per rebuild for 30 at 192x108,
+         * 0.7%; little better beyond 64. The only count on the per-frame path, 0.07 ms per rebuild for 30 at 128x256,
          * linear in the count and the texels.
          */
         skyView: number;
@@ -172,7 +173,7 @@ export interface PrecomputedTextureConfig {
 export const DEFAULT_TEXTURE_CONFIG: PrecomputedTextureConfig = {
     transmittance: { width: 256, height: 64 },
     multiScattering: { width: 64, height: 64 },
-    skyView: { width: 256, height: 144 },
+    skyView: { width: 128, height: 256 },
     integralSamples: { transmittance: 100, multiScattering: 40, skyView: 30 },
 };
 

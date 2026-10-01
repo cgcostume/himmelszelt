@@ -7,7 +7,7 @@
 // half with both, DK_SKY_VIEW_ROWS 2. The sky's rays never reach the ground, so the upper half does not depend on the
 // lower one. Without the sky's light on the ground, one dispatch writes all of it, DK_SKY_VIEW_ROWS 0.
 //
-// Cheap enough to rebuild every frame (a 256x144 table, 30 samples each) and it turns the sky pass into a
+// Cheap enough to rebuild every frame (a 128x256 table, 30 samples each) and it turns the sky pass into a
 // single texture fetch per pixel. The sun's position is baked into it, so it has to follow the sun; the
 // transmittance and multiple-scattering tables above it do not, and are only rebuilt when the model changes.
 

@@ -47,6 +47,6 @@ test("the texture config keeps osgHimmel's transmittance resolution", () => {
     expect(DEFAULT_TEXTURE_CONFIG.transmittance).toEqual({ width: 256, height: 64 });
 
     // Hillaire's tables, which replace Bruneton's 4D one of 32 x 128 x 32 x 8: far smaller.
-    const hillaireTexels = 64 * 64 + 256 * 144;
+    const hillaireTexels = 64 * 64 + 128 * 256;
     expect(hillaireTexels).toBeLessThan((32 * 128 * 32 * 8) / 10);
 });
