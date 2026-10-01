@@ -36,9 +36,15 @@ fn dkRaymarchSky(
     result.luminance = vec3f(0.0);
     result.transmittance = vec3f(1.0);
 
+    // A ray going up meets its densest air first, the aerosols within a km or two: its steps grow with the square of
+    // the distance, t_k = T (k / N)^2, dense where it starts. Uniform for the rest, whose densest air lies along it.
+    let quadratic = mu >= 0.0;
+    let n = f32(samples);
     var path = dkPathStart(mu);
     for (var i = 0u; i < samples; i = i + 1u) {
-        let ds = dkPathRemaining(a, h, path, result.hitsGround) / f32(samples - i);
+        let k = f32(i);
+        let share = select(1.0 / (n - k), (2.0 * k + 1.0) / (n * n - k * k), quadratic);
+        let ds = dkPathRemaining(a, h, path, result.hitsGround) * share;
         let step = dkPathAdvance(a, h, path, ds);
         path = step.next;
 

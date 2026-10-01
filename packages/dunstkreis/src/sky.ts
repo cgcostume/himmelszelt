@@ -127,9 +127,16 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             compute: { module: skyViewModule, entryPoint, constants: constants({ skyViewRows }) },
         });
     const meterModule = device.createShaderModule({
-        code: [wgsl.atmosphere, wgsl.common, wgsl.lut, wgsl.sampling, wgsl.raymarch, wgsl.frame, wgsl.exposure].join(
-            "\n",
-        ),
+        code: [
+            wgsl.workgroupSum(128, device.features.has("subgroups")),
+            wgsl.atmosphere,
+            wgsl.common,
+            wgsl.lut,
+            wgsl.sampling,
+            wgsl.raymarch,
+            wgsl.frame,
+            wgsl.exposure,
+        ].join("\n"),
     });
     const [skyViewPipeline, groundIrradiancePipeline, groundPipeline, meterPipeline, skyPipeline] = await Promise.all([
         skyViewStep("dkPrecomputeSkyView", groundLit ? 1 : 0),

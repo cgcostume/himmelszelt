@@ -231,7 +231,7 @@ function rebuild() {
 
     if (ray.kind === "view") {
         // Up to the top of the drawn air, or down to its ground where the true ray ends there, the samples spaced along
-        // it as evenly as the trace spaces them.
+        // it as the trace spaces them.
         const elevation = Math.asin(ray.mu);
         const view = drawnDirection(
             trace.hitsGround ? Math.min(elevation, -1e-3) : Math.max(elevation, 0),
@@ -240,7 +240,7 @@ function rebuild() {
         const length = drawnThroughAir(origin, view);
         styled(new Shape({ addTo: scene, path: [origin, along(origin, view, length)], closed: false, color: INK }), 2);
         for (let i = 0; i < trace.points.length; i++) {
-            const p = along(origin, view, (length * (i + 0.5)) / trace.points.length);
+            const p = along(origin, view, length * trace.points[i].along);
             const path = [p, along(p, toSun, drawnThroughAir(p, toSun))];
             styled(new Shape({ addTo: scene, path, closed: false, color: transmittance }), 1, null, 0.45);
             halo(p, multiple, 7);

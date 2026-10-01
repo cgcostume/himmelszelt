@@ -144,14 +144,16 @@ gives the features and limits to request a device with, `unmetRequirements(adapt
 in words:
 
 ```js
-const options = { format: "rgba8unorm", outputSize: 4096, cube: { format: "rgba16float", irradiance: true } };
+const options = { format: "rgba8unorm", outputSize: 4096, cube: { format: "rgba16float" } };
 const unmet = unmetRequirements(adapter, options);
 if (unmet.length) throw new Error(unmet.join("; "));
-const device = await adapter.requestDevice(skyRequirements(options));
+// With the adapter, also "subgroups" and "float32-filterable" where it has them.
+const device = await adapter.requestDevice(skyRequirements(options, adapter));
 ```
 
-The light meter's 128 threads also fit WebGPU's compatibility mode; the irradiance pass asks for 9 KiB of workgroup
-memory. Pass creation is asynchronous throughout (`createComputePipelineAsync`), so compiling never blocks a frame.
+The limits fit WebGPU's compatibility mode too. The passes that sum over a workgroup, the multiple-scattering table
+(one workgroup of 64 per texel), the light meter and the spherical harmonics, use subgroup operations where the device
+has "subgroups", and a tree in workgroup memory where it has not (`wgsl.workgroupSum`). Pass creation is asynchronous throughout (`createComputePipelineAsync`), so compiling never blocks a frame.
 
 ## Status
 

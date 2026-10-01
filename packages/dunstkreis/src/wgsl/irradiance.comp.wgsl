@@ -1,5 +1,5 @@
-// Diffuse image-based lighting from any cube map in cd/m², the sky's or an HDR environment's. Requires `cube.wgsl`.
-// A pass, so it declares its bindings.
+// Diffuse image-based lighting from any cube map in cd/m², the sky's or an HDR environment's. Requires `cube.wgsl` and
+// `workgroupSum(64, ...)` from `reduce.ts`, first. A pass, so it declares its bindings.
 //
 // Two entry points, run one after the other. `dkProjectSH` projects the cube map onto the nine real spherical
 // harmonics up to order 2, from directions spread evenly over the sphere. `dkIrradianceCube` then writes, for every
@@ -17,8 +17,6 @@ override DK_SOURCE_CUBIFIED: bool = false;
 
 const DK_SH_THREADS: u32 = 64u;
 const DK_SH_SAMPLES: u32 = 64u;
-
-var<workgroup> dkSHSums: array<array<vec3f, 9>, DK_SH_THREADS>;
 
 // The real spherical harmonics up to order 2, in the order (l, m) = (0, 0), (1, -1), (1, 0), (1, 1), (2, -2) to (2, 2).
 fn dkSHBasis(d: vec3f) -> array<f32, 9> {
@@ -55,20 +53,13 @@ fn dkProjectSH(@builtin(local_invocation_index) index: u32) {
             sums[c] = sums[c] + radiance * basis[c];
         }
     }
-    dkSHSums[index] = sums;
-    workgroupBarrier();
-
-    for (var stride = DK_SH_THREADS / 2u; stride > 0u; stride = stride / 2u) {
-        if (index < stride) {
-            for (var c = 0u; c < 9u; c = c + 1u) {
-                dkSHSums[index][c] = dkSHSums[index][c] + dkSHSums[index + stride][c];
-            }
+    // One coefficient at a time, so the sums need 1 KiB of workgroup memory rather than 9.
+    for (var c = 0u; c < 9u; c = c + 1u) {
+        let sum = dkWorkgroupSum(vec4f(sums[c], 0.0), index);
+        if (index == 0u) {
+            // Each sample stands for 4 pi / total of the sphere.
+            dkSH[c] = vec4f(sum.rgb * (4.0 * 3.14159265358979 / total), 0.0);
         }
-        workgroupBarrier();
-    }
-    if (index < 9u) {
-        // Each sample stands for 4 pi / total of the sphere.
-        dkSH[index] = vec4f(dkSHSums[0][index] * (4.0 * 3.14159265358979 / total), 0.0);
     }
 }
 

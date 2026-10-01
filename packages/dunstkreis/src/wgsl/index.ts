@@ -10,6 +10,9 @@
  * compile-time constants. `features` holds the passes' switches the same way, so an unused feature compiles out
  * rather than branching. `common` declares one override of its own, `DK_REFRACTION`, on by default.
  *
+ * The passes that sum over a workgroup take `workgroupSum(threads, subgroups)` first, with subgroup operations where the
+ * device has the "subgroups" feature and workgroup memory where it has not.
+ *
  * Every identifier is prefixed `dk` (or `DK_` for constants) so several `@himmelszelt/*` fragments can share one
  * shader module.
  */
@@ -32,6 +35,7 @@ import sun from "./sun.wgsl";
 import transmittance from "./transmittance.comp.wgsl";
 
 export { skyCubeOutput, skyOutput } from "./output.js";
+export { workgroupSum } from "./reduce.js";
 
 export {
     atmosphere,

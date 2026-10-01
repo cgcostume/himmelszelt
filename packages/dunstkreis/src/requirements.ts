@@ -8,8 +8,8 @@ export interface RequirementOptions {
     outputSize?: number;
     /** The tables' sizes, `DEFAULT_TEXTURE_CONFIG` by default. */
     config?: PrecomputedTextureConfig;
-    /** A sky cube map: its format, its edge in texels, and whether it feeds the irradiance pass. */
-    cube?: { format: "rgba16float" | "rgba32float"; size?: number; irradiance?: boolean };
+    /** A sky cube map: its format and its edge in texels. */
+    cube?: { format: "rgba16float" | "rgba32float"; size?: number };
 }
 
 /** Features and limits to request a device with, as `adapter.requestDevice(skyRequirements(options))` takes them. */
@@ -18,12 +18,16 @@ export interface DeviceRequirements {
     requiredLimits: Record<string, number>;
 }
 
+/** Features the passes use where a device has them, and do without otherwise. */
+const OPTIONAL_FEATURES: GPUFeatureName[] = ["subgroups", "float32-filterable"];
+
 /**
  * The device features and limits the tables, the sky pass and a sky cube map need. Every limit is within WebGPU's
- * defaults, and all but the irradiance pass' workgroup memory within its compatibility mode's: a device made without
- * asking for more has them. Only bgra8unorm output needs a feature.
+ * defaults and its compatibility mode's: a device made without asking for more has them. Only bgra8unorm output needs
+ * a feature. Given the `adapter`, the features the passes are faster or finer with are asked for too, where it has them:
+ * "subgroups" for the sums over a workgroup, "float32-filterable" for an rgba32float cube map in the irradiance pass.
  */
-export function skyRequirements(options: RequirementOptions = {}): DeviceRequirements {
+export function skyRequirements(options: RequirementOptions = {}, adapter?: GPUAdapter): DeviceRequirements {
     const { format, outputSize = 0, config = DEFAULT_TEXTURE_CONFIG, cube } = options;
     const tables = [config.transmittance, config.multiScattering, config.skyView].flatMap(({ width, height }) => [
         width,
@@ -38,16 +42,15 @@ export function skyRequirements(options: RequirementOptions = {}): DeviceRequire
         maxSamplersPerShaderStage: 1,
         maxStorageBuffersPerShaderStage: 1,
         maxStorageTexturesPerShaderStage: 1,
-        // The light meter's workgroup, and its sums in workgroup memory.
+        // The light meter's workgroup, and its sums in workgroup memory without subgroups.
         maxComputeInvocationsPerWorkgroup: 128,
         maxComputeWorkgroupSizeX: 128,
-        maxComputeWorkgroupStorageSize: 1024,
+        maxComputeWorkgroupStorageSize: 2048,
         maxTextureDimension2D: Math.max(outputSize, cube?.size ?? 0, ...tables),
     };
     if (cube) requiredLimits.maxTextureArrayLayers = 6;
-    // The irradiance pass sums nine coefficients over 64 threads in workgroup memory.
-    if (cube?.irradiance) requiredLimits.maxComputeWorkgroupStorageSize = 9216;
     const requiredFeatures: GPUFeatureName[] = format === "bgra8unorm" ? ["bgra8unorm-storage"] : [];
+    for (const feature of OPTIONAL_FEATURES) if (adapter?.features.has(feature)) requiredFeatures.push(feature);
     return { requiredFeatures, requiredLimits };
 }
 

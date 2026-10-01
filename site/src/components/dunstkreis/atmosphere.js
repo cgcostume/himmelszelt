@@ -3,6 +3,7 @@ import {
     DEFAULT_ATMOSPHERE_MODEL,
     DEFAULT_TEXTURE_CONFIG,
     precomputeAtmosphere,
+    skyRequirements,
 } from "@himmelszelt/dunstkreis";
 
 /**
@@ -27,7 +28,8 @@ async function acquire() {
                 "<code>chrome://flags/#enable-unsafe-webgpu</code> enabled and a restart.",
         };
     }
-    const device = await adapter.requestDevice();
+    // With subgroups where the GPU has them, for the sums over a workgroup.
+    const device = await adapter.requestDevice(skyRequirements({ format: "rgba8unorm" }, adapter));
     // Which GPU, for the timings: a fallback adapter renders on the CPU, a hundred times slower.
     const { vendor, architecture, description } = adapter.info ?? {};
     const name = description || [vendor, architecture].filter(Boolean).join(" ") || "unknown GPU";

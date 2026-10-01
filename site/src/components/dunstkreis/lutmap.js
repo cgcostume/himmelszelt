@@ -93,7 +93,8 @@ const normalize = (a) => a.map((c) => c / Math.hypot(...a));
 /**
  * The view ray the sky-view table traces from `h` km up along `direction` (ENU, z up), bent by the air, in `samples`
  * steps: the path, the planet's center at (0, 0, -Rg - h) and the observer at the origin, and at the middle of each
- * step, where the two lookups happen, its position, altitude and the cosine of the sun's zenith angle there.
+ * step, where the two lookups happen, its position, altitude, the cosine of the sun's zenith angle there, and how far
+ * along the path it lies, from 0 to 1. A ray going up takes steps growing with the square of the distance, as there.
  */
 export function traceView(g, h, direction, sunDirection, samples) {
     const mu = clamp(direction[2], -1, 1);
@@ -131,8 +132,10 @@ export function traceView(g, h, direction, sunDirection, samples) {
     let d = [Math.sqrt(1 - mu * mu), mu];
     const path = [toWorld(p)];
     const points = [];
+    const n = samples;
+    let travelled = 0;
     for (let i = 0; i < samples; i++) {
-        const ds = remaining(p, d) / (samples - i);
+        const ds = remaining(p, d) * (mu >= 0 ? (2 * i + 1) / (n * n - i * i) : 1 / (n - i));
         const t0 = turn(p, d);
         const dm = normalize([d[0] + t0[0] * 0.5 * ds, d[1] + t0[1] * 0.5 * ds]);
         const middle = [p[0] + dm[0] * 0.5 * ds, p[1] + dm[1] * 0.5 * ds];
@@ -142,11 +145,14 @@ export function traceView(g, h, direction, sunDirection, samples) {
             position: toWorld(middle),
             altitude,
             muS: clamp(dot(toWorldUp(upAt(middle)), sunDirection), -1, 1),
+            along: travelled + ds / 2,
         });
+        travelled += ds;
         p = [p[0] + dm[0] * ds, p[1] + dm[1] * ds];
         d = normalize([d[0] + t1[0] * ds, d[1] + t1[1] * ds]);
         path.push(toWorld(p));
     }
+    for (const point of points) point.along /= travelled;
     return { path, points, hitsGround, center: [0, 0, -r0] };
 }
 

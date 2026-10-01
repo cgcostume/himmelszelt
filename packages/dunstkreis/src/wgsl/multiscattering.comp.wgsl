@@ -1,5 +1,6 @@
 // Hillaire's multiple-scattering LUT precompute. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`,
-// `sampling.wgsl` and `quality.wgsl`. A pass, so it declares its bindings.
+// `sampling.wgsl`, `quality.wgsl` and `workgroupSum(64, ...)` from `reduce.ts`, first. A pass, so it declares its
+// bindings.
 //
 // This is what replaces Bruneton's 4D inscatter table and its ping-pong over scattering orders. The trick is
 // to assume multiply scattered light is isotropic, which makes each order a fixed fraction of the one before
@@ -11,8 +12,7 @@
 @group(0) @binding(2) var dkLutSampler: sampler;
 @group(0) @binding(3) var dkMultiScatteringOut: texture_storage_2d<rgba16float, write>;
 
-// Directions sampled per axis, so 64 in total. Hillaire's own value. Quadratic, and this pass is the whole
-// precompute cost, so it is not an override: 64 is cheap and there is little to gain.
+// Directions sampled per axis, so 64 in total, one per invocation of a texel's workgroup. Hillaire's own value.
 const DK_MS_DIRECTIONS: u32 = 8u;
 
 struct DkMultiScatterSample {
@@ -77,46 +77,41 @@ fn dkIntegrateMultiScattering(a: DkAtmosphere, h: f32, direction: vec3f, sunDire
     return result;
 }
 
-@compute @workgroup_size(8, 8)
-fn dkPrecomputeMultiScattering(@builtin(global_invocation_id) id: vec3u) {
-    let size = vec2f(textureDimensions(dkMultiScatteringOut));
-    if (f32(id.x) >= size.x || f32(id.y) >= size.y) {
-        return;
-    }
-
+// One workgroup per texel, as in Hillaire's own: its 64 invocations trace a direction each, and the sums over them are
+// shared. Rather than one invocation tracing all 64, which leaves the GPU nearly idle on a 32x32 table.
+@compute @workgroup_size(64)
+fn dkPrecomputeMultiScattering(
+    @builtin(workgroup_id) texel: vec3u,
+    @builtin(local_invocation_index) index: u32,
+) {
     let a = dkAtmosphere;
-    let uv = (vec2f(f32(id.x), f32(id.y)) + 0.5) / size;
+    let size = vec2f(textureDimensions(dkMultiScatteringOut));
+    let uv = (vec2f(texel.xy) + 0.5) / size;
     let altitudeMuS = dkMultiScatteringAltitudeMuS(a, uv, size);
     let h = altitudeMuS.x;
     let muS = altitudeMuS.y;
     let sunDirection = vec3f(sqrt(max(1.0 - muS * muS, 0.0)), 0.0, muS);
 
-    var luminance = vec3f(0.0);
-    var transfer = vec3f(0.0);
-
-    for (var i = 0u; i < DK_MS_DIRECTIONS; i = i + 1u) {
-        for (var j = 0u; j < DK_MS_DIRECTIONS; j = j + 1u) {
-            // Uniform over the sphere: azimuth linear, polar angle inverted through the cosine, so that
-            // equal-area patches get equal numbers of samples rather than clustering at the poles.
-            let azimuth = 2.0 * DK_PI * (f32(i) + 0.5) / f32(DK_MS_DIRECTIONS);
-            let polar = acos(1.0 - 2.0 * (f32(j) + 0.5) / f32(DK_MS_DIRECTIONS));
-            let direction = vec3f(sin(polar) * cos(azimuth), sin(polar) * sin(azimuth), cos(polar));
-
-            let sample = dkIntegrateMultiScattering(a, h, direction, sunDirection);
-            luminance = luminance + sample.luminance;
-            transfer = transfer + sample.transfer;
-        }
-    }
+    // Uniform over the sphere: azimuth linear, polar angle inverted through the cosine, so that equal-area patches get
+    // equal numbers of samples rather than clustering at the poles.
+    let i = index % DK_MS_DIRECTIONS;
+    let j = index / DK_MS_DIRECTIONS;
+    let azimuth = 2.0 * DK_PI * (f32(i) + 0.5) / f32(DK_MS_DIRECTIONS);
+    let cosPolar = 1.0 - 2.0 * (f32(j) + 0.5) / f32(DK_MS_DIRECTIONS);
+    let sinPolar = sqrt(max(1.0 - cosPolar * cosPolar, 0.0));
+    let direction = vec3f(sinPolar * cos(azimuth), sinPolar * sin(azimuth), cosPolar);
+    let sample = dkIntegrateMultiScattering(a, h, direction, sunDirection);
 
     // Both are integrals over the sphere with the isotropic phase, 4 pi / N per direction times 1 / (4 pi):
     // plain averages over the directions (Hillaire eqs. 5 and 7).
     let directions = f32(DK_MS_DIRECTIONS * DK_MS_DIRECTIONS);
-    luminance = luminance / directions;
-    transfer = transfer / directions;
+    let luminance = dkWorkgroupSum(vec4f(sample.luminance, 0.0), index).rgb / directions;
+    let transfer = dkWorkgroupSum(vec4f(sample.transfer, 0.0), index).rgb / directions;
 
     // The geometric series over all remaining orders. Clamped below 1 because a transfer of 1 would mean a
     // perfectly conserving atmosphere and an infinite sum.
     let series = 1.0 / (1.0 - min(transfer, vec3f(0.999)));
-
-    textureStore(dkMultiScatteringOut, vec2i(id.xy), vec4f(luminance * series, 1.0));
+    if (index == 0u) {
+        textureStore(dkMultiScatteringOut, vec2i(texel.xy), vec4f(luminance * series, 1.0));
+    }
 }

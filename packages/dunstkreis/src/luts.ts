@@ -83,14 +83,22 @@ export async function precomputeAtmosphere(
         },
     });
 
+    // One workgroup of 64 per texel, summing with subgroup operations where the device has them.
+    const subgroups = device.features.has("subgroups");
     const multiScatteringPipeline = device.createComputePipelineAsync({
         label: "dunstkreis:multiScattering",
         layout: "auto",
         compute: {
             module: device.createShaderModule({
-                code: [wgsl.quality, wgsl.atmosphere, wgsl.common, wgsl.lut, wgsl.sampling, wgsl.multiscattering].join(
-                    "\n",
-                ),
+                code: [
+                    wgsl.workgroupSum(64, subgroups),
+                    wgsl.quality,
+                    wgsl.atmosphere,
+                    wgsl.common,
+                    wgsl.lut,
+                    wgsl.sampling,
+                    wgsl.multiscattering,
+                ].join("\n"),
             }),
             entryPoint: "dkPrecomputeMultiScattering",
             constants,
@@ -134,10 +142,7 @@ export async function precomputeAtmosphere(
             ],
         }),
     );
-    multiScatteringPass.dispatchWorkgroups(
-        dispatch(config.multiScattering.width),
-        dispatch(config.multiScattering.height),
-    );
+    multiScatteringPass.dispatchWorkgroups(config.multiScattering.width, config.multiScattering.height);
     multiScatteringPass.end();
 
     device.queue.submit([encoder.finish()]);

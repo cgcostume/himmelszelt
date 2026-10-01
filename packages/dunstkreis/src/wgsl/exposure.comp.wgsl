@@ -1,5 +1,6 @@
 // A light meter for the sky, for automatic exposure. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`,
-// `sampling.wgsl`, `raymarch.wgsl` and `frame.wgsl`. A pass, so it declares its bindings.
+// `sampling.wgsl`, `raymarch.wgsl`, `frame.wgsl` and `workgroupSum(128, ...)` from `reduce.ts`, first. A pass, so it
+// declares its bindings.
 //
 // Reads the sky-view table rather than the rendered image: it is small, rebuilt only when the sun or the observer
 // moves, and holds every direction, so the reading does not change as the camera turns, and the sun disc, which is not
@@ -28,8 +29,6 @@ const DK_METER_SAMPLES: u32 = 32u;
 const DK_METER_FLOOR: f32 = 1e-10;
 // Samples per ray from space: the meter averages thousands of rays, so each can be coarse.
 const DK_METER_RAY_SAMPLES: u32 = 16u;
-
-var<workgroup> dkMeterSums: array<vec2f, DK_METER_THREADS>;
 
 // log2 of the luminance seen from altitude h along mu and an azimuth from the sun, for the geometric mean.
 fn dkMeterLog2(a: DkAtmosphere, h: f32, mu: f32, azimuth: f32, size: vec2f) -> f32 {
@@ -81,17 +80,9 @@ fn dkMeterSky(@builtin(local_invocation_index) index: u32) {
         let below = dkMeterLog2(a, h, -1.0 + (1.0 + horizon) * k / total, azimuth, size);
         sum = sum + vec2f(above, below);
     }
-    dkMeterSums[index] = sum;
-    workgroupBarrier();
-
-    for (var stride = DK_METER_THREADS / 2u; stride > 0u; stride = stride / 2u) {
-        if (index < stride) {
-            dkMeterSums[index] = dkMeterSums[index] + dkMeterSums[index + stride];
-        }
-        workgroupBarrier();
-    }
+    let sums = dkWorkgroupSum(vec4f(sum, 0.0, 0.0), index);
     if (index == 0u) {
-        dkMeteringOut.log2Luminance = max(dkMeterSums[0].x, dkMeterSums[0].y) / total;
+        dkMeteringOut.log2Luminance = max(sums.x, sums.y) / total;
         dkMeteringOut.sunIlluminance = a.solarIlluminance * dkSunTransmittance(a, h);
     }
 }

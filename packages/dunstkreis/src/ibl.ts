@@ -51,7 +51,8 @@ export async function createIrradiancePass(
 ): Promise<IrradiancePass> {
     const { size = 32, cubified = false, sourceFormat = "rgba16float" } = options;
     const filterable = sourceFormat !== "rgba32float" || device.features.has("float32-filterable");
-    const module = device.createShaderModule({ code: [wgsl.cube, wgsl.irradiance].join("\n") });
+    const reduce = wgsl.workgroupSum(64, device.features.has("subgroups"));
+    const module = device.createShaderModule({ code: [reduce, wgsl.cube, wgsl.irradiance].join("\n") });
     // The source's layout spelled out, since "auto" would take any float texture as filterable.
     const sourceLayout = device.createBindGroupLayout({
         entries: [

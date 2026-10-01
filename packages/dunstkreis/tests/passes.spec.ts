@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { skyCubeOutput, skyOutput } from "../src/wgsl/output.js";
+import { workgroupSum } from "../src/wgsl/reduce.js";
 import { compileWgsl, gpuDevice, wgslSource } from "./gpu.js";
 
 // Each pass, with exactly the fragments it declares a dependency on in its header comment. Compiling them
@@ -27,11 +28,15 @@ const PASSES: Record<string, readonly string[]> = {
     irradiance: ["cube", "irradiance"],
     mipmap: ["cube", "mipmap"],
 };
-// The output the sky pass leaves to whoever builds its pipeline.
+// What the passes leave to whoever builds their pipelines: the sky pass' output, and the sums over a workgroup, here
+// without subgroups, which the test device lacks.
 const OUTPUTS: Record<string, string> = {
     sky: skyOutput("rgba8unorm"),
     skyCube: skyCubeOutput("rgba16float"),
     mipmap: skyCubeOutput("rgba16float"),
+    multiscattering: workgroupSum(64, false),
+    exposure: workgroupSum(128, false),
+    irradiance: workgroupSum(64, false),
 };
 
 for (const [name, fragments] of Object.entries(PASSES)) {

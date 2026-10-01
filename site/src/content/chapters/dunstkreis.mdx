@@ -133,7 +133,8 @@ Three tables carry the sky. Transmittance says how much light gets through the a
 how much light arrives after more than one bounce, and the sky view holds the whole sky as seen from where the observer
 stands, rebuilt whenever the Sun or the observer moves. The sky pass then only looks up one texel per pixel.
 
-<Fig id="lookup" /> follows one of those pixels back. Its view ray is marched from the eye in 30 steps. At each, sunlight
+<Fig id="lookup" /> follows one of those pixels back. Its view ray is marched from the eye in 30 steps, short ones first
+where it goes up, since the air is densest right at the eye, and the haze in it within a kilometer or two. At each, sunlight
 comes in from the side: how much of it made it through the air is a transmittance lookup, by the step's altitude and
 the Sun's angle there, and the light that bounced more than once is a multiple scattering lookup, by the same two. How
 much of all that still reaches the eye is summed up along the way, step by step. Sixty lookups end up in a single texel
