@@ -1,5 +1,5 @@
 import * as precise from "@himmelszelt/sternzeit";
-import { svgText, veiledHorizon } from "./figure.js";
+import { drawSvg, svgText, veiledHorizon } from "./figure.js";
 import { aboveVisibleHorizon } from "./horizon.js";
 import { offPanelArrowFromCenter, offPanelArrowSvg } from "./offpanel.js";
 import { ephemerisDay, onChange, state, update } from "./state.js";
@@ -124,8 +124,8 @@ function renderLunar(jd) {
     }
     const arrow = onPanelLunar ? "" : offPanelMoon(mx, my);
     svg += circle(0, 0, penumbra, "eclipse-edge") + circle(0, 0, umbra, "eclipse-edge");
-    svg += svgText(0, -umbra + 9, "umbra", "figure-label", unitsPerPx);
-    svg += svgText(0, -penumbra + 9, "penumbra", "figure-label", unitsPerPx);
+    svg += svgText(0, -umbra + 9, "umbra", "figure-label");
+    svg += svgText(0, -penumbra + 9, "penumbra", "figure-label");
 
     const km = eclipse.axisOffsetKm;
     const moonKm = precise.moon.MEAN_RADIUS_KM;
@@ -155,7 +155,7 @@ function render() {
         const panel = view.querySelector(".eclipse-panel > svg");
         unitsPerPx = (2 * HALF) / (panel.clientWidth || 2 * HALF);
         const { svg, status } = RENDERERS[view.dataset.kind](state.jd);
-        panel.innerHTML = svg;
+        drawSvg(panel, svg, unitsPerPx);
         view.querySelector('[data-field="status"]').textContent = status;
     }
 }

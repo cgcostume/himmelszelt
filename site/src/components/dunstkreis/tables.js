@@ -120,7 +120,7 @@ const fixed = (v, digits) => v.toFixed(digits);
 const exp = (v) => v.toExponential(2);
 /** A texel's four wavelengths, labelled by them. */
 const spectral = (model, d, i, format) =>
-    `at ${model.wavelengths.join(", ")} nm: ${[0, 1, 2, 3].map((c) => format(d[i + c])).join(", ")}`;
+    `at ${model.wavelengths.join(", ")}\u202fnm: ${[0, 1, 2, 3].map((c) => format(d[i + c])).join(", ")}`;
 
 // What a texel stands for: short values for the two axes, and the lines of the tooltip.
 const READOUTS = {
@@ -131,11 +131,11 @@ const READOUTS = {
         const angle = Math.asin(mu) * DEG;
         return {
             x: `${fixed(angle, 2)}°`,
-            y: `${fixed(r - g.Rg, 2)} km`,
+            y: `${fixed(r - g.Rg, 2)}\u202fkm`,
             lines: [
-                `altitude ${fixed(r - g.Rg, 3)} km`,
+                `altitude ${fixed(r - g.Rg, 3)}\u202fkm`,
                 `light from ${fixed(angle, 3)}° above the horizontal, μ ${fixed(mu, 5)}`,
-                `${fixed(d, 1)} km to the top`,
+                `${fixed(d, 1)}\u202fkm to the top`,
                 `transmittance ${spectral(table.model, data, i, (v) => fixed(v, 4))}`,
             ],
         };
@@ -145,9 +145,9 @@ const READOUTS = {
         const { data } = table;
         return {
             x: `${fixed(Math.asin(muS) * DEG, 1)}°`,
-            y: `${fixed(altitude, 1)} km`,
+            y: `${fixed(altitude, 1)}\u202fkm`,
             lines: [
-                `altitude ${fixed(altitude, 2)} km`,
+                `altitude ${fixed(altitude, 2)}\u202fkm`,
                 `sun ${fixed(Math.asin(muS) * DEG, 2)}° high, μs ${fixed(muS, 4)}`,
                 `per unit of sunlight and scattering ${spectral(table.model, data, i, exp)}`,
             ],
@@ -167,7 +167,7 @@ const READOUTS = {
             lines: [
                 `azimuth ${fixed(azimuth, 2)}° from the sun`,
                 `${fixed(90 - (zenithHorizon + below) * DEG, 3)}° above the horizontal`,
-                `${fixed(-below * DEG, 3)}° above the visible horizon, seen from ${fixed(h, 3)} km`,
+                `${fixed(-below * DEG, 3)}° above the visible horizon, seen from ${fixed(h, 3)}\u202fkm`,
                 `luminance ${exp(luminance(table.model, data, i))} cd/m²`,
                 spectral(table.model, data, i, exp),
                 bent === null ? "ends on the ground" : `bent by ${fixed(bent * 60, 2)}′`,

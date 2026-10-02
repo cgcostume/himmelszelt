@@ -1,7 +1,17 @@
 import * as precise from "@himmelszelt/sternzeit";
 import Zdog from "zdog";
 import { onDemand } from "../frame.js";
-import { COMPASS, cssColor, gridLine, labelAboveY, SUN_SYMBOL, sunRays, sunSymbol, svgText } from "./figure.js";
+import {
+    COMPASS,
+    cssColor,
+    drawSvg,
+    gridLine,
+    labelAboveY,
+    SUN_SYMBOL,
+    sunRays,
+    sunSymbol,
+    svgText,
+} from "./figure.js";
 import { aboveVisibleHorizon } from "./horizon.js";
 import { onChange, state } from "./state.js";
 import "./export.js";
@@ -39,10 +49,11 @@ const analemmaPanel = frameEl.querySelector(".analemma-panel");
 const analemmaSvg = analemmaPanel.querySelector(":scope > svg");
 const analemmaNote = frameEl.querySelector('[data-field="analemmaNote"]');
 
-// Stroke widths and dash patterns in screen pixels; converted to scene units whenever the zoom changes.
-const styles = new Map();
-const DOTTED = [0.1, 4];
-const DASHED = [3, 3];
+// Strokes are in screen pixels (see .zdog in global.css); the dash patterns are classes there too, set on each shape's
+// SVG element once it has one.
+const dashes = new Map();
+const DOTTED = "line-dotted";
+const DASHED = "line-dashed";
 let zoom = 1;
 let stageWidth = 0;
 let stageHeight = 0;
@@ -51,8 +62,8 @@ let centerShiftPx = 0;
 const rotation = { x: -20 * DEG, y: 40 * DEG, z: 0 };
 
 function styled(shape, strokePx, dash = null) {
-    styles.set(shape, { strokePx, dash });
-    shape.stroke = strokePx / zoom;
+    if (dash) dashes.set(shape, dash);
+    shape.stroke = strokePx;
     return shape;
 }
 
@@ -71,7 +82,6 @@ function layer(name) {
             this.translate.y = centerShiftPx / zoom;
             this.zoom = zoom;
             this.setSize(width, height);
-            for (const [shape, { strokePx }] of styles) shape.stroke = strokePx / zoom;
         },
     });
 }
@@ -206,8 +216,7 @@ function addSunRays(horizontal) {
     const yaw = new Anchor({ addTo: at });
     const face = new Anchor({ addTo: yaw });
     billboards.push({ yaw, face });
-    for (const path of sunRays())
-        styled(new Shape({ addTo: face, path, color: INK }), SUN_SYMBOL.stroke, SUN_SYMBOL.dash);
+    for (const path of sunRays()) styled(new Shape({ addTo: face, path, color: INK }), 1, "figure-sun-ray");
 }
 
 function rebuildPaths() {
@@ -215,7 +224,7 @@ function rebuildPaths() {
     billboards.length = 0;
     for (const anchor of dynamic) {
         for (const child of [...anchor.children]) {
-            styles.delete(child);
+            dashes.delete(child);
             child.remove();
         }
     }
@@ -276,8 +285,7 @@ function renderAnalemma() {
     const labelReach = ((analemmaSvg.clientWidth || 1) / 2 - 12) * unitsPerPx;
     COMPASS.forEach((label, i) => {
         const x = ((i * 45 - today.azimuth + 540) % 360) - 180;
-        if (Math.abs(x - centerX) < labelReach)
-            svg += svgText(x, labelAboveY(0, unitsPerPx), label, "figure-label", unitsPerPx);
+        if (Math.abs(x - centerX) < labelReach) svg += svgText(x, labelAboveY(0, unitsPerPx), label, "figure-label");
     });
     svg += `<polyline points="${points.map((p) => `${f(p.x)},${f(p.y)}`).join(" ")}" class="analemma-line"/>`;
     // A dot on the 1st of every month: fixed on the curve while the Sun moves along it, and their spacing shows its pace.
@@ -286,7 +294,7 @@ function renderAnalemma() {
         svg += `<circle cx="${f(p.x)}" cy="${f(p.y)}" r="0.9" class="analemma-tick"/>`;
     }
     svg += sunSymbol(0, -today.altitude, unitsPerPx);
-    analemmaSvg.innerHTML = svg;
+    drawSvg(analemmaSvg, svg, unitsPerPx);
     analemmaNote.textContent = points.every((p) => p.y > 0) ? ", below the horizon at this hour" : "";
 }
 
@@ -352,11 +360,7 @@ function frame() {
         illustration.rotate.set(rotation);
         illustration.updateRenderGraph();
     }
-    for (const [shape, { dash }] of styles) {
-        if (!dash || !shape.svgElement) continue;
-        shape.svgElement.setAttribute("stroke-dasharray", `${dash[0] / zoom},${dash[1] / zoom}`);
-        shape.svgElement.setAttribute("stroke-linecap", "round");
-    }
+    for (const [shape, dash] of dashes) shape.svgElement?.classList.add(dash);
     placeCompass();
 }
 

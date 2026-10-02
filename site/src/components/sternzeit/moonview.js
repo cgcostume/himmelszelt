@@ -1,5 +1,5 @@
 import * as precise from "@himmelszelt/sternzeit";
-import { sunInViewFrame, svgText, veiledHorizon } from "./figure.js";
+import { drawSvg, sunInViewFrame, svgText, veiledHorizon } from "./figure.js";
 import { aboveVisibleHorizon } from "./horizon.js";
 import { ephemerisDay, onChange, state } from "./state.js";
 import "./export.js";
@@ -136,7 +136,7 @@ function render() {
     const outside = PERIGEE_RADIUS + 3;
     const [nx, ny] = toScreen([0, 1], tilt, 1);
     svg += `<line x1="${f(nx * radius)}" y1="${f(ny * radius)}" x2="${f(nx * (outside + 7))}" y2="${f(ny * (outside + 7))}" class="moon-axis"/>`;
-    svg += svgText(nx * (outside + 13), ny * (outside + 13), "N", "figure-note", unitsPerPx);
+    svg += svgText(nx * (outside + 13), ny * (outside + 13), "N", "figure-note");
     const tiltDeg = ((((twist + 180) % 360) + 360) % 360) - 180;
     if (!locked) {
         svg += `<line x1="0" y1="${f(-outside)}" x2="0" y2="${f(-(outside + 7))}" class="moon-zenith"/>`;
@@ -186,7 +186,7 @@ function render() {
         const horizon = aboveVisibleHorizon(horizontal.altitude, state.heightM) * DEG * UNITS_PER_RADIAN;
         svg += veiledHorizon(horizon, 100, unitsPerPx);
     }
-    svgEl.innerHTML = svg;
+    drawSvg(svgEl, svg, unitsPerPx);
 
     const minutes = diameter * 60;
     const ew = l >= 0 ? "E" : "W";

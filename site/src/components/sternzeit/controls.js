@@ -31,7 +31,7 @@ function formatSummary() {
     const when = dateOf(state.jd).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "medium" });
     const lat = `${Math.abs(state.latitude).toFixed(2)}° ${state.latitude >= 0 ? "N" : "S"}`;
     const lon = `${Math.abs(state.longitude).toFixed(2)}° ${state.longitude >= 0 ? "E" : "W"}`;
-    return `${when}, ${lat} ${lon}, ${state.heightM} m${state.live ? ", live" : ""}`;
+    return `${when}, ${lat} ${lon}, ${state.heightM}\u202fm${state.live ? ", live" : ""}`;
 }
 
 // The whole moment and place as JSON, under the names the library's own functions use, so it pastes straight into

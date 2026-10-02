@@ -50,8 +50,8 @@ traces the refraction itself. How to hand it over is the first of the [code exam
 ## Why is the sky blue?
 
 <Planned title="A short history of the question" plan="keep, as a timeline.">
-    From Leonardo's blue haze in front of distant mountains through Newton, Tyndall's blue light from fine particles and
-    Rayleigh's inverse fourth power to Mie, Smoluchowski and Einstein, after Hoeppe's "Why the Sky Is Blue". A timeline,
+    From Leonardo's blue haze in front of distant mountains through Newton, Tyndall's blue light from fine particles, and
+    Rayleigh's inverse fourth power to Mie, Smoluchowski, and Einstein, after Hoeppe's "Why the Sky Is Blue". A timeline,
     each step with the one idea it added.
 </Planned>
 
@@ -60,9 +60,9 @@ traces the refraction itself. How to hand it over is the first of the [code exam
     sky is still blue and not violet, from the Sun's spectrum and the eye's sensitivity.
 </Planned>
 
-<Planned title="Molecules, aerosols and ozone">
+<Planned title="Molecules, aerosols, and ozone">
     The three actors, illustrated rather than shaded: where a photon goes after meeting an air molecule (Rayleigh, as
-    much forward as back), a droplet or dust grain (Mie, a narrow forward lobe, with its asymmetry to drag) and ozone,
+    much forward as back), a droplet or dust grain (Mie, a narrow forward lobe, with its asymmetry to drag), and ozone,
     which only absorbs. Their phase functions as live polar plots.
 </Planned>
 
@@ -83,28 +83,28 @@ scattering still lit. Set <Fig id="sky" /> to a clear evening, look east and wat
     below is the same thing for every height and angle at once.
 </Planned>
 
-<Planned title="Taking the sky apart" plan="merge with Scattering orders into one figure, Rayleigh, Mie, ozone and each order as switches.">
+<Planned title="Taking the sky apart" plan="merge with Scattering orders into one figure, Rayleigh, Mie, ozone, and each order as switches.">
     The same sunset with Rayleigh, Mie and ozone switched on and off one by one. Without ozone, twilight turns gray.
 </Planned>
 
 ## Four wavelengths
 
 Scattering, absorption and the Sun's own light all change with the wavelength, so the sky is computed per wavelength,
-not per color. A color on a screen is something else: its red, green and blue each sum the whole spectrum, weighted by
-how the eye responds to it <Cite id="wyman2013" />. Bruneton and Neyret computed three wavelengths, 680, 550 and 440 nm,
-and showed them as red, green and blue <Cite id="bruneton2008" />, as real-time skies have mostly done since, osgHimmel's
+not per color. A color on a screen is something else: its red, green, and blue each sum the whole spectrum, weighted by
+how the eye responds to it <Cite id="wyman2013" />. Bruneton and Neyret computed three wavelengths, 680, 550, and 440 nm,
+and showed them as red, green, and blue <Cite id="bruneton2008" />, as real-time skies have mostly done since, osgHimmel's
 included. Weighted by the eye instead, the same light comes out 12% off in hue on average, and a third at sunset: none
-of the three samples sees the orange around 600 nm, where red peaks for the eye and ozone absorbs. Bruneton's later implementation
+of the three samples sees the orange around 600 nm, where red peaks for the eye and ozone absorbs. Bruneton's later implementation
 computes some fifteen wavelengths and converts them exactly <Cite id="bruneton2017" />, at about five times the cost.
 
 dunstkreis takes a middle road. It computes four wavelengths, one per channel of its tables, which have four anyway,
-and turns them into red, green and blue by a matrix fitted for it: by least squares, to 85 sky spectra built from the
+and turns them into red, green, and blue by a matrix fitted for it: by least squares, to 85 sky spectra built from the
 model's own physics, sunlight through every depth of air and ozone, scattered by molecules or by haze, with the Sun
-itself held white. Which four was a search: every set on 10 nm steps between 420 and 690 nm, 4,788 of them, each fitted
-and then tested on 72 skies it was not fitted to. 630, 580, 510 and 440 nm came out best, 0.6% off on average and 1.7%
+itself held white. Which four was a search: every set on 10 nm steps between 420 and 690 nm, 4,788 of them, each fitted
+and then tested on 72 skies it was not fitted to. 630, 580, 510, and 440 nm came out best, 0.6% off on average and 1.7%
 at worst, and the GPU does not notice: it computes on four components either way. We have not found this middle road
 described before. The model choice in <Fig id="sky" /> shows the sky as it was colored before, Bruneton's three
-wavelengths taken as red, green and blue, and as osgHimmel computed it.
+wavelengths taken as red, green, and blue, and as osgHimmel computed it.
 
 ## More than one bounce
 
@@ -126,7 +126,7 @@ dunstkreis traces it instead, through the same air it scatters light in: the ref
 Rayleigh layer, and every ray bends between the same samples that integrate its scattering, the view rays as well as the
 sunlight reaching each point in the air. Along a bent ray in an atmosphere that is the same in every direction, n r
 sin(z) stays constant, with r the distance from the planet's center and z the angle from the vertical. That alone
-decides where the ground starts, which also lifts the visible horizon: from 10 km up, by 0.2°. The same model covers an
+decides where the ground starts, which also lifts the visible horizon: from 10 km up, by 0.2°. The same model covers an
 observer on the ground, one high up looking down, and one in orbit looking through the planet's rim, where a grazing ray
 crosses the air twice and bends by more than a degree.
 
@@ -182,7 +182,7 @@ in <Fig id="tables" />, and all of them follow the same ray.
 
 The tables' sizes and sample counts are open here to play with; the sky above follows. Every table is traced through
 the bent air of the section before, and each has a switch for it: off, the rays run straight. It is one setting for the
-whole page, so every table, cube map and figure follows it.
+whole page, so every table, cube map, and figure follows it.
 
 <Tables />
 
@@ -314,7 +314,7 @@ pipeline turns that off and gets the exposed luminance itself, linear and unclam
 ## Make your own
 
 <Planned title="The generator" plan="keep; exports: the tables as files, the nine coefficients, and the sky and irradiance maps as RGBE (.hdr), which any engine reads.">
-    Everything this chapter changed along the way, the atmosphere, the table sizes, the sample counts and the encoding,
+    Everything this chapter changed along the way, the atmosphere, the table sizes, the sample counts, and the encoding,
     in one place, previewed, and downloaded as files for your own renderer.
 </Planned>
 

@@ -37,9 +37,10 @@ let stageWidth = 0;
 let stageHeight = 0;
 const rotation = { x: -12 * DEG, y: 30 * DEG, z: 0 };
 const styles = new Map();
+// Strokes in screen pixels (see .zdog in global.css), dashes as a class there, both set once the shape is drawn.
 function styled(shape, strokePx, dash = null, opacity = 1) {
-    styles.set(shape, { strokePx, dash, opacity });
-    shape.stroke = strokePx / zoom;
+    styles.set(shape, { dash, opacity });
+    shape.stroke = strokePx;
     return shape;
 }
 
@@ -58,7 +59,6 @@ const illustration = new Illustration({
         this.translate.y = RADIUS * 0.2;
         this.setSize(width, height);
         [stageWidth, stageHeight] = [width, height];
-        for (const [shape, { strokePx }] of styles) shape.stroke = strokePx / zoom;
     },
 });
 const scene = new Anchor({ addTo: illustration });
@@ -176,7 +176,7 @@ function onStage(point) {
 }
 
 const degrees = (value, positive, negative) => `${Math.abs(value).toFixed(2)}° ${value < 0 ? negative : positive}`;
-const meters = (m) => (m < 1000 ? `${m.toFixed(0)} m` : `${(m / 1000).toFixed(1)} km`);
+const meters = (m) => (m < 1000 ? `${m.toFixed(0)}\u202fm` : `${(m / 1000).toFixed(1)}\u202fkm`);
 
 function rebuild() {
     for (const child of [...scene.children]) child.remove();
@@ -209,7 +209,7 @@ function rebuild() {
         ]);
     };
     const ring = Array.from({ length: 73 }, (_, i) => around(i * 5 * DEG));
-    styled(new Shape({ addTo: scene, path: ring, closed: false, color: MUTED }), 1, [0.1, 4]);
+    styled(new Shape({ addTo: scene, path: ring, closed: false, color: MUTED }), 1, "line-dotted");
     compassPoints = COMPASS.map((_, i) => around(i * 45 * DEG));
     const origin = drawn(g, r0, [0, 0, 0]);
     observerPoint = origin;
@@ -267,8 +267,8 @@ function rebuild() {
         const angle = (Math.asin(mu) / DEG).toFixed(2);
         info =
             ray.kind === "transmittance"
-                ? `transmittance texel: ${altitude.toFixed(2)} km up, towards ${angle}° above the horizontal`
-                : `multiple scattering texel: ${altitude.toFixed(2)} km up, the sun ${angle}° high`;
+                ? `transmittance texel: ${altitude.toFixed(2)}\u202fkm up, towards ${angle}° above the horizontal`
+                : `multiple scattering texel: ${altitude.toFixed(2)}\u202fkm up, the sun ${angle}° high`;
     }
     field("info").textContent = info;
 }
@@ -283,8 +283,7 @@ function frame() {
     illustration.updateRenderGraph();
     for (const [shape, { dash, opacity }] of styles) {
         if (!shape.svgElement) continue;
-        if (dash) shape.svgElement.setAttribute("stroke-dasharray", `${dash[0] / zoom},${dash[1] / zoom}`);
-        if (dash) shape.svgElement.setAttribute("stroke-linecap", "round");
+        if (dash) shape.svgElement.classList.add(dash);
         if (opacity < 1) shape.svgElement.setAttribute("opacity", String(opacity));
     }
     // Each label pushed out from the observer on screen, so they keep their distance from the ring at any turn.

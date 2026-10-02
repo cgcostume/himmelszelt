@@ -185,6 +185,15 @@ const CALL_OVERRIDES = {
 
 const DECIMALS = 4;
 
+// Which of the two variants every table shows, one at a time: the toggle in any table's heading switches them all.
+let variant = "precise";
+
+function variantToggle() {
+    const button = (name) =>
+        `<button type="button" class="variant" data-variant="${name}" aria-pressed="${variant === name}">${name}</button>`;
+    return `<span class="variant-toggle" title="Precise after Meeus, or approximate after Jensen et al.">${button("precise")}${button("approx")}</span>`;
+}
+
 // Fixed decimal count + a reserved sign column (a space where "-" would go) so that, combined with the
 // monospace font and right-aligned cells, digits/decimal points/signs all line up down a column. Thousands
 // separators (km values can run into the hundreds of millions) don't break that: they only ever land left
@@ -252,16 +261,12 @@ function isPlainObject(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function cell(value, present, unit) {
-    return present ? `<td class="value">${formatValue(value, unit)}</td>` : `<td class="value missing">n/a</td>`;
-}
-
 // Delta as a signed, fixed-decimal value with the row's own unit suffix, e.g. "Δ +0.0004°". Kept as a plain
 // signed decimal rather than formatNumber's full DMS breakdown: a tooltip is for "how far off is this",
 // not a value to read precision out of.
 function formatDelta(delta, unit) {
     const sign = delta < 0 ? "-" : "+";
-    const suffix = unit === "deg" ? "°" : unit === "rad" ? " rad" : unit ? ` ${unit}` : "";
+    const suffix = unit === "deg" ? "°" : unit === "rad" ? "\u202frad" : unit ? `\u202f${unit}` : "";
     const formatted = Math.abs(delta).toLocaleString("en-US", {
         minimumFractionDigits: DECIMALS,
         maximumFractionDigits: DECIMALS,
@@ -269,17 +274,19 @@ function formatDelta(delta, unit) {
     return `Δ ${sign}${formatted}${suffix}`;
 }
 
-// Same as cell(), but for the approx column: adds a tooltip showing the delta to the precise value,
-// so the value cells themselves stay plain numbers (not replaced by the delta), while the "how far off" is
-// still a hover away.
-function approxCell(value, present, unit, preciseValue, precisePresent) {
-    if (!present) return `<td class="value approx missing">n/a</td>`;
+// The precise values are plain; an approximate one carries how far off the precise value it is, a hover away.
+function cell(value, present, unit, preciseValue, precisePresent) {
+    if (!present) return `<td class="value missing">n/a</td>`;
     const formatted = formatValue(value, unit);
     const hasDelta =
-        precisePresent && typeof value === "number" && typeof preciseValue === "number" && value !== preciseValue;
-    if (!hasDelta) return `<td class="value approx">${formatted}</td>`;
+        variant === "approx" &&
+        precisePresent &&
+        typeof value === "number" &&
+        typeof preciseValue === "number" &&
+        value !== preciseValue;
+    if (!hasDelta) return `<td class="value">${formatted}</td>`;
     const tip = `<strong>${formatDelta(value - preciseValue, unit)}</strong> off the precise value.`;
-    return `<td class="value approx">${tooltip(formatted, tip)}</td>`;
+    return `<td class="value">${tooltip(formatted, tip)}</td>`;
 }
 
 function computeRows(names, preciseNs, approxNs, jd) {
@@ -308,12 +315,16 @@ function computeRows(names, preciseNs, approxNs, jd) {
                 // Most object exports (apparentPosition, position, ...) have every field share one unit, but
                 // eclipse states mix degrees/km/dimensionless/strings, so a "name.field" entry wins if present.
                 const fieldUnit = UNITS[`${name}.${field}`] ?? unit;
-                return `<tr>${nameCell(name, field)}<td class="unit">${fieldUnit}</td>${cell(preciseValue?.[field], preciseHasField, fieldUnit)}${approxCell(approxValue?.[field], approxHasField, fieldUnit, preciseValue?.[field], preciseHasField)}</tr>`;
+                const shown =
+                    variant === "approx"
+                        ? [approxValue?.[field], approxHasField]
+                        : [preciseValue?.[field], preciseHasField];
+                return `<tr>${nameCell(name, field)}<td class="unit">${fieldUnit}</td>${cell(...shown, fieldUnit, preciseValue?.[field], preciseHasField)}</tr>`;
             });
         }
 
         return [
-            `<tr>${nameCell(name)}<td class="unit">${unit}</td>${cell(preciseValue, hasPrecise, unit)}${approxCell(approxValue, hasApprox, unit, preciseValue, hasPrecise)}</tr>`,
+            `<tr>${nameCell(name)}<td class="unit">${unit}</td>${cell(...(variant === "approx" ? [approxValue, hasApprox] : [preciseValue, hasPrecise]), unit, preciseValue, hasPrecise)}</tr>`,
         ];
     });
 }
@@ -342,16 +353,14 @@ function renderDomain(domainName, jd, open) {
     const rows = computeRows(names, preciseNs, approxNs, jd);
 
     // Foldable, because on a phone a table of this length is a wall to scroll past; open unless the cards are showing.
-    // Where only one of the two value columns fits, the button in its heading swaps which one that is.
-    const swap = (other) =>
-        `<button type="button" class="value-swap" title="Show the ${other} values">${other}</button>`;
+    // The cards have no heading row, so the variant toggle sits above them instead.
     return `
         <details class="table-fold"${open ? " open" : ""}>
             <summary>${label} <span class="note">${rows.length} values</span></summary>
-            <p class="table-note note">Every card gives the precise value and, dimmed, the one the approximate math arrives at.</p>
+            <p class="table-note note">Values: ${variantToggle()}</p>
             <table>
-                <colgroup><col class="name" /><col class="unit" /><col class="value" /><col class="approx" /></colgroup>
-                <thead><tr><th>${label}</th><th>unit</th><th class="value">precise${swap("approx")}</th><th class="value approx">approx${swap("precise")}</th></tr></thead>
+                <colgroup><col class="name" /><col class="unit" /><col class="value" /></colgroup>
+                <thead><tr><th>${label}</th><th>unit</th><th class="value">${variantToggle()}</th></tr></thead>
                 <tbody>${rows.join("")}</tbody>
             </table>
         </details>
@@ -393,8 +402,10 @@ for (const container of tableContainers) {
     container.addEventListener("toggle", () => syncControls(container), true);
     // On the container, not on the button, which is rewritten with the rest of the table on every change.
     container.addEventListener("click", (event) => {
-        if (!event.target.closest(".value-swap")) return;
-        container.dataset.show = container.dataset.show === "approx" ? "precise" : "approx";
+        const button = event.target.closest(".variant");
+        if (!button || button.dataset.variant === variant) return;
+        variant = button.dataset.variant;
+        render();
     });
 }
 

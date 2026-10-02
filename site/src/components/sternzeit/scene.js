@@ -4,6 +4,7 @@ import { onDemand } from "../frame.js";
 import {
     COMPASS,
     cssColor,
+    drawSvg,
     gridLine,
     labelAboveY,
     moonSymbol,
@@ -113,7 +114,8 @@ const illustration = new Illustration({
     onResize: function (width, height) {
         stageWidth = width;
         stageHeight = height;
-        baseZoom = (Math.min(width, height) / 2 / (SUN_DIST + SUN_R)) * 2.0;
+        // Most of the Sun's orbit in view: about as wide as the stage, as tall as a wide stage allows.
+        baseZoom = Math.min(width * 0.52, height * 0.8) / (SUN_DIST + SUN_R);
         this.zoom = baseZoom * zoomFactor;
         this.setSize(width, height);
     },
@@ -127,8 +129,8 @@ const earthAnchor = new Anchor({ addTo: illustration });
 // Three-tier line-style scheme, tracking how far a line is from "the answer": dotted = fixed reference,
 // independent of both JD and location (equator, rotation axis, ecliptic pole below); dashed = construction
 // lines derived from the inputs but not themselves the result (the observer's lat/long rings); solid = the
-// actual current fact the rest exists to locate (the radius line + observer marker). Dash patterns are
-// applied via raw SVG attributes each frame in frame(), Zdog itself has no dashed/dotted-stroke option.
+// actual current fact the rest exists to locate (the radius line + observer marker). Zdog has no dashed
+// strokes, so the patterns are classes from global.css, set in frame().
 const equatorRing = new Ellipse({
     addTo: earthAnchor,
     diameter: 2 * EARTH_R,
@@ -193,7 +195,7 @@ const meridianRing = new Ellipse({ addTo: earthAnchor, diameter: 2 * EARTH_R, co
 // The radius from center to the observer: the concrete result, solid.
 const radiusLine = new Shape({ addTo: earthAnchor, path: [v(0, 0, 0), v(0, 0, 0)], stroke: 1, color: INK });
 // Earth's center, so the radius line has a visible point of origin to read from.
-const centerDot = new Shape({ addTo: earthAnchor, stroke: 3, color: INK });
+new Shape({ addTo: earthAnchor, stroke: 3, color: INK });
 // The two rings cross at two antipodal points; this marks which one is actually the observer.
 const observerMarker = new Shape({ addTo: earthAnchor, stroke: 7, color: INK, translate: { z: 0.1 } });
 // Ecliptic pole: the celestial pole (the solid vertical axis) rotated by the true obliquity about the X axis (the
@@ -254,7 +256,7 @@ const sunAnchor = new Anchor({ addTo: illustration });
 // yellow/grey didn't read well against the dotted stroke at this size.
 const sunDisc = new Ellipse({ addTo: sunAnchor, diameter: SUN_R * 2, color: INK, stroke: 1, fill: false });
 // Mirrors earthAnchor's centerDot: marks the exact point the body's apparentPosition refers to.
-const sunCenterDot = new Shape({ addTo: sunAnchor, stroke: 3, color: INK });
+new Shape({ addTo: sunAnchor, stroke: 3, color: INK });
 
 // Sunrays: the one purely decorative touch in this otherwise data-driven scene, so the sun reads as the sun
 // at a glance instead of just "the bigger of two identical outline circles" next to the moon (whose apparent
@@ -279,7 +281,7 @@ const moonDisc = new Ellipse({
     stroke: 1,
     fill: false,
 });
-const moonCenterDot = new Shape({ addTo: moonAnchor, stroke: 3, color: MOON_INK });
+new Shape({ addTo: moonAnchor, stroke: 3, color: MOON_INK });
 
 // Two small, flat (never rotated), transparent alt-az panels overlaid directly on top of the main scene:
 // each anchors one body to x=0 (its own azimuth origin) and plots the other offset by azimuth difference,
@@ -386,7 +388,7 @@ function updateAltAzPanel(panel, anchorHorizontal, otherHorizontal, lit, earthsh
     COMPASS.forEach((label, i) => {
         const d = azimuthDelta(anchorHorizontal.azimuth, i * 45);
         if (Math.abs(d) > ALTAZ_FIELD_OF_VIEW_DEG / 2) return;
-        svg += svgText(tangentPx(d), labelAboveY(ALTAZ_HORIZON_Y, unitsPerPx), label, "figure-label", unitsPerPx);
+        svg += svgText(tangentPx(d), labelAboveY(ALTAZ_HORIZON_Y, unitsPerPx), label, "figure-label");
     });
     // The sun before the moon, whichever is the anchor, so the moon renders in front whenever the two nearly overlap.
     svg += altAzBody(sunPoint, true, unitsPerPx) + altAzBody(moonPoint, false, unitsPerPx, towardsSun, lit, earthshine);
@@ -398,44 +400,14 @@ function updateAltAzPanel(panel, anchorHorizontal, otherHorizontal, lit, earthsh
         const arrow = offPanelArrow(point, half, unitsPerPx);
         if (arrow) svg += offPanelArrowSvg(arrow, isSun);
     }
-    panel.element.innerHTML = svg;
+    drawSvg(panel.element, svg, unitsPerPx);
 }
-
-// Zdog's SVG renderer scales stroke-width along with everything else in the viewBox (see the zoom comment
-// above illustration's declaration): a stroke of `n` at zoom=1 renders as `n*zoom` screen pixels, so line
-// weight would visibly thicken/thin as the wheel zoom changes. To keep every line's *screen* width constant
-// regardless of zoom, each shape's stroke is captured here (its authored value, meant as "screen pixels at
-// zoom=1") and divided by the current zoom every frame in frame() below.
-const ALL_SHAPES = [
-    equatorRing,
-    axisLine,
-    spinArc,
-    spinHead,
-    latitudeRing,
-    meridianRing,
-    radiusLine,
-    centerDot,
-    observerMarker,
-    trueEclipticAxis,
-    trueObliquityArc,
-    trueObliquityArcSouth,
-    longitudeNutationLine,
-    trueEquinoxDot,
-    orbitEllipse,
-    atmosphereShell,
-    sunDisc,
-    sunCenterDot,
-    ...sunRays,
-    moonDisc,
-    moonCenterDot,
-];
-const BASE_STROKE = new Map(ALL_SHAPES.map((shape) => [shape, shape.stroke]));
 
 const stageEl = document.getElementById("stage");
 
 // Manual drag-rotate (rather than Zdog's built-in dragRotate), since billboardRotate() needs the rotation as
 // readable state, not hidden inside Zdog's Dragger.
-let rotX = -0.3;
+let rotX = -0.45;
 let rotY = 0.5;
 let dragging = false;
 let lastPointer = { x: 0, y: 0 };
@@ -475,7 +447,6 @@ function frame() {
     zoomFactor += (targetZoomFactor - zoomFactor) * 0.15;
     illustration.zoom = baseZoom * zoomFactor;
     illustration.setSize(stageWidth, stageHeight);
-    for (const shape of ALL_SHAPES) shape.stroke = BASE_STROKE.get(shape) / illustration.zoom;
 
     // Read once per animation frame from the shared state (see state.js), so the scene follows every set of controls.
     const { jd, latitude, longitude } = state;
@@ -584,40 +555,27 @@ function frame() {
     // At the axis' end, so the arrow runs along the axis and stops short of it like the others do at their dots.
     annotate("eclipticAxis", vScale(truePole, AXIS_OVERHANG));
     annotateEcliptic(sunPos);
-    // svgElement only exists once a shape has rendered at least once, hence setting this here rather than
-    // at construction; idempotent, so doing it every frame is fine. See the earthAnchor comment for the
-    // three-tier rationale. radiusLine and longitudeNutationLine are deliberately left alone here: each is itself
-    // an answer, so solid, the default; orbitEllipse joins the dotted fixed-reference tier instead, next to the
-    // equator/axis/ecliptic-pole lines it's drawn alongside.
-    // Dash lengths are in the same scene-space units as everything else, so without this they'd suffer the
-    // same zoom-dependent-thickening problem stroke width did (see BASE_STROKE): the dot/gap length would
-    // stay fixed in scene units while the viewBox shrinks, so each dot would visibly grow as you zoom in,
-    // with the same fixed count around a given circle's fixed circumference. Dividing by zoom keeps each
-    // dot's *screen* size constant, which means more of them fit around the same circumference as you zoom
-    // in, i.e. dot density increases with zoom, matching finer scale with finer dotting.
-    const dotDash = `${0.1 / illustration.zoom},${4 / illustration.zoom}`;
-    const lineDash = `${3 / illustration.zoom},${3 / illustration.zoom}`;
-    // Larger dashes (no dots): distinguishes the sun's orbit from the plain-dotted fixed-reference tier
-    // (atmosphereShell, the earth rings, etc.), since it's worth a visually distinct line style, not
-    // another dotted ring easily lost among the others.
-    const dashDot = `${4 / illustration.zoom},${8 / illustration.zoom}`;
-    for (const shape of [
-        equatorRing,
-        axisLine,
-        trueEclipticAxis,
-        trueObliquityArc,
-        trueObliquityArcSouth,
-        atmosphereShell,
-        moonDisc,
-        ...sunRays,
-    ]) {
-        shape.svgElement?.setAttribute("stroke-dasharray", dotDash);
-        shape.svgElement?.setAttribute("stroke-linecap", "round");
-    }
-    orbitEllipse.svgElement?.setAttribute("stroke-dasharray", dashDot);
-    orbitEllipse.svgElement?.setAttribute("stroke-linecap", "round");
-    latitudeRing.svgElement?.setAttribute("stroke-dasharray", lineDash);
-    meridianRing.svgElement?.setAttribute("stroke-dasharray", lineDash);
+    // The line styles are classes (see global.css), set once each shape has an SVG element, i.e. after its first
+    // render. Dotted for the fixed references, long dashes for the Sun's orbit, which deserves a style of its own among
+    // them, and short dashes for the observer's two circles. radiusLine and longitudeNutationLine are answers, so solid.
+    const dashes = [
+        [
+            "line-dotted",
+            [
+                equatorRing,
+                axisLine,
+                trueEclipticAxis,
+                trueObliquityArc,
+                trueObliquityArcSouth,
+                atmosphereShell,
+                moonDisc,
+                ...sunRays,
+            ],
+        ],
+        ["line-long-dashed", [orbitEllipse]],
+        ["line-dashed", [latitudeRing, meridianRing]],
+    ];
+    for (const [dash, shapes] of dashes) for (const shape of shapes) shape.svgElement?.classList.add(dash);
 
     // Drawn only when something changed; only the zoom's easing keeps asking for frames, until it has arrived.
     if (Math.abs(targetZoomFactor - zoomFactor) > 1e-4) requestFrame();

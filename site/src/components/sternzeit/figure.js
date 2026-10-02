@@ -1,8 +1,14 @@
 import * as precise from "@himmelszelt/sternzeit";
 
-// Text inside the figures' SVGs, at the page's small text size (--text-small, 0.75rem, like the compass labels)
+// Text inside the figures' SVGs is at the page's small text size (--text-small, 0.75rem, like the compass labels)
 // whatever size the SVG is drawn at: each figure passes how many of its own units one screen pixel is.
 const SMALL_TEXT_PX = 12;
+
+/** Fills a figure's SVG; its CSS sizes text and sun symbols in screen pixels by --units-per-px (see global.css). */
+export function drawSvg(element, svg, unitsPerPx) {
+    element.style.setProperty("--units-per-px", unitsPerPx.toFixed(4));
+    element.innerHTML = svg;
+}
 
 /** Text made safe for HTML and SVG, in element content and in quoted attributes alike. */
 export const escapeText = (text) => String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
@@ -14,9 +20,8 @@ export const cssColor = (name, fallback) =>
 /** The eight compass directions, from north through east, 45 degrees apart. */
 export const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 
-export function svgText(x, y, text, cls, unitsPerPx) {
-    const size = (SMALL_TEXT_PX * unitsPerPx).toFixed(2);
-    return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${size}" class="${cls}">${escapeText(text)}</text>`;
+export function svgText(x, y, text, cls) {
+    return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" class="${cls}">${escapeText(text)}</text>`;
 }
 
 // A label at the top of a figure, as far below its upper edge as the panel captions sit below their panels (0.5rem).
@@ -35,9 +40,9 @@ export function labelAboveY(y, unitsPerPx) {
 /**
  * The Sun wherever it appears as a symbol rather than a disc to scale, in the locked views, the sun path diagram and
  * dunstkreis' figures: a filled disc with a ring of dotted rays, one motif the reader learns once, the same size in
- * screen pixels everywhere. The rays start `gap` past the disc, are `length` long, and dotted by `dash`.
+ * screen pixels everywhere. The rays start `gap` past the disc and are `length` long; their stroke is in the CSS.
  */
-export const SUN_SYMBOL = { radius: 8.5, gap: 5, length: 8.5, rays: 8, stroke: 1.7, dash: [0.1, 5.2] };
+export const SUN_SYMBOL = { radius: 8.5, gap: 5, length: 8.5, rays: 8 };
 
 /** The symbol's rays as segments around its center, in screen pixels. */
 export function sunRays() {
@@ -54,10 +59,8 @@ export function sunRays() {
 
 /** The Sun as a symbol at (x, y) in an SVG drawn at `unitsPerPx` of its units to a screen pixel. */
 export function sunSymbol(x, y, unitsPerPx) {
-    const { radius, stroke, dash } = SUN_SYMBOL;
-    const f = (n) => (n * unitsPerPx).toFixed(2);
-    const width = `stroke-width="${f(stroke)}"`;
-    let svg = `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${f(radius)}" ${width} class="figure-sun"/>`;
+    const r = (SUN_SYMBOL.radius * unitsPerPx).toFixed(2);
+    let svg = `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${r}" class="figure-sun"/>`;
     for (const [a, b] of sunRays()) {
         const [x1, y1, x2, y2] = [
             x + a.x * unitsPerPx,
@@ -66,7 +69,7 @@ export function sunSymbol(x, y, unitsPerPx) {
             y + b.y * unitsPerPx,
         ];
         const points = `x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}"`;
-        svg += `<line ${points} ${width} stroke-dasharray="${f(dash[0])} ${f(dash[1])}" class="figure-sun-ray"/>`;
+        svg += `<line ${points} class="figure-sun-ray"/>`;
     }
     return svg;
 }
@@ -81,7 +84,7 @@ const GRID_LABEL_GAP_PX = 5;
 export function gridLine(y, left, right, label, unitsPerPx) {
     const start = left + (GRID_LABEL_PADDING_PX + GRID_LABEL_WIDTH_PX) * unitsPerPx;
     const line = `<line x1="${start.toFixed(2)}" y1="${y.toFixed(2)}" x2="${right.toFixed(2)}" y2="${y.toFixed(2)}" class="figure-grid"/>`;
-    return svgText(start - GRID_LABEL_GAP_PX * unitsPerPx, y, label, "figure-grid-label", unitsPerPx) + line;
+    return svgText(start - GRID_LABEL_GAP_PX * unitsPerPx, y, label, "figure-grid-label") + line;
 }
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -134,7 +137,6 @@ export function veiledHorizon(y, half, unitsPerPx) {
     if (y >= half) return "";
     const top = Math.max(y, -half);
     const veil = `<rect x="${-half}" y="${top.toFixed(2)}" width="${2 * half}" height="${(half - top).toFixed(2)}" class="figure-veil"/>`;
-    if (y <= -half)
-        return veil + svgText(0, topLabelY(half, unitsPerPx), "below the horizon", "figure-note", unitsPerPx);
+    if (y <= -half) return veil + svgText(0, topLabelY(half, unitsPerPx), "below the horizon", "figure-note");
     return `${veil}<line x1="${-half}" y1="${y.toFixed(2)}" x2="${half}" y2="${y.toFixed(2)}" class="figure-horizon"/>`;
 }

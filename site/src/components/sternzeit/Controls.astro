@@ -9,6 +9,7 @@ const { open = false } = Astro.props;
 // Unique per instance, so every label still points at its own input when a page has several sets of controls.
 const uid = `moment-${Math.random().toString(36).slice(2, 8)}`;
 // The step sizes of each field, as a group of radio buttons: one tap on a touch screen, and the current one stays visible.
+// A unit follows its number after a narrow no-break space (U+202F), as everywhere on the site.
 const jdSteps = [
     { label: "year", value: "365.25", calendar: "year" },
     { label: "month", value: "30.436875", calendar: "month" },
@@ -19,16 +20,16 @@ const jdSteps = [
     { label: "sec", value: "0.0000115740741" },
 ];
 const angleSteps = [
-    { label: "deg", value: "1", checked: true },
-    { label: "min", value: "0.0166666666667" },
-    { label: "sec", value: "0.0002777777778" },
+    { label: "deg", title: "One degree", value: "1", checked: true },
+    { label: "min", title: "One arcminute, a sixtieth of a degree", value: "0.0166666666667" },
+    { label: "sec", title: "One arcsecond, a sixtieth of an arcminute", value: "0.0002777777778" },
 ];
 const heightSteps = [
-    { label: "1 m", value: "1" },
-    { label: "10 m", value: "10", checked: true },
-    { label: "100 m", value: "100" },
-    { label: "1 km", value: "1000" },
-    { label: "10 km", value: "10000" },
+    { label: "1\u202fm", value: "1" },
+    { label: "10\u202fm", value: "10", checked: true },
+    { label: "100\u202fm", value: "100" },
+    { label: "1\u202fkm", value: "1000" },
+    { label: "10\u202fkm", value: "10000" },
 ];
 ---
 
@@ -96,7 +97,7 @@ const heightSteps = [
             <span class="steps" role="radiogroup" aria-label="Latitude and longitude step" data-field="latlongStep">
                 {
                     angleSteps.map((step) => (
-                        <label>
+                        <label title={step.title}>
                             <input type="radio" name={`${uid}-latlong-step`} value={step.value} checked={step.checked} />
                             <span>{step.label}</span>
                         </label>

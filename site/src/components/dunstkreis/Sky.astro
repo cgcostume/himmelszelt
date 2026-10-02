@@ -10,7 +10,7 @@ import Choice from "./Choice.astro";
 import "./dunstkreis.css";
 
 // The wavelengths a model computes, once each: the three-wavelength models repeat their third as a fourth.
-const nm = (model: AtmosphereModel) => `${[...new Set(model.wavelengths)].join(", ")} nm`;
+const nm = (model: AtmosphereModel) => `${[...new Set(model.wavelengths)].join(", ")}\u202fnm`;
 const CHOICES = [
     {
         name: "model",

@@ -185,7 +185,7 @@ function render() {
     });
     gpu.device.queue.submit([encoder.finish()]);
     const lux = 0.2126 * sun[0] + 0.7152 * sun[1] + 0.0722 * sun[2];
-    const meters = (m) => (m < 1000 ? `${m.toFixed(1)} m` : `${(m / 1000).toFixed(2)} km`);
+    const meters = (m) => (m < 1000 ? `${m.toFixed(1)}\u202fm` : `${(m / 1000).toFixed(2)}\u202fkm`);
     field("info").innerHTML =
         `<span class="status-title">camera</span> ${meters(cameraFrame(camera).eye[2])} above the observer, ` +
         `${meters(cameraHeight())} up; ` +

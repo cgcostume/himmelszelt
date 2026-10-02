@@ -211,14 +211,13 @@ th {
     background: var(--surface);
 }
 col.name {
-    width: 30%;
+    width: 45%;
 }
 col.unit {
-    width: 8%;
+    width: 10%;
 }
-col.value,
-col.approx {
-    width: 29%;
+col.value {
+    width: 45%;
 }
 th.value,
 td.value {
@@ -333,12 +332,17 @@ tbody tr:hover {
 }
 /* The Sun wherever it stands as a symbol (the locked views, the line off the Moon's bright limb): a white disc with
    dotted rays. The Moon beside it in the locked views is a muted disc. */
-.figure-sun {
-    fill: var(--text);
-    stroke: var(--text);
-}
+.figure-sun,
 .figure-sun-ray {
     stroke: var(--text);
+    stroke-width: var(--sun-stroke);
+    vector-effect: non-scaling-stroke;
+}
+.figure-sun {
+    fill: var(--text);
+}
+.figure-sun-ray {
+    stroke-dasharray: var(--sun-dots);
     stroke-linecap: round;
 }
 /* The Moon wherever it stands as a symbol: the lit part in the Sun's own shade, the night side in the earthshine it
@@ -597,8 +601,9 @@ figure[id] {
     stroke-width: 1;
     vector-effect: non-scaling-stroke;
 }
+/* The month dots in the line's own color: they mark points along it, not something else. */
 .analemma-tick {
-    fill: var(--muted);
+    fill: var(--text);
 }
 .figure-grid-label {
     fill: var(--muted);
@@ -786,15 +791,36 @@ figure[id] {
         opacity: 1;
     }
 }
-/* Wide enough for both value columns: no summary line to unfold it, nothing to swap, nothing to explain. */
+/* Wide enough for the table: no summary line to unfold it, and the variant toggle sits in its heading. */
 .table-fold > summary,
-.table-note,
-.value-swap {
+.table-note {
     display: none;
 }
-/* The page has three widths, and every rule below belongs to one of them, in this order:
+/* Both variants named in the value column's heading, the one shown in full, the other dimmed: a click swaps them. */
+.variant-toggle {
+    display: inline-flex;
+    gap: 0.6rem;
+}
+.variant {
+    height: auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: inherit;
+    opacity: 0.55;
+}
+.variant[aria-pressed="true"] {
+    color: var(--text);
+    opacity: 1;
+    cursor: default;
+}
+.variant[aria-pressed="false"]:hover {
+    color: var(--accent);
+    opacity: 1;
+}
+/* The page has two widths, and every rule below belongs to one of them, in this order:
    wide (64rem and up), the big scenes turn 16:9 and the analemma stands tall beside the dome;
-   medium (up to 64rem), the tables come back into the reading column;
    narrow (up to 48rem), one column all the way down, figures square, tables as cards, controls sized for a finger;
    plus one step below that (40rem), where even two small panels no longer fit side by side. */
 @media (min-width: 64rem) {
@@ -802,56 +828,6 @@ figure[id] {
     #scene,
     .dome-scene {
         aspect-ratio: 16 / 9;
-    }
-}
-/* Narrower than the full site width: only one column of values fits, precise unless the button in its heading
-   swaps the two. */
-@media (max-width: 64rem) {
-    .sternzeit-table.wide {
-        width: auto;
-        margin-left: 0;
-    }
-    /* A notch below the page's meta size: two columns of numbers in the reading column are tight. */
-    .sternzeit-table table {
-        font-size: 0.8rem;
-    }
-    .sternzeit-table .approx {
-        display: none;
-    }
-    .sternzeit-table col.name {
-        width: 45%;
-    }
-    .sternzeit-table col.unit {
-        width: 10%;
-    }
-    .sternzeit-table col.value {
-        width: 45%;
-    }
-    .sternzeit-table col.approx {
-        width: 0;
-    }
-    .sternzeit-table[data-show="approx"] .value:not(.approx) {
-        display: none;
-    }
-    .sternzeit-table[data-show="approx"] .approx {
-        display: table-cell;
-    }
-    .sternzeit-table[data-show="approx"] col.value {
-        width: 0;
-    }
-    .sternzeit-table[data-show="approx"] col.approx {
-        width: 45%;
-    }
-    .value-swap {
-        display: inline;
-        height: auto;
-        margin-left: 0.5rem;
-        padding: 0 0.3rem;
-        color: var(--muted);
-        font-size: inherit;
-    }
-    .value-swap:hover {
-        color: var(--accent);
     }
 }
 /* Narrow screens, one column all the way down: every figure is the width of the text and square, what floats over
@@ -1037,28 +1013,15 @@ figure[id] {
         text-align: left;
         padding-right: 0;
     }
-    /* Value first, its unit after it, as one reads it out, and the approximation behind both, dimmed. */
+    /* Value first, its unit after it, as one reads it out. */
     .sternzeit-table td.unit {
         order: 2;
         color: var(--muted);
-    }
-    .sternzeit-table .approx {
-        display: block;
-    }
-    .sternzeit-table td.approx {
-        order: 3;
-        color: var(--muted);
-    }
-    .sternzeit-table[data-show="approx"] .value:not(.approx) {
-        display: block;
     }
     .table-note {
         display: block;
         margin: 0 0 0.6rem;
         font-size: var(--text-meta);
-    }
-    .value-swap {
-        display: none;
     }
 }
 /* Too narrow for two panels side by side: the eclipses stack, and are then as wide as every other figure. */

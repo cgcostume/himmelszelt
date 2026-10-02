@@ -1,0 +1,124 @@
+---
+import { CYANOMETER_STEPS, DEFAULT_STEP, stepColor } from "../lib/cyanometer";
+import Term from "./Term.astro";
+
+// Saussure's instrument as a ring of 53 swatches, step 0 at the top and darker clockwise, as on the original disc.
+const [CENTER, INNER, OUTER] = [120, 84, 108];
+// The chosen and the hovered step are marked by an arc just inside the ring, a gap away from it.
+const MARK_RADIUS = INNER - 6;
+const MARK_INSET = 0.12;
+const point = (radius: number, turn: number) => {
+    const angle = turn * 2 * Math.PI - Math.PI / 2;
+    return `${(CENTER + radius * Math.cos(angle)).toFixed(2)} ${(CENTER + radius * Math.sin(angle)).toFixed(2)}`;
+};
+const steps = Array.from({ length: CYANOMETER_STEPS }, (_, step) => {
+    const [from, to] = [step / CYANOMETER_STEPS, (step + 1) / CYANOMETER_STEPS];
+    const d = `M ${point(OUTER, from)} A ${OUTER} ${OUTER} 0 0 1 ${point(OUTER, to)} L ${point(INNER, to)} A ${INNER} ${INNER} 0 0 0 ${point(INNER, from)} Z`;
+    const [start, end] = [from + MARK_INSET / CYANOMETER_STEPS, to - MARK_INSET / CYANOMETER_STEPS];
+    const mark = `M ${point(MARK_RADIUS, start)} A ${MARK_RADIUS} ${MARK_RADIUS} 0 0 1 ${point(MARK_RADIUS, end)}`;
+    return { step, d, mark, color: stepColor(step) };
+});
+---
+
+<span>
+    The accent blue is step <span data-cyanometer-step>{DEFAULT_STEP}</span> of Saussure's{" "}
+    <span class="cyanometer-trigger"><Term of="Cyanometer">cyanometer</Term></span>.
+</span>
+
+<dialog class="cyanometer" aria-label="Cyanometer">
+    <svg viewBox="0 0 240 240" role="radiogroup" aria-label="The accent's step">
+        {
+            steps.map(({ step, d, mark, color }) => (
+                <path
+                    d={d}
+                    fill={color}
+                    data-step={step}
+                    data-mark-path={mark}
+                    role="radio"
+                    aria-checked="false"
+                    tabindex="0"
+                >
+                    <title>{`Step ${step}`}</title>
+                </path>
+            ))
+        }
+
+        <path class="cyanometer-mark" data-mark="chosen" d="" />
+        <path class="cyanometer-mark" data-mark="hover" d="" />
+        <text x={CENTER} y={CENTER - 6} class="cyanometer-number" data-cyanometer-step>{DEFAULT_STEP}</text>
+        <text x={CENTER} y={CENTER + 22} class="cyanometer-unit">of 52</text>
+    </svg>
+    <p>
+        Saussure held 53 steps of Prussian blue against the sky, from white to black, and noted the one that matched.
+        Pick the blue of your own sky for this site, even a night one; it stays in this browser.
+    </p>
+    <form method="dialog" class="cyanometer-actions">
+        <button type="button" data-cyanometer-reset>step {DEFAULT_STEP} again</button>
+        <button>close</button>
+    </form>
+</dialog>
+
+<script>
+    import { applyStep, DEFAULT_STEP, STORAGE_KEY, storedStep } from "../lib/cyanometer";
+
+    const dialog = document.querySelector<HTMLDialogElement>("dialog.cyanometer");
+    const swatches = [...document.querySelectorAll<SVGPathElement>("dialog.cyanometer path[data-step]")];
+    let chosen = storedStep();
+
+    const show = (step: number) => {
+        applyStep(step);
+        for (const label of document.querySelectorAll("[data-cyanometer-step]")) label.textContent = String(step);
+    };
+    const outline = (name: string, step: number | null) =>
+        dialog
+            ?.querySelector(`[data-mark="${name}"]`)
+            ?.setAttribute("d", step === null ? "" : (swatches[step].dataset.markPath ?? ""));
+    const mark = () => {
+        for (const swatch of swatches) swatch.setAttribute("aria-checked", String(Number(swatch.dataset.step) === chosen));
+        outline("chosen", chosen);
+    };
+    const choose = (step: number) => {
+        chosen = step;
+        try {
+            if (step === DEFAULT_STEP) localStorage.removeItem(STORAGE_KEY);
+            else localStorage.setItem(STORAGE_KEY, String(step));
+        } catch {}
+        show(step);
+        mark();
+    };
+    show(chosen);
+    mark();
+
+    // The word opens the instrument; hovering it still shows the definition, as every term does.
+    document.querySelector(".cyanometer-trigger")?.addEventListener("click", () => dialog?.showModal());
+    for (const swatch of swatches) {
+        const step = Number(swatch.dataset.step);
+        // Hovering a step previews it on the whole page, leaving it goes back to the chosen one.
+        for (const type of ["pointerenter", "focus"]) {
+            swatch.addEventListener(type, () => {
+                show(step);
+                outline("hover", step);
+            });
+        }
+        for (const type of ["pointerleave", "blur"]) {
+            swatch.addEventListener(type, () => {
+                show(chosen);
+                outline("hover", null);
+            });
+        }
+        swatch.addEventListener("click", () => choose(step));
+        swatch.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                choose(step);
+            }
+        });
+    }
+    document.querySelector("[data-cyanometer-reset]")?.addEventListener("click", () => choose(DEFAULT_STEP));
+    // A click on the backdrop, outside the dialog's box, closes it.
+    dialog?.addEventListener("click", (event) => {
+        const box = dialog.getBoundingClientRect();
+        const inside = event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
+        if (!inside) dialog.close();
+    });
+</script>

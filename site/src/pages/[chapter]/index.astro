@@ -3,6 +3,7 @@ import { getCollection, render } from "astro:content";
 import About from "../../components/About.astro";
 import Fig from "../../components/Fig.astro";
 import References from "../../components/References.astro";
+import Term from "../../components/Term.astro";
 import Toc from "../../components/Toc.astro";
 import Base from "../../layouts/Base.astro";
 import { findEntry } from "../../lib/glossary";
@@ -17,15 +18,16 @@ const { Content, headings } = await render(chapter);
 const sections = headings.filter((heading) => heading.depth === 2);
 // What the German name means, from the glossary, for the readers who do not speak it.
 const name = findEntry(chapter.data.title);
+const scope = chapter.data.package.slice(0, -chapter.data.title.length);
 const updated = formatUpdated(lastUpdated(chapter.filePath ?? ""));
 ---
 
 <Base title={`${chapter.data.package}: ${chapter.data.summary}`} description={chapter.data.summary}>
-    <h1 class="mono">{chapter.data.package}</h1>
+    <h1 class="mono"><span class="scope">{scope}</span>{chapter.data.title}</h1>
     <p class="etymology"><strong>{name.term}</strong>: <Fragment set:html={name.html} /></p>
     <p class="lead">{chapter.data.summary}</p>
     <p class="page-meta">
-        by <a href="https://daniellimberger.de" target="_blank" rel="noopener">Daniel Limberger</a> · Last updated {updated} · Unfamiliar term? Hover or tap it.
+        by <a href="https://daniellimberger.de" target="_blank" rel="noopener">Daniel Limberger</a> · Last updated {updated} · <Term of="Unfamiliar term">Unfamiliar term?</Term>
     </p>
     <Toc sections={sections} />
     <Content components={{ Fig }} />

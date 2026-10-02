@@ -4,7 +4,6 @@ package: "@himmelszelt/sternzeit"
 summary: "Astronomy for sky renderers: the Sun and the Moon, accurate, anywhere, any time."
 order: 1
 references:
-    - mueller2012thesis
     - meeus1998
     - jensen2001
     - saemundsson1986
@@ -34,15 +33,15 @@ on? None of this is guesswork: astronomers have been computing it for centuries,
 They are just scattered across books written for telescope operators rather than graphics programmers.
 
 This chapter does not derive those formulas; the references do. It goes through what the numbers mean, how they fit
-together and what to do with them, from how astronomers count time to why the Moon seems to wobble. Everything below
-is computed live, in your browser, by the library itself, the astronomy core of osgHimmel rebuilt in TypeScript
-<Cite id="mueller2012thesis" />.
+together, and what to do with them, from how astronomers count time to why the Moon seems to wobble. No background in
+astronomy is needed, only curiosity about the sky you want to render. Everything below is computed live, in your
+browser, by the library itself.
 
 <Scene />
 
 The discs are drawn from the Sun's and the Moon's actual apparent diameters, and they almost match: the Sun is about
 400 times wider than the Moon and about 400 times farther away. That is pure luck, and it will not last. The Moon
-drifts away from Earth by about 3.8 cm a year, and in some 600 million years it will be too small to ever cover the Sun
+drifts away from Earth by about 3.8 cm a year, and in some 600 million years it will be too small to ever cover the Sun
 again, leaving only annular eclipses. We happen to live in the stretch of Earth's history in which the sky can go dark
 in the middle of the day.
 
@@ -81,7 +80,7 @@ import {
     fromDate, fromJulianDay, julianDayUT, siderealTime, toDate,
 } from "@himmelszelt/sternzeit";
 
-// Any JavaScript Date, e.g. new Date() for now; its time zone
+// Any JavaScript Date, e.g., new Date() for now; its time zone
 // offset comes along.
 const time = fromDate(new Date("2026-09-21T20:00:00+02:00"));
 // The same moment spelled out: 20:00 in Berlin (UTC+2).
@@ -116,7 +115,7 @@ atmosphere <Cite id="nishita1993" /> <Cite id="bruneton2008" />, and the refract
 minutes after it has geometrically set. Refraction comes in two directions, from the true altitude
 <Cite id="saemundsson1986" /> and from the apparent one <Cite id="bennett1982" />, and a renderer bending its view rays
 wants the latter. These rows are evaluated towards the Sun. More than a degree below the horizon, refraction shows as
-`n/a`, and the ray simply ends in the ground: 0 km at sea level and a little more from a mountain, whose horizon lies
+`n/a`, and the ray simply ends in the ground: 0 km at sea level and a little more from a mountain, whose horizon lies
 lower.
 
 The tilt and the vernal equinox are also what the sky's coordinates are built on. There are several coordinate
@@ -254,8 +253,8 @@ is why it often lands on a modest partial eclipse. How it works is shown [below]
 From the maximum, step the Julian Day by minutes and watch it unfold. The Moon darkens in the penumbra first, barely
 noticeable, then turns a dark red in the umbra, lit only by sunlight that Earth's atmosphere bends around the planet,
 its outer rim tinged blue by the ozone the light passes through. Tracing that light through the atmosphere gives the
-colors physically <Cite id="yapo2009" />, but far from real time. osgHimmel approximated them from the eclipse's `phase`
-instead <Cite id="mueller2012vmv" />, a lookup coordinate from 0 at the center to 1 as the discs part; the table also
+colors physically <Cite id="yapo2009" />, but far from real time. A renderer can approximate them from the eclipse's
+`phase` instead <Cite id="mueller2012vmv" />, a lookup coordinate from 0 at the center to 1 as the discs part; the table also
 lists the <Term of="Eclipse magnitude">magnitude</Term>, the number the catalogs give. The panel only hints at those
 colors; rendering them properly, along with the Moon's surface, is the job of [nachtgestirn](../nachtgestirn/).
 
@@ -266,8 +265,8 @@ colors; rendering them properly, along with the Moon's surface, is the job of [n
 
 Every quantity comes in two variants. The **precise** one follows Jean Meeus' _Astronomical Algorithms_
 <Cite id="meeus1998" />, the standard reference for this kind of computation. The **approximate** one follows the
-night sky model of Jensen et al. <Cite id="jensen2001" />, with far fewer terms. Both columns sit side by side in the
-tables; hover an approximate value to see how far off it is.
+night sky model of Jensen et al. <Cite id="jensen2001" />, with far fewer terms. The tables show the precise values;
+_approx_ in any table's heading switches all of them, and hovering an approximate value shows how far off it is.
 
 For most rendering, the approximation is plenty. Over a year, the Sun's approximate altitude stays within 0.002° of the
 precise one, invisible next to a disc half a degree wide. The Moon's can be off by almost a tenth of a degree, a fifth
@@ -308,12 +307,12 @@ const moonlight = moon.illuminatedFraction(julianEphemerisDay(time));
 ```
 
 Shading the Moon itself is a different question, and an optional one: the light hitting it does not come from where
-the observer stands but from 384,000 km away, which `moon.sunDirection` accounts for. That vector, with the libration
+the observer stands but from 384,000 km away, which `moon.sunDirection` accounts for. That vector, with the libration
 and the earthshine, is what [nachtgestirn](../nachtgestirn/) will want.
 
 **Find the golden hour.** There is no `sunrise()` function, and there does not need to be: sunrise is where the Sun's
 altitude crosses the horizon, so walking a day in one-minute steps finds it, and the same loop finds dusk, the blue
-hour or any other threshold you care to render.
+hour, or any other threshold you care to render.
 
 ```ts
 import {
@@ -425,7 +424,7 @@ function nextTotalLunarEclipse(from: number): Date | null {
 const next = nextTotalLunarEclipse(julianDayUT(fromDate(new Date())));
 ```
 
-The same goes for the other libraries: the Moon's phase, libration, sun direction and earthshine are what
+The same goes for the other libraries: the Moon's phase, libration, sun direction, and earthshine are what
 [nachtgestirn](../nachtgestirn/) shades the Moon with, sidereal time is what will turn the stars of
 [sternenheer](../sternenheer/), and the Sun's and the Moon's directions light the clouds of [gewoelk](../gewoelk/).
 
@@ -442,6 +441,6 @@ on programmable calculators <Cite id="bennett1982" />. Þorsteinn Sæmundsson, a
 and for decades the editor of its almanac, fitted the other, behind `earth.atmosphericRefraction`
 <Cite id="saemundsson1986" />.
 The approximate variants follow the night sky model of Henrik Wann Jensen and his
-colleagues <Cite id="jensen2001" />, which renders moonlight, starlight, zodiacal light and airglow from their physics.
+colleagues <Cite id="jensen2001" />, which renders moonlight, starlight, zodiacal light, and airglow from their physics.
 And Fred Espenak, for decades at NASA's Goddard Space Flight Center and known as Mr. Eclipse, compiled the eclipse
 canons with Meeus, along with the polynomials for ΔT <Cite id="espenak2006" />.
