@@ -50,6 +50,8 @@ export type ToneCurve = "neutral" | "agx" | "aces" | "clip";
 /** The passes' switches, `wgsl/features.wgsl`, as their defaults there. */
 export interface Features {
     toneMap: ToneCurve | false;
+    /** The display's headroom in multiples of SDR white, for a float target on an HDR display; 1 for SDR. */
+    headroom: number;
     dither: boolean;
     autoExposure: boolean;
     debugGrid: boolean;
@@ -63,6 +65,7 @@ export interface Features {
 
 export const DEFAULT_FEATURES: Features = {
     toneMap: "neutral",
+    headroom: 1,
     dither: true,
     autoExposure: false,
     debugGrid: false,
@@ -78,6 +81,7 @@ export function featureConstants(features: Partial<Features> = {}): Record<strin
     const f = { ...DEFAULT_FEATURES, ...features };
     return {
         DK_TONE_MAP: f.toneMap === false ? 0 : { neutral: 1, agx: 2, aces: 3, clip: 4 }[f.toneMap],
+        DK_HEADROOM: f.headroom,
         DK_DITHER: Number(f.dither),
         DK_AUTO_EXPOSURE: Number(f.autoExposure),
         DK_DEBUG_GRID: Number(f.debugGrid),

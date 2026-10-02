@@ -49,6 +49,21 @@ const CHOICES = [
         checked: "neutral",
     },
 ];
+
+// Shown on an HDR display only: how far above SDR white the sky may go. The browser does not tell how far the display can.
+const HEADROOM = {
+    name: "headroom",
+    label: "HDR headroom",
+    heading: "headroom",
+    title: "How many times brighter than SDR white the sky may show: Neutral and no tone mapping compress or cut off there instead of at white. AgX and ACES are fits to SDR and stay within it. The browser does not tell how far the display goes, so pick what looks right",
+    options: [
+        ["1", "off", "SDR, as on any display"],
+        ["2", "2×"],
+        ["4", "4×"],
+        ["8", "8×"],
+    ],
+    checked: "4",
+};
 ---
 
 <figure class="scene-frame wide" id="sky">
@@ -68,7 +83,11 @@ const CHOICES = [
                 <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="Dither the 8-bit output by a step of noise, against banding in the sky's smooth gradients">dither</button>
                 <button type="button" class="view-toggle" data-field="refraction" aria-pressed="true" title="Traced through the air, bending the light. Switches it for the whole page, recomputing every table and cube map">refracted</button>
             </span>
-            <span class="sky-toggles">{CHOICES.map((choice) => <Choice figure="sky" {...choice} />)}</span>
+            <span class="sky-toggles">
+                <span class="note sky-hdr" data-field="hdr" hidden></span>
+                <span data-field="headroom" hidden><Choice figure="sky" {...HEADROOM} /></span>
+                {CHOICES.map((choice) => <Choice figure="sky" {...choice} />)}
+            </span>
         </div>
         <p class="vis-credit footnote">Drag to look around, scroll to zoom, click to follow a pixel's view ray through the tables. Rendered with WebGPU.</p>
     </div>

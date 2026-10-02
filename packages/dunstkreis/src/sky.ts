@@ -17,7 +17,7 @@ export interface SkyPassOptions {
     /**
      * Format of the target the pass writes into, which needs `STORAGE_BINDING` usage: rgba8unorm for a display (a
      * canvas configured with it), bgra8unorm with the "bgra8unorm-storage" feature, rgba16float or rgba32float for
-     * linear output with `toneMap` off.
+     * linear output with `toneMap` off, or for an HDR canvas with `headroom`.
      */
     format: GPUTextureFormat;
     /**
@@ -26,6 +26,12 @@ export interface SkyPassOptions {
      * target and a renderer that tone maps the whole frame, with `wgsl.tonemap` if it likes.
      */
     toneMap?: ToneCurve | false;
+    /**
+     * The display's headroom, how many times SDR white it shows at most: above 1, "neutral" and "clip" compress or cut
+     * off there instead, extended sRGB, for an rgba16float canvas configured with `toneMapping: { mode: "extended" }`
+     * on an HDR display. "agx" and "aces" stay within 1. Default 1, SDR.
+     */
+    headroom?: number;
     /** Dither the tone mapped output against banding, by default for an 8-bit target only. */
     dither?: boolean;
     /**
@@ -119,11 +125,15 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         debugGrid = false,
         sunDisc = true,
         groundLight = true,
+        headroom = 1,
     } = options;
     const dither = options.dither ?? (toneMap !== false && EIGHT_BIT.includes(format));
     const storable = ["rgba8unorm", "rgba16float", "rgba32float"].includes(format);
     if (!storable && !(format === "bgra8unorm" && device.features.has("bgra8unorm-storage"))) {
         throw new Error(`dunstkreis: the sky pass writes ${format} as a storage texture, which this device cannot`);
+    }
+    if (headroom !== 1 && (!(headroom > 1) || toneMap === false || !["rgba16float", "rgba32float"].includes(format))) {
+        throw new Error(`dunstkreis: a headroom of ${headroom} needs a tone curve, a float target and more than 1`);
     }
     const constants = (features: Partial<Features>, samples: { cube?: number } = {}) => ({
         ...pipelineConstants(config, samples),
@@ -197,7 +207,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             compute: {
                 module: device.createShaderModule({ code: skySource(wgsl.skyOutput(format)) }),
                 entryPoint: "dkSky",
-                constants: constants({ toneMap, dither, autoExposure, debugGrid, sunDisc }),
+                constants: constants({ toneMap, headroom, dither, autoExposure, debugGrid, sunDisc }),
             },
         }),
     ]);

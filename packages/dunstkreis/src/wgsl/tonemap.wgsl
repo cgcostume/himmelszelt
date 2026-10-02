@@ -1,5 +1,9 @@
 // Tone curves for a display: exposed luminance, scene-linear Rec. 709 where 1 saturates, to sRGB-encoded values in
 // [0, 1] for an 8-bit target. Binding-free, so a renderer that tone maps its whole frame can use the same.
+//
+// On an HDR display, a float canvas with extended tone mapping shows values above 1 brighter than SDR white, up to the
+// display's headroom. The curves taking a headroom compress into [0, headroom] instead, encoded by the sRGB curve
+// continued beyond 1, which is how the canvas reads them.
 
 // Exposed by EV100, a light meter's reading lands at 1/9.6 of saturation, its calibration K = 12.5 over ISO 100 times
 // 1.2: a camera's convention, which the ACES fit was built for. Neutral and AgX expect scene middle gray at 0.18 instead:
@@ -11,14 +15,31 @@ fn dkEncodeSrgb(linear: vec3f) -> vec3f {
     return select(1.055 * pow(x, vec3f(1.0 / 2.4)) - 0.055, x * 12.92, x <= vec3f(0.0031308));
 }
 
+// The sRGB curve continued beyond 1, for a float target: extended sRGB, cut off at `headroom` times SDR white.
+fn dkEncodeSrgbExtended(linear: vec3f, headroom: f32) -> vec3f {
+    let x = clamp(linear, vec3f(0.0), vec3f(headroom));
+    return select(1.055 * pow(x, vec3f(1.0 / 2.4)) - 0.055, x * 12.92, x <= vec3f(0.0031308));
+}
+
 // No curve: the exposed light as it is, cut off at 1, where it saturates. What the curves start from.
 fn dkToneMapClip(exposed: vec3f) -> vec3f {
     return dkEncodeSrgb(exposed);
 }
 
+// The same, cut off at the display's headroom.
+fn dkToneMapClipHdr(exposed: vec3f, headroom: f32) -> vec3f {
+    return dkEncodeSrgbExtended(exposed, headroom);
+}
+
 // Khronos PBR Neutral (2024): linear up to 0.76 apart from a small offset in the blacks, so colors stay as they are,
 // then compressed towards white and desaturated only as much as that takes. Hues never shift.
 fn dkToneMapNeutral(exposed: vec3f) -> vec3f {
+    return dkToneMapNeutralHdr(exposed, 1.0);
+}
+
+// Neutral towards `headroom` times SDR white instead of 1: the same hyperbola, starting at the same 0.76 with a slope
+// of 1, its asymptote moved up to the headroom. Everything below 0.76 shows as it does in SDR.
+fn dkToneMapNeutralHdr(exposed: vec3f, headroom: f32) -> vec3f {
     let startCompression = 0.8 - 0.04;
     let desaturation = 0.15;
     var color = max(exposed * DK_MIDDLE_GRAY_GAIN, vec3f(0.0));
@@ -26,13 +47,13 @@ fn dkToneMapNeutral(exposed: vec3f) -> vec3f {
     color = color - select(0.04, x - 6.25 * x * x, x < 0.08);
     let peak = max(color.r, max(color.g, color.b));
     if (peak < startCompression) {
-        return dkEncodeSrgb(color);
+        return dkEncodeSrgbExtended(color, headroom);
     }
-    let d = 1.0 - startCompression;
-    let newPeak = 1.0 - d * d / (peak + d - startCompression);
+    let d = headroom - startCompression;
+    let newPeak = headroom - d * d / (peak + d - startCompression);
     color = color * (newPeak / peak);
     let g = 1.0 - 1.0 / (desaturation * (peak - newPeak) + 1.0);
-    return dkEncodeSrgb(mix(color, vec3f(newPeak), g));
+    return dkEncodeSrgbExtended(mix(color, vec3f(newPeak), g), headroom);
 }
 
 // Narkowicz's fit of the ACES filmic curve (2016), what dunstkreis used before: a toe, a straight middle and a

@@ -6,6 +6,10 @@
 // exposed luminance itself, linear and unclamped, for a float target and a renderer that tone maps the frame.
 override DK_TONE_MAP: u32 = 1u;
 
+// The display's headroom, how many times SDR white it shows at most, for a float target on an HDR display: Neutral
+// and none compress or cut off there instead of at 1. AgX and ACES are fits to SDR and stay within 1.
+override DK_HEADROOM: f32 = 1.0;
+
 // Dither the tone mapped output by one 8-bit step against the bands smooth gradients show on an 8-bit target.
 override DK_DITHER: bool = true;
 

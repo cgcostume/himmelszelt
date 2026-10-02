@@ -87,7 +87,7 @@ fn dkExposure() -> f32 {
     return dkParams.exposure;
 }
 
-// The tone curve the pass was made with, from tonemap.wgsl, sRGB encoded for an 8-bit target.
+// The tone curve the pass was made with, from tonemap.wgsl, sRGB encoded, beyond 1 up to the headroom on HDR.
 fn dkToneMap(exposed: vec3f) -> vec3f {
     if (DK_TONE_MAP == 2u) {
         return dkToneMapAgx(exposed);
@@ -96,9 +96,9 @@ fn dkToneMap(exposed: vec3f) -> vec3f {
         return dkToneMapAces(exposed);
     }
     if (DK_TONE_MAP == 4u) {
-        return dkToneMapClip(exposed);
+        return dkToneMapClipHdr(exposed, DK_HEADROOM);
     }
-    return dkToneMapNeutral(exposed);
+    return dkToneMapNeutralHdr(exposed, DK_HEADROOM);
 }
 
 // What the sky shows along a view ray, in linear sRGB.
@@ -318,7 +318,7 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
         color = dkDebugOverlay(color, view, right, below, sunAngle, dkParams.sunAngularRadius);
     }
     if (DK_TONE_MAP != 0u && DK_DITHER) {
-        color = clamp(dkDither(color, id.xy), vec3f(0.0), vec3f(1.0));
+        color = clamp(dkDither(color, id.xy), vec3f(0.0), dkEncodeSrgbExtended(vec3f(DK_HEADROOM), DK_HEADROOM));
     }
     dkOutputStore(id.xy, 0u, vec4f(color, 1.0));
 }
