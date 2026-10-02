@@ -19,6 +19,9 @@ struct DkSkyParams {
     exposureCompensation: f32,
     // The EV100s metering may expose with: night stays dark instead of being lifted to day.
     autoExposureRange: vec2f,
+    // What the sky-view table holds luminance multiplied by: a power of two that follows the sun, so the table's values
+    // sit where half floats resolve them best, from noon down into the night. Its readers divide by it.
+    skyViewScale: f32,
 }
 
 struct DkMetering {

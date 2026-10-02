@@ -91,3 +91,38 @@ const best = results[0]?.wavelengths ?? [];
 const matrix = fitSpectrumToRgb(best);
 for (const [name, r] of Object.entries(named))
     console.log(`  ${name.padEnd(28)} ${percent(colorError(matrix, best, r, rgbOfSpectrum(r)))}`);
+
+// Bruneton's three wavelengths, converted without a fit: what the three-wavelength table in README.md compares.
+const three = [680, 550, 440];
+const solarThree = three.map(solarIrradianceAt);
+const fromColumns = (columns: number[][]) => [0, 1, 2].map((i) => columns.map((column) => column[i] as number));
+// As RGB, white balanced: each channel scaled so the sun above the air comes out at its true color.
+const sun = rgbOfSpectrum(() => 1);
+const balanced = [0, 1, 2].map((i) =>
+    [0, 1, 2].map((j) => (i === j ? (sun[i] as number) / (solarThree[i] as number) : 0)),
+);
+// Bruneton 2017's approximate mode: per channel, the spectrum taken as solar(λ) (λ / λc)⁻³.
+const factors = [0, 1, 2].map((i) =>
+    [0, 1, 2].map((j) =>
+        i === j ? (rgbOfSpectrum((w) => (w / (three[j] as number)) ** -3)[i] as number) / (solarThree[j] as number) : 0,
+    ),
+);
+// r(λ) interpolated linearly between the samples, extrapolated linearly beyond them.
+const hat = (j: number) => (w: number) => {
+    const [r, g, b] = three as [number, number, number];
+    const t = w <= g ? (w - b) / (g - b) : (w - g) / (r - g);
+    return w <= g ? ([0, t, 1 - t][j] as number) : ([t, 1 - t, 0][j] as number);
+};
+const interpolated = fromColumns([0, 1, 2].map((j) => rgbOfSpectrum(hat(j)).map((v) => v / (solarThree[j] as number))));
+const conversions: Record<string, number[][]> = {
+    "the samples as RGB, white balanced": balanced,
+    "Bruneton 2017's per-channel factors": factors,
+    "a matrix from interpolating r(λ)": interpolated,
+    "a matrix fitted by least squares": fitSpectrumToRgb(three),
+};
+console.log("\nBruneton's three wavelengths, on the named spectra:");
+for (const [name, matrix] of Object.entries(conversions)) {
+    const errors = namedSet.map(({ r, truth }) => colorError(matrix, three, r, truth));
+    const mean = errors.reduce((a, b) => a + b, 0) / errors.length;
+    console.log(`  ${name.padEnd(38)} ${percent(mean)} ${percent(Math.max(...errors))}`);
+}

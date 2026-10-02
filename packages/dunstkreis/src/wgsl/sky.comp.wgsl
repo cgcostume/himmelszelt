@@ -5,7 +5,8 @@
 // `skyOutput(format)` for an image, `skyCubeOutput(format)` for the six faces of a cube map.
 //
 // For an image, it writes every pixel, so the sky goes first, as the background the rest of the frame is drawn over.
-// For a cube map, with DK_CUBE, it writes the luminance itself, in cd/m², neither exposed nor tone mapped.
+// For a cube map, with DK_CUBE, it writes the luminance itself, in cd/m², neither exposed nor tone mapped, or times
+// skyViewScale with DK_CUBE_SCALED.
 
 @group(0) @binding(0) var<uniform> dkAtmosphere: DkAtmosphere;
 @group(0) @binding(1) var<uniform> dkParams: DkSkyParams;
@@ -94,6 +95,9 @@ fn dkToneMap(exposed: vec3f) -> vec3f {
     if (DK_TONE_MAP == 3u) {
         return dkToneMapAces(exposed);
     }
+    if (DK_TONE_MAP == 4u) {
+        return dkToneMapClip(exposed);
+    }
     return dkToneMapNeutral(exposed);
 }
 
@@ -131,7 +135,7 @@ fn dkSkyFromInside(a: DkAtmosphere, view: vec3f, h: f32) -> DkSkySample {
     // linear filter does not blend the last row of sky with the first of ground.
     let half = 0.5 / size.y;
     uv.y = select(min(uv.y, 0.5 - half), max(uv.y, 0.5 + half), result.hitsGround);
-    result.luminance = dkToRgb(a, textureSampleLevel(dkSkyViewLut, dkLutSampler, uv, 0.0));
+    result.luminance = dkToRgb(a, textureSampleLevel(dkSkyViewLut, dkLutSampler, uv, 0.0)) / dkParams.skyViewScale;
 
     // Turned down within its vertical plane by the bending the table traced, stored per row as its sine, and read
     // between rows as the filter would.
@@ -236,7 +240,8 @@ fn dkPixelRay(pixel: vec2u, size: vec2u) -> vec3f {
     return dkProjectRay(dkParams.inverseViewProjection, ndc, clamp(dkParams.projectionDistance, 0.0, 1.0));
 }
 
-// A texel of a cube map: the mean of DK_SAMPLES_CUBE rays through it, in cd/m², the disc included with DK_SUN_DISC.
+// A texel of a cube map: the mean of DK_SAMPLES_CUBE rays through it, in cd/m², the disc included with DK_SUN_DISC; times
+// skyViewScale with DK_CUBE_SCALED.
 fn dkCubeTexel(face: u32, texel: vec2u, size: u32) -> vec3f {
     var luminance = vec3f(0.0);
     for (var i = 0u; i < DK_SAMPLES_CUBE; i = i + 1u) {
@@ -247,7 +252,7 @@ fn dkCubeTexel(face: u32, texel: vec2u, size: u32) -> vec3f {
             luminance = luminance + dkSkySunLuminance(sky);
         }
     }
-    return luminance / f32(DK_SAMPLES_CUBE);
+    return luminance / f32(DK_SAMPLES_CUBE) * select(1.0, dkParams.skyViewScale, DK_CUBE_SCALED);
 }
 
 @compute @workgroup_size(8, 8, 1)

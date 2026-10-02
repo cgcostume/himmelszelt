@@ -3,6 +3,7 @@ import { paintRange } from "../range.js";
 import {
     bindCubifyToggle,
     bindRefractionToggle,
+    bindScaledToggle,
     gpu,
     onEnvironment,
     quality,
@@ -77,7 +78,7 @@ function cubeBytes({ width, mipLevelCount }) {
 
 // The calls that compute each cube map as it is shown, with the settings it was computed with.
 const CALLS = {
-    sky: ({ cube, cubified }) => [
+    sky: ({ cube, cubified, scaledWith, scale }) => [
         "const cube = device.createTexture({",
         `    size: [${cube.width}, ${cube.width}, 6],`,
         `    mipLevelCount: ${cube.mipLevelCount}, // each filled, the mean of four above; 1 for none`,
@@ -85,8 +86,11 @@ const CALLS = {
         "    usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,",
         '    textureBindingViewDimension: "cube",',
         "});",
-        `const cubePass = await sky.createCubePass({ format: "rgba16float", samples: 8${cubified ? ", cubify: true" : ""} });`,
+        `const cubePass = await sky.createCubePass({ format: "rgba16float", samples: 8${cubified ? ", cubify: true" : ""}${scaledWith ? ", scaled: true" : ""} });`,
         "cubePass.encode(encoder, cube);",
+        ...(scaledWith
+            ? [`const scale = sky.skyViewScale; // 2^${Math.log2(scale)}, read when encoding: cd/m² = texel / scale`]
+            : []),
     ],
     irradiance: ({ ibl, cubified }) => [
         "// Every mip level, each from the nine coefficients.",
@@ -105,7 +109,13 @@ function draw(environment) {
         showCode(levelPart(name, "call"), CALLS[name](environment).join("\n"));
         // The settings folded into one line: what the cube map is computed with, then how it is shown.
         const built =
-            name === "sky" ? [cubified ? "cubified" : "plain", quality.refraction ? "refracted" : "straight"] : [];
+            name === "sky"
+                ? [
+                      cubified ? "cubified" : "plain",
+                      ...(environment.scaledWith ? [`scaled 2^${Math.log2(environment.scale)}`] : []),
+                      quality.refraction ? "refracted" : "straight",
+                  ]
+                : [];
         levelPart(name, "summary").textContent = [
             `faces ${texture.width}`,
             ...built,
@@ -118,7 +128,10 @@ function draw(environment) {
             `${texture.format}, 6 faces, ${texture.mipLevelCount} levels, ${formatBytes(cubeBytes(texture))}`;
     }
     field("timing").textContent = `built in ${buildMs.toFixed(1)} ms`;
-    showValues(sh, sun);
+    showValues(
+        sh.map((v) => v / environment.scale),
+        sun,
+    );
 }
 
 // The shown level unrolled into a panorama, four texels of a face across a quarter turn, up to 4096 by 2048: tone mapped
@@ -130,6 +143,8 @@ async function download(name, format) {
     const width = Math.min(4 * face, 4096);
     const height = width / 2;
     const pixels = await renderPixels(texture, previewOptions(name, cubified), width, height, format === "hdr");
+    // In cd/m², or lux for the irradiance, whether the cube map is scaled or not.
+    if (format === "hdr" && last.scale !== 1) for (let i = 0; i < pixels.length; ++i) pixels[i] /= last.scale;
     const file = `himmelszelt-dunstkreis-${name}-${face}${cubified ? "-cubified" : ""}-panorama`;
     if (format === "hdr") saveHdr(pixels, width, height, file);
     else savePng(pixels, width, height, file);
@@ -184,6 +199,7 @@ if (gpu.error) {
         radio.addEventListener("change", () => set(Number(radio.value)));
     }
     for (const button of root.querySelectorAll("[data-cubify]")) bindCubifyToggle(button);
+    for (const button of root.querySelectorAll("[data-scaled]")) bindScaledToggle(button);
     for (const button of root.querySelectorAll("[data-download]")) {
         button.addEventListener("click", () => download(button.dataset.panelName, button.dataset.download));
     }

@@ -39,8 +39,16 @@
 }
 .sky-toggles {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 0.5rem;
     margin-left: auto;
+}
+/* A named group wraps as a whole, onto the next line, where there is room for it on one. */
+@media (min-width: 40rem) {
+    .sky-toggles .steps:has(.steps-heading) {
+        flex: none;
+    }
 }
 .sky-overlay .view-toggle {
     position: static;

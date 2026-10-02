@@ -54,7 +54,7 @@ struct Params {
     cubified: u32,
     // Nonzero to dither the 8-bit output against banding.
     dither: u32,
-    // The tone curve, from dunstkreis' tonemap.wgsl: 1 Khronos PBR Neutral, 2 AgX, 3 Narkowicz's ACES fit.
+    // The tone curve, from dunstkreis' tonemap.wgsl: 1 Khronos PBR Neutral, 2 AgX, 3 Narkowicz's ACES fit, 4 none, cut off.
     toneCurve: u32,
     // The sun as the camera sees it, which may be far above the scene's ground: where its disc shows, and its
     // illuminance there, per channel in lux.
@@ -62,6 +62,8 @@ struct Params {
     // The z of the planet's horizon as the camera sees it: the backdrop shows ground below it, and hides the disc.
     horizonZ: f32,
     discIlluminance: vec3f,
+    // What the sky map and its coefficients hold the light multiplied by, 1 for cd/m²: dunstkreis' skyViewScale, scaled.
+    skyScale: f32,
 }
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -229,7 +231,7 @@ fn skyIrradiance(n: vec3f) -> vec3f {
     for (var c = 0u; c < 9u; c = c + 1u) {
         irradiance = irradiance + lobe[c] * sh[c].rgb * basis[c];
     }
-    return max(irradiance, vec3f(0.0));
+    return max(irradiance, vec3f(0.0)) / params.skyScale;
 }
 
 // Which of the pixel's four camera rays is being traced.
@@ -311,6 +313,9 @@ fn toneMap(exposed: vec3f) -> vec3f {
     if (params.toneCurve == 3u) {
         return dkToneMapAces(exposed);
     }
+    if (params.toneCurve == 4u) {
+        return dkToneMapClip(exposed);
+    }
     return dkToneMapNeutral(exposed);
 }
 
@@ -330,7 +335,7 @@ fn backdrop(pixel: vec2u, direction: vec3f) -> vec3f {
     let texelAngle = 0.5 * PI / f32(textureDimensions(sky).x);
     let level = clamp(log2(pixelAngle / texelAngle), 0.0, f32(textureNumLevels(sky) - 1u));
     let lookup = select(direction, dkCubeFromSphere(normalize(direction)), params.cubified != 0u);
-    return textureSampleLevel(sky, skySampler, lookup, level).rgb;
+    return textureSampleLevel(sky, skySampler, lookup, level).rgb / params.skyScale;
 }
 
 // How much of the sun disc a camera ray covers, as the share of its part of a pixel inside the disc's rim: the four rays

@@ -77,6 +77,7 @@ const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
                 {[group("background"), group("ground")].map((choice) => <Choice {...choice} />)}
                 <span class="sky-toggles lighting-toggles">
                     <button type="button" class="view-toggle" data-cubify aria-pressed="false" title="The sky map as the environment figure builds it: cubified, its texels spread evenly over the sphere, sampled through the inverse mapping. The same switch as there">cubified</button>
+                    <button type="button" class="view-toggle" data-scaled aria-pressed="false" title="The sky map as the environment figure builds it: scaled, times a power of two that follows the sun, divided by it again here. The same switch as there">scaled</button>
                     <span class="toggle-separator" aria-hidden="true"></span>
                     <button type="button" class="view-toggle" data-field="sunDisc" aria-pressed="true" title="Draw the sun disc in the background">sun disc</button>
                     <button type="button" class="view-toggle" data-field="sunLight" aria-pressed="true" title="Light the solids by the sun directly, with its shadows">sunlight</button>

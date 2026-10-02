@@ -72,8 +72,10 @@ above the horizon and, apart, below it, and writes the brighter of the two geome
 pass reads, so there is no round trip to the CPU. On the ground that is mostly the sky; the ground below is darker,
 except, as for a camera, over snow. High up it is the lit air below, while the sky above turns black. Above the
 atmosphere, beyond the table, the meter raymarches its directions instead and so reads the lit planet. The reading is
-EV100 = log2(L · 100 / 12.5) (`ev100FromLuminance`), held within `autoExposureRange`, [8, 20] by default, less
-`exposureCompensation`. The lower bound keeps night dark: exposed like day, a night sky looks like one. Metering the
+EV100 = log2(L · 100 / 12.5) (`ev100FromLuminance`), held within `autoExposureRange`, [4, 20] by default, less
+`exposureCompensation`. The lower bound keeps night dark: exposed like day, a night sky looks like one. At 4 it is reached
+with the sun 6° down, at the end of civil twilight, so the earth's shadow and the belt of Venus are still exposed as
+metered. Metering the
 table rather than the frame keeps the reading still as the camera turns and leaves the sun disc out of it. It follows at
 once, with no eye adaptation over time. `meteredEV100()` reads it back, e.g. for a UI.
 
@@ -129,7 +131,10 @@ The sun and the sky light a scene apart, the usual split for image-based lightin
   ENU directions, so a y-up engine samples it with (x, -z, y). Without the sun disc by default: some 10^9 cd/m² in a
   few texels would outshine the whole sky in every filtered lookup. With `sunDisc: true`, for a background, it needs
   rgba32float, being far beyond what rgba16float holds. `samples` per texel, spread by the R2 sequence, smooth the
-  edges a texel straddles, the horizon's and the sun disc's. Mip levels need `TEXTURE_BINDING` usage too.
+  edges a texel straddles, the horizon's and the sun disc's. Mip levels need `TEXTURE_BINDING` usage too. In deep
+  twilight cd/m² fall below what rgba16float holds finely; with `scaled: true` the cube map holds them times
+  `sky.skyViewScale`, a power of two that follows the sun, as the sky-view table does: divide by it, as read when
+  encoding, for cd/m², and the irradiance from it too.
 - The sky's diffuse light from `await createIrradiancePass(device, { cubified, sourceFormat })`: `encode(encoder, cube)` projects any cube map onto the
   nine real spherical harmonics up to order 2 (Ramamoorthi & Hanrahan), in a storage buffer to shade with directly,
   and writes an irradiance cube map from them, 32x32 per face, in lux. It takes any cube map, the sky's or an HDR

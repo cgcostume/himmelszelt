@@ -25,6 +25,7 @@ references:
 import Cite from "../../components/Cite.astro";
 import Controls from "../../components/sternzeit/Controls.astro";
 import Planned from "../../components/Planned.astro";
+import Term from "../../components/Term.astro";
 import Sky from "../../components/dunstkreis/Sky.astro";
 import Tables from "../../components/dunstkreis/Tables.astro";
 import Environment from "../../components/dunstkreis/Environment.astro";
@@ -67,6 +68,15 @@ traces the refraction itself. How to hand it over is the first of the [code exam
 
 ## Why is the sunset red?
 
+Turn away from the sun just after it has set, and the sky above the opposite horizon splits in two: a dark blue-gray
+band along it, the <Term of="Earth's shadow" />, and above that a band of pink, the <Term of="Belt of Venus" />. The
+dark band is the planet's own shadow, cast onto the air: the air in it is lit no longer by the sun, only by the sky,
+and so by light that has scattered more than once. The pink above is air the sun still reaches, by rays that have
+crossed hundreds of kilometers along the horizon and lost their blue on the way, scattered back towards the observer.
+As the sun sinks the shadow rises, and some 6° below the horizon it has merged with the darkening sky. Nothing in
+dunstkreis draws either: a ray that crosses the shadow simply finds the sun's light hidden there, the multiple
+scattering still lit. Set <Fig id="sky" /> to a clear evening, look east and watch them rise.
+
 <Planned title="The long way through the air">
     One ray from the observer to the top of the atmosphere, the Sun's elevation to drag: how the path lengthens towards
     the horizon, what the optical depth along it is, and how much of each color survives. The transmittance table
@@ -83,8 +93,8 @@ Scattering, absorption and the Sun's own light all change with the wavelength, s
 not per color. A color on a screen is something else: its red, green and blue each sum the whole spectrum, weighted by
 how the eye responds to it <Cite id="wyman2013" />. Bruneton and Neyret computed three wavelengths, 680, 550 and 440 nm,
 and showed them as red, green and blue <Cite id="bruneton2008" />, as real-time skies have mostly done since, osgHimmel's
-included. Weighted by the eye instead, the same light comes out 5% off in hue on average, and 14% in deep twilight,
-where ozone takes out the orange around 600 nm that none of the three samples sees. Bruneton's later implementation
+included. Weighted by the eye instead, the same light comes out 12% off in hue on average, and a third at sunset: none
+of the three samples sees the orange around 600 nm, where red peaks for the eye and ozone absorbs. Bruneton's later implementation
 computes some fifteen wavelengths and converts them exactly <Cite id="bruneton2017" />, at about five times the cost.
 
 dunstkreis takes a middle road. It computes four wavelengths, one per channel of its tables, which have four anyway,
@@ -243,9 +253,11 @@ Bruneton's tables use and the illuminance it has above the atmosphere, 128 000 l
 1361 W/m² <Cite id="kopp2011" /> times about 94 lumens per watt for sunlight. That puts a clear midday sky at some
 thousands of cd/m², the sun's disc near 1.6 × 10⁹, and the sky at the end of twilight around a thousandth.
 
-The sky-view table holds cd/m² as well, in 16-bit floats. They keep full precision from 6 × 10⁻⁵ cd/m², deep into
-twilight, up to 65 504, above even the bright sky around the sun. Below that range the values coarsen into steps, which
-an exposure for the night would magnify into colored blocks.
+The sky-view table holds them in 16-bit floats, which keep full precision over some 30 stops, from 6 × 10⁻⁵ to 65 504.
+The sky spans more than that in a day: its brightest value falls by 37 stops from noon to the sun 30° down, and held in
+cd/m², deep twilight would coarsen into steps that an exposure for the night magnifies into colored blocks. So the table
+holds the luminance times a power of two that follows the sun, which keeps its brightest value near 2¹⁰ at any hour,
+and whatever reads it divides by the same.
 
 Exposure is set in EV100, as on a camera and in engines like Frostbite and Unreal <Cite id="lagarde2014" />: the
 luminance that just saturates is 1.2 × 2^EV100 cd/m². A sunny day is about EV 15, an overcast one 10, twilight 0,
@@ -260,8 +272,8 @@ while the sky above turns black, and from space the lit planet, raymarched like 
 straight from the meter's buffer. Metering the table rather than the image means the reading does not change as the
 camera turns, and the sun's disc, which is not in the table, does not darken everything. The meter reads again whenever
 the table is rebuilt; the exposure follows at once, without the eye's slow adaptation. The day meters around EV 14, a
-sunset around 12, and twilight follows down to 8, where it stops: exposed like day, the night would look like day, only
-noisier. On top, a ramp over the day shapes it: compensations at sun altitudes above the observer's horizon, which sinks
+sunset around 12, and twilight follows down to 4, with the sun 6° below the horizon, where it stops: exposed like day,
+the night would look like day, only noisier. On top, a ramp over the day shapes it: compensations at sun altitudes above the observer's horizon, which sinks
 as the observer rises, joined by a smooth curve that never overshoots them <Cite id="fritsch1980" />. By default they
 keep the night and the minutes around sunrise and sunset darker than metered, lift the blue hour a little so its blue
 shows, make the sunset a little brighter than the sunrise, and leave noon as metered. Mornings and evenings may differ,

@@ -62,9 +62,10 @@ export interface SkyParams {
      */
     ev100: number;
     /**
-     * The EV100s metering may expose with, after compensation, [8, 20] by default. The lower bound keeps night dark:
+     * The EV100s metering may expose with, after compensation, [4, 20] by default. The lower bound keeps night dark:
      * exposed like day, a night sky would look like one. The day meters around 14, a sunset around 12, and twilight
-     * follows down to 8.
+     * follows down to 4, the sun 6° down, the end of civil twilight. Stopped earlier, the twilight sky would be exposed
+     * so dark that a tone curve's toe changes its colors.
      */
     autoExposureRange: readonly [number, number];
     /**
@@ -93,11 +94,18 @@ export interface SkyCubeOptions {
     cubify?: boolean;
     /** Draw the sun disc into it, for exporting it as one image; off by default, to light a scene with. */
     sunDisc?: boolean;
+    /**
+     * Write the luminance times `SkyPass.skyViewScale` at the time of `encode`, rather than in cd/m²: a power of two
+     * that follows the sun, so rgba16float holds the sky from noon into the night, where cd/m² fall below its normal
+     * values in deep twilight. Divide by the same factor to read cd/m², and the irradiance and its coefficients from it
+     * too. Off by default.
+     */
+    scaled?: boolean;
 }
 
 /**
- * A pass that writes the sky of its sky pass into a cube map: the luminance in cd/m², linear, neither exposed nor tone
- * mapped, indexed by ENU directions, so a y-up engine samples it with (x, -z, y). It reads the sky pass' sky-view
+ * A pass that writes the sky of its sky pass into a cube map: the luminance in cd/m², or times `skyViewScale` with
+ * `scaled`, linear, neither exposed nor tone mapped, indexed by ENU directions, so a y-up engine samples it with (x, -z, y). It reads the sky pass' sky-view
  * table, so it follows its `update()`.
  */
 export interface SkyCubePass {
@@ -116,10 +124,15 @@ export interface SkyCubePass {
  */
 export interface SkyPass {
     /**
-     * The table the sky pass reads, rebuilt by `update()`. Exposed so it can be inspected or exported;
-     * nothing in a normal render path needs it.
+     * The table the sky pass reads, rebuilt by `update()`, its values times `skyViewScale`. Exposed so it can be
+     * inspected or exported; nothing in a normal render path needs it.
      */
     readonly skyViewTexture: GPUTexture;
+    /**
+     * What the sky-view table holds luminance in cd/m² multiplied by, and a cube map written with `scaled`: a power of
+     * two that follows the sun, set by `update()`, so the table's values sit where half floats resolve them best.
+     */
+    readonly skyViewScale: number;
     update(params: Partial<SkyParams>): void;
     /** The EV100 `autoExposure` exposes with: the light meter's latest reading, read back from the GPU, compensated and
      *  held within `autoExposureRange`. */

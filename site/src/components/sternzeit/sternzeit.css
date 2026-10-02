@@ -137,6 +137,18 @@
 .steps label:last-child span {
     border-radius: 0 var(--radius-small) var(--radius-small) 0;
 }
+/* A group's name, first and plain: text, not a button. */
+.steps-heading {
+    padding: 0.15rem 0.45rem;
+    border: var(--border);
+    border-radius: var(--radius-small) 0 0 var(--radius-small);
+    background: var(--surface);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    line-height: 1.4;
+    opacity: 0.7;
+}
 /* Which one is chosen shows in the text, not in a second outline: the group already has enough lines in it. */
 .steps label:hover span {
     color: var(--text);
@@ -963,7 +975,8 @@ figure[id] {
         width: 2.4rem;
     }
     /* Taller for a finger, but narrow enough that the seven Julian Day steps stay one unbroken row. */
-    .steps label span {
+    .steps label span,
+    .steps-heading {
         padding: 0.3rem 0.45rem;
     }
     /* The same size and marker as the moment-and-place summary it sits next to, so both folds match. */

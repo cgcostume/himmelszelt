@@ -111,7 +111,7 @@ export function createScene(device) {
          * Records the scene into `target` (rgba8unorm, storage). `camera` orbits the scene's center: yaw from north
          * through east, pitch, distance, vertical field of view, all angles in radians. `seconds` turns the solids and
          * moves them along their orbits. `shadowRays` over the sun disc, 8 or 64 for soft shadows, 0 for none, anything else for hard ones. `background`, a texture of the target's size
-         * holding the sky in cd/m² through the same camera, replaces the sky map behind the solids. `cubified` for a sky map written cubified. `groundRadius`, in
+         * holding the sky in cd/m² through the same camera, replaces the sky map behind the solids. `cubified` for a sky map written cubified, `skyScale` for one written scaled, which its light and coefficients are divided by. `groundRadius`, in
          * scene units, sizes the round ground, which fades out over its outer half. `sunLight` and `skyLight`, both on
          * by default, switch the direct sunlight and the sky's light from the coefficients. `ground` is "floor" by
          * default, a round floor of the scene's own; "backdrop" shows the backdrop's ground with the solids' shadows.
@@ -120,7 +120,7 @@ export function createScene(device) {
          * the ground's, 1 by default, thin the veil and the haze. `discDirection` and `discIlluminance`, the sun as the
          * camera sees it from its own height, the sun's by default, place and light the disc and its veil; `horizonZ`,
          * the planet's horizon as the camera sees it, hides the disc below it, -1 by default for none. `dither`, on by
-         * default, dithers the 8-bit output against banding. `toneCurve`, "neutral" by default, "agx" or "aces", as dunstkreis'.
+         * default, dithers the 8-bit output against banding. `toneCurve`, "neutral" by default, "agx", "aces" or "clip", as dunstkreis'.
          */
         encode(
             encoder,
@@ -154,10 +154,11 @@ export function createScene(device) {
             data[116] = rest.hazeDensity ?? 1;
             flags[117] = rest.cubified ? 1 : 0;
             flags[118] = rest.dither === false ? 0 : 1;
-            flags[119] = { neutral: 1, agx: 2, aces: 3 }[rest.toneCurve ?? "neutral"];
+            flags[119] = { neutral: 1, agx: 2, aces: 3, clip: 4 }[rest.toneCurve ?? "neutral"];
             data.set(rest.discDirection ?? sunDirection, 120);
             data[123] = rest.horizonZ ?? -1;
             data.set(rest.discIlluminance ?? sunIlluminance, 124);
+            data[127] = rest.skyScale ?? 1;
             device.queue.writeBuffer(params, 0, data);
 
             const bindGroup = device.createBindGroup({

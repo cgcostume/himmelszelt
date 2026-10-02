@@ -42,9 +42,10 @@ export function pipelineConstants(config: PrecomputedTextureConfig, samples: { c
 /**
  * A tone curve for a display: "neutral", Khronos PBR Neutral, which keeps colors as they are up to 0.76 and compresses
  * only above; "agx", Sobotka's, whose bright colors fade towards white as film does, flatter and greyer by day; or
- * "aces", Narkowicz's fit of the ACES filmic curve, saturated, shifting bright hues towards yellow.
+ * "aces", Narkowicz's fit of the ACES filmic curve, saturated, shifting bright hues towards yellow; or "clip", none at
+ * all, the exposed light cut off at 1, where it saturates, to see what the curves make of it.
  */
-export type ToneCurve = "neutral" | "agx" | "aces";
+export type ToneCurve = "neutral" | "agx" | "aces" | "clip";
 
 /** The passes' switches, `wgsl/features.wgsl`, as their defaults there. */
 export interface Features {
@@ -54,6 +55,7 @@ export interface Features {
     debugGrid: boolean;
     sunDisc: boolean;
     cube: boolean;
+    cubeScaled: boolean;
     cubify: boolean;
     /** Which rows of the sky-view table a dispatch writes: 0 all, 1 the sky, 2 the ground lit by the sky too. */
     skyViewRows: 0 | 1 | 2;
@@ -66,6 +68,7 @@ export const DEFAULT_FEATURES: Features = {
     debugGrid: false,
     sunDisc: true,
     cube: false,
+    cubeScaled: false,
     cubify: false,
     skyViewRows: 0,
 };
@@ -74,12 +77,13 @@ export const DEFAULT_FEATURES: Features = {
 export function featureConstants(features: Partial<Features> = {}): Record<string, number> {
     const f = { ...DEFAULT_FEATURES, ...features };
     return {
-        DK_TONE_MAP: f.toneMap === false ? 0 : { neutral: 1, agx: 2, aces: 3 }[f.toneMap],
+        DK_TONE_MAP: f.toneMap === false ? 0 : { neutral: 1, agx: 2, aces: 3, clip: 4 }[f.toneMap],
         DK_DITHER: Number(f.dither),
         DK_AUTO_EXPOSURE: Number(f.autoExposure),
         DK_DEBUG_GRID: Number(f.debugGrid),
         DK_SUN_DISC: Number(f.sunDisc),
         DK_CUBE: Number(f.cube),
+        DK_CUBE_SCALED: Number(f.cubeScaled),
         DK_CUBIFY: Number(f.cubify),
         DK_SKY_VIEW_ROWS: f.skyViewRows,
     };

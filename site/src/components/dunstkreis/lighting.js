@@ -3,6 +3,7 @@ import { onDemand } from "../frame.js";
 import { cameraFrame, createScene } from "../scene/scene.js";
 import {
     bindCubifyToggle,
+    bindScaledToggle,
     display,
     environment,
     gpu,
@@ -158,6 +159,7 @@ function render() {
         background: live,
         cube,
         cubified: environment.cubified,
+        skyScale: environment.scale,
         sh: ibl.sh,
         camera,
         sunDirection: sky.apparentSun,
@@ -211,6 +213,7 @@ if (gpu.error) {
     onEnvironment(requestRender);
     // Rebuilds the sky map, which renders anew once it is in.
     bindCubifyToggle(root.querySelector("[data-cubify]"));
+    bindScaledToggle(root.querySelector("[data-scaled]"));
     onTables(requestRender);
     onDisplay(requestRender);
     new ResizeObserver(requestRender).observe(canvas);

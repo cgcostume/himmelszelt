@@ -65,13 +65,14 @@ distance between the converted color and the true one at equal luminance, relati
 
 | conversion | mean | worst |
 |---|---|---|
-| the samples as RGB, white balanced on the sun | 5.9% | 10.6% |
-| Bruneton 2017's approximate per-channel factors | 8% | 17% |
-| a 3x3 matrix from interpolating r(λ) between the samples | 5.4% | 15.5% |
+| the samples as RGB, white balanced on the sun | 12.4% | 35% |
+| Bruneton 2017's approximate per-channel factors | 18.3% | 43% |
+| a 3x3 matrix from interpolating r(λ) between the samples | 6.4% | 14.8% |
 | a 3x3 matrix fitted by least squares (below) | 4.9% | 13.6% |
 
-None wins: each fixes one kind of sky and breaks another. Three samples see too little: 680 nm lies past red's peak
-sensitivity around 600 nm, and ozone's Chappuis band, which colors twilight, peaks between two of them.
+None wins: the interpolation is best for sunlight at the horizon, the plain samples for the twilight zenith, the fit
+for most of the rest. Three samples see too little: 680 nm lies past red's peak sensitivity around 600 nm, and
+ozone's Chappuis band, which colors twilight, peaks between two of them.
 
 **A fourth wavelength.** The tables are rgba16float textures, and the transmittance and multiple-scattering tables left
 alpha unused, so a fourth wavelength is free in memory and close to free in arithmetic, GPUs computing on four
@@ -201,6 +202,14 @@ Exact for the table, no sample count to choose, and a workgroup of 64 does the 1
 
 ## Precision
 
+- **The sky-view table, scaled to the sun.** Half floats hold some 30 stops in their normal range, from 6e-5 to
+  65504. The table's brightest value falls by 37 stops from noon to the sun 30° down, and at noon it sat at 64740,
+  0.1% below the top; with the sun 18° down nine of ten values were subnormal, stepping by up to half their value. It
+  now holds the luminance times a power of two from the sun's altitude above the observer's horizon, which puts its
+  brightest value near 2^10, 16 stops below the top and 24 above the bottom: its brightest value, measured from the
+  ground to the top of the atmosphere, for this model and osgHimmel's, follows that altitude within 1.5 stops. It
+  changes only with the table, and its readers divide by it. Tone mapped, the images are the same to the bit,
+  but for the deepest twilight at the lowest exposures.
 - **Altitudes, not radii.** In f32, a radius near 6360 km resolves only about half a meter. Every function near the
   ground takes the altitude instead, and differences of squares like r² − Rg² are factored from it. That took a floor
   out from under the observer, a band at the horizon, and, last, a jitter of the sun's cutoff there, from the
@@ -234,6 +243,17 @@ a light meter's reading lands at 1/9.6 of saturation, its calibration K = 12.5 o
 was made for that, mapping it to a normal mid-tone. Neutral and AgX expect scene middle gray at 0.18 instead, and
 Neutral passes 0.104 almost through, less its toe. Both now take the exposed light times 0.18 × 9.6 = 1.728, which lands a
 metered average on their middle gray; the meter and the exposure keys stay as they are.
+
+## The exposure's lower bound
+
+Metering is held within an EV100 range, so the night stays dark rather than exposed like day. Its lower bound was 8,
+which the meter reaches with the sun 4.3° down: the earth's shadow and the belt of Venus, at their best between 2° and
+6° down, were exposed up to two stops below the meter's reading. The whole sky then lay below 0.08 after the exposure,
+in Khronos PBR Neutral's toe, which takes nearly the smallest channel off all three: it saturated the dark blue of the
+earth's shadow to cyan and, measured with the sun 4.75° down, turned its luminance from 0.0129 below the belt of Venus
+above it (0.0166) to 0.0094 above it (0.0079). The bound is now 4, reached at the end of civil twilight, 6° down, with
+the default compensations. Without them the meter reads EV 13.9 with the sun 10° up, 11.7 at the horizon, 4.2 at 6°
+down, -3.4 at 10° and -14.5 at 18° down (`research/measure.mjs` does not cover this; it was read from `meteredEV100`).
 
 ## The GPU tests
 

@@ -53,7 +53,7 @@ export const quality = {
 
 const events = new EventTarget();
 
-/** How the page's figures show the sky on a display: the tone curve, "agx" or "neutral", shared by all of them. */
+/** How the page's figures show the sky on a display: the tone curve, "neutral", "agx", "aces" or "clip", shared by all. */
 export const display = { toneCurve: "neutral" };
 export const onDisplay = (listener) => events.addEventListener("display", () => listener(display));
 
@@ -119,12 +119,15 @@ export function skyViewChanged(sky) {
 /**
  * The sky as an environment to light a scene with, rebuilt along with the sky view: its cube map, without the sun
  * disc, the irradiance pass holding its nine coefficients and irradiance cube map, the coefficients read back, the
- * sunlight at the observer in lux, the metered EV100, and the sky it was built from.
+ * sunlight at the observer in lux, the metered EV100, and the sky it was built from. Scaled, the cube map, the
+ * coefficients and the irradiance hold the light times `scale`, 1 otherwise.
  */
 export const environment = {
     size: 128,
     irradianceSize: 32,
     cubify: false,
+    scaled: false,
+    scale: 1,
     cube: null,
     ibl: null,
     sh: null,
@@ -143,6 +146,7 @@ let retiredIbl = null;
 let cubePassFor = {};
 
 const cubifyToggles = new Set();
+const scaledToggles = new Set();
 
 /** Rebuilds the environment with its cube map cubified or not: texels spread evenly over the sphere, see cube.wgsl. */
 export function setEnvironmentCubify(cubify) {
@@ -157,6 +161,21 @@ export function bindCubifyToggle(button) {
     cubifyToggles.add(button);
     button.setAttribute("aria-pressed", String(environment.cubify));
     button.addEventListener("click", () => setEnvironmentCubify(!environment.cubify));
+}
+
+/** Rebuilds the environment with its cube map scaled or not: times a power of two that follows the sun, or in cd/m². */
+export function setEnvironmentScaled(scaled) {
+    environment.scaled = scaled;
+    for (const button of scaledToggles) button.setAttribute("aria-pressed", String(scaled));
+    pendingSky = lastSky;
+    buildEnvironment();
+}
+
+/** A scaled button, one of several: the sky cube is built scaled, and whoever reads it divides by the scale. */
+export function bindScaledToggle(button) {
+    scaledToggles.add(button);
+    button.setAttribute("aria-pressed", String(environment.scaled));
+    button.addEventListener("click", () => setEnvironmentScaled(!environment.scaled));
 }
 
 /** Rebuilds the environment with an irradiance cube map of faces of `size` texels. */
@@ -195,7 +214,7 @@ async function buildEnvironment() {
             textureBindingViewDimension: "cube",
         });
     }
-    const { cubify } = environment;
+    const { cubify, scaled } = environment;
     let { ibl } = environment;
     if (ibl?.irradiance.width !== environment.irradianceSize || environment.cubified !== cubify) {
         // Like the cube, the old one is kept one build longer.
@@ -203,18 +222,22 @@ async function buildEnvironment() {
         retiredIbl = ibl;
         ibl = await createIrradiancePass(device, { size: environment.irradianceSize, cubified: cubify });
     }
-    if (cubePassFor.pass !== sky.pass || cubePassFor.cubify !== cubify) {
-        const cubePass = await sky.pass.createCubePass({ format: "rgba16float", samples: 8, cubify });
-        cubePassFor = { pass: sky.pass, cubify, cubePass };
+    if (cubePassFor.pass !== sky.pass || cubePassFor.cubify !== cubify || cubePassFor.scaled !== scaled) {
+        const cubePass = await sky.pass.createCubePass({ format: "rgba16float", samples: 8, cubify, scaled });
+        cubePassFor = { pass: sky.pass, cubify, scaled, cubePass };
     }
     const encoder = device.createCommandEncoder({ label: "sternwarte:environment" });
     cubePassFor.cubePass.encode(encoder, cube);
+    // The scale it is written with, read as it is encoded: the next update may change it.
+    const scale = scaled ? sky.pass.skyViewScale : 1;
     ibl.encode(encoder, cube);
     device.queue.submit([encoder.finish()]);
     const [sh, sun, ev100] = await Promise.all([ibl.readSH(), sky.pass.sunIlluminance(), sky.pass.meteredEV100()]);
     Object.assign(environment, {
         cube,
         cubified: cubify,
+        scaledWith: scaled,
+        scale,
         ibl,
         sh,
         sun,

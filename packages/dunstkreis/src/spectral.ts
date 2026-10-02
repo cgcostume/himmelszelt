@@ -1,7 +1,7 @@
 /**
  * The light is computed at four wavelengths, not in RGB: a color on a screen is a weighted sum over the whole
  * spectrum, ∫ CMF(λ) S(λ) dλ, and four samples of S(λ) with a fitted matrix give it to within about 1%, where three
- * used directly as R, G and B were 5% off on average and 14% in twilight. See research/README.md for how.
+ * used directly as R, G and B were 12% off on average and 35% at sunset. See research/README.md for how.
  */
 
 /** Wavelengths in nm, 360 to 830 every 10, for the tables below. */
@@ -172,6 +172,6 @@ export function fitSpectrumToRgb(wavelengths: readonly number[], spectra = TRAIN
  * The four wavelengths the light is computed at, in nm, red to blue. Chosen by research/wavelengths.ts: every set of
  * four on 10 nm steps between 420 and 690 nm, 4788 of them, fitted as `fitSpectrumToRgb` does and ranked by their
  * color error on 72 sky spectra the fit never saw. This one is 0.57% off on average and 1.6% at worst; the three of
- * Bruneton's model, 680, 550 and 440 nm, taken as R, G and B, 5% and 14%.
+ * Bruneton's model, 680, 550 and 440 nm, taken as R, G and B, 12% and 35%.
  */
 export const DEFAULT_WAVELENGTHS = [630, 580, 510, 440] as const;

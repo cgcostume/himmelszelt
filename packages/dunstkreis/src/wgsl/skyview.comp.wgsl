@@ -66,9 +66,9 @@ fn dkPrecomputeSkyView(@builtin(global_invocation_id) id: vec3u) {
         // The sky's light on the ground, reflected diffusely by its albedo and dimmed by the air on the way here.
         luminance = luminance + ray.transmittance * a.groundAlbedo / DK_PI * dkMetering.groundLight;
     }
-    // At the four wavelengths, in units `toRgb` turns into cd/m², which half floats hold from 6e-5, deep into twilight,
-    // up to 65504, above the sky around the sun.
-    textureStore(dkSkyViewOut, vec2i(i32(id.x), i32(row)), min(luminance, vec4f(65504.0)));
+    // At the four wavelengths, in units `toRgb` turns into cd/m², times skyViewScale: its brightest texel near 2^10, with
+    // 16 stops above it to 65504 and 24 below it to half floats' smallest normal value, 6e-5.
+    textureStore(dkSkyViewOut, vec2i(i32(id.x), i32(row)), min(luminance * dkParams.skyViewScale, vec4f(65504.0)));
 }
 
 // The sky's irradiance on the ground, ∫ L μ dω over the hemisphere above: the table's upper half summed texel by
@@ -99,6 +99,6 @@ fn dkGroundIrradiance(@builtin(local_invocation_index) index: u32) {
     }
     let total = dkWorkgroupSum(sum, index);
     if (index == 0u) {
-        dkMetering.groundLight = total;
+        dkMetering.groundLight = total / dkParams.skyViewScale;
     }
 }

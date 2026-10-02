@@ -71,13 +71,13 @@ const CALLS = {
     ],
 };
 
-function show(name, texture) {
+function show(name, texture, scale = 1) {
     showCode(part(name, "call"), CALLS[name](texture).join("\n"));
     const { width, height } = texture;
     const model = tables().luts.model;
     const heightKm = clampObserverHeight(state.heightM) / 1000;
     // Read back only when pointed at, for the readouts.
-    shown[name] = { texture, width, height, data: null, model, heightKm };
+    shown[name] = { texture, width, height, data: null, model, heightKm, scale };
     // Framed in the default size's shape whatever the size, so resizing a table does not move the page; its own size
     // on top.
     const shape = DEFAULT_TEXTURE_CONFIG[name];
@@ -246,7 +246,8 @@ function hover(name, event) {
         table.reading ??= readTexture(gpu.device, table.texture).then(({ data }) => {
             // The multiple scattering as the values themselves, not their stored log2.
             const log2 = TABLE_PREVIEW[name].log2;
-            table.data = log2 ? data.map((v, i) => (i % 4 === 3 ? v : 2 ** (v - MULTI_SCATTERING_LOG2_OFFSET))) : data;
+            // All four wavelengths, the sky view in cd/m² rather than times its scale.
+            table.data = data.map(log2 ? (v) => 2 ** (v - MULTI_SCATTERING_LOG2_OFFSET) : (v) => v / table.scale);
             if (shown[name] === table && table.pointer) hover(name, table.pointer);
         });
         return;
@@ -334,7 +335,7 @@ if (gpu.error) {
     });
     onSkyView((sky) => {
         lastSky = sky;
-        show("skyView", sky.pass.skyViewTexture);
+        show("skyView", sky.pass.skyViewTexture, sky.pass.skyViewScale);
     });
     const { luts } = tables();
     show("transmittance", luts.transmittance);

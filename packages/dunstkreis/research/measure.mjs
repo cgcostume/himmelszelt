@@ -340,6 +340,13 @@ const result = await page.evaluate(async (mode) => {
             out.push(
                 `multiple scattering ${w}x${h}, ${s} samples: ${await dispatch(multi, "dkPrecomputeMultiScattering", { DK_SAMPLES_MULTI_SCATTERING: s }, [w, h], [w, h], (view) => [atmosphere, { binding: 1, resource: luts.transmittance.createView() }, { binding: 2, resource: luts.sampler }, { binding: 3, resource: view }])}`,
             );
+        // The sum over a workgroup without subgroups, in workgroup memory: the same time, the parallelism is what counts.
+        const fallback = [wgsl.workgroupSum(64, false), ...multi.split("\n").slice(reduce.split("\n").length)].join(
+            "\n",
+        );
+        out.push(
+            `multiple scattering 128x64, 40 samples, without subgroups: ${await dispatch(fallback, "dkPrecomputeMultiScattering", { DK_SAMPLES_MULTI_SCATTERING: 40 }, [128, 64], [128, 64], (view) => [atmosphere, { binding: 1, resource: luts.transmittance.createView() }, { binding: 2, resource: luts.sampler }, { binding: 3, resource: view }])}`,
+        );
         const params = device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
         device.queue.writeBuffer(params, 0, new Float32Array([0, 0.9995, 0.03, 0.01]));
         const view = [

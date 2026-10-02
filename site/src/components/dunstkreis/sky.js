@@ -1,4 +1,9 @@
-import { apparentDirection, clampObserverHeight, createSkyPass } from "@himmelszelt/dunstkreis";
+import {
+    apparentDirection,
+    clampObserverHeight,
+    createSkyPass,
+    DEFAULT_AUTO_EXPOSURE_KEYS,
+} from "@himmelszelt/dunstkreis";
 import { fromJulianDay, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
 import { onDemand } from "../frame.js";
 import { paintRange } from "../range.js";
@@ -231,6 +236,7 @@ function render() {
         inverseViewProjection: inverseViewProjection(basis),
         projectionDistance: basis.d,
         ev100: evOfSlider(),
+        autoExposureKeys: pressed("ramp") ? DEFAULT_AUTO_EXPOSURE_KEYS : [],
     });
 
     const encoder = gpu.device.createCommandEncoder();
@@ -277,9 +283,11 @@ if (gpu) {
     });
     new ResizeObserver(requestRender).observe(canvas);
     field("exposure").addEventListener("input", requestRender);
-    for (const name of ["auto", "lock", "grid", "refraction", "dither"]) {
+    for (const name of ["auto", "ramp", "lock", "grid", "refraction", "dither"]) {
         field(name).addEventListener("click", async () => {
             field(name).setAttribute("aria-pressed", String(!pressed(name)));
+            // The environment and the lighting figure take their exposure from this meter: rebuilt with it.
+            if (name === "ramp") skyViewFor = "";
             if (name === "refraction") {
                 quality.refraction = pressed("refraction");
                 await recompute();

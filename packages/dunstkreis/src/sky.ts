@@ -22,7 +22,7 @@ export interface SkyPassOptions {
     format: GPUTextureFormat;
     /**
      * Tone map for a display: exposed, compressed into [0, 1] and sRGB encoded, for an 8-bit target, by "neutral", the
-     * default, "agx" or "aces" (`ToneCurve`). `false` writes the exposed luminance itself, linear and unclamped, for a float
+     * default, "agx", "aces" or "clip", none, to compare (`ToneCurve`). `false` writes the exposed luminance itself, linear and unclamped, for a float
      * target and a renderer that tone maps the whole frame, with `wgsl.tonemap` if it likes.
      */
     toneMap?: ToneCurve | false;
@@ -45,7 +45,7 @@ export interface SkyPassOptions {
     groundLight?: boolean;
 }
 
-/** Byte size of DkSkyParams in frame.wgsl: a vec3 and a scalar, a mat4x4, four scalars and a vec2, padded. */
+/** Byte size of DkSkyParams in frame.wgsl: a vec3 and a scalar, a mat4x4, four scalars, a vec2 and a scalar, padded. */
 const SKY_PARAMS_SIZE = 112;
 /** Byte size of DkMetering before its bend per sky-view row: a scalar, a vec3 and a vec4, each aligned to 16. */
 const METERING_SIZE = 48;
@@ -55,7 +55,7 @@ const DEFAULTS: SkyParams = {
     observerHeightM: MIN_OBSERVER_HEIGHT_M,
     inverseViewProjection: new Float32Array(16),
     ev100: 14,
-    autoExposureRange: [8, 20],
+    autoExposureRange: [4, 20],
     autoExposureKeys: DEFAULT_AUTO_EXPOSURE_KEYS,
     exposureCompensation: 0,
     sunAngularDiameter: 0.533,
@@ -63,6 +63,45 @@ const DEFAULTS: SkyParams = {
 };
 
 const EIGHT_BIT = ["rgba8unorm", "bgra8unorm"];
+
+/**
+ * log2 of the sky-view table's brightest value by the sun's altitude above the observer's horizon, in degrees, for a
+ * sun of 128,000 lux: measured from the ground to the top of the atmosphere, within 1.5 stops at any height and for
+ * osgHimmel's air as well. From noon to the sun 30° down it falls by 37 stops, more than half floats hold.
+ */
+const BRIGHTEST: readonly (readonly [number, number])[] = [
+    [-30, -22],
+    [-24, -15.5],
+    [-21, -12.5],
+    [-18, -7.5],
+    [-15, -3],
+    [-12, 1],
+    [-9, 4.5],
+    [-6, 7.5],
+    [-4, 9.3],
+    [-2, 11],
+    [0, 13.5],
+    [3, 15.5],
+    [10, 15.5],
+    [30, 15],
+];
+
+/**
+ * What the sky-view table stores luminance multiplied by: the power of two that puts its brightest value near 2^10,
+ * 16 stops below what half floats hold and 24 above their smallest normal value. It follows the sun, as the table does.
+ */
+function skyViewScale(solarIlluminance: number, sunAltitude: number): number {
+    // The segment the altitude lies in, the first or the last beyond them.
+    const after = BRIGHTEST.findIndex(([a]) => a > sunAltitude);
+    const i = Math.min(Math.max((after < 0 ? BRIGHTEST.length : after) - 1, 0), BRIGHTEST.length - 2);
+    const [[a0, l0], [a1, l1]] = [BRIGHTEST[i], BRIGHTEST[i + 1]] as [
+        readonly [number, number],
+        readonly [number, number],
+    ];
+    const t = Math.min(Math.max((sunAltitude - a0) / (a1 - a0), 0), 1);
+    const brightest = l0 + (l1 - l0) * t + Math.log2(solarIlluminance / 128_000);
+    return 2 ** Math.round(10 - brightest);
+}
 
 /**
  * A sky pass. Owns the per-frame sky-view table and the compute pipelines, and nothing else: no device, no canvas, no
@@ -215,6 +254,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     let params: SkyParams = { ...DEFAULTS };
     let skyViewKey = "";
     let compensation = 0;
+    let scale = 1;
 
     async function readMetering(offset: number, floats: number): Promise<Float32Array> {
         const staging = device.createBuffer({
@@ -233,6 +273,10 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     return {
         skyViewTexture: skyView,
 
+        get skyViewScale() {
+            return scale;
+        },
+
         update(next) {
             params = { ...params, ...next };
             const [sx, sy, sz] = params.sunDirection;
@@ -250,6 +294,10 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                 params.exposureCompensation + autoExposureCompensation(params.autoExposureKeys, [sx, sy, sz], dip);
             sky[23] = compensation;
             sky.set(params.autoExposureRange, 24);
+            // Of the sun and the observer alone, like the table: it changes only when the table is rebuilt.
+            const sunAltitude = (Math.atan2(sz, Math.hypot(sx, sy)) * 180) / Math.PI + dip;
+            scale = skyViewScale(model.solarIlluminance, sunAltitude);
+            sky[26] = scale;
             device.queue.writeBuffer(skyParams, 0, sky);
 
             // Rebuilding the sky-view table is the expensive part, and it is why the sky pass itself is one fetch
@@ -289,7 +337,8 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             return [r as number, g as number, b as number];
         },
 
-        async createCubePass({ format: cubeFormat, samples = 1, cubify = false, sunDisc = false }: SkyCubeOptions) {
+        async createCubePass(cubeOptions: SkyCubeOptions) {
+            const { format: cubeFormat, samples = 1, cubify = false, sunDisc = false, scaled = false } = cubeOptions;
             if (cubeFormat !== "rgba16float" && cubeFormat !== "rgba32float") {
                 throw new Error(`dunstkreis: the sky's cube map is rgba16float or rgba32float, not ${cubeFormat}`);
             }
@@ -329,7 +378,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                         module: device.createShaderModule({ code: skySource(wgsl.skyCubeOutput(cubeFormat)) }),
                         entryPoint: "dkSky",
                         constants: constants(
-                            { toneMap: false, dither: false, cube: true, cubify, sunDisc },
+                            { toneMap: false, dither: false, cube: true, cubeScaled: scaled, cubify, sunDisc },
                             { cube: samples },
                         ),
                     },

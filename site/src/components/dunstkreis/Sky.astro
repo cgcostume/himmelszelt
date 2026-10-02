@@ -1,25 +1,47 @@
 ---
 import "../sternzeit/sternzeit.css";
+import {
+    type AtmosphereModel,
+    DEFAULT_ATMOSPHERE_MODEL,
+    OSGHIMMEL_ATMOSPHERE_MODEL,
+    RGB_ATMOSPHERE_MODEL,
+} from "@himmelszelt/dunstkreis";
 import Choice from "./Choice.astro";
 import "./dunstkreis.css";
 
+// The wavelengths a model computes, once each: the three-wavelength models repeat their third as a fourth.
+const nm = (model: AtmosphereModel) => `${[...new Set(model.wavelengths)].join(", ")} nm`;
 const CHOICES = [
     {
         name: "model",
         label: "Atmosphere model",
-        title: "Four wavelengths turned into RGB by a fitted matrix; Bruneton's three taken as R, G and B, as skies were colored before; or osgHimmel's model as it was. Switches the whole page, recomputing every table",
+        heading: "wavelengths",
+        title: "Four wavelengths (λ) turned into RGB by a fitted matrix; Bruneton's three taken as R, G and B, as skies were colored before; or osgHimmel's air as it was, its three as R, G and B too. Switches the whole page, recomputing every table",
         options: [
-            ["fitted", "4 wavelengths"],
-            ["rgb", "3 as RGB"],
-            ["osghimmel", "osgHimmel"],
+            [
+                "fitted",
+                "dunstkreis 4λ",
+                `${nm(DEFAULT_ATMOSPHERE_MODEL)}, turned into RGB by a matrix fitted to sky spectra`,
+            ],
+            [
+                "rgb",
+                "Bruneton’08 3λ",
+                `${nm(RGB_ATMOSPHERE_MODEL)}, taken as R, G and B, as Bruneton and Neyret did; the same air`,
+            ],
+            [
+                "osghimmel",
+                "osgHimmel’12 3λ",
+                `${nm(OSGHIMMEL_ATMOSPHERE_MODEL)}, taken as R, G and B, with osgHimmel's air as it was: no ozone, far more haze`,
+            ],
         ],
         checked: "fitted",
     },
     {
         name: "tone",
         label: "Tone curve",
-        title: "Khronos PBR Neutral keeps colors as they are and compresses only the brightest, AgX fades bright colors towards white as film does, ACES is the saturated filmic curve used before. Switches every figure",
+        title: "Khronos PBR Neutral keeps colors as they are and compresses only the brightest, AgX fades bright colors towards white as film does, ACES is the saturated filmic curve used before, none cuts the light off where it saturates. Switches every figure",
         options: [
+            ["clip", "no tone mapping", "No curve: the exposed light cut off at 1, where it saturates, sRGB encoded"],
             ["neutral", "neutral"],
             ["agx", "AgX"],
             ["aces", "ACES"],
@@ -40,6 +62,7 @@ const CHOICES = [
             <span class="note" data-field="timing"></span>
             <span class="sky-toggles">
                 <button type="button" class="view-toggle" data-field="auto" aria-pressed="true" title="Expose by a light meter reading the whole sky">auto</button>
+                <button type="button" class="view-toggle" data-field="ramp" aria-pressed="true" title="Shape the metered exposure over the day by the sun's altitude: night and the minutes around sunrise and sunset darker, the blue hour lifted. Off, the light meter's reading as it is, for the tone curve alone">ramp</button>
                 <button type="button" class="view-toggle" data-field="lock" aria-pressed="true" title="Keep the view on the Sun; dragging lets go">sun-locked</button>
                 <button type="button" class="view-toggle" data-field="grid" aria-pressed="true" title="Lines of altitude every 10°, the compass directions, a ring around the sun disc and timings">grid</button>
                 <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="Dither the 8-bit output by a step of noise, against banding in the sky's smooth gradients">dither</button>

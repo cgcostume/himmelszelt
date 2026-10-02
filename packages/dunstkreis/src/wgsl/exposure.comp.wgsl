@@ -46,7 +46,7 @@ fn dkMeterLog2(a: DkAtmosphere, h: f32, mu: f32, azimuth: f32, size: vec2f) -> f
         rgb = dkToRgb(a, ray.luminance);
     } else {
         let uv = dkSkyViewUv(a, h, mu, cos(azimuth), size);
-        rgb = dkToRgb(a, textureSampleLevel(dkSkyViewLut, dkLutSampler, uv, 0.0));
+        rgb = dkToRgb(a, textureSampleLevel(dkSkyViewLut, dkLutSampler, uv, 0.0)) / dkParams.skyViewScale;
     }
     return log2(max(dot(rgb, vec3f(0.2126, 0.7152, 0.0722)), DK_METER_FLOOR));
 }

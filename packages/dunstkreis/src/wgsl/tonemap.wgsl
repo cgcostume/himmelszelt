@@ -11,6 +11,11 @@ fn dkEncodeSrgb(linear: vec3f) -> vec3f {
     return select(1.055 * pow(x, vec3f(1.0 / 2.4)) - 0.055, x * 12.92, x <= vec3f(0.0031308));
 }
 
+// No curve: the exposed light as it is, cut off at 1, where it saturates. What the curves start from.
+fn dkToneMapClip(exposed: vec3f) -> vec3f {
+    return dkEncodeSrgb(exposed);
+}
+
 // Khronos PBR Neutral (2024): linear up to 0.76 apart from a small offset in the blacks, so colors stay as they are,
 // then compressed towards white and desaturated only as much as that takes. Hues never shift.
 fn dkToneMapNeutral(exposed: vec3f) -> vec3f {
