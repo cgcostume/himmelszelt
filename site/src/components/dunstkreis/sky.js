@@ -21,8 +21,6 @@ import {
     skyViewChanged,
     tables,
 } from "./atmosphere.js";
-import { azimuthFromSun, viewDirection } from "./lutmap.js";
-import { onPick, pick, picked } from "./pick.js";
 
 // The two libraries meet in one vector: sternzeit says where the Sun is, dunstkreis what the air does to its light.
 const DEG = Math.PI / 180;
@@ -136,21 +134,6 @@ function project(direction, basis, width, height) {
     return { x: ((x + 1) / 2) * width, y: ((1 - y) / 2) * height };
 }
 
-/** The view direction through a point of the view, `x` and `y` in pixels from the top left: dkProjectRay's twin. */
-function unproject(px, py, basis, width, height) {
-    const [x, y] = [(px / width) * 2 - 1, 1 - (py / height) * 2];
-    const offset = [0, 1, 2].map((c) => basis.r[c] * basis.tx * x + basis.u[c] * basis.ty * y);
-    const normalize = (v) => v.map((c) => c / Math.hypot(...v));
-    if (basis.d <= 0) return normalize(basis.f.map((c, i) => c + offset[i]));
-    const rho = Math.hypot(...offset);
-    if (rho < 1e-7) return basis.f;
-    const { d } = basis;
-    const k = rho / (d + 1);
-    const cosTheta = (Math.sqrt(1 + k * k * (1 - d * d)) - k * k * d) / (1 + k * k);
-    const sinTheta = Math.sqrt(Math.max(1 - cosTheta * cosTheta, 0));
-    return normalize(basis.f.map((c, i) => c * cosTheta + (offset[i] / rho) * sinTheta));
-}
-
 function placeCompass(basis, width, height) {
     compass.hidden = !pressed("grid");
     labels.forEach((label, i) => {
@@ -162,21 +145,7 @@ function placeCompass(basis, width, height) {
     });
 }
 
-// The view ray the lookup and tables figures follow, where it shows in the sky.
-const marker = field("pick");
-function placeMarker(basis, width, height, sunDirection) {
-    const ray = picked();
-    const at =
-        ray.kind === "view" ? project(viewDirection(ray.mu, ray.azimuth, sunDirection), basis, width, height) : null;
-    marker.hidden = at === null || at.x < 0 || at.y < 0 || at.x > width || at.y > height;
-    if (marker.hidden) return;
-    marker.style.left = `${at.x}px`;
-    marker.style.top = `${at.y}px`;
-}
-
 const gpu = setup();
-// The last frame's camera and sun, for turning a click into a view ray.
-let view = null;
 let pass = null;
 let passFor = {};
 let skyViewFor = "";
@@ -263,8 +232,6 @@ function render() {
 
     const basis = cameraBasis(width / height);
     placeCompass(basis, canvas.clientWidth, canvas.clientHeight);
-    placeMarker(basis, canvas.clientWidth, canvas.clientHeight, sunDirection);
-    view = { basis, sunDirection };
     pass.update({
         sunDirection,
         sunAngularDiameter,
@@ -339,22 +306,9 @@ if (gpu) {
         });
     }
 
-    onPick(requestRender);
     canvas.addEventListener("pointerdown", (event) => {
         canvas.setPointerCapture(event.pointerId);
         const start = { x: event.clientX, y: event.clientY, yaw: camera.yaw, pitch: camera.pitch };
-        // A click that does not drag picks the view ray through that pixel.
-        canvas.addEventListener(
-            "pointerup",
-            (e) => {
-                if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3 || !view) return;
-                const rect = canvas.getBoundingClientRect();
-                const { basis, sunDirection } = view;
-                const d = unproject(e.clientX - rect.left, e.clientY - rect.top, basis, rect.width, rect.height);
-                pick({ kind: "view", mu: d[2], azimuth: azimuthFromSun(d, sunDirection) }, true);
-            },
-            { once: true },
-        );
         const move = (e) => {
             field("lock").setAttribute("aria-pressed", "false");
             // A pixel of drag turns the view by a pixel's worth of the field of view, so the sky follows the pointer.

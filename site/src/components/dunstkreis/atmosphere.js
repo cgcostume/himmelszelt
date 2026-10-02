@@ -123,7 +123,7 @@ export function skyViewChanged(sky) {
  * coefficients and the irradiance hold the light times `scale`, 1 otherwise.
  */
 export const environment = {
-    size: 128,
+    size: 512,
     irradianceSize: 32,
     cubify: false,
     scaled: false,

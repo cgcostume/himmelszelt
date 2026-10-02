@@ -70,7 +70,6 @@ const HEADROOM = {
     <div class="sky-view">
         <canvas data-field="canvas" aria-label="The sky at the chosen moment and place"></canvas>
         <div class="sky-compass" data-field="compass"></div>
-        <div class="sky-pick" data-field="pick" title="The view ray the lookup and tables figures follow" hidden></div>
         <div class="sky-overlay">
             <span class="note" data-field="sun"></span>
             <label class="note">EV<sub>100</sub> <input data-field="exposure" type="range" min="-20" max="8" step="0.1" value="-14" title="Brighter to the right: a lower EV lets in more light" /> <output data-field="ev"></output></label>
@@ -89,7 +88,7 @@ const HEADROOM = {
                 {CHOICES.map((choice) => <Choice figure="sky" {...choice} />)}
             </span>
         </div>
-        <p class="vis-credit footnote">Drag to look around, scroll to zoom, click to follow a pixel's view ray through the tables. Rendered with WebGPU.</p>
+        <p class="vis-credit footnote">Drag to look around, scroll to zoom. Rendered with WebGPU.</p>
     </div>
     <figcaption class="figure-caption">
         The sky at the chosen moment and place: every pixel one lookup into a table of the whole sky, rebuilt whenever

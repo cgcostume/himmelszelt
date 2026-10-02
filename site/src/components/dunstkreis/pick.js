@@ -1,5 +1,5 @@
 /**
- * The ray the page follows through the tables, shared by the sky, the lookup figure and the tables figure: a view
+ * The ray the page follows through the tables, shared by the lookup figure and the tables figure: a view
  * ray, `{ kind: "view", mu, azimuth }`, its azimuth from the sun, signed, clockwise like a compass's; or what a texel of
  * the other two tables stands for, `{ kind: "transmittance", r, mu }` or `{ kind: "multiScattering", altitude, muS }`.
  * Pointing at something shows it for as long as the pointer stays; a click keeps it.

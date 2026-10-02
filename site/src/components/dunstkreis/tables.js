@@ -12,7 +12,7 @@ import { state } from "../sternzeit/state.js";
 import { bindRefractionToggle, gpu, onSkyView, onTables, quality, recompute, tables } from "./atmosphere.js";
 import { formatBytes, saveHdr, savePng } from "./download.js";
 import { geometry, multiScatteringAt, skyViewAt, transmittanceAt } from "./lutmap.js";
-import { pick, picked, unpoint } from "./pick.js";
+import { pick, unpoint } from "./pick.js";
 import { createPreview, renderPixels, TABLE_PREVIEW, texelOf } from "./preview.js";
 
 const root = document.querySelector("#tables");
@@ -31,6 +31,9 @@ const previews = {};
 // How each table is shown: texel by texel, or interpolated between texel centers as the shaders sample it.
 const filters = { transmittance: "nearest", multiScattering: "nearest", skyView: "nearest" };
 const flipped = (name) => TABLE_PREVIEW[name].flip;
+// The sky view shown twice as wide, its mirror image to the left, as the sky pass reads it for the sun's other side.
+const mirrored = (name) => name === "skyView";
+const shownColumns = (name, width) => (mirrored(name) ? 2 * width : width);
 const part = (name, field) => lut(name).querySelector(`[data-field="${field}"]`);
 
 const modelLine = () =>
@@ -81,7 +84,7 @@ function show(name, texture, scale = 1) {
     // Framed in the default size's shape whatever the size, so resizing a table does not move the page; its own size
     // on top.
     const shape = DEFAULT_TEXTURE_CONFIG[name];
-    part(name, "image").parentElement.style.aspectRatio = `${shape.width} / ${shape.height}`;
+    part(name, "image").parentElement.style.aspectRatio = `${shownColumns(name, shape.width)} / ${shape.height}`;
     part(name, "size").textContent = `${width}×${height}`;
     part(name, "info").textContent = `${texture.format}, ${formatBytes(width * height * 8)}`;
     paint(name);
@@ -111,7 +114,7 @@ function paint(name) {
         `${filters[name]}`;
     const overlay = part(name, "overlay");
     Object.assign(overlay, { width: image.width, height: image.height });
-    table.columns = cells(table.width, image.width);
+    table.columns = cells(shownColumns(name, table.width), image.width);
     table.rows = cells(table.height, image.height);
     drawOverlay(name);
 }
@@ -153,11 +156,12 @@ const READOUTS = {
             ],
         };
     },
-    skyView(table, x, y, i) {
+    skyView(table, x, y, i, leftOfSun) {
         const g = geometry(table.model);
         const h = Math.min(Math.max(table.heightKm, 1e-6), g.top);
         const { below, zenithHorizon, ...view } = skyViewAt(g, table, h, x, y);
-        const azimuth = view.azimuth * DEG;
+        // Counterclockwise from the sun, to its left, negative: the mirror image of the same texel.
+        const azimuth = (leftOfSun ? -1 : 1) * view.azimuth * DEG;
         const { data } = table;
         const altitude = 90 - (zenithHorizon + below) * DEG;
         const bent = below < 0 ? refractionAngle(table.model, h * 1000, altitude) : null;
@@ -165,7 +169,7 @@ const READOUTS = {
             x: `${fixed(azimuth, 1)}°`,
             y: `${fixed(-below * DEG, 2)}°`,
             lines: [
-                `azimuth ${fixed(azimuth, 2)}° from the sun`,
+                `azimuth ${fixed(azimuth, 2)}° from the sun${leftOfSun ? ", the mirror image of its texel" : ""}`,
                 `${fixed(90 - (zenithHorizon + below) * DEG, 3)}° above the horizontal`,
                 `${fixed(-below * DEG, 3)}° above the visible horizon, seen from ${fixed(h, 3)}\u202fkm`,
                 `luminance ${exp(luminance(table.model, data, i))} cd/m²`,
@@ -176,27 +180,42 @@ const READOUTS = {
     },
 };
 
-// The hovered texel's row and column lit faintly, the texel itself outlined.
+// The hovered texel's row and column lit faintly, the texel itself outlined; mirrored, on both sides of the mirror axis,
+// which is drawn dashed.
 function drawOverlay(name) {
     const table = shown[name];
     if (!table?.columns) return;
     const overlay = part(name, "overlay");
     const context = overlay.getContext("2d");
     context.clearRect(0, 0, overlay.width, overlay.height);
+    const dpr = window.devicePixelRatio || 1;
+    context.lineWidth = Math.max(1, dpr);
+    const columns = table.columns.start.length - 1;
+    if (mirrored(name)) {
+        const axis = table.columns.start[columns / 2];
+        context.strokeStyle = "rgba(255, 255, 255, 0.5)";
+        context.setLineDash([4 * dpr, 4 * dpr]);
+        context.beginPath();
+        context.moveTo(axis, 0);
+        context.lineTo(axis, overlay.height);
+        context.stroke();
+        context.setLineDash([]);
+    }
     if (!table.hover) return;
     const { column, row } = table.hover;
-    const [x0, x1] = [table.columns.start[column], table.columns.start[column + 1]];
     const [y0, y1] = [table.rows.start[row], table.rows.start[row + 1]];
     context.fillStyle = "rgba(255, 255, 255, 0.14)";
-    context.fillRect(x0, 0, x1 - x0, overlay.height);
     context.fillRect(0, y0, overlay.width, y1 - y0);
     context.strokeStyle = getComputedStyle(root).getPropertyValue("--accent");
-    context.lineWidth = Math.max(1, window.devicePixelRatio || 1);
-    context.strokeRect(x0 - 0.5, y0 - 0.5, x1 - x0 + 1, y1 - y0 + 1);
+    for (const c of mirrored(name) ? [column, columns - 1 - column] : [column]) {
+        const [x0, x1] = [table.columns.start[c], table.columns.start[c + 1]];
+        context.fillRect(x0, 0, x1 - x0, overlay.height);
+        context.strokeRect(x0 - 0.5, y0 - 0.5, x1 - x0 + 1, y1 - y0 + 1);
+    }
 }
 
 // What the texel under the pointer stands for, as a ray to pick: the other tables and figures follow it.
-function rayAt(name, x, y) {
+function rayAt(name, x, y, leftOfSun) {
     const table = shown[name];
     const g = geometry(table.model);
     if (name === "transmittance") {
@@ -206,9 +225,8 @@ function rayAt(name, x, y) {
     if (name === "multiScattering") return { kind: name, ...multiScatteringAt(g, table, x, y) };
     const h = Math.min(Math.max(table.heightKm, 1e-6), g.top);
     const { mu, azimuth } = skyViewAt(g, table, h, x, y);
-    // The table holds one side of the sun; the ray stays on the side it was on.
-    const current = picked();
-    return { kind: "view", mu, azimuth: current.kind === "view" && current.azimuth < 0 ? -azimuth : azimuth };
+    // The table holds the sun's right side, clockwise from it; its mirror image the left.
+    return { kind: "view", mu, azimuth: leftOfSun ? -azimuth : azimuth };
 }
 
 // Marks on the axes where the texel sits, with its values, like the axes' own end labels.
@@ -231,15 +249,18 @@ function texelAt(name, event) {
     const py = Math.floor(((event.clientY - rect.top) / rect.height) * image.height);
     const column = table.columns.texel[Math.min(Math.max(px, 0), image.width - 1)];
     const row = table.rows.texel[Math.min(Math.max(py, 0), image.height - 1)];
-    return { column, row, x: column, y: flipped(name) ? table.height - 1 - row : row };
+    const leftOfSun = mirrored(name) && column < table.width;
+    const x = mirrored(name) ? (leftOfSun ? table.width - 1 - column : column - table.width) : column;
+    return { column, row, x, y: flipped(name) ? table.height - 1 - row : row, leftOfSun };
 }
 
 function hover(name, event) {
     const table = shown[name];
     if (!table?.columns) return;
-    const { column, row, x, y } = texelAt(name, event);
+    const { column, row, x, y, leftOfSun } = texelAt(name, event);
     table.hover = { column, row };
-    pick(rayAt(name, x, y));
+    drawOverlay(name);
+    pick(rayAt(name, x, y, leftOfSun));
     if (!table.data) {
         // The texels, read back once per table, then the readout for wherever the pointer is by then.
         table.pointer = event;
@@ -253,9 +274,9 @@ function hover(name, event) {
         return;
     }
     const rect = part(name, "image").getBoundingClientRect();
-    const readout = READOUTS[name](table, x, y, (y * table.width + x) * 4);
+    const readout = READOUTS[name](table, x, y, (y * table.width + x) * 4, leftOfSun);
     const center = (start, i, n) => (start[i] + start[i + 1]) / 2 / start[n];
-    mark(name, "x", center(table.columns.start, column, table.width), readout.x);
+    mark(name, "x", center(table.columns.start, column, table.columns.start.length - 1), readout.x);
     mark(name, "y", center(table.rows.start, row, table.height), readout.y);
 
     const tip = part(name, "tip");
@@ -274,7 +295,7 @@ function hover(name, event) {
     tip.style.bottom = below ? "" : `${rect.height - top + 16}px`;
 }
 
-const previewOptions = (name) => ({ ...TABLE_PREVIEW[name], filter: filters[name] });
+const previewOptions = (name) => ({ ...TABLE_PREVIEW[name], filter: filters[name], mirror: mirrored(name) });
 
 // A texel a pixel, the rows as shown: tone mapped for PNG, the values themselves for HDR.
 async function download(name, format) {
@@ -283,7 +304,7 @@ async function download(name, format) {
     const { texture, width, height } = table;
     const pixels = await renderPixels(
         texture,
-        { ...previewOptions(name), filter: "nearest" },
+        { ...previewOptions(name), filter: "nearest", mirror: false },
         width,
         height,
         format === "hdr",
@@ -373,8 +394,8 @@ if (gpu.error) {
         image.addEventListener("pointerleave", () => leave(name));
         image.addEventListener("click", (event) => {
             if (!shown[name]?.columns) return;
-            const { x, y } = texelAt(name, event);
-            pick(rayAt(name, x, y), true);
+            const { x, y, leftOfSun } = texelAt(name, event);
+            pick(rayAt(name, x, y, leftOfSun), true);
         });
         new ResizeObserver(() => paint(name)).observe(image);
     }

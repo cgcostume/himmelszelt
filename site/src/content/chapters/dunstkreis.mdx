@@ -49,21 +49,9 @@ traces the refraction itself. How to hand it over is the first of the [code exam
 
 ## Why is the sky blue?
 
-<Planned title="A short history of the question" plan="keep, as a timeline.">
-    From Leonardo's blue haze in front of distant mountains through Newton, Tyndall's blue light from fine particles, and
-    Rayleigh's inverse fourth power to Mie, Smoluchowski, and Einstein, after Hoeppe's "Why the Sky Is Blue". A timeline,
-    each step with the one idea it added.
-</Planned>
-
 <Planned title="How strongly each color scatters">
     The visible spectrum against how much of it a column of air scatters: violet many times more than red. Why the
     sky is still blue and not violet, from the Sun's spectrum and the eye's sensitivity.
-</Planned>
-
-<Planned title="Molecules, aerosols, and ozone">
-    The three actors, illustrated rather than shaded: where a photon goes after meeting an air molecule (Rayleigh, as
-    much forward as back), a droplet or dust grain (Mie, a narrow forward lobe, with its asymmetry to drag), and ozone,
-    which only absorbs. Their phase functions as live polar plots.
 </Planned>
 
 ## Why is the sunset red?
@@ -105,6 +93,12 @@ and then tested on 72 skies it was not fitted to. 630, 580, 510, and 440 nm ca
 at worst, and the GPU does not notice: it computes on four components either way. We have not found this middle road
 described before. The model choice in <Fig id="sky" /> shows the sky as it was colored before, Bruneton's three
 wavelengths taken as red, green, and blue, and as osgHimmel computed it.
+
+<Planned title="A few wavelengths or the whole spectrum">
+    The same sky computed from the full spectrum and from a few representative wavelengths, side by side with their
+    difference: Bruneton's three as red, green, and blue, dunstkreis' four through the fitted matrix. Which wavelengths
+    are picked shifts how strongly each color appears to scatter, and so the sky's hue, most of all at sunset.
+</Planned>
 
 ## More than one bounce
 
@@ -173,8 +167,8 @@ where it goes up, since the air is densest right at the eye, and the haze in it 
 comes in from the side: how much of it made it through the air is a transmittance lookup, by the step's altitude and
 the Sun's angle there, and the light that bounced more than once is a multiple scattering lookup, by the same two. How
 much of all that still reaches the eye is summed up along the way, step by step. Sixty lookups end up in a single texel
-of the sky view, and the sky pass reads just that one. Click a pixel in <Fig id="sky" />, or point at a texel below or
-in <Fig id="tables" />, and all of them follow the same ray.
+of the sky view, and the sky pass reads just that one. Point at a texel below or in <Fig id="tables" />, and all of
+them follow the same ray.
 
 <Lookup />
 

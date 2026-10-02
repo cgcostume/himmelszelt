@@ -68,20 +68,6 @@
     font-size: var(--text-small);
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
-/* The view ray the lookup and tables figures follow, where it shows in the sky. */
-.sky-pick {
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    transform: translate(-50%, -50%);
-    border: 2px solid var(--lookup-skyView);
-    border-radius: 50%;
-    box-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
-    pointer-events: none;
-}
-.sky-pick[hidden] {
-    display: none;
-}
 .sky-error {
     position: absolute;
     inset: 0;
@@ -151,6 +137,11 @@
     .lut[data-lut="multiScattering"] .lut-plot {
         max-width: none;
     }
+}
+/* The sky view with its mirror image, square, would be as tall as the column is wide: narrowed and centered too. */
+.lut[data-lut="skyView"] .lut-plot {
+    max-width: calc(28rem + var(--lut-axis) + 0.4rem);
+    margin-inline: auto;
 }
 /* Start, title and end of each axis, with a hairline on either side of the title filling the space between them. In
    logical sizes, so the same rules hold for the y axis, whose text runs vertically. */

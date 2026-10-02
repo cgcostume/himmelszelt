@@ -27,8 +27,8 @@ export const TABLE_PREVIEW = {
 };
 
 /** The texel device pixel `p` of `pixels` shows in nearest filtering, exactly as the preview shader picks it. */
-// Params: eight scalars, the mat4x3f at byte 32, the sun's spectrum at 96.
-const PARAMS_SIZE = 112;
+// Params: nine scalars, padded to twelve, the mat4x3f at byte 48, the sun's spectrum at 112.
+const PARAMS_SIZE = 128;
 
 export const texelOf = (p, n, pixels) => Math.floor(((2 * p + 1) * n) / (2 * pixels));
 
@@ -49,6 +49,8 @@ struct Params {
     log2: u32,
     // SPECTRAL: the four channels as they are, as light, or as a ratio on the sunlight.
     spectral: u32,
+    // 2D: the table again to the left, mirrored at its first column and dimmed, the sky view's other side of the sun.
+    mirror: u32,
     toRgb: mat4x3f,
     sun: vec4f,
 }
@@ -152,12 +154,20 @@ fn display(@builtin(global_invocation_id) id: vec3u) {
         c = sampleDirection(d, nearestSampler);
     }`
             : `let n = textureDimensions(source);
+    let mirrored = params.mirror != 0u;
+    let columns = select(n.x, 2u * n.x, mirrored);
     if (params.linear == 0u) {
-        let texel = (2u * id.xy + 1u) * n / (2u * size);
+        var texel = (2u * id.xy + 1u) * vec2u(columns, n.y) / (2u * size);
+        if (mirrored) {
+            texel.x = select(n.x - 1u - texel.x, texel.x - n.x, texel.x >= n.x);
+        }
         c = decoded(textureLoad(source, vec2u(texel.x, select(texel.y, n.y - 1u - texel.y, params.flip != 0u)), 0));
     } else {
         let fraction = (vec2f(id.xy) + 0.5) / vec2f(size);
-        var uv = vec2f(fraction.x, select(fraction.y, 1.0 - fraction.y, params.flip != 0u));
+        var uv = vec2f(
+            select(fraction.x, abs(2.0 * fraction.x - 1.0), mirrored),
+            select(fraction.y, 1.0 - fraction.y, params.flip != 0u),
+        );
         if (params.split != 0u) {
             let half = 0.5 / f32(n.y);
             uv.y = select(max(uv.y, 0.5 + half), min(uv.y, 0.5 - half), fraction.y < 0.5);
@@ -165,6 +175,7 @@ fn display(@builtin(global_invocation_id) id: vec3u) {
         c = decoded(textureSampleLevel(source, linearSampler, uv, 0.0));
     }`
     }
+    ${cube ? "" : "if (params.mirror != 0u && 2u * id.x < size.x) { c = c * 0.2; }"}
     textureStore(output, vec2i(id.xy), vec4f(${format === "rgba8unorm" ? "toneMap(c)" : "c"}, 1.0));
 }
 `;
@@ -191,12 +202,12 @@ let samplers = null;
 /**
  * Records `texture` drawn into `output`, a storage view of `width` by `height` in `format`: a 2D table, or with `cube`,
  * a cube map unrolled into a panorama at mip `level`, `cubified` or not. `filter` is "nearest" or "linear", `scale` one
- * of `SCALE`; `flip` shows a table's rows bottom up, `split` keeps its halves apart.
+ * of `SCALE`; `flip` shows a table's rows bottom up, `split` keeps its halves apart, `mirror` adds it mirrored, dimmed.
  */
 function encode(encoder, texture, options, output, width, height, format, buffers) {
     const { device } = gpu;
     const { cube = false, filter = "nearest", scale = SCALE.none, flip = false, split = false } = options;
-    const { level = 0, cubified = false, log2 = false, spectral = SPECTRAL.none } = options;
+    const { level = 0, cubified = false, log2 = false, spectral = SPECTRAL.none, mirror = false } = options;
     samplers ??= {
         linear: device.createSampler({ magFilter: "linear", minFilter: "linear" }),
         nearest: device.createSampler(),
@@ -204,15 +215,15 @@ function encode(encoder, texture, options, output, width, height, format, buffer
     const { reduce, display } = pipelinesFor(cube, format);
     const data = new ArrayBuffer(PARAMS_SIZE);
     const flags = [scale, filter === "linear" ? 1 : 0, flip ? 1 : 0, split ? 1 : 0, 0, cubified ? 1 : 0, log2 ? 1 : 0];
-    new Uint32Array(data).set([...flags, spectral]);
+    new Uint32Array(data).set([...flags, spectral, mirror ? 1 : 0]);
     const floats = new Float32Array(data);
     floats[4] = level;
     // The tables' model: its matrix, column by column, padded to four floats, and the sun's spectrum.
     const model = tables()?.luts.model;
     if (spectral !== SPECTRAL.none && model) {
         const matrix = spectrumToRgb(model);
-        for (let j = 0; j < 4; ++j) floats.set([matrix[0][j], matrix[1][j], matrix[2][j]], 8 + j * 4);
-        floats.set(model.solarSpectrum, 24);
+        for (let j = 0; j < 4; ++j) floats.set([matrix[0][j], matrix[1][j], matrix[2][j]], 12 + j * 4);
+        floats.set(model.solarSpectrum, 28);
     }
     device.queue.writeBuffer(buffers.params, 0, data);
     const all = [

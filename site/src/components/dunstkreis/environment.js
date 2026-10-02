@@ -19,7 +19,7 @@ const panel = (name) => root.querySelector(`[data-panel="${name}"] canvas`);
 const levels = (name) => root.querySelector(`[data-panel="${name}"] [data-field="levels"]`);
 // The mip level each panel shows, and how: texel by texel, or interpolated between texel centers as a sampler does.
 const shown = { sky: 0, irradiance: 0 };
-const filters = { sky: "nearest", irradiance: "nearest" };
+const filters = { sky: "linear", irradiance: "nearest" };
 
 const levelPart = (name, field) => root.querySelector(`[data-panel="${name}"] [data-field="${field}"]`);
 
