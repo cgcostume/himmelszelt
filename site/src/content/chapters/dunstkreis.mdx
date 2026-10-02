@@ -262,7 +262,8 @@ Automatic exposure is an option, for a renderer without an exposure of its own, 
 meter on the GPU reads the sky-view table in directions spread evenly over the sky above the horizon, and takes the
 geometric mean of their luminance, as a camera's averaging meter does: EV100 = log2(L · 100 / 12.5). It meters the
 directions below the horizon apart and takes the brighter: on the ground that is the sky, high up the lit air below,
-while the sky above turns black, and from space the lit planet, raymarched like the view. The sky pass reads that
+while the sky above turns black, and from space the lit planet, raymarched like the view. No direction counts more than
+ten stops below the brightest, a camera's range, so the black sky and the night side do not drown out the day side. The sky pass reads that
 straight from the meter's buffer. Metering the table rather than the image means the reading does not change as the
 camera turns, and the sun's disc, which is not in the table, does not darken everything. The meter reads again whenever
 the table is rebuilt; the exposure follows at once, without the eye's slow adaptation. The day meters around EV 14, a
@@ -273,7 +274,7 @@ keep the night and the minutes around sunrise and sunset darker than metered, li
 shows, make the sunset a little brighter than the sunrise, and leave noon as metered. Mornings and evenings may differ,
 though the model's air is the same for both.
 
-The floor of EV 8 is for now. A camera exposes a landscape by full moon at about EV −3 and the Milky Way at about −6
+The floor of EV 4 is for now. A camera exposes a landscape by full moon at about EV −3 and the Milky Way at about −6
 to −7. Once the moon lights the air and the stars are drawn, the floor drops and the night follows. Exposed that far
 today, the sky would show only the sun's last twilight, amplified beyond what the table can hold.
 

@@ -12,7 +12,9 @@
 // while the sky above turns black. Above the atmosphere, where the table does not reach, it raymarches what the
 // observer sees instead: the lit planet and its rim of air.
 //
-// TODO: high up, and from space, it still exposes too bright, if only subjectively.
+// Each sample counts at most DK_METER_RANGE stops below the brightest of its cap: a black direction would otherwise
+// enter the geometric mean at the floor, some 33 stops down, and from space the planet's night side and the black sky
+// would pull the reading towards night while the day side shines.
 
 @group(0) @binding(0) var<uniform> dkAtmosphere: DkAtmosphere;
 @group(0) @binding(1) var<uniform> dkParams: DkSkyParams;
@@ -24,9 +26,12 @@
 
 // 128 threads, the most WebGPU's compatibility mode allows per workgroup.
 const DK_METER_THREADS: u32 = 128u;
+var<workgroup> dkMeterBrightest: array<vec2f, DK_METER_THREADS>;
 const DK_METER_SAMPLES: u32 = 32u;
 // Below the darkest night sky, so a black direction counts as very dark rather than as minus infinity.
 const DK_METER_FLOOR: f32 = 1e-10;
+// How far below the brightest sample of a cap a sample counts at most, in stops: a camera's dynamic range.
+const DK_METER_RANGE: f32 = 10.0;
 // Samples per ray from space: the meter averages thousands of rays, so each can be coarse.
 const DK_METER_RAY_SAMPLES: u32 = 16u;
 
@@ -73,14 +78,32 @@ fn dkMeterSky(@builtin(local_invocation_index) index: u32) {
     let horizon = dkHorizonMu(a, h);
 
     // Fibonacci spirals over the caps above and below the horizon: even in solid angle, the table's own spacing is not.
-    var sum = vec2f(0.0);
+    var samples: array<vec2f, DK_METER_SAMPLES>;
+    var brightest = vec2f(log2(DK_METER_FLOOR));
     for (var i = 0u; i < DK_METER_SAMPLES; i = i + 1u) {
         let j = index * DK_METER_SAMPLES + i;
         let k = f32(j) + 0.5;
         let azimuth = dkGoldenAzimuth(j);
         let above = dkMeterLog2(a, h, 1.0 - (1.0 - horizon) * k / total, azimuth, size);
         let below = dkMeterLog2(a, h, -1.0 + (1.0 + horizon) * k / total, azimuth, size);
-        sum = sum + vec2f(above, below);
+        samples[i] = vec2f(above, below);
+        brightest = max(brightest, samples[i]);
+    }
+
+    // The brightest of each cap over the workgroup, by halving.
+    dkMeterBrightest[index] = brightest;
+    workgroupBarrier();
+    for (var stride = DK_METER_THREADS / 2u; stride > 0u; stride = stride / 2u) {
+        if (index < stride) {
+            dkMeterBrightest[index] = max(dkMeterBrightest[index], dkMeterBrightest[index + stride]);
+        }
+        workgroupBarrier();
+    }
+    let lowest = dkMeterBrightest[0] - DK_METER_RANGE;
+
+    var sum = vec2f(0.0);
+    for (var i = 0u; i < DK_METER_SAMPLES; i = i + 1u) {
+        sum = sum + max(samples[i], lowest);
     }
     let sums = dkWorkgroupSum(vec4f(sum, 0.0, 0.0), index);
     if (index == 0u) {

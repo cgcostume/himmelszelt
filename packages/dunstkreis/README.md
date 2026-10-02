@@ -99,11 +99,12 @@ matter of taste, e.g. for hazier evenings. The metering stays the base, so the r
 | 60° | 0 | 0 | noon, as metered |
 
 Night is yet to come. A camera exposes a landscape by full moon at about EV100 −3 and the Milky Way at about −6 to
-−7, some 11 to 15 stops below the floor of 8. The floor stays until the night sky has light of its own: the moon's
+−7, some 7 to 11 stops below the floor of 4. The floor stays until the night sky has light of its own: the moon's
 scattered light, airglow, zodiacal light and the stars. Exposed that far now, the sky would show only the sun's last
 twilight, amplified to where the f16 table runs out of precision. Then the floor drops and the night key follows.
 
-To do: high up, and from space, the metered exposure still looks too bright, if only subjectively.
+No direction counts more than 10 stops below the brightest of its half, a camera's dynamic range: from space, the black
+sky and the planet's night side would otherwise pull the geometric mean towards night while the day side shines.
 
 With `toneMap`, the pass writes display colors for an 8-bit target: exposed, mapped by Khronos PBR Neutral (`"neutral"`, the
 default), which keeps colors as they are up to 0.76 and compresses only above, or AgX (`"agx"`), whose bright colors

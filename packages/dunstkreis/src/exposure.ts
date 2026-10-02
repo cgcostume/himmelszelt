@@ -70,8 +70,8 @@ function monotoneCubic(points: readonly (readonly [number, number])[], x: number
 
 /**
  * The compensation the keys give for a sun direction (ENU, x east) and the observer's horizon dip in degrees, 0 on the
- * ground: a smooth curve through the keys, held beyond the first and the last, 0 without keys. Morning and evening blend across the meridian, within some 15° of azimuth, so
- * noon and midnight do not jump.
+ * ground: a smooth curve through the keys, held beyond the first and the last, 0 without keys. Morning and evening blend
+ * across the meridian, within 30° of azimuth on either side, so noon and midnight do not jump.
  */
 export function autoExposureCompensation(
     keys: readonly AutoExposureKey[],
