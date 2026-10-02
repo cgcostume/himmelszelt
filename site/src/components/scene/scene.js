@@ -25,7 +25,8 @@ const source = [
  */
 
 const DEG = Math.PI / 180;
-const PARAMS_SIZE = 512;
+// Params: 129 scalars, rounded up to a multiple of 16 bytes.
+const PARAMS_SIZE = 528;
 
 /** Rotation about a unit axis by an angle, as a column-major 3x3 matrix padded to WGSL's mat3x3f: 12 floats. */
 function rotation([x, y, z], angle) {
@@ -80,11 +81,18 @@ export function cameraFrame({ yaw, pitch, distance }) {
 }
 
 export function createScene(device) {
-    const pipeline = device.createComputePipeline({
-        label: "sternwarte:scene",
-        layout: "auto",
-        compute: { module: device.createShaderModule({ code: source }), entryPoint: "render" },
-    });
+    // One pipeline per output format, rgba8unorm or rgba16float for an HDR canvas, made when first drawn into.
+    const pipelines = new Map();
+    const pipelineFor = (format) => {
+        if (!pipelines.has(format)) {
+            const code = source.replace("OUTPUT_FORMAT", format);
+            const module = device.createShaderModule({ label: "sternwarte:scene", code });
+            const layout = "auto";
+            const compute = { module, entryPoint: "render" };
+            pipelines.set(format, device.createComputePipeline({ label: "sternwarte:scene", layout, compute }));
+        }
+        return pipelines.get(format);
+    };
     const params = device.createBuffer({ size: PARAMS_SIZE, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const sampler = device.createSampler({ magFilter: "linear", minFilter: "linear", mipmapFilter: "linear" });
     const blueNoiseTexture = device.createTexture({
@@ -108,7 +116,7 @@ export function createScene(device) {
 
     return {
         /**
-         * Records the scene into `target` (rgba8unorm, storage). `camera` orbits the scene's center: yaw from north
+         * Records the scene into `target` (rgba8unorm, or rgba16float for an HDR canvas, storage). `camera` orbits the scene's center: yaw from north
          * through east, pitch, distance, vertical field of view, all angles in radians. `seconds` turns the solids and
          * moves them along their orbits. `shadowRays` over the sun disc, 8 or 64 for soft shadows, 0 for none, anything else for hard ones. `background`, a texture of the target's size
          * holding the sky in cd/m² through the same camera, replaces the sky map behind the solids. `cubified` for a sky map written cubified, `skyScale` for one written scaled, which its light and coefficients are divided by. `groundRadius`, in
@@ -121,6 +129,7 @@ export function createScene(device) {
          * camera sees it from its own height, the sun's by default, place and light the disc and its veil; `horizonZ`,
          * the planet's horizon as the camera sees it, hides the disc below it, -1 by default for none. `dither`, on by
          * default, dithers the 8-bit output against banding. `toneCurve`, "neutral" by default, "agx", "aces" or "clip", as dunstkreis'.
+         * `headroom`, 1 by default, how many times SDR white an HDR display shows, which Neutral and "clip" go up to.
          */
         encode(
             encoder,
@@ -159,8 +168,10 @@ export function createScene(device) {
             data[123] = rest.horizonZ ?? -1;
             data.set(rest.discIlluminance ?? sunIlluminance, 124);
             data[127] = rest.skyScale ?? 1;
+            data[128] = rest.headroom ?? 1;
             device.queue.writeBuffer(params, 0, data);
 
+            const pipeline = pipelineFor(target.format);
             const bindGroup = device.createBindGroup({
                 layout: pipeline.getBindGroupLayout(0),
                 entries: [

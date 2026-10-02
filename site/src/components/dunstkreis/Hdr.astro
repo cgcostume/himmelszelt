@@ -1,0 +1,29 @@
+---
+import Choice from "./Choice.astro";
+
+/**
+ * The headroom choice over a figure, "HDR off" first, the others disabled where the display or the canvas cannot show
+ * HDR, and a note on an HDR display; bound by atmosphere.js' bindHdr.
+ */
+interface Props {
+    figure: string;
+}
+const { figure } = Astro.props;
+
+// The browser does not tell how far the display can go, so the headroom is chosen, the same for every figure.
+const HEADROOM = {
+    name: "headroom",
+    label: "HDR headroom",
+    title: "How many times brighter than SDR white the image may show: Neutral and no tone mapping compress or cut off there instead of at white. AgX and ACES are fits to SDR and stay within it. The browser does not tell how far the display goes, so pick what looks right. Switches every figure",
+    options: [
+        ["1", "HDR off", "SDR, as on any display"],
+        ["2", "2×"],
+        ["4", "4×"],
+        ["8", "8×"],
+    ],
+    checked: "4",
+};
+---
+
+<span class="note sky-hdr" data-hdr="note" hidden></span>
+<span data-hdr="choice"><Choice figure={figure} {...HEADROOM} /></span>

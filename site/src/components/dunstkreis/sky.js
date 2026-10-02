@@ -10,13 +10,17 @@ import { paintRange } from "../range.js";
 import { COMPASS } from "../sternzeit/figure.js";
 import { onChange, state } from "../sternzeit/state.js";
 import {
+    bindHdr,
     bindModelChoice,
     bindToneCurveChoice,
+    configureCanvas,
     display,
+    displayOutput,
     onDisplay,
     onTables,
     quality,
     recompute,
+    SDR,
     gpu as shared,
     skyViewChanged,
     tables,
@@ -40,18 +44,6 @@ function showError(html) {
     canvas.replaceWith(error);
 }
 
-// The sky is written by a compute pass, straight into the canvas: rgba8unorm, which storage textures take everywhere,
-// or on an HDR display rgba16float, extended sRGB, whose values above 1 show brighter than SDR white.
-const SDR = "rgba8unorm";
-const HDR = "rgba16float";
-const hdrDisplay = window.matchMedia("(dynamic-range: high)");
-
-function configure(context, device, format) {
-    const toneMapping = { mode: format === HDR ? "extended" : "standard" };
-    const usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.STORAGE_BINDING;
-    context.configure({ device, format, alphaMode: "opaque", usage, toneMapping });
-}
-
 function setup() {
     if (shared.error) {
         showError(shared.error);
@@ -59,30 +51,8 @@ function setup() {
     }
     const { device, adapterName } = shared;
     const context = canvas.getContext("webgpu");
-    // Whether the canvas takes extended tone mapping at all: a browser without it drops the member it does not know.
-    configure(context, device, HDR);
-    const extended = context.getConfiguration?.()?.toneMapping?.mode === "extended";
-    configure(context, device, SDR);
-    return { device, context, format: SDR, extended, adapterName };
-}
-
-/** The format and headroom to render with: HDR where both the display and the canvas can, and a headroom is chosen. */
-function output() {
-    const headroom = Number(root.querySelector('input[name="sky-headroom"]:checked')?.value ?? 1);
-    const hdr = gpu.extended && hdrDisplay.matches && headroom > 1;
-    return { format: hdr ? HDR : SDR, headroom: hdr ? headroom : 1 };
-}
-
-// On an HDR display, a note that it is one, and the headroom to choose; a display that is HDR but a canvas that cannot
-// show it say so instead.
-function showHdr() {
-    const note = field("hdr");
-    note.hidden = !hdrDisplay.matches;
-    field("headroom").hidden = !(hdrDisplay.matches && gpu.extended);
-    note.textContent = gpu.extended ? "HDR display" : "HDR display, SDR canvas";
-    note.title = gpu.extended
-        ? "The display shows more than SDR white, and the canvas renders into that headroom: half floats, extended sRGB"
-        : "The display shows more than SDR white, but this browser's WebGPU canvas has no extended tone mapping";
+    configureCanvas(context, SDR);
+    return { device, context, format: SDR, adapterName };
 }
 
 // Zooming out past 100 degrees bends the perspective into a stereographic fisheye, complete at the widest view of
@@ -161,7 +131,7 @@ function buildPass(settings) {
     createSkyPass(gpu.device, { luts, ...features }).then((next) => {
         if (building !== settings) return next.destroy();
         if (settings.format !== gpu.format) {
-            configure(gpu.context, gpu.device, settings.format);
+            configureCanvas(gpu.context, settings.format);
             gpu.format = settings.format;
         }
         pass?.destroy();
@@ -197,7 +167,7 @@ function render() {
     const astronomyMs = performance.now() - started;
 
     const debugGrid = pressed("grid");
-    const { format, headroom } = output();
+    const { format, headroom } = displayOutput();
     // Half floats need no dither: their steps are far finer than 8 bits'.
     const dither = pressed("dither") && format === SDR;
     field("dither").disabled = format !== SDR;
@@ -278,13 +248,7 @@ function showExposure() {
 if (gpu) {
     bindToneCurveChoice(root.querySelectorAll('input[name="sky-tone"]'));
     bindModelChoice(root.querySelectorAll('input[name="sky-model"]'));
-    showHdr();
-    hdrDisplay.addEventListener("change", () => {
-        showHdr();
-        requestRender();
-    });
-    const headrooms = root.querySelectorAll('input[name="sky-headroom"]');
-    for (const input of headrooms) input.addEventListener("change", requestRender);
+    bindHdr(root.querySelector('[data-hdr="note"]'), root.querySelector('[data-hdr="choice"]'));
     onDisplay(requestRender);
     onChange(requestRender);
     onTables(() => {

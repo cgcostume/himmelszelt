@@ -53,9 +53,79 @@ export const quality = {
 
 const events = new EventTarget();
 
-/** How the page's figures show the sky on a display: the tone curve, "neutral", "agx", "aces" or "clip", shared by all. */
-export const display = { toneCurve: "neutral" };
+/**
+ * How the page's figures show the sky on a display, shared by all: the tone curve, "neutral", "agx", "aces" or "clip",
+ * and the headroom chosen for an HDR display, how many times SDR white it may show.
+ */
+export const display = { toneCurve: "neutral", headroom: 4 };
 export const onDisplay = (listener) => events.addEventListener("display", () => listener(display));
+
+// A figure writes its canvas by a compute pass: rgba8unorm, which storage textures take everywhere, or on an HDR display
+// rgba16float, extended sRGB, whose values above 1 show brighter than SDR white.
+export const SDR = "rgba8unorm";
+export const HDR = "rgba16float";
+export const hdrDisplay = window.matchMedia("(dynamic-range: high)");
+hdrDisplay.addEventListener("change", () => events.dispatchEvent(new Event("display")));
+
+/** Configures a figure's canvas for `format`, extended tone mapping for HDR, to be written by a compute pass. */
+export function configureCanvas(context, format) {
+    const toneMapping = { mode: format === HDR ? "extended" : "standard" };
+    const usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.STORAGE_BINDING;
+    context.configure({ device: gpu.device, format, alphaMode: "opaque", usage, toneMapping });
+}
+
+// Whether a canvas takes extended tone mapping at all: a browser without it drops the member it does not know.
+let extended = null;
+function canvasExtended() {
+    if (extended === null && gpu.device) {
+        const context = document.createElement("canvas").getContext("webgpu");
+        configureCanvas(context, HDR);
+        extended = context.getConfiguration?.()?.toneMapping?.mode === "extended";
+        context.unconfigure();
+    }
+    return extended === true;
+}
+
+/** The format and headroom to render with: HDR where both the display and the canvas can, and a headroom is chosen. */
+export function displayOutput() {
+    const hdr = canvasExtended() && hdrDisplay.matches && display.headroom > 1;
+    return { format: hdr ? HDR : SDR, headroom: hdr ? display.headroom : 1 };
+}
+
+/**
+ * The headroom radios of a figure and its note (Hdr.astro): "HDR off" chosen and the headrooms disabled where the
+ * display or the canvas cannot show HDR, the note on an HDR display only; choosing a headroom switches every figure.
+ */
+export function bindHdr(note, choice) {
+    const show = () => {
+        const can = canvasExtended();
+        const available = can && hdrDisplay.matches;
+        note.hidden = !hdrDisplay.matches;
+        note.textContent = can ? "HDR display" : "HDR display, SDR canvas";
+        note.title = can
+            ? "The display shows more than SDR white, and the canvas renders into that headroom: half floats, extended sRGB"
+            : "The display shows more than SDR white, but this browser's WebGPU canvas has no extended tone mapping";
+        for (const input of choice.querySelectorAll("input")) {
+            const headroom = Number(input.value);
+            input.disabled = !available && headroom > 1;
+            input.checked = headroom === (available ? display.headroom : 1);
+            const label = input.parentElement;
+            label.dataset.title ??= label.title;
+            const why = hdrDisplay.matches
+                ? "This browser's WebGPU canvas has no extended tone mapping"
+                : "Not an HDR display, or HDR is off in the system's display settings";
+            label.title = input.disabled ? why : label.dataset.title;
+        }
+    };
+    show();
+    onDisplay(show);
+    for (const input of choice.querySelectorAll("input")) {
+        input.addEventListener("change", () => {
+            display.headroom = Number(input.value);
+            events.dispatchEvent(new Event("display"));
+        });
+    }
+}
 
 /** Tone curve radios, `name="…"` inputs of the curves' values: choosing one switches every figure. */
 export function bindToneCurveChoice(inputs) {

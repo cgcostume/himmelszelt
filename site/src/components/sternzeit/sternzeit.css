@@ -153,6 +153,11 @@
 .steps label:hover span {
     color: var(--text);
 }
+.steps label:has(:disabled) span {
+    color: var(--muted);
+    opacity: 0.45;
+    cursor: default;
+}
 .steps label:has(:checked) span {
     color: var(--accent);
 }

@@ -1,6 +1,7 @@
 ---
 import "../sternzeit/sternzeit.css";
 import Choice from "./Choice.astro";
+import Hdr from "./Hdr.astro";
 import "./dunstkreis.css";
 
 // The choices over the scene: what it shows, in the first row, and how finely it is sampled, in the second.
@@ -85,6 +86,7 @@ const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
                     <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="Dither the 8-bit output by a step of blue noise, against banding in smooth gradients">dither</button>
                     <span class="toggle-separator" aria-hidden="true"></span>
                     <button type="button" class="view-toggle" data-field="rotate" aria-pressed="false" title="Turn the solids slowly, and send them round the sphere on slightly tilted orbits">rotate</button>
+                    <Hdr figure="lighting" />
                 </span>
             </div>
             <div class="lighting-row">

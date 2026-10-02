@@ -3,14 +3,18 @@ import { onDemand } from "../frame.js";
 import { cameraFrame, createScene } from "../scene/scene.js";
 import {
     bindCubifyToggle,
+    bindHdr,
     bindScaledToggle,
+    configureCanvas,
     display,
+    displayOutput,
     environment,
     gpu,
     onDisplay,
     onEnvironment,
     onTables,
     quality,
+    SDR,
     tables,
 } from "./atmosphere.js";
 import { geometry } from "./lutmap.js";
@@ -152,6 +156,9 @@ function render() {
 
     const { cube, ibl, sun, ev100, sky } = environment;
     if (liveSky() && !readySkyPass()) return;
+    const { format, headroom } = displayOutput();
+    if (context.getConfiguration().format !== format) configureCanvas(context, format);
+    field("dither").disabled = format !== SDR;
     const encoder = gpu.device.createCommandEncoder({ label: "sternwarte:lighting" });
     const live = liveSky() ? renderBackground(encoder, width, height) : null;
     const seen = sunSeen(live !== null);
@@ -178,8 +185,10 @@ function render() {
         shadowRays: shadowRays(),
         sunLight: pressed("sunLight"),
         skyLight: pressed("skyLight"),
-        dither: pressed("dither"),
+        // Half floats need no dither: their steps are far finer than 8 bits'.
+        dither: pressed("dither") && format === SDR,
         toneCurve: display.toneCurve,
+        headroom,
         ground: ground(),
         seconds,
     });
@@ -203,12 +212,8 @@ if (gpu.error) {
     );
 } else {
     context = canvas.getContext("webgpu");
-    context.configure({
-        device: gpu.device,
-        format: "rgba8unorm",
-        alphaMode: "opaque",
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.STORAGE_BINDING,
-    });
+    configureCanvas(context, SDR);
+    bindHdr(root.querySelector('[data-hdr="note"]'), root.querySelector('[data-hdr="choice"]'));
     scene = createScene(gpu.device);
     onEnvironment(requestRender);
     // Rebuilds the sky map, which renders anew once it is in.

@@ -64,13 +64,15 @@ struct Params {
     discIlluminance: vec3f,
     // What the sky map and its coefficients hold the light multiplied by, 1 for cd/m²: dunstkreis' skyViewScale, scaled.
     skyScale: f32,
+    // How many times SDR white the display shows, for an HDR canvas; 1 for SDR.
+    headroom: f32,
 }
 
 @group(0) @binding(0) var<uniform> params: Params;
 @group(0) @binding(1) var sky: texture_cube<f32>;
 @group(0) @binding(2) var skySampler: sampler;
 @group(0) @binding(3) var<storage, read> sh: array<vec4f, 9>;
-@group(0) @binding(4) var output: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(4) var output: texture_storage_2d<OUTPUT_FORMAT, write>;
 // The sky rendered live through the same camera, linear in cd/m², one texel per pixel.
 @group(0) @binding(5) var background: texture_2d<f32>;
 @group(0) @binding(6) var blueNoiseTexture: texture_2d<f32>;
@@ -305,7 +307,7 @@ fn sunVisibility(p: vec3f, pixel: vec2u) -> f32 {
     return visible / f32(count);
 }
 
-// The sky pass' tone curves, sRGB encoded.
+// The sky pass' tone curves, sRGB encoded, beyond 1 up to the headroom on an HDR display.
 fn toneMap(exposed: vec3f) -> vec3f {
     if (params.toneCurve == 2u) {
         return dkToneMapAgx(exposed);
@@ -314,9 +316,9 @@ fn toneMap(exposed: vec3f) -> vec3f {
         return dkToneMapAces(exposed);
     }
     if (params.toneCurve == 4u) {
-        return dkToneMapClip(exposed);
+        return dkToneMapClipHdr(exposed, params.headroom);
     }
-    return dkToneMapNeutral(exposed);
+    return dkToneMapNeutralHdr(exposed, params.headroom);
 }
 
 // Four rays per pixel on a rotated grid, as 4x multisampling places its samples: edges come out smooth in one frame.
@@ -505,6 +507,6 @@ fn render(@builtin(global_invocation_id) id: vec3u) {
         let noise = dot(blueNoise(id.xy), vec2f(1.0, -1.0));
         color = color + noise / 255.0;
     }
-    color = clamp(color, vec3f(0.0), vec3f(1.0));
+    color = clamp(color, vec3f(0.0), dkEncodeSrgbExtended(vec3f(params.headroom), params.headroom));
     textureStore(output, vec2i(id.xy), vec4f(color, 1.0));
 }
