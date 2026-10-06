@@ -1,0 +1,40 @@
+---
+import Term from "../Term.astro";
+import "./sternzeit.css";
+---
+
+<figure class="moon-calendar" id="moon-calendar">
+    {/* The container the month buttons size by; not the figure, as a container scopes the counter that numbers it. */}
+    <div class="calendar">
+    <div class="calendar-head">
+        {/* Up to three months either side, as many as the width has room for. */}
+        {[-3, -2, -1].map((offset) => <button type="button" data-month={offset} class={`calendar-month-${-offset}`}></button>)}
+        <button type="button" class="calendar-title" data-field="title" aria-pressed="true"></button>
+        {[1, 2, 3].map((offset) => <button type="button" data-month={offset} class={`calendar-month-${offset}`}></button>)}
+    </div>
+    <div class="calendar-weekdays" aria-hidden="true"></div>
+    <div class="calendar-weeks" data-field="weeks"></div>
+    </div>
+    {/* One hatching for every disc below the horizon, referenced from each day's own SVG. */}
+    <svg width="0" height="0" aria-hidden="true" style="position: absolute">
+        <defs>
+            <pattern id="moon-calendar-hatch" width="2" height="2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <line x1="0" y1="0" x2="0" y2="2" class="calendar-hatch-line" />
+            </pattern>
+        </defs>
+    </svg>
+    <figcaption class="figure-caption">
+        A month of Moons at the chosen place, each day at the chosen time of day on the chosen clock, as seen there:
+        the phase, the night side in <Term of="Earthshine">earthshine</Term>, the Moon's equator and prime meridian
+        shifted by the <Term of="Libration">libration</Term>, and all of it turned towards the zenith by the{" "}
+        <Term of="Parallactic angle">parallactic angle</Term>. Beside the date, where it stands then: its compass point and, after the arrow, its altitude above the horizon. Hatched, it is below the horizon. Under each
+        week, from midnight to midnight, the Moon above the horizon (top lane, yellow while low, where the long path
+        through the air reddens it) and the Sun (bottom lane, fading out through civil twilight); the ticks mark the
+        chosen time. Hover a day for its moonrise, moonset and highest point, click it to
+        make it the page's moment, with Ctrl (Cmd on a Mac) to turn to its month too.
+    </figcaption>
+</figure>
+
+<script>
+    import "./mooncalendar.js";
+</script>

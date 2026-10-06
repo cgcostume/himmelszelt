@@ -1,5 +1,14 @@
 import * as precise from "@himmelszelt/sternzeit";
-import { drawSvg, sunInViewFrame, svgText, veiledHorizon } from "./figure.js";
+import {
+    drawSvg,
+    EARTHSHINE_MAX,
+    selenographic,
+    sunInViewFrame,
+    svgText,
+    toScreen,
+    veiledHorizon,
+    visibleRuns,
+} from "./figure.js";
 import { aboveVisibleHorizon } from "./horizon.js";
 import { ephemerisDay, onChange, state } from "./state.js";
 import "./export.js";
@@ -13,8 +22,6 @@ const radiusAt = (km) => Math.asin(precise.moon.MEAN_RADIUS_KM / km);
 const UNITS_PER_RADIAN = PERIGEE_RADIUS / radiusAt(PERIGEE_KM);
 // Selenographic grid spacing, in degrees.
 const GRID_STEP = 30;
-// Earthshine peaks at about this (relative to full sunlight, see moon.earthshine); rays reach full length there.
-const EARTHSHINE_MAX = 0.095;
 const EARTHSHINE_RAY_COUNT = 11;
 const EARTHSHINE_RAY_GAP = 4;
 const EARTHSHINE_RAY_MAX = 14;
@@ -34,41 +41,6 @@ let optical = true;
 const f = (n) => n.toFixed(2);
 const polyline = (points, cls) =>
     `<polyline points="${points.map(([x, y]) => `${f(x)},${f(y)}`).join(" ")}" class="${cls}"/>`;
-
-/**
- * A point on the Moon at selenographic longitude `lon` and latitude `lat` (degrees), seen with the sub-observer point at
- * (`l`, `b`), the libration: x right (selenographic east, which is sky west), y up (lunar north), z towards the viewer.
- */
-function selenographic(lon, lat, l, b) {
-    const [dl, la, bb] = [(lon - l) * DEG, lat * DEG, b * DEG];
-    return [
-        Math.cos(la) * Math.sin(dl),
-        Math.sin(la) * Math.cos(bb) - Math.cos(la) * Math.sin(bb) * Math.cos(dl),
-        Math.sin(la) * Math.sin(bb) + Math.cos(la) * Math.cos(bb) * Math.cos(dl),
-    ];
-}
-
-/** Rotates (x right, y up) counterclockwise by `angle` degrees and flips y for SVG (y down). */
-function toScreen([x, y], angle, radius) {
-    const [c, s] = [Math.cos(angle * DEG), Math.sin(angle * DEG)];
-    return [(x * c - y * s) * radius, -(x * s + y * c) * radius];
-}
-
-/** Splits a curve on the Moon into the runs facing the viewer (z > 0), in screen coordinates. */
-function visibleRuns(points, angle, radius) {
-    const runs = [];
-    let run = null;
-    for (const p of points) {
-        if (p[2] > 0) {
-            if (!run) {
-                run = [];
-                runs.push(run);
-            }
-            run.push(toScreen(p, angle, radius));
-        } else run = null;
-    }
-    return runs.filter((r) => r.length > 1);
-}
 
 function render() {
     const { jd } = state;

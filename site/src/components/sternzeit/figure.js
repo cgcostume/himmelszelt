@@ -3,6 +3,7 @@ import * as precise from "@himmelszelt/sternzeit";
 // Text inside the figures' SVGs is at the page's small text size (--text-small, 0.75rem, like the compass labels)
 // whatever size the SVG is drawn at: each figure passes how many of its own units one screen pixel is.
 const SMALL_TEXT_PX = 12;
+const DEG = precise.DEG_TO_RAD;
 
 /** Fills a figure's SVG; its CSS sizes text and sun symbols in screen pixels by --units-per-px (see global.css). */
 export function drawSvg(element, svg, unitsPerPx) {
@@ -112,11 +113,50 @@ export function sunInViewFrame(time, observer) {
 export const EARTHSHINE_MAX = 0.095;
 
 /**
+ * A point on the Moon at selenographic longitude `lon` and latitude `lat` (degrees), seen with the sub-observer point at
+ * (`l`, `b`), the libration: x right (selenographic east, which is sky west), y up (lunar north), z towards the viewer.
+ */
+export function selenographic(lon, lat, l, b) {
+    const [dl, la, bb] = [(lon - l) * DEG, lat * DEG, b * DEG];
+    return [
+        Math.cos(la) * Math.sin(dl),
+        Math.sin(la) * Math.cos(bb) - Math.cos(la) * Math.sin(bb) * Math.cos(dl),
+        Math.sin(la) * Math.sin(bb) + Math.cos(la) * Math.cos(bb) * Math.cos(dl),
+    ];
+}
+
+/** Rotates (x right, y up) counterclockwise by `angle` degrees and flips y for SVG (y down). */
+export function toScreen([x, y], angle, radius) {
+    const [c, s] = [Math.cos(angle * DEG), Math.sin(angle * DEG)];
+    return [(x * c - y * s) * radius, -(x * s + y * c) * radius];
+}
+
+/** Splits a curve on the Moon into the runs facing the viewer (z > 0), in screen coordinates. */
+export function visibleRuns(points, angle, radius) {
+    const runs = [];
+    let run = null;
+    for (const p of points) {
+        if (p[2] > 0) {
+            if (!run) {
+                run = [];
+                runs.push(run);
+            }
+            run.push(toScreen(p, angle, radius));
+        } else run = null;
+    }
+    return runs.filter((r) => r.length > 1);
+}
+
+const polylinePoints = (points) => points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
+
+/**
  * The Moon as a symbol at (x, y): a disc of `radius` with `lit` of it (0 to 1) shining towards (dx, dy), the way it
  * would look to the eye. The terminator is the ellipse it really is, so the crescent bulges the right way, and the
- * night side carries the earthshine, which is at its strongest with the least of the Moon lit.
+ * night side carries the earthshine, which is at its strongest with the least of the Moon lit. With a `graticule`
+ * ({ longitude, latitude } of the libration and the `tilt` of the Moon's north, counterclockwise from up, in degrees),
+ * its equator and prime meridian show which way the Moon is turned and how far we see around it.
  */
-export function moonSymbol(x, y, radius, lit, dx, dy, earthshine = 0) {
+export function moonSymbol(x, y, radius, lit, dx, dy, earthshine = 0, graticule = null) {
     const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
     const waist = (radius * Math.abs(1 - 2 * lit)).toFixed(2);
     // Counterclockwise back over the bright side for a crescent, clockwise around the dark one for a gibbous moon.
@@ -126,7 +166,15 @@ export function moonSymbol(x, y, radius, lit, dx, dy, earthshine = 0) {
     const glow = (Math.min(earthshine, EARTHSHINE_MAX) / EARTHSHINE_MAX).toFixed(3);
     return `<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${angle.toFixed(2)})">
         <circle r="${radius}" class="figure-moon" style="--earthshine: ${glow}"/>
-        <path d="${limb} ${terminator} Z" class="figure-moon-lit"/></g>`;
+        <path d="${limb} ${terminator} Z" class="figure-moon-lit"/></g>${graticule ? moonGraticule(x, y, radius, graticule) : ""}`;
+}
+
+function moonGraticule(x, y, radius, { longitude, latitude, tilt }) {
+    const equator = Array.from({ length: 73 }, (_, i) => selenographic(-180 + i * 5, 0, longitude, latitude));
+    const meridian = Array.from({ length: 37 }, (_, i) => selenographic(0, -90 + i * 5, longitude, latitude));
+    const runs = [...visibleRuns(equator, tilt, radius), ...visibleRuns(meridian, tilt, radius)];
+    const lines = runs.map((run) => `<polyline points="${polylinePoints(run)}" class="figure-moon-graticule"/>`);
+    return `<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)})">${lines.join("")}</g>`;
 }
 
 /**

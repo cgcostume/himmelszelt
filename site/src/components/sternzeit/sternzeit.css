@@ -365,6 +365,13 @@ tbody tr:hover {
 .figure-moon-lit {
     fill: var(--muted);
 }
+/* The Moon's equator and prime meridian on the symbol, faint: they only have to show which way it is turned. */
+.figure-moon-graticule {
+    fill: none;
+    stroke: var(--bg);
+    stroke-width: 0.6;
+    opacity: 0.5;
+}
 /* The caption of a panel floating over a scene, below the panel and as wide as it, so it wraps within the panel's
    width rather than across the scene. It carries the page's background: without it the scene's lines and labels
    would show through the lines of text. */
@@ -797,6 +804,134 @@ figure[id] {
     opacity: 1;
 }
 /* Nothing to hover with: the buttons that would otherwise appear on hover are simply always there. */
+/* The moon calendar: a month in whole weeks, a Moon per day, and under each week the lanes of the Moon and the Sun. */
+.moon-calendar {
+    /* The Moon low in the sky, yellowed by the long path through the air. */
+    --moon-low: hsl(36 80% 62%);
+    margin: 1.5rem 0;
+}
+/* Set off from its caption by the same gap as the moon view. */
+.calendar {
+    container-type: inline-size;
+    margin-bottom: 0.75rem;
+}
+.calendar-head {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: center;
+    align-items: baseline;
+    margin-bottom: 0.75rem;
+}
+/* The shown month, a button like its neighbors, picked out the way a chosen step is. */
+.calendar-title[aria-pressed="true"] {
+    color: var(--accent);
+    cursor: default;
+}
+/* The farther months only where there is room for them. */
+@container (max-width: 42rem) {
+    .calendar-month-3 {
+        display: none;
+    }
+}
+@container (max-width: 34rem) {
+    .calendar-month-2 {
+        display: none;
+    }
+    /* Room for a compass point and an altitude under the day. */
+    .calendar .calendar-day {
+        padding: 0.2rem 0.1rem;
+    }
+    .calendar .calendar-where {
+        flex-basis: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+.calendar-weekdays,
+.calendar-week {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.calendar-weekdays {
+    color: var(--muted);
+    font-size: var(--text-small);
+    text-align: center;
+}
+.calendar-week {
+    margin-bottom: 0.4rem;
+}
+/* A button like any other on the page, only without its fixed height and, until hovered, its outline. */
+.calendar-day {
+    height: auto;
+    padding: 0.2rem 0.45rem;
+    border-color: transparent;
+    background: none;
+    color: var(--muted);
+}
+.calendar-day[aria-current="date"] {
+    background: var(--surface);
+}
+.calendar-day svg {
+    display: block;
+    width: 100%;
+    max-width: 3.25rem;
+    margin: 0 auto;
+}
+/* The day and where the Moon stands, beside it or, on a narrow screen, on a line of its own. */
+.calendar-date {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.25rem;
+    font-size: var(--text-small);
+    line-height: 1.2;
+}
+/* Where the Moon stands at the chosen time, quietly: the compass point and the altitude. */
+.calendar-where {
+    display: flex;
+    gap: 0.4em;
+    opacity: 0.6;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.calendar-day[aria-current="date"] .calendar-date {
+    color: var(--accent);
+}
+/* The neighboring months' days, clearly fainter than a Moon below the horizon, so the two are not mistaken. */
+.calendar-other {
+    opacity: 0.15;
+}
+.calendar-moon-below {
+    opacity: 0.35;
+}
+.calendar-moon-hatch {
+    fill: url(#moon-calendar-hatch);
+}
+.calendar-hatch-line {
+    stroke: var(--muted);
+    stroke-width: 0.5;
+    opacity: 0.6;
+}
+.calendar-lanes {
+    grid-column: 1 / -1;
+    display: block;
+    width: 100%;
+    height: 10px;
+}
+.calendar-lane-below {
+    fill: var(--line);
+}
+.calendar-lane-moon {
+    fill: color-mix(in oklab, var(--text) var(--level), var(--moon-low));
+}
+.calendar-lane-sun {
+    fill: color-mix(in oklab, var(--accent) var(--level), var(--line));
+}
+.calendar-tick {
+    stroke: var(--text);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
 @media (hover: none) {
     .svg-download,
     .icon-button {

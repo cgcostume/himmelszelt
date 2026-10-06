@@ -22,6 +22,7 @@ import Cite from "../../components/Cite.astro";
 import Controls from "../../components/sternzeit/Controls.astro";
 import DayArc from "../../components/sternzeit/DayArc.astro";
 import Eclipse from "../../components/sternzeit/Eclipse.astro";
+import MoonCalendar from "../../components/sternzeit/MoonCalendar.astro";
 import MoonView from "../../components/sternzeit/MoonView.astro";
 import Scene from "../../components/sternzeit/Scene.astro";
 import Table from "../../components/sternzeit/Table.astro";
@@ -283,8 +284,8 @@ import { sun as fast } from "@himmelszelt/sternzeit/approx"; // approximate
 `@himmelszelt/sternzeit` has no dependencies, touches neither the DOM nor the GPU, and runs anywhere JavaScript runs. It
 returns plain numbers, and it is up to you what to do with them. A CAD or architecture viewer with the correct
 light and shadows for a real site and hour. A sun study for a solar roof. A game whose day follows the player's real
-clock. A photo planner that knows when the full Moon rises behind a landmark. A moon calendar. An augmented reality
-overlay that labels what is up there right now. A sundial, or the sky over a date in history. Here are four more
+clock. A photo planner that knows when the full Moon rises behind a landmark. An augmented reality
+overlay that labels what is up there right now. A sundial, or the sky over a date in history. Here are five more
 ideas to start with, code included:
 
 **Light a scene.** The two directions a renderer wants, the ones
@@ -423,6 +424,55 @@ function nextTotalLunarEclipse(from: number): Date | null {
 // 2028-12-31, from 16:18 UTC.
 const next = nextTotalLunarEclipse(julianDayUT(fromDate(new Date())));
 ```
+
+**Plan a night under the Moon.** A moon calendar shows the phase and little else: not which way the Moon is turned
+where you are, and not whether it is up while it is dark. Both are a few calls away. The discs are the Moon at the
+same time of day all month, turned as it stands in the sky there; the lanes say when it is up, and the Sun with it.
+How to draw them is up to you, so here they are two functions you bring yourself:
+
+```ts
+import {
+    fromDate, julianEphemerisDay, moon, positionAngle, sun,
+} from "@himmelszelt/sternzeit";
+
+const DAY_MS = 86_400_000;
+const observer = { latitude, longitude };
+// Upper limb on the horizon, refraction included, as for sunrise.
+const isUp = (altitude: number) => altitude > -0.833;
+
+// firstDay: the first midnight, timeOfDay: milliseconds after it.
+for (let day = 0; day < days; day++) {
+    const time = fromDate(new Date(firstDay + day * DAY_MS + timeOfDay));
+    const jd = julianEphemerisDay(time);
+    // The parallactic angle turns the sky's north into the zenith.
+    const q = moon.parallacticAngle(time, observer);
+    const m = moon.apparentPosition(jd);
+    const s = sun.apparentPosition(jd);
+    drawMoonDisc(day, {
+        lit: moon.illuminatedFraction(jd),
+        earthshine: moon.earthshine(jd),
+        libration: moon.librations(jd),
+        brightLimb: positionAngle(
+            m.rightAscension, m.declination,
+            s.rightAscension, s.declination,
+        ) - q,
+        north: moon.positionAngleOfAxis(jd) - q,
+        up: isUp(moon.horizontalPosition(time, observer).altitude),
+    });
+}
+
+// The lanes, in ten-minute steps: the altitude picks the color.
+for (let minute = 0; minute < days * 1440; minute += 10) {
+    const time = fromDate(new Date(firstDay + minute * 60_000));
+    drawLane("moon", minute, moon.horizontalPosition(time, observer).altitude);
+    drawLane("sun", minute, sun.horizontalPosition(time, observer).altitude);
+}
+```
+
+Drawn, with the chosen moment's time of day and place:
+
+<MoonCalendar />
+<Controls />
 
 The same goes for the other libraries: the Moon's phase, libration, sun direction, and earthshine are what
 [nachtgestirn](../nachtgestirn/) shades the Moon with, sidereal time is what will turn the stars of
