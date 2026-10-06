@@ -27,7 +27,7 @@ osghimmel/         read-only reference clone, gitignored
 | npm package | Directory | Status |
 |---|---|---|
 | `@himmelszelt/sternzeit` (astronomy/sidereal time math) | `packages/sternzeit` | Julian Day, sidereal time, sun/moon/earth positions, moon phase, sun direction from the moon, earthshine and librations done (precise + approx), ΔT from IERS observations and Espenak & Meeus; cross-checked against astronomia; stars stubbed |
-| `@himmelszelt/dunstkreis` (WebGPU atmosphere after Hillaire, on Bruneton's model) | `packages/dunstkreis` | tables, sky pass, traced refraction, exposure, sky cube map and diffuse IBL (SH9, irradiance cube) working, live in its chapter; aerial perspective, specular IBL, Bruneton as another sky-view filler pending |
+| `@himmelszelt/dunstkreis` (WebGPU atmosphere after Hillaire, on Bruneton's model) | `packages/dunstkreis` | tables, sky pass, traced refraction, exposure, sky cube map and diffuse IBL (SH9, irradiance cube) working, live in its chapter under `pnpm dev` (a draft, withheld from the published site); aerial perspective, specular IBL, Bruneton as another sky-view filler pending |
 | `@himmelszelt/sternwarte` (the website, `private: true`) | `site/` | sternzeit chapter done (figures, glossary tooltips, references, TOC); dunstkreis chapter started (live sky, section skeleton), and `planned: true` placeholders for nachtgestirn, sternenheer, gewoelk, rundbild; deployed to GitHub Pages by CI from main |
 | `@himmelszelt/gewoelk` (clouds) | not created yet | later |
 | `@himmelszelt/sternenheer` (star rendering) | not created yet | later; the old poetic word for the host of stars, and clear of himmelszelt |
@@ -53,6 +53,9 @@ combining sun, moon, atmosphere, stars, clouds. Audience: developers who want to
 libraries; should be a joy to read, educational, and nerdy. Hard requirements, non-negotiable:
 runs locally with a single command, deploys as static files to GitHub Pages, no other hosting.
 No per-package dev pages: a library is developed and debugged in its chapter, which imports its source directly.
+`pnpm dev` and the published site differ on purpose: a chapter with `draft: true` in its frontmatter (dunstkreis for
+now) is shown in full under `pnpm dev` and published as a placeholder like a planned one, and `<Planned>` figure notes
+render under `pnpm dev` only. Both switch on `import.meta.env.DEV` (see `site/src/lib/chapters.ts`).
 
 **No cross-module hard dependencies.** `dunstkreis` doesn't depend on `sternzeit`, it takes a
 sun/moon direction vector + time as plain inputs. Whoever embeds it computes that vector however

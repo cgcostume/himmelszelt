@@ -6,6 +6,7 @@ import References from "../../components/References.astro";
 import Term from "../../components/Term.astro";
 import Toc from "../../components/Toc.astro";
 import Base from "../../layouts/Base.astro";
+import { withheld } from "../../lib/chapters";
 import { findEntry } from "../../lib/glossary";
 import { formatUpdated, lastUpdated } from "../../lib/updated";
 
@@ -29,8 +30,19 @@ const updated = formatUpdated(lastUpdated(chapter.filePath ?? ""));
     <p class="page-meta">
         by <a href="https://daniellimberger.de" target="_blank" rel="noopener">Daniel Limberger</a> · Last updated {updated} · <Term of="Unfamiliar term">Unfamiliar term?</Term>
     </p>
-    <Toc sections={sections} />
-    <Content components={{ Fig }} />
-    <About />
-    <References chapter={chapter.id} body={chapter.body ?? ""} />
+    {
+        withheld(chapter) ? (
+            <>
+                <p>This chapter is still being written.</p>
+                <About />
+            </>
+        ) : (
+            <>
+                <Toc sections={sections} />
+                <Content components={{ Fig }} />
+                <About />
+                <References chapter={chapter.id} body={chapter.body ?? ""} />
+            </>
+        )
+    }
 </Base>

@@ -1,6 +1,7 @@
 ---
 import { getCollection } from "astro:content";
 import Base from "../layouts/Base.astro";
+import { placeholder } from "../lib/chapters";
 import { findEntry, literalMeaning } from "../lib/glossary";
 import { formatUpdated, lastUpdated } from "../lib/updated";
 
@@ -35,9 +36,9 @@ const updated = formatUpdated(lastUpdated("src/pages/index.astro"));
         {
             chapters.map((c) => (
                 <li>
-                    <a href={`${base}/${c.id}/`} class:list={{ planned: c.data.planned }}>
+                    <a href={`${base}/${c.id}/`} class:list={{ planned: placeholder(c) }}>
                         <span class="mono">{c.data.title}</span>
-                        {c.data.planned && <span class="mono planned-tag">// planned</span>}
+                        {placeholder(c) && <span class="mono planned-tag">// planned</span>}
                         <span class="literal">"{literalMeaning(c.data.title)}"</span>
                         <p>{c.data.summary}</p>
                     </a>
