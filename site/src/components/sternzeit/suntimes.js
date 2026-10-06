@@ -37,10 +37,9 @@ function render() {
         if (rising === undefined && setting === undefined) return aboveAtStart ? allAbove : allBelow;
         return `${field(risingName, rising)}, ${field(settingName, setting)}`;
     };
-    const date = new Date(day * DAY_MS).toLocaleDateString("en-GB", { dateStyle: "medium", timeZone: "UTC" });
     const sun = pair(-0.833, ["sunrise", "sunset"], ["the Sun stays up all day", "the Sun stays down all day"]);
     const twilight = pair(-6, ["dawn", "dusk"], ["no civil night", "no civil twilight"]);
-    output.innerHTML = `${date}: ${sun}; ${twilight}`;
+    output.innerHTML = `${sun}; ${twilight}`;
 }
 
 onChange(render);
