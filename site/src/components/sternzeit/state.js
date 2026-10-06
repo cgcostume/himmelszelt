@@ -50,12 +50,20 @@ function restore() {
             if (valid) state[key] = value;
         }
         state.heightM = Math.min(Math.max(state.heightM, 1), 408_000);
+        placeOnEarth();
     } catch {}
+}
+
+// A place on Earth: latitude from pole to pole, longitude once around, whatever was typed or stepped past the ends.
+function placeOnEarth() {
+    state.latitude = Math.min(Math.max(state.latitude, -90), 90);
+    state.longitude = ((((state.longitude + 180) % 360) + 360) % 360) - 180;
 }
 
 /** Applies `patch` and notifies every listener; `source` is the controls element the change came from, if any. */
 export function update(patch, source = null) {
     Object.assign(state, patch);
+    placeOnEarth();
     save();
     changes.dispatchEvent(new CustomEvent("change", { detail: source }));
 }

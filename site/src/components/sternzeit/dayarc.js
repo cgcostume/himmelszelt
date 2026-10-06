@@ -248,16 +248,23 @@ function rebuildPaths() {
 function renderAnalemma() {
     const { jd, latitude, longitude } = state;
     const today = seen(precise.sun, precise.fromJulianDay(jd), latitude, longitude);
-    // Azimuths relative to today's, unwrapped, and shrunk by cos(altitude) so both axes are true angles on the sky.
+    // Seen along the vertical circle through today's Sun: x is the true angle off it to the right, y the angle along it,
+    // up from the horizon ahead and on over the zenith. Close to that circle this is azimuth and altitude, but unlike
+    // them it stays smooth near the zenith, where the azimuth swings through half the compass within a few degrees.
+    const project = ({ azimuth, altitude }) => {
+        const [a, h] = [(azimuth - today.azimuth) * DEG, altitude * DEG];
+        const x = Math.asin(Math.cos(h) * Math.sin(a)) / DEG;
+        return { x, y: -Math.atan2(Math.sin(h), Math.cos(h) * Math.cos(a)) / DEG };
+    };
     const points = [];
     for (let day = -ANALEMMA_DAYS; day <= ANALEMMA_DAYS; day++) {
-        const { azimuth, altitude } = seen(precise.sun, precise.fromJulianDay(jd + day), latitude, longitude);
-        const deltaAzimuth = ((azimuth - today.azimuth + 540) % 360) - 180;
+        const sun = seen(precise.sun, precise.fromJulianDay(jd + day), latitude, longitude);
         const firstOfMonth = new Date((jd + day - 2440587.5) * 86400000).getUTCDate() === 1;
-        points.push({ day, firstOfMonth, x: deltaAzimuth * Math.cos(altitude * DEG), y: -altitude });
+        points.push({ day, firstOfMonth, ...project(sun) });
     }
-    // A fixed scale, so analemmas from different places compare directly, centered on the analemma and kept between
-    // zenith and nadir. The viewBox is fitted into the panel keeping its aspect ratio, so the larger scale applies.
+    // A fixed scale, so analemmas from different places compare directly, always centered on the analemma, so it glides
+    // rather than jumps as the moment and place change. The viewBox is fitted into the panel keeping its aspect ratio, so
+    // the larger scale applies.
     const unitsPerPx = Math.max(
         (2 * ANALEMMA_HALF_WIDTH) / (analemmaSvg.clientWidth || 1),
         ANALEMMA_HEIGHT / (analemmaSvg.clientHeight || 1),
@@ -265,8 +272,7 @@ function renderAnalemma() {
     const xs = points.map((p) => p.x);
     const ys = points.map((p) => p.y);
     const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
-    const reach = 90 - ANALEMMA_HEIGHT / 2;
-    const centerY = Math.min(Math.max((Math.min(...ys) + Math.max(...ys)) / 2, -reach), reach);
+    const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
     const [x0, y0] = [centerX - ANALEMMA_HALF_WIDTH, centerY - ANALEMMA_HEIGHT / 2];
     analemmaSvg.setAttribute("viewBox", `${x0} ${y0} ${2 * ANALEMMA_HALF_WIDTH} ${ANALEMMA_HEIGHT}`);
 
@@ -276,8 +282,10 @@ function renderAnalemma() {
     let svg = `<rect x="${f(left)}" y="0" width="${f(right - left)}" height="1090" class="figure-ground"/>`;
     // The panel's own left edge, not the far end of the ground rectangle, is where the altitude labels belong.
     const visibleLeft = centerX - ((analemmaSvg.clientWidth || 1) / 2) * unitsPerPx;
-    for (const altitude of [-60, -30, 30, 60]) {
-        svg += gridLine(altitude, visibleLeft, right, `${-altitude}°`, unitsPerPx);
+    // Past the zenith the altitude falls again, on the far side of the sky, and past the nadir it rises again.
+    for (const angle of [-150, -120, -90, -60, -30, 30, 60, 90, 120, 150]) {
+        const altitude = angle > 90 ? 180 - angle : angle < -90 ? -180 - angle : angle;
+        svg += gridLine(-angle, visibleLeft, right, `${altitude}°`, unitsPerPx);
     }
     svg += `<line x1="${f(left)}" y1="0" x2="${f(right)}" y2="0" class="figure-horizon"/>`;
     // The compass directions on the horizon, where the x axis is plain azimuth (cos 0 = 1), relative to today's; only
