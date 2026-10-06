@@ -11,10 +11,10 @@ import "./sternzeit.css";
             <span class="calendar-lock-word">moment</span>
         </button>
         <div class="calendar-months">
-            {/* Up to three months either side, as many as the width has room for. */}
-            {[-3, -2, -1].map((offset) => <button type="button" data-month={offset} class={`calendar-month-${-offset}`}></button>)}
+            {/* Up to five months either side, as many as the width has room for. */}
+            {[-5, -4, -3, -2, -1].map((offset) => <button type="button" data-month={offset} class={`calendar-month-${-offset}`}></button>)}
             <button type="button" class="calendar-title" data-field="title" aria-pressed="true"></button>
-            {[1, 2, 3].map((offset) => <button type="button" data-month={offset} class={`calendar-month-${offset}`}></button>)}
+            {[1, 2, 3, 4, 5].map((offset) => <button type="button" data-month={offset} class={`calendar-month-${offset}`}></button>)}
         </div>
     </div>
     <div class="calendar-weekdays" aria-hidden="true"></div>

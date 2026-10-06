@@ -255,19 +255,20 @@ function render() {
         reopened.querySelector(".term-tip").style.setProperty("--tip-shift", shift);
     }
 
+    // en-US, as en-GB shortens September to four letters.
     const monthName = (offset, options) =>
-        new Date(Date.UTC(shown.year, shown.month + offset, 1)).toLocaleDateString("en-GB", {
+        new Date(Date.UTC(shown.year, shown.month + offset, 1)).toLocaleDateString("en-US", {
             ...options,
             timeZone: "UTC",
         });
-    titleEl.textContent = monthName(0, { month: "long", year: "numeric" });
-    // The year only where it changes, counting outwards from the shown month: on a January to its right, a December
-    // to its left.
+    // Three letters for every month, so in the monospaced font the buttons keep one width as the months turn.
+    titleEl.textContent = monthName(0, { month: "short", year: "numeric" });
+    // Every neighbor by its month alone; one of another year is dimmed, like the days of another month below.
     for (const button of monthButtons) {
         const offset = Number(button.dataset.month);
-        const month = new Date(Date.UTC(shown.year, shown.month + offset, 1)).getUTCMonth();
-        const boundary = month === (offset > 0 ? 0 : 11);
-        button.textContent = monthName(offset, { month: "long", ...(boundary ? { year: "numeric" } : {}) });
+        const year = new Date(Date.UTC(shown.year, shown.month + offset, 1)).getUTCFullYear();
+        button.textContent = monthName(offset, { month: "short" });
+        button.classList.toggle("calendar-other-year", year !== shown.year);
         button.setAttribute("aria-label", monthName(offset, { month: "long", year: "numeric" }));
         button.disabled = locked;
     }

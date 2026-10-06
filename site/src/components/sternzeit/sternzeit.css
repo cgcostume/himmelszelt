@@ -96,7 +96,8 @@
 .stepper button[data-field="animate"] {
     padding: 0.15rem 0.5rem;
 }
-.stepper button[aria-pressed="true"] {
+.stepper button[aria-pressed="true"],
+.calendar-title[aria-pressed="true"] {
     color: var(--accent);
 }
 /* The map pin that fills in latitude and longitude, and the height that goes with them. */
@@ -685,11 +686,7 @@ figure[id] {
     vector-effect: non-scaling-stroke;
 }
 .moon-axis,
-.moon-sun-arrow {
-    stroke: var(--text);
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-}
+.moon-sun-arrow,
 .moon-zenith {
     stroke: var(--text);
     stroke-width: 1;
@@ -837,28 +834,54 @@ figure[id] {
     gap: 0.3rem;
     align-items: center;
 }
-/* The shown month, a button like its neighbors, picked out the way a chosen step is. */
-.calendar-title[aria-pressed="true"] {
-    color: var(--accent);
+/* The months to pick muted like steps not chosen, brightening on hover; those of another year fainter still, like a
+   variant not shown. */
+.calendar-months > button {
+    color: var(--muted);
+}
+.calendar-months > button:hover:enabled {
+    color: var(--text);
+}
+.calendar-other-year {
+    opacity: 0.55;
+}
+/* The shown month, highlighted like a pressed toggle (see .stepper), with nothing to pick. */
+.calendar-title {
     cursor: default;
 }
-/* The farther months only where there is room for them, measured around a turn of the year, the widest case. */
-@container (max-width: 46rem) {
-    .calendar-month-3 {
+/* The farther months only where there is room for them, measured around a turn of the year, the widest case: five a
+   side with the lock's word at the page's width, then fewer, and on a narrow screen in the controls' small text. */
+@container (max-width: 38.5rem) {
+    .calendar-month-5 {
         display: none;
     }
 }
 @container (max-width: 36.5rem) {
-    .calendar-month-2,
+    /* No room for where the Moon stands beside the day; the tooltip still says it. */
+    .calendar .calendar-where {
+        display: none;
+    }
+}
+@container (max-width: 33rem) {
     .calendar-lock-word {
         display: none;
     }
-    /* As small as the controls on a narrow screen, so a month either side still fits beside the lock. */
     .calendar-head button {
         font-size: var(--text-small);
     }
-    /* No room for where the Moon stands beside the day; the tooltip still says it. */
-    .calendar .calendar-where {
+}
+@container (max-width: 27.75rem) {
+    .calendar-month-4 {
+        display: none;
+    }
+}
+@container (max-width: 22.5rem) {
+    .calendar-month-3 {
+        display: none;
+    }
+}
+@container (max-width: 17.5rem) {
+    .calendar-month-2 {
         display: none;
     }
 }
@@ -884,12 +907,11 @@ figure[id] {
     padding: 0.2rem 0.45rem;
     border-color: transparent;
     background: none;
-    color: var(--muted);
     cursor: pointer;
     /* A double tap turns the month rather than zooming the page. */
     touch-action: manipulation;
 }
-/* Not underlined or recolored like a glossary term in the text: only its tip is borrowed. */
+/* Every day is a term for its tip, but not underlined or recolored like one in the text. */
 .calendar-day.term,
 .calendar-day.term:hover {
     color: var(--muted);
@@ -952,11 +974,6 @@ figure[id] {
 /* A day's tip opens below its week's lanes, not over them: they are half of what it is about. */
 .calendar-day .term-tip {
     top: calc(100% + var(--calendar-lanes-height) + 0.4rem);
-}
-.calendar-tick {
-    stroke: var(--text);
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
 }
 @media (hover: none) {
     .svg-download,
