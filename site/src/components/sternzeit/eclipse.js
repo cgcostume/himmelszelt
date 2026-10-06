@@ -85,7 +85,6 @@ function renderSolar(jd) {
         const covered = (outer - eclipse.separation) / (2 * sunRadiusDeg);
         status = `partial, ${Math.round(covered * 100)}% of the Sun's diameter covered`;
     } else status = `none, the Moon is ${eclipse.separation.toFixed(1)}° away`;
-    if (sunAbove < 0) status += " (the Sun is below the horizon)";
     return { svg, status };
 }
 
@@ -140,9 +139,9 @@ function renderLunar(jd) {
     // An eclipse happens for everyone at once, but only those with the Moon above their horizon get to see it.
     const moonAltitude = precise.moon.horizontalPosition(precise.fromJulianDay(jd), state).altitude;
     if (aboveVisibleHorizon(moonAltitude, state.heightM) < 0) {
-        // The panel's frame is the sky's, not the observer's, so a Moon below the horizon veils all of it.
+        // The panel's frame is the sky's, not the observer's, so a Moon below the horizon veils all of it. The veil says
+        // so; the status line does not, as a line that wraps and unwraps would jump the page while the time runs.
         svg += veiledHorizon(-HALF, HALF, unitsPerPx);
-        status += " (the Moon is below the horizon at the chosen place)";
     }
     return { svg: svg + arrow, status };
 }
