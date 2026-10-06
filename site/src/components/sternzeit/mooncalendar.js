@@ -1,9 +1,8 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { moonSymbol, sunInViewFrame } from "./figure.js";
 import { onChange, state, update } from "./state.js";
-import { clock, clockOffsetMs } from "./zone.js";
+import { clock, clockOffsetMs, DAY_MS, instantOf, wallDayOf } from "./zone.js";
 
-const DAY_MS = 86_400_000;
 // Ten-minute steps: rise and set are then found to the minute by bisection, and the lanes are smooth enough.
 const SAMPLES_PER_DAY = 144;
 // The upper limb on the horizon, refraction included: the almanacs' -0.833 degrees, for the Moon about right too.
@@ -12,8 +11,8 @@ const RISE_ALTITUDE = -0.833;
 const TWILIGHT_ALTITUDE = -6;
 // Above this the Moon has left the yellow of the long path through the air behind.
 const MOON_WHITE_ALTITUDE = 10;
-// Color steps along the lanes: few enough to merge into a handful of runs per day, enough to read as a gradient.
-const LEVELS = 4;
+// Gradient stops along the lanes only where the color has moved on by this much, so a week takes a few dozen.
+const LEVEL_STEP = 0.05;
 const LANE_HEIGHT = 3;
 const LANE_GAP = 1;
 const LANES_HEIGHT = 2 * LANE_HEIGHT + LANE_GAP;
@@ -35,16 +34,6 @@ const timeOf = (ms) => precise.fromDate(new Date(ms));
 const moonAltitude = (ms) => precise.moon.horizontalPosition(timeOf(ms), state).altitude;
 const sunAltitude = (ms) => precise.sun.horizontalPosition(timeOf(ms), state).altitude;
 const clamp01 = (t) => Math.min(1, Math.max(0, t));
-const level = (t) => Math.round(clamp01(t) * LEVELS) / LEVELS;
-
-// A calendar day on the page's clock, as whole days since 1970, and the instant its clock reads `wallMs`, which is UT
-// shifted by the clock's offset; the offset is taken twice, so a day that switches to or from daylight saving time
-// lands right.
-const wallDayOf = (ms) => Math.floor((ms + clockOffsetMs(new Date(ms))) / DAY_MS);
-function instantOf(wallMs) {
-    const guess = wallMs - clockOffsetMs(new Date(wallMs));
-    return wallMs - clockOffsetMs(new Date(guess));
-}
 
 const pageMs = () => precise.toDate(precise.fromJulianDay(state.jd)).getTime();
 // The month shown, as year and month on the page's clock; it starts at the page's moment and then keeps to itself.
@@ -110,32 +99,46 @@ function dayLanes(wallDay) {
     }
     const moonLevels = moon
         .slice(0, -1)
-        .map((h) => (h > RISE_ALTITUDE ? level((h - RISE_ALTITUDE) / (MOON_WHITE_ALTITUDE - RISE_ALTITUDE)) : -1));
+        .map((h) => (h > RISE_ALTITUDE ? clamp01((h - RISE_ALTITUDE) / (MOON_WHITE_ALTITUDE - RISE_ALTITUDE)) : -1));
     const sunLevels = sun
         .slice(0, -1)
         .map((h) =>
             h > RISE_ALTITUDE
                 ? 1
                 : h > TWILIGHT_ALTITUDE
-                  ? level((h - TWILIGHT_ALTITUDE) / (RISE_ALTITUDE - TWILIGHT_ALTITUDE))
+                  ? clamp01((h - TWILIGHT_ALTITUDE) / (RISE_ALTITUDE - TWILIGHT_ALTITUDE))
                   : -1,
         );
     return { start, end: start + step * SAMPLES_PER_DAY, events, moonLevels, sunLevels };
 }
 
-// Runs of equal level as rects, one sample one unit wide, x from the start of the day; -1 is below the horizon.
-function laneRuns(levels, y, cls, x0) {
-    let svg = "";
-    let from = 0;
-    for (let i = 1; i <= levels.length; i++) {
-        if (i < levels.length && levels[i] === levels[from]) continue;
-        const value = levels[from];
-        const style = value < 0 ? "" : ` style="--level: ${value * 100}%"`;
-        const kind = value < 0 ? "calendar-lane-below" : cls;
-        svg += `<rect x="${x0 + from}" y="${y}" width="${i - from}" height="${LANE_HEIGHT}" class="${kind}"${style}/>`;
-        from = i;
+const LANE_COLORS = {
+    moon: (level) => `color-mix(in oklab, var(--text) ${(level * 100).toFixed(0)}%, var(--moon-low))`,
+    sun: (level) => `color-mix(in oklab, var(--accent) ${(level * 100).toFixed(0)}%, var(--line))`,
+};
+
+/**
+ * A week's lane as one rect filled with a gradient: no seams between pieces, the color gliding where the altitude does,
+ * and a hard edge where the body rises or sets, two stops at the same offset. Levels are 0 to 1, -1 below the horizon.
+ */
+function lane(levels, id, kind, y) {
+    const color = (level) => (level < 0 ? "var(--line)" : LANE_COLORS[kind](level));
+    const stop = (offset, level) => `<stop offset="${offset.toFixed(5)}" style="stop-color: ${color(level)}"/>`;
+    let stops = stop(0, levels[0]);
+    let last = levels[0];
+    for (let i = 1; i < levels.length; i++) {
+        const [before, now] = [levels[i - 1], levels[i]];
+        if (before < 0 !== now < 0) {
+            stops += stop(i / levels.length, before) + stop(i / levels.length, now);
+            last = now;
+        } else if (now >= 0 && Math.abs(now - last) >= LEVEL_STEP) {
+            stops += stop((i + 0.5) / levels.length, now);
+            last = now;
+        }
     }
-    return svg;
+    stops += stop(1, levels.at(-1));
+    const width = levels.length;
+    return `<linearGradient id="${id}">${stops}</linearGradient><rect y="${y}" width="${width}" height="${LANE_HEIGHT}" fill="url(#${id})"/>`;
 }
 
 /** The Moon at `ms` as the symbol in a day's cell: phase, earthshine, libration and tilt as seen from the place. */
@@ -214,7 +217,11 @@ function render() {
     for (let week = 0; week < days.length / 7; week++) {
         const weekDays = days.slice(week * 7, week * 7 + 7);
         let cells = "";
-        let lanes = "";
+        // Under the ticks: the lanes of the whole week, each one gradient.
+        const levels = (kind) => weekDays.flatMap((day) => lanesByDay.get(day)[kind]);
+        let lanes =
+            lane(levels("moonLevels"), `moon-calendar-lane-${week}-moon`, "moon", 0) +
+            lane(levels("sunLevels"), `moon-calendar-lane-${week}-sun`, "sun", LANE_HEIGHT + LANE_GAP);
         weekDays.forEach((day, column) => {
             const date = new Date(day * DAY_MS);
             const other = date.getUTCMonth() !== shown.month;
@@ -231,8 +238,6 @@ function render() {
                 <span class="term-tip" aria-hidden="true">${tip.html}</span></button>`;
 
             const x0 = column * SAMPLES_PER_DAY;
-            lanes += laneRuns(dayLanes.moonLevels, 0, "calendar-lane-moon", x0);
-            lanes += laneRuns(dayLanes.sunLevels, LANE_HEIGHT + LANE_GAP, "calendar-lane-sun", x0);
             const toX = (ms) => x0 + ((ms - dayLanes.start) / (dayLanes.end - dayLanes.start)) * SAMPLES_PER_DAY;
             const tick = toX(at);
             lanes += `<line x1="${f(tick)}" y1="-1" x2="${f(tick)}" y2="${LANES_HEIGHT + 1}" class="calendar-tick"/>`;

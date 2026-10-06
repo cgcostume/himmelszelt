@@ -64,3 +64,17 @@ export function clock(date, options) {
     const text = new Date(date.getTime() + offset).toLocaleString("en-GB", { ...options, timeZone: "UTC" });
     return { offset: `UTC${signed(offset)}`, text };
 }
+
+export const DAY_MS = 86_400_000;
+
+/** The calendar day on the page's clock at instant `ms`, as whole days since 1970. */
+export const wallDayOf = (ms) => Math.floor((ms + clockOffsetMs(new Date(ms))) / DAY_MS);
+
+/**
+ * The instant the page's clock reads `wallMs`, its time as if it were UT. The offset is taken twice, so a day that
+ * switches to or from daylight saving time lands right.
+ */
+export function instantOf(wallMs) {
+    const guess = wallMs - clockOffsetMs(new Date(wallMs));
+    return wallMs - clockOffsetMs(new Date(guess));
+}

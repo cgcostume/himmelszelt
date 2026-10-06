@@ -830,13 +830,12 @@ figure[id] {
     justify-content: center;
     gap: 0.3rem;
 }
-/* A view toggle like the moon view's, but in the row rather than over the figure, and a padlock rather than a word. */
+/* A view toggle like the moon view's, but in the row rather than over the figure, with a padlock before its word. */
 .calendar-head > .calendar-lock {
     position: static;
-    display: grid;
-    place-items: center;
-    width: 1.65rem;
-    padding: 0;
+    display: flex;
+    gap: 0.3rem;
+    align-items: center;
 }
 /* The shown month, a button like its neighbors, picked out the way a chosen step is. */
 .calendar-title[aria-pressed="true"] {
@@ -844,13 +843,14 @@ figure[id] {
     cursor: default;
 }
 /* The farther months only where there is room for them, measured around a turn of the year, the widest case. */
-@container (max-width: 42.75rem) {
+@container (max-width: 46rem) {
     .calendar-month-3 {
         display: none;
     }
 }
-@container (max-width: 33.5rem) {
-    .calendar-month-2 {
+@container (max-width: 36.5rem) {
+    .calendar-month-2,
+    .calendar-lock-word {
         display: none;
     }
     /* As small as the controls on a narrow screen, so a month either side still fits beside the lock. */
@@ -952,15 +952,6 @@ figure[id] {
 /* A day's tip opens below its week's lanes, not over them: they are half of what it is about. */
 .calendar-day .term-tip {
     top: calc(100% + var(--calendar-lanes-height) + 0.4rem);
-}
-.calendar-lane-below {
-    fill: var(--line);
-}
-.calendar-lane-moon {
-    fill: color-mix(in oklab, var(--text) var(--level), var(--moon-low));
-}
-.calendar-lane-sun {
-    fill: color-mix(in oklab, var(--accent) var(--level), var(--line));
 }
 .calendar-tick {
     stroke: var(--text);

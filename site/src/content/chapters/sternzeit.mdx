@@ -25,6 +25,7 @@ import Eclipse from "../../components/sternzeit/Eclipse.astro";
 import MoonCalendar from "../../components/sternzeit/MoonCalendar.astro";
 import MoonView from "../../components/sternzeit/MoonView.astro";
 import Scene from "../../components/sternzeit/Scene.astro";
+import SunTimes from "../../components/sternzeit/SunTimes.astro";
 import Table from "../../components/sternzeit/Table.astro";
 import Term from "../../components/Term.astro";
 
@@ -37,6 +38,13 @@ This chapter does not derive those formulas; the references do. It goes through 
 together, and what to do with them, from how astronomers count time to why the Moon seems to wobble. No background in
 astronomy is needed, only curiosity about the sky you want to render. Everything below is computed live, in your
 browser, by the library itself.
+
+`@himmelszelt/sternzeit` has no dependencies, touches neither the DOM nor the GPU, and runs anywhere JavaScript runs. It
+returns plain numbers, and it is up to you what to do with them. A CAD or architecture viewer with the correct
+light and shadows for a real site and hour. A sun study for a solar roof. A game whose day follows the player's real
+clock. A photo planner that knows when the full Moon rises behind a landmark. An augmented reality
+overlay that labels what is up there right now. A sundial, or the sky over a date in history. The sections below
+show a few more in code, each where the numbers it needs are explained.
 
 <Scene />
 
@@ -150,10 +158,11 @@ The prefixes of the function names say how far a position has been corrected, as
 - `topocentric`: from the observer's place, still in right ascension and declination.
 - `horizontal`: as altitude and azimuth above the observer's horizon.
 
-For a renderer, it all ends in one call: `direction`, the `horizontalPosition` as a unit vector in the local
-east-north-up frame, ENU for short: x east, y north, z up. A y-up engine takes it as `(x, z, -y)`. Refraction is
-left out on purpose: the altitude returned is the true one, not the apparent altitude the eye sees, which refraction
-lifts by more than the Sun's own diameter at the horizon. Bending the rays is the atmosphere's job.
+For a renderer, all of this ends in a single call. `direction` returns the `horizontalPosition` as a unit vector in
+the observer's east-north-up frame, ENU for short, with x pointing east, y north and z up; an engine with y up, as most
+real-time renderers have it, assigns it as `(x, z, -y)`. Refraction is left out on purpose. The altitude is the true
+one, not the apparent one the eye sees, which at the horizon is lifted by more than the Sun's own diameter, and
+bending the light that way is the job of the atmosphere, such as [dunstkreis](../dunstkreis/).
 
 ## The Sun
 
@@ -192,128 +201,9 @@ November and 14 behind it in February <Cite id="meeus1998" />. Where its dots cr
 early July, and the Sun's disc in <Fig id="armillary-sphere" /> grows and shrinks accordingly as you step through a
 year.
 
-## The Moon
-
-The Moon is the hard one. It is close, its orbit is tilted against Earth's by about 5°, and the Sun actually pulls on
-it about twice as hard as Earth does. Its position needs dozens of periodic correction terms, built from four
-fundamental angles: its <Term of="Mean anomaly">mean anomaly</Term>, its
-<Term of="Mean elongation">mean elongation</Term> from the Sun, its
-<Term of="Argument of latitude">mean argument of latitude</Term>, and the longitude of its
-<Term of="Longitude of the ascending node">ascending node</Term>, where its orbit crosses Earth's heading north.
-Being close also means a large <Term of="Parallax">parallax</Term>, which is why the topocentric correction matters
-most here.
-
-<Table domain="moon" />
-<Controls />
-
-The rows after `distance` are for rendering the Moon rather than locating it. The Moon always shows the same face,
-almost: tilted orbit and varying speed let us peek a few degrees around its edges over a month, the optical
-<Term of="Libration">libration</Term>, and the Moon's own slight wobble adds a few hundredths of a degree. The
-<Term of="Position angle of axis">position angle of the axis</Term> says how the Moon's north pole is oriented on the
-sky, and the <Term of="Parallactic angle">parallactic angle</Term> how that sky direction relates to your local "up".
-Together they determine how the Moon's surface, and its lit crescent, appear rotated for you.
-
-The last four rows light it. The <Term of="Phase angle">phase angle</Term>, the angle Sun-Moon-Earth, says how much of
-the lit half faces us, and the <Term of="Illuminated fraction">illuminated fraction</Term> turns that into what the
-phase looks like, from 0 at new moon to 1 at full moon <Cite id="meeus1998" />. For actual shading, a renderer wants
-the light direction itself: `sunDirection` points from the Moon's center to the Sun, in the same frame as every other
-direction here, east-north-up. It is not quite the Sun's direction as seen from Earth, since the Moon sits a few
-hundred thousand kilometers off to the side, but it is close.
-
-The night side is not entirely dark either. The Earth reflects sunlight too, and around new moon, when the Moon sees
-an almost full Earth, that <Term of="Earthshine">earthshine</Term> gives the unlit part of a thin crescent a faint,
-ashen glow. How strong it is follows from the Earth's phase as seen from the Moon <Cite id="vandehulst1980" />, scaled
-by the Earth's albedo <Cite id="jensen2001" />.
-
-<MoonView />
-<Controls />
-
-## Eclipses
-
-With both bodies located, eclipses come almost for free. A solar eclipse is a matter of perspective: the Moon passing
-in front of the Sun, which depends on where you stand. Stand on the line the Moon's shadow sweeps and the Sun goes out
-(total), or, with the Moon near apogee and too small to cover it, leaves a ring of light around the black disc
-(annular); a few hundred kilometers to the side the Moon only takes a bite out of it (partial). A lunar eclipse is
-the Moon passing through Earth's shadow, and it looks the same from anywhere the Moon is up: total once the whole
-disc is inside the umbra, partial while only part of it is, and penumbral, barely a dimming, when the Moon misses
-the umbra altogether. Both are summarized as a single
-<Term of="Eclipse phase">phase</Term> <Cite id="mueller2012vmv" />: 0 at the deepest point, 0.5 where a total or
-annular eclipse turns partial, 1 where the discs, or the Moon and the shadow, just touch, and above 1 when there is
-nothing to see. The fixed 0.5 boundary is what makes the phase usable as a texture coordinate for a shader.
-
-<Eclipse />
-<Controls />
-
-Most of the time there is nothing to see, hence the four buttons: they search the sky itself, forwards or backwards
-from the moment you are on, for the next eclipse, and jump to its maximum. Nothing is looked up. NASA's catalogs list
-every eclipse over five millennia <Cite id="espenak2006" /> <Cite id="espenak2009" />, but the search finds them from
-the positions alone: only a full moon can enter Earth's shadow and only a new moon can cross the Sun, so it needs to
-look closer only once a <Term of="Lunation">lunation</Term>. The solar search answers for the place you chose, which
-is why it often lands on a modest partial eclipse. How it works is shown [below](#code-examples).
-
-From the maximum, step the Julian Day by minutes and watch it unfold. The Moon darkens in the penumbra first, barely
-noticeable, then turns a dark red in the umbra, lit only by sunlight that Earth's atmosphere bends around the planet,
-its outer rim tinged blue by the ozone the light passes through. Tracing that light through the atmosphere gives the
-colors physically <Cite id="yapo2009" />, but far from real time. A renderer can approximate them from the eclipse's
-`phase` instead <Cite id="mueller2012vmv" />, a lookup coordinate from 0 at the center to 1 as the discs part; the table also
-lists the <Term of="Eclipse magnitude">magnitude</Term>, the number the catalogs give. The panel only hints at those
-colors; rendering them properly, along with the Moon's surface, is the job of [nachtgestirn](../nachtgestirn/).
-
-<Table domain="eclipse" />
-<Controls />
-
-## Precise or approximate?
-
-Every quantity comes in two variants. The **precise** one follows Jean Meeus' _Astronomical Algorithms_
-<Cite id="meeus1998" />, the standard reference for this kind of computation. The **approximate** one follows the
-night sky model of Jensen et al. <Cite id="jensen2001" />, with far fewer terms. The tables show the precise values;
-_approx_ in any table's heading switches all of them, and hovering an approximate value shows how far off it is.
-
-For most rendering, the approximation is plenty. Over a year, the Sun's approximate altitude stays within 0.002° of the
-precise one, invisible next to a disc half a degree wide. The Moon's can be off by almost a tenth of a degree, a fifth
-of its diameter: fine for a sky dome, not for an eclipse. That is what the precise variant is for, along with the exact
-moment of sunset or a telescope view. Both live behind the same names, so switching is a change of import path.
-
-```ts
-import { sun } from "@himmelszelt/sternzeit"; // precise
-import { sun as fast } from "@himmelszelt/sternzeit/approx"; // approximate
-```
-
-## Code examples
-
-`@himmelszelt/sternzeit` has no dependencies, touches neither the DOM nor the GPU, and runs anywhere JavaScript runs. It
-returns plain numbers, and it is up to you what to do with them. A CAD or architecture viewer with the correct
-light and shadows for a real site and hour. A sun study for a solar roof. A game whose day follows the player's real
-clock. A photo planner that knows when the full Moon rises behind a landmark. An augmented reality
-overlay that labels what is up there right now. A sundial, or the sky over a date in history. Here are five more
-ideas to start with, code included:
-
-**Light a scene.** The two directions a renderer wants, the ones
-[dunstkreis](../dunstkreis/) takes to light its atmosphere, are one call each, and the Moon's brightness comes with
-them: moonlight is sunlight, so the lit fraction of the disc is roughly how much of it there is.
-
-```ts
-import {
-    fromDate, julianEphemerisDay, moon, sun,
-} from "@himmelszelt/sternzeit";
-
-const time = fromDate(new Date());
-// Unit vectors in the observer's ENU frame: x east, y north, z up.
-// A y-up engine takes them as (x, z, -y).
-const observer = { latitude, longitude, heightM }; // heightM is optional
-const toSun = sun.direction(time, observer);
-const toMoon = moon.direction(time, observer);
-// Functions of a bare Julian Day take ephemeris time.
-const moonlight = moon.illuminatedFraction(julianEphemerisDay(time));
-```
-
-Shading the Moon itself is a different question, and an optional one: the light hitting it does not come from where
-the observer stands but from 384,000 km away, which `moon.sunDirection` accounts for. That vector, with the libration
-and the earthshine, is what [nachtgestirn](../nachtgestirn/) will want.
-
-**Find the golden hour.** There is no `sunrise()` function, and there does not need to be: sunrise is where the Sun's
-altitude crosses the horizon, so walking a day in one-minute steps finds it, and the same loop finds dusk, the blue
-hour, or any other threshold you care to render.
+With the Sun's altitude at hand, the library leaves out the conveniences on purpose: there is no `sunrise()`, and no
+`dawn()` or `dusk()` either. Each is just the moment the altitude crosses a threshold, so walking a day in one-minute
+steps finds all of them, the golden and the blue hour too, or any other threshold you care to render.
 
 ```ts
 import {
@@ -343,9 +233,69 @@ const [sunrise, sunset] = crossings(-0.833);
 const [dawn, dusk] = crossings(-6); // civil twilight
 ```
 
-**Draw the Moon the right way round.** A phase widget that only scales a crescent gets the tilt wrong: the lit side
-points at the Sun, which is rarely straight down. The position angle from the Moon to the Sun is the angle to rotate
-the crescent by, measured on the sky from north through east.
+Run for the chosen day, place and clock:
+
+<SunTimes />
+<Controls />
+
+## The Moon
+
+The Moon is the hard one. It is close, its orbit is tilted against Earth's by about 5°, and the Sun actually pulls on
+it about twice as hard as Earth does. Its position needs dozens of periodic correction terms, built from four
+fundamental angles: its <Term of="Mean anomaly">mean anomaly</Term>, its
+<Term of="Mean elongation">mean elongation</Term> from the Sun, its
+<Term of="Argument of latitude">mean argument of latitude</Term>, and the longitude of its
+<Term of="Longitude of the ascending node">ascending node</Term>, where its orbit crosses Earth's heading north.
+Being close also means a large <Term of="Parallax">parallax</Term>, which is why the topocentric correction matters
+most here.
+
+<Table domain="moon" />
+<Controls />
+
+The rows after `distance` are for rendering the Moon rather than locating it. The Moon always shows the same face,
+almost: tilted orbit and varying speed let us peek a few degrees around its edges over a month, the optical
+<Term of="Libration">libration</Term>, and the Moon's own slight wobble adds a few hundredths of a degree. The
+<Term of="Position angle of axis">position angle of the axis</Term> says how the Moon's north pole is oriented on the
+sky, and the <Term of="Parallactic angle">parallactic angle</Term> how that sky direction relates to your local "up".
+Together they determine how the Moon's surface, and its lit crescent, appear rotated for you.
+
+The last four rows light it. The <Term of="Phase angle">phase angle</Term>, the angle Sun-Moon-Earth, says how much of
+the lit half faces us, and the <Term of="Illuminated fraction">illuminated fraction</Term> turns that into what the
+phase looks like, from 0 at new moon to 1 at full moon <Cite id="meeus1998" />. For actual shading, a renderer wants
+the light direction itself: `sunDirection` points from the Moon's center to the Sun, in the same frame as every other
+direction here, east-north-up. It is not quite the Sun's direction as seen from Earth, since the Moon sits a few
+hundred thousand kilometers off to the side, but it is close.
+
+With both bodies located, lighting a scene takes little more. The two directions a renderer wants, the ones
+[dunstkreis](../dunstkreis/) takes to light its atmosphere, are one call each, and the Moon's brightness comes with
+them: moonlight is sunlight, so the lit fraction of the disc is roughly how much of it there is.
+
+```ts
+import {
+    fromDate, julianEphemerisDay, moon, sun,
+} from "@himmelszelt/sternzeit";
+
+const time = fromDate(new Date());
+// Unit vectors in the observer's ENU frame: x east, y north, z up.
+// Real-time rendering mostly puts y up: assign them as (x, z, -y).
+const observer = { latitude, longitude, heightM }; // heightM is optional
+const toSun = sun.direction(time, observer);
+const toMoon = moon.direction(time, observer);
+// Functions of a bare Julian Day take ephemeris time.
+const moonlight = moon.illuminatedFraction(julianEphemerisDay(time));
+```
+
+Shading the Moon itself is a different, optional question, and it takes `moon.sunDirection` from above rather than
+`toSun`: with the libration and the earthshine, that is what [nachtgestirn](../nachtgestirn/) will want.
+
+The night side is not entirely dark either. The Earth reflects sunlight too, and around new moon, when the Moon sees
+an almost full Earth, that <Term of="Earthshine">earthshine</Term> gives the unlit part of a thin crescent a faint,
+ashen glow. How strong it is follows from the Earth's phase as seen from the Moon <Cite id="vandehulst1980" />, scaled
+by the Earth's albedo <Cite id="jensen2001" />.
+
+Where the lit side faces is also where most drawings of the Moon go wrong. A phase widget that only scales a crescent
+gets its tilt wrong: the lit side points at the Sun, which is rarely straight down. The position angle from the Moon to
+the Sun is the angle to rotate the crescent by, measured on the sky from north through east.
 
 ```ts
 import {
@@ -374,12 +324,49 @@ point the lit side at least somewhat towards the horizon and you are right witho
 
 The other classic is the unlit part. It is not a hole: no star has ever shone through the Moon. What is faintly there
 instead is earthshine, sunlight that went to Earth and back, and it is one call away (`moon.earthshine`), which is how
-<Fig id="moon-view" /> above shades the Moon's night side.
+<Fig id="moon-view" /> below shades the Moon's night side.
 
-**Know when to bother.** Eclipses are rare enough that a renderer should not compute them every frame, and special
-enough to be worth a notification when one comes. This example finds the next total lunar eclipse: it steps from
-full moon to full moon, checks each one in coarse steps for whether the Moon gets near Earth's shadow at all, and only
-then walks it minute by minute. This is, give or take the search window, what the buttons under
+<MoonView />
+<Controls />
+
+## Eclipses
+
+With both bodies located, eclipses come almost for free. A solar eclipse is a matter of perspective: the Moon passing
+in front of the Sun, which depends on where you stand. Stand on the line the Moon's shadow sweeps and the Sun goes out
+(total), or, with the Moon near apogee and too small to cover it, leaves a ring of light around the black disc
+(annular); a few hundred kilometers to the side the Moon only takes a bite out of it (partial). A lunar eclipse is
+the Moon passing through Earth's shadow, and it looks the same from anywhere the Moon is up: total once the whole
+disc is inside the umbra, partial while only part of it is, and penumbral, barely a dimming, when the Moon misses
+the umbra altogether. Both are summarized as a single
+<Term of="Eclipse phase">phase</Term> <Cite id="mueller2012vmv" />: 0 at the deepest point, 0.5 where a total or
+annular eclipse turns partial, 1 where the discs, or the Moon and the shadow, just touch, and above 1 when there is
+nothing to see. The fixed 0.5 boundary is what makes the phase usable as a texture coordinate for a shader.
+
+<Eclipse />
+<Controls />
+
+Most of the time there is nothing to see, hence the four buttons: they search the sky itself, forwards or backwards
+from the moment you are on, for the next eclipse, and jump to its maximum. Nothing is looked up. NASA's catalogs list
+every eclipse over five millennia <Cite id="espenak2006" /> <Cite id="espenak2009" />, but the search finds them from
+the positions alone: only a full moon can enter Earth's shadow and only a new moon can cross the Sun, so it needs to
+look closer only once a <Term of="Lunation">lunation</Term>. The solar search answers for the place you chose, which
+is why it often lands on a modest partial eclipse. How it works is shown below.
+
+From the maximum, step the Julian Day by minutes and watch it unfold. The Moon darkens in the penumbra first, barely
+noticeable, then turns a dark red in the umbra, lit only by sunlight that Earth's atmosphere bends around the planet,
+its outer rim tinged blue by the ozone the light passes through. Tracing that light through the atmosphere gives the
+colors physically <Cite id="yapo2009" />, but far from real time. A renderer can approximate them from the eclipse's
+`phase` instead <Cite id="mueller2012vmv" />, a lookup coordinate from 0 at the center to 1 as the discs part; the table also
+lists the <Term of="Eclipse magnitude">magnitude</Term>, the number the catalogs give. The panel only hints at those
+colors; rendering them properly, along with the Moon's surface, is the job of [nachtgestirn](../nachtgestirn/).
+
+<Table domain="eclipse" />
+<Controls />
+
+Rare as they are, eclipses should not cost a renderer anything on every frame, yet they are special enough to be worth
+a notification when one comes. This example finds the next total lunar eclipse: it
+steps from full moon to full moon, checks each one in coarse steps for whether the Moon gets near Earth's shadow at
+all, and only then walks it minute by minute. This is, give or take the search window, what the buttons under
 <Fig id="eclipse-views" /> above do:
 
 ```ts
@@ -425,10 +412,12 @@ function nextTotalLunarEclipse(from: number): Date | null {
 const next = nextTotalLunarEclipse(julianDayUT(fromDate(new Date())));
 ```
 
-**Plan a night under the Moon.** A moon calendar shows the phase and little else: not which way the Moon is turned
-where you are, and not whether it is up while it is dark. Both are a few calls away. The discs are the Moon at the
-same time of day all month, turned as it stands in the sky there; the lanes say when it is up, and the Sun with it.
-How to draw them is up to you, so here they are two functions you bring yourself:
+## A month of Moons
+
+A moon calendar shows the phase and little else: not which way the Moon is turned where you are, and not whether it is
+up while it is dark. Both are a few calls away. The discs are the Moon at the same time of day all month, turned as it
+stands in the sky there; the lanes say when it is up, and the Sun with it. How to draw them is up to you, so here they
+are two functions you bring yourself:
 
 ```ts
 import {
@@ -474,8 +463,25 @@ Drawn, with the chosen moment's time of day and place:
 <MoonCalendar />
 <Controls />
 
-The same goes for the other libraries: the Moon's phase, libration, sun direction, and earthshine are what
-[nachtgestirn](../nachtgestirn/) shades the Moon with, sidereal time is what will turn the stars of
+## Precise or approximate?
+
+Every quantity comes in two variants. The **precise** one follows Jean Meeus' _Astronomical Algorithms_
+<Cite id="meeus1998" />, the standard reference for this kind of computation. The **approximate** one follows the
+night sky model of Jensen et al. <Cite id="jensen2001" />, with far fewer terms. The tables show the precise values;
+_approx_ in any table's heading switches all of them, and hovering an approximate value shows how far off it is.
+
+For most rendering, the approximation is plenty. Over a year, the Sun's approximate altitude stays within 0.002° of the
+precise one, invisible next to a disc half a degree wide. The Moon's can be off by almost a tenth of a degree, a fifth
+of its diameter: fine for a sky dome, not for an eclipse. That is what the precise variant is for, along with the exact
+moment of sunset or a telescope view. Both live behind the same names, so switching is a change of import path.
+
+```ts
+import { sun } from "@himmelszelt/sternzeit"; // precise
+import { sun as fast } from "@himmelszelt/sternzeit/approx"; // approximate
+```
+
+The other libraries take their numbers from here, whichever variant: the Moon's phase, libration, sun direction, and
+earthshine are what [nachtgestirn](../nachtgestirn/) shades the Moon with, sidereal time is what will turn the stars of
 [sternenheer](../sternenheer/), and the Sun's and the Moon's directions light the clouds of [gewoelk](../gewoelk/).
 
 ## The people behind the numbers

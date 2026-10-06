@@ -8,6 +8,7 @@ import "./sternzeit.css";
     <div class="calendar-head">
         <button type="button" class="view-toggle calendar-lock" data-field="lock" aria-pressed="false" title="Lock the calendar to the moment and place: it shows the moment's month, and neither the months nor the days can be picked" aria-label="Lock to the moment and place">
             <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="7.5" width="9" height="6.5" rx="1.2" /><path d="M5.5 7.5V5.5a2.5 2.5 0 0 1 5 0v2" /></svg>
+            <span class="calendar-lock-word">moment</span>
         </button>
         <div class="calendar-months">
             {/* Up to three months either side, as many as the width has room for. */}
