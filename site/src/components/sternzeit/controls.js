@@ -1,12 +1,13 @@
 import { fromDate, fromJulianDay, julianDayUT, toDate } from "@himmelszelt/sternzeit";
 import { julianDayNow, onChange, state, update } from "./state.js";
+import { clock } from "./zone.js";
 
 // Every set of controls on the page (see Controls.astro) is wired the same way: user input writes to the shared
 // state, and every state change is written back to all of them, so they always show the one moment and place.
 const roots = [...document.querySelectorAll(".moment")];
 const LATLONG_DECIMALS = 7;
 
-// jd is UT; shown in the viewer's own timezone.
+// jd is UT; shown in the viewer's own time zone or in the place's, as the clock toggle says.
 const dateOf = (jd) => toDate(fromJulianDay(jd));
 const julianDayOf = (date) => julianDayUT(fromDate(date));
 
@@ -26,9 +27,14 @@ function stepCalendar(jd, unit, sign) {
     return julianDayOf(date);
 }
 
+const formatClock = (options) => {
+    const { offset, text } = clock(dateOf(state.jd), options);
+    return `${text} ${offset}`;
+};
+
 // One-liner in every set's summary, so the current moment and place stay readable while it is folded.
 function formatSummary() {
-    const when = dateOf(state.jd).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "medium" });
+    const when = formatClock({ dateStyle: "medium", timeStyle: "medium" });
     const lat = `${Math.abs(state.latitude).toFixed(2)}° ${state.latitude >= 0 ? "N" : "S"}`;
     const lon = `${Math.abs(state.longitude).toFixed(2)}° ${state.longitude >= 0 ? "E" : "W"}`;
     return `${when}, ${lat} ${lon}, ${state.heightM}\u202fm${state.live ? ", live" : ""}`;
@@ -181,6 +187,8 @@ for (const root of roots) {
         }
     });
     // One button for both: while it is on the moment follows the clock, and switching it off leaves it at "now".
+    // Only how the clock reads changes, never the instant, so the sky stays where it is.
+    field("timeZone").addEventListener("change", (event) => update({ timeZone: event.target.value }, root));
     field("live").addEventListener("click", () => setLive(!state.live, root));
     field("animate").addEventListener("click", () => setAnimate(!state.animate, root, field("jdStep")));
     field("geolocate").addEventListener("click", () => {
@@ -228,6 +236,8 @@ function sync(source) {
         for (const button of root.querySelectorAll('.stepper:has([data-field="jd"]) [data-step]')) {
             button.disabled = driven;
         }
+        for (const choice of stepChoices(field("timeZone"))) choice.checked = choice.value === state.timeZone;
+        field("clock").textContent = `${clock(dateOf(state.jd)).name}, ${formatClock({ timeStyle: "medium" })}`;
         field("summary").textContent = formatSummary();
     }
 }

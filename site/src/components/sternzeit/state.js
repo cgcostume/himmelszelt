@@ -4,14 +4,22 @@ import { fromDate, julianDayUT, julianEphemerisDay } from "@himmelszelt/sternzei
  * The one moment and place the whole page shows. Every set of controls writes here, and the tables and the scene
  * read from here, so any number of controls on the page stay in sync by construction.
  */
-export const state = { jd: 0, latitude: 52.3920607, longitude: 13.0925765, heightM: 1, live: false, animate: false };
+export const state = {
+    jd: 0,
+    latitude: 52.3920607,
+    longitude: 13.0925765,
+    heightM: 1,
+    live: false,
+    animate: false,
+    timeZone: "yours",
+};
 
 const changes = new EventTarget();
 
 // The moment and place are kept in the browser, so the page opens where it was left, on any chapter. Only a
 // convenience: without storage, e.g. in a private window, it opens at the defaults.
 const STORAGE_KEY = "sternwarte:momentAndPlace";
-const STORED = ["jd", "latitude", "longitude", "heightM", "live"];
+const STORED = ["jd", "latitude", "longitude", "heightM", "live", "timeZone"];
 let saveTimer = null;
 
 function save() {
@@ -33,7 +41,13 @@ function restore() {
         if (!stored || typeof stored !== "object") return;
         for (const key of STORED) {
             const value = stored[key];
-            if (key === "live" ? typeof value === "boolean" : Number.isFinite(value)) state[key] = value;
+            const valid =
+                key === "live"
+                    ? typeof value === "boolean"
+                    : key === "timeZone"
+                      ? value === "local"
+                      : Number.isFinite(value);
+            if (valid) state[key] = value;
         }
         state.heightM = Math.min(Math.max(state.heightM, 1), 408_000);
     } catch {}

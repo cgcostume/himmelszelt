@@ -46,8 +46,18 @@
     margin-bottom: 1rem;
 }
 /* Placed by hand rather than by flow, since not every row fills all three columns. */
-.input-grid > label {
+.note {
+    color: var(--muted);
+}
+/* Labels and the notes of their button groups share one column, right-aligned, against the controls they name. */
+.input-grid > label,
+.input-grid > .note {
     grid-column: 1;
+    justify-self: end;
+}
+/* As large as the notes in the button rows they stand in front of. */
+.input-grid > .note {
+    font-size: var(--text-meta);
 }
 /* A minus and a plus around the input, so a value can be stepped by finger as well as by arrow key or wheel. The
    three are one control: no gaps, shared borders, rounded only on the outside. */
@@ -188,9 +198,6 @@
 .moment input[data-field="jd"],
 .moment input.latlong {
     width: 17ch;
-}
-.note {
-    color: var(--muted);
 }
 table {
     border-collapse: collapse;

@@ -1,4 +1,5 @@
 ---
+import glossary from "../../data/glossary.json";
 import "./sternzeit.css";
 
 interface Props {
@@ -54,6 +55,7 @@ const heightSteps = [
             <button type="button" data-field="live" aria-pressed="false">now</button>
             <button type="button" data-field="animate" aria-pressed="false" title="Step on by itself, thirty times a second">animate</button>
         </span>
+        <span class="note" aria-hidden="true">Step</span>
         <span class="input-grid-subrow">
             <span class="steps" role="radiogroup" aria-label="Julian Day step" data-field="jdStep">
                 {
@@ -71,6 +73,25 @@ const heightSteps = [
                     ))
                 }
             </span>
+        </span>
+
+        <span class="note" aria-hidden="true">Clock</span>
+        <span class="input-grid-subrow">
+            <span class="steps" role="radiogroup" aria-label="Time zone of the clock time" data-field="timeZone">
+                <label title="Your own time zone, as your browser has it">
+                    <input type="radio" name={`${uid}-time-zone`} value="yours" checked />
+                    <span>yours</span>
+                </label>
+                <label title={glossary["Local time"]}>
+                    <input type="radio" name={`${uid}-time-zone`} value="local" />
+                    <span>local</span>
+                </label>
+                <label title={glossary["Local mean time"]}>
+                    <input type="radio" name={`${uid}-time-zone`} value="mean" />
+                    <span>mean</span>
+                </label>
+            </span>
+            <span data-field="clock" class="note"></span>
         </span>
 
         <label for={`${uid}-latitude`}>Latitude</label>
@@ -93,6 +114,7 @@ const heightSteps = [
             <button type="button" data-step="1" aria-label="Longitude, one step forward">+</button>
         </span>
 
+        <span class="note" aria-hidden="true">Step</span>
         <span class="input-grid-subrow">
             <span class="steps" role="radiogroup" aria-label="Latitude and longitude step" data-field="latlongStep">
                 {
@@ -113,6 +135,7 @@ const heightSteps = [
             <input id={`${uid}-height`} data-field="height" class="latlong" type="number" min="1" max="408000" />
             <button type="button" data-step="1" aria-label="Height, one step forward">+</button>
         </span>
+        <span class="note" aria-hidden="true">Step</span>
         <span class="input-grid-subrow">
             <span class="steps" role="radiogroup" aria-label="Height step" data-field="heightStep">
                 {
