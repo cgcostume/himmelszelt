@@ -43,7 +43,7 @@ Sources are cited with `<Cite>` and listed at the end of each chapter (`site/src
 
 **sternzeit is the blueprint for every chapter.** The layout adds the name's meaning (from the glossary) under the
 title, the lead (the `summary`), a meta line (last updated, term hint), a TOC from three sections on, and after the content the short himmelszelt note before the references. The
-body follows: an interactive scene first ("Pick a moment and a place"), then the concepts building on each other,
+body follows: an interactive scene first, with the moment and place controls under it, still in the opening section, then the concepts building on each other,
 "Precise or approximate?" wherever both variants exist, and the references. There is no separate code examples section:
 each example sits in the section whose concepts it uses, led into from what the section just explained rather than by
 a bold heading or any other subsection, and one that runs has its output live below it; what the library can be used

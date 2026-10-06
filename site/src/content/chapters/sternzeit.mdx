@@ -32,17 +32,16 @@ import Term from "../../components/Term.astro";
 A sky can look right without any astronomy: for a mood, a game level or a film shot, the Sun and the Moon may stand
 wherever they serve the picture, and [dunstkreis](../dunstkreis/) lights its atmosphere by them all the same. A sky that
 is meant to be the real one, over a georeferenced site at a given hour, first has to know what the real sky looks like
-then. Where is the Sun? How high is the Moon, how large does it appear, which way is its crescent tilted? Is there an
-eclipse going on? None of this is guesswork, nor even hard: Jean Meeus wrote it all down as recipes
-<Cite id="meeus1998" />, and [SunCalc](https://github.com/mourner/suncalc),
-[astronomia](https://github.com/commenthol/astronomia) and [Astronomy Engine](https://github.com/cosinekitty/astronomy)
-compute it in JavaScript already. sternzeit adds what a renderer asks for on top: directions in its frame, the Moon's
-tilt, libration and earthshine, eclipses as a shader coordinate, and every quantity in a precise and a cheap variant.
+then. Where is the Sun? Is the Moon up, and how high? How large does it appear, which way is its crescent tilted? None
+of this is guesswork, nor even hard: Jean Meeus wrote it all down as recipes <Cite id="meeus1998" />, and libraries such
+as [SunCalc](https://github.com/mourner/suncalc), [astronomia](https://github.com/commenthol/astronomia) and [Astronomy
+Engine](https://github.com/cosinekitty/astronomy) compute it in JavaScript already. sternzeit is one more implementation
+of the same recipes, made for real-time rendering: directions in a renderer's frame, the Moon's tilt, libration and
+earthshine, and eclipses as a shader coordinate, all as plain, fast functions.
 
 This chapter goes through what the numbers mean, how they fit together, and what to do with them, from how astronomers
-count time to why the Moon seems to wobble. No background in astronomy is needed, only curiosity about the sky you
-want to render. Everything below is computed live, in your browser, by the library itself, with the code for it right
-beside the figures.
+count time to why the Moon seems to wobble. No background in astronomy is needed, only curiosity about the sky you want
+to render. Everything below is computed live, in your browser, by the library itself, with code examples along the way.
 
 `@himmelszelt/sternzeit` has no dependencies, touches neither the DOM nor the GPU, and runs anywhere JavaScript runs. It
 returns plain numbers, and what to do with them is up to you: give a CAD or architecture viewer the right light and
@@ -52,16 +51,15 @@ reality, or show the sky over a date in history. A few are worked out below, cod
 hour](#the-sun) for any day and place, a crescent [turned the right way](#the-moon), [the next eclipse](#eclipses), and
 [a moon calendar of your own](#a-month-of-moons).
 
+All of them start from the same three bodies. Earth, tilted and turning, is where we watch from
+(<Fig id="armillary-sphere" />), and its turning is what sweeps the sky around us once a day. It circles the Sun once a
+year, and the tilt makes the seasons of that year. The Moon circles Earth about once a month, lit by sunshine and,
+faintly, by earthshine. From the ground, the two discs almost match, as the Sun is about 400 times wider than the Moon
+and about 400 times farther away, a stroke of luck that will not last: the Moon drifts away by about 3.8 cm a year, and
+in some 600 million years it will be too small to ever cover the Sun again. We happen to live in the stretch of Earth's
+history in which the sky can go dark in the middle of the day.
+
 <Scene />
-
-Earth, tilted and turning, is where we watch from (<Fig id="armillary-sphere" />), and its turning is what sweeps the
-sky around us once a day. It circles the Sun once a year, and the tilt makes the seasons of that year. The Moon circles
-Earth about once a month, lit by sunshine and, faintly, by earthshine. From the ground, the two discs almost match, as
-the Sun is about 400 times wider than the Moon and about 400 times farther away, a stroke of luck that will not last:
-the Moon drifts away by about 3.8 cm a year, and in some 600 million years it will be too small to ever cover the Sun
-again. We happen to live in the stretch of Earth's history in which the sky can go dark in the middle of the day.
-
-## Pick a moment and a place
 
 <Controls open />
 
@@ -133,13 +131,13 @@ wants the latter. The rows are evaluated towards the Sun, so once it is more tha
 refraction shows as `n/a` and the line of sight simply ends in the ground, after 0 km at sea level and a little more
 from a mountain, whose horizon lies lower.
 
-The tilt and the vernal equinox are also what the sky's coordinates are built on. There are several coordinate
-systems, and each exists because one step of the computation is simplest in it.
-<Term of="Ecliptic coordinates">Ecliptic coordinates</Term> take the plane of Earth's orbit, the ecliptic
+The tilt and the vernal equinox are also what the sky's coordinates are built on. The equinox makes a natural zero: it
+is one of the two points where the equator and the ecliptic cross, so it lies on both, and the Sun marks it every March,
+no star needed. There are several coordinate systems, and each exists because one step of the computation is simplest in
+it. <Term of="Ecliptic coordinates">Ecliptic coordinates</Term> take the plane of Earth's orbit, the ecliptic
 (<Fig id="armillary-sphere" />), as their equator. The Sun never leaves it, and the Moon and the planets stay within a
 few degrees, so orbits are computed here: an ecliptic longitude counted from the vernal equinox, and a small latitude
-off the plane. The orbit itself is almost a circle, at an eccentricity of about 0.0167
-<Cite id="meeus1998" />.
+off the plane. The orbit itself is almost a circle, at an eccentricity of about 0.0167 <Cite id="meeus1998" />.
 
 <Term of="Equatorial coordinates">Equatorial coordinates</Term> take Earth's equator instead: right ascension along it,
 also counted from the vernal equinox, and declination north or south of it. This is the sky's own map, the one star
