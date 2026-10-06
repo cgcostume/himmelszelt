@@ -49,7 +49,8 @@ each example sits in the section whose concepts it uses, led into from what the 
 a bold heading or any other subsection, and one that runs has its output live below it; what the library can be used
 for at all opens the chapter. Leads are short and curious rather than feature lists, and never promise what a planned
 chapter does not have yet.
-Figures are numbered automatically; refer to one with `<Fig id="..." />`, never with a typed number.
+Figures are numbered automatically; refer to one with `<Fig id="..." />`, never with a typed number, and only in
+parentheses, as a reference after what it shows: "(Figure 2)", never "Figure 2 shows" or a sentence starting with it.
 
 Final showpiece: one comprehensive demo
 combining sun, moon, atmosphere, stars, clouds. Audience: developers who want to use the
