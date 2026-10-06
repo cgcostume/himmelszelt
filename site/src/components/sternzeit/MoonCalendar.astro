@@ -1,5 +1,4 @@
 ---
-import Term from "../Term.astro";
 import "./sternzeit.css";
 ---
 
@@ -7,10 +6,15 @@ import "./sternzeit.css";
     {/* The container the month buttons size by; not the figure, as a container scopes the counter that numbers it. */}
     <div class="calendar">
     <div class="calendar-head">
-        {/* Up to three months either side, as many as the width has room for. */}
-        {[-3, -2, -1].map((offset) => <button type="button" data-month={offset} class={`calendar-month-${-offset}`}></button>)}
-        <button type="button" class="calendar-title" data-field="title" aria-pressed="true"></button>
-        {[1, 2, 3].map((offset) => <button type="button" data-month={offset} class={`calendar-month-${offset}`}></button>)}
+        <button type="button" class="view-toggle calendar-lock" data-field="lock" aria-pressed="false" title="Lock the calendar to the moment and place: it shows the moment's month, and neither the months nor the days can be picked" aria-label="Lock to the moment and place">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="7.5" width="9" height="6.5" rx="1.2" /><path d="M5.5 7.5V5.5a2.5 2.5 0 0 1 5 0v2" /></svg>
+        </button>
+        <div class="calendar-months">
+            {/* Up to three months either side, as many as the width has room for. */}
+            {[-3, -2, -1].map((offset) => <button type="button" data-month={offset} class={`calendar-month-${-offset}`}></button>)}
+            <button type="button" class="calendar-title" data-field="title" aria-pressed="true"></button>
+            {[1, 2, 3].map((offset) => <button type="button" data-month={offset} class={`calendar-month-${offset}`}></button>)}
+        </div>
     </div>
     <div class="calendar-weekdays" aria-hidden="true"></div>
     <div class="calendar-weeks" data-field="weeks"></div>
@@ -24,14 +28,11 @@ import "./sternzeit.css";
         </defs>
     </svg>
     <figcaption class="figure-caption">
-        A month of Moons at the chosen place, each day at the chosen time of day on the chosen clock, as seen there:
-        the phase, the night side in <Term of="Earthshine">earthshine</Term>, the Moon's equator and prime meridian
-        shifted by the <Term of="Libration">libration</Term>, and all of it turned towards the zenith by the{" "}
-        <Term of="Parallactic angle">parallactic angle</Term>. Beside the date, where it stands then: its compass point and, after the arrow, its altitude above the horizon. Hatched, it is below the horizon. Under each
-        week, from midnight to midnight, the Moon above the horizon (top lane, yellow while low, where the long path
-        through the air reddens it) and the Sun (bottom lane, fading out through civil twilight); the ticks mark the
-        chosen time. Hover a day for its moonrise, moonset and highest point, click it to
-        make it the page's moment, with Ctrl (Cmd on a Mac) to turn to its month too.
+        The Moon on every day of a month at the chosen time of day, as it stands in the sky at the chosen place: beside
+        the date its compass point and, after the arrow, its altitude, hatched while it is below the horizon. Under each
+        week, midnight to midnight, when the Moon is up (yellow while low) and the Sun (fading through civil twilight);
+        the ticks mark the time of day. Hover or tap a day for its moonrise and moonset; a click makes it the moment, a
+        double click turns the calendar to its month too. The lock keeps the calendar on the moment's month.
     </figcaption>
 </figure>
 

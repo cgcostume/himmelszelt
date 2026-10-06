@@ -747,7 +747,8 @@ figure[id] {
     color: var(--accent);
 }
 .svg-download svg,
-.icon-button svg {
+.icon-button svg,
+.calendar-lock svg {
     width: 14px;
     height: 14px;
     fill: none;
@@ -808,6 +809,7 @@ figure[id] {
 .moon-calendar {
     /* The Moon low in the sky, yellowed by the long path through the air. */
     --moon-low: hsl(36 80% 62%);
+    --calendar-lanes-height: 10px;
     margin: 1.5rem 0;
 }
 /* Set off from its caption by the same gap as the moon view. */
@@ -817,34 +819,47 @@ figure[id] {
 }
 .calendar-head {
     display: flex;
-    gap: 0.4rem;
-    justify-content: center;
-    align-items: baseline;
+    gap: 0.3rem;
+    align-items: center;
     margin-bottom: 0.75rem;
+}
+.calendar-months {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.3rem;
+}
+/* A view toggle like the moon view's, but in the row rather than over the figure, and a padlock rather than a word. */
+.calendar-head > .calendar-lock {
+    position: static;
+    display: grid;
+    place-items: center;
+    width: 1.65rem;
+    padding: 0;
 }
 /* The shown month, a button like its neighbors, picked out the way a chosen step is. */
 .calendar-title[aria-pressed="true"] {
     color: var(--accent);
     cursor: default;
 }
-/* The farther months only where there is room for them. */
-@container (max-width: 42rem) {
+/* The farther months only where there is room for them, measured around a turn of the year, the widest case. */
+@container (max-width: 42.75rem) {
     .calendar-month-3 {
         display: none;
     }
 }
-@container (max-width: 34rem) {
+@container (max-width: 33.5rem) {
     .calendar-month-2 {
         display: none;
     }
-    /* Room for a compass point and an altitude under the day. */
-    .calendar .calendar-day {
-        padding: 0.2rem 0.1rem;
+    /* As small as the controls on a narrow screen, so a month either side still fits beside the lock. */
+    .calendar-head button {
+        font-size: var(--text-small);
     }
+    /* No room for where the Moon stands beside the day; the tooltip still says it. */
     .calendar .calendar-where {
-        flex-basis: 100%;
-        flex-direction: column;
-        align-items: flex-start;
+        display: none;
     }
 }
 .calendar-weekdays,
@@ -862,25 +877,41 @@ figure[id] {
 }
 /* A button like any other on the page, only without its fixed height and, until hovered, its outline. */
 .calendar-day {
+    display: flex;
+    flex-direction: column;
+    aspect-ratio: 1;
     height: auto;
     padding: 0.2rem 0.45rem;
     border-color: transparent;
     background: none;
     color: var(--muted);
+    cursor: pointer;
+    /* A double tap turns the month rather than zooming the page. */
+    touch-action: manipulation;
+}
+/* Not underlined or recolored like a glossary term in the text: only its tip is borrowed. */
+.calendar-day.term,
+.calendar-day.term:hover {
+    color: var(--muted);
+    text-decoration: none;
+}
+/* Locked, the days only show: no hand cursor promising a pick. */
+.moon-calendar[data-locked] .calendar-day {
+    cursor: default;
 }
 .calendar-day[aria-current="date"] {
     background: var(--surface);
 }
+/* The disc takes what the square leaves under the date. */
 .calendar-day svg {
     display: block;
+    flex: 1;
+    min-height: 0;
     width: 100%;
-    max-width: 3.25rem;
-    margin: 0 auto;
 }
-/* The day and where the Moon stands, beside it or, on a narrow screen, on a line of its own. */
+/* The day and, beside it, where the Moon stands. */
 .calendar-date {
     display: flex;
-    flex-wrap: wrap;
     justify-content: space-between;
     gap: 0.25rem;
     font-size: var(--text-small);
@@ -898,7 +929,7 @@ figure[id] {
     color: var(--accent);
 }
 /* The neighboring months' days, clearly fainter than a Moon below the horizon, so the two are not mistaken. */
-.calendar-other {
+.calendar-other > :not(.term-tip) {
     opacity: 0.15;
 }
 .calendar-moon-below {
@@ -916,7 +947,11 @@ figure[id] {
     grid-column: 1 / -1;
     display: block;
     width: 100%;
-    height: 10px;
+    height: var(--calendar-lanes-height);
+}
+/* A day's tip opens below its week's lanes, not over them: they are half of what it is about. */
+.calendar-day .term-tip {
+    top: calc(100% + var(--calendar-lanes-height) + 0.4rem);
 }
 .calendar-lane-below {
     fill: var(--line);
@@ -1073,34 +1108,45 @@ figure[id] {
         bottom: auto;
         left: auto;
     }
-    /* One column: the label goes above its field rather than beside it, which leaves the field its full width even
-       with a second button (now, the location pin) beside the two steppers. */
+    /* Two columns, labels and notes right-aligned in the first as on a wide screen: a field stays on the line of its
+       label, and what does not fit beside it (now, animate) wraps under it. */
     .input-grid {
-        grid-template-columns: 1fr;
-        gap: 0.3rem;
+        grid-template-columns: max-content 1fr;
+        gap: 0.3rem 0.4rem;
     }
-    .input-grid > label,
-    .input-grid-extra,
-    .input-grid-subrow,
+    .input-grid-extra {
+        grid-column: 1 / -1;
+    }
+    .stepper,
+    .input-grid-subrow {
+        grid-column: 2;
+    }
     .stepper {
-        grid-column: 1;
+        flex-wrap: wrap;
+        row-gap: 0.3rem;
     }
+    /* Room for -179.9999999, no more. */
+    .moment input.latlong {
+        width: 13ch;
+    }
+    /* As small as the notes and the step buttons beside them, so the fields and their steps read as one block; the
+       labels keep the text's color, the notes stay quiet. Inputs sized in ch narrow with their text. */
     .input-grid > label {
-        margin-top: 0.4rem;
+        font-size: var(--text-meta);
     }
-    /* Bigger targets for a finger; the field between them grows with them, so the row stays one block. */
     .stepper button,
     .stepper input {
-        height: 2rem;
+        height: 1.75rem;
+        font-size: var(--text-small);
     }
     .stepper > button[data-step],
     .stepper > button[data-field="geolocate"] {
-        width: 2.4rem;
+        width: 2rem;
     }
-    /* Taller for a finger, but narrow enough that the seven Julian Day steps stay one unbroken row. */
+    /* Taller for a finger, but narrow enough that the seven Julian Day steps stay one unbroken row beside their note. */
     .steps label span,
     .steps-heading {
-        padding: 0.3rem 0.45rem;
+        padding: 0.3rem 0.2rem;
     }
     /* The same size and marker as the moment-and-place summary it sits next to, so both folds match. */
     .table-fold > summary {

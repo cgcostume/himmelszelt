@@ -58,10 +58,9 @@ function signed(ms) {
     return `${ms < 0 ? "\u2212" : "+"}${[hours, ...rest.map((n) => String(n).padStart(2, "0"))].join(":")}`;
 }
 
-/** The page's clock: its zone's name and offset, and `date` formatted on it with the given Intl options. */
+/** The page's clock: its offset from UT, and `date` formatted on it with the given Intl options. */
 export function clock(date, options) {
     const offset = clockOffsetMs(date);
-    const name = state.timeZone === "mean" ? "local mean time" : state.timeZone === "local" ? localZone() : yourZone;
     const text = new Date(date.getTime() + offset).toLocaleString("en-GB", { ...options, timeZone: "UTC" });
-    return { name, offset: `UTC${signed(offset)}`, text };
+    return { offset: `UTC${signed(offset)}`, text };
 }

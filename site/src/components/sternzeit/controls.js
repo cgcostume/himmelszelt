@@ -237,7 +237,6 @@ function sync(source) {
             button.disabled = driven;
         }
         for (const choice of stepChoices(field("timeZone"))) choice.checked = choice.value === state.timeZone;
-        field("clock").textContent = `${clock(dateOf(state.jd)).name}, ${formatClock({ timeStyle: "medium" })}`;
         field("summary").textContent = formatSummary();
     }
 }

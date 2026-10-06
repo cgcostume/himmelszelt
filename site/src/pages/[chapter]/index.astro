@@ -23,7 +23,7 @@ const updated = formatUpdated(lastUpdated(chapter.filePath ?? ""));
 ---
 
 <Base title={`${chapter.data.package}: ${chapter.data.summary}`} description={chapter.data.summary}>
-    <h1 class="mono"><span class="scope">{scope}</span>{chapter.data.title}</h1>
+    <h1 class="mono"><span class="scope">{scope}</span><wbr />{chapter.data.title}</h1>
     <p class="etymology"><strong>{name.term}</strong>: <Fragment set:html={name.html} /></p>
     <p class="lead">{chapter.data.summary}</p>
     <p class="page-meta">

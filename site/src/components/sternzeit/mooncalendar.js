@@ -26,6 +26,9 @@ const figure = document.querySelector(".moon-calendar");
 const weeksEl = figure.querySelector('[data-field="weeks"]');
 const titleEl = figure.querySelector('[data-field="title"]');
 const monthButtons = [...figure.querySelectorAll("[data-month]")];
+const lockButton = figure.querySelector('[data-field="lock"]');
+// Locked, the calendar shows the moment's month and follows it; neither months nor days can be picked.
+let locked = false;
 
 const f = (n) => n.toFixed(2);
 const timeOf = (ms) => precise.fromDate(new Date(ms));
@@ -45,10 +48,11 @@ function instantOf(wallMs) {
 
 const pageMs = () => precise.toDate(precise.fromJulianDay(state.jd)).getTime();
 // The month shown, as year and month on the page's clock; it starts at the page's moment and then keeps to itself.
-let shown = (() => {
+function pageMonth() {
     const date = new Date(wallDayOf(pageMs()) * DAY_MS);
     return { year: date.getUTCFullYear(), month: date.getUTCMonth() };
-})();
+}
+let shown = pageMonth();
 
 /** The days the grid shows: whole weeks from Monday, around the shown month. */
 function gridDays() {
@@ -157,7 +161,8 @@ function disc(ms) {
 
 const clockTime = (ms) => (ms === null ? "none" : clock(new Date(ms), { timeStyle: "short" }).text);
 
-function describe(wallDay, lanes, moon) {
+/** What a day's tip says, as plain text for screen readers and as the tip's HTML: where the Moon is, and when it is up. */
+function describe(wallDay, lanes, moon, at) {
     const date = new Date(wallDay * DAY_MS).toLocaleDateString("en-GB", {
         weekday: "short",
         day: "numeric",
@@ -165,12 +170,25 @@ function describe(wallDay, lanes, moon) {
         timeZone: "UTC",
     });
     const { rise, set, transit, transitAltitude } = lanes.events;
-    const highest =
-        transit === null || transitAltitude <= RISE_ALTITUDE
-            ? ""
-            : `, highest ${clockTime(transit)} at ${transitAltitude.toFixed(0)}°`;
+    // In the order they happen: the Moon may well set in the morning and rise again in the evening of the same day.
+    const events = [
+        [rise, `moonrise ${clockTime(rise)}`],
+        [
+            transitAltitude > RISE_ALTITUDE ? transit : null,
+            `highest ${clockTime(transit)} at ${transitAltitude?.toFixed(0)}°`,
+        ],
+        [set, `moonset ${clockTime(set)}`],
+    ]
+        .filter(([ms]) => ms !== null)
+        .sort(([a], [b]) => a - b)
+        .map(([, text]) => text);
     const where = moon.below ? "below the horizon" : `${moon.altitude.toFixed(0)}° up in the ${moon.direction}`;
-    return `${date}: moonrise ${clockTime(rise)}, moonset ${clockTime(set)}${highest}; ${Math.round(moon.lit * 100)}% lit, ${where} at the chosen time`;
+    const now = `${where}, ${Math.round(moon.lit * 100)}% lit`;
+    const day = events.length ? events.join(", ") : "no moonrise or moonset";
+    return {
+        label: `${date}, at ${clockTime(at)}: ${now}; ${day}`,
+        html: `<strong>${date}</strong>, at ${clockTime(at)}: ${now}<span class="tip-note">${day[0].toUpperCase()}${day.slice(1)}</span>`,
+    };
 }
 
 let lanesKey = "";
@@ -180,6 +198,7 @@ let pending = false;
 
 function render() {
     pending = false;
+    if (locked) shown = pageMonth();
     const days = gridDays();
     const key = [shown.year, shown.month, state.latitude, state.longitude, state.heightM, state.timeZone].join();
     if (key !== lanesKey) {
@@ -202,12 +221,14 @@ function render() {
             const at = instantOf(day * DAY_MS + timeOfDay);
             const moon = disc(at);
             const dayLanes = lanesByDay.get(day);
-            const label = describe(day, dayLanes, moon);
-            const classes = `calendar-day${other ? " calendar-other" : ""}`;
+            const tip = describe(day, dayLanes, moon, at);
+            // A term like the glossary's, so its tip opens on hover, focus, and on a tap, which a touch screen needs.
+            const classes = `calendar-day term${other ? " calendar-other" : ""}`;
             const current = day === pageDay ? ' aria-current="date"' : "";
-            cells += `<button type="button" class="${classes}" data-day="${day}" data-at="${at}" title="${label}" aria-label="${label}"${current}>
-                <span class="calendar-date">${String(date.getUTCDate()).padStart(2, "0")}<span class="calendar-where">${moon.below ? "<span>\u00a0</span><span>\u00a0</span>" : `<span>${moon.direction}</span><span>\u2191${moon.altitude.toFixed(0)}°</span>`}</span></span>
-                <svg viewBox="-20 -20 40 40" aria-hidden="true">${moon.svg}</svg></button>`;
+            cells += `<button type="button" class="${classes}" data-day="${day}" data-at="${at}" aria-label="${tip.label}"${current}>
+                <span class="calendar-date">${String(date.getUTCDate()).padStart(2, "0")}<span class="calendar-where">${moon.below ? "" : `<span>${moon.direction}</span><span>\u2191${moon.altitude.toFixed(0)}°</span>`}</span></span>
+                <svg viewBox="-20 -20 40 40" aria-hidden="true">${moon.svg}</svg>
+                <span class="term-tip" aria-hidden="true">${tip.html}</span></button>`;
 
             const x0 = column * SAMPLES_PER_DAY;
             lanes += laneRuns(dayLanes.moonLevels, 0, "calendar-lane-moon", x0);
@@ -219,7 +240,15 @@ function render() {
         html += `<div class="calendar-week">${cells}
             <svg class="calendar-lanes" viewBox="0 -2 ${7 * SAMPLES_PER_DAY} ${LANES_HEIGHT + 3}" preserveAspectRatio="none" aria-hidden="true">${lanes}</svg></div>`;
     }
+    // Redrawn on every change, a tapped day included: its tip stays open across the redraw, where it was.
+    const open = weeksEl.querySelector("[data-tip-open]");
+    const shift = open?.querySelector(".term-tip").style.getPropertyValue("--tip-shift");
     weeksEl.innerHTML = html;
+    const reopened = open && weeksEl.querySelector(`[data-day="${open.dataset.day}"]`);
+    if (reopened) {
+        reopened.setAttribute("data-tip-open", "");
+        reopened.querySelector(".term-tip").style.setProperty("--tip-shift", shift);
+    }
 
     const monthName = (offset, options) =>
         new Date(Date.UTC(shown.year, shown.month + offset, 1)).toLocaleDateString("en-GB", {
@@ -235,6 +264,7 @@ function render() {
         const boundary = month === (offset > 0 ? 0 : 11);
         button.textContent = monthName(offset, { month: "long", ...(boundary ? { year: "numeric" } : {}) });
         button.setAttribute("aria-label", monthName(offset, { month: "long", year: "numeric" }));
+        button.disabled = locked;
     }
 }
 
@@ -245,6 +275,13 @@ function schedule() {
     requestAnimationFrame(render);
 }
 
+lockButton.addEventListener("click", () => {
+    locked = !locked;
+    lockButton.setAttribute("aria-pressed", String(locked));
+    figure.toggleAttribute("data-locked", locked);
+    schedule();
+});
+
 for (const button of monthButtons) {
     button.addEventListener("click", () => {
         const date = new Date(Date.UTC(shown.year, shown.month + Number(button.dataset.month), 1));
@@ -253,12 +290,17 @@ for (const button of monthButtons) {
     });
 }
 
-// A day sets the page's moment to that day, at the same time of day. With Ctrl, or Cmd on a Mac, where Ctrl+click opens
-// the context menu, the calendar turns to that day's month as well.
+// A day sets the page's moment to that day, at the same time of day; a second click or tap on it soon after turns the
+// calendar to that day's month as well. Counted here rather than left to dblclick, as the first click redraws the
+// calendar and the second lands on a new element.
+const DOUBLE_CLICK_MS = 500;
+let lastClick = { day: null, time: 0 };
 weeksEl.addEventListener("click", (event) => {
     const day = event.target.closest(".calendar-day");
-    if (!day) return;
-    if (event.ctrlKey || event.metaKey) {
+    if (!day || locked) return;
+    const double = lastClick.day === day.dataset.day && event.timeStamp - lastClick.time < DOUBLE_CLICK_MS;
+    lastClick = double ? { day: null, time: 0 } : { day: day.dataset.day, time: event.timeStamp };
+    if (double) {
         const date = new Date(Number(day.dataset.day) * DAY_MS);
         shown = { year: date.getUTCFullYear(), month: date.getUTCMonth() };
     }
