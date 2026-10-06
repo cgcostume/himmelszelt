@@ -50,6 +50,14 @@ body {
     font-weight: 300;
     line-height: 1.7;
 }
+/* No word left alone on the last line of a paragraph, a caption or a list item, at any width: the browser balances the
+   last lines instead. Where it is not supported, text simply wraps as before. */
+p,
+li,
+figcaption,
+.term-tip {
+    text-wrap: pretty;
+}
 a {
     color: var(--accent);
     text-decoration: none;
