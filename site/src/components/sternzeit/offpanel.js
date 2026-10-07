@@ -1,5 +1,5 @@
 // The indicator for a body outside a panel, shared by every figure so it looks the same everywhere: an arrow at the
-// panel's edge pointing towards the body, its tail marked like the body (a ring for the Sun, a disc for the Moon).
+// panel's edge pointing towards the body, its tail a disc colored like the body (white for the Sun, muted for the Moon).
 // Sizes are screen pixels; each figure passes how many of its own units one pixel is.
 const INSET_PX = 10;
 const LENGTH_PX = 12;
@@ -27,6 +27,17 @@ export function offPanelArrowFromCenter(direction, half, unitsPerPx) {
     const [ux, uy] = [direction.x / length, direction.y / length];
     const reach = (half - INSET_PX * unitsPerPx) / Math.max(Math.abs(ux), Math.abs(uy));
     return arrow({ x: ux * reach, y: uy * reach }, ux, uy, unitsPerPx);
+}
+
+/**
+ * The arrow along `direction` around a symbol at `center`, centered on a circle of `radius` panel units around it: for a
+ * body off the panel of a view that keeps the other one at its center.
+ */
+export function arrowAround(center, direction, radius, unitsPerPx) {
+    const length = Math.hypot(direction.x, direction.y) || 1;
+    const [ux, uy] = [direction.x / length, direction.y / length];
+    const reach = radius + ((LENGTH_PX + TAIL_GAP_PX + TAIL_DIAMETER_PX / 2) / 2) * unitsPerPx;
+    return arrow({ x: center.x + ux * reach, y: center.y + uy * reach }, ux, uy, unitsPerPx);
 }
 
 function arrow(tip, ux, uy, unitsPerPx) {

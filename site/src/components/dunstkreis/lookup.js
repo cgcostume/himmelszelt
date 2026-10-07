@@ -28,8 +28,8 @@ const COMPASS_RING = 24;
 const COMPASS_LABEL_GAP_PX = 14;
 const DRAG_RADIANS_PER_PX = 0.008;
 
-const INK = cssColor("--text", "#d6dae3");
-const MUTED = cssColor("--muted", "#8a92a3");
+const INK = cssColor("--text", "#c5c9d2");
+const MUTED = cssColor("--muted", "#808899");
 const color = (name) => getComputedStyle(root).getPropertyValue(`--lookup-${name}`).trim();
 
 let zoom = 1;

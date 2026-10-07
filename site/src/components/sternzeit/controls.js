@@ -169,11 +169,14 @@ for (const root of roots) {
         height.value = Math.min(Number(height.max), Math.max(Number(height.min), Number(height.value) || 0));
         update({ heightM: Number(height.value) }, root);
     };
-    wireStepping(height, field("heightStep"), commitHeight, 0);
+    // Not every set offers the height (see Controls.astro).
+    if (height) {
+        wireStepping(height, field("heightStep"), commitHeight, 0);
+        height.addEventListener("change", commitHeight);
+    }
     jd.addEventListener("input", commitJd);
     latitude.addEventListener("input", commitLatLong);
     longitude.addEventListener("input", commitLatLong);
-    height.addEventListener("change", commitHeight);
 
     field("copy").addEventListener("click", async (event) => {
         // It sits inside the summary line, where a click would otherwise fold the set open or shut.
@@ -227,7 +230,7 @@ function sync(source) {
         set(field("jd"), state.jd);
         set(field("latitude"), state.latitude);
         set(field("longitude"), state.longitude);
-        set(field("height"), state.heightM);
+        if (field("height")) set(field("height"), state.heightM);
         field("live").setAttribute("aria-pressed", String(state.live));
         field("animate").setAttribute("aria-pressed", String(state.animate));
         // Nothing to set or step by hand while the clock or the animation is driving it.

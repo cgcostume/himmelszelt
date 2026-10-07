@@ -2,6 +2,7 @@
 import { getCollection, render } from "astro:content";
 import About from "../../components/About.astro";
 import Fig from "../../components/Fig.astro";
+import Tab from "../../components/Tab.astro";
 import References from "../../components/References.astro";
 import Term from "../../components/Term.astro";
 import Toc from "../../components/Toc.astro";
@@ -39,7 +40,7 @@ const updated = formatUpdated(lastUpdated(chapter.filePath ?? ""));
         ) : (
             <>
                 <Toc sections={sections} />
-                <Content components={{ Fig }} />
+                <Content components={{ Fig, Tab }} />
                 <About />
                 <References chapter={chapter.id} body={chapter.body ?? ""} />
             </>

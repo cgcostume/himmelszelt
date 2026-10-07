@@ -352,11 +352,11 @@ function renderDomain(domainName, jd, open) {
     const names = [...new Set([...Object.keys(preciseNs), ...Object.keys(approxNs)])];
     const rows = computeRows(names, preciseNs, approxNs, jd);
 
-    // Foldable, because on a phone a table of this length is a wall to scroll past; open unless the cards are showing.
+    // Folded until asked for, because a table of this length is a wall to scroll past in the middle of the text.
     // The cards have no heading row, so the variant toggle sits above them instead.
     return `
         <details class="table-fold"${open ? " open" : ""}>
-            <summary>${label} <span class="note">${rows.length} values</span></summary>
+            <summary><span class="table-caption"></span>${label} <span class="note">${rows.length} values</span></summary>
             <p class="table-note note">Values: ${variantToggle()}</p>
             <table>
                 <colgroup><col class="name" /><col class="unit" /><col class="value" /></colgroup>
@@ -369,8 +369,6 @@ function renderDomain(domainName, jd, open) {
 
 // One container per domain, placed wherever the chapter text discusses it (see Table.astro).
 const tableContainers = document.querySelectorAll(".sternzeit-table[data-domain]");
-// Below this the rows are stacked as cards (see sternzeit.css), so the tables start folded.
-const cards = matchMedia("(max-width: 48rem)");
 
 // The set of controls the chapter places right after a table (see the .mdx); a script tag may sit in between.
 function controlsAfter(container) {
@@ -384,14 +382,14 @@ function controlsAfter(container) {
 function syncControls(container) {
     const controls = controlsAfter(container);
     const fold = container.querySelector(".table-fold");
-    if (controls) controls.hidden = Boolean(fold && cards.matches && !fold.open);
+    if (controls) controls.hidden = Boolean(fold && !fold.open);
 }
 
 function render() {
     for (const container of tableContainers) {
         // Rerendered on every change, so whether the reader folded it open is carried over by hand.
         const fold = container.querySelector(".table-fold");
-        const open = fold ? fold.open : !cards.matches;
+        const open = fold ? fold.open : location.hash === `#${container.id}`;
         container.innerHTML = renderDomain(container.dataset.domain, state.jd, open);
         syncControls(container);
     }
@@ -410,9 +408,4 @@ for (const container of tableContainers) {
 }
 
 onChange(render);
-// Crossing the breakpoint decides afresh: folded where the cards take over, open where the table fits.
-cards.addEventListener("change", () => {
-    for (const container of tableContainers) container.innerHTML = "";
-    render();
-});
 render();

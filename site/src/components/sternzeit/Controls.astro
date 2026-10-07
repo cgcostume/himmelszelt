@@ -5,8 +5,10 @@ import "./sternzeit.css";
 interface Props {
     /** Starts unfolded; folded sets show just a one-line summary of the current moment and place. */
     open?: boolean;
+    /** Offers the observer's height, for where it matters; it stays part of the moment and place either way. */
+    height?: boolean;
 }
-const { open = false } = Astro.props;
+const { open = false, height = true } = Astro.props;
 // Unique per instance, so every label still points at its own input when a page has several sets of controls.
 const uid = `moment-${Math.random().toString(36).slice(2, 8)}`;
 // The step sizes of each field, as a group of radio buttons: one tap on a touch screen, and the current one stays visible.
@@ -128,25 +130,31 @@ const heightSteps = [
             <span data-field="location" class="note"></span>
         </span>
 
-        <label for={`${uid}-height`}>Height</label>
-        <span class="stepper">
-            <button type="button" data-step="-1" aria-label="Height, one step back">&#8722;</button>
-            <input id={`${uid}-height`} data-field="height" class="latlong" type="number" min="1" max="408000" />
-            <button type="button" data-step="1" aria-label="Height, one step forward">+</button>
-        </span>
-        <span class="note" aria-hidden="true">Step</span>
-        <span class="input-grid-subrow">
-            <span class="steps" role="radiogroup" aria-label="Height step" data-field="heightStep">
-                {
-                    heightSteps.map((step) => (
-                        <label>
-                            <input type="radio" name={`${uid}-height-step`} value={step.value} checked={step.checked} />
-                            <span>{step.label}</span>
-                        </label>
-                    ))
-                }
-            </span>
-        </span>
+        {
+            height && (
+                <>
+                    <label for={`${uid}-height`}>Height</label>
+                    <span class="stepper">
+                        <button type="button" data-step="-1" aria-label="Height, one step back">&#8722;</button>
+                        <input id={`${uid}-height`} data-field="height" class="latlong" type="number" min="1" max="408000" />
+                        <button type="button" data-step="1" aria-label="Height, one step forward">+</button>
+                    </span>
+                    <span class="note" aria-hidden="true">Step</span>
+                    <span class="input-grid-subrow">
+                        <span class="steps" role="radiogroup" aria-label="Height step" data-field="heightStep">
+                            {
+                                heightSteps.map((step) => (
+                                    <label>
+                                        <input type="radio" name={`${uid}-height-step`} value={step.value} checked={step.checked} />
+                                        <span>{step.label}</span>
+                                    </label>
+                                ))
+                            }
+                        </span>
+                    </span>
+                </>
+            )
+        }
     </div>
 </details>
 

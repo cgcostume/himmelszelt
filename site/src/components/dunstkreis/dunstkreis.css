@@ -332,31 +332,9 @@
 .lut-call .code-block {
     margin: 0 0 0.6rem;
 }
-/* A panel's settings under its result, folded by default and drawn like the moment and place, a rule down the left and
-   a line saying what they are, but a class of its own: sternzeit's controls take every .moment for theirs. */
+/* A panel's settings under its result, folded by default (see .fold). */
 .lut-fold {
-    margin: 0.5rem 0 0 -0.9rem;
-    padding-left: 0.9rem;
-    border-left: 2px solid var(--accent);
-}
-.lut-fold > summary {
-    cursor: pointer;
-    list-style: none;
-}
-.lut-fold > summary::-webkit-details-marker {
-    display: none;
-}
-.lut-fold > summary::before {
-    content: "+";
-    display: inline-block;
-    width: 1.2em;
-    color: var(--muted);
-}
-.lut-fold[open] > summary::before {
-    content: "\2212";
-}
-.lut-fold[open] > summary {
-    margin-bottom: 0.5rem;
+    margin-top: 0.5rem;
 }
 .lut-fold .lut-controls:last-child {
     margin-bottom: 0;

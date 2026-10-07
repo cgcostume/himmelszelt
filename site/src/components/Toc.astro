@@ -1,24 +1,25 @@
 ---
-/** The chapter's sections as one line under its lead, for chapters long enough to need one. */
+/** The chapter's sections, folded under the lead like the moment and place, for chapters long enough to need them. */
 interface Props {
     sections: { slug: string; text: string }[];
 }
 const { sections } = Astro.props;
+const entries = [...sections, { slug: "references", text: "References" }];
 ---
 
 {
     sections.length >= 3 && (
-        <nav class="toc" aria-label="Contents">
+        <details class="fold toc">
+            <summary>
+                <span class="fold-title">Contents</span>
+            </summary>
             <ol>
-                {sections.map((heading) => (
+                {entries.map((heading) => (
                     <li>
                         <a href={`#${heading.slug}`}>{heading.text}</a>
                     </li>
                 ))}
-                <li>
-                    <a href="#references">References</a>
-                </li>
             </ol>
-        </nav>
+        </details>
     )
 }

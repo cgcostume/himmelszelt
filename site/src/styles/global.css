@@ -3,8 +3,8 @@
     --bg: #0b0d12;
     --surface: #12151c;
     --line: #262b36;
-    --text: #d6dae3;
-    --muted: #8a92a3;
+    --text: #c5c9d2;
+    --muted: #808899;
     /* A light step of Saussure's cyanometer (late 18th century): Prussian blue lightened with white, the hue (~207°) kept. The
        cyanometer measured how blue the sky is in 53 such steps; see Götz Hoeppe, "Blau: Die Farbe des Himmels". */
     --cyanometer: hsl(207 62% 62%);
@@ -12,7 +12,7 @@
     --measure: 46rem;
     /* The page's text sizes besides body (1rem), lead, h2 and h1: meta for captions, tables, controls and tooltips,
        small for labels inside figures and the fine print. */
-    --text-meta: 0.85rem;
+    --text-meta: 0.875rem;
     --text-small: 0.75rem;
     --wide: 1140px;
     /* Outlines of panels, boxes and controls. */
@@ -47,7 +47,8 @@ body {
     background: var(--bg);
     color: var(--text);
     font-family: "Roboto", system-ui, sans-serif;
-    font-weight: 300;
+    font-size: 1.0625rem;
+    font-weight: 350;
     line-height: 1.7;
 }
 /* No word left alone on the last line of a paragraph, a caption or a list item, at any width: the browser balances the
@@ -57,6 +58,19 @@ li,
 figcaption,
 .term-tip {
     text-wrap: pretty;
+}
+/* Phone-width lines hold some 40 characters, where one long word otherwise leaves a wide gap; code is never split. */
+@media (max-width: 40rem) {
+    p,
+    li,
+    figcaption {
+        hyphens: auto;
+        hyphenate-limit-chars: 7 3 3;
+    }
+    code,
+    .mono {
+        hyphens: manual;
+    }
 }
 a {
     color: var(--accent);
@@ -81,12 +95,17 @@ h2 {
 /* The package scope is the same on every chapter: the name after it is what the page is about. */
 h1 .scope {
     color: var(--muted);
+    font-weight: 300;
 }
 h1,
 h2,
 h3 {
     font-weight: 400;
     line-height: 1.3;
+}
+h1,
+h2 {
+    font-weight: 700;
 }
 .site-header,
 .site-footer {
@@ -172,13 +191,13 @@ h3 {
     margin-top: 4rem;
 }
 main {
-    counter-reset: figure;
+    counter-reset: figure table;
     max-width: var(--measure);
     margin: 0 auto;
     padding: 2rem 1.5rem;
 }
 .lead {
-    font-size: 1.15rem;
+    font-size: 1.125rem;
 }
 /* The libraries as tiles, each with what its German name means; planned ones only outlined. */
 .chapter-list {
@@ -245,7 +264,8 @@ main {
 code,
 pre {
     font-size: var(--text-meta);
-    background: var(--surface);
+    /* The shade the figures' ground takes where it veils what lies below the horizon (see .figure-veil). */
+    background: #10141a;
     border: var(--border);
     border-radius: var(--radius-small);
     padding: 0.1rem 0.35rem;
@@ -440,7 +460,7 @@ input[type="range"]:focus-visible::-moz-range-thumb {
     color: var(--text);
     font-size: var(--text-meta);
     font-style: normal;
-    font-weight: 300;
+    font-weight: 350;
     line-height: 1.5;
     font-family: "Roboto", system-ui, sans-serif;
     text-align: left;
@@ -499,22 +519,43 @@ svg text {
     content: "Figure " counter(figure) ". ";
     color: var(--accent);
 }
-/* The chapter's sections in one flowing line, so the contents never push the text far down. */
+/* A fold drawn like the moment and place: a rule down the left and a line saying what is inside. */
+.fold {
+    margin-left: -0.9rem;
+    padding-left: 0.9rem;
+    border-left: 2px solid var(--accent);
+}
+.fold > summary {
+    cursor: pointer;
+    list-style: none;
+}
+.fold > summary::-webkit-details-marker {
+    display: none;
+}
+.fold > summary::before {
+    content: "+";
+    display: inline-block;
+    width: 1.2em;
+    color: var(--muted);
+}
+.fold[open] > summary::before {
+    content: "\2212";
+}
+.fold[open] > summary {
+    margin-bottom: 0.5rem;
+}
+.fold-title {
+    color: var(--accent);
+}
+/* The chapter's sections, one per line under the lead. */
 .toc {
-    margin: 1.5rem 0 2rem;
-    font-size: var(--text-meta);
+    margin-top: 2rem;
+    margin-bottom: 1.5rem;
 }
 .toc ol {
-    display: inline;
     margin: 0;
-    padding: 0;
-}
-.toc li {
-    display: inline;
-}
-.toc li + li::before {
-    content: " · ";
-    color: var(--muted);
+    padding: 0 0 0 1.2em;
+    list-style: none;
 }
 h2,
 figure[id],

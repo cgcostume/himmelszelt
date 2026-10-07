@@ -2,6 +2,7 @@ import * as precise from "@himmelszelt/sternzeit";
 import Zdog from "zdog";
 import { onDemand } from "../frame.js";
 import {
+    alongVerticalCircle,
     COMPASS,
     cssColor,
     drawSvg,
@@ -14,7 +15,7 @@ import {
     svgText,
 } from "./figure.js";
 import { aboveVisibleHorizon } from "./horizon.js";
-import { offPanelArrow, offPanelArrowSvg } from "./offpanel.js";
+import { arrowAround, offPanelArrowSvg } from "./offpanel.js";
 import { ephemerisDay, onChange, state } from "./state.js";
 import "./export.js";
 
@@ -45,9 +46,9 @@ const KM_TO_SCENE = EARTH_R / precise.earth.MEAN_RADIUS_KM;
 const ATMOSPHERE_SHELL_DIAMETER = 2 * (EARTH_R + precise.earth.ATMOSPHERE_THICKNESS_KM * KM_TO_SCENE);
 const PAGE_ACCENT = cssColor("--accent", "#5aa9ff");
 // Every stroke that was plain black on the old light page: the site's text color, so the scene follows the theme.
-const INK = cssColor("--text", "#d6dae3");
+const INK = cssColor("--text", "#c5c9d2");
 // The Moon's color in every figure except the eclipse panels (which show how it really looks): muted grey.
-const MOON_INK = cssColor("--muted", "#8a92a3");
+const MOON_INK = cssColor("--muted", "#808899");
 
 function v(x, y, z) {
     return { x, y, z };
@@ -87,19 +88,7 @@ function billboardRotate(rotX, rotY) {
     return rotateToFace(v(cx * Math.sin(rotY), Math.sin(rotX), cx * Math.cos(rotY)));
 }
 
-// Mouse-wheel zoom, layered on top of the auto-fit zoom below rather than replacing it: baseZoom is
-// whatever onResize computes to fit the viewport, zoomFactor is the user's own multiplier on top of that
-// (0.5..2.0), and the two combine each frame (see frame()) into illustration.zoom. targetZoomFactor is set
-// instantly by the wheel handler; zoomFactor eases toward it every frame for a soft, non-jumpy feel rather
-// than snapping straight to each wheel tick.
-const ZOOM_FACTOR_MIN = 0.5;
-const ZOOM_FACTOR_MAX = 2.0;
-let baseZoom = 1;
-let zoomFactor = 1;
-let targetZoomFactor = 1;
-// Zdog's SVG renderer (unlike its canvas renderer) only bakes `zoom` into the <svg> viewBox at setSize()
-// time; it doesn't rescale path coordinates per frame. So a plain `illustration.zoom = ...` between resizes
-// has no visual effect until setSize() runs again with the current width/height, hence caching them here.
+// The stage's size, for the annotations laid over it.
 let stageWidth = 0;
 let stageHeight = 0;
 
@@ -115,8 +104,7 @@ const illustration = new Illustration({
         stageWidth = width;
         stageHeight = height;
         // Most of the Sun's orbit in view: about as wide as the stage, as tall as a wide stage allows.
-        baseZoom = Math.min(width * 0.52, height * 0.8) / (SUN_DIST + SUN_R);
-        this.zoom = baseZoom * zoomFactor;
+        this.zoom = Math.min(width * 0.52, height * 0.8) / (SUN_DIST + SUN_R);
         this.setSize(width, height);
     },
 });
@@ -283,46 +271,16 @@ const moonDisc = new Ellipse({
 });
 new Shape({ addTo: moonAnchor, stroke: 3, color: MOON_INK });
 
-// Two small, flat (never rotated), transparent alt-az panels overlaid directly on top of the main scene:
-// each anchors one body to x=0 (its own azimuth origin) and plots the other offset by azimuth difference,
-// both against a fixed horizon line. Both axes use a tangent (rectilinear) mapping rather than a plain
-// angle-linear one, the same distortion an ordinary (non-fisheye) camera lens has: positions stretch
-// increasingly as they approach 90 degrees from the vertical/horizontal center, instead of spreading evenly
-// by raw degrees. The horizon itself stays put regardless of either body's altitude: it's a fixed reference
-// the tangent mapping is built around (see ALTAZ_LOOK_UP_DEG below for exactly where).
-const ALTAZ_PANEL_SIZE = 140;
-// A true tangent mapping can't reach 180 degrees (tan blows up at 90), so this picks a moderate wide-lens
-// angle instead; shown in each panel's caption (see makeAltAzPanel) so the scale is never left to guess at.
+// Two small, flat (never rotated), transparent panels overlaid on the main scene, each locked to one body: seen along
+// the vertical circle through it, as in the analemma (see alongVerticalCircle), with that body always at the center and
+// the horizon, the altitude lines and the other body moving around it instead. Units are degrees.
 const ALTAZ_FIELD_OF_VIEW_DEG = 120;
-// The vertical half of that FOV is tilted up by this much rather than centered on the horizon: the zenith
-// (altitude 90) is worth seeing (the sun/moon is often high up), while the sky far below the horizon (the
-// unlit side of the world an observer never looks at) isn't. 30 up + 90 down from that shifted center covers
-// -30 to +90 altitude, the same 120 degrees total, just spent where it's actually useful.
-const ALTAZ_LOOK_UP_DEG = 30;
-const ALTAZ_FOCAL_PX = ALTAZ_PANEL_SIZE / 2 / Math.tan((ALTAZ_FIELD_OF_VIEW_DEG / 2) * DEG);
-
-// Tangent (rectilinear) mapping of a single axis: 0 stays at 0 (tan(0)=0), and the further from center, the
-// more a fixed number of remaining degrees pushes the point outward, same as a real camera lens. Independent
-// per axis (not a joint spherical projection): that's what keeps the horizon exactly fixed (at a height that
-// depends only on the constant ALTAZ_LOOK_UP_DEG, never on either body's actual altitude), rather than tying
-// it to the anchor's own direction.
-//
-// tan() has period 180 degrees, so past +/-90 it starts producing the SAME values it gave for angles 180
-// degrees smaller (tan(-157) equals tan(23)): without the clamp below, a body nearly opposite the panel's
-// center would wrap around and render as if it were nearly on top of it, exactly backwards. Anything at or
-// past 90 degrees off-axis is outside any real camera's field of view anyway, so it's parked far off-panel.
-function tangentPx(degreesFromCenter) {
-    if (Math.abs(degreesFromCenter) >= 90) return Math.sign(degreesFromCenter || 1) * 1e5;
-    return Math.tan(degreesFromCenter * DEG) * ALTAZ_FOCAL_PX;
-}
-// The horizon's fixed height, in panel units (0 = panel center, positive = downward): where the horizon line is drawn
-// and the compass labels sit (see updateAltAzPanel).
-const ALTAZ_HORIZON_Y = -tangentPx(-ALTAZ_LOOK_UP_DEG);
-const ALTAZ_GRID_ALTITUDES = [30, 60];
+const ALTAZ_GRID_ANGLES = [-150, -120, -90, -60, -30, 30, 60, 90, 120, 150];
+// The arrow towards the other body sits on a circle around the center, half the panel across.
+const ALTAZ_ARROW_RADIUS = ALTAZ_FIELD_OF_VIEW_DEG / 4;
 
 // A fixed per-species look, regardless of anchor/other role: the sun is a white disc plus rays, the moon carries its
-// phase, lit towards wherever the sun stands in the same panel. The anchor/other role is legible from position alone
-// (the anchor always sits at dead-center horizontally).
+// phase, lit towards wherever the sun stands in the same panel.
 function altAzBody(point, isSun, unitsPerPx, towardsSun, lit, earthshine) {
     if (isSun) return sunSymbol(point.x, point.y, unitsPerPx);
     const radius = SUN_SYMBOL.radius * unitsPerPx;
@@ -331,27 +289,18 @@ function altAzBody(point, isSun, unitsPerPx, towardsSun, lit, earthshine) {
 
 function makeAltAzPanel(elementSelector, anchorIsSun) {
     const element = document.querySelector(elementSelector);
-    const half = ALTAZ_PANEL_SIZE / 2;
-    element.setAttribute("viewBox", `${-half} ${-half} ${ALTAZ_PANEL_SIZE} ${ALTAZ_PANEL_SIZE}`);
-    // Appended here (not hardcoded in the markup) so the caption can never drift out of sync with
-    // ALTAZ_FIELD_OF_VIEW_DEG above.
+    // Appended here (not hardcoded in the markup) so the caption can never drift out of sync with the field of view.
     const caption = element.closest(".altaz-panel")?.querySelector(".altaz-caption");
     // Appended as text, so the accented name already in the caption survives.
-    if (caption) caption.append(`, ${ALTAZ_FIELD_OF_VIEW_DEG}° FOV, tilted ${ALTAZ_LOOK_UP_DEG}° up`);
+    if (caption) caption.append(`, ${ALTAZ_FIELD_OF_VIEW_DEG}° field of view`);
     return { element, anchorIsSun, drawn: "" };
 }
 const sunView = makeAltAzPanel("#sunView", true);
 const moonView = makeAltAzPanel("#moonView", false);
 
-// Signed azimuth difference wrapped to [-180, 180]: the shorter way around the compass, so a moon just west
-// of due north relative to a sun just east of it reads as a small gap, not a ~360-degree one.
-function azimuthDelta(fromAzimuth, toAzimuth) {
-    return ((((toAzimuth - fromAzimuth) % 360) + 540) % 360) - 180;
-}
-
 function updateAltAzPanel(panel, anchorHorizontal, otherHorizontal, lit, earthshine, towardsSun) {
     // The panel is drawn at whatever size the page gives it; arrows and labels keep their size in screen pixels.
-    const unitsPerPx = ALTAZ_PANEL_SIZE / (panel.element.clientWidth || ALTAZ_PANEL_SIZE);
+    const unitsPerPx = ALTAZ_FIELD_OF_VIEW_DEG / (panel.element.clientWidth || ALTAZ_FIELD_OF_VIEW_DEG);
     // Redrawn only when something changed, not every frame of the main scene.
     const key = [
         anchorHorizontal.altitude,
@@ -366,39 +315,43 @@ function updateAltAzPanel(panel, anchorHorizontal, otherHorizontal, lit, earthsh
     if (key === panel.drawn) return;
     panel.drawn = key;
 
-    // Anchor: x=0 by construction (it defines this panel's azimuth origin); y from its own true altitude
-    // (shifted by ALTAZ_LOOK_UP_DEG, same as the horizon), tangent-mapped like everything else, so it moves
-    // like any other point, not locked to panel center.
-    const anchorPoint = { x: 0, y: -tangentPx(anchorHorizontal.altitude - ALTAZ_LOOK_UP_DEG) };
-    const dAz = azimuthDelta(anchorHorizontal.azimuth, otherHorizontal.azimuth);
-    const otherPoint = { x: tangentPx(dAz), y: -tangentPx(otherHorizontal.altitude - ALTAZ_LOOK_UP_DEG) };
+    const half = ALTAZ_FIELD_OF_VIEW_DEG / 2;
+    const anchorPoint = alongVerticalCircle(anchorHorizontal, anchorHorizontal.azimuth);
+    const otherPoint = alongVerticalCircle(otherHorizontal, anchorHorizontal.azimuth);
     const [sunPoint, moonPoint] = panel.anchorIsSun ? [anchorPoint, otherPoint] : [otherPoint, anchorPoint];
+    const center = anchorPoint;
+    const [left, right] = [center.x - half, center.x + half];
+    panel.element.setAttribute("viewBox", `${left} ${center.y - half} ${2 * half} ${2 * half}`);
 
-    // The ground below the fixed horizon (see ALTAZ_LOOK_UP_DEG above), first, so everything else draws on top of it.
-    const half = ALTAZ_PANEL_SIZE / 2;
-    const y = ALTAZ_HORIZON_Y.toFixed(2);
-    let svg = `<rect x="${-half}" y="${y}" width="${ALTAZ_PANEL_SIZE}" height="${(half - ALTAZ_HORIZON_Y).toFixed(2)}" class="figure-ground"/>`;
-    // Altitude lines as in the analemma: 30 degrees sits at the center, 60 well above the middle of the upper half.
-    for (const altitude of ALTAZ_GRID_ALTITUDES) {
-        svg += gridLine(-tangentPx(altitude - ALTAZ_LOOK_UP_DEG), -half, half, `${altitude}°`, unitsPerPx);
+    // The ground below the horizon first, so everything else draws on top of it; it reaches past the nadir's view.
+    let svg = `<rect x="${left}" y="0" width="${2 * half}" height="${180 + half}" class="figure-ground"/>`;
+    // Past the zenith the altitude falls again, on the far side of the sky, and past the nadir it rises again.
+    for (const angle of ALTAZ_GRID_ANGLES) {
+        // Only lines whose label fits whole into the panel.
+        if (Math.abs(-angle - center.y) > half - 8 * unitsPerPx) continue;
+        const altitude = angle > 90 ? 180 - angle : angle < -90 ? -180 - angle : angle;
+        svg += gridLine(-angle, left, right, `${altitude}°`, unitsPerPx);
     }
-    svg += `<line x1="${-half}" y1="${y}" x2="${half}" y2="${y}" class="figure-horizon"/>`;
-    // The compass directions on the horizon, placed by azimuth with the same tangent mapping as the bodies: as the
-    // panel follows its body across the sky, the directions pass by along the horizon.
+    svg += `<line x1="${left}" y1="0" x2="${right}" y2="0" class="figure-horizon"/>`;
+    // The compass directions on the horizon, where the x axis is plain azimuth: they pass by as the body moves.
     COMPASS.forEach((label, i) => {
-        const d = azimuthDelta(anchorHorizontal.azimuth, i * 45);
-        if (Math.abs(d) > ALTAZ_FIELD_OF_VIEW_DEG / 2) return;
-        svg += svgText(tangentPx(d), labelAboveY(ALTAZ_HORIZON_Y, unitsPerPx), label, "figure-label");
+        const x = ((i * 45 - anchorHorizontal.azimuth + 540) % 360) - 180;
+        if (Math.abs(x) < half - 12 * unitsPerPx) svg += svgText(x, labelAboveY(0, unitsPerPx), label, "figure-label");
     });
     // The sun before the moon, whichever is the anchor, so the moon renders in front whenever the two nearly overlap.
     svg += altAzBody(sunPoint, true, unitsPerPx) + altAzBody(moonPoint, false, unitsPerPx, towardsSun, lit, earthshine);
-    // A body outside the panel, usually far below the horizon, gets the shared off-panel arrow (see offpanel.js).
-    for (const [point, isSun] of [
-        [sunPoint, true],
-        [moonPoint, false],
-    ]) {
-        const arrow = offPanelArrow(point, half, unitsPerPx);
-        if (arrow) svg += offPanelArrowSvg(arrow, isSun);
+    // The other body outside the panel gets an arrow around the anchor, along the great circle towards it.
+    if (Math.abs(otherPoint.x - center.x) > half || Math.abs(otherPoint.y - center.y) > half) {
+        const angle =
+            precise.positionAngle(
+                anchorHorizontal.azimuth,
+                anchorHorizontal.altitude,
+                otherHorizontal.azimuth,
+                otherHorizontal.altitude,
+            ) * DEG;
+        const direction = { x: Math.sin(angle), y: -Math.cos(angle) };
+        const arrow = arrowAround(center, direction, ALTAZ_ARROW_RADIUS, unitsPerPx);
+        svg += offPanelArrowSvg(arrow, !panel.anchorIsSun);
     }
     drawSvg(panel.element, svg, unitsPerPx);
 }
@@ -430,24 +383,7 @@ stageEl.addEventListener("pointermove", (e) => {
         requestFrame();
     }
 });
-// preventDefault so the page itself doesn't scroll while zooming the scene; multiplicative (not additive)
-// so each tick scales the current zoom rather than the raw pixel delta, keeping the feel consistent whether
-// zoomed all the way in or out. Eased toward in frame() rather than applied instantly, for a soft feel.
-stageEl.addEventListener(
-    "wheel",
-    (e) => {
-        e.preventDefault();
-        targetZoomFactor = Math.min(ZOOM_FACTOR_MAX, Math.max(ZOOM_FACTOR_MIN, targetZoomFactor * 1.0015 ** -e.deltaY));
-        requestFrame();
-    },
-    { passive: false },
-);
-
 function frame() {
-    zoomFactor += (targetZoomFactor - zoomFactor) * 0.15;
-    illustration.zoom = baseZoom * zoomFactor;
-    illustration.setSize(stageWidth, stageHeight);
-
     // Read once per animation frame from the shared state (see state.js), so the scene follows every set of controls.
     const { jd, latitude, longitude } = state;
     const time = precise.fromJulianDay(jd);
@@ -576,9 +512,6 @@ function frame() {
         ["line-dashed", [latitudeRing, meridianRing]],
     ];
     for (const [dash, shapes] of dashes) for (const shape of shapes) shape.svgElement?.classList.add(dash);
-
-    // Drawn only when something changed; only the zoom's easing keeps asking for frames, until it has arrived.
-    if (Math.abs(targetZoomFactor - zoomFactor) > 1e-4) requestFrame();
 }
 
 const requestFrame = onDemand(frame);

@@ -5,23 +5,21 @@ import "./sternzeit.css";
 
 <figure class="moon-figure" id="moon-view">
     <div class="moon-view" data-export="moon">
-        <button type="button" class="view-toggle" data-field="lockMoon" aria-pressed="false" title="Lock the view to the Moon itself: north up, no horizon">moon-locked</button>
+        <button type="button" class="view-toggle" data-field="lockMoon" aria-pressed="false" title="Lock the view to the Moon itself: north up, no horizon">moon frame</button>
         <div class="moon-panel">
             <svg viewBox="-100 -100 200 200" aria-hidden="true"></svg>
             <button type="button" class="view-toggle libration-toggle" data-field="opticalLibration" aria-pressed="true" title="The tilt of the Moon's axis against its orbit and its uneven speed along it let us see a little around its edges">optical libration</button>
         </div>
-        <p class="moon-status" data-field="status"></p>
     </div>
     <figcaption class="figure-caption">
         The Moon as seen from the chosen place, zenith up: lit by the Sun (arrow), its night side in{" "}
-        <Term of="Earthshine">earthshine</Term> (blue rays, longer when stronger). The grid is the Moon's own, its
+        <Term of="Earthshine">earthshine</Term> (bluer when stronger). The grid is the Moon's own, its
         center shifted by the <Term of="Libration">libration</Term> (arrow, from its mean center to the point we
         look at) and its north pole (N) turned, against the zenith (dashed), by the{" "}
         <Term of="Position angle of axis">position angle of the axis</Term> and the{" "}
         <Term of="Parallactic angle">parallactic angle</Term> (arc). The dashed circles are its size at apogee and perigee.
-        Magnified, with the horizon at the same scale. The button in the corner locks the view to the Moon itself,
-        its north up and the horizon gone, leaving the librations as the only motion. The button at the bottom switches the
-        optical libration off, leaving only the physical one, too small to see here.
+        Magnified, disc and horizon true to each other. Locked to the Moon, its north is up and only the librations
+        move.
     </figcaption>
 </figure>
 

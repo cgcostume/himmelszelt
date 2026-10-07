@@ -25,7 +25,7 @@ const current = Astro.url.pathname.replace(/\/$/, "");
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
-            href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Roboto+Mono:wght@300;400;700&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Roboto:wght@300..700&family=Roboto+Mono:wght@300;400;700&display=swap"
             rel="stylesheet"
         />
         {/* The accent a reader picked on the cyanometer (see Cyanometer.astro), set before the first paint. */}
@@ -127,6 +127,16 @@ const current = Astro.url.pathname.replace(/\/$/, "");
             for (const ref of document.querySelectorAll<HTMLAnchorElement>("a.figref")) {
                 const number = figures.indexOf(ref.hash.slice(1)) + 1;
                 if (number > 0) ref.textContent = `Figure ${number}`;
+            }
+            // Table references likewise, and a folded table opens when one is followed.
+            const tables = [...document.querySelectorAll("[data-table][id]")].map((t) => t.id);
+            for (const ref of document.querySelectorAll<HTMLAnchorElement>("a.tabref")) {
+                const number = tables.indexOf(ref.hash.slice(1)) + 1;
+                if (number > 0) ref.textContent = `Table ${number}`;
+                ref.addEventListener("click", () => {
+                    const fold = document.querySelector(`${ref.hash} details`);
+                    if (fold instanceof HTMLDetailsElement) fold.open = true;
+                });
             }
             // Keeps glossary and citation tooltips inside the viewport: shifted left by however far they would overflow.
             const host = (event: Event) => (event.target as Element).closest?.(".term, .cite") ?? null;

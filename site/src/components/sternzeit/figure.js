@@ -33,6 +33,18 @@ function topLabelY(half, unitsPerPx) {
     return -half + (TOP_PADDING_PX + SMALL_TEXT_PX / 2) * unitsPerPx;
 }
 
+/**
+ * A direction seen along the vertical circle through `azimuth0`, in degrees: x the true angle off that circle to the right,
+ * y the angle along it, negated (y down), up from the horizon ahead and on over the zenith. Close to the circle this is
+ * azimuth and altitude, but unlike them it stays smooth near the zenith, where the azimuth swings through half the
+ * compass within a few degrees.
+ */
+export function alongVerticalCircle({ azimuth, altitude }, azimuth0) {
+    const [a, h] = [((azimuth - azimuth0) * Math.PI) / 180, (altitude * Math.PI) / 180];
+    const x = (Math.asin(Math.cos(h) * Math.sin(a)) * 180) / Math.PI;
+    return { x, y: (-Math.atan2(Math.sin(h), Math.cos(h) * Math.cos(a)) * 180) / Math.PI };
+}
+
 /** The y of a middle-aligned label sitting just above a line at `y`, such as a compass direction on the horizon. */
 export function labelAboveY(y, unitsPerPx) {
     return y - (2 + SMALL_TEXT_PX / 2) * unitsPerPx;
@@ -181,10 +193,11 @@ function moonGraticule(x, y, radius, { longitude, latitude, tilt }) {
  * The visible horizon at `y` across a square panel of half size `half`, the ground beneath veiling what it hides; or,
  * with the horizon above the panel, the whole panel veiled and a note saying so.
  */
-export function veiledHorizon(y, half, unitsPerPx) {
+export function veiledHorizon(y, half, unitsPerPx, halfWidth = half, label = null) {
     if (y >= half) return "";
     const top = Math.max(y, -half);
-    const veil = `<rect x="${-half}" y="${top.toFixed(2)}" width="${2 * half}" height="${(half - top).toFixed(2)}" class="figure-veil"/>`;
-    if (y <= -half) return veil + svgText(0, topLabelY(half, unitsPerPx), "below the horizon", "figure-note");
-    return `${veil}<line x1="${-half}" y1="${y.toFixed(2)}" x2="${half}" y2="${y.toFixed(2)}" class="figure-horizon"/>`;
+    const veil = `<rect x="${-halfWidth}" y="${top.toFixed(2)}" width="${2 * halfWidth}" height="${(half - top).toFixed(2)}" class="figure-veil"/>`;
+    const { x = 0, y: labelY = topLabelY(half, unitsPerPx), cls = "figure-note" } = label ?? {};
+    if (y <= -half) return veil + svgText(x, labelY, "below the horizon", cls);
+    return `${veil}<line x1="${-halfWidth}" y1="${y.toFixed(2)}" x2="${halfWidth}" y2="${y.toFixed(2)}" class="figure-horizon"/>`;
 }

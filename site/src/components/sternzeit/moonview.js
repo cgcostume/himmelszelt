@@ -2,6 +2,7 @@ import * as precise from "@himmelszelt/sternzeit";
 import {
     drawSvg,
     EARTHSHINE_MAX,
+    escapeText,
     selenographic,
     sunInViewFrame,
     svgText,
@@ -22,15 +23,11 @@ const radiusAt = (km) => Math.asin(precise.moon.MEAN_RADIUS_KM / km);
 const UNITS_PER_RADIAN = PERIGEE_RADIUS / radiusAt(PERIGEE_KM);
 // Selenographic grid spacing, in degrees.
 const GRID_STEP = 30;
-const EARTHSHINE_RAY_COUNT = 11;
-const EARTHSHINE_RAY_GAP = 4;
-const EARTHSHINE_RAY_MAX = 14;
 const SUN_ARROW_GAP = 5;
 const SUN_ARROW_LENGTH = 14;
 
 const view = document.querySelector(".moon-view");
 const svgEl = view.querySelector(".moon-panel > svg");
-const statusEl = view.querySelector('[data-field="status"]');
 const lockButton = view.querySelector('[data-field="lockMoon"]');
 // Locked to the Moon: its north up rather than the zenith, and no horizon, so only the librations still move.
 let locked = false;
@@ -38,13 +35,44 @@ const opticalButton = view.querySelector('[data-field="opticalLibration"]');
 // Off leaves only the physical libration, the Moon's own wobble, well below a pixel here.
 let optical = true;
 
+// The panel is wider than the Moon needs: the readouts sit beside it. Its height keeps the disc at the size a 416 px
+// square would give it, unless the panel is too narrow for the readouts, when the disc shrinks to make room for them.
+const BASE_UNITS_PER_PX = 200 / 416;
+// Room a one-line readout beside the disc needs; where the panel lacks it, the readouts move under the disc instead.
+const READOUT_WIDTH_PX = 100;
+const READOUT_LINE_PX = 16;
+// Never lower than this, so a shrunk disc still leaves room above and below it for the tilt and the buttons.
+const MIN_HEIGHT_PX = 300;
+// The corners' inset and the middle of their row, as for the switches there (see .view-toggle).
+const CORNER_PX = 10;
+const CORNER_ROW_PX = 20;
+// The north tick and the tilt arc reach this far from the center; the readouts start just beyond.
+const OUTSIDE = PERIGEE_RADIUS + 3;
+// The Sun's arrow reaches this far at most; the readouts stay beyond it, whichever way it points.
+const REACH = PERIGEE_RADIUS + SUN_ARROW_GAP + SUN_ARROW_LENGTH;
+const SIDE = REACH + 6;
+
 const f = (n) => n.toFixed(2);
+// A one-line readout, its name muted and its value in full, anchored at `x` by `anchor`.
+const readout = (x, y, name, value, anchor) =>
+    `<text x="${f(x)}" y="${f(y)}" dy="0.35em" class="figure-note figure-readout figure-anchor-${anchor}"><tspan class="figure-readout-name">${escapeText(name)}</tspan> ${escapeText(value)}</text>`;
 const polyline = (points, cls) =>
     `<polyline points="${points.map(([x, y]) => `${f(x)},${f(y)}`).join(" ")}" class="${cls}"/>`;
 
 function render() {
     const { jd } = state;
-    const unitsPerPx = 200 / (svgEl.clientWidth || 200);
+    const width = svgEl.parentElement.clientWidth || 416;
+    const besides = (width * BASE_UNITS_PER_PX) / 2 >= SIDE + READOUT_WIDTH_PX * BASE_UNITS_PER_PX;
+    const unitsPerPx = Math.max(BASE_UNITS_PER_PX, (2 * (SIDE + 10)) / width);
+    const line = READOUT_LINE_PX * unitsPerPx;
+    // Under the disc, a row each: its size, then where they do not fit around it the tilt, the libration and the
+    // earthshine, and below those the corners' row, with the switch and the note that the Moon is below the horizon.
+    const rows = besides ? 1 : locked ? 3 : 4;
+    const firstRow = REACH + 10;
+    const halfHeight = Math.max(100, firstRow + (rows + (besides ? 1 : 2)) * line, (MIN_HEIGHT_PX / 2) * unitsPerPx);
+    const halfWidth = (width * unitsPerPx) / 2;
+    svgEl.style.height = `${f((2 * halfHeight) / unitsPerPx)}px`;
+    svgEl.setAttribute("viewBox", `${f(-halfWidth)} ${f(-halfHeight)} ${f(2 * halfWidth)} ${f(2 * halfHeight)}`);
     const time = precise.fromJulianDay(jd);
     const diameter = precise.moon.topocentricAngularDiameter(time, state);
     const radius = (diameter / 2) * DEG * UNITS_PER_RADIAN;
@@ -68,7 +96,9 @@ function render() {
     const bulge = sunFrame.toward / Math.hypot(sunFrame.right, sunFrame.up, sunFrame.toward);
 
     let svg = "";
-    svg += `<circle r="${f(radius)}" class="moon-night"/>`;
+    // The night side in the earthshine, bluer the stronger it is, as on the moon calendar's discs.
+    const glow = Math.min(earthshine, EARTHSHINE_MAX) / EARTHSHINE_MAX;
+    svg += `<circle r="${f(radius)}" class="moon-night" style="--earthshine: ${glow.toFixed(3)}"/>`;
 
     // The lit part: the half disc towards the Sun, closed by the terminator, an ellipse across it.
     const lit = [];
@@ -105,14 +135,13 @@ function render() {
 
     // The lunar north pole and the axis' tilt against the zenith, outside the perigee circle so they never overlap it: a
     // tick from the limb along the axis with an N beyond, a dashed tick straight up, and an arc between the two.
-    const outside = PERIGEE_RADIUS + 3;
     const [nx, ny] = toScreen([0, 1], tilt, 1);
-    svg += `<line x1="${f(nx * radius)}" y1="${f(ny * radius)}" x2="${f(nx * (outside + 7))}" y2="${f(ny * (outside + 7))}" class="moon-axis"/>`;
-    svg += svgText(nx * (outside + 13), ny * (outside + 13), "N", "figure-note");
+    svg += `<line x1="${f(nx * radius)}" y1="${f(ny * radius)}" x2="${f(nx * (OUTSIDE + 7))}" y2="${f(ny * (OUTSIDE + 7))}" class="moon-axis"/>`;
+    svg += svgText(nx * (OUTSIDE + 13), ny * (OUTSIDE + 13), "N", "figure-note");
     const tiltDeg = ((((twist + 180) % 360) + 360) % 360) - 180;
     if (!locked) {
-        svg += `<line x1="0" y1="${f(-outside)}" x2="0" y2="${f(-(outside + 7))}" class="moon-zenith"/>`;
-        const arc = Array.from({ length: 25 }, (_, i) => toScreen([0, 1], (tiltDeg * i) / 24, outside + 4));
+        svg += `<line x1="0" y1="${f(-OUTSIDE)}" x2="0" y2="${f(-(OUTSIDE + 7))}" class="moon-zenith"/>`;
+        const arc = Array.from({ length: 25 }, (_, i) => toScreen([0, 1], (tiltDeg * i) / 24, OUTSIDE + 4));
         svg += polyline(arc, "moon-tilt");
     }
 
@@ -141,35 +170,45 @@ function render() {
     svg += `<line x1="${f(ax)}" y1="${f(ay)}" x2="${f(hx)}" y2="${f(hy)}" class="moon-sun-arrow"/>`;
     svg += `<polygon points="${f(tx)},${f(ty)} ${f(hx - uy * 2.4)},${f(hy + ux * 2.4)} ${f(hx + uy * 2.4)},${f(hy - ux * 2.4)}" class="moon-sun-head"/>`;
 
-    // Earthshine: rays around the night side's limb, their length following its strength.
-    const rayLength = (Math.min(earthshine, EARTHSHINE_MAX) / EARTHSHINE_MAX) * EARTHSHINE_RAY_MAX;
-    if (rayLength > 0.5) {
-        for (let i = 0; i < EARTHSHINE_RAY_COUNT; i++) {
-            const a = limb + Math.PI / 2 + ((i + 0.5) / EARTHSHINE_RAY_COUNT) * Math.PI;
-            const [rx, ry] = [Math.sin(a), -Math.cos(a)];
-            const [r0, r1] = [radius + EARTHSHINE_RAY_GAP, radius + EARTHSHINE_RAY_GAP + rayLength];
-            svg += `<line x1="${f(rx * r0)}" y1="${f(ry * r0)}" x2="${f(rx * r1)}" y2="${f(ry * r1)}" class="moon-earthshine"/>`;
-        }
-    }
-
     // The visible horizon, below the Moon by its apparent altitude over it, at the disc's own scale (so it only shows
     // within a few tenths of a degree); the ground beneath veils what it hides.
     if (!locked) {
         const horizon = aboveVisibleHorizon(horizontal.altitude, state.heightM) * DEG * UNITS_PER_RADIAN;
-        svg += veiledHorizon(horizon, 100, unitsPerPx);
+        svg += veiledHorizon(horizon, halfHeight, unitsPerPx, halfWidth, {
+            // In the bottom right corner, level with the switch in the bottom left one.
+            x: halfWidth - CORNER_PX * unitsPerPx,
+            y: halfHeight - CORNER_ROW_PX * unitsPerPx,
+            cls: "figure-note figure-anchor-end",
+        });
     }
-    drawSvg(svgEl, svg, unitsPerPx);
 
-    const minutes = diameter * 60;
+    // The readouts, each beside what it measures: the tilt by its arc, the size under the disc, the libration and the
+    // earthshine to either side.
     const ew = l >= 0 ? "E" : "W";
     const ns = b >= 0 ? "N" : "S";
-    const tiltText = locked
-        ? ""
-        : `tilt ${tiltDeg.toFixed(1)}° (axis ${axis.toFixed(1)}° − parallactic ${parallactic.toFixed(1)}°); `;
-    statusEl.innerHTML =
-        `<span class="status-title">lunar libration</span> ${Math.abs(l).toFixed(1)}° ${ew}, ${Math.abs(b).toFixed(1)}° ${ns}; ` +
-        tiltText +
-        `${minutes.toFixed(1)}′ across; earthshine ${(earthshine * 100).toFixed(1)}%`;
+    const libration = `${Math.abs(l).toFixed(1)}° ${ew}, ${Math.abs(b).toFixed(1)}° ${ns}`;
+    // With its phase factor: how full the Earth looks from the Moon, 1 at new moon, where the earthshine peaks.
+    const shine = `${(earthshine * 100).toFixed(1)}% (Earth's phase ${(earthshine / EARTHSHINE_MAX).toFixed(2)})`;
+    const parts = `axis ${axis.toFixed(1)}°, parallactic ${parallactic.toFixed(1)}°`;
+    const tiltText = `${tiltDeg.toFixed(1)}° (${parts})`;
+    const stacked = [["size", `${(diameter * 60).toFixed(1)}′`]];
+    if (besides) {
+        // Beside the disc, name over value, so they stay narrow.
+        const half = line / 2;
+        svg += svgText(-SIDE, -half, "libration", "figure-label figure-anchor-end");
+        svg += svgText(-SIDE, half, libration, "figure-note figure-anchor-end");
+        svg += svgText(SIDE, -half, "earthshine", "figure-label figure-anchor-start");
+        svg += svgText(SIDE, half, shine, "figure-note figure-anchor-start");
+        // Centered above the tick and the arc, as far up as the size is down.
+        if (!locked) svg += readout(0, -firstRow, "tilt", tiltText, "middle");
+    } else {
+        if (!locked) stacked.push(["tilt", tiltText]);
+        stacked.push(["libration", libration], ["earthshine", shine]);
+    }
+    stacked.forEach(([name, value], i) => {
+        svg += readout(0, firstRow + i * line, name, value, "middle");
+    });
+    drawSvg(svgEl, svg, unitsPerPx);
 }
 
 lockButton.addEventListener("click", () => {

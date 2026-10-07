@@ -2,6 +2,7 @@ import * as precise from "@himmelszelt/sternzeit";
 import Zdog from "zdog";
 import { onDemand } from "../frame.js";
 import {
+    alongVerticalCircle,
     COMPASS,
     cssColor,
     drawSvg,
@@ -38,8 +39,8 @@ const TILT_MIN = -85 * DEG;
 const TILT_MAX = -8 * DEG;
 const DRAG_RADIANS_PER_PX = 0.008;
 
-const INK = cssColor("--text", "#d6dae3");
-const MUTED = cssColor("--muted", "#8a92a3");
+const INK = cssColor("--text", "#c5c9d2");
+const MUTED = cssColor("--muted", "#808899");
 const SURFACE = cssColor("--surface", "#12151c");
 const ACCENT = cssColor("--accent", "#5aa9ff");
 
@@ -248,14 +249,8 @@ function rebuildPaths() {
 function renderAnalemma() {
     const { jd, latitude, longitude } = state;
     const today = seen(precise.sun, precise.fromJulianDay(jd), latitude, longitude);
-    // Seen along the vertical circle through today's Sun: x is the true angle off it to the right, y the angle along it,
-    // up from the horizon ahead and on over the zenith. Close to that circle this is azimuth and altitude, but unlike
-    // them it stays smooth near the zenith, where the azimuth swings through half the compass within a few degrees.
-    const project = ({ azimuth, altitude }) => {
-        const [a, h] = [(azimuth - today.azimuth) * DEG, altitude * DEG];
-        const x = Math.asin(Math.cos(h) * Math.sin(a)) / DEG;
-        return { x, y: -Math.atan2(Math.sin(h), Math.cos(h) * Math.cos(a)) / DEG };
-    };
+    // Seen along the vertical circle through today's Sun, smooth past the zenith (see alongVerticalCircle).
+    const project = (horizontal) => alongVerticalCircle(horizontal, today.azimuth);
     const points = [];
     for (let day = -ANALEMMA_DAYS; day <= ANALEMMA_DAYS; day++) {
         const sun = seen(precise.sun, precise.fromJulianDay(jd + day), latitude, longitude);

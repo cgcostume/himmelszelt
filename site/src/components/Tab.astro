@@ -1,0 +1,9 @@
+---
+/** A reference to a table by its id; the number is filled in by the page, in the order the captions count. */
+interface Props {
+    id: string;
+}
+const { id } = Astro.props;
+---
+
+<a class="tabref" href={`#table-${id}`}>Table</a>
