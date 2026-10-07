@@ -1231,3 +1231,77 @@ figure[id] {
         grid-template-columns: 1fr;
     }
 }
+
+/* The flat strips across the page, such as ΔT over the millennia. Their SVGs draw in screen pixels. */
+.strip-figure {
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+.strip-panel > svg {
+    display: block;
+    width: 100%;
+    height: 9rem;
+    border: var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    cursor: crosshair;
+}
+.strip-panel {
+    position: relative;
+}
+/* The caption keeps to the text column, which the wide figure is centered on. */
+.strip-figure > figcaption {
+    max-width: calc(var(--measure) - 3rem);
+    margin-inline: auto;
+}
+.strip-band {
+    fill: var(--surface);
+}
+.strip-moment {
+    stroke: var(--text);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    opacity: 0.6;
+}
+.strip-moment-dot {
+    fill: var(--text);
+}
+/* No frame around ΔT: the curve and its grid stand on their own. */
+.deltat-panel > svg {
+    border: 0;
+    cursor: default;
+}
+/* The ΔT ticks in the monospace, so their one-letter units line up. */
+.deltat-tick {
+    font-family: var(--font-mono);
+}
+.deltat-axis {
+    stroke: var(--line);
+    stroke-width: 1;
+}
+.deltat-negative {
+    fill: url(#deltat-hatch);
+}
+.deltat-bubble {
+    fill: var(--bg);
+    stroke: var(--muted);
+    stroke-width: 1.2;
+}
+.deltat-join {
+    fill: var(--muted);
+}
+.deltat-hover {
+    opacity: 0.6;
+}
+.deltat-line {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+}
+.deltat-measured {
+    stroke: var(--accent);
+}
+.deltat-extrapolated {
+    stroke-dasharray: 4 4;
+}

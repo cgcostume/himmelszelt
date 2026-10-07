@@ -21,6 +21,7 @@ references:
 import Cite from "../../components/Cite.astro";
 import Controls from "../../components/sternzeit/Controls.astro";
 import DayArc from "../../components/sternzeit/DayArc.astro";
+import DeltaT from "../../components/sternzeit/DeltaT.astro";
 import Eclipse from "../../components/sternzeit/Eclipse.astro";
 import MoonCalendar from "../../components/sternzeit/MoonCalendar.astro";
 import MoonView from "../../components/sternzeit/MoonView.astro";
@@ -79,8 +80,10 @@ tiny coefficients multiplied by millions of days.
 
 The clock and the orbits do not quite agree, though. The tides brake Earth's rotation, unevenly, so the time it keeps
 drifts from the uniform time the orbits run on. The difference is <Term of="Delta T">ΔT</Term>: about a minute today,
-hours in antiquity. Functions that take a date and a place account for it on their own. Those that take a bare Julian
-Day expect it in ephemeris time, from `julianEphemerisDay`.
+hours in antiquity (<Fig id="delta-t" />). Functions that take a date and a place account for it on their own. Those
+that take a bare Julian Day expect it in ephemeris time, from `julianEphemerisDay`.
+
+<DeltaT />
 
 Then there is <Term of="Sidereal time">sidereal time</Term>. A solar day, noon to noon, is 24 hours. But Earth also
 moves along its orbit, so it has to turn a little more than once for the Sun to come back to the same spot. Relative to
