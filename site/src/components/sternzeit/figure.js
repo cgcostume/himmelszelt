@@ -121,7 +121,8 @@ export function sunInViewFrame(time, observer) {
     return { right: dot(sun, right), up: dot(sun, up), toward: -dot(sun, lineOfSight) };
 }
 
-// Earthshine peaks at about this, relative to full sunlight (see moon.earthshine): the night side is at its bluest.
+// Earthshine peaks at this, a relative strength rather than a fraction of sunlight (see moon.earthshine): the night
+// side is at its bluest.
 export const EARTHSHINE_MAX = 0.095;
 
 /**

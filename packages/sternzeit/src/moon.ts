@@ -592,10 +592,11 @@ function between(a: Direction, aDistance: number, b: Direction, bDistance: numbe
 }
 
 /**
- * Earthshine on the Moon, relative to full sunlight on it: sunlight reflected by the Earth, which lights the Moon's
- * night side as a faint ashen glow. Peaks at ~0.095 around new moon, when the Moon sees a full Earth, and vanishes
- * at full moon. Per van de Hulst, "Multiple Light Scattering" (1980), with Jensen et al.'s Earth albedo of 0.19,
- * as used by osgHimmel.
+ * Earthshine on the Moon, the faint ashen glow of its night side from sunlight reflected by the Earth, as a relative
+ * strength for shading that side: the Earth's albedo (0.19, after Jensen et al.) times half the phase function of the
+ * Earth as seen from the Moon. Peaks at 0.095 at new moon, when the Moon sees a full Earth, and vanishes at full moon.
+ * Not a fraction of sunlight: physically, earthshine is some 10^-4 of the sunlight on the Moon's day side. Per van de
+ * Hulst, "Multiple Light Scattering" (1980), as used by osgHimmel.
  */
 export function earthshine(t: JulianDay): number {
     // Half the elongation, clamped off both ends, where the formula is a 0 * infinity limit that tends to 0.
