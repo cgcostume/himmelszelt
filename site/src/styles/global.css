@@ -509,6 +509,10 @@ svg text {
 .line-long-dashed {
     stroke-dasharray: var(--line-long-dashes);
 }
+/* A line's part behind the center of what it circles, in a scene without perspective to tell front from back. */
+.line-behind {
+    opacity: 0.35;
+}
 /* Every visualization is a numbered figure, counted through the page by CSS alone. */
 .figure-caption {
     font-size: var(--text-meta);

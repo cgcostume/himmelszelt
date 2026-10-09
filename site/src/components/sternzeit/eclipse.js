@@ -1,7 +1,7 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { drawSvg, svgText, veiledHorizon } from "./figure.js";
 import { aboveVisibleHorizon } from "./horizon.js";
-import { offPanelArrowFromCenter, offPanelArrowSvg } from "./offpanel.js";
+import { arrowAround, offPanelArrowSvg } from "./offpanel.js";
 import { ephemerisDay, onChange, state, update } from "./state.js";
 import "./export.js";
 
@@ -40,10 +40,10 @@ function corona() {
 const f = (n) => n.toFixed(2);
 const circle = (x, y, r, cls, extra = "") => `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}" class="${cls}" ${extra}/>`;
 
-/** A body outside the panel: an arrow along the rim pointing towards it, its distance labeled at the bottom (top, if the arrow points down). */
-function offPanelMoon(dx, dy) {
-    // Along the direction from the panel's center (the Sun, or the shadow's axis) to the Moon, at the panel's edge.
-    return offPanelArrowSvg(offPanelArrowFromCenter({ x: dx, y: dy }, HALF, unitsPerPx), false);
+/** The Moon outside the panel: an arrow towards it on a circle around the center, half the panel across by default. */
+function offPanelMoon(dx, dy, radius = HALF / 2) {
+    // Along the direction from the panel's center (the Sun, or the shadow's axis) to the Moon.
+    return offPanelArrowSvg(arrowAround({ x: 0, y: 0 }, { x: dx, y: dy }, radius, unitsPerPx), false);
 }
 
 function renderSolar(jd) {
@@ -121,7 +121,8 @@ function renderLunar(jd) {
         svg += `<g clip-path="url(#${clip})"><circle r="${penumbra}" fill="url(#${pid})"/>`;
         svg += `<circle r="${umbra * UMBRA_FADE}" fill="url(#${uid})"/></g>`;
     }
-    const arrow = onPanelLunar ? "" : offPanelMoon(mx, my);
+    // Midway between the umbra's and the penumbra's edge, clear of both.
+    const arrow = onPanelLunar ? "" : offPanelMoon(mx, my, (umbra + penumbra) / 2);
     svg += circle(0, 0, penumbra, "eclipse-edge") + circle(0, 0, umbra, "eclipse-edge");
     svg += svgText(0, -umbra + 9, "umbra", "figure-label");
     svg += svgText(0, -penumbra + 9, "penumbra", "figure-label");

@@ -235,6 +235,77 @@ const atmosphereShell = new Ellipse({
     fill: false,
 });
 
+// Orthographic, the scene has no perspective to tell front from back, so the circles and axes through Earth are each
+// drawn twice: the part in front of Earth's center as it is, the part behind it faint (see .line-behind). The shapes
+// above only hold the geometry, hidden; their halves are split anew every frame, since what is in front depends on
+// the view. Zdog draws a one-point path as a dot, so a half with nothing in it is hidden instead.
+const RING_SEGMENTS = 96;
+const inDepth = (source, closed) => {
+    source.visible = false;
+    const half = () =>
+        new Shape({ addTo: earthAnchor, path: [v(0, 0, 0)], closed: false, stroke: source.stroke, color: INK });
+    return { source, closed, front: half(), back: half() };
+};
+const depthLines = [
+    inDepth(equatorRing, true),
+    inDepth(latitudeRing, true),
+    inDepth(meridianRing, true),
+    inDepth(orbitEllipse, true),
+    inDepth(axisLine, false),
+    inDepth(trueEclipticAxis, false),
+    inDepth(trueObliquityArc, false),
+    inDepth(trueObliquityArcSouth, false),
+    inDepth(radiusLine, false),
+];
+const depthOf = (source) => depthLines.find((line) => line.source === source);
+
+// The source's points in Earth's frame: an ellipse sampled around, a shape's own path, both turned and moved as Zdog
+// turns and moves them.
+function sourcePoints(source) {
+    const local =
+        source instanceof Ellipse
+            ? Array.from({ length: RING_SEGMENTS }, (_, i) => {
+                  const t = (i / RING_SEGMENTS) * 2 * Math.PI;
+                  const [w, h] = [source.width ?? source.diameter, source.height ?? source.diameter];
+                  return { x: (w / 2) * Math.cos(t), y: (h / 2) * Math.sin(t) };
+              })
+            : source.path;
+    return local.map((point) => new Vector(point).rotate(source.rotate).add(source.translate));
+}
+
+// Splits each line where it passes Earth's center in depth, a crossing point interpolated between the two either side.
+function splitInDepth(view) {
+    for (const { source, closed, front, back } of depthLines) {
+        const points = sourcePoints(source);
+        if (closed) points.push(points[0]);
+        const depth = points.map((point) => point.copy().rotate(view).z);
+        const paths = { front: [], back: [] };
+        let side = null;
+        points.forEach((point, i) => {
+            const here = depth[i] >= 0 ? "front" : "back";
+            if (side === null) paths[here].push({ move: point });
+            else if (here !== side) {
+                const t = depth[i - 1] / (depth[i - 1] - depth[i]);
+                const crossing = points[i - 1].copy().lerp(point, t);
+                paths[side].push({ line: crossing });
+                paths[here].push({ move: crossing });
+            }
+            if (side !== null) paths[here].push({ line: point });
+            side = here;
+        });
+        for (const [shape, path] of [
+            [front, paths.front],
+            [back, paths.back],
+        ]) {
+            shape.visible = path.length > 1;
+            if (shape.visible) {
+                shape.path = path;
+                shape.updatePath();
+            }
+        }
+    }
+}
+
 const sunAnchor = new Anchor({ addTo: illustration });
 // A solid, billboarded outline, deliberately not dotted like atmosphereShell/moonDisc: with the sunrays
 // below, the sun is the one body meant to read as a concrete, currently-there thing rather than a fixed
@@ -378,8 +449,9 @@ stageEl.addEventListener("pointermove", (e) => {
         const dx = e.clientX - lastPointer.x;
         const dy = e.clientY - lastPointer.y;
         lastPointer = { x: e.clientX, y: e.clientY };
-        rotY += dx * 0.008;
-        rotX += dy * 0.008;
+        // Subtracted, as Zdog's own drag does: what is in front follows the pointer, like a globe turned by hand.
+        rotY -= dx * 0.008;
+        rotX -= dy * 0.008;
         requestFrame();
     }
 });
@@ -483,6 +555,7 @@ function frame() {
     orbitEllipse.updatePath();
 
     illustration.rotate = { x: rotX, y: rotY, z: 0 };
+    splitInDepth(illustration.rotate);
     illustration.updateRenderGraph();
     annotate("observer", vScale(observerPos, 1.02));
     annotate("equinox", trueEquinoxDot.translate);
@@ -511,7 +584,13 @@ function frame() {
         ["line-long-dashed", [orbitEllipse]],
         ["line-dashed", [latitudeRing, meridianRing]],
     ];
-    for (const [dash, shapes] of dashes) for (const shape of shapes) shape.svgElement?.classList.add(dash);
+    for (const [dash, shapes] of dashes) {
+        for (const shape of shapes) {
+            const halves = depthOf(shape);
+            for (const drawn of halves ? [halves.front, halves.back] : [shape]) drawn.svgElement?.classList.add(dash);
+        }
+    }
+    for (const { back } of depthLines) back.svgElement?.classList.add("line-behind");
 }
 
 const requestFrame = onDemand(frame);
