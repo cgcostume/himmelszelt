@@ -4,19 +4,19 @@ import { drawSvg, svgText } from "./figure.js";
 import { onChange, state } from "./state.js";
 import "./export.js";
 
-// From the start of the Five Millennium Canon, as far as the long-term parabola of Espenak and Meeus reaches back,
-// to the end of their polynomials, and where the measurements take over from them.
-const FIRST_YEAR = -2000;
+// Far back on the long-term parabola of Espenak and Meeus, beyond their canon's −2000, to the end of their polynomials,
+// and where the measurements take over from them.
+const FIRST_YEAR = -8000;
 const LAST_YEAR = 2150;
 const MEASURED_SINCE = 1962;
 const YEAR_STEP = 2;
-// Room around the plot, the years below it, in screen pixels; the ΔT axis stands at the year 0.
-const MARGIN = { left: 8, right: 8, top: 8, bottom: 20 };
-const AXIS_YEAR = 0;
-// ΔT runs from a few seconds below zero to nearly five hours: a logarithm of its size, its sign kept, shows both ends.
-const SCALE_MIN = -10;
-const SCALE_MAX = 50_000;
+// Room above the plot and for the years below it, in screen pixels.
+const MARGIN = { top: 8, bottom: 20 };
+// ΔT runs from a minute below zero to ten hours, where the parabola leaves the plot: a logarithm of its size, its sign kept, shows both ends.
+const SCALE_MIN = -60;
+const SCALE_MAX = 36_000;
 const TICKS = [
+    [-10, "\u221210 s"],
     [0, "0"],
     [10, "10 s"],
     [60, "1 m"],
@@ -26,7 +26,7 @@ const TICKS = [
 ];
 // Where Espenak and Meeus switch from one polynomial to the next, between -500 and 1962.
 const POLYNOMIAL_JOINS = [500, 1600, 1700, 1800, 1860, 1900, 1920, 1941];
-const YEAR_TICKS = [-2000, 0, 500, 1000, 1500, 1750, 1900, 2000];
+const YEAR_TICKS = [-8000, -2000, 0, 500, 1600, 1700, 1800, 1860, 1920, MEASURED_SINCE];
 // From this year on, time runs linearly over this share of the width; before it, the years back from it are compressed
 // on a logarithm, at a scale chosen so the two meet at the same pace, without a kink.
 const LINEAR_SINCE = 1750;
@@ -56,7 +56,7 @@ function duration(seconds) {
 
 function layout() {
     const [width, height] = [svgEl.clientWidth || 600, svgEl.clientHeight || 140];
-    const plot = { left: MARGIN.left, right: width - MARGIN.right, top: MARGIN.top, bottom: height - MARGIN.bottom };
+    const plot = { left: 0, right: width, top: MARGIN.top, bottom: height - MARGIN.bottom };
     const span = plot.right - plot.left;
     const split = plot.right - LINEAR_SHARE * span;
     const back = (year) =>
@@ -92,20 +92,34 @@ function render() {
     svgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
 
     let svg = "";
-    const axis = x(AXIS_YEAR);
+    // The lines stop short of the labels: five monospace characters, some 0.6 em each, and half the labels' 6 px gap.
+    const gutter = 3 * parseFloat(getComputedStyle(svgEl).fontSize) + 3;
     for (const [seconds, label] of TICKS) {
-        svg += `<line x1="${plot.left}" y1="${f(y(seconds))}" x2="${plot.right}" y2="${f(y(seconds))}" class="figure-grid"/>`;
-        svg += svgText(axis - 6, y(seconds), label, "figure-grid-label deltat-tick");
+        const cls = seconds === 0 ? "deltat-zero" : `figure-grid${label.includes("10") ? " deltat-minor" : ""}`;
+        svg += `<line x1="${f(plot.left + gutter)}" y1="${f(y(seconds))}" x2="${plot.right}" y2="${f(y(seconds))}" class="${cls}"/>`;
+        svg += svgText(plot.left, y(seconds), label.padStart(5, "\u2007"), "figure-grid-label deltat-tick");
     }
-    svg += `<line x1="${f(axis)}" y1="${plot.top}" x2="${f(axis)}" y2="${plot.bottom}" class="deltat-axis"/>`;
-    for (const year of YEAR_TICKS) {
+    // Narrow, the years crowd: those that are only details left out.
+    const crowded = [-2000, 500, 1600, 1700, 1860, 1920, MEASURED_SINCE];
+    const years = width < 480 ? YEAR_TICKS.filter((year) => !crowded.includes(year)) : YEAR_TICKS;
+    // A labeled join gets a line up through the plot.
+    for (const year of POLYNOMIAL_JOINS.filter((year) => years.includes(year))) {
+        svg += `<line x1="${f(x(year))}" y1="${plot.top}" x2="${f(x(year))}" y2="${plot.bottom}" class="figure-grid deltat-minor"/>`;
+    }
+    for (const year of years) {
         // The first one starts at the plot's edge rather than centered on it, so it stays whole.
         const cls = year === FIRST_YEAR ? "figure-label figure-anchor-start" : "figure-label";
         svg += svgText(x(year), height - MARGIN.bottom / 2, String(year).replace("-", "\u2212"), cls);
     }
-    // The era of measurements, a band behind the curve.
-    svg += `<rect x="${f(x(MEASURED_SINCE))}" y="${plot.top}" width="${f(x(today) - x(MEASURED_SINCE))}" height="${plot.bottom - plot.top}" class="strip-band"/>`;
-    svg += `<polyline points="${path(FIRST_YEAR, MEASURED_SINCE, view)}" class="deltat-line"/>`;
+    // Today in place of 2000, which it would crowd.
+    svg += svgText(x(1970 + Date.now() / (365.25 * 86_400_000)), height - MARGIN.bottom / 2, "today", "figure-label");
+    // Where the pieces join, a line from the curve down to the years.
+    for (const year of [-500, MEASURED_SINCE, today]) {
+        svg += `<line x1="${f(x(year))}" y1="${f(y(precise.deltaT(jdOf(year))))}" x2="${f(x(year))}" y2="${plot.bottom}" class="deltat-axis"/>`;
+    }
+    // The parabola climbs past the top long before the first year: the curve clipped to the plot.
+    svg += `<clipPath id="deltat-clip"><rect x="${plot.left}" y="${plot.top}" width="${plot.right - plot.left}" height="${plot.bottom - plot.top}"/></clipPath>`;
+    svg += `<polyline points="${path(FIRST_YEAR, MEASURED_SINCE, view)}" class="deltat-line" clip-path="url(#deltat-clip)"/>`;
     svg += `<polyline points="${path(MEASURED_SINCE, today, view)}" class="deltat-line deltat-measured"/>`;
     svg += `<polyline points="${path(today, LAST_YEAR, view)}" class="deltat-line deltat-extrapolated"/>`;
 
@@ -122,28 +136,26 @@ function render() {
         svg += `<polygon points="${first},${f(y(0))} ${negative.join(" ")} ${last},${f(y(0))}" class="deltat-negative"/>`;
     }
 
-    // Where the pieces join: a bubble at each end of the parabola, the polynomials, the measurements and the
-    // extrapolation, and a small dot where one of Espenak and Meeus' polynomials hands over to the next.
+    // Where the pieces join: a bubble where the parabola, the polynomials, the measurements and the extrapolation hand
+    // over, and a small dot where one of Espenak and Meeus' polynomials hands over to the next.
     for (const year of POLYNOMIAL_JOINS) {
         svg += `<circle cx="${f(x(year))}" cy="${f(y(precise.deltaT(jdOf(year))))}" r="2.2" class="deltat-join"/>`;
     }
-    for (const year of [FIRST_YEAR, -500, MEASURED_SINCE, today, LAST_YEAR]) {
+    for (const year of [-500, MEASURED_SINCE, today]) {
         svg += `<circle cx="${f(x(year))}" cy="${f(y(precise.deltaT(jdOf(year))))}" r="3" class="deltat-bubble"/>`;
     }
 
-    // What the curve is made of, and the one stretch where the clock ran ahead, all named in one row along the bottom,
-    // where the curve only dips once.
-    const row = y(-3);
-    svg += svgText(x(-500) - 6, row, "parabola", "figure-label figure-anchor-end");
-    svg += svgText(x(1150), row, "polynomials", "figure-label");
-    svg += svgText(x(today) + 6, row, "extrapolated", "figure-label figure-anchor-start");
-    svg += svgText(x(today) - 6, row, "measured", "figure-label figure-anchor-end");
-    svg += svgText(x(1868) - 6, row, "below 0, 1871\u20131902", "figure-label figure-anchor-end");
+    // What the curve is made of, named in one row along the bottom, where the curve only dips once.
+    const row = (y(0) + y(-10)) / 2;
+    svg += svgText(x(-500) - 6, row, "\u2039 parabola", "figure-label figure-anchor-end");
+    svg += svgText(x(-500) + 6, row, "polynomials \u203A", "figure-label figure-anchor-start");
+    svg += svgText(x(today) + 6, row, "extrapolated \u203A", "figure-label figure-anchor-start");
+    svg += svgText((x(MEASURED_SINCE) + x(today)) / 2, row, "measured", "figure-label");
 
     // A year marked on the curve: a line down to the years, a dot, and its ΔT beside the line, on the side with more room.
-    // A year marked on the curve. The moment's label keeps to the row of the 1 h line, the same height wherever it is;
-    // the hovered year's sits by its dot, on the side with more room, below it in the upper half and above it in the
-    // lower one.
+    // A year marked on the curve. The moment's label keeps to the row between the 1 h and 10 h lines, the same height
+    // wherever it is; the hovered year's sits by its dot, on the side with more room, below it in the upper half and
+    // above it in the lower one.
     const mark = (year, name, cls, labelY = null) => {
         if (year < FIRST_YEAR || year > LAST_YEAR) return "";
         const seconds = precise.deltaT(jdOf(year));
@@ -159,7 +171,7 @@ function render() {
     };
     // The page's moment always, the hovered year besides while there is one.
     const year = yearOf(state.jd);
-    svg += mark(year, yearText(Math.floor(year)), "", y(3600));
+    svg += mark(year, yearText(Math.floor(year)), "", (y(3600) + y(36_000)) / 2);
     if (hovered !== null) svg += mark(hovered, yearText(Math.round(hovered)), "deltat-hover");
     drawSvg(svgEl, svg, 1);
 }

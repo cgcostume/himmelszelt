@@ -1249,10 +1249,16 @@ figure[id] {
 .strip-panel {
     position: relative;
 }
+/* Broken out of the column, inset as far as the panels floating over the scenes, the analemma's among them. */
+@media (min-width: 48rem) {
+    .strip-panel {
+        margin-inline: 1.5rem;
+    }
+}
 /* The caption keeps to the text column, which the wide figure is centered on. */
 .strip-figure > figcaption {
     max-width: calc(var(--measure) - 3rem);
-    margin-inline: auto;
+    margin: 0.75rem auto 0;
 }
 .strip-band {
     fill: var(--surface);
@@ -1268,14 +1274,25 @@ figure[id] {
 }
 /* No frame around ΔT: the curve and its grid stand on their own. */
 .deltat-panel > svg {
+    height: 11rem;
     border: 0;
     cursor: default;
 }
-/* The ΔT ticks in the monospace, so their one-letter units line up. */
+/* The ΔT ticks in the monospace, so their one-letter units line up, at the left edge, where the parabola has left the
+   plot and nothing else is drawn. */
 .deltat-tick {
     font-family: var(--font-mono);
+    text-anchor: start;
 }
 .deltat-axis {
+    stroke: var(--line);
+    stroke-width: 1;
+}
+/* The decades between the units fainter, the zero line solid. */
+.deltat-minor {
+    opacity: 0.5;
+}
+.deltat-zero {
     stroke: var(--line);
     stroke-width: 1;
 }
