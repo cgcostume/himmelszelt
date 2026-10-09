@@ -307,13 +307,16 @@ tbody tr:hover {
 #scene.labels-off :is(.scene-annotation, .scene-annotations) {
     visibility: hidden;
 }
-/* The two alt-az panels float on top of #stage, transparent and click-through, straddling its vertical middle. */
+/* The two alt-az panels float on top of #stage, straddling its vertical middle; between them it is click-through. */
 .altaz-panels {
     position: absolute;
     inset: 0;
     pointer-events: none;
 }
+/* The panels take the pointer, so a drag over one does not turn the scene underneath, nor shows that it would. */
 .altaz-panel {
+    pointer-events: auto;
+    cursor: default;
     position: absolute;
     right: 1.5rem;
     height: 38%;
@@ -641,7 +644,8 @@ figure[id] {
     top: 50%;
     transform: translateY(-50%);
     width: 38cqh;
-    pointer-events: none;
+    pointer-events: auto;
+    cursor: default;
 }
 .analemma-caption {
     display: block;
@@ -1043,6 +1047,9 @@ figure[id] {
     .dome-scene {
         aspect-ratio: 16 / 9;
     }
+    .strip-panel {
+        --scene-ratio: 9 / 16;
+    }
 }
 /* Narrow screens, one column all the way down: every figure is the width of the text and square, what floats over
    the two big scenes moves below them, the tables become cards folded behind their name (a hundred of them would
@@ -1234,17 +1241,21 @@ figure[id] {
     }
 }
 
-/* The flat strips across the page, such as ΔT over the millennia. Their SVGs draw in screen pixels. */
+/* The flat strips: ΔT over the millennia and the year's daylight. Their SVGs draw in screen pixels, without a frame. */
 .strip-figure {
     margin-top: 1.5rem;
     margin-bottom: 1.5rem;
 }
+/* One that stays in the column fills it, without the browser's figure indent. */
+.strip-figure:not(.wide) {
+    margin-inline: 0;
+}
+/* As tall as the panels over the scenes are wide (1a, 1b, the analemma): 38% of the scene's height, which is 4:3 of the
+   wide width, 16:9 once the page is wide, never over 80vh; never under 9rem, where the scenes turn square and small. */
 .strip-panel > svg {
     display: block;
     width: 100%;
-    height: 9rem;
-    border: var(--border);
-    border-radius: var(--radius);
+    height: max(9rem, 0.38 * min(80vh, min(var(--wide), 100vw - 3rem) * var(--scene-ratio, 3 / 4)));
     background: var(--bg);
     cursor: crosshair;
 }
@@ -1253,7 +1264,7 @@ figure[id] {
 }
 /* Broken out of the column, inset as far as the panels floating over the scenes, the analemma's among them. */
 @media (min-width: 48rem) {
-    .strip-panel {
+    .wide > .strip-panel {
         margin-inline: 1.5rem;
     }
 }
@@ -1274,16 +1285,16 @@ figure[id] {
 .strip-moment-dot {
     fill: var(--text);
 }
-/* No frame around ΔT: the curve and its grid stand on their own. */
+/* Nothing to click on ΔT, only to hover. */
 .deltat-panel > svg {
-    height: 11rem;
-    border: 0;
     cursor: default;
 }
-/* The ΔT ticks in the monospace, so their one-letter units line up, at the left edge, where the parabola has left the
-   plot and nothing else is drawn. */
-.deltat-tick {
+/* The strips' value ticks in the monospace, so their digits and units line up. */
+.strip-tick {
     font-family: var(--font-mono);
+}
+/* At the left edge, flush with the text. */
+.strip-tick {
     text-anchor: start;
 }
 .deltat-axis {
@@ -1323,4 +1334,53 @@ figure[id] {
 }
 .deltat-extrapolated {
     stroke-dasharray: 4 4;
+}
+/* The year's light, a sky from night to day: the twilights in ever more of the accent, the golden hour a soft amber
+   rather than orange, the blue hour a deep blue, darker than the day as in the sky. */
+#daylight {
+    --golden: hsl(40 65% 68%);
+    --blue-hour: hsl(222 70% 52%);
+}
+.daylight-night {
+    fill: var(--bg);
+}
+.daylight-astronomical {
+    fill: color-mix(in srgb, var(--accent) 12%, var(--bg));
+}
+.daylight-nautical {
+    fill: color-mix(in srgb, var(--accent) 25%, var(--bg));
+}
+.daylight-blue {
+    fill: color-mix(in srgb, var(--blue-hour) 70%, var(--bg));
+}
+.daylight-golden {
+    fill: color-mix(in srgb, var(--golden) 80%, var(--bg));
+}
+.daylight-day {
+    fill: var(--accent);
+}
+.daylight-sunrise {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 1;
+}
+.daylight-grid {
+    stroke: var(--text);
+    opacity: 0.3;
+}
+.daylight-tick {
+    stroke: var(--line);
+}
+/* The caption's colour key: each band's name in its own colour. */
+.daylight-key {
+    color: var(--text);
+}
+span.daylight-golden {
+    color: var(--golden);
+}
+span.daylight-blue {
+    color: color-mix(in srgb, var(--blue-hour) 70%, var(--text));
+}
+span.daylight-day {
+    color: var(--accent);
 }

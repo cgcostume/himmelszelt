@@ -1,0 +1,20 @@
+---
+import "./sternzeit.css";
+---
+
+<figure class="strip-figure" id="daylight">
+    <div class="strip-panel daylight-panel" data-export="daylight">
+        <svg aria-hidden="true"></svg>
+    </div>
+    <figcaption class="figure-caption">
+        The year at the chosen place, day by day from left to right, midnight to midnight from top to bottom on the chosen
+        clock, its daylight saving time included: <span class="daylight-key daylight-day">day</span>, the <span class="daylight-key daylight-golden"
+            >golden</span
+        > and the <span class="daylight-key daylight-blue">blue</span> hour, then nautical and astronomical twilight,
+        each a shade darker, and night. The line through the golden hour is sunrise and sunset. Click to move the moment there.
+    </figcaption>
+</figure>
+
+<script>
+    import "./daylight.js";
+</script>

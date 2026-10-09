@@ -334,6 +334,8 @@ function placeCompass() {
 
 let dragFrom = null;
 frameEl.addEventListener("pointerdown", (event) => {
+    // Not over the analemma, which floats on top of the dome.
+    if (event.target.closest(".analemma-panel")) return;
     dragFrom = { x: event.clientX, y: event.clientY };
     frameEl.setPointerCapture(event.pointerId);
 });

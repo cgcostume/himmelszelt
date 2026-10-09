@@ -1,6 +1,6 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { onDemand } from "../frame.js";
-import { drawSvg, svgText } from "./figure.js";
+import { drawSvg, LABEL_GAP as GAP, STRIP_MARGIN as MARGIN, svgText } from "./figure.js";
 import { onChange, state } from "./state.js";
 import "./export.js";
 
@@ -10,10 +10,6 @@ const FIRST_YEAR = -8000;
 const LAST_YEAR = 2150;
 const MEASURED_SINCE = 1962;
 const YEAR_STEP = 2;
-// What a label keeps from the line or the mark it names, in screen pixels.
-const GAP = 6;
-// Room above the plot and for the years below it, in screen pixels.
-const MARGIN = { top: 12, bottom: 20 };
 // ΔT from a minute below zero to ten hours, where the parabola leaves the plot: a logarithm of its size, its sign kept.
 const SCALE_MIN = -60;
 const SCALE_MAX = 36_000;
@@ -95,7 +91,7 @@ function render() {
     for (const [seconds, label, minor] of TICKS) {
         if (seconds !== 0)
             svg += line(0, y(seconds), width, y(seconds), `figure-grid deltat-row${minor ? " deltat-minor" : ""}`);
-        svg += svgText(0, y(seconds), label.padStart(5, "\u2007"), "figure-grid-label deltat-tick");
+        svg += svgText(0, y(seconds), label.padStart(5, "\u2007"), "figure-grid-label strip-tick");
     }
     // Narrow, the years crowd: those that are only details left out.
     const crowded = [-2000, 500, 1600, 1700, 1860, 1920, MEASURED_SINCE];
@@ -171,7 +167,7 @@ function render() {
     if (hovered !== null) svg += mark(hovered, yearText(Math.round(hovered)), "deltat-hover");
     drawSvg(svgEl, svg, 1);
     // The rows stop a gap short of their labels, measured once drawn.
-    const labels = [...svgEl.querySelectorAll(".deltat-tick")].map((text) => text.getBBox());
+    const labels = [...svgEl.querySelectorAll(".strip-tick")].map((text) => text.getBBox());
     const edge = Math.max(...labels.map((box) => box.x + box.width)) + GAP;
     for (const row of svgEl.querySelectorAll(".deltat-row")) row.setAttribute("x1", f(edge));
 }

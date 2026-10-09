@@ -21,6 +21,7 @@ references:
 import Cite from "../../components/Cite.astro";
 import Controls from "../../components/sternzeit/Controls.astro";
 import DayArc from "../../components/sternzeit/DayArc.astro";
+import Daylight from "../../components/sternzeit/Daylight.astro";
 import DeltaT from "../../components/sternzeit/DeltaT.astro";
 import Eclipse from "../../components/sternzeit/Eclipse.astro";
 import MoonCalendar from "../../components/sternzeit/MoonCalendar.astro";
@@ -247,6 +248,11 @@ const [dawn, dusk] = crossings(-6); // civil twilight
 
 Run for the chosen day, place and clock: <SunTimes />.
 
+Walk the same thresholds through a whole year and they draw the light of every day at once (<Fig id="daylight" />): the
+days lengthening and shortening, the hour by which summer time shifts them, and the twilights, which far enough north
+fill whole summer nights.
+
+<Daylight />
 <Controls height={false} />
 
 ## The Moon

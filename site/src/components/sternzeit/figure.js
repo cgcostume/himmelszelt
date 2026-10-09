@@ -21,6 +21,10 @@ export const cssColor = (name, fallback) =>
 /** The eight compass directions, from north through east, 45 degrees apart. */
 export const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 
+/** What a label keeps from the line or the mark it names, and the room above and below the flat strips, in pixels. */
+export const LABEL_GAP = 6;
+export const STRIP_MARGIN = { top: 12, bottom: 20 };
+
 export function svgText(x, y, text, cls) {
     return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" class="${cls}">${escapeText(text)}</text>`;
 }
