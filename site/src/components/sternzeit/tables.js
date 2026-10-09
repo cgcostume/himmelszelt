@@ -343,9 +343,19 @@ const namespacesOf = (domainName) =>
     // biome-ignore lint/performance/noDynamicNamespaceImportAccess: the tables list every export, so it needs the whole namespace anyway
     domainName === "time" ? [pick(precise), pick(approx)] : [precise[domainName], approx[domainName]];
 
+// What each table holds, ahead of the namespace it lists; the time functions have none.
+const TITLES = {
+    time: "Julian Day, ΔT and sidereal time",
+    earth: "Earth's axis, size and atmosphere",
+    sun: "The Sun's position, distance and size",
+    moon: "The Moon's position, phase and libration",
+    eclipse: "Solar and lunar eclipses",
+};
+
 function renderDomain(domainName, jd, open) {
     const [preciseNs, approxNs] = namespacesOf(domainName);
     const label = domainName === "time" ? "time" : `${domainName}.*`;
+    const title = `<span class="table-caption">${TITLES[domainName]}${domainName === "time" ? "</span>" : `,</span> ${label}`}`;
     // Not alphabetized: preserves each namespace's own hand-grouped declaration order (index.ts/approx.ts),
     // e.g. apparentPosition/equatorialHorizontalParallax/topocentricPosition/horizontalPosition stay adjacent
     // as a pipeline, which sorting would scatter (a.../e.../h.../t...).
@@ -355,8 +365,8 @@ function renderDomain(domainName, jd, open) {
     // Folded until asked for, because a table of this length is a wall to scroll past in the middle of the text.
     // The cards have no heading row, so the variant toggle sits above them instead.
     return `
-        <details class="table-fold"${open ? " open" : ""}>
-            <summary><span class="table-caption"></span>${label} <span class="note">${rows.length} values</span></summary>
+        <details class="fold table-fold"${open ? " open" : ""}>
+            <summary>${title}</summary>
             <p class="table-note note">Values: ${variantToggle()}</p>
             <table>
                 <colgroup><col class="name" /><col class="unit" /><col class="value" /></colgroup>

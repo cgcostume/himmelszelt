@@ -223,6 +223,10 @@ th {
     font-weight: 400;
     background: var(--surface);
 }
+/* The value tables a size smaller, so the longest name, ATMOSPHERE_THICKNESS_NON_UNIFORM_KM, fits on one line. */
+.sternzeit-table table {
+    font-size: var(--text-small);
+}
 col.name {
     width: 45%;
 }
@@ -389,19 +393,20 @@ tbody tr:hover {
     left: 0;
     width: 100%;
 }
-/* Every table starts folded, numbered like the figures, with the same marker as the moment-and-place summary. */
+/* Every table starts folded like the contents, numbered like the figures, only the number in the accent. */
 .table-fold > summary {
-    margin-bottom: 0.5rem;
     padding: 0.3rem 0;
     font-family: var(--font-mono);
-    color: var(--accent);
-    cursor: pointer;
-    list-style: none;
+    color: var(--text);
+}
+/* What the table holds in the text's face, the namespace after it in the monospace. */
+.table-caption {
+    font-family: "Roboto", system-ui, sans-serif;
 }
 .table-caption::before {
     counter-increment: table;
     content: "Table " counter(table) ". ";
-    font-family: "Roboto", system-ui, sans-serif;
+    color: var(--accent);
 }
 /* A set of moment-and-place controls, foldable behind a one-line summary of the current values. No box around it,
    just a rule down its left saying how far it reaches, the same one a jumped-to reference gets. It sits in the
@@ -422,19 +427,16 @@ tbody tr:hover {
     /* Clear of the copy button in the corner. */
     padding-right: 2rem;
 }
-.moment summary::-webkit-details-marker,
-.table-fold > summary::-webkit-details-marker {
+.moment summary::-webkit-details-marker {
     display: none;
 }
-.moment summary::before,
-.table-fold > summary::before {
+.moment summary::before {
     content: "+";
     display: inline-block;
     width: 1.2em;
     color: var(--muted);
 }
-.moment[open] summary::before,
-.table-fold[open] > summary::before {
+.moment[open] summary::before {
     content: "\2212";
 }
 .moment-title {

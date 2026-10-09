@@ -78,10 +78,11 @@ Most formulas then don't count in days but in <Term of="Julian century">Julian c
 shape of an orbit, is written as a polynomial in time, and counted in centuries its terms stay modest numbers instead of
 tiny coefficients multiplied by millions of days.
 
-The clock and the orbits do not quite agree, though. The tides brake Earth's rotation, unevenly, so the time it keeps
-drifts from the uniform time the orbits run on. The difference is <Term of="Delta T">ΔT</Term>: about a minute today,
-hours in antiquity (<Fig id="delta-t" />). Functions that take a date and a place account for it on their own. Those
-that take a bare Julian Day expect it in ephemeris time, from `julianEphemerisDay`.
+Earth's rotation makes a fine clock, but not a perfect one. Tidal friction slows it, by an amount that varies over
+the centuries, so time counted by the turning Earth falls behind the uniform time in which the orbits are computed. The
+gap between the two is <Term of="Delta T">ΔT</Term>: about a minute today, and hours in antiquity (<Fig id="delta-t" />).
+Wherever you pass a date and a place, ΔT is taken care of. A function that takes a bare Julian Day expects it in
+ephemeris time, which `julianEphemerisDay` gives you.
 
 <DeltaT />
 
