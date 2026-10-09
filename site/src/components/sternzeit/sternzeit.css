@@ -1288,12 +1288,12 @@ figure[id] {
     stroke: var(--line);
     stroke-width: 1;
 }
-/* The decades between the units fainter, the zero line solid. */
+/* The decades between the units fainter, the zero line solid and a little brighter than the lines at the handovers. */
 .deltat-minor {
     opacity: 0.5;
 }
 .deltat-zero {
-    stroke: var(--line);
+    stroke: color-mix(in srgb, var(--line), var(--muted));
     stroke-width: 1;
 }
 .deltat-negative {
