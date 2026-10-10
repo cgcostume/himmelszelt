@@ -89,7 +89,7 @@ everything; one `pnpm-lock.yaml`, one `biome.json`, one `tsconfig.base.json` (ea
 `tsconfig.json` extends it). Cross-package dependencies use `workspace:*` (e.g. dunstkreis' tests
 use sternzeit), which pnpm rewrites to real version ranges on publish.
 
-Root scripts: `pnpm dev` (site at http://localhost:4321/himmelszelt/), `pnpm build`, `pnpm typecheck`, `pnpm test` (recursive), `pnpm lint`, `pnpm format`, `pnpm clean` (removes everything generated, including `node_modules`).
+Root scripts: `pnpm dev` (site at http://localhost:4321/), `pnpm build`, `pnpm typecheck`, `pnpm test` (recursive), `pnpm lint`, `pnpm format`, `pnpm clean` (removes everything generated, including `node_modules`).
 
 ## Tooling (same across every `@himmelszelt/*` package)
 

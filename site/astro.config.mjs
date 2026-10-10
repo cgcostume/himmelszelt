@@ -11,10 +11,9 @@ const wgsl = {
         id.endsWith(".wgsl") ? { code: `export default ${JSON.stringify(code)};`, map: null } : null,
 };
 
-// Static output only: served locally by `pnpm dev` and deployed as plain files to GitHub Pages under /himmelszelt.
+// Static output only: served locally by `pnpm dev` and deployed as plain files to GitHub Pages at himmelszelt.dev.
 export default defineConfig({
-    site: "https://cgcostume.github.io",
-    base: "/himmelszelt",
+    site: "https://himmelszelt.dev",
     output: "static",
     integrations: [mdx()],
     markdown: {

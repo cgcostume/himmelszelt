@@ -10,7 +10,7 @@ for atmosphere rendering). Modules are intentionally decoupled: consumers
 compute positions here and pass plain vectors/angles into the rendering
 packages themselves.
 
-New to terms like nutation, obliquity, or libration? The [himmelszelt site](https://github.com/cgcostume/himmelszelt) explains every one of them, right where it is used.
+New to terms like nutation, obliquity, or libration? The [himmelszelt site](https://himmelszelt.dev) explains every one of them, right where it is used.
 
 ## Status
 
@@ -90,7 +90,7 @@ pnpm build       # rolldown -> dist/*.js + dist/*.d.ts, for every package
 pnpm typecheck
 pnpm lint        # biome, repo-wide
 pnpm test        # playwright
-pnpm dev         # the site, where this library's chapter lives: http://localhost:4321/himmelszelt/sternzeit/
+pnpm dev         # the site, where this library's chapter lives: http://localhost:4321/sternzeit/
 ```
 
 `pnpm generate:catalog` (inside `packages/sternzeit`) regenerates the binary star catalog from its CSV.
