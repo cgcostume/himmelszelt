@@ -175,9 +175,19 @@ function periodicSum(t: JulianDay, table: Float64Array, stride: number, column: 
     return sum;
 }
 
+// The last position and distance: what is built on them asks for the same instant again and again, and the series
+// are the costly part. Off, every call sums them anew, to measure what the cache saves.
+const CACHE_SERIES = true;
+let positionAt = Number.NaN;
+let positionCached: EclipticalCoords = { longitude: 0, latitude: 0 };
+let distanceAt = Number.NaN;
+let distanceCached = 0;
+
 /** Geocentric ecliptical position, geometric and referred to the mean equinox of the date, per Meeus ch. 47 (tables
  *  47.A and 47.B). {@link apparentPosition} adds the nutation. */
 export function position(t: JulianDay): EclipticalCoords {
+    // A copy, so a caller changing it cannot change the cache.
+    if (CACHE_SERIES && t === positionAt) return { ...positionCached };
     const T = julianCenturiesSinceStandardEquinox(t);
     let Sl = periodicSum(t, LONGITUDE_DISTANCE_TERMS, 6, 4, false);
     let Sb = periodicSum(t, LATITUDE_TERMS, 5, 4, false);
@@ -193,7 +203,9 @@ export function position(t: JulianDay): EclipticalCoords {
     Sb += -2235 * Math.sin(L) + 382 * Math.sin(A3) + 175 * Math.sin(A1 - F) + 175 * Math.sin(A1 + F);
     Sb += 127 * Math.sin(L - Mm) - 115 * Math.sin(L + Mm);
 
-    return { longitude: normalizeDegrees(meanLongitude(t) + Sl / 1e6), latitude: Sb / 1e6 };
+    positionAt = t;
+    positionCached = { longitude: normalizeDegrees(meanLongitude(t) + Sl / 1e6), latitude: Sb / 1e6 };
+    return { ...positionCached };
 }
 
 /** Approximation of {@link position} per Jensen et al. 2001. */
@@ -297,7 +309,10 @@ export function horizontalPositionApprox(time: AstronomicalTime, observer: Obser
 
 /** Distance from the center of the Moon to the center of the Earth, in kilometers, per Meeus ch. 47 (table 47.A). */
 export function distance(t: JulianDay): number {
-    return 385_000.56 + periodicSum(t, LONGITUDE_DISTANCE_TERMS, 6, 5, true) / 1000;
+    if (CACHE_SERIES && t === distanceAt) return distanceCached;
+    distanceAt = t;
+    distanceCached = 385_000.56 + periodicSum(t, LONGITUDE_DISTANCE_TERMS, 6, 5, true) / 1000;
+    return distanceCached;
 }
 
 /** Approximation of {@link distance} per Jensen et al. 2001. */

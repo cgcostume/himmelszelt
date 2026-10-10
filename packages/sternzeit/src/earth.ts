@@ -33,14 +33,16 @@ export function orbitEccentricityApprox(_t: JulianDay): number {
  *  and Ω in the argument, then the coefficients of sin (Δψ) and cos (Δε), in 0.0001", each with its T term. */
 const NUTATION_TERMS = flatTable(nutationTable.terms);
 
-// The last result: a position asks for both Δψ and Δε at the same instant, and the series is the costly part.
+// The last result: a position asks for both Δψ and Δε at the same instant, and the series is the costly part. Off, every
+// call sums the series anew, to measure what the cache saves.
+const CACHE_NUTATION = true;
 let nutationAt = Number.NaN;
 let nutationCached = { longitude: 0, obliquity: 0 };
 
 /** Nutation in longitude (Δψ) and in obliquity (Δε), in degrees, summed over {@link NUTATION_TERMS} with the
  *  arguments of Meeus ch. 22, which differ slightly from the Moon's own mean elements of ch. 47. */
 function nutation(t: JulianDay): { longitude: number; obliquity: number } {
-    if (t === nutationAt) return nutationCached;
+    if (CACHE_NUTATION && t === nutationAt) return nutationCached;
     const T = julianCenturiesSinceStandardEquinox(t);
     const D = polynomial(T, 297.85036, 445267.11148, -0.0019142, 1 / 189474) * DEG_TO_RAD;
     const M = polynomial(T, 357.52772, 35999.05034, -0.0001603, -1 / 300000) * DEG_TO_RAD;
