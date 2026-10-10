@@ -1627,7 +1627,8 @@ span.daylight-day {
 .pipeline {
     /* What every arrow keeps clear of the box it starts or ends at. */
     --pipeline-gap: 3px;
-    /* The line above a result and, the 6 pixel tip added, below it. */
+    /* Every arrow is 9 pixels across, an odd number, so its 1 pixel line falls on whole pixels, not between two. */
+    /* The line of each arrow down the middle, its 6 pixel tip not counted. */
     --pipeline-stem: 0.75rem;
     /* Below the equatorial position, only a line's gap before the divider's label. */
     --pipeline-into-divider: 0.3rem;
@@ -1677,25 +1678,35 @@ span.daylight-day {
 .pipeline-input-arrow {
     flex: none;
     width: 0.75rem;
-    height: 1px;
+    height: 9px;
     background: var(--line);
+    mask: linear-gradient(#000, #000) center / 100% 1px no-repeat;
 }
-.pipeline-direct-call::before,
 .pipeline-function.fed::before {
     content: "";
     flex: none;
     width: 1.25rem;
-    height: 8px;
+    height: 9px;
     background: var(--line);
-    /* The arrow down the middle, turned: a 1 pixel line and a tip 6 by 8 pixels that keeps its shape. */
+    /* The arrow down the middle, turned: a 1 pixel line and a tip 6 by 9 pixels that keeps its shape. */
     mask:
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 8'%3E%3Cpath d='M0 0l6 4-6 4z'/%3E%3C/svg%3E")
-        right center / 6px 8px no-repeat,
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 9'%3E%3Cpath d='M0 0l6 4.5-6 4.5z'/%3E%3C/svg%3E")
+        right center / 6px 9px no-repeat,
         linear-gradient(#000, #000) left center / calc(100% - 6px) 1px no-repeat;
 }
 /* A single input's arrow starts right after it, not a bar's width away. */
 .pipeline-input-list:not(.gathered) {
     padding-right: 0.3rem;
+}
+/* A conversion's name over its arguments, the coordinates it takes in braces, the way the code takes them, and the
+   inputs by their symbols. */
+.pipeline-call {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.pipeline-args {
+    color: var(--muted);
 }
 /* The conversion: just its name, centered in its column, level with the arrow into it, which fills the room to its
    left; as much room stays empty on its right. */
@@ -1703,7 +1714,6 @@ span.daylight-day {
     grid-column: 2;
     display: flex;
     align-items: center;
-    padding: 0.3rem 0;
 }
 .pipeline-function::before,
 .pipeline-function::after {
@@ -1737,29 +1747,28 @@ span.daylight-day {
 .pipeline-space::after,
 .pipeline-through {
     content: "";
-    width: 8px;
+    width: 9px;
     height: var(--pipeline-stem);
     background: var(--line);
     mask: linear-gradient(#000, #000) center top / 1px 100% no-repeat;
 }
-/* Out of a box and into the next one, each keeping a small gap to it. */
-.pipeline-space::before {
-    margin-top: var(--pipeline-gap);
-    height: var(--pipeline-stem);
-}
+/* Two arrows, out of the function into its result and out of the result into the next function, each the same length,
+   tip included, and each keeping a small gap at both ends, so the result sits in the middle. */
+.pipeline-space::before,
 .pipeline-space::after {
-    margin-bottom: var(--pipeline-gap);
     height: calc(var(--pipeline-stem) + 6px);
+    margin-block: var(--pipeline-gap);
 }
 .pipeline-through {
     margin-bottom: var(--pipeline-gap);
 }
-/* Arrows end in a tip, a triangle 8 by 6 pixels; the line stops short of it. */
+/* Arrows end in a tip, a triangle 9 by 6 pixels; the line stops short of it. */
+.pipeline-space::before,
 .pipeline-space::after,
 .pipeline-through {
     mask:
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 6'%3E%3Cpath d='M0 0h8l-4 6z'/%3E%3C/svg%3E")
-        center bottom / 8px 6px no-repeat,
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 6'%3E%3Cpath d='M0 0h9l-4.5 6z'/%3E%3C/svg%3E")
+        center bottom / 9px 6px no-repeat,
         linear-gradient(#000, #000) center top / 1px calc(100% - 6px) no-repeat;
 }
 /* The equatorial position runs on through the divider, which carries the rest of its arrow. */
@@ -1793,7 +1802,7 @@ span.daylight-day {
     padding-right: 1.55rem;
 }
 .pipeline-heading.pipeline-direct {
-    padding-left: 1.85rem;
+    padding-left: calc(1.25rem + var(--pipeline-gap));
 }
 .pipeline-function-heading {
     grid-column: 2;
@@ -1809,25 +1818,32 @@ span.daylight-day {
 .pipeline-direct:not(.pipeline-heading) {
     display: flex;
     align-items: center;
-    padding: calc(var(--pipeline-gap) + var(--pipeline-stem)) 0 calc(var(--pipeline-gap) + var(--pipeline-stem) + 6px);
+    padding-block: calc(2 * var(--pipeline-gap) + var(--pipeline-stem) + 6px);
 }
 .pipeline-direct.into-divider {
-    padding-bottom: var(--pipeline-into-divider);
+    padding-bottom: calc(var(--pipeline-gap) + var(--pipeline-into-divider));
 }
 /* The calls a renderer most likely makes, in the text's own color. */
 .pipeline-direct.likely {
     color: var(--text);
 }
 /* Its arrow points back at the position, the other way round. */
+/* Right at the start of its column, a short arrow pointing back at the position it returns, the same for every call. */
 .pipeline-direct-call {
     display: flex;
     align-items: center;
-    gap: 0.3rem;
-    padding-left: 0.3rem;
+    gap: var(--pipeline-gap);
 }
 .pipeline-direct-call::before {
-    margin-right: 0;
-    transform: scaleX(-1);
+    content: "";
+    flex: none;
+    width: 1.25rem;
+    height: 9px;
+    background: var(--line);
+    mask:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 9'%3E%3Cpath d='M6 0L0 4.5l6 4.5z'/%3E%3C/svg%3E")
+        left center / 6px 9px no-repeat,
+        linear-gradient(#000, #000) right center / calc(100% - 6px) 1px no-repeat;
 }
 
 /* Which half is the same for everyone and which is the observer's: a dashed line across, the one half named over
