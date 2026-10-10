@@ -1,0 +1,160 @@
+---
+import { findEntry } from "../lib/glossary";
+import { SCENES, sunAt } from "../lib/skyrule";
+import { SUN_SYMBOL, sunRays } from "./sternzeit/figure";
+
+interface Props {
+    /** The section's id, or "references" for the rule above them. */
+    id: string;
+}
+const { id } = Astro.props;
+// Every Sun is a section: the introduction before the first h2 is the sunrise, without a rule of its own, the page's
+// sections follow (listed in Astro.locals by the chapter page), and the references are the sunset.
+const targets = [
+    { href: "#", title: "Introduction" },
+    ...(Astro.locals.sections ?? []).map((section) => ({ href: `#${section.id}`, title: section.title })),
+    { href: "#references", title: "References" },
+];
+const total = targets.length;
+// The stick figure's glossary entry, an easter egg under it (see observer()).
+const observerTip = findEntry("Observer");
+const index = targets.findIndex((target) => target.href === `#${id}`);
+const suns = Array.from({ length: total }, (_, i) => ({
+    ...sunAt(i, total),
+    state: i < index ? "passed" : i === index ? "current" : "ahead",
+}));
+const here = suns[index];
+const scene = SCENES[id];
+// The path's direction at the current Sun, from its neighbors, for the scenes that line up along it.
+const place = `--x: ${here.x.toFixed(4)}; --y: ${here.y.toFixed(4)}`;
+// The path's direction on either side of the current Sun, for the Moons lined up along it: each side turns its own way.
+const [before, after] = [suns[Math.max(index - 1, 0)], suns[Math.min(index + 1, total - 1)]];
+const along = (from: { x: number; y: number }, to: { x: number; y: number }) =>
+    `${place}; --dx: ${(to.x - from.x).toFixed(4)}; --dy: ${(to.y - from.y).toFixed(4)}`;
+// The path in a 100 by 100 box stretched over the rule, y down from its top.
+const points = (from: number, to: number) =>
+    suns
+        .slice(from, to + 1)
+        .map(({ x, y }) => `${(x * 100).toFixed(2)},${((1 - y) * 100).toFixed(2)}`)
+        .join(" ");
+// A Moon of radius r at (x, y): the night side faint, the lit part from a half disc and a terminator ellipse of width w
+// (positive bulges it to a gibbous Moon, negative cuts it to a crescent), lit towards the Sun at x = 0. A disc in the
+// background color under it cuts a gap into the path, as the Suns' rings do.
+const moon = (x: number, y: number, r: number, w: number) => {
+    const towards = x > 0 ? 0 : 1;
+    const terminator = w > 0 ? towards : 1 - towards;
+    return `<circle cx="${x}" cy="${y}" r="${r + 3}" class="cover"/><circle cx="${x}" cy="${y}" r="${r}" class="night"/><path d="M${x} ${y - r}A${r} ${r} 0 0 ${towards} ${x} ${y + r}A${Math.abs(w)} ${r} 0 0 ${terminator} ${x} ${y - r}Z" class="lit"/>`;
+};
+// A clock in place of the Sun, a little larger than the other current Suns: the hours as dots just inside the rim, the hands at
+// five past ten, the minute hand reaching the rim. The rim runs from just past the minute hand once around
+// and ends in an arrow just short of it: time going round. The path keeps clear.
+const polar = (deg: number, r: number) =>
+    `${(Math.sin((deg * Math.PI) / 180) * r).toFixed(2)} ${(-Math.cos((deg * Math.PI) / 180) * r).toFixed(2)}`;
+// The current Sun's radius in pixels, as .sky-sun.current in global.css draws it; every scene is sized by it.
+const SUN = 7;
+const CLOCK = SUN;
+const MINUTE = 30;
+const HOUR = -57.5;
+// No dot where a hand lies over it, nor at eleven and twelve, where the arrow ends.
+const marks = Array.from({ length: 12 }, (_, i) => i * 30)
+    .filter((deg) => deg !== 0 && deg !== 330 && [MINUTE, HOUR + 360].every((hand) => Math.abs(deg - hand) > 10))
+    .map((deg) => {
+        const [x, y] = polar(deg, CLOCK - 1.7).split(" ");
+        return `<circle cx="${x}" cy="${y}" r="0.4" class="mark"/>`;
+    });
+const [rimFrom, rimTo] = [MINUTE + 30, MINUTE + 330];
+// The arrow's two barbs, back along the rim from its tip and to either side of it.
+const tip = (rimTo * Math.PI) / 180;
+const barb = (side: number) => {
+    const [x, y] = [Math.sin(tip) * CLOCK, -Math.cos(tip) * CLOCK];
+    const [bx, by] = [x - Math.cos(tip) * 2.8 + Math.sin(tip) * side, y - Math.sin(tip) * 2.8 - Math.cos(tip) * side];
+    return `${bx.toFixed(2)} ${by.toFixed(2)}`;
+};
+const clock = `<circle r="${CLOCK + 1}" class="face"/><path d="M${polar(rimFrom, CLOCK)}A${CLOCK} ${CLOCK} 0 1 1 ${polar(rimTo, CLOCK)}" class="rim"/><path d="M${barb(2.1)}L${polar(rimTo, CLOCK)}L${barb(-2.1)}Z" class="tip"/>${marks.join("")}<path d="M${polar(MINUTE, CLOCK)}L0 0L${polar(HOUR, CLOCK * 0.65)}" class="hands"/>`;
+// The figures' Sun symbol, shrunk to the size of the other current Suns (5 px across the radius): its rays and their dot
+// spacing scaled alike, so each ray still shows two dots.
+const SHRINK = SUN / SUN_SYMBOL.radius;
+const symbol = `<circle r="${SUN}" class="sun"/><path d="${sunRays()
+    .map(
+        ([a, b]) =>
+            `M${(a.x * SHRINK).toFixed(2)} ${(a.y * SHRINK).toFixed(2)}L${(b.x * SHRINK).toFixed(2)} ${(b.y * SHRINK).toFixed(2)}`,
+    )
+    .join("")}" class="rays" style="stroke-dasharray: 0.1 ${(5.2 * SHRINK).toFixed(2)}"/>`;
+// The rule's height in pixels, 2.5rem in global.css, for the line from the horizon up to the Sun.
+const RULE_PX = 40;
+// A stick figure standing on the horizon down to the right of the Sun, looking up at it along a dotted line of sight.
+function observer() {
+    // Its size in pixels: k times the proportions below.
+    const k = 1.4;
+    const [x, ground] = [26, here.y * RULE_PX];
+    const [hip, shoulder] = [ground - 4 * k, ground - 7.5 * k];
+    const head = { x: x - 0.6 * k, y: ground - 9.6 * k };
+    const toSun = Math.hypot(head.x, head.y);
+    const [ux, uy] = [-head.x / toSun, -head.y / toSun];
+    const hand = { x: x - 0.3 * k + ux * 3.2 * k, y: shoulder + uy * 3.2 * k };
+    const p = (px: number, py: number) => `${px.toFixed(2)} ${py.toFixed(2)}`;
+    const neck = p(x - 0.3 * k, shoulder);
+    const figure = `M${p(x - 1.8 * k, ground)}L${p(x, hip)}L${p(x + 1.8 * k, ground)}M${p(x, hip)}L${neck}L${p(hand.x, hand.y)}M${neck}L${p(x + 1.8 * k, shoulder + 2.8 * k)}`;
+    const sight = `M${p(head.x + ux * 4.5 * k, head.y + uy * 4.5 * k)}L${p(-ux * (SUN + 4), -uy * (SUN + 4))}`;
+    return `<path d="${sight}" class="dots"/><path d="${figure}" class="figure"/><circle cx="${head.x.toFixed(2)}" cy="${head.y.toFixed(2)}" r="${1.4 * k}" class="figure"/>`;
+}
+// Drawn behind the Suns, so their rings cut gaps into the lines as into the path; only what covers the Sun goes in
+// front: the clock, the Sun symbol and the Sun's stippled outline with its center in its place, the eclipse's Moon, and the approximate Sun as a dashed outline a
+// little off the precise one.
+const OVER: Record<string, string> = {
+    grid: `<circle r="${SUN + 1.5}" class="cover"/><circle r="${SUN}" class="dashes"/><circle r="1" class="mark-bright"/>`,
+    eclipse: `<circle cx="${SUN * 0.28}" cy="${-SUN * 0.2}" r="${SUN * 0.92}" class="cover"/>`,
+    clock,
+    rays: symbol,
+    approx: `<circle cx="${SUN * 0.5}" cy="${-SUN * 0.4}" r="${SUN}" class="dashes"/>`,
+};
+const drawings: Record<string, string> = {
+    eclipse: "",
+    clock: `<circle r="${CLOCK + 4}" class="cover"/>`,
+    earth: observer(),
+    grid: `<path d="M0 0V${(here.y * RULE_PX).toFixed(2)}" class="dashes"/>`,
+    rays: `<circle r="${(SUN_SYMBOL.radius + SUN_SYMBOL.gap + SUN_SYMBOL.length) * SHRINK + 3}" class="cover"/>`,
+    moon: "",
+    phases: "",
+    approx: "",
+};
+// Close to the Sun the Moon is near new: thin crescents lit towards it, the nearest ones thinnest.
+const phase = (x: number) => moon(x, 0, 4.3, Math.abs(x) < 25 ? -3.4 : -2.1);
+const ALONG: Record<string, { left?: string; right?: string }> = {
+    moon: { right: moon(26, 0, 6.5, -4.9) },
+    phases: { left: phase(-31) + phase(-19), right: phase(19) + phase(31) },
+};
+---
+
+{/* One Sun per section on a day's arc, from rising at the left to setting at the right, the ones read so far lit. */}
+<nav class="sky-rule" aria-label="Sections">
+    <svg class="sky-path" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
+        {index > 0 && <polyline class="passed" points={points(0, index)} vector-effect="non-scaling-stroke" />}
+        {index < total - 1 && <polyline class="ahead" points={points(index, total - 1)} vector-effect="non-scaling-stroke" />}
+    </svg>
+    {scene && <svg class="sky-scene" aria-hidden="true" viewBox="-24 -16 48 32" style={place} set:html={drawings[scene]} />}
+    {ALONG[scene]?.left && <svg class="sky-scene along" aria-hidden="true" viewBox="-24 -16 48 32" style={along(before, here)} set:html={ALONG[scene].left} />}
+    {ALONG[scene]?.right && <svg class="sky-scene along" aria-hidden="true" viewBox="-24 -16 48 32" style={along(here, after)} set:html={ALONG[scene].right} />}
+    {
+        suns.map(({ x, y, state }, i) => {
+            const cls = `sky-sun ${state}${i === 0 || i === total - 1 ? " on-horizon" : ""}`;
+            const style = `--x: ${x.toFixed(4)}; --y: ${y.toFixed(4)}`;
+            // Every other Sun leads to its section.
+            return i === index ? (
+                <span class={`${cls}${scene === "grid" ? " outlined" : ""}`} style={style} aria-current="location" />
+            ) : (
+                <a class={cls} style={style} href={targets[i].href} aria-label={targets[i].title} />
+            );
+        })
+    }
+    {
+        scene === "earth" && (
+            <span class="term sky-observer" tabindex="0" style={place}>
+                <span class="term-tip" role="tooltip">
+                    <strong>{observerTip.term}</strong> <Fragment set:html={observerTip.html} />
+                </span>
+            </span>
+        )
+    }
+    {OVER[scene] && <svg class="sky-scene" aria-hidden="true" viewBox="-24 -16 48 32" style={place} set:html={OVER[scene]} />}
+</nav>

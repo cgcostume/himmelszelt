@@ -314,7 +314,7 @@ function splitInDepth(view: Zdog.Vector) {
 // its ring of dotted rays, in screen pixels whatever the zoom; the rays are turned square to the viewer in frame().
 const BODY_STROKE_PX = 2 * SUN_SYMBOL.radius;
 const sunAnchor = new Anchor({ addTo: illustration });
-new Shape({ addTo: sunAnchor, stroke: BODY_STROKE_PX, color: INK });
+const sunDisc = new Shape({ addTo: sunAnchor, stroke: BODY_STROKE_PX, color: INK });
 const sunRays = symbolRays().map(
     () => new Shape({ addTo: sunAnchor, path: [v(0, 0, 0), v(0, 0, 0)], stroke: 1, color: INK }),
 );
@@ -545,6 +545,7 @@ function frame() {
     illustration.rotate.set({ x: rotX, y: rotY, z: 0 });
     splitInDepth(illustration.rotate);
     illustration.updateRenderGraph();
+    (sunDisc as unknown as { svgElement?: SVGElement }).svgElement?.classList.add("figure-sun-glow");
     annotate("observer", vScale(observerPos, 1.02));
     annotate("equinox", trueEquinoxDot.translate);
     annotate("north", v(0, -AXIS_OVERHANG * EARTH_R, 0));

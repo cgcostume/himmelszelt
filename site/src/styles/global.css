@@ -27,6 +27,11 @@
     --line-long-dashes: 4 8;
     --sun-stroke: 1.7px;
     --sun-dots: 0.1 5.2;
+    /* The soft glow around every Sun symbol, in the figures and on the section rules. */
+    --sun-glow: drop-shadow(0 0 4px color-mix(in srgb, currentColor 45%, transparent));
+    --sun-glow-small: drop-shadow(0 0 2px color-mix(in srgb, currentColor 40%, transparent));
+    /* The Sun's tint low over the horizon, on the section rules. */
+    --golden-hour: hsl(36 85% 62%);
 }
 * {
     box-sizing: border-box;
@@ -92,12 +97,234 @@ h2 {
     font-size: 1.5rem;
     margin-top: 2rem;
 }
-/* A rule between the sections across the text, in the borders' grey, half of the old space above it and half below. */
-h2::before {
+/* The rule above each section (see SkyRule.astro): a Sun per section on a day's arc over a fading horizon, the
+   ground below it in the figures' shade under the horizon, the sections read so far lit. */
+.sky-rule {
+    position: relative;
+    container-type: inline-size;
+    height: 2.5rem;
+    margin: 5rem 0 2.5rem;
+}
+.sky-rule::before,
+.sky-rule::after {
     content: "";
+    position: absolute;
+    inset: 100% 0 auto;
+    mask: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+}
+.sky-rule::before {
+    height: 1px;
+    background: var(--line);
+    /* Over the scenes, whose gaps would cut it otherwise. */
+    z-index: 1;
+}
+.sky-rule::after {
+    height: 1rem;
+    background: linear-gradient(var(--surface), transparent);
+    opacity: 0.8;
+}
+/* The day's path through the Suns, lit up to the current one; each Sun's ring in the background color cuts a gap
+   into it, as the slider rail's thumb does. */
+.sky-path {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    fill: none;
+    stroke-width: 1px;
+}
+.sky-path .passed {
+    stroke: var(--muted);
+}
+.sky-path .ahead {
+    stroke: var(--line);
+}
+/* Golden low over the horizon, white towards noon. */
+.sky-sun {
+    position: absolute;
+    /* On whole pixels: on fractions the anti-aliasing draws a small disc slightly oval. */
+    left: round(calc(var(--x) * 100%), 1px);
+    bottom: round(calc(var(--y) * 100%), 1px);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    translate: -50% 50%;
+    color: color-mix(in oklab, var(--text) calc(min(1, var(--y) * 1.6) * 100%), var(--golden-hour));
+    background: currentColor;
+    box-shadow: 0 0 0 4px var(--bg);
+}
+/* SUN in SkyRule.astro is half of this. */
+.sky-sun.current {
+    width: 14px;
+    height: 14px;
+}
+/* The glow on a disc of its own, so the gap's ring does not glow along. */
+.sky-sun.current::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: currentColor;
+    filter: var(--sun-glow);
+}
+.sky-sun.ahead {
+    color: var(--line);
+}
+/* Every Sun but the current one leads to its section: a larger target than the dot, and lit up under the pointer. */
+a.sky-sun::before {
+    content: "";
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+}
+a.sky-sun:hover,
+a.sky-sun:focus-visible {
+    color: var(--accent);
+}
+/* The glow on a disc of its own, as the current Sun's, so the gap's ring does not glow along. */
+a.sky-sun:hover::after,
+a.sky-sun:focus-visible::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: currentColor;
+    filter: var(--sun-glow);
+}
+/* Under a stippled outline the full glow reads as a second ring. */
+.sky-sun.current.outlined::after {
+    filter: var(--sun-glow-small);
+}
+a.sky-sun:focus-visible {
+    outline: none;
+}
+.sky-path,
+.sky-scene {
+    pointer-events: none;
+}
+/* Over the stick figure of the Earth section (see observer() in SkyRule.astro), its glossary entry. */
+.sky-rule .sky-observer {
+    position: absolute;
+    left: calc(round(calc(var(--x) * 100%), 1px) + 20px);
+    bottom: 0;
+    width: 12px;
+    height: 16px;
+    text-decoration: none;
+}
+/* Sunrise and sunset, the lower half below the horizon, glow and all. */
+.sky-sun.on-horizon {
+    clip-path: inset(-100% -100% 50% -100%);
+}
+/* The current section's scene around its Sun (see SkyRule.astro), in screen pixels, in the figures' line styles. */
+.sky-scene {
+    position: absolute;
+    /* On whole pixels: on fractions the anti-aliasing draws a small disc slightly oval. */
+    left: round(calc(var(--x) * 100%), 1px);
+    bottom: round(calc(var(--y) * 100%), 1px);
+    width: 48px;
+    height: 32px;
+    translate: -50% 50%;
+    overflow: visible;
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1px;
+    stroke-linecap: round;
+}
+.sky-scene.along {
+    rotate: atan2(calc(var(--dy) * -2.5rem), calc(var(--dx) * 100cqw));
+}
+.sky-scene .face {
+    fill: var(--bg);
+    stroke: none;
+    color: var(--text);
+    filter: var(--sun-glow);
+}
+.sky-scene .rim {
+    stroke: var(--text);
+    stroke-width: 1px;
+    stroke-linejoin: round;
+}
+.sky-scene .tip {
+    fill: var(--text);
+    stroke: var(--text);
+    stroke-width: 1px;
+    stroke-linejoin: round;
+}
+.sky-scene .mark {
+    fill: var(--muted);
+    stroke: none;
+}
+.sky-scene .hands {
+    stroke: var(--text);
+    stroke-width: 1.2px;
+    stroke-linejoin: round;
+}
+.sky-scene .dots {
+    stroke: var(--muted);
+    stroke-width: 1.4px;
+    stroke-dasharray: 0.1 2.6;
+}
+.sky-scene .mark-bright {
+    fill: var(--text);
+    stroke: none;
+}
+.sky-scene .figure {
+    stroke: var(--text);
+    stroke-width: 1.1px;
+    stroke-linejoin: round;
+}
+.sky-scene .dashes {
+    stroke-dasharray: var(--line-dashes);
+}
+.sky-scene .rays {
+    stroke: var(--text);
+    stroke-width: var(--sun-stroke);
+    stroke-dasharray: var(--sun-dots);
+}
+.sky-scene .sun {
+    fill: var(--text);
+    stroke: none;
+    filter: var(--sun-glow);
+    color: var(--text);
+}
+.sky-scene .lit {
+    fill: var(--text);
+    stroke: none;
+}
+.sky-scene .night {
+    fill: var(--muted);
+    stroke: none;
+    opacity: 0.45;
+}
+.sky-scene .cover {
+    fill: var(--bg);
+    stroke: none;
+}
+/* A computed result, behind an arrow like what a program prints, its lines set in as far as the controls' title is
+   behind its +. */
+.result {
     display: block;
-    margin-bottom: 2rem;
-    border-top: var(--border);
+    padding-inline-start: 1.2em;
+    text-indent: -1.2em;
+}
+/* Drawn rather than typed: Roboto's subset lacks the arrow, and each browser falls back to a different font for it. Thin
+   and small, centered on the lowercase letters. */
+.result::before {
+    content: "";
+    display: inline-block;
+    width: 1.2em;
+    height: 0.6em;
+    text-indent: 0;
+    vertical-align: 0.05em;
+    background: var(--muted);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 10'%3E%3Cpath d='M1 5h13M10 1.5 14 5l-4 3.5' fill='none' stroke='%23000' stroke-width='1.1' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+        left center / 0.8em 0.5em no-repeat;
+}
+.sky-rule + h2 {
+    margin-top: 0;
+    /* A jump to a section lands on its rule: the rule's height and the space below it, and the usual 1rem above. */
+    scroll-margin-top: calc(2.5rem + 2.5rem + 1rem);
 }
 /* The package scope is the same on every chapter: the name after it is what the page is about. */
 h1 .scope {

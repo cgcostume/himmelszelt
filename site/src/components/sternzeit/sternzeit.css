@@ -361,6 +361,16 @@ tbody tr:hover {
 .figure-sun {
     fill: var(--text);
 }
+/* The glow is a copy of the Sun's disc behind it, clipped at the horizon (see sunGlow); Zdog's Sun, a plain path, is
+   tagged by scene.ts and dayarc.ts once it exists, the latter only while the Sun is up. */
+.figure-sun-glow {
+    color: var(--text);
+    filter: var(--sun-glow);
+}
+/* In a drawn figure the filter's lengths are in the figure's own units, so the blur is scaled back to screen pixels. */
+[style*="--units-per-px"] .figure-sun-glow {
+    filter: drop-shadow(0 0 calc(4px * var(--units-per-px)) color-mix(in srgb, currentColor 45%, transparent));
+}
 .figure-sun-ray {
     stroke-dasharray: var(--sun-dots);
     stroke-linecap: round;

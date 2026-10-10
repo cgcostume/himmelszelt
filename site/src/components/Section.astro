@@ -1,0 +1,9 @@
+---
+import SkyRule from "./SkyRule.astro";
+
+// The chapter's h2, with the rule above it.
+const { id } = Astro.props;
+---
+
+<SkyRule id={id} />
+<h2 id={id}><slot /></h2>

@@ -250,7 +250,7 @@ function rebuildPaths() {
     const time = precise.fromJulianDay(jd);
     addDot(seen(precise.moon, time, latitude, longitude), MUTED, BODY_DOT_PX);
     const sunNow = seen(precise.sun, time, latitude, longitude);
-    addDot(sunNow, INK, BODY_DOT_PX);
+    styled(new Shape({ addTo: anchorFor(sunNow.altitude), translate: skyPoint(sunNow), color: INK }), BODY_DOT_PX, sunNow.altitude > 0 ? "figure-sun-glow" : null);
     addSunRays(sunNow);
 }
 

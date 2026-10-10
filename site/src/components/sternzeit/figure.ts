@@ -85,10 +85,20 @@ export function sunRays() {
     });
 }
 
-/** The Sun as a symbol at (x, y) in an SVG drawn at `unitsPerPx` of its units to a screen pixel. */
+let glows = 0;
+
+/** A copy of a Sun's disc at (x, y) that only glows, clipped at the horizon at `horizonY` so the ground hides the glow. */
+export function sunGlow(x: number, y: number, r: number, horizonY: number, cls: string) {
+    const id = `sun-glow-${glows++}`;
+    const clip = `<clipPath id="${id}"><rect x="-1e4" y="-1e4" width="2e4" height="${(horizonY + 1e4).toFixed(2)}"/></clipPath>`;
+    return `${clip}<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${r.toFixed(2)}" class="${cls} figure-sun-glow" clip-path="url(#${id})"/>`;
+}
+
+/** The Sun as a symbol at (x, y) in an SVG drawn at `unitsPerPx` of its units to a screen pixel, glowing above y = 0. */
 export function sunSymbol(x: number, y: number, unitsPerPx: number) {
     const r = (SUN_SYMBOL.radius * unitsPerPx).toFixed(2);
-    let svg = `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${r}" class="figure-sun"/>`;
+    let svg = sunGlow(x, y, Number(r), 0, "figure-sun");
+    svg += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${r}" class="figure-sun"/>`;
     for (const [a, b] of sunRays()) {
         const [x1, y1, x2, y2] = [
             x + a.x * unitsPerPx,

@@ -1,5 +1,6 @@
 ---
 import { chapterReferences } from "../lib/references";
+import SkyRule from "./SkyRule.astro";
 
 interface Props {
     chapter: string;
@@ -14,6 +15,7 @@ for (const { id } of list) {
 ---
 
 <section class="references">
+    <SkyRule id="references" />
     <h2 id="references">References</h2>
     {
         list.length === 0 ? (

@@ -1,7 +1,7 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { find } from "../dom";
 import { onDemand } from "../frame";
-import { drawSvg, svgText, veiledHorizon } from "./figure";
+import { drawSvg, sunGlow, svgText, veiledHorizon } from "./figure";
 import { arrowAround, offPanelArrowSvg } from "./offpanel";
 import { ephemerisDay, onChange, state, update } from "./state";
 import "./export";
@@ -70,14 +70,14 @@ function renderSolar(jd: number) {
     if (total) {
         svg += corona();
     }
-    svg += circle(0, 0, SUN_RADIUS_UNITS, "eclipse-sun");
-    const onPanel = distance < HALF * Math.SQRT2 + moonRadius;
-    if (onPanel) svg += circle(mx, my, moonRadius, "eclipse-moon-new");
-
     // The Sun sits at the center, so the visible horizon is the Sun's apparent altitude over it below; refraction lifts
     // the Sun, the observer's height lowers the horizon. The ground veils whatever is beneath.
     const sunAbove = precise.earth.apparentAltitude(sunAltitude, { observerHeightM: state.heightM });
     const horizon = sunAbove * scale;
+    svg += sunGlow(0, 0, SUN_RADIUS_UNITS, horizon, "eclipse-sun") + circle(0, 0, SUN_RADIUS_UNITS, "eclipse-sun");
+    const onPanel = distance < HALF * Math.SQRT2 + moonRadius;
+    if (onPanel) svg += circle(mx, my, moonRadius, "eclipse-moon-new");
+
     svg += veiledHorizon(horizon, HALF, unitsPerPx);
     if (!onPanel) svg += offPanelMoon(mx, my);
 

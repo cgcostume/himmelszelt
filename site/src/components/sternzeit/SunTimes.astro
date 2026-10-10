@@ -4,26 +4,9 @@ import "./sternzeit.css";
 
 {/* What the golden hour example prints for the page's day, place and clock: on a line of its own, so the sentence
     leading into it keeps its lines whatever the result is. */}
-<span data-field="sunTimes" class="sun-times" aria-live="polite"></span>
+<span data-field="sunTimes" class="result" aria-live="polite"></span>
 
 <script>
     import "./suntimes";
 </script>
 
-<style>
-    /* Behind an arrow, like what a program prints, the text set in as far as the controls' title is behind its +. */
-    .sun-times {
-        display: block;
-        padding-inline-start: 1.2em;
-        text-indent: -1.2em;
-    }
-    /* In the line, lifted a little: the font draws its arrow below the middle of the lowercase letters. */
-    .sun-times::before {
-        content: "\2192";
-        display: inline-block;
-        width: 1.2em;
-        text-indent: 0;
-        transform: translateY(-0.12em);
-        color: var(--muted);
-    }
-</style>
