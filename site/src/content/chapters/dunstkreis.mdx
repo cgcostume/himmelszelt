@@ -11,6 +11,7 @@ references:
     - bruneton2017
     - edlen1966
     - fritsch1980
+    - kelly2019
     - khronos2024
     - kopp2011
     - lagarde2014
@@ -48,14 +49,14 @@ already where the Sun shows rather than where it is, its light 8 minutes 20 seco
 [sternzeit explains](../sternzeit/#the-sun). It is the true direction nonetheless, not yet bent by the air: dunstkreis
 traces the refraction itself. How to hand it over is the first of the [code examples](#code-examples).
 
-## Why is the sky blue?
+## Why the sky is blue
 
 <Planned title="How strongly each color scatters">
     The visible spectrum against how much of it a column of air scatters: violet many times more than red. Why the
     sky is still blue and not violet, from the Sun's spectrum and the eye's sensitivity.
 </Planned>
 
-## Why is the sunset red?
+## The red of the sunset
 
 Turn away from the Sun just after it has set, and the sky above the opposite horizon splits in two: a dark blue-gray
 band along it, the <Term of="Earth's shadow" />, and above that a band of pink, the <Term of="Belt of Venus" />. The
@@ -72,7 +73,10 @@ scattering still lit. Set <Fig id="sky" /> to a clear evening, look east and wat
     below is the same thing for every height and angle at once.
 </Planned>
 
-<Planned title="Taking the sky apart" plan="merge with Scattering orders into one figure, Rayleigh, Mie, ozone, and each order as switches.">
+<Planned
+    title="Taking the sky apart"
+    plan="merge with Scattering orders into one figure, Rayleigh, Mie, ozone, and each order as switches."
+>
     The same sunset with Rayleigh, Mie and ozone switched on and off one by one. Without ozone, twilight turns gray.
 </Planned>
 
@@ -80,11 +84,12 @@ scattering still lit. Set <Fig id="sky" /> to a clear evening, look east and wat
 
 Scattering, absorption and the Sun's own light all change with the wavelength, so the sky is computed per wavelength,
 not per color. A color on a screen is something else: its red, green, and blue each sum the whole spectrum, weighted by
-how the eye responds to it <Cite id="wyman2013" />. Bruneton and Neyret computed three wavelengths, 680, 550, and 440 nm,
-and showed them as red, green, and blue <Cite id="bruneton2008" />, as real-time skies have mostly done since, osgHimmel's
-included. Weighted by the eye instead, the same light comes out 12% off in hue on average, and a third at sunset: none
-of the three samples sees the orange around 600 nm, where red peaks for the eye and ozone absorbs. Bruneton's later implementation
-computes some fifteen wavelengths and converts them exactly <Cite id="bruneton2017" />, at about five times the cost.
+how the eye responds to it <Cite id="wyman2013" />. Bruneton and Neyret computed three wavelengths, 680, 550, and
+440 nm, and showed them as red, green, and blue <Cite id="bruneton2008" />, as real-time skies have mostly done since,
+osgHimmel's included. Weighted by the eye instead, the same light comes out 12% off in hue on average, and a third at
+sunset: none of the three samples sees the orange around 600 nm, where red peaks for the eye and ozone absorbs.
+Bruneton's later implementation computes some fifteen wavelengths and converts them exactly <Cite id="bruneton2017" />,
+at about five times the cost.
 
 dunstkreis takes a middle road. It computes four wavelengths, one per channel of its tables, which have four anyway,
 and turns them into red, green, and blue by a matrix fitted for it: by least squares, to 85 sky spectra built from the
@@ -114,8 +119,10 @@ wavelengths taken as red, green, and blue, and as osgHimmel computed it.
 Air slows light down a little, and denser air more: its refractive index exceeds 1 by 2.778 × 10⁻⁴ at the standard
 atmosphere's 15 °C and 1013 hPa <Cite id="edlen1966" />, in proportion to its density. So a ray crossing the atmosphere
 curves towards the denser air below it, and what reaches the eye from the horizon left the atmosphere a little lower.
-Astronomers usually take this from a fit, like Bennett's for the apparent altitude <Cite id="bennett1982" />, which
-sternzeit uses too. It holds for an observer on the ground looking up, and nowhere else.
+Astronomers usually take this from a fit, like the one for the apparent altitude <Cite id="bennett1982" />, which
+sternzeit uses too. George G. Bennett, a professor of surveying in Sydney who navigated yachts in the Sydney to Hobart
+race <Cite id="kelly2019" />, made it for navigators who worked out their positions on programmable calculators. It
+holds for an observer on the ground looking up, and nowhere else.
 
 dunstkreis traces it instead, through the same air it scatters light in: the refractive index follows the density of the
 Rayleigh layer, and every ray bends between the same samples that integrate its scattering, the view rays as well as the
@@ -132,7 +139,10 @@ far it bent; the transmittance table, indexed by where the light comes from, how
 looked up, and the Sun's disc flattens near the horizon and stays in view after it has geometrically set, without either
 being a special case.
 
-<Planned title="With and without refraction" plan="keep, perhaps as a split view of the sky figure above rather than a figure of its own.">
+<Planned
+    title="With and without refraction"
+    plan="keep, perhaps as a split view of the sky figure above rather than a figure of its own."
+>
     The setting Sun side by side, bent and unbent, zoomed in on the horizon: the disc flattened, still in view while
     geometrically already below the horizon, and the altitude grid to measure it against.
 </Planned>
@@ -145,16 +155,23 @@ being a special case.
     away is this ridge?
 </Planned>
 
-<Planned title="Beyond the atmosphere" plan="move to nachtgestirn or the final demo, where there is a Moon to put behind the air.">
+<Planned
+    title="Beyond the atmosphere"
+    plan="move to nachtgestirn or the final demo, where there is a Moon to put behind the air."
+>
     The Moon, planets or a spaceship behind the atmosphere get the same treatment: dimmed and tinted by the air in
     front of them, and lit by sunlight that crossed the atmosphere on its way to them.
 </Planned>
 
 ## From the ground to orbit
 
-<Planned title="Leaving the ground" plan="drop as a figure: presets for eye level, an airliner and the ISS in the sky figure above, the text stays.">
-    The observer from eye level up to the orbit of the International Space Station: the horizon dips, the sky darkens overhead, and
-    from above the atmosphere the whole planet appears, its thin glowing rim and the terminator between day and night.
+<Planned
+    title="Leaving the ground"
+    plan="drop as a figure: presets for eye level, an airliner and the ISS in the sky figure above, the text stays."
+>
+    The observer from eye level up to the orbit of the International Space Station: the horizon dips, the sky darkens
+    overhead, and from above the atmosphere the whole planet appears, its thin glowing rim and the terminator between
+    day and night.
 </Planned>
 
 ## Tables instead of raymarching
@@ -164,12 +181,12 @@ how much light arrives after more than one bounce, and the sky view holds the wh
 stands, rebuilt whenever the Sun or the observer moves. The sky pass then only looks up one texel per pixel.
 
 <Fig id="lookup" /> follows one of those pixels back. Its view ray is marched from the eye in 30 steps, short ones first
-where it goes up, since the air is densest right at the eye, and the haze in it within a kilometer or two. At each, sunlight
-comes in from the side: how much of it made it through the air is a transmittance lookup, by the step's altitude and
-the Sun's angle there, and the light that bounced more than once is a multiple scattering lookup, by the same two. How
-much of all that still reaches the eye is summed up along the way, step by step. Sixty lookups end up in a single texel
-of the sky view, and the sky pass reads just that one. Point at a texel below or in <Fig id="tables" />, and all of
-them follow the same ray.
+where it goes up, since the air is densest right at the eye, and the haze in it within a kilometer or two. At each,
+sunlight comes in from the side: how much of it made it through the air is a transmittance lookup, by the step's
+altitude and the Sun's angle there, and the light that bounced more than once is a multiple scattering lookup, by the
+same two. How much of all that still reaches the eye is summed up along the way, step by step. Sixty lookups end up in a
+single texel of the sky view, and the sky pass reads just that one. Point at a texel below or in <Fig id="tables" />,
+and all of them follow the same ray.
 
 <Lookup />
 
@@ -185,13 +202,13 @@ whole page, so every table, cube map, and figure follows it.
 
 ## Lighting a scene
 
-The same sky can light a scene. The sky pass writes it into the six faces of a cube map, in cd/m² and without the
-sun's disc, and a second pass projects that onto nine spherical harmonics coefficients, which give the irradiance for
-any surface's orientation <Cite id="ramamoorthi2001" />. The disc stays out on purpose: at some two billion cd/m² it is
-far brighter than a half float holds, and at half a degree smaller than a texel of all but the largest cube maps, so it
+The same sky can light a scene. The sky pass writes it into the six faces of a cube map, in cd/m² and without the sun's
+disc, and a second pass projects that onto nine spherical harmonics coefficients, which give the irradiance for any
+surface's orientation <Cite id="ramamoorthi2001" />. The disc stays out on purpose: at some two billion cd/m² it is far
+brighter than a half float holds, and at half a degree smaller than a texel of all but the largest cube maps, so it
 would be one blocky texel, smeared by the mip levels, and the coefficients would ring with it. Wherever the cube map is
-shown, the disc is drawn over it instead, sharp at any resolution. The Sun lights the scene apart, as a light of its own,
-with what the air leaves of it.
+shown, the disc is drawn over it instead, sharp at any resolution. The Sun lights the scene apart, as a light of its
+own, with what the air leaves of it.
 
 Why a cube map, rather than the atmosphere itself for every pixel and every surface? Because the sky hardly changes from
 one frame to the next. The Sun moves by a quarter of a degree a minute, its own diameter in about two, and at 60 frames
@@ -213,12 +230,11 @@ faces' edges and the mip levels work as before. The two figures below switch it 
 
 The cube map comes with its mip levels, each texel the mean of four in the level above, down to a single texel a face.
 They cost a third more memory and a few cheap passes, and they are optional: the cube pass fills as many levels as the
-texture was created with, so a `mipLevelCount` of 1 leaves them out. Two
-readers need them here. The projection onto the coefficients takes 4,096 directions; from a face of 1,024 texels it would
-see only one texel in some 1,500 and miss whatever lies between, so it reads the level whose texels are about as many as
-its directions. And a background showing the cube map through a wide lens spans several texels with each pixel, so it
-reads the level where a texel is about a pixel wide, instead of picking one texel of many and flickering as the view
-turns.
+texture was created with, so a `mipLevelCount` of 1 leaves them out. Two readers need them here. The projection onto the
+coefficients takes 4,096 directions; from a face of 1,024 texels it would see only one texel in some 1,500 and miss
+whatever lies between, so it reads the level whose texels are about as many as its directions. And a background showing
+the cube map through a wide lens spans several texels with each pixel, so it reads the level where a texel is about a
+pixel wide, instead of picking one texel of many and flickering as the view turns.
 
 <Environment />
 
@@ -228,7 +244,10 @@ turns.
 
 ## Resolution and sampling
 
-<Planned title="Starving the tables" plan="merge into the tables figure, a high-resolution reference and the difference heat map as a switch there.">
+<Planned
+    title="Starving the tables"
+    plan="merge into the tables figure, a high-resolution reference and the difference heat map as a switch there."
+>
     Table sizes and sample counts to turn down, next to a reference computed at high resolution, and a heat map of the
     difference: where bands and seams appear first, and why the mappings spend their texels near the horizon.
 </Planned>
@@ -264,16 +283,16 @@ meter on the GPU reads the sky-view table in directions spread evenly over the s
 geometric mean of their luminance, as a camera's averaging meter does: EV100 = log2(L · 100 / 12.5). It meters the
 directions below the horizon apart and takes the brighter: on the ground that is the sky, high up the lit air below,
 while the sky above turns black, and from space the lit planet, raymarched like the view. No direction counts more than
-ten stops below the brightest, a camera's range, so the black sky and the night side do not drown out the day side. The sky pass reads that
-straight from the meter's buffer. Metering the table rather than the image means the reading does not change as the
-camera turns, and the Sun's disc, which is not in the table, does not darken everything. The meter reads again whenever
-the table is rebuilt; the exposure follows at once, without the eye's slow adaptation. The day meters around EV 14, a
-sunset around 12, and twilight follows down to 4, with the Sun 6° below the horizon, where it stops: exposed like day,
-the night would look like day, only noisier. On top, a ramp over the day shapes it: compensations at sun altitudes above the observer's horizon, which sinks
-as the observer rises, joined by a smooth curve that never overshoots them <Cite id="fritsch1980" />. By default they
-keep the night and the minutes around sunrise and sunset darker than metered, lift the blue hour a little so its blue
-shows, make the sunset a little brighter than the sunrise, and leave noon as metered. Mornings and evenings may differ,
-though the model's air is the same for both.
+ten stops below the brightest, a camera's range, so the black sky and the night side do not drown out the day side. The
+sky pass reads that straight from the meter's buffer. Metering the table rather than the image means the reading does
+not change as the camera turns, and the Sun's disc, which is not in the table, does not darken everything. The meter
+reads again whenever the table is rebuilt; the exposure follows at once, without the eye's slow adaptation. The day
+meters around EV 14, a sunset around 12, and twilight follows down to 4, with the Sun 6° below the horizon, where it
+stops: exposed like day, the night would look like day, only noisier. On top, a ramp over the day shapes it:
+compensations at sun altitudes above the observer's horizon, which sinks as the observer rises, joined by a smooth curve
+that never overshoots them <Cite id="fritsch1980" />. By default they keep the night and the minutes around sunrise and
+sunset darker than metered, lift the blue hour a little so its blue shows, make the sunset a little brighter than the
+sunrise, and leave noon as metered. Mornings and evenings may differ, though the model's air is the same for both.
 
 The floor of EV 4 is for now. A camera exposes a landscape by full moon at about EV −3 and the Milky Way at about −6
 to −7. Once the Moon lights the air and the stars are drawn, the floor drops and the night follows. Exposed that far
@@ -281,14 +300,15 @@ today, the sky would show only the Sun's last twilight, amplified beyond what th
 
 For a display, the pass then tone maps: exposed, compressed into the display's range, and encoded for sRGB, dithered
 against banding. Khronos PBR Neutral <Cite id="khronos2024" /> keeps colors exactly as they are up to three quarters of
-white and compresses only the brightest, so the sky's blue stays the blue the model computes. AgX <Cite id="sobotka2023" />,
-in Wrensch's fit <Cite id="wrensch2023" />, fades bright colors towards white as film does: the glow around the Sun and
-a sunset's brightest band turn white instead of clipping to a flat hue, but the daytime sky comes out flatter and
-grayer. Narkowicz's fit of the ACES filmic curve <Cite id="narkowicz2016" />, which dunstkreis used first, is the third:
-saturated, and it pushes bright hues towards yellow. The exposure follows a camera's convention, which puts a metered
-average at about a tenth of white, where ACES expects it; Neutral and AgX expect the scene's middle gray at 0.18, and
-are lifted by the difference. The tone curve choice in <Fig id="sky" /> switches every figure between them. A renderer with its own HDR
-pipeline turns that off and gets the exposed luminance itself, linear and unclamped, for a float target.
+white and compresses only the brightest, so the sky's blue stays the blue the model computes. AgX
+<Cite id="sobotka2023" />, in Wrensch's fit <Cite id="wrensch2023" />, fades bright colors towards white as film does:
+the glow around the Sun and a sunset's brightest band turn white instead of clipping to a flat hue, but the daytime sky
+comes out flatter and grayer. Narkowicz's fit of the ACES filmic curve <Cite id="narkowicz2016" />, which dunstkreis
+used first, is the third: saturated, and it pushes bright hues towards yellow. The exposure follows a camera's
+convention, which puts a metered average at about a tenth of white, where ACES expects it; Neutral and AgX expect the
+scene's middle gray at 0.18, and are lifted by the difference. The tone curve choice in <Fig id="sky" /> switches every
+figure between them. A renderer with its own HDR pipeline turns that off and gets the exposed luminance itself, linear
+and unclamped, for a float target.
 
 <Planned title="Exposure and tone mapping">
     The eye adapts across some fourteen orders of magnitude, from starlight to the midday Sun, and a screen shows about
@@ -301,7 +321,7 @@ pipeline turns that off and gets the exposed luminance itself, linear and unclam
     added before quantizing.
 </Planned>
 
-## Precise or approximate?
+## Precise and approximate
 
 <Planned title="Bruneton and Hillaire" plan="keep, with Bruneton's four-dimensional table next to Hillaire's three.">
     Both variants side by side at the same moment and place, and their difference.
@@ -309,7 +329,11 @@ pipeline turns that off and gets the exposed luminance itself, linear and unclam
 
 ## Make your own
 
-<Planned title="The generator" plan="keep; exports: the tables as files, the nine coefficients, and the sky and irradiance maps as RGBE (.hdr), which any engine reads.">
+<Planned
+    title="The generator"
+    plan="keep; exports: the tables as files, the nine coefficients, and the sky and irradiance maps as RGBE (.hdr),
+        which any engine reads."
+>
     Everything this chapter changed along the way, the atmosphere, the table sizes, the sample counts, and the encoding,
     in one place, previewed, and downloaded as files for your own renderer.
 </Planned>

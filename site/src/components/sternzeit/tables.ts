@@ -58,7 +58,7 @@ const DESCRIPTIONS: Record<string, [title: string, text: string]> = {
     ],
     modifiedJulianDay: [
         "Modified Julian Day",
-        "The Julian Day minus 2,400,000.5: days since midnight of 1858 November 17, a smaller number that starts at midnight.",
+        "The Julian Day minus 2,400,000.5: days since midnight of November 17, 1858, a smaller number that starts at midnight.",
     ],
     MEAN_RADIUS_KM: ["Mean radius", "The body's mean radius, in kilometers."],
     EQUATORIAL_RADIUS_KM: [
@@ -67,11 +67,11 @@ const DESCRIPTIONS: Record<string, [title: string, text: string]> = {
     ],
     MEAN_SYNODIC_MONTH: [
         "Mean synodic month",
-        "Mean length of a lunation, new moon to new moon, in days. The true interval swings about half a day either side of it.",
+        "Mean length of a lunation, new moon to new moon, in days. The true interval swings by up to about seven hours either side of it.",
     ],
     MEAN_NEW_MOON: [
         "Mean new moon epoch",
-        "The mean new moon of 2000 January 6, as a Julian Day: lunation k falls at this plus k mean synodic months, a full moon half a lunation later.",
+        "The mean new moon of January 6, 2000, as a Julian Day: lunation k falls at this plus k mean synodic months, a full moon half a lunation later.",
     ],
     ATMOSPHERE_THICKNESS_KM: [
         "Atmosphere thickness",

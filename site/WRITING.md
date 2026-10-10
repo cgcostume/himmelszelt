@@ -16,20 +16,25 @@ any chapter text, caption, glossary entry or code example. When this file and st
   that pins it down, then the function that computes it. Never the other way round.
 - Curious rather than complete. A section explains what a renderer needs and stops; the details live in the cited
   sources and the API reference.
+- Easy on the reader. Most paragraphs should be readable without hovering a single term; one hard idea per section at
+  most, and only if a renderer needs it or it is genuinely surprising. A complicated detail that is neither, however
+  true and however clever, goes.
 
 ## What makes it nerdy
 
 - **Every number gets an anchor** the reader can picture: "20.5 arcseconds, under a ninetieth of the Sun's disc", "up to
   a degree, two of its own diameters", "within 0.002°, invisible next to a disc half a degree wide". A bare number in
   prose is a missed chance.
-- **One surprising, true fact per section**, tied back to the topic, never a detour: Earth turns 366 times a year, the
+- **One surprising, true fact per section**, tied back to the topic, never a detour, and simple to state: if it takes a
+  paragraph of setup, it is not the fun fact. Earth turns 366 times a year, the
   Moon is the original three-body problem, no star has ever shone through the Moon.
 - **Name the classic mistakes** renderers make and show the reasoning that rules them out (the crescent lit from above,
   the unlit Moon as a hole). This is where the text earns its keep with developers.
 - **Invite the reader to try something** in a figure, and say what they will see: "Raise the height to 10 km, and the
   horizon sinks by more than 3°", "Step the moment a day at a time, and sidereal time gains almost a degree".
-- **People, briefly.** The sources are people: a closing section ("The people behind the numbers") gives each a
-  sentence or two of who they were and ties them to the function their work powers.
+- **People, briefly.** The sources are people: a closing section ("The people behind the numbers") gives every source
+  a library function rests on a sentence or two of who they were and ties them to that function. The authors' own
+  papers are cited, but their authors not portrayed.
 
 ## Chapter structure
 
@@ -44,11 +49,13 @@ The body, in this order:
    can be used for, ending in links to the worked tasks further down. Then a bridge to the interactive scene, which
    follows with the moment and place controls under it, and one short paragraph on how the figures and controls work.
    Keep the opening to three paragraphs before the scene; anything that is a concept belongs in a section.
-2. **Concept sections** building on each other: each uses only what earlier ones explained. A section reads phenomenon,
-   concept, number, function, figure or table, an invitation to try it, and a code example where one fits.
+2. **Concept sections** building on each other: each uses only what earlier ones explained, and the chapter gets
+   harder only as slowly as it has to. A section reads phenomenon, concept, number, function, figure or table, an
+   invitation to try it, and a code example where one fits. Within a section, too, the parts build up: what a reader
+   sees first, the machinery after it, and the call a renderer actually uses closes it.
 3. **A capstone section** that combines the pieces into one thing worth building (sternzeit: "A month of Moons"), with
    its code and its live result, and a short look at what else the same functions could do.
-4. **"Precise or approximate?"** wherever both variants exist: what each follows, how far apart they are in visible
+4. **"Precise and approximate"** wherever both variants exist: what each follows, how far apart they are in visible
    terms, when the precise one is worth it, how to switch.
 5. **"The people behind the numbers."**
 6. The references, generated.
@@ -59,8 +66,8 @@ be a list is a sentence ("The function names carry these steps as prefixes, `mea
 ## Headings
 
 Sentence case, short. A noun phrase ("The Sun", "Eclipses"), or a phrase with a point of view ("Counting time the
-astronomer's way", "Earth, the platform we observe from"). A question only where the section answers exactly that
-question ("Precise or approximate?", "Why is the sky blue?"). German terms only where they are the term ("Luftperspektive").
+astronomer's way", "Earth, the platform we observe from"). Never a question: "Why the sky is blue", not
+"Why is the sky blue?". German terms only where they are the term ("Luftperspektive").
 
 ## Lead (`summary`)
 
@@ -69,8 +76,7 @@ list, and never a promise the chapter does not keep yet.
 
 ## Paragraphs and sentences
 
-- One idea per paragraph, three to seven sentences. A paragraph that introduces more than two glossary terms is too
-  dense: split it.
+- One idea per paragraph, three to seven sentences.
 - Vary sentence length; a short sentence lands the point ("Calendars are a mess.").
 - The colon delivers a payoff or an explanation: "None of this is guesswork: Jean Meeus wrote it all down as recipes."
 - No em-dash, anywhere. Use a comma, a colon, or two sentences.
@@ -84,7 +90,8 @@ list, and never a promise the chapter does not keep yet.
 ## Words, spelling and numbers
 
 - **American English** everywhere, code comments included: color, center, gray, catalog, kilometer, meter,
-  visualization, labeled, traveled, neighbor. Proper names keep theirs (the Yale Bright Star Catalogue). "towards" is fine.
+  visualization, labeled, traveled, neighbor. Proper names keep theirs (the Yale Bright Star Catalogue). "towards" is
+  fine.
 - **Sun, Moon, Earth** are capitalized as bodies: "the Sun", "the Moon", "Earth" (no article, "Earth's"). Lowercase in
   compounds and phases: sunlight, moonlight, sunrise, earthshine, full moon, new moon, a moon calendar. The plural of
   drawn Moon discs is "Moons".
@@ -105,28 +112,46 @@ list, and never a promise the chapter does not keep yet.
 
 ## Glossary terms (`<Term>`)
 
-- Every technical term gets a `<Term>` at its first appearance in the chapter's body, and only there. Captions and
-  tables may mark it again, as they are read on their own.
+- Every technical term gets a `<Term>` at its first appearance in the chapter's body, the opening included, and only
+  there. Captions and tables may mark it again, as they are read on their own. A term first met in a caption still gets
+  its `<Term>` where the text first uses it.
 - The text still says enough that a reader who never hovers can follow; the tooltip adds the definition, not the point.
 - A glossary entry is one to three sentences: what it is as a noun phrase first, then what it looks like or why a
-  renderer cares. Same spelling and capitalization rules as the text. One site-wide `glossary.json`; terms shared by
-  chapters are defined once.
+  renderer cares. Same spelling, capitalization, number and date rules as the text: "about", not "~"; no contractions;
+  no long parentheses. One site-wide `glossary.json`; terms shared by chapters are defined once.
+- A tooltip is read on its own, anywhere: no "below" or "above", no pointers into source files ("see `eclipse.ts`"),
+  and API names only as the library exports them. Numbers in an entry are checked like those in the text, and an entry
+  matches what the library computes (an eclipse phase defined as the code defines it, not as it was once planned).
+- Table rows without a glossary entry get their tooltip from the table's own descriptions (`DESCRIPTIONS` in
+  `tables.ts`), held to the same rules. Every row has one or the other.
 
 ## Citations (`<Cite>`)
 
 Right after the claim they back, before the punctuation; several in a row separated by spaces. Cite the source of a
 number or a model, not the general background. Every id in the frontmatter's `references` must be cited in the text.
 
+What needs a citation: every number and claim the library does not compute itself (a rate such as the Moon's 3.8 cm a
+year, a constant from a fact sheet, a date in history, a person's life), and every data set a figure draws (ΔT from the
+IERS). What the library computes is backed by the tables and needs none; a number derived from both, such as the 600
+million years until the last total eclipse, must be one a reader could redo from them. Links in the text (SunCalc,
+astronomia) and credit lines in captions count as references too. A claim that cannot be sourced is rephrased until it
+can, or goes.
+
 ## Figures and tables
 
-- Refer to a figure with `<Fig id="..." />` and a table with `<Tab id="..." />`, only in parentheses after what they
-  show: "(Figure 2)", never "Figure 2 shows" or a sentence starting with it. Never type a number.
-- A figure sits after the paragraph that first needs it; every figure and unfolded table gets `<Controls />` under it.
+- Every figure and every table is referenced in the text, at least once. Refer to a figure with `<Fig id="..." />` and
+  a table with `<Tab id="..." />`, only in parentheses after what they show: "(Figure 2)", never "Figure 2 shows" or a
+  sentence starting with it. Never type a number.
+- A figure or table sits right after the paragraph holding its first reference, never before it; a later reference is
+  fine anywhere. A paragraph that needs a figure but would not otherwise mention it gets the reference anyway.
+- Every figure that follows the moment and the place, and every table, gets `<Controls />` under it; a static diagram
+  (the coordinate pipeline) gets none.
 - **Captions**: what the figure is first, as a noun phrase ("A sun path diagram: ..."), then how to read it (colors,
   dashes, arrows), subfigures as "(a) ... (b) ...", then scale ("Symbols, not to scale", "Magnified, discs and horizon
   true to each other"), credits, and what to do with it last ("Hover to read off any other.", "Click to move the moment
-  there."). A figure with a credit line over it says there instead what to do with it, before the credit ("Drag
-  to rotate, click the Sun or the Moon to annotate it. Visualized with Zdog."). "The chosen place" and "the chosen moment" for whatever the controls are set to.
+  there."). A figure with a credit line over it says there instead what to do with it, before the credit ("Drag to
+  rotate, click the Sun or the Moon to annotate it. Visualized with Zdog."). "The chosen place" and "the chosen moment"
+  for whatever the controls are set to.
 - Figures render on demand, never in a continuous loop (the one exception: the corona in the eclipse figure turns
   while it shows and is in view), and are built so the later Tafeln can lift them out (colors
   from CSS tokens, UI switchable off, no reach into the chapter's DOM).
@@ -137,6 +162,11 @@ number or a model, not the general background. Every id in the frontmatter's `re
 - Each sits in the section whose concepts it uses, led into by the sentence before it, which says what the code is
   for and ends in a period or a colon. Never "Here is an example".
 - Short enough to read in one go, complete enough to copy: real imports from `@himmelszelt/<name>`, nothing hidden.
+  Every import is used, and every name and signature is the library's current one; when the library changes, the
+  examples change with it.
+- Correct for every place and moment the controls allow, not only near Greenwich or in summer: a day starts at the
+  place's midnight, not at UT's, and polar days and nights are handled or named. Prefer the call the library has for
+  the job (`moon.brightLimbAngle`, `umbralMagnitude`) over rebuilding it from parts, unless the parts are the point.
   The reader's own values stay free variables (`latitude`, `longitude`); functions the reader brings (`drawMoonDisc`)
   are named as such in the lead-in.
 - Lines at most 80 columns, so the block fits the text column without scrolling; long import lists wrapped.
@@ -147,9 +177,15 @@ number or a model, not the general background. Every id in the frontmatter's `re
 
 ## Facts
 
-Every number in the text is checked against the library's output or a cited source before it goes in, and again when
-the code changes. Dates of events (eclipses, perihelion) are real and verified. Claims about the library ("stays within
-0.002°") are measured, not estimated.
+Every number in the text, the captions, the glossary and the table descriptions is checked against the library's output
+or a cited source before it goes in, and again when the code changes. Dates of events (eclipses, perihelion) are real
+and verified. Claims about the library ("stays within 0.002°") are measured, not estimated. Simplifications are fine,
+wrong claims are not: "moonlight is the lit fraction" is wrong, "the lit fraction is a first measure of moonlight" is a
+simplification.
+
+Every check is logged in `FACTS.md`: the claim, where it stands, what it was checked against, the result and the date.
+A review rechecks only rows whose text, code or source changed since, and new claims; an `open` row is resolved or the
+claim is rephrased.
 
 ## Draft chapters
 

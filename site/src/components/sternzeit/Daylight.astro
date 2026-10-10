@@ -1,4 +1,5 @@
 ---
+import Term from "../Term.astro";
 import "./sternzeit.css";
 
 // The slider's marks: the poles and the equator named, the tropics and the polar circles as ticks, at today's tilt.
@@ -35,7 +36,7 @@ const ticks: [number, string][] = [
         The year at the chosen place, day by day from left to right, midnight to midnight from top to bottom on the chosen
         clock, its daylight saving time included: <span class="daylight-key daylight-day">day</span>, the <span class="daylight-key daylight-golden"
             >golden</span
-        > and the <span class="daylight-key daylight-blue">blue</span> hour, then nautical and astronomical twilight,
+        > and the <span class="daylight-key daylight-blue">blue</span> hour, then nautical and astronomical <Term of="Twilight">twilight</Term>,
         each a shade darker, and night. The line through the golden hour is sunrise and sunset. The slider's ticks are the
         tropics and the polar circles. Click to move the moment there.
     </figcaption>
