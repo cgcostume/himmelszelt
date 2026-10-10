@@ -29,11 +29,11 @@ const DEG = precise.DEG_TO_RAD;
 // Illustration's onResize below), so a uniform scale-up of every constant would render identically after
 // that zoom. Instead these keep the same clearance gaps as before EARTH_R doubled, so Earth reads as
 // bigger relative to the sun/moon, not just bigger in an auto-zoom-cancelled absolute sense.
-const EARTH_R = 80;
+const EARTH_R = 90;
 // Narrower gap than a strict distance scale would give (moon:sun is really ~1:390): keeps the sun where
 // it was and brings the moon closer to it, still clearly nearer but not as separated as before.
-const MOON_DIST = 320;
-const SUN_DIST = 460;
+const MOON_DIST = 235;
+const SUN_DIST = 340;
 
 // Room past the Sun's orbit for its symbol, in scene units.
 const ORBIT_MARGIN = 32;
@@ -102,7 +102,7 @@ const illustration = new Illustration({
         stageWidth = width;
         stageHeight = height;
         // Most of the Sun's orbit in view: about as wide as the stage, as tall as a wide stage allows.
-        this.zoom = Math.min(width * 0.52, height * 0.8) / (SUN_DIST + ORBIT_MARGIN);
+        this.zoom = Math.min(width * 0.52, height * 0.9) / (SUN_DIST + ORBIT_MARGIN);
         this.setSize(width, height);
     },
 });

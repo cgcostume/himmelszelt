@@ -1083,6 +1083,20 @@ figure[id] {
     .dome-scene {
         aspect-ratio: 16 / 9;
     }
+    /* Flatter still for the armillary sphere: its tilted ecliptic leaves the top and bottom of 16:9 empty. */
+    #scene {
+        aspect-ratio: 2 / 1;
+    }
+    /* The alt-az panels as tall as on 16:9 (38% of it), so packed closer to the edges to fit. */
+    #scene .altaz-panel {
+        height: 42.75%;
+    }
+    #scene .altaz-panel-sun {
+        top: 0;
+    }
+    #scene .altaz-panel-moon {
+        top: 52%;
+    }
     .strip-panel {
         --scene-ratio: 9 / 16;
     }
