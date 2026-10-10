@@ -1367,7 +1367,8 @@ figure[id] {
 .deltat-join {
     fill: var(--muted);
 }
-.deltat-hover {
+.deltat-hover,
+.daylight-hover {
     opacity: 0.6;
 }
 .deltat-line {

@@ -212,24 +212,62 @@ function render() {
         ];
         svg += stripMoment(mx, my, plot.top, plot.bottom);
     }
+    // Where a click would take the moment, while the pointer is over the plot, labelled on the side with more room.
+    if (hovered) {
+        const [hx, hy] = [
+            plot.left + (hovered.day + 0.5) * column,
+            plot.top + (hovered.minutes / (24 * 60)) * (plot.bottom - plot.top),
+        ];
+        const left = hx > (plot.left + plot.right) / 2;
+        const date = new Date((year.first + hovered.day) * DAY_MS).toLocaleDateString("en-GB", {
+            day: "numeric",
+            month: "short",
+            timeZone: "UTC",
+        });
+        const time = `${String(Math.floor(hovered.minutes / 60) % 24).padStart(2, "0")}:${String(hovered.minutes % 60).padStart(2, "0")}`;
+        const ly = hy < (plot.top + plot.bottom) / 2 ? hy + 12 : hy - 10;
+        svg += stripMoment(hx, hy, plot.top, plot.bottom, "daylight-hover");
+        svg += svgText(
+            hx + (left ? -LABEL_GAP : LABEL_GAP),
+            ly,
+            `${date} ${time}`,
+            `figure-note figure-anchor-${left ? "end" : "start"} daylight-hover`,
+        );
+    }
     drawSvg(svgEl, svg, 1);
+}
+
+// The day and the minute on the clock under the pointer, or null off the plot.
+let hovered: { day: number; minutes: number } | null = null;
+function pointAt(event: MouseEvent) {
+    if (!year) return null;
+    const { plot, column } = layout(year);
+    const box = svgEl.getBoundingClientRect();
+    const [px, py] = [event.clientX - box.left, event.clientY - box.top];
+    if (px < plot.left || px > plot.right || py < plot.top || py > plot.bottom) return null;
+    const day = Math.min(year.days.length - 1, Math.floor((px - plot.left) / column));
+    return { day, minutes: Math.round(((py - plot.top) / (plot.bottom - plot.top)) * 24 * 60) };
 }
 
 // A click moves the moment to that day and time of day on the clock.
 svgEl.addEventListener("click", (event) => {
-    if (!year) return;
-    const { plot, column } = layout(year);
-    const box = svgEl.getBoundingClientRect();
-    const [px, py] = [event.clientX - box.left, event.clientY - box.top];
-    if (px < plot.left || px > plot.right || py < plot.top || py > plot.bottom) return;
-    const day = year.days[Math.min(year.days.length - 1, Math.floor((px - plot.left) / column))];
-    const minutes = Math.round(((py - plot.top) / (plot.bottom - plot.top)) * 24 * 60);
-    if (!day) return;
-    const ms = day.dayMs + minutes * MINUTE_MS - day.offset;
+    const at = pointAt(event);
+    const day = at && year?.days[at.day];
+    if (!at || !day) return;
+    const ms = day.dayMs + at.minutes * MINUTE_MS - day.offset;
     update({ jd: Number(precise.julianDayFromDate(new Date(ms)).toFixed(7)), live: false, animate: false });
 });
 
 const requestRender = onDemand(render, svgEl);
+// Hovering shows where a click would go, without touching the page's moment.
+svgEl.addEventListener("pointermove", (event) => {
+    hovered = pointAt(event);
+    requestRender();
+});
+svgEl.addEventListener("pointerleave", () => {
+    hovered = null;
+    requestRender();
+});
 onChange(requestRender);
 new ResizeObserver(requestRender).observe(svgEl);
 render();
