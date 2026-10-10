@@ -13,8 +13,8 @@ import {
     sunInViewFrame,
     sunSymbol,
     svgText,
+    sunRays as symbolRays,
 } from "./figure.js";
-import { aboveVisibleHorizon } from "./horizon.js";
 import { arrowAround, offPanelArrowSvg } from "./offpanel.js";
 import { ephemerisDay, onChange, state } from "./state.js";
 import "./export.js";
@@ -33,14 +33,8 @@ const EARTH_R = 80;
 const MOON_DIST = 320;
 const SUN_DIST = 460;
 
-// Disc *sizes* (unlike positions/distances above) ARE to real proportion: both discs are drawn from
-// apparentAngularDiameter each frame (see frame() below), so unlike everything else in this schematic,
-// their ratio matches what an observer would actually see, near 1:1 most of the time, and shifting with
-// real perigee/apogee and perihelion/aphelion, exactly as the difference between annular and total solar
-// eclipses does in reality. SUN_R is only a reference size, chosen to read well at this scene's scale, that
-// APPARENT_SIZE_SCALE is derived from so the sun starts out at roughly its old, hand-picked diameter.
-const SUN_R = 32;
-const APPARENT_SIZE_SCALE = (SUN_R * 2) / precise.sun.apparentAngularDiameter(precise.J2000);
+// Room past the Sun's orbit for its symbol, in scene units.
+const ORBIT_MARGIN = 32;
 
 const KM_TO_SCENE = EARTH_R / precise.earth.MEAN_RADIUS_KM;
 const ATMOSPHERE_SHELL_DIAMETER = 2 * (EARTH_R + precise.earth.ATMOSPHERE_THICKNESS_KM * KM_TO_SCENE);
@@ -104,7 +98,7 @@ const illustration = new Illustration({
         stageWidth = width;
         stageHeight = height;
         // Most of the Sun's orbit in view: about as wide as the stage, as tall as a wide stage allows.
-        this.zoom = Math.min(width * 0.52, height * 0.8) / (SUN_DIST + SUN_R);
+        this.zoom = Math.min(width * 0.52, height * 0.8) / (SUN_DIST + ORBIT_MARGIN);
         this.setSize(width, height);
     },
 });
@@ -306,41 +300,16 @@ function splitInDepth(view) {
     }
 }
 
+// The Sun and the Moon as in the sun path diagram (see SUN_SYMBOL): a filled dot each, the Moon's muted, the Sun's with
+// its ring of dotted rays, in screen pixels whatever the zoom; the rays are turned square to the viewer in frame().
+const BODY_STROKE_PX = 2 * SUN_SYMBOL.radius;
 const sunAnchor = new Anchor({ addTo: illustration });
-// A solid, billboarded outline, deliberately not dotted like atmosphereShell/moonDisc: with the sunrays
-// below, the sun is the one body meant to read as a concrete, currently-there thing rather than a fixed
-// reference construction, matching radiusLine's "solid = the actual answer" tier. Always presents a full
-// circle to the viewer regardless of scene rotation, unlike earthAnchor's two-ring (outline + equator)
-// treatment, which is oriented toward Earth, not the camera. Plain INK, same as everything else:
-// yellow/grey didn't read well against the dotted stroke at this size.
-const sunDisc = new Ellipse({ addTo: sunAnchor, diameter: SUN_R * 2, color: INK, stroke: 1, fill: false });
-// Mirrors earthAnchor's centerDot: marks the exact point the body's apparentPosition refers to.
-new Shape({ addTo: sunAnchor, stroke: 3, color: INK });
-
-// Sunrays: the one purely decorative touch in this otherwise data-driven scene, so the sun reads as the sun
-// at a glance instead of just "the bigger of two identical outline circles" next to the moon (whose apparent
-// size is now often close to the sun's, see APPARENT_SIZE_SCALE above). Short strokes radiating from just
-// outside the disc's edge, camera-facing like the disc itself; a gap separates them from the outline so they
-// don't visually fuse into it. Recomputed every frame in frame() below since sunDisc's own radius changes
-// with apparentAngularDiameter. Dotted (see the dash-array loop in frame()), unlike the now-solid disc: the
-// disc itself is the "concrete, currently-there" answer, the rays are just flourish around it.
-const SUN_RAY_COUNT = 12;
-const SUN_RAY_GAP = 8;
-const SUN_RAY_LENGTH = 24;
-const sunRays = Array.from(
-    { length: SUN_RAY_COUNT },
+new Shape({ addTo: sunAnchor, stroke: BODY_STROKE_PX, color: INK });
+const sunRays = symbolRays().map(
     () => new Shape({ addTo: sunAnchor, path: [v(0, 0, 0), v(0, 0, 0)], stroke: 1, color: INK }),
 );
-
 const moonAnchor = new Anchor({ addTo: illustration });
-const moonDisc = new Ellipse({
-    addTo: moonAnchor,
-    diameter: APPARENT_SIZE_SCALE * precise.moon.apparentAngularDiameter(precise.J2000),
-    color: MOON_INK,
-    stroke: 1,
-    fill: false,
-});
-new Shape({ addTo: moonAnchor, stroke: 3, color: MOON_INK });
+new Shape({ addTo: moonAnchor, stroke: BODY_STROKE_PX, color: MOON_INK });
 
 // Two small, flat (never rotated), transparent panels overlaid on the main scene, each locked to one body: seen along
 // the vertical circle through it, as in the analemma (see alongVerticalCircle), with that body always at the center and
@@ -473,8 +442,11 @@ function frame() {
     const sunHorizontal = precise.sun.horizontalPosition(time, state);
     const moonHorizontal = precise.moon.horizontalPosition(time, state);
     // The locked views show sunrise and sunset to the second, so their altitudes are over the visible horizon: lifted by
-    // refraction, the horizon lowered by the observer's height (see horizon.js). The horizon line stays where it is.
-    const overHorizon = (h) => ({ ...h, altitude: aboveVisibleHorizon(h.altitude, state.heightM) });
+    // refraction, the horizon lowered by the observer's height (see earth.apparentAltitude). The horizon line stays where it is.
+    const overHorizon = (h) => ({
+        ...h,
+        altitude: precise.earth.apparentAltitude(h.altitude, { observerHeightM: state.heightM }),
+    });
     const sunSeen = overHorizon(sunHorizontal);
     const moonSeen = overHorizon(moonHorizontal);
     const lit = precise.moon.illuminatedFraction(ephemerisDay(jd));
@@ -487,23 +459,13 @@ function frame() {
     updateAltAzPanel(moonView, moonSeen, sunSeen, lit, earthshine, towardsSun);
 
     sunAnchor.translate = sunPos;
-    sunDisc.rotate = billboardRotate(rotX, rotY);
-    sunDisc.diameter = APPARENT_SIZE_SCALE * precise.sun.apparentAngularDiameter(ephemerisDay(jd));
-    sunDisc.updatePath();
-    const sunRayInner = sunDisc.diameter / 2 + SUN_RAY_GAP;
-    const sunRayOuter = sunRayInner + SUN_RAY_LENGTH;
+    const rays = symbolRays();
     sunRays.forEach((ray, i) => {
-        const rayAngle = (i / SUN_RAY_COUNT) * 2 * Math.PI;
-        const cosA = Math.cos(rayAngle);
-        const sinA = Math.sin(rayAngle);
         ray.rotate = billboardRotate(rotX, rotY);
-        ray.path = [v(sunRayInner * cosA, sunRayInner * sinA, 0), v(sunRayOuter * cosA, sunRayOuter * sinA, 0)];
+        ray.path = rays[i].map((p) => v(p.x / illustration.zoom, p.y / illustration.zoom, 0));
         ray.updatePath();
     });
     moonAnchor.translate = moonPos;
-    moonDisc.rotate = billboardRotate(rotX, rotY);
-    moonDisc.diameter = APPARENT_SIZE_SCALE * precise.moon.apparentAngularDiameter(ephemerisDay(jd));
-    moonDisc.updatePath();
     atmosphereShell.rotate = billboardRotate(rotX, rotY);
     // observerPos already has magnitude EARTH_R (sphericalToVector's radius arg), so this only needs a
     // plain 1.02x nudge above the surface, not a divide-by-EARTH_R (that previously collapsed the whole
@@ -570,20 +532,12 @@ function frame() {
     const dashes = [
         [
             "line-dotted",
-            [
-                equatorRing,
-                axisLine,
-                trueEclipticAxis,
-                trueObliquityArc,
-                trueObliquityArcSouth,
-                atmosphereShell,
-                moonDisc,
-                ...sunRays,
-            ],
+            [equatorRing, axisLine, trueEclipticAxis, trueObliquityArc, trueObliquityArcSouth, atmosphereShell],
         ],
         ["line-long-dashed", [orbitEllipse]],
         ["line-dashed", [latitudeRing, meridianRing]],
     ];
+    for (const ray of sunRays) ray.svgElement?.classList.add("figure-sun-ray");
     for (const [dash, shapes] of dashes) {
         for (const shape of shapes) {
             const halves = depthOf(shape);
@@ -665,7 +619,7 @@ function annotateEcliptic(sunPos) {
         return [cx + p.x * zoom, cy + p.y * zoom];
     };
     const [sx, sy] = project(sunPos);
-    const clearOfSun = (SUN_R + SUN_RAY_GAP + SUN_RAY_LENGTH) * zoom + ECLIPTIC_MARGIN_PX;
+    const clearOfSun = SUN_SYMBOL.radius + SUN_SYMBOL.gap + SUN_SYMBOL.length + ECLIPTIC_MARGIN_PX;
     // The panels cover the stage's right side on wide screens; on narrow ones they sit below it.
     const stageBox = eclipticLabel.parentElement.querySelector("#stage").getBoundingClientRect();
     const panelBox = eclipticLabel.parentElement.querySelector(".altaz-panel")?.getBoundingClientRect();

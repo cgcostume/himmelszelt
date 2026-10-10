@@ -1,6 +1,6 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { onDemand } from "../frame.js";
-import { drawSvg, LABEL_GAP as GAP, STRIP_MARGIN as MARGIN, svgText } from "./figure.js";
+import { drawSvg, LABEL_GAP as GAP, STRIP_MARGIN as MARGIN, stripMoment, svgText } from "./figure.js";
 import { onChange, state } from "./state.js";
 import "./export.js";
 
@@ -106,7 +106,12 @@ function render() {
         svg += svgText(x(year), height - MARGIN.bottom / 2, String(year).replace("-", "\u2212"), cls);
     }
     // Today in place of 2000, which it would crowd.
-    svg += svgText(x(1970 + Date.now() / (365.25 * 86_400_000)), height - MARGIN.bottom / 2, "today", "figure-label");
+    svg += svgText(
+        x(yearOf(precise.julianDayFromDate(new Date()))),
+        height - MARGIN.bottom / 2,
+        "today",
+        "figure-label",
+    );
     // Where the pieces hand over, a line from the curve down to the years, a bubble on top (drawn over the curve, below).
     const handovers = [-500, MEASURED_SINCE, today];
     for (const year of handovers) svg += line(x(year), y(deltaT(year)), x(year), plot.bottom, "deltat-axis");
@@ -156,8 +161,7 @@ function render() {
         const label = `${name} ${duration(seconds)}`;
         const ly = labelY ?? (my < (plot.top + plot.bottom) / 2 ? my + 12 : my - 10);
         return (
-            line(mx, plot.top, mx, plot.bottom, `strip-moment ${cls}`) +
-            `<circle cx="${f(mx)}" cy="${f(my)}" r="3" class="strip-moment-dot ${cls}"/>` +
+            stripMoment(mx, my, plot.top, plot.bottom, cls) +
             svgText(mx + (left ? -GAP : GAP), ly, label, `figure-note figure-anchor-${left ? "end" : "start"} ${cls}`)
         );
     };

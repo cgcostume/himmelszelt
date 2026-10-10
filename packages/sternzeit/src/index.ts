@@ -24,10 +24,12 @@ export { eclipticalToEquatorial, equatorialToHorizontal, horizontalToDirection }
 export type { AstronomicalTime, JulianDay } from "./time.js";
 export { J2000, J2050, B1900, B1950, STANDARD_EQUINOX } from "./time.js"; // reference epochs
 export {
+    dateFromJulianDay,
     fromDate,
     fromJulianDay,
     julianDay,
     julianDay0UT,
+    julianDayFromDate,
     julianDayUT,
     julianEphemerisDay,
     deltaT,
@@ -52,6 +54,7 @@ export const earth = {
     airPressureRatio: earthImpl.airPressureRatio,
     atmosphericRefraction: earthImpl.atmosphericRefraction,
     atmosphericRefractionFromApparent: earthImpl.atmosphericRefractionFromApparent,
+    apparentAltitude: earthImpl.apparentAltitude,
     orbitEccentricity: earthImpl.orbitEccentricity,
     longitudeNutation: earthImpl.longitudeNutation,
     obliquityNutation: earthImpl.obliquityNutation,
@@ -102,6 +105,7 @@ export const moon = {
     opticalLibrations: moonImpl.opticalLibrations,
     librations: moonImpl.librations,
     parallacticAngle: moonImpl.parallacticAngle,
+    brightLimbAngle: moonImpl.brightLimbAngle,
     positionAngleOfAxis: moonImpl.positionAngleOfAxis,
     phaseAngle: moonImpl.phaseAngle,
     illuminatedFraction: moonImpl.illuminatedFraction,

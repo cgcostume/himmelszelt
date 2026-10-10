@@ -10,7 +10,6 @@ import {
     veiledHorizon,
     visibleRuns,
 } from "./figure.js";
-import { aboveVisibleHorizon } from "./horizon.js";
 import { ephemerisDay, onChange, state } from "./state.js";
 import "./export.js";
 
@@ -173,7 +172,10 @@ function render() {
     // The visible horizon, below the Moon by its apparent altitude over it, at the disc's own scale (so it only shows
     // within a few tenths of a degree); the ground beneath veils what it hides.
     if (!locked) {
-        const horizon = aboveVisibleHorizon(horizontal.altitude, state.heightM) * DEG * UNITS_PER_RADIAN;
+        const horizon =
+            precise.earth.apparentAltitude(horizontal.altitude, { observerHeightM: state.heightM }) *
+            DEG *
+            UNITS_PER_RADIAN;
         svg += veiledHorizon(horizon, halfHeight, unitsPerPx, halfWidth, {
             // In the bottom right corner, level with the switch in the bottom left one.
             x: halfWidth - CORNER_PX * unitsPerPx,

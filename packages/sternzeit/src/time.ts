@@ -167,27 +167,38 @@ export function fromJulianDay(jd: JulianDay, utcOffsetSeconds = 0): Astronomical
     return { year, month, day, hour, minute, second, utcOffsetSeconds };
 }
 
-/** A JavaScript `Date` as an AstronomicalTime in the runtime's local time zone, offset included, milliseconds as
- *  fractional seconds. */
+/**
+ * A JavaScript `Date` as an AstronomicalTime in the runtime's local time zone, offset included, milliseconds as
+ * fractional seconds. The calendar fields follow the AstronomicalTime convention (Meeus ch. 7): the Julian calendar
+ * before 1582 October 15, the Gregorian after, whereas a `Date` counts in the Gregorian calendar throughout. The offset
+ * is taken to the second, as a local mean time had seconds, which `getTimezoneOffset` would round off.
+ */
 export function fromDate(date: Date): AstronomicalTime {
-    return {
-        year: date.getFullYear(),
-        month: date.getMonth() + 1,
-        day: date.getDate(),
-        hour: date.getHours(),
-        minute: date.getMinutes(),
-        second: date.getSeconds() + date.getMilliseconds() / 1000,
-        utcOffsetSeconds: -date.getTimezoneOffset() * 60,
-    };
+    // The local wall clock read as if it were UT, minus the instant, is the offset.
+    const wall = new Date(0);
+    // setUTCFullYear, unlike Date.UTC, doesn't map the years 0-99 to 1900-1999.
+    wall.setUTCFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+    wall.setUTCHours(date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds());
+    const utcOffsetSeconds = Math.round((wall.getTime() - date.getTime()) / 1000);
+    return fromJulianDay(julianDayFromDate(date), utcOffsetSeconds);
 }
 
-/** Inverse of {@link fromDate}: the same instant as a JavaScript `Date`. */
+// The Julian Day of 1970-01-01T00:00Z, where a JavaScript Date counts its milliseconds from.
+const UNIX_EPOCH_JD = 2440587.5;
+
+/** The Julian Day (UT) of the instant a JavaScript Date stands for. */
+export function julianDayFromDate(date: Date): JulianDay {
+    return UNIX_EPOCH_JD + date.getTime() / 86_400_000;
+}
+
+/** The JavaScript Date of a Julian Day (UT), to the millisecond. */
+export function dateFromJulianDay(jd: JulianDay): Date {
+    return new Date(Math.round((jd - UNIX_EPOCH_JD) * 86_400_000));
+}
+
+/** Inverse of {@link fromDate}: the same instant as a JavaScript `Date`, its fields read as Meeus reads them. */
 export function toDate(time: AstronomicalTime): Date {
-    const date = new Date(0);
-    // setUTCFullYear, unlike Date.UTC, doesn't map the years 0-99 to 1900-1999.
-    date.setUTCFullYear(time.year, time.month - 1, time.day);
-    date.setUTCHours(time.hour, time.minute, 0, 0);
-    return new Date(date.getTime() + (time.second - time.utcOffsetSeconds) * 1000);
+    return dateFromJulianDay(julianDayUT(time));
 }
 
 /** `time` converted to UT (utcOffsetSeconds = 0). */

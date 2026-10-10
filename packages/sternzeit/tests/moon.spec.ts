@@ -113,3 +113,24 @@ test("stepping by moon.MEAN_SYNODIC_MONTH from MEAN_NEW_MOON stays within a day 
         }
     }
 });
+
+// The bright limb faces the Sun: in the observer's view of the Moon, counterclockwise from up, which is to the left,
+// the sky's east. Checked against the same direction built from the ENU vectors alone.
+test("moon.brightLimbAngle points the bright limb at the Sun in the observer's view", () => {
+    const observer = { latitude: 52.4, longitude: 13.1 };
+    type V = [number, number, number];
+    const dot = ([a0, a1, a2]: V, [b0, b1, b2]: V) => a0 * b0 + a1 * b1 + a2 * b2;
+    const cross = ([a0, a1, a2]: V, [b0, b1, b2]: V): V => [a1 * b2 - a2 * b1, a2 * b0 - a0 * b2, a0 * b1 - a1 * b0];
+    for (let jd = 2461000; jd < 2461060; jd += 1.37) {
+        const time = precise.fromJulianDay(jd);
+        const v = [...precise.moon.direction(time, observer)] as V;
+        const zenithAcross = cross(cross(v, [0, 0, 1]), v);
+        const up = zenithAcross.map((c) => c / Math.hypot(...zenithAcross)) as V;
+        const right = cross(v, up);
+        const s = [...precise.moon.sunDirection(time, observer)] as V;
+        const expected = ((Math.atan2(-dot(s, right), dot(s, up)) * 180) / Math.PI + 360) % 360;
+        const angle = precise.moon.brightLimbAngle(time, observer);
+        expect(Math.abs(((angle - expected + 540) % 360) - 180)).toBeLessThan(0.5);
+        expect(Math.abs(((approx.moon.brightLimbAngle(time, observer) - angle + 540) % 360) - 180)).toBeLessThan(1);
+    }
+});

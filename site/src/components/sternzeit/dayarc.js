@@ -13,7 +13,6 @@ import {
     sunSymbol,
     svgText,
 } from "./figure.js";
-import { aboveVisibleHorizon } from "./horizon.js";
 import { onChange, state } from "./state.js";
 import "./export.js";
 
@@ -30,7 +29,7 @@ const HOURS = 24;
 const ANALEMMA_DAYS = 182;
 // Half the analemma panel's width and its height in degrees: some 47 degrees of analemma, with room around it.
 const ANALEMMA_HALF_WIDTH = 25;
-const ANALEMMA_HEIGHT = 130;
+const ANALEMMA_HEIGHT = 110;
 // The dome sits below the frame's middle: seen from high up it reaches as far above the horizon plane as the sky
 // grid does, and centered it would be cut off at the top.
 const CENTER_SHIFT = 0.04;
@@ -78,7 +77,7 @@ function layer(name) {
         onResize: function (width, height) {
             stageWidth = width;
             stageHeight = height;
-            zoom = Math.min(width / 2 / (R * 1.35), height / 2 / (R * 1.25));
+            zoom = Math.min(width / 2 / (R * 1.2), height / 2 / (R * 1.1));
             centerShiftPx = height * CENTER_SHIFT;
             this.translate.y = centerShiftPx / zoom;
             this.zoom = zoom;
@@ -92,10 +91,13 @@ const above = layer("above");
 const layers = [below, ground, above];
 
 // Every altitude here is over the visible horizon, as in the other figures: lifted by refraction, the horizon lowered by
-// the observer's height (see horizon.js). So rising and setting line up with the horizon ring and line to the second.
+// the observer's height (see earth.apparentAltitude). So rising and setting line up with the horizon ring and line to the second.
 function seen(body, time, latitude, longitude) {
     const horizontal = body.horizontalPosition(time, { latitude, longitude, heightM: state.heightM });
-    return { ...horizontal, altitude: aboveVisibleHorizon(horizontal.altitude, state.heightM) };
+    return {
+        ...horizontal,
+        altitude: precise.earth.apparentAltitude(horizontal.altitude, { observerHeightM: state.heightM }),
+    };
 }
 
 // ENU to Zdog, which is y down and z towards the viewer: x east, y up (negated), z north (negated, away from the viewer).
@@ -254,7 +256,7 @@ function renderAnalemma() {
     const points = [];
     for (let day = -ANALEMMA_DAYS; day <= ANALEMMA_DAYS; day++) {
         const sun = seen(precise.sun, precise.fromJulianDay(jd + day), latitude, longitude);
-        const firstOfMonth = new Date((jd + day - 2440587.5) * 86400000).getUTCDate() === 1;
+        const firstOfMonth = precise.dateFromJulianDay(jd + day).getUTCDate() === 1;
         points.push({ day, firstOfMonth, ...project(sun) });
     }
     // A fixed scale, so analemmas from different places compare directly, always centered on the analemma, so it glides
@@ -278,7 +280,10 @@ function renderAnalemma() {
     // The panel's own left edge, not the far end of the ground rectangle, is where the altitude labels belong.
     const visibleLeft = centerX - ((analemmaSvg.clientWidth || 1) / 2) * unitsPerPx;
     // Past the zenith the altitude falls again, on the far side of the sky, and past the nadir it rises again.
+    // A line whose label would be cut by the panel's top or bottom edge is left out.
+    const reach = ((analemmaSvg.clientHeight || 1) / 2 - 10) * unitsPerPx;
     for (const angle of [-150, -120, -90, -60, -30, 30, 60, 90, 120, 150]) {
+        if (Math.abs(-angle - centerY) > reach) continue;
         const altitude = angle > 90 ? 180 - angle : angle < -90 ? -180 - angle : angle;
         svg += gridLine(-angle, visibleLeft, right, `${altitude}°`, unitsPerPx);
     }

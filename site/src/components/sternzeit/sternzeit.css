@@ -346,9 +346,9 @@ tbody tr:hover {
     height: 100%;
     aspect-ratio: auto;
 }
-/* Twice as tall as wide while it floats over the dome, where the analemma, a tall figure, has the room for it. */
+/* Taller than wide while it floats over the dome, where the analemma, a tall figure, has the room for it. */
 .analemma-panel > svg {
-    aspect-ratio: 1 / 2;
+    aspect-ratio: 3 / 5;
 }
 /* The Sun wherever it stands as a symbol (the locked views, the line off the Moon's bright limb): a white disc with
    dotted rays. The Moon beside it in the locked views is a muted disc. */
@@ -636,7 +636,7 @@ figure[id] {
     color: var(--muted);
 }
 /* As wide as the locked panels are, centered on the scene's height, with the caption hanging below it. Square while
-   the scene is, and twice as tall as wide once the scene turns wide itself (see the media query below), where the
+   the scene is, and five thirds as tall as wide once the scene turns wide itself (see the media query below), where the
    analemma, a tall figure, has the room for it. */
 .analemma-panel {
     position: absolute;
@@ -1085,6 +1085,17 @@ figure[id] {
     }
     .strip-panel {
         --scene-ratio: 9 / 16;
+    }
+    /* The sun path diagram only as tall as the analemma beside it, which keeps the locked panels' width (38% of the
+       armillary sphere's height) rather than following its own scene's height: what a dome seen from above would
+       show around it is rarely looked at. The caption hangs below the panel, hence the room under it. */
+    .dome-scene {
+        --analemma-width: calc(0.38 * min(80vh, var(--wide-width) * 9 / 16));
+        aspect-ratio: auto;
+        height: calc(5 / 3 * var(--analemma-width) + 4rem);
+    }
+    .analemma-panel {
+        width: var(--analemma-width);
     }
 }
 /* Narrow screens, one column all the way down: every figure is the width of the text and square, what floats over

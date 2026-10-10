@@ -25,6 +25,12 @@ export const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 export const LABEL_GAP = 6;
 export const STRIP_MARGIN = { top: 12, bottom: 20 };
 
+/** The moment on a flat strip: a line across the plot at `x`, from `top` to `bottom`, and a dot at `y` on it. */
+export function stripMoment(x, y, top, bottom, cls = "") {
+    const [px, py] = [x.toFixed(1), y.toFixed(1)];
+    return `<line x1="${px}" y1="${top}" x2="${px}" y2="${bottom}" class="strip-moment ${cls}"/><circle cx="${px}" cy="${py}" r="3" class="strip-moment-dot ${cls}"/>`;
+}
+
 export function svgText(x, y, text, cls) {
     return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" class="${cls}">${escapeText(text)}</text>`;
 }
@@ -95,13 +101,12 @@ export function sunSymbol(x, y, unitsPerPx) {
 // it. The label is set flush against the line's start, so that -30° lines up with 30° digit for digit.
 const GRID_LABEL_PADDING_PX = 6;
 const GRID_LABEL_WIDTH_PX = 30;
-const GRID_LABEL_GAP_PX = 5;
 
 /** A dotted altitude line at `y`, from `left` to `right` in figure units, labeled with `label` at its left end. */
 export function gridLine(y, left, right, label, unitsPerPx) {
     const start = left + (GRID_LABEL_PADDING_PX + GRID_LABEL_WIDTH_PX) * unitsPerPx;
     const line = `<line x1="${start.toFixed(2)}" y1="${y.toFixed(2)}" x2="${right.toFixed(2)}" y2="${y.toFixed(2)}" class="figure-grid"/>`;
-    return svgText(start - GRID_LABEL_GAP_PX * unitsPerPx, y, label, "figure-grid-label") + line;
+    return svgText(start - LABEL_GAP * unitsPerPx, y, label, "figure-grid-label") + line;
 }
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];

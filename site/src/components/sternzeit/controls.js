@@ -1,4 +1,4 @@
-import { fromDate, fromJulianDay, julianDayUT, toDate } from "@himmelszelt/sternzeit";
+import { dateFromJulianDay, julianDayFromDate } from "@himmelszelt/sternzeit";
 import { julianDayNow, onChange, state, update } from "./state.js";
 import { clock } from "./zone.js";
 
@@ -8,8 +8,8 @@ const roots = [...document.querySelectorAll(".moment")];
 const LATLONG_DECIMALS = 7;
 
 // jd is UT; shown in the viewer's own time zone or in the place's, as the clock toggle says.
-const dateOf = (jd) => toDate(fromJulianDay(jd));
-const julianDayOf = (date) => julianDayUT(fromDate(date));
+const dateOf = dateFromJulianDay;
+const julianDayOf = julianDayFromDate;
 
 // Days, weeks, months and years step in UT, so time flows on evenly: across daylight saving time the clock shows an
 // hour more or less instead of the sky jumping. A month from 31 January is the last of February.

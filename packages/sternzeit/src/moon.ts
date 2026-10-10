@@ -13,7 +13,15 @@ import {
 } from "./coords.js";
 import moonTables from "./data/moon.json" with { type: "json" };
 import * as earth from "./earth.js";
-import { angularSeparation, DEG_TO_RAD, flatTable, normalizeDegrees, polynomial, RAD_TO_DEG } from "./math.js";
+import {
+    angularSeparation,
+    DEG_TO_RAD,
+    flatTable,
+    normalizeDegrees,
+    polynomial,
+    positionAngle,
+    RAD_TO_DEG,
+} from "./math.js";
 import { apparentSiderealTime, apparentSiderealTimeApprox } from "./siderealTime.js";
 import * as sun from "./sun.js";
 import {
@@ -452,6 +460,26 @@ export function parallacticAngle(time: AstronomicalTime, observer: Observer): nu
 /** Approximation of {@link parallacticAngle}, from the approximate chain. */
 export function parallacticAngleApprox(time: AstronomicalTime, observer: Observer): number {
     return parallactic(topocentricPositionApprox(time, observer), apparentSiderealTimeApprox(time), observer);
+}
+
+/**
+ * Which way the Moon's bright limb faces in the observer's sky, in degrees counterclockwise from the zenith, 0-360: the
+ * position angle of the bright limb (Meeus 48.5), from the Moon's topocentric place towards the Sun's, turned from the
+ * sky's north to the observer's up by the parallactic angle. What a crescent drawn over a horizon is rotated by.
+ */
+export function brightLimbAngle(time: AstronomicalTime, observer: Observer): number {
+    const m = topocentricPosition(time, observer);
+    const s = sun.topocentricPosition(time, observer);
+    const chi = positionAngle(m.rightAscension, m.declination, s.rightAscension, s.declination);
+    return normalizeDegrees(chi - parallacticAngle(time, observer));
+}
+
+/** Approximation of {@link brightLimbAngle}, from the approximate chain. */
+export function brightLimbAngleApprox(time: AstronomicalTime, observer: Observer): number {
+    const m = topocentricPositionApprox(time, observer);
+    const s = sun.topocentricPositionApprox(time, observer);
+    const chi = positionAngle(m.rightAscension, m.declination, s.rightAscension, s.declination);
+    return normalizeDegrees(chi - parallacticAngleApprox(time, observer));
 }
 
 /** Meeus 14.1 from the local hour angle H = θ + L - α (Meeus ch. 13), all in degrees. */

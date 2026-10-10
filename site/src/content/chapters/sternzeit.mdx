@@ -211,8 +211,7 @@ in November and 14 behind it in February <Cite id="meeus1998" />. Where its dots
 <Controls height={false} />
 
 `distance` and `apparentAngularDiameter` belong together (<Tab id="sun" />). Earth is about 3% closer to the Sun in
-early January than in early July, and the Sun's disc grows and shrinks accordingly as you step through a year
-(<Fig id="armillary-sphere" />).
+early January than in early July, and the Sun's disc looks about 3% larger then.
 
 With the Sun's altitude at hand, the library leaves out the conveniences on purpose: there is no `sunrise()`, and no
 `dawn()` or `dusk()` either. Each is the moment the altitude crosses a threshold, so walking a day in one-minute
@@ -438,9 +437,7 @@ Moon at the same time of day all month, turned as it stands in the sky there; th
 with it. How to draw them is up to you, so here they are two functions you bring yourself:
 
 ```ts
-import {
-    fromDate, julianEphemerisDay, moon, positionAngle, sun,
-} from "@himmelszelt/sternzeit";
+import { fromDate, julianEphemerisDay, moon, sun } from "@himmelszelt/sternzeit";
 
 const DAY_MS = 86_400_000;
 const observer = { latitude, longitude };
@@ -453,16 +450,12 @@ for (let day = 0; day < days; day++) {
     const jd = julianEphemerisDay(time);
     // The parallactic angle turns the sky's north into the zenith.
     const q = moon.parallacticAngle(time, observer);
-    const m = moon.apparentPosition(jd);
-    const s = sun.apparentPosition(jd);
     drawMoonDisc(day, {
         lit: moon.illuminatedFraction(jd),
         earthshine: moon.earthshine(jd),
         libration: moon.librations(jd),
-        brightLimb: positionAngle(
-            m.rightAscension, m.declination,
-            s.rightAscension, s.declination,
-        ) - q,
+        // Counterclockwise from up, already turned into this sky.
+        brightLimb: moon.brightLimbAngle(time, observer),
         north: moon.positionAngleOfAxis(jd) - q,
         up: isUp(moon.horizontalPosition(time, observer).altitude),
     });

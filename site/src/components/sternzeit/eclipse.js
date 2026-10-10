@@ -1,6 +1,5 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { drawSvg, svgText, veiledHorizon } from "./figure.js";
-import { aboveVisibleHorizon } from "./horizon.js";
 import { arrowAround, offPanelArrowSvg } from "./offpanel.js";
 import { ephemerisDay, onChange, state, update } from "./state.js";
 import "./export.js";
@@ -74,7 +73,7 @@ function renderSolar(jd) {
 
     // The Sun sits at the center, so the visible horizon is the Sun's apparent altitude over it below; refraction lifts
     // the Sun, the observer's height lowers the horizon. The ground veils whatever is beneath.
-    const sunAbove = aboveVisibleHorizon(sunAltitude, state.heightM);
+    const sunAbove = precise.earth.apparentAltitude(sunAltitude, { observerHeightM: state.heightM });
     const horizon = sunAbove * scale;
     svg += veiledHorizon(horizon, HALF, unitsPerPx);
     if (!onPanel) svg += offPanelMoon(mx, my);
@@ -139,7 +138,7 @@ function renderLunar(jd) {
 
     // An eclipse happens for everyone at once, but only those with the Moon above their horizon get to see it.
     const moonAltitude = precise.moon.horizontalPosition(precise.fromJulianDay(jd), state).altitude;
-    if (aboveVisibleHorizon(moonAltitude, state.heightM) < 0) {
+    if (precise.earth.apparentAltitude(moonAltitude, { observerHeightM: state.heightM }) < 0) {
         // The panel's frame is the sky's, not the observer's, so a Moon below the horizon veils all of it. The veil says
         // so; the status line does not, as a line that wraps and unwraps would jump the page while the time runs.
         svg += veiledHorizon(-HALF, HALF, unitsPerPx);

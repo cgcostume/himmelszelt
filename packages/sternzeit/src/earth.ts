@@ -249,6 +249,27 @@ export function horizonDip(observerHeightM: number): number {
     return Math.acos(R / (R + Math.max(observerHeightM, 0))) * RAD_TO_DEG;
 }
 
+// The refraction fit (Meeus 16.4) holds down to about a degree below the horizon and has a pole near -1.9°; lower, it
+// is taken as constant.
+const REFRACTION_FLOOR_DEG = -1;
+
+/**
+ * The altitude a body at `trueAltitude` (degrees) appears at above the observer's visible horizon, in degrees: lifted by
+ * `atmosphericRefraction`, while the horizon itself lies `horizonDip` below the true horizontal for an observer above
+ * sea level. At sea level, simply the refracted altitude. Rising and setting are where this crosses 0 for the body's
+ * upper limb, which is how a renderer with a horizon lines them up to the second.
+ */
+export function apparentAltitude(trueAltitude: number, conditions: RefractionConditions = {}): number {
+    const refraction = atmosphericRefraction(Math.max(trueAltitude, REFRACTION_FLOOR_DEG), conditions);
+    return trueAltitude + refraction + horizonDip(conditions.observerHeightM ?? 0);
+}
+
+/** `apparentAltitude` with the small-angle `horizonDipApprox`. */
+export function apparentAltitudeApprox(trueAltitude: number, conditions: RefractionConditions = {}): number {
+    const refraction = atmosphericRefraction(Math.max(trueAltitude, REFRACTION_FLOOR_DEG), conditions);
+    return trueAltitude + refraction + horizonDipApprox(conditions.observerHeightM ?? 0);
+}
+
 /** The small-angle form of `horizonDip`, `sqrt(2h / R)`: within 0.01% of it anywhere within the atmosphere. */
 export function horizonDipApprox(observerHeightM: number): number {
     return Math.sqrt((2 * Math.max(observerHeightM, 0)) / (MEAN_RADIUS_KM * 1000)) * RAD_TO_DEG;

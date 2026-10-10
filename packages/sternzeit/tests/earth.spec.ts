@@ -170,6 +170,17 @@ test("earth.horizonDip is zero at sea level and about a degree from a 1000 m mou
 });
 
 // Meeus, "Astronomical Algorithms", example 11.a: Palomar Observatory, 33°21'22" N, 1706 m.
+test("earth.apparentAltitude lifts by refraction, lowers the horizon by its dip, and holds below a degree under it", () => {
+    expect(precise.earth.apparentAltitude(30)).toBeCloseTo(30 + precise.earth.atmosphericRefraction(30), 12);
+    const conditions = { observerHeightM: 1000 };
+    const expected = 0 + precise.earth.atmosphericRefraction(0, conditions) + precise.earth.horizonDip(1000);
+    expect(precise.earth.apparentAltitude(0, conditions)).toBeCloseTo(expected, 12);
+    // Below -1° the fit's value there is kept, so the result keeps falling with the true altitude instead of diverging.
+    const floor = precise.earth.atmosphericRefraction(-1);
+    expect(precise.earth.apparentAltitude(-5)).toBeCloseTo(-5 + floor, 12);
+    expect(approx.earth.apparentAltitude(0, conditions)).toBeCloseTo(precise.earth.apparentAltitude(0, conditions), 3);
+});
+
 test("observerGeocentric places an observer on the ellipsoid and above it", () => {
     const { rhoSinPhi, rhoCosPhi } = observerGeocentric(33 + 21 / 60 + 22 / 3600, 1706);
     expect(rhoSinPhi).toBeCloseTo(0.546861, 6);

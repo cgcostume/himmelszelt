@@ -1,7 +1,7 @@
 import * as precise from "@himmelszelt/sternzeit";
 import * as approx from "@himmelszelt/sternzeit/approx";
 import { onDemand } from "../frame.js";
-import { drawSvg, LABEL_GAP, STRIP_MARGIN, svgText } from "./figure.js";
+import { drawSvg, LABEL_GAP, STRIP_MARGIN, stripMoment, svgText } from "./figure.js";
 import { onChange, state, update } from "./state.js";
 import { clockOffsetMs, DAY_MS, wallDayOf } from "./zone.js";
 import "./export.js";
@@ -11,7 +11,6 @@ import "./export.js";
 const STEP_MINUTES = 10;
 const ROWS = (24 * 60) / STEP_MINUTES;
 const MINUTE_MS = 60_000;
-const UNIX_EPOCH_JD = 2440587.5;
 // The bands by the Sun's altitude, from the top: day, the golden hour (-4 to 6 degrees, as photographers count it),
 // the blue hour (-6 to -4), then the three twilights; below -18 degrees it is night, the page's own background.
 const BANDS = [
@@ -52,7 +51,7 @@ let key = "";
 let year = null;
 
 function computeYear() {
-    const wallDay = wallDayOf(precise.toDate(precise.fromJulianDay(state.jd)).getTime());
+    const wallDay = wallDayOf(precise.dateFromJulianDay(state.jd).getTime());
     const shownYear = new Date(wallDay * DAY_MS).getUTCFullYear();
     const next = [shownYear, state.latitude, state.longitude, state.heightM, state.timeZone].join();
     if (next === key) return;
@@ -68,7 +67,10 @@ function computeYear() {
         const offset = clockOffsetMs(new Date(dayMs + DAY_MS / 2));
         const altitudes = Array.from({ length: ROWS }, (_, row) => {
             const ms = dayMs + (row + 0.5) * STEP_MINUTES * MINUTE_MS - offset;
-            return approx.sun.horizontalPosition(precise.fromJulianDay(UNIX_EPOCH_JD + ms / DAY_MS), observer).altitude;
+            return approx.sun.horizontalPosition(
+                precise.fromJulianDay(precise.julianDayFromDate(new Date(ms))),
+                observer,
+            ).altitude;
         });
         const peak = altitudes.indexOf(Math.max(...altitudes));
         days.push({
@@ -153,7 +155,7 @@ function render() {
     });
 
     // The moment: its day and time on the clock, a dot where the two meet.
-    const ms = precise.toDate(precise.fromJulianDay(state.jd)).getTime();
+    const ms = precise.dateFromJulianDay(state.jd).getTime();
     const d = wallDayOf(ms) - year.first;
     if (d >= 0 && d < year.days.length) {
         const wallMinutes = (ms + clockOffsetMs(new Date(ms)) - (year.first + d) * DAY_MS) / MINUTE_MS;
@@ -161,8 +163,7 @@ function render() {
             plot.left + (d + 0.5) * column,
             plot.top + (wallMinutes / (24 * 60)) * (plot.bottom - plot.top),
         ];
-        svg += `<line x1="${f(mx)}" y1="${plot.top}" x2="${f(mx)}" y2="${plot.bottom}" class="strip-moment"/>`;
-        svg += `<circle cx="${f(mx)}" cy="${f(my)}" r="3" class="strip-moment-dot"/>`;
+        svg += stripMoment(mx, my, plot.top, plot.bottom);
     }
     drawSvg(svgEl, svg, 1);
 }
@@ -177,7 +178,7 @@ svgEl.addEventListener("click", (event) => {
     const day = year.days[Math.min(year.days.length - 1, Math.floor((px - plot.left) / column))];
     const minutes = Math.round(((py - plot.top) / (plot.bottom - plot.top)) * 24 * 60);
     const ms = day.dayMs + minutes * MINUTE_MS - day.offset;
-    update({ jd: Number((UNIX_EPOCH_JD + ms / DAY_MS).toFixed(7)), live: false, animate: false });
+    update({ jd: Number(precise.julianDayFromDate(new Date(ms)).toFixed(7)), live: false, animate: false });
 });
 
 const requestRender = onDemand(render);

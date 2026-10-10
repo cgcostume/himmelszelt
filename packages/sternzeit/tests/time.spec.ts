@@ -2,11 +2,13 @@ import { expect, test } from "@playwright/test";
 import { apparentSiderealTime, meanSiderealTime } from "../src/siderealTime.js";
 import {
     type AstronomicalTime,
+    dateFromJulianDay,
     deltaT,
     fromDate,
     fromJulianDay,
     J2000,
     julianDay,
+    julianDayFromDate,
     julianDayUT,
     julianEphemerisDay,
     modifiedJulianDay,
@@ -102,4 +104,28 @@ test("apparentSiderealTime matches Meeus' worked example 12.a", () => {
 test("julianEphemerisDay takes a Julian Day in UT as well as a date", () => {
     const time = utc(2026, 8, 12, 18);
     expect(julianEphemerisDay(julianDayUT(time))).toBe(julianEphemerisDay(time));
+});
+
+test("julianDayFromDate and dateFromJulianDay convert an instant both ways, to the millisecond", () => {
+    expect(julianDayFromDate(new Date("2000-01-01T12:00:00Z"))).toBe(J2000);
+    const date = new Date("2026-09-21T20:00:00.123+02:00");
+    expect(julianDayFromDate(date)).toBeCloseTo(julianDayUT(fromDate(date)), 8);
+    expect(dateFromJulianDay(julianDayFromDate(date)).getTime()).toBe(date.getTime());
+});
+
+// A Date counts in the Gregorian calendar throughout; an AstronomicalTime, as Meeus does, in the Julian before 1582.
+test("fromDate and toDate keep the instant across the calendar reform and in local mean time", () => {
+    for (const iso of [
+        "1000-01-01T00:00:00Z",
+        "1582-10-10T06:30:00Z",
+        "1850-06-01T12:00:00.250Z",
+        "-000584-05-22T12:00:00Z",
+    ]) {
+        const date = new Date(iso);
+        expect(julianDayUT(fromDate(date))).toBeCloseTo(julianDayFromDate(date), 8);
+        expect(toDate(fromDate(date)).getTime()).toBe(date.getTime());
+    }
+    // 1582 October 4 (Julian), the last day before the reform, was October 14 in the proleptic Gregorian calendar.
+    const lastJulian = toDate({ year: 1582, month: 10, day: 4, hour: 12, minute: 0, second: 0, utcOffsetSeconds: 0 });
+    expect(lastJulian.toISOString()).toBe("1582-10-14T12:00:00.000Z");
 });

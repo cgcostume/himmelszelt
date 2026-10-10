@@ -4,7 +4,6 @@ import { lookupEntry } from "../../lib/glossary";
 import { escapeText } from "./figure.js";
 import { formatDMS } from "./format.js";
 import { GLOSSARY_TERMS } from "./glossary-map.js";
-import { REFRACTION_FLOOR_DEG } from "./horizon.js";
 import { ephemerisDay, onChange, state } from "./state.js";
 
 // Unit of each export's return value (or of an object return's fields, which all share one unit here).
@@ -44,6 +43,14 @@ const DEFAULT_UNIT = "deg";
 // Title and description for rows the glossary has no entry for (see glossary-map.js), shown in the same tooltip
 // style as glossary terms. Keyed by name or "name.field".
 const DESCRIPTIONS = {
+    apparentAltitude: [
+        "Apparent altitude",
+        "How high a body appears above the visible horizon: its true altitude lifted by refraction, the horizon lowered by its dip for an observer above sea level.",
+    ],
+    brightLimbAngle: [
+        "Bright limb angle",
+        "Which way the Moon's lit side faces in the observer's sky, counterclockwise from up: what a crescent drawn over a horizon is turned by.",
+    ],
     modifiedJulianDay: [
         "Modified Julian Day",
         "The Julian Day minus 2,400,000.5: days since midnight of 1858 November 17, a smaller number that starts at midnight.",
@@ -117,6 +124,7 @@ const NOTES = {
     atmosphericRefractionFromApparent:
         "Here: from the Sun's apparent altitude, the direction a renderer's view ray already has.",
     horizonDip: "Here: at the observer's height.",
+    apparentAltitude: "Here: the Sun's, at the observer's height.",
 };
 
 // Same markup and styling as the Term component in the text: a dotted underline with a tooltip.
@@ -144,7 +152,9 @@ function sunAltitude(jd) {
     return precise.sun.horizontalPosition(precise.fromJulianDay(jd), state).altitude;
 }
 
-// Refraction is only meaningful for a body at or near the horizon, not for one well below it: null reads as n/a.
+// Refraction is only meaningful for a body at or near the horizon, not for one well below it: null reads as n/a. Below
+// about a degree under the horizon its fit no longer holds (see earth.apparentAltitude).
+const REFRACTION_FLOOR_DEG = -1;
 function refractionTowardsSun(fn, jd, apparent) {
     const altitude = sunAltitude(jd);
     if (altitude < REFRACTION_FLOOR_DEG) return null;
@@ -167,6 +177,8 @@ const CALL_OVERRIDES = {
     horizontalPosition: (fn, jd) => fn(precise.fromJulianDay(jd), state),
     topocentricPosition: (fn, jd) => fn(precise.fromJulianDay(jd), state),
     parallacticAngle: (fn, jd) => fn(precise.fromJulianDay(jd), state),
+    brightLimbAngle: (fn, jd) => fn(precise.fromJulianDay(jd), state),
+    apparentAltitude: (fn, jd) => fn(sunAltitude(jd), { observerHeightM: state.heightM }),
     sunDirection: (fn, jd) => fn(precise.fromJulianDay(jd), state),
     direction: (fn, jd) => fn(precise.fromJulianDay(jd), state),
     airPressureRatio: (fn) => fn(state.heightM),

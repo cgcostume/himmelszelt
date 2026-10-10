@@ -34,12 +34,12 @@ const MINUTE_MS = 60_000;
 let locked = false;
 
 const f = (n) => n.toFixed(2);
-const timeOf = (ms) => precise.fromDate(new Date(ms));
+const timeOf = (ms) => precise.fromJulianDay(precise.julianDayFromDate(new Date(ms)));
 const moonAltitude = (ms) => precise.moon.horizontalPosition(timeOf(ms), state).altitude;
 const sunAltitude = (ms) => precise.sun.horizontalPosition(timeOf(ms), state).altitude;
 const clamp01 = (t) => Math.min(1, Math.max(0, t));
 
-const pageMs = () => precise.toDate(precise.fromJulianDay(state.jd)).getTime();
+const pageMs = () => precise.dateFromJulianDay(state.jd).getTime();
 // The month shown, as year and month on the page's clock; it starts at the page's moment and then keeps to itself.
 function pageMonth() {
     const date = new Date(wallDayOf(pageMs()) * DAY_MS);
@@ -318,7 +318,7 @@ weeksEl.addEventListener("click", (event) => {
         const date = new Date(Number(day.dataset.day) * DAY_MS);
         shown = { year: date.getUTCFullYear(), month: date.getUTCMonth() };
     }
-    const jd = precise.julianDayUT(precise.fromDate(new Date(Number(day.dataset.at))));
+    const jd = precise.julianDayFromDate(new Date(Number(day.dataset.at)));
     update({ jd: Number(jd.toFixed(7)), live: false, animate: false });
 });
 
@@ -327,7 +327,7 @@ timeInput.addEventListener("input", () => {
     const page = pageMs();
     const minutes = Math.min(Number(timeInput.value), 24 * 60 - 1);
     const ms = instantOf(wallDayOf(page) * DAY_MS + minutes * MINUTE_MS);
-    const jd = precise.julianDayUT(precise.fromDate(new Date(ms)));
+    const jd = precise.julianDayFromDate(new Date(ms));
     update({ jd: Number(jd.toFixed(7)), live: false, animate: false });
 });
 

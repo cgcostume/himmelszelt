@@ -9,7 +9,9 @@ const MINUTE_MS = 60_000;
 // When the Sun climbs past `altitude` and when it sinks past it again: in a northern summer, dusk can come after midnight,
 // so the first crossing of a day is not always the rising one.
 function crossings(start, end, altitude) {
-    const above = (ms) => precise.sun.horizontalPosition(precise.fromDate(new Date(ms)), state).altitude > altitude;
+    const above = (ms) =>
+        precise.sun.horizontalPosition(precise.fromJulianDay(precise.julianDayFromDate(new Date(ms))), state).altitude >
+        altitude;
     const found = { rising: undefined, setting: undefined, aboveAtStart: above(start) };
     let before = found.aboveAtStart;
     for (let ms = start + MINUTE_MS; ms <= end; ms += MINUTE_MS) {
@@ -23,7 +25,7 @@ function crossings(start, end, altitude) {
 let key = "";
 
 function render() {
-    const page = precise.toDate(precise.fromJulianDay(state.jd)).getTime();
+    const page = precise.dateFromJulianDay(state.jd).getTime();
     const day = wallDayOf(page);
     const [start, end] = [instantOf(day * DAY_MS), instantOf((day + 1) * DAY_MS)];
     const next = [day, state.latitude, state.longitude, state.heightM, state.timeZone].join();

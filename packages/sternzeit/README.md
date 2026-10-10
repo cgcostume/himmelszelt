@@ -64,6 +64,7 @@ chapter 53 and `Meeus table 22.A` a table of the 2nd edition; `Jensen et al. 200
   Meeus gives both directions as separate empirical fits: Bennett's (16.3) takes the apparent altitude
   (`atmosphericRefractionFromApparent`, what a renderer warping a camera ray needs), Sæmundsson's (16.4) the
   true one (`atmosphericRefraction`). They differ by ~5' at the horizon and are not interchangeable.
+  `apparentAltitude` adds the latter to a true altitude and lowers the horizon by its dip, for rising and setting.
 - J. Laskar (Astronomy and Astrophysics 157, 1986): the mean obliquity, by way of Meeus 22.3.
 - F. Espenak, J. Meeus, [*Five Millennium Canon of Solar Eclipses*](https://eclipse.gsfc.nasa.gov/SEpubs/5MCSE.html)
   (NASA TP-2006-214141), fitted to L. V. Morrison, F. R. Stephenson (2004): ΔT before 1962 and after the last

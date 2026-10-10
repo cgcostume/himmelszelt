@@ -1,4 +1,4 @@
-import { fromDate, julianDayUT, julianEphemerisDay } from "@himmelszelt/sternzeit";
+import { julianDayFromDate, julianEphemerisDay } from "@himmelszelt/sternzeit";
 
 /**
  * The one moment and place the whole page shows. Every set of controls writes here, and the tables and the scene
@@ -76,7 +76,7 @@ export function onChange(listener) {
 const JD_MIN_STEP = 1 / 86_400;
 
 export function julianDayNow() {
-    const jd = julianDayUT(fromDate(new Date()));
+    const jd = julianDayFromDate(new Date());
     return Number((Math.round(jd / JD_MIN_STEP) * JD_MIN_STEP).toFixed(7));
 }
 
