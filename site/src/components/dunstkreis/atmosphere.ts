@@ -304,9 +304,27 @@ export function setEnvironmentSize(size: number) {
     buildEnvironment();
 }
 
+// The figures that show the environment, and how many of them are on screen: it is built only while one is.
+let shownNeeding = 0;
+
+/** Builds the environment while `element`, a figure that shows it, is on screen or about to be. */
+export function needEnvironment(element: Element) {
+    let visible = false;
+    new IntersectionObserver(
+        ([entry]) => {
+            const now = entry?.isIntersecting ?? false;
+            if (now === visible) return;
+            visible = now;
+            shownNeeding += now ? 1 : -1;
+            buildEnvironment();
+        },
+        { rootMargin: "100% 0px" },
+    ).observe(element);
+}
+
 // One build at a time: while the sky moves on, only its latest state is built next.
 async function buildEnvironment() {
-    if (building || !pendingSky) return;
+    if (building || !pendingSky || shownNeeding === 0) return;
     building = true;
     const sky = pendingSky;
     pendingSky = null;

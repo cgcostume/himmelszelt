@@ -14,6 +14,7 @@ import {
     environment,
     gpu,
     gpuDevice,
+    needEnvironment,
     onDisplay,
     onEnvironment,
     onTables,
@@ -209,7 +210,7 @@ function render() {
     if (pressed("rotate")) requestRender();
 }
 
-const requestRender = onDemand(render);
+const requestRender = onDemand(render, canvas);
 
 if (gpu.error) {
     canvas.replaceWith(
@@ -220,6 +221,7 @@ if (gpu.error) {
     if (context) configureCanvas(context, SDR);
     bindHdr(find('[data-hdr="note"]', root), find('[data-hdr="choice"]', root));
     scene = createScene(gpuDevice());
+    needEnvironment(canvas);
     onEnvironment(requestRender);
     // Rebuilds the sky map, which renders anew once it is in.
     bindCubifyToggle(find("[data-cubify]", root));

@@ -1,5 +1,6 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { find } from "../dom";
+import { onDemand } from "../frame";
 import { drawSvg, svgText, veiledHorizon } from "./figure";
 import { arrowAround, offPanelArrowSvg } from "./offpanel";
 import { ephemerisDay, onChange, state, update } from "./state";
@@ -259,8 +260,9 @@ for (const button of document.querySelectorAll<HTMLElement>(".eclipse-view [data
     });
 }
 
-onChange(render);
-// The arrows are sized in screen pixels, so a resized panel redraws them.
 const [first] = views;
-if (first) new ResizeObserver(render).observe(first);
+const requestRender = onDemand(render, first?.parentElement ?? undefined);
+onChange(requestRender);
+// The arrows are sized in screen pixels, so a resized panel redraws them.
+if (first) new ResizeObserver(requestRender).observe(first);
 render();

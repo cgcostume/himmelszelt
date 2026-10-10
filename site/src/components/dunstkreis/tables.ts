@@ -9,6 +9,7 @@ import {
 } from "@himmelszelt/dunstkreis";
 import { showCode } from "../code";
 import { find } from "../dom";
+import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { state } from "../sternzeit/state";
 import {
@@ -416,9 +417,13 @@ if (gpu.error) {
         field("timing").textContent =
             `transmittance and multiple scattering computed in ${table?.precomputeMs.toFixed(1)} ms`;
     });
+    // The sky view changes with every moment: shown while its table is on screen.
+    const requestSkyView = onDemand(() => {
+        if (lastSky) show("skyView", lastSky.pass.skyViewTexture, lastSky.pass.skyViewScale);
+    }, lut("skyView"));
     onSkyView((sky) => {
         lastSky = sky;
-        show("skyView", sky.pass.skyViewTexture, sky.pass.skyViewScale);
+        requestSkyView();
     });
     showTables();
 

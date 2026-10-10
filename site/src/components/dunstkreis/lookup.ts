@@ -319,7 +319,7 @@ function frame() {
     sunLabel.style.left = `${sunAt.x}px`;
     sunLabel.style.top = `${sunAt.y}px`;
 }
-const requestFrame = onDemand(frame);
+const requestFrame = onDemand(frame, stage);
 
 // The three tables, small, with what the kept ray touches in them, and the texel under the pointer apart: pointing at
 // one shows what it stands for, a click keeps it.
@@ -425,17 +425,19 @@ if (gpu.error) {
         show("transmittance", table.luts.transmittance);
         show("multiScattering", table.luts.multiScattering);
     };
+    // The marks and the scene only while the figure is on screen.
+    const requestUpdate = onDemand(update, root);
     onTables(() => {
         showTables();
-        update();
+        requestUpdate();
     });
     onSkyView((next) => {
         sky = next;
         show("skyView", next.pass.skyViewTexture);
-        update();
+        requestUpdate();
     });
-    onPick(update);
-    onChange(update);
+    onPick(requestUpdate);
+    onChange(requestUpdate);
     showTables();
     // What the texel under the pointer stands for, once there are tables to point at.
     const pointAt = (name: TableName, event: MouseEvent, keep = false) => {

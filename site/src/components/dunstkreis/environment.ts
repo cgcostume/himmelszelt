@@ -1,5 +1,6 @@
 import { showCode } from "../code";
 import { find } from "../dom";
+import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import {
     bindCubifyToggle,
@@ -7,6 +8,7 @@ import {
     bindScaledToggle,
     type Environment,
     gpu,
+    needEnvironment,
     onEnvironment,
     quality,
     setEnvironmentSize,
@@ -176,7 +178,15 @@ function showValues(sh: ArrayLike<number>, [r = 0, g = 0, b = 0]: ArrayLike<numb
 if (gpu.error) {
     find(".lut-bar", root).insertAdjacentHTML("afterend", `<p class="note">${gpu.error}</p>`);
 } else {
-    onEnvironment(draw);
+    // Drawn while on screen, from the environment built last.
+    const requestDraw = onDemand(() => {
+        if (last) draw(last);
+    }, root);
+    onEnvironment((environment) => {
+        last = environment;
+        requestDraw();
+    });
+    needEnvironment(root);
     for (const button of root.querySelectorAll("[data-refraction]")) bindRefractionToggle(button);
     for (const name of PANELS) {
         new ResizeObserver(() => {

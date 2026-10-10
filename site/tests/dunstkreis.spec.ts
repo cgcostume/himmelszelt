@@ -2,7 +2,9 @@ import { choose, expect, test } from "./fixtures.js";
 
 test.beforeEach(async ({ page }) => {
     await page.goto("dunstkreis/");
-    // The lighting figure's readout shows sunlight once the environment is built from the sky at the chosen moment.
+    // The lighting figure's readout shows sunlight once the environment is built from the sky at the chosen moment, which
+    // happens only while the figure is on screen.
+    await page.locator("#lighting").scrollIntoViewIfNeeded();
     await expect(page.locator('#lighting [data-field="info"]')).toContainText(/sunlight [1-9]/, { timeout: 30_000 });
 });
 

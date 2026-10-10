@@ -31,9 +31,17 @@ const WALL_CLOCK: Intl.DateTimeFormatOptions = {
     second: "numeric",
 };
 
+// One formatter per zone: making one costs far more than formatting with it.
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
 // What a zone's clock reads at that instant, put back together as if it were UT.
 function zoneOffsetMs(date: Date, timeZone: string) {
-    const parts = new Intl.DateTimeFormat("en-US", { ...WALL_CLOCK, timeZone }).formatToParts(date);
+    let formatter = formatters.get(timeZone);
+    if (!formatter) {
+        formatter = new Intl.DateTimeFormat("en-US", { ...WALL_CLOCK, timeZone });
+        formatters.set(timeZone, formatter);
+    }
+    const parts = formatter.formatToParts(date);
     const part = Object.fromEntries(parts.map(({ type, value }) => [type, Number(value)]));
     const { year = 0, month = 1, day = 1, hour = 0, minute = 0, second = 0 } = part;
     const wall = Date.UTC(year, month - 1, day, hour, minute, second);

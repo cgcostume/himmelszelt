@@ -1,6 +1,7 @@
 import * as precise from "@himmelszelt/sternzeit";
 import * as approx from "@himmelszelt/sternzeit/approx";
 import { lookupEntry } from "../../lib/glossary";
+import { onDemand } from "../frame";
 import { escapeText } from "./figure";
 import { formatDMS } from "./format";
 import { GLOSSARY_TERMS } from "./glossary-map";
@@ -415,15 +416,19 @@ function syncControls(container: Element) {
     if (controls) controls.hidden = Boolean(fold && !fold.open);
 }
 
-function render() {
-    for (const container of tableContainers) {
-        // Rerendered on every change, so whether the reader folded it open is carried over by hand.
-        const fold = container.querySelector<HTMLDetailsElement>(".table-fold");
-        const open = fold ? fold.open : location.hash === `#${container.id}`;
-        container.innerHTML = renderDomain(container.dataset.domain as Domain, state.jd, open);
-        syncControls(container);
-    }
+function renderTable(container: HTMLElement) {
+    // Rerendered on every change, so whether the reader folded it open is carried over by hand.
+    const fold = container.querySelector<HTMLDetailsElement>(".table-fold");
+    const open = fold ? fold.open : location.hash === `#${container.id}`;
+    container.innerHTML = renderDomain(container.dataset.domain as Domain, state.jd, open);
+    syncControls(container);
 }
+
+// Each table on its own, while it is on screen.
+const requests = [...tableContainers].map((container) => onDemand(() => renderTable(container), container));
+const render = () => {
+    for (const request of requests) request();
+};
 
 // The details element's toggle event does not bubble, so it is caught on the way down instead.
 for (const container of tableContainers) {
@@ -438,4 +443,4 @@ for (const container of tableContainers) {
 }
 
 onChange(render);
-render();
+for (const container of tableContainers) renderTable(container);

@@ -389,7 +389,8 @@ function update() {
     requestFrame();
 }
 
-onChange(update);
+// The paths and the analemma only while the figure is on screen.
+onChange(onDemand(update, frameEl));
 // The analemma's text keeps the page's small size in screen pixels, so a resized panel redraws it, and the compass
 // labels find out where the panel now covers the scene.
 new ResizeObserver(() => {

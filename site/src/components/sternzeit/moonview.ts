@@ -1,5 +1,6 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { find } from "../dom";
+import { onDemand } from "../frame";
 import {
     drawSvg,
     EARTHSHINE_MAX,
@@ -226,7 +227,8 @@ opticalButton.addEventListener("click", () => {
     render();
 });
 
-onChange(render);
+const requestRender = onDemand(render, view);
+onChange(requestRender);
 // Its text keeps the page's small size in screen pixels, so a resized panel redraws.
-new ResizeObserver(render).observe(svgEl);
+new ResizeObserver(requestRender).observe(svgEl);
 render();

@@ -573,7 +573,7 @@ function frame() {
     for (const { back } of depthLines) back.svgElement?.classList.add("line-behind");
 }
 
-const requestFrame = onDemand(frame);
+const requestFrame = onDemand(frame, stageEl);
 onChange(requestFrame);
 new ResizeObserver(requestFrame).observe(stageEl);
 requestFrame();

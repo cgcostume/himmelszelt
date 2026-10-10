@@ -1,5 +1,6 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { find } from "../dom";
+import { onDemand } from "../frame";
 import { onChange, state } from "./state";
 import { clock, DAY_MS, instantOf, wallDayOf } from "./zone";
 
@@ -46,5 +47,5 @@ function render() {
     output.innerHTML = `${sun}; ${twilight}`;
 }
 
-onChange(render);
+onChange(onDemand(render, output));
 render();

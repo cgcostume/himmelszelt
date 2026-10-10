@@ -8,9 +8,12 @@ import { clockOffsetMs, DAY_MS, wallDayOf } from "./zone";
 import "./export";
 
 // Ten-minute rows: a pixel or so each at the strip's height. The approximate Sun is a few thousandths of a degree off,
-// far below that, and some fifty thousand positions a year are then quick.
-const STEP_MINUTES = 10;
-const ROWS = (24 * 60) / STEP_MINUTES;
+// far below that. A new year or place is sampled half-hourly first, on every fourth day with the days between drawn in,
+// a twelfth of the work, and in full once it has stood still for a moment.
+const ROWS = 144;
+const COARSE_ROWS = 48;
+const COARSE_DAY_STEP = 4;
+const REFINE_MS = 200;
 const MINUTE_MS = 60_000;
 // The bands by the Sun's altitude, from the top: day, the golden hour (-4 to 6 degrees, as photographers count it),
 // the blue hour (-6 to -4), then the three twilights; below -18 degrees it is night, the page's own background.
@@ -35,16 +38,20 @@ const f = (n: number) => n.toFixed(1);
 type Span = [start: number, end: number];
 
 function span(altitudes: number[], peak: number, threshold: number): Span {
-    const at = (i: number) => altitudes[(i + ROWS) % ROWS] ?? Number.NaN;
-    if (at(peak) < threshold) return [peak + 0.5, peak + 0.5];
+    const n = altitudes.length;
+    // In ROWS whatever the samples, so the drawing need not know how finely the day was sampled.
+    const scale = ROWS / n;
+    const at = (i: number) => altitudes[(i + n) % n] ?? Number.NaN;
+    if (at(peak) < threshold) return [(peak + 0.5) * scale, (peak + 0.5) * scale];
     const edge = (direction: number) => {
-        for (let k = 1; k <= ROWS / 2; k++) {
+        for (let k = 1; k <= n / 2; k++) {
             const [inside, outside] = [at(peak + direction * (k - 1)), at(peak + direction * k)];
             if (outside < threshold)
-                return peak + 0.5 + direction * (k - 1 + (inside - threshold) / (inside - outside));
+                return (peak + 0.5 + direction * (k - 1 + (inside - threshold) / (inside - outside))) * scale;
         }
-        // Above all day: a whole day either way, so the copies a day apart overlap instead of meeting in a seam.
-        return peak + 0.5 + direction * ROWS;
+        // Above all day: closed where it is lowest, half a day off its peak, as a day it dips below there briefly is;
+        // a row further, so the copies a day apart overlap instead of meeting in a seam.
+        return (peak + 0.5) * scale + direction * (ROWS / 2 + 1);
     };
     return [edge(-1), edge(1)];
 }
@@ -54,6 +61,7 @@ let key = "";
 type Day = { dayMs: number; offset: number; spans: Span[]; sun: Span };
 type Year = { shownYear: number; first: number; days: Day[] };
 let year: Year | null = null;
+let refine: ReturnType<typeof setTimeout> | undefined;
 
 function computeYear(): Year {
     const wallDay = wallDayOf(precise.dateFromJulianDay(state.jd).getTime());
@@ -61,6 +69,18 @@ function computeYear(): Year {
     const next = [shownYear, state.latitude, state.longitude, state.heightM, state.timeZone].join();
     if (next === key && year) return year;
     key = next;
+    clearTimeout(refine);
+    year = sampleYear(shownYear, COARSE_ROWS, COARSE_DAY_STEP);
+    refine = setTimeout(() => {
+        if (key !== next) return;
+        year = sampleYear(shownYear, ROWS);
+        requestRender();
+    }, REFINE_MS);
+    return year;
+}
+
+/** The year's days, every `dayStep`th and the last sampled `rows` times, those between interpolated. */
+function sampleYear(shownYear: number, rows: number, dayStep = 1): Year {
     const first = Date.UTC(shownYear, 0, 1) / DAY_MS;
     const count = Date.UTC(shownYear + 1, 0, 1) / DAY_MS - first;
     const observer = { latitude: state.latitude, longitude: state.longitude, heightM: state.heightM };
@@ -70,8 +90,12 @@ function computeYear(): Year {
         // The clock's offset at noon: it changes at night, so the day switching to or from summer time is off by an
         // hour for those few hours only.
         const offset = clockOffsetMs(new Date(dayMs + DAY_MS / 2));
-        const altitudes = Array.from({ length: ROWS }, (_, row) => {
-            const ms = dayMs + (row + 0.5) * STEP_MINUTES * MINUTE_MS - offset;
+        if (d % dayStep !== 0 && d !== count - 1) {
+            days.push({ dayMs, offset, spans: [], sun: [0, 0] });
+            continue;
+        }
+        const altitudes = Array.from({ length: rows }, (_, row) => {
+            const ms = dayMs + ((row + 0.5) / rows) * DAY_MS - offset;
             return approx.sun.horizontalPosition(
                 precise.fromJulianDay(precise.julianDayFromDate(new Date(ms))),
                 observer,
@@ -85,8 +109,24 @@ function computeYear(): Year {
             sun: span(altitudes, peak, SUNRISE),
         });
     }
-    year = { shownYear, first, days };
-    return year;
+    // The days between, along a straight line from the sampled one before to the one after: in UT, then onto the day's
+    // own clock, so a switch to or from summer time still steps where it happens.
+    for (let d = 0; d < count; d++) {
+        if (d % dayStep === 0 || d === count - 1) continue;
+        const [a, b] = [Math.floor(d / dayStep) * dayStep, Math.min(Math.ceil(d / dayStep) * dayStep, count - 1)];
+        const [before, after, day] = [days[a], days[b], days[d]];
+        if (!before || !after || !day) continue;
+        const t = (d - a) / (b - a);
+        const rowsOf = (ms: number) => (ms / DAY_MS) * ROWS;
+        const [from, to] = [rowsOf(day.offset - before.offset), rowsOf(day.offset - after.offset)];
+        const lerp = (x: Span, y: Span): Span => [
+            x[0] + from + (y[0] + to - x[0] - from) * t,
+            x[1] + from + (y[1] + to - x[1] - from) * t,
+        ];
+        day.spans = before.spans.map((s, i) => lerp(s, after.spans[i] ?? s));
+        day.sun = lerp(before.sun, after.sun);
+    }
+    return { shownYear, first, days };
 }
 
 function layout(year: Year) {
@@ -189,7 +229,7 @@ svgEl.addEventListener("click", (event) => {
     update({ jd: Number(precise.julianDayFromDate(new Date(ms)).toFixed(7)), live: false, animate: false });
 });
 
-const requestRender = onDemand(render);
+const requestRender = onDemand(render, svgEl);
 onChange(requestRender);
 new ResizeObserver(requestRender).observe(svgEl);
 render();

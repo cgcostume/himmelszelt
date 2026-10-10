@@ -1,5 +1,6 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { find } from "../dom";
+import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { moonSymbol, sunInViewFrame } from "./figure";
 import { onChange, state, update } from "./state";
@@ -209,11 +210,8 @@ function describe(wallDay: number, lanes: DayLanes, moon: ReturnType<typeof disc
 
 let lanesKey = "";
 let lanesByDay = new Map<number, DayLanes>();
-let visible = false;
-let pending = false;
 
 function render() {
-    pending = false;
     if (locked) shown = pageMonth();
     const days = gridDays();
     const key = [shown.year, shown.month, state.latitude, state.longitude, state.heightM, state.timeZone].join();
@@ -295,11 +293,7 @@ function render() {
 }
 
 // Drawn on demand, at most once a frame, and only while in view: out of view a change just marks it for later.
-function schedule() {
-    if (!visible || pending) return;
-    pending = true;
-    requestAnimationFrame(render);
-}
+const schedule = onDemand(render, figure);
 
 lockButton.addEventListener("click", () => {
     locked = !locked;
@@ -345,8 +339,5 @@ timeInput.addEventListener("input", () => {
 
 find(".calendar-weekdays", figure).innerHTML = WEEKDAYS.map((day) => `<span>${day}</span>`).join("");
 
-new IntersectionObserver(([entry]) => {
-    visible = entry?.isIntersecting ?? false;
-    schedule();
-}).observe(figure);
 onChange(schedule);
+schedule();

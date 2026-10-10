@@ -37,7 +37,7 @@ const LOG_SPAN = Math.log1p((LINEAR_SINCE - FIRST_YEAR) / LOG_SCALE_YEARS);
 const svgEl = find<SVGSVGElement>(".deltat-panel > svg");
 // The year under the pointer, while it hovers the plot.
 let hovered: number | null = null;
-const requestRender = onDemand(() => render());
+const requestRender = onDemand(() => render(), svgEl);
 const f = (n: number) => n.toFixed(1);
 const yearOf = (jd: number) => 2000 + (jd - precise.J2000) / 365.25;
 const jdOf = (year: number) => precise.J2000 + (year - 2000) * 365.25;
