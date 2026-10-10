@@ -26,7 +26,7 @@ const GROUPS = {
     },
     bloom: {
         label: "Bloom",
-        title: "The air's wide, soft veil around the sun, thinning with height, gone in space: none, light or strong",
+        title: "The air's wide, soft veil around the Sun, thinning with height, gone in space: none, light or strong",
         options: [
             ["off", "no bloom"],
             ["light", "light"],
@@ -35,8 +35,8 @@ const GROUPS = {
         checked: "strong",
     },
     shadows: {
-        label: "Shadow rays over the sun disc",
-        title: "Shadow rays over the sun disc: none, one to its center for hard shadows, or 8 or 64 spread over it for soft ones",
+        label: "Shadow rays over the Sun's disc",
+        title: "Shadow rays over the Sun's disc: none, one to its center for hard shadows, or 8 or 64 spread over it for soft ones",
         options: [
             ["0", "no shadows"],
             ["1", "hard"],
@@ -57,7 +57,7 @@ const GROUPS = {
     },
     godrays: {
         label: "God ray samples",
-        title: "Haze in front of the scene, lit by the sun where the solids leave it lit, brighter towards the sun, with their shadows as dark shafts through it: none, or 8 or 64 samples along each pixel's ray",
+        title: "Haze in front of the scene, lit by the Sun where the solids leave it lit, brighter towards the Sun, with their shadows as dark shafts through it: none, or 8 or 64 samples along each pixel's ray",
         options: [
             ["0", "no god rays"],
             ["8", "8"],
@@ -72,16 +72,16 @@ const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
 
 <figure class="scene-frame wide" id="lighting">
     <div class="sky-view">
-        <canvas data-field="canvas" aria-label="The five Platonic solids and a sphere, lit by the sky and the sun at the chosen moment and place"></canvas>
+        <canvas data-field="canvas" aria-label="The five Platonic solids and a sphere, lit by the sky and the Sun at the chosen moment and place"></canvas>
         <div class="sky-overlay lighting-overlay">
             <div class="lighting-row">
                 {[group("background"), group("ground")].map((choice) => <Choice {...choice} />)}
                 <span class="sky-toggles lighting-toggles">
                     <button type="button" class="view-toggle" data-cubify aria-pressed="false" title="The sky map as the environment figure builds it: cubified, its texels spread evenly over the sphere, sampled through the inverse mapping. The same switch as there">cubified</button>
-                    <button type="button" class="view-toggle" data-scaled aria-pressed="false" title="The sky map as the environment figure builds it: scaled, times a power of two that follows the sun, divided by it again here. The same switch as there">scaled</button>
+                    <button type="button" class="view-toggle" data-scaled aria-pressed="false" title="The sky map as the environment figure builds it: scaled, times a power of two that follows the Sun, divided by it again here. The same switch as there">scaled</button>
                     <span class="toggle-separator" aria-hidden="true"></span>
-                    <button type="button" class="view-toggle" data-field="sunDisc" aria-pressed="true" title="Draw the sun disc in the background">sun disc</button>
-                    <button type="button" class="view-toggle" data-field="sunLight" aria-pressed="true" title="Light the solids by the sun directly, with its shadows">sunlight</button>
+                    <button type="button" class="view-toggle" data-field="sunDisc" aria-pressed="true" title="Draw the Sun's disc in the background">sun disc</button>
+                    <button type="button" class="view-toggle" data-field="sunLight" aria-pressed="true" title="Light the solids by the Sun directly, with its shadows">sunlight</button>
                     <button type="button" class="view-toggle" data-field="skyLight" aria-pressed="true" title="Light the solids by the sky, image-based, from the nine coefficients of the sky map">sky light</button>
                     <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="Dither the 8-bit output by a step of blue noise, against banding in smooth gradients">dither</button>
                     <span class="toggle-separator" aria-hidden="true"></span>
@@ -98,7 +98,7 @@ const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
     </div>
     <p class="view-status" data-field="info"></p>
     <figcaption class="figure-caption">
-        The five Platonic solids, on a pentagon around a sphere, lit by the sky above: the sun as a light of its own, with its
+        The five Platonic solids, on a pentagon around a sphere, lit by the sky above: the Sun as a light of its own, with its
         shadows, soft from rays spread over its disc, and the sky's light from its nine coefficients, dimmed where the
         solids hide the sky. Raytraced, not a triangle in it, four rays per pixel. Every surface is white but the
         ground, a darker gray; the colors are the light's. The ground is either a round floor of their own or

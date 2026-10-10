@@ -57,13 +57,13 @@ traces the refraction itself. How to hand it over is the first of the [code exam
 
 ## Why is the sunset red?
 
-Turn away from the sun just after it has set, and the sky above the opposite horizon splits in two: a dark blue-gray
+Turn away from the Sun just after it has set, and the sky above the opposite horizon splits in two: a dark blue-gray
 band along it, the <Term of="Earth's shadow" />, and above that a band of pink, the <Term of="Belt of Venus" />. The
-dark band is the planet's own shadow, cast onto the air: the air in it is lit no longer by the sun, only by the sky,
-and so by light that has scattered more than once. The pink above is air the sun still reaches, by rays that have
+dark band is the planet's own shadow, cast onto the air: the air in it is lit no longer by the Sun, only by the sky,
+and so by light that has scattered more than once. The pink above is air the Sun still reaches, by rays that have
 crossed hundreds of kilometers along the horizon and lost their blue on the way, scattered back towards the observer.
-As the sun sinks the shadow rises, and some 6° below the horizon it has merged with the darkening sky. Nothing in
-dunstkreis draws either: a ray that crosses the shadow simply finds the sun's light hidden there, the multiple
+As the Sun sinks the shadow rises, and some 6° below the horizon it has merged with the darkening sky. Nothing in
+dunstkreis draws either: a ray that crosses the shadow simply finds the Sun's light hidden there, the multiple
 scattering still lit. Set <Fig id="sky" /> to a clear evening, look east and watch them rise.
 
 <Planned title="The long way through the air">
@@ -129,7 +129,7 @@ Near the ground the traced refraction lands within a few percent of Bennett's ab
 larger: the model's air thins out with one scale height, the real air more slowly near the ground, where the
 temperature falls with height. The tables store the result: the sky-view table, indexed by where the ray is seen, how
 far it bent; the transmittance table, indexed by where the light comes from, how much of it arrives. So the sky is
-looked up, and the sun disc flattens near the horizon and stays in view after it has geometrically set, without either
+looked up, and the Sun's disc flattens near the horizon and stays in view after it has geometrically set, without either
 being a special case.
 
 <Planned title="With and without refraction" plan="keep, perhaps as a split view of the sky figure above rather than a figure of its own.">
@@ -190,7 +190,7 @@ sun's disc, and a second pass projects that onto nine spherical harmonics coeffi
 any surface's orientation <Cite id="ramamoorthi2001" />. The disc stays out on purpose: at some two billion cd/m² it is
 far brighter than a half float holds, and at half a degree smaller than a texel of all but the largest cube maps, so it
 would be one blocky texel, smeared by the mip levels, and the coefficients would ring with it. Wherever the cube map is
-shown, the disc is drawn over it instead, sharp at any resolution. The sun lights the scene apart, as a light of its own,
+shown, the disc is drawn over it instead, sharp at any resolution. The Sun lights the scene apart, as a light of its own,
 with what the air leaves of it.
 
 Why a cube map, rather than the atmosphere itself for every pixel and every surface? Because the sky hardly changes from
@@ -246,12 +246,12 @@ turns.
 The sky comes out in physical units: luminance, in candela per square meter. The model's sun has the spectrum
 Bruneton's tables use and the illuminance it has above the atmosphere, 128 000 lux: the solar constant of
 1361 W/m² <Cite id="kopp2011" /> times about 94 lumens per watt for sunlight. That puts a clear midday sky at some
-thousands of cd/m², the sun's disc near 1.6 × 10⁹, and the sky at the end of twilight around a thousandth.
+thousands of cd/m², the Sun's disc near 1.6 × 10⁹, and the sky at the end of twilight around a thousandth.
 
 The sky-view table holds them in 16-bit floats, which keep full precision over some 30 stops, from 6 × 10⁻⁵ to 65 504.
-The sky spans more than that in a day: its brightest value falls by 37 stops from noon to the sun 30° down, and held in
+The sky spans more than that in a day: its brightest value falls by 37 stops from noon to the Sun 30° down, and held in
 cd/m², deep twilight would coarsen into steps that an exposure for the night magnifies into colored blocks. So the table
-holds the luminance times a power of two that follows the sun, which keeps its brightest value near 2¹⁰ at any hour,
+holds the luminance times a power of two that follows the Sun, which keeps its brightest value near 2¹⁰ at any hour,
 and whatever reads it divides by the same.
 
 Exposure is set in EV100, as on a camera and in engines like Frostbite and Unreal <Cite id="lagarde2014" />: the
@@ -266,9 +266,9 @@ directions below the horizon apart and takes the brighter: on the ground that is
 while the sky above turns black, and from space the lit planet, raymarched like the view. No direction counts more than
 ten stops below the brightest, a camera's range, so the black sky and the night side do not drown out the day side. The sky pass reads that
 straight from the meter's buffer. Metering the table rather than the image means the reading does not change as the
-camera turns, and the sun's disc, which is not in the table, does not darken everything. The meter reads again whenever
+camera turns, and the Sun's disc, which is not in the table, does not darken everything. The meter reads again whenever
 the table is rebuilt; the exposure follows at once, without the eye's slow adaptation. The day meters around EV 14, a
-sunset around 12, and twilight follows down to 4, with the sun 6° below the horizon, where it stops: exposed like day,
+sunset around 12, and twilight follows down to 4, with the Sun 6° below the horizon, where it stops: exposed like day,
 the night would look like day, only noisier. On top, a ramp over the day shapes it: compensations at sun altitudes above the observer's horizon, which sinks
 as the observer rises, joined by a smooth curve that never overshoots them <Cite id="fritsch1980" />. By default they
 keep the night and the minutes around sunrise and sunset darker than metered, lift the blue hour a little so its blue
@@ -276,15 +276,15 @@ shows, make the sunset a little brighter than the sunrise, and leave noon as met
 though the model's air is the same for both.
 
 The floor of EV 4 is for now. A camera exposes a landscape by full moon at about EV −3 and the Milky Way at about −6
-to −7. Once the moon lights the air and the stars are drawn, the floor drops and the night follows. Exposed that far
-today, the sky would show only the sun's last twilight, amplified beyond what the table can hold.
+to −7. Once the Moon lights the air and the stars are drawn, the floor drops and the night follows. Exposed that far
+today, the sky would show only the Sun's last twilight, amplified beyond what the table can hold.
 
 For a display, the pass then tone maps: exposed, compressed into the display's range, and encoded for sRGB, dithered
 against banding. Khronos PBR Neutral <Cite id="khronos2024" /> keeps colors exactly as they are up to three quarters of
 white and compresses only the brightest, so the sky's blue stays the blue the model computes. AgX <Cite id="sobotka2023" />,
-in Wrensch's fit <Cite id="wrensch2023" />, fades bright colors towards white as film does: the glow around the sun and
+in Wrensch's fit <Cite id="wrensch2023" />, fades bright colors towards white as film does: the glow around the Sun and
 a sunset's brightest band turn white instead of clipping to a flat hue, but the daytime sky comes out flatter and
-greyer. Narkowicz's fit of the ACES filmic curve <Cite id="narkowicz2016" />, which dunstkreis used first, is the third:
+grayer. Narkowicz's fit of the ACES filmic curve <Cite id="narkowicz2016" />, which dunstkreis used first, is the third:
 saturated, and it pushes bright hues towards yellow. The exposure follows a camera's convention, which puts a metered
 average at about a tenth of white, where ACES expects it; Neutral and AgX expect the scene's middle gray at 0.18, and
 are lifted by the difference. The tone curve choice in <Fig id="sky" /> switches every figure between them. A renderer with its own HDR

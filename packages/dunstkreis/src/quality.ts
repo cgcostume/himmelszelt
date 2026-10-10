@@ -41,7 +41,7 @@ export function pipelineConstants(config: PrecomputedTextureConfig, samples: { c
 
 /**
  * A tone curve for a display: "neutral", Khronos PBR Neutral, which keeps colors as they are up to 0.76 and compresses
- * only above; "agx", Sobotka's, whose bright colors fade towards white as film does, flatter and greyer by day; or
+ * only above; "agx", Sobotka's, whose bright colors fade towards white as film does, flatter and grayer by day; or
  * "aces", Narkowicz's fit of the ACES filmic curve, saturated, shifting bright hues towards yellow; or "clip", none at
  * all, the exposed light cut off at 1, where it saturates, to see what the curves make of it.
  */

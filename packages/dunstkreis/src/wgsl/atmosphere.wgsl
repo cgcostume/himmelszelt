@@ -34,7 +34,7 @@ struct DkAtmosphere {
 
     // Mie scale height, in km.
     HM: f32,
-    // Centre altitude of the ozone layer, in km, and half its linear falloff width.
+    // Center altitude of the ozone layer, in km, and half its linear falloff width.
     ozoneCenter: f32,
     ozoneHalfWidth: f32,
     // Refractivity n - 1 of the air on the ground, falling off with its density; 0 leaves every ray straight.

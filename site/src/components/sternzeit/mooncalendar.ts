@@ -220,10 +220,12 @@ function render() {
         lanesByDay = new Map(days.map((day) => [day, dayLanes(day)]));
     }
     const page = pageMs();
-    const pageDay = wallDayOf(page);
+    // The slider's 24:00 is the next midnight, still counted to the day it ends, so the thumb stays at the end.
+    const atEnd = state.jd === sliderEnd;
+    const pageDay = wallDayOf(page) - (atEnd ? 1 : 0);
     // The time of day on the page's clock, the same for every day of the grid.
     const timeOfDay = page + clockOffsetMs(new Date(page)) - pageDay * DAY_MS;
-    const minutes = Math.floor(timeOfDay / MINUTE_MS);
+    const minutes = Math.round(timeOfDay / MINUTE_MS);
     timeInput.value = String(minutes);
     paintRange(timeInput);
     timeValue.textContent = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
@@ -328,13 +330,16 @@ weeksEl.addEventListener("click", (event) => {
     update({ jd: Number(jd.toFixed(7)), live: false, animate: false });
 });
 
-// The slider sets the moment's time of day on the clock and keeps its date; 24:00 stays a minute short of the next day.
+// The slider sets the moment's time of day on the clock and keeps its date; 24:00 is the next midnight, which the
+// calendar still counts to the day it ends, until something else moves the moment.
+let sliderEnd = Number.NaN;
 timeInput.addEventListener("input", () => {
     const page = pageMs();
-    const minutes = Math.min(Number(timeInput.value), 24 * 60 - 1);
-    const ms = instantOf(wallDayOf(page) * DAY_MS + minutes * MINUTE_MS);
-    const jd = precise.julianDayFromDate(new Date(ms));
-    update({ jd: Number(jd.toFixed(7)), live: false, animate: false });
+    const day = wallDayOf(page) - (state.jd === sliderEnd ? 1 : 0);
+    const minutes = Number(timeInput.value);
+    const jd = Number(precise.julianDayFromDate(new Date(instantOf(day * DAY_MS + minutes * MINUTE_MS))).toFixed(7));
+    sliderEnd = minutes === 24 * 60 ? jd : Number.NaN;
+    update({ jd, live: false, animate: false });
 });
 
 find(".calendar-weekdays", figure).innerHTML = WEEKDAYS.map((day) => `<span>${day}</span>`).join("");

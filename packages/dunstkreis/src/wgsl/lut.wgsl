@@ -6,7 +6,7 @@
 // horizon where the sky's gradient is steep, and it is exactly invertible, which is what lets the precompute
 // pass and the sampling path agree.
 
-// Texels sample at their centres, so a unit-range value has to be squeezed into [0.5/n, 1 - 0.5/n] to line
+// Texels sample at their centers, so a unit-range value has to be squeezed into [0.5/n, 1 - 0.5/n] to line
 // up with them. Getting this wrong shifts every LUT lookup by half a texel, which shows up as a seam at the
 // horizon rather than as an obvious error.
 fn dkUnitToTextureCoord(x: f32, n: f32) -> f32 {

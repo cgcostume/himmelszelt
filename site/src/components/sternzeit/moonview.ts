@@ -1,6 +1,7 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { find } from "../dom";
 import { onDemand } from "../frame";
+import { paintRange } from "../range";
 import {
     drawSvg,
     EARTHSHINE_MAX,
@@ -12,7 +13,8 @@ import {
     veiledHorizon,
     visibleRuns,
 } from "./figure";
-import { ephemerisDay, onChange, state } from "./state";
+import { arrowAround, offPanelArrowSvg } from "./offpanel";
+import { ephemerisDay, onChange, state, update } from "./state";
 import "./export";
 
 const DEG = precise.DEG_TO_RAD;
@@ -24,17 +26,91 @@ const radiusAt = (km: number) => Math.asin(precise.moon.MEAN_RADIUS_KM / km);
 const UNITS_PER_RADIAN = PERIGEE_RADIUS / radiusAt(PERIGEE_KM);
 // Selenographic grid spacing, in degrees.
 const GRID_STEP = 30;
-const SUN_ARROW_GAP = 5;
-const SUN_ARROW_LENGTH = 14;
+// The Sun's normal is this long where it stands on the limb, at first and last quarter, and its head this long.
+const SUN_NORMAL_LENGTH = 19;
+const SUN_HEAD_LENGTH = 4;
+// Past the quarters, the common arrow (see offpanel.ts) on this fixed circle, outside the disc at perigee.
+const SUN_CIRCLE = PERIGEE_RADIUS + 9;
 
 const view = find(".moon-view");
 const svgEl = find<SVGSVGElement>(".moon-panel > svg", view);
 const lockButton = find('[data-field="lockMoon"]', view);
 // Locked to the Moon: its north up rather than the zenith, and no horizon, so only the librations still move.
-let locked = false;
+let locked = true;
 const opticalButton = find('[data-field="opticalLibration"]', view);
 // Off leaves only the physical libration, the Moon's own wobble, well below a pixel here.
 let optical = true;
+const lunationInput = find<HTMLInputElement>('[data-field="lunation"]');
+const lunationValue = find('[data-field="lunationValue"]');
+const phasesEl = find('[data-field="phases"]');
+
+// The slider runs through the lunation the moment is in, from one true full moon to the next: the moments the Moon's
+// apparent longitude stands 180° from the Sun's. The last quarter is at 270°, the new moon at 0°, the first at 90°.
+const { MEAN_NEW_MOON, MEAN_SYNODIC_MONTH } = precise.moon;
+const HOUR = 1 / 24;
+const SECOND = 1 / 86_400;
+const elongation = (jd: number) => {
+    const t = ephemerisDay(jd);
+    return precise.moon.position(t).longitude + precise.earth.longitudeNutation(t) - precise.sun.apparentLongitude(t);
+};
+/** When, near `guess`, the elongation reaches `target` degrees: Newton's method on the mean rate, to a second. */
+function phaseTime(guess: number, target: number) {
+    let jd = guess;
+    for (let i = 0; i < 10; i++) {
+        const step = ((((((elongation(jd) - target + 180) % 360) + 360) % 360) - 180) / 360) * MEAN_SYNODIC_MONTH;
+        jd -= step;
+        if (Math.abs(step) < SECOND) break;
+    }
+    return jd;
+}
+interface Lunation {
+    start: number;
+    end: number;
+    /** Each phase's moment and elongation, full moon to full moon. */
+    phases: [number, number][];
+}
+function lunationAt(jd: number): Lunation {
+    const k = Math.floor((jd - MEAN_NEW_MOON) / MEAN_SYNODIC_MONTH - 0.5);
+    let start = phaseTime(MEAN_NEW_MOON + (k + 0.5) * MEAN_SYNODIC_MONTH, 180);
+    if (start > jd) start = phaseTime(start - MEAN_SYNODIC_MONTH, 180);
+    let end = phaseTime(start + MEAN_SYNODIC_MONTH, 180);
+    if (end <= jd) [start, end] = [end, phaseTime(end + MEAN_SYNODIC_MONTH, 180)];
+    const between = [270, 0, 90].map((target, i): [number, number] => [
+        phaseTime(start + ((i + 1) / 4) * MEAN_SYNODIC_MONTH, target),
+        target,
+    ]);
+    return { start, end, phases: [[start, 180], ...between, [end, 180]] };
+}
+let lunation = lunationAt(state.jd);
+
+/** A phase as a small disc, lit on the side the Sun is on: the right while waxing, seen from the north. */
+function phaseIcon(target: number, north: boolean) {
+    const half = (right: boolean) => `<path d="M0,-4A4,4 0 0 ${right ? 1 : 0} 0,4Z"/>`;
+    const lit = target === 180 ? '<circle r="4"/>' : target === 0 ? "" : half((target === 90) === north);
+    return `<svg viewBox="-5 -5 10 10"><circle r="4" class="phase-outline"/>${lit}</svg>`;
+}
+const PHASE_NAMES: Record<number, string> = {
+    180: "full moon",
+    270: "last quarter",
+    0: "new moon",
+    90: "first quarter",
+};
+
+function renderLunation(jd: number) {
+    if (jd < lunation.start || jd >= lunation.end) lunation = lunationAt(jd);
+    const { start, end, phases } = lunation;
+    lunationInput.max = String(Math.floor((end - start) / HOUR));
+    lunationInput.value = String(Math.floor((jd - start) / HOUR));
+    paintRange(lunationInput);
+    lunationValue.textContent = `${(jd - start).toFixed(1)} d`;
+    const north = state.latitude >= 0;
+    phasesEl.innerHTML = phases
+        .map(([at, target]) => {
+            const left = (((at - start) / (end - start)) * 100).toFixed(2);
+            return `<span class="figure-slider-mark" style="left: ${left}%" title="${PHASE_NAMES[target]}">${phaseIcon(target, north)}</span>`;
+        })
+        .join("");
+}
 
 // The panel is wider than the Moon needs: the readouts sit beside it. Its height keeps the disc at the size a 416 px
 // square would give it, unless the panel is too narrow for the readouts, when the disc shrinks to make room for them.
@@ -49,8 +125,8 @@ const CORNER_PX = 10;
 const CORNER_ROW_PX = 20;
 // The north tick and the tilt arc reach this far from the center; the readouts start just beyond.
 const OUTSIDE = PERIGEE_RADIUS + 3;
-// The Sun's arrow reaches this far at most; the readouts stay beyond it, whichever way it points.
-const REACH = PERIGEE_RADIUS + SUN_ARROW_GAP + SUN_ARROW_LENGTH;
+// The Sun's arrows reach this far at most; the readouts stay beyond them, whichever way they point.
+const REACH = PERIGEE_RADIUS + SUN_NORMAL_LENGTH;
 const SIDE = REACH + 6;
 
 const f = (n: number) => n.toFixed(2);
@@ -62,6 +138,7 @@ const polyline = (points: (readonly [number, number])[], cls: string) =>
 
 function render() {
     const { jd } = state;
+    renderLunation(jd);
     const width = svgEl.parentElement?.clientWidth || 416;
     const besides = (width * BASE_UNITS_PER_PX) / 2 >= SIDE + READOUT_WIDTH_PX * BASE_UNITS_PER_PX;
     const unitsPerPx = Math.max(BASE_UNITS_PER_PX, (2 * (SIDE + 10)) / width);
@@ -146,30 +223,29 @@ function render() {
         svg += polyline(arc, "moon-tilt");
     }
 
-    // The libration: an arrow from where the Moon's mean center (0° longitude, 0° latitude) appears to the disc's center,
-    // the point we look at; that is how far, and which way, we see around the Moon's edge.
-    const mean = toScreen(selenographic(0, 0, l, b), tilt, radius);
-    const shift = Math.hypot(mean[0], mean[1]);
-    svg += `<circle r="1.2" class="moon-libration-dot"/>`;
-    if (shift > 5) {
-        // Ends just short of the center's dot, so the head stays visible.
-        const [ux, uy] = [-mean[0] / shift, -mean[1] / shift];
-        const [tx, ty] = [-ux * 2, -uy * 2];
-        const [hx, hy] = [tx - ux * 3, ty - uy * 3];
-        svg += `<line x1="${f(mean[0])}" y1="${f(mean[1])}" x2="${f(hx)}" y2="${f(hy)}" class="moon-libration"/>`;
-        svg += `<polygon points="${f(tx)},${f(ty)} ${f(hx - uy * 1.6)},${f(hy + ux * 1.6)} ${f(hx + uy * 1.6)},${f(hy - ux * 1.6)}" class="moon-libration-dot"/>`;
-    }
+    // The disc's center, the point we look at: the libration is how far the grid's own center has moved from it.
+    svg += `<circle r="1.2" class="moon-center"/>`;
 
-    // The Sun: an arrow off the bright limb.
+    // The Sun: while the point under it faces us, the normal there, towards the Sun and foreshortened as the sphere
+    // turns it away, down to a dot at full moon; once that point is on the far side, the common arrow around the disc.
     const [ux, uy] = [ls, -lc];
-    const [ax, ay] = [ux * (radius + SUN_ARROW_GAP), uy * (radius + SUN_ARROW_GAP)];
-    const [tx, ty] = [
-        ux * (radius + SUN_ARROW_GAP + SUN_ARROW_LENGTH),
-        uy * (radius + SUN_ARROW_GAP + SUN_ARROW_LENGTH),
-    ];
-    const [hx, hy] = [tx - ux * 4, ty - uy * 4];
-    svg += `<line x1="${f(ax)}" y1="${f(ay)}" x2="${f(hx)}" y2="${f(hy)}" class="moon-sun-arrow"/>`;
-    svg += `<polygon points="${f(tx)},${f(ty)} ${f(hx - uy * 2.4)},${f(hy + ux * 2.4)} ${f(hx + uy * 2.4)},${f(hy - ux * 2.4)}" class="moon-sun-head"/>`;
+    const across = Math.hypot(sunFrame.right, sunFrame.up) / Math.hypot(sunFrame.right, sunFrame.up, sunFrame.toward);
+    if (sunFrame.toward > 0) {
+        const [px, py] = [ux * radius * across, uy * radius * across];
+        const length = SUN_NORMAL_LENGTH * across;
+        let normal = `<circle cx="${f(px)}" cy="${f(py)}" r="1.8"/>`;
+        if (length > SUN_HEAD_LENGTH) {
+            const [tx, ty] = [px + ux * length, py + uy * length];
+            const [hx, hy] = [tx - ux * SUN_HEAD_LENGTH, ty - uy * SUN_HEAD_LENGTH];
+            const shaft = `x1="${f(px)}" y1="${f(py)}" x2="${f(hx)}" y2="${f(hy)}"`;
+            normal = `<line ${shaft}/>${normal}`;
+            normal += `<polygon points="${f(tx)},${f(ty)} ${f(hx - uy * 2.4)},${f(hy + ux * 2.4)} ${f(hx + uy * 2.4)},${f(hy - ux * 2.4)}"/>`;
+        }
+        svg += `<g class="moon-sun-normal">${normal}</g>`;
+    } else {
+        const arrow = arrowAround({ x: 0, y: 0 }, { x: ux, y: uy }, SUN_CIRCLE, unitsPerPx);
+        svg += offPanelArrowSvg(arrow, true);
+    }
 
     // The visible horizon, below the Moon by its apparent altitude over it, at the disc's own scale (so it only shows
     // within a few tenths of a degree); the ground beneath veils what it hides.
@@ -225,6 +301,16 @@ opticalButton.addEventListener("click", () => {
     optical = !optical;
     opticalButton.setAttribute("aria-pressed", String(optical));
     render();
+});
+
+// The slider moves the moment through the lunation by whole hours and keeps its minutes; never quite to the next full
+// moon, where the next lunation begins.
+lunationInput.addEventListener("input", () => {
+    const { start, end } = lunation;
+    const within = (state.jd - start) / HOUR;
+    const jd = start + (Number(lunationInput.value) + within - Math.floor(within)) * HOUR;
+    const kept = Math.min(Math.max(jd, start + SECOND), end - 60 * SECOND);
+    update({ jd: Number(kept.toFixed(7)), live: false, animate: false });
 });
 
 const requestRender = onDemand(render, view);

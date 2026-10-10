@@ -40,7 +40,7 @@ const TABLES = [
     {
         name: "skyView",
         title: "Sky view",
-        axes: "azimuth from the sun × angle from the horizon",
+        axes: "azimuth from the Sun × angle from the horizon",
         width: { min: 8, max: 1024, presets: [32, 64, 128, 256, 512] },
         height: { min: 4, max: 1024, presets: [64, 128, 256, 512, 1024] },
         samples: {
@@ -50,7 +50,7 @@ const TABLES = [
             label: "samples per view ray",
             title: "Integration samples along each texel's view ray, out to the ground or the top of the atmosphere. From above the atmosphere the sky pass raymarches every pixel with as many.",
         },
-        x: ["away from the sun", "the sun, mirrored at it", "away from it"],
+        x: ["away from the Sun", "the Sun, mirrored at it", "away from it"],
         y: ["zenith", "angle from the horizon, which is in the middle", "nadir"],
     },
 ];

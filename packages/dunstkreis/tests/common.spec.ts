@@ -200,14 +200,14 @@ test("density profiles follow their layers", async () => {
     expect(rayleighScale).toBeCloseTo(Math.E ** -1, 5);
     expect(mieScale).toBeCloseTo(Math.E ** -1, 5);
 
-    // Ozone is a tent, not an exponential: zero at the ground, peaking at its centre altitude.
-    const [ozoneGround, ozoneCentre, ozoneEdge] = await evaluate("vec4f(dkDensityOzone(atmosphere, input.x))", [
+    // Ozone is a tent, not an exponential: zero at the ground, peaking at its center altitude.
+    const [ozoneGround, ozoneCenter, ozoneEdge] = await evaluate("vec4f(dkDensityOzone(atmosphere, input.x))", [
         [0, 0],
         [model.ozone.centerAltitudeKm, 0],
         [model.ozone.centerAltitudeKm + model.ozone.widthKm / 2, 0],
     ]);
     expect(ozoneGround).toBeCloseTo(0, 6);
-    expect(ozoneCentre).toBeCloseTo(1, 6);
+    expect(ozoneCenter).toBeCloseTo(1, 6);
     expect(ozoneEdge).toBeCloseTo(0, 6);
 });
 

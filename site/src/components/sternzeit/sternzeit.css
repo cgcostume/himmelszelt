@@ -85,7 +85,7 @@
 .stepper > button[data-field] {
     margin-left: 0.4rem;
 }
-/* Whichever is hovered or focused draws its whole outline, over the neighbour it shares an edge with. */
+/* Whichever is hovered or focused draws its whole outline, over the neighbor it shares an edge with. */
 .stepper > :hover,
 .stepper > :focus-visible {
     position: relative;
@@ -299,7 +299,7 @@ tbody tr:hover {
     color: var(--accent);
     pointer-events: none;
 }
-/* The poles' N and S belong to the drawing, not to the annotations, so they take its muted grey. */
+/* The poles' N and S belong to the drawing, not to the annotations, so they take its muted gray. */
 .scene-annotation.pole-label {
     color: var(--muted);
 }
@@ -483,10 +483,6 @@ figure[id] {
 .subfigure-title::before {
     counter-increment: subfigure;
     content: "(" counter(subfigure, lower-alpha) ") ";
-}
-.eclipse-orientation {
-    display: block;
-    color: var(--muted);
 }
 /* The panel proper, without the caption below it: what floats over the figure is placed against this. */
 .eclipse-panel {
@@ -731,7 +727,6 @@ figure[id] {
     vector-effect: non-scaling-stroke;
 }
 .moon-axis,
-.moon-sun-arrow,
 .moon-zenith {
     stroke: var(--text);
     stroke-width: 1;
@@ -744,17 +739,19 @@ figure[id] {
     stroke-width: 1;
     vector-effect: non-scaling-stroke;
 }
-/* In the grid's grey: the libration is a property of the grid, where its center has moved to. */
-.moon-libration {
-    stroke: var(--muted);
-    stroke-width: 1.5;
-    vector-effect: non-scaling-stroke;
-}
-.moon-libration-dot {
+/* In the grid's gray: the disc's center, against which the libration moves the grid. */
+.moon-center {
     fill: var(--muted);
 }
-.moon-sun-head {
-    fill: var(--text);
+/* The Sun's normal on the lit side: a little dimmed, so it shows on the disc and off it without an outline. */
+.moon-sun-normal > * {
+    fill: var(--muted);
+    stroke: none;
+}
+.moon-sun-normal > line {
+    stroke: var(--muted);
+    stroke-width: 1.5px;
+    vector-effect: non-scaling-stroke;
 }
 /* The download button on every figure panel (see export.js): in its top right corner, shown on hover or focus. */
 [data-export] {
@@ -937,8 +934,9 @@ figure[id] {
 .calendar-week {
     margin-bottom: 0.4rem;
 }
-/* The time of day under the weeks, as wide as they are, its hours under the thumb's travel and the time beside it. */
-.calendar-time {
+/* A slider under a figure, as wide as it is, its marks under the thumb's travel and its value beside it: the moon
+   calendar's time of day, the Moon's lunation, the eclipses' hours around their moment. */
+.figure-slider {
     display: flex;
     gap: 0.75rem;
     align-items: flex-start;
@@ -946,15 +944,15 @@ figure[id] {
     font-size: var(--text-meta);
     line-height: 18px;
 }
-.calendar-time-rail {
+.figure-slider-rail {
     flex: 1;
 }
 /* Without the browser's margin around a slider, so its rail is level with the words either side. */
-.calendar-time input {
+.figure-slider input {
     width: 100%;
     margin: 0;
 }
-.calendar-time-scale {
+.figure-slider-scale {
     position: relative;
     display: block;
     height: 1em;
@@ -965,11 +963,52 @@ figure[id] {
     font-family: var(--font-mono);
     font-size: var(--text-small);
 }
-.calendar-hour {
+.figure-slider-mark {
     position: absolute;
     transform: translateX(-50%);
+    white-space: nowrap;
 }
-.calendar-time output {
+/* The Moon's phases on its lunation, drawn rather than named, lit where the Moon is: full, last quarter, new, first. */
+.figure-slider-mark > svg {
+    display: block;
+    width: 10px;
+    height: 10px;
+    margin-top: 0.15em;
+    fill: currentColor;
+}
+.figure-slider-mark .phase-outline {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+/* A mark's unit or hemisphere, hanging after it, so the mark centers on its number under the thumb. */
+.figure-slider-unit {
+    position: absolute;
+    left: 100%;
+}
+/* A mark without a name, its name on hover: the tropics and the polar circles under the latitude. */
+.figure-slider-tick {
+    width: 1px;
+    height: 0.5em;
+    margin-top: 0.15em;
+    background: currentColor;
+}
+/* The latitude, as wide as "90.0° S", so the rail stays put. */
+#daylight .figure-slider output {
+    min-width: 7ch;
+    text-align: right;
+}
+/* The days since the full moon, as wide as two digits ever need, so the rail stays put as they drop to one. */
+.moon-figure .figure-slider output {
+    min-width: 6ch;
+    text-align: right;
+}
+/* Under the half-width eclipse panels, closer to them than under a full figure. */
+.eclipse-view > .figure-slider {
+    margin-top: 0.5rem;
+}
+.figure-slider output {
     min-width: 5ch;
     font-family: var(--font-mono);
 }
@@ -1443,7 +1482,7 @@ figure[id] {
 .daylight-tick {
     stroke: var(--line);
 }
-/* The caption's colour key: each band's name in its own colour. */
+/* The caption's color key: each band's name in its own color. */
 .daylight-key {
     color: var(--text);
 }

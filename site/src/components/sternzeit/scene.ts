@@ -28,7 +28,7 @@ const DEG = precise.DEG_TO_RAD;
 // SUN_DIST aren't simply EARTH_R*2 scaled: the whole scene auto-zooms to fit the viewport (see
 // Illustration's onResize below), so a uniform scale-up of every constant would render identically after
 // that zoom. Instead these keep the same clearance gaps as before EARTH_R doubled, so Earth reads as
-// bigger relative to the sun/moon, not just bigger in an auto-zoom-cancelled absolute sense.
+// bigger relative to the sun/moon, not just bigger in an auto-zoom-canceled absolute sense.
 const EARTH_R = 90;
 // Narrower gap than a strict distance scale would give (moon:sun is really ~1:390): keeps the sun where
 // it was and brings the moon closer to it, still clearly nearer but not as separated as before.
@@ -43,7 +43,7 @@ const ATMOSPHERE_SHELL_DIAMETER = 2 * (EARTH_R + precise.earth.ATMOSPHERE_THICKN
 const PAGE_ACCENT = cssColor("--accent", "#5aa9ff");
 // Every stroke that was plain black on the old light page: the site's text color, so the scene follows the theme.
 const INK = cssColor("--text", "#c5c9d2");
-// The Moon's color in every figure except the eclipse panels (which show how it really looks): muted grey.
+// The Moon's color in every figure except the eclipse panels (which show how it really looks): muted gray.
 const MOON_INK = cssColor("--muted", "#808899");
 
 type Point = { x: number; y: number; z: number };

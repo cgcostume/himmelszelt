@@ -1,19 +1,40 @@
 ---
 import "./sternzeit.css";
+
+// The slider's marks: the poles and the equator named, the tropics and the polar circles as ticks, at today's tilt.
+const percent = (latitude: number) => `left: ${((latitude + 90) / 180) * 100}%`;
+const named: [number, string, string][] = [[-90, "90°", " S"], [0, "0°", ""], [90, "90°", " N"]];
+const ticks: [number, string][] = [
+    [-66.6, "Antarctic Circle"],
+    [-23.4, "Tropic of Capricorn"],
+    [23.4, "Tropic of Cancer"],
+    [66.6, "Arctic Circle"],
+];
 ---
 
 <figure class="strip-figure" id="daylight">
     <div class="strip-panel daylight-panel" data-export="daylight">
         <svg aria-hidden="true"></svg>
     </div>
+    <label class="figure-slider" title="The chosen place's latitude: drag, or turn the mouse wheel for a degree a notch">
+        <span class="note">Latitude</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="latitude" min="-90" max="90" step="1" aria-label="Latitude" />
+            <span class="figure-slider-scale" aria-hidden="true">
+                {named.map(([latitude, name, side]) => <span class="figure-slider-mark" style={percent(latitude)}>{name}{side && <span class="figure-slider-unit">{side}</span>}</span>)}
+                {ticks.map(([latitude, name]) => <span class="figure-slider-mark figure-slider-tick" style={percent(latitude)} title={name}></span>)}
+            </span>
+        </span>
+        <output data-field="latitudeValue"></output>
+    </label>
     <figcaption class="figure-caption">
         The year at the chosen place, day by day from left to right, midnight to midnight from top to bottom on the chosen
         clock, its daylight saving time included: <span class="daylight-key daylight-day">day</span>, the <span class="daylight-key daylight-golden"
             >golden</span
         > and the <span class="daylight-key daylight-blue">blue</span> hour, then nautical and astronomical twilight,
         each a shade darker, and night. The line through the golden hour is sunrise and sunset. Click to move the moment
-        there. Try another latitude below: the farther from the equator, the more the days swing over the year, and the
-        longer the twilights last.
+        there. Try another latitude on the slider, its ticks the tropics and the polar circles: the farther from the
+        equator, the more the days swing over the year, and the longer the twilights last.
     </figcaption>
 </figure>
 

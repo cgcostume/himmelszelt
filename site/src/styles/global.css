@@ -317,7 +317,8 @@ a.sky-sun:focus-visible {
     text-indent: 0;
     vertical-align: 0.05em;
     background: var(--muted);
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 10'%3E%3Cpath d='M1 5h13M10 1.5 14 5l-4 3.5' fill='none' stroke='%23000' stroke-width='1.1' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    mask:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 10'%3E%3Cpath d='M1 5h13M10 1.5 14 5l-4 3.5' fill='none' stroke='%23000' stroke-width='1.1' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
         left center / 0.8em 0.5em no-repeat;
 }
 .sky-rule + h2 {
@@ -414,7 +415,7 @@ h2 {
 .site-header nav a[aria-current="page"] {
     color: var(--text);
 }
-/* One centred line per statement, rather than the header's row. */
+/* One centered line per statement, rather than the header's row. */
 .site-footer {
     flex-direction: column;
     align-items: center;
@@ -629,6 +630,7 @@ input[type="range"]::-moz-range-track {
 }
 input[type="range"]::-webkit-slider-thumb {
     appearance: none;
+    box-sizing: border-box;
     width: var(--range-thumb);
     height: var(--range-thumb);
     margin-top: calc((3px - var(--range-thumb)) / 2);
@@ -637,11 +639,42 @@ input[type="range"]::-webkit-slider-thumb {
     background: var(--accent);
 }
 input[type="range"]::-moz-range-thumb {
+    box-sizing: border-box;
     width: var(--range-thumb);
     height: var(--range-thumb);
     border: 3px solid var(--range-gap);
     border-radius: 50%;
     background: var(--accent);
+}
+/* The one-time hint that a slider can be dragged (see range.ts): the thumb rings out three times, or once, held, for
+   a reader who prefers less motion. */
+@keyframes slider-hint {
+    0% {
+        box-shadow: 0 0 0 0 var(--accent);
+    }
+    100% {
+        box-shadow: 0 0 0 10px transparent;
+    }
+}
+input[type="range"].slider-hint::-webkit-slider-thumb {
+    animation: slider-hint 0.9s ease-out 3;
+}
+input[type="range"].slider-hint::-moz-range-thumb {
+    animation: slider-hint 0.9s ease-out 3;
+}
+@keyframes slider-hint-still {
+    0%,
+    100% {
+        box-shadow: 0 0 0 4px var(--accent);
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    input[type="range"].slider-hint::-webkit-slider-thumb {
+        animation: slider-hint-still 2.5s 1;
+    }
+    input[type="range"].slider-hint::-moz-range-thumb {
+        animation: slider-hint-still 2.5s 1;
+    }
 }
 input[type="range"]:focus-visible {
     outline: none;

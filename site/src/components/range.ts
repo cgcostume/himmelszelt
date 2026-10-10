@@ -48,3 +48,43 @@ document.addEventListener(
     },
     { passive: false },
 );
+
+// A slider in view for HINT_AFTER_MS without ever being touched pulses its thumb once, so a reader who has not noticed
+// that the figure can be dragged gets a hint. Counted per slider, while at least half of it is on screen.
+export const HINT_AFTER_MS = 12_000;
+const hinted = new WeakSet<HTMLInputElement>();
+const touch = (event: Event) => {
+    const input = sliderFor(event.target);
+    if (input) hinted.add(input);
+};
+for (const type of ["pointerdown", "focusin", "input"]) document.addEventListener(type, touch, true);
+document.addEventListener("wheel", touch, { capture: true, passive: true });
+
+const hintTimers = new Map<HTMLInputElement, { left: number; since: number; timer?: ReturnType<typeof setTimeout> }>();
+const hintObserver = new IntersectionObserver(
+    (entries) => {
+        for (const entry of entries) {
+            const input = entry.target as HTMLInputElement;
+            const count = hintTimers.get(input) ?? { left: HINT_AFTER_MS, since: 0 };
+            hintTimers.set(input, count);
+            if (entry.isIntersecting) {
+                count.since = performance.now();
+                count.timer = setTimeout(() => {
+                    hintObserver.unobserve(input);
+                    if (hinted.has(input)) return;
+                    hinted.add(input);
+                    input.classList.add("slider-hint");
+                    // Long enough for either animation; the class goes, so it never plays again.
+                    setTimeout(() => input.classList.remove("slider-hint"), 3000);
+                }, count.left);
+            } else if (count.timer !== undefined) {
+                clearTimeout(count.timer);
+                count.timer = undefined;
+                count.left -= performance.now() - count.since;
+            }
+        }
+    },
+    { threshold: 0.5 },
+);
+for (const input of document.querySelectorAll<HTMLInputElement>('figure input[type="range"]'))
+    hintObserver.observe(input);

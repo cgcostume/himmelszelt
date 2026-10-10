@@ -41,18 +41,8 @@ Markdown). Terms are explained only as hover tooltips, in the text (`<Term>`) an
 site-wide glossary (`site/src/data/glossary.json`); no glossary pages, no per-package GLOSSARY.md.
 Sources are cited with `<Cite>` and listed at the end of each chapter (`site/src/data/references.ts`).
 
-**sternzeit is the blueprint for every chapter.** The layout adds the name's meaning (from the glossary) under the
-title, the lead (the `summary`), a meta line (last updated, term hint), a TOC from three sections on, and the
-references right after the content; the short himmelszelt note shows only on a withheld chapter's placeholder, as the
-header and footer say the rest. The
-body follows: an interactive scene first, with the moment and place controls under it, still in the opening section, then the concepts building on each other,
-"Precise or approximate?" wherever both variants exist, and the references. There is no separate code examples section:
-each example sits in the section whose concepts it uses, led into from what the section just explained rather than by
-a bold heading or any other subsection, and one that runs has its output live below it; what the library can be used
-for at all opens the chapter. Leads are short and curious rather than feature lists, and never promise what a planned
-chapter does not have yet.
-Figures are numbered automatically; refer to one with `<Fig id="..." />`, never with a typed number, and only in
-parentheses, as a reference after what it shows: "(Figure 2)", never "Figure 2 shows" or a sentence starting with it.
+**sternzeit is the blueprint for every chapter.** How a chapter is structured and written (voice, spelling, numbers,
+terms, figures, captions, code examples) is in `site/WRITING.md`: read it before writing or editing any chapter text.
 
 Final showpiece: one comprehensive demo
 combining sun, moon, atmosphere, stars, clouds. Audience: developers who want to use the

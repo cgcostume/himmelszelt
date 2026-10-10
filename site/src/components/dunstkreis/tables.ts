@@ -164,7 +164,7 @@ function paint(name: TableName) {
 
 const fixed = (v: number, digits: number) => v.toFixed(digits);
 const exp = (v: number) => v.toExponential(2);
-/** A texel's four wavelengths, labelled by them. */
+/** A texel's four wavelengths, labeled by them. */
 const spectral = (model: AtmosphereModel, d: Float32Array, i: number, format: (v: number) => string) =>
     `at ${model.wavelengths.join(", ")}\u202fnm: ${[0, 1, 2, 3].map((c) => format(d[i + c] ?? 0)).join(", ")}`;
 

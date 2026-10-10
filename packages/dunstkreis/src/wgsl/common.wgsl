@@ -2,7 +2,7 @@
 // DkAtmosphere struct, which every function takes by value rather than reading from a binding, so that this
 // composes into an existing pipeline without dictating group or binding indices.
 //
-// Everything is in kilometers and measured from the planet's centre, so `r` is a radius, not an altitude, and
+// Everything is in kilometers and measured from the planet's center, so `r` is a radius, not an altitude, and
 // `mu` is the cosine of the angle between a direction and local up.
 
 const DK_PI: f32 = 3.141592653589793;

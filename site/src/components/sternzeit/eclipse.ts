@@ -1,6 +1,7 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { find } from "../dom";
 import { onDemand } from "../frame";
+import { paintRange } from "../range";
 import { drawSvg, sunGlow, svgText, veiledHorizon } from "./figure";
 import { arrowAround, offPanelArrowSvg } from "./offpanel";
 import { ephemerisDay, onChange, state, update } from "./state";
@@ -16,7 +17,7 @@ const KM_PER_UNIT = 110;
 const UMBRA_FADE = 1.09;
 // Off-panel bodies get the shared off-panel arrow instead (see offpanel.js), sized in screen pixels.
 let unitsPerPx = 1;
-// A Sun hidden completely shows its corona: a photograph of the total eclipse of 20 April 2023 from Exmouth, Western
+// A Sun hidden completely shows its corona: a photograph of the total eclipse of April 20, 2023, from Exmouth, Western
 // Australia (modified from one by Phil Hart). Its black disc is laid exactly over the Sun's;
 // screen-blended so the photo's black adds nothing to the panel, and faded out towards its edges so the square never shows.
 const CORONA_IMAGE = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/images/corona-2023-04-20-exmouth.webp`;
@@ -92,12 +93,20 @@ function renderSolar(jd: number) {
 
 function renderLunar(jd: number) {
     const eclipse = precise.eclipse.lunar(ephemerisDay(jd));
+    const time = precise.fromJulianDay(jd);
+    // Zenith up, every ecliptic position angle turns by where ecliptic north points on the sky, as a position angle
+    // from celestial north at the Moon, less the parallactic angle, where the zenith points.
+    const m = precise.moon.apparentPosition(ephemerisDay(jd));
+    const pole = 90 - precise.earth.trueObliquity(ephemerisDay(jd));
+    const turn =
+        precise.positionAngle(m.rightAscension, m.declination, 270, pole) - precise.moon.parallacticAngle(time, state);
     const moonRadius = precise.moon.MEAN_RADIUS_KM / KM_PER_UNIT;
     const umbra = eclipse.umbraRadiusKm / KM_PER_UNIT;
     const penumbra = eclipse.penumbraRadiusKm / KM_PER_UNIT;
 
-    // Ecliptic position angle, from north through increasing longitude (east), which is to the left on the sky.
-    const angle = eclipse.positionAngle * precise.DEG_TO_RAD;
+    // Ecliptic position angle, from north through increasing longitude (east), which is to the left on the sky; zenith
+    // up, turned into the place's sky.
+    const angle = (eclipse.positionAngle + turn) * precise.DEG_TO_RAD;
     const distance = eclipse.axisOffsetKm / KM_PER_UNIT;
     const [mx, my] = [-Math.sin(angle) * distance, -Math.cos(angle) * distance];
 
@@ -140,17 +149,40 @@ function renderLunar(jd: number) {
     else status = `none, the Moon is ${eclipse.separation.toFixed(1)}° from the shadow axis`;
 
     // An eclipse happens for everyone at once, but only those with the Moon above their horizon get to see it.
-    const moonAltitude = precise.moon.horizontalPosition(precise.fromJulianDay(jd), state).altitude;
-    if (precise.earth.apparentAltitude(moonAltitude, { observerHeightM: state.heightM }) < 0) {
-        // The panel's frame is the sky's, not the observer's, so a Moon below the horizon veils all of it. The veil says
-        // so; the status line does not, as a line that wraps and unwraps would jump the page while the time runs.
-        svg += veiledHorizon(-HALF, HALF, unitsPerPx);
-    }
+    const moonAltitude = precise.moon.horizontalPosition(time, state).altitude;
+    const apparent = precise.earth.apparentAltitude(moonAltitude, { observerHeightM: state.heightM });
+    // The horizon lies the Moon's apparent altitude below it, at the panel's scale of kilometers at its distance.
+    const unitsPerDegree = (precise.moon.distance(ephemerisDay(jd)) * precise.DEG_TO_RAD) / KM_PER_UNIT;
+    svg += veiledHorizon(my + apparent * unitsPerDegree, HALF, unitsPerPx);
     return { svg: svg + arrow, status };
 }
 
 const RENDERERS = { solar: renderSolar, lunar: renderLunar };
 const views = document.querySelectorAll<HTMLElement>(".eclipse-view[data-kind]");
+
+// Under each panel, a slider through the eclipse in minutes: two hours either way for the Sun, three for the Moon, which
+// takes longer to cross Earth's shadow. It moves the moment around where something else last set it, a jump to an
+// eclipse's maximum most of all; a change of place alone keeps that anchor.
+const MINUTE = 1 / 1440;
+const sliders = [...views].map((view) => {
+    const input = find<HTMLInputElement>('[data-field="offset"]', view);
+    const output = find('[data-field="offsetValue"]', view);
+    const slider = { input, output, anchor: state.jd, slid: Number.NaN };
+    input.addEventListener("input", () => {
+        slider.slid = Number((slider.anchor + Number(input.value) * MINUTE).toFixed(7));
+        update({ jd: slider.slid, live: false, animate: false }, input);
+    });
+    onChange(() => {
+        if (state.jd !== slider.slid) slider.anchor = state.jd;
+    });
+    return slider;
+});
+
+/** Signed hours and minutes, as the offset beside a slider: "+1:05", "−0:30". */
+function signedTime(minutes: number) {
+    const m = Math.round(Math.abs(minutes));
+    return `${minutes < 0 ? "\u2212" : "+"}${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+}
 
 function render() {
     for (const view of views) {
@@ -159,6 +191,12 @@ function render() {
         const { svg, status } = RENDERERS[view.dataset.kind as keyof typeof RENDERERS](state.jd);
         drawSvg(panel, svg, unitsPerPx);
         find('[data-field="status"]', view).textContent = status;
+    }
+    for (const { input, output, anchor } of sliders) {
+        const minutes = Math.round((state.jd - anchor) / MINUTE);
+        input.value = String(minutes);
+        paintRange(input);
+        output.textContent = signedTime(minutes);
     }
 }
 

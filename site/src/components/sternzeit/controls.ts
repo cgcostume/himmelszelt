@@ -13,7 +13,7 @@ const dateOf = dateFromJulianDay;
 const julianDayOf = julianDayFromDate;
 
 // Days, weeks, months and years step in UT, so time flows on evenly: across daylight saving time the clock shows an
-// hour more or less instead of the sky jumping. A month from 31 January is the last of February.
+// hour more or less instead of the sky jumping. A month from January 31 is the last of February.
 function stepCalendar(jd: number, unit: string, sign: number) {
     const date = dateOf(jd);
     if (unit === "day" || unit === "week") date.setUTCDate(date.getUTCDate() + sign * (unit === "week" ? 7 : 1));

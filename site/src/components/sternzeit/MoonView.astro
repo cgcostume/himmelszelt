@@ -5,21 +5,31 @@ import "./sternzeit.css";
 
 <figure class="moon-figure" id="moon-view">
     <div class="moon-view" data-export="moon">
-        <button type="button" class="view-toggle" data-field="lockMoon" aria-pressed="false" title="Lock the view to the Moon itself: north up, no horizon">moon frame</button>
+        <button type="button" class="view-toggle" data-field="lockMoon" aria-pressed="true" title="Lock the view to the Moon itself: north up, no horizon">moon frame</button>
         <div class="moon-panel">
             <svg viewBox="-100 -100 200 200" aria-hidden="true"></svg>
             <button type="button" class="view-toggle libration-toggle" data-field="opticalLibration" aria-pressed="true" title="The tilt of the Moon's axis against its orbit and its uneven speed along it let us see a little around its edges">optical libration</button>
         </div>
     </div>
+    {/* The lunation the moment is in, from one full moon to the next; its true phases are marked by the script. */}
+    <label class="figure-slider" title="The lunation, full moon to full moon: drag, or turn the mouse wheel for an hour a notch">
+        <span class="note">Lunation</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="lunation" min="0" max="708" step="1" aria-label="Hours since the full moon" />
+            <span class="figure-slider-scale" data-field="phases" aria-hidden="true"></span>
+        </span>
+        <output data-field="lunationValue" title="Days since the full moon"></output>
+    </label>
     <figcaption class="figure-caption">
-        The Moon as seen from the chosen place, zenith up: lit by the Sun (arrow), its night side in{" "}
-        <Term of="Earthshine">earthshine</Term> (bluer when stronger). The grid is the Moon's own, its
-        center shifted by the <Term of="Libration">libration</Term> (arrow, from its mean center to the point we
-        look at) and its north pole (N) turned, against the zenith (dashed), by the{" "}
+        The Moon as seen from the chosen place, its north pole (N) up: lit by the Sun, its night side in{" "}
+        <Term of="Earthshine">earthshine</Term> (bluer when stronger). The arrow points to the Sun, as the normal at the
+        point beneath it while that faces us, and from around the disc once it has turned away. The grid is the Moon's own, its center shifted by
+        the <Term of="Libration">libration</Term>. The dashed
+        circles are its size at apogee and perigee. Magnified, disc and horizon true to each other. Unlocked from the
+        moon frame, the zenith is up (dashed) and the north pole turns against it by the{" "}
         <Term of="Position angle of axis">position angle of the axis</Term> and the{" "}
-        <Term of="Parallactic angle">parallactic angle</Term> (arc). The dashed circles are its size at apogee and perigee.
-        Magnified, disc and horizon true to each other. Locked to the Moon, its north is up and only the librations
-        move.
+        <Term of="Parallactic angle">parallactic angle</Term> (arc). The slider runs through the lunation from full moon
+        to full moon, an hour a step, its marks the true phases.
     </figcaption>
 </figure>
 

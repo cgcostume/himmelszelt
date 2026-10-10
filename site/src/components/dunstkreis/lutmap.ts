@@ -142,7 +142,7 @@ export function traceView(g: Geometry, h: number, direction: Vec, sunDirection: 
     const path = [toWorld(p)];
     const points: { position: Vec; altitude: number; muS: number; along: number }[] = [];
     const n = samples;
-    let travelled = 0;
+    let traveled = 0;
     for (let i = 0; i < samples; i++) {
         const ds = remaining(p, d) * (mu >= 0 ? (2 * i + 1) / (n * n - i * i) : 1 / (n - i));
         const t0 = turn(p, d);
@@ -154,14 +154,14 @@ export function traceView(g: Geometry, h: number, direction: Vec, sunDirection: 
             position: toWorld(middle),
             altitude,
             muS: clamp(dot(toWorldUp(upAt(middle)), sunDirection), -1, 1),
-            along: travelled + ds / 2,
+            along: traveled + ds / 2,
         });
-        travelled += ds;
+        traveled += ds;
         p = [p[0] + dm[0] * ds, p[1] + dm[1] * ds];
         d = normalize([d[0] + t1[0] * ds, d[1] + t1[1] * ds]);
         path.push(toWorld(p));
     }
-    for (const point of points) point.along /= travelled;
+    for (const point of points) point.along /= traveled;
     return { path, points, hitsGround, center: [0, 0, -r0] };
 }
 
