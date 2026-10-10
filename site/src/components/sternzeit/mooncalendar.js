@@ -1,4 +1,5 @@
 import * as precise from "@himmelszelt/sternzeit";
+import { paintRange } from "../range.js";
 import { moonSymbol, sunInViewFrame } from "./figure.js";
 import { onChange, state, update } from "./state.js";
 import { clock, clockOffsetMs, DAY_MS, instantOf, wallDayOf } from "./zone.js";
@@ -26,6 +27,9 @@ const weeksEl = figure.querySelector('[data-field="weeks"]');
 const titleEl = figure.querySelector('[data-field="title"]');
 const monthButtons = [...figure.querySelectorAll("[data-month]")];
 const lockButton = figure.querySelector('[data-field="lock"]');
+const timeInput = figure.querySelector('[data-field="time"]');
+const timeValue = figure.querySelector('[data-field="timeValue"]');
+const MINUTE_MS = 60_000;
 // Locked, the calendar shows the moment's month and follows it; neither months nor days can be picked.
 let locked = false;
 
@@ -212,6 +216,10 @@ function render() {
     const pageDay = wallDayOf(page);
     // The time of day on the page's clock, the same for every day of the grid.
     const timeOfDay = page + clockOffsetMs(new Date(page)) - pageDay * DAY_MS;
+    const minutes = Math.floor(timeOfDay / MINUTE_MS);
+    timeInput.value = String(minutes);
+    paintRange(timeInput);
+    timeValue.textContent = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 
     let html = "";
     for (let week = 0; week < days.length / 7; week++) {
@@ -311,6 +319,15 @@ weeksEl.addEventListener("click", (event) => {
         shown = { year: date.getUTCFullYear(), month: date.getUTCMonth() };
     }
     const jd = precise.julianDayUT(precise.fromDate(new Date(Number(day.dataset.at))));
+    update({ jd: Number(jd.toFixed(7)), live: false, animate: false });
+});
+
+// The slider sets the moment's time of day on the clock and keeps its date; 24:00 stays a minute short of the next day.
+timeInput.addEventListener("input", () => {
+    const page = pageMs();
+    const minutes = Math.min(Number(timeInput.value), 24 * 60 - 1);
+    const ms = instantOf(wallDayOf(page) * DAY_MS + minutes * MINUTE_MS);
+    const jd = precise.julianDayUT(precise.fromDate(new Date(ms)));
     update({ jd: Number(jd.toFixed(7)), live: false, animate: false });
 });
 

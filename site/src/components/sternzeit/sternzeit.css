@@ -927,6 +927,42 @@ figure[id] {
 .calendar-week {
     margin-bottom: 0.4rem;
 }
+/* The time of day under the weeks, as wide as they are, its hours under the thumb's travel and the time beside it. */
+.calendar-time {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    margin-top: 1.25rem;
+    font-size: var(--text-meta);
+    line-height: 18px;
+}
+.calendar-time-rail {
+    flex: 1;
+}
+/* Without the browser's margin around a slider, so its rail is level with the words either side. */
+.calendar-time input {
+    width: 100%;
+    margin: 0;
+}
+.calendar-time-scale {
+    position: relative;
+    display: block;
+    height: 1em;
+    margin-top: -0.1rem;
+    margin-inline: calc(18px / 2);
+    line-height: 1;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+}
+.calendar-hour {
+    position: absolute;
+    transform: translateX(-50%);
+}
+.calendar-time output {
+    min-width: 5ch;
+    font-family: var(--font-mono);
+}
 /* A button like any other on the page, only without its fixed height and, until hovered, its outline. */
 .calendar-day {
     display: flex;

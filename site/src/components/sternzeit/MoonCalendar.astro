@@ -19,6 +19,15 @@ import "./sternzeit.css";
     </div>
     <div class="calendar-weekdays" aria-hidden="true"></div>
     <div class="calendar-weeks" data-field="weeks"></div>
+    {/* The time of day the discs are drawn at, on the chosen clock: the moment's, the date kept. */}
+    <label class="calendar-time" title="The time of day on the chosen clock: drag, or turn the mouse wheel">
+        <span class="note">Time</span>
+        <span class="calendar-time-rail">
+            <input type="range" data-field="time" min="0" max="1440" step="5" aria-label="Time of day" />
+            <span class="calendar-time-scale" aria-hidden="true">{["00", "06", "12", "18", "24"].map((hour, i) => <span class="calendar-hour" style={`left: ${i * 25}%`}>{hour}</span>)}</span>
+        </span>
+        <output data-field="timeValue"></output>
+    </label>
     </div>
     {/* One hatching for every disc below the horizon, referenced from each day's own SVG. */}
     <svg width="0" height="0" aria-hidden="true" style="position: absolute">
@@ -32,7 +41,8 @@ import "./sternzeit.css";
         The Moon on every day of a month at the chosen time of day, as it stands in the sky at the chosen place: beside
         the date its compass point and, after the arrow, its altitude, hatched while it is below the horizon. Under each
         week, midnight to midnight, when the Moon is up (yellow while low) and the Sun (fading through civil twilight);
-        the ticks mark the time of day. Hover or tap a day for its moonrise and moonset, click it to make it the moment.
+        the ticks mark the time of day, which the slider below sets. Hover or tap a day for its moonrise and moonset,
+        click it to make it the moment.
     </figcaption>
 </figure>
 
