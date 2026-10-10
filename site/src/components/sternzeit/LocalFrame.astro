@@ -1,0 +1,34 @@
+---
+import Term from "../Term.astro";
+import "./sternzeit.css";
+import TimeSlider from "./TimeSlider.astro";
+---
+
+<figure class="scene-frame" id="local-frame">
+    <div class="frame-scene" data-export="local-frame">
+        <svg class="dome-layer zdog" data-layer="below" aria-hidden="true"></svg>
+        <svg class="dome-layer zdog" data-layer="ground" aria-hidden="true"></svg>
+        <svg class="dome-layer zdog" data-layer="above" aria-hidden="true"></svg>
+        <div class="frame-labels" aria-hidden="true"></div>
+        <div class="frame-options">
+            <button type="button" class="view-toggle" data-field="labels" aria-pressed="true" title="Show or hide the annotations, all but the axes and the compass">show labels</button>
+        </div>
+        <p class="vis-credit footnote">
+            Drag to rotate, click the Sun or the Moon to annotate it. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
+        </p>
+    </div>
+    <TimeSlider />
+    <figcaption class="figure-caption">
+        The observer's frame at the chosen place and moment: the ground and the horizon, the axes of ENU, x east, y
+        north and z up, and the meridian (dotted) from north over the zenith to south. The Sun, the Moon (gray), and the
+        direction to one of them (arrow) with its <Term of="Horizontal coordinates">horizontal coordinates</Term>{" "}
+        (accent): the azimuth A along the ground from north through east, the altitude h up from the horizon, and the
+        vector <code>direction</code> returns. The celestial pole stands above the horizon at the place's latitude φ,
+        and the celestial equator (dashed below the horizon) is the circle a quarter turn from it. Drawn to no scale but
+        the angles.
+    </figcaption>
+</figure>
+
+<script>
+    import "./localframe";
+</script>

@@ -309,8 +309,8 @@ tbody tr:hover {
 .scene-annotation.pole-label {
     color: var(--muted);
 }
-/* The labels toggle hides the annotations, for a clean view and a clean export. */
-#scene.labels-off :is(.scene-annotation, .scene-annotations) {
+/* The labels toggle hides the annotations, for a clean view and a clean export; the poles keep their N and S. */
+#scene.labels-off :is(.scene-annotation:not(.pole-label), .scene-annotations) {
     visibility: hidden;
 }
 /* The two alt-az panels float on top of #stage, straddling its vertical middle; between them it is click-through. */
@@ -826,6 +826,26 @@ g.eclipse-corona {
     color: var(--accent);
     border-color: var(--accent);
 }
+/* The observer's frame's labels switch, under the credit line, where the armillary
+   sphere has its labels switch. */
+.frame-options {
+    position: absolute;
+    top: 2.2rem;
+    left: var(--content-inset);
+    z-index: 5;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.frame-options > .view-toggle {
+    position: static;
+}
+.frame-scene.over-body {
+    cursor: pointer;
+}
+.frame-scene.labels-off .frame-label:not(.frame-axis) {
+    visibility: hidden;
+}
 /* No box around the controls any more, so their copy button sits in the corner of the summary line itself. It is
    inside the summary element, not a child of the set, hence the descendant selector. */
 .moment .icon-button {
@@ -1187,7 +1207,8 @@ g.eclipse-corona {
         margin-left: 0;
     }
     .vis-credit,
-    #scene > .view-toggle {
+    #scene > .view-toggle,
+    .frame-options {
         left: 0;
     }
     .moon-view {
@@ -1556,4 +1577,294 @@ span.daylight-day {
 }
 .eclipse-goto:hover {
     fill: var(--accent);
+}
+/* The observer's frame: a square-ish scene in the text column, with the labels floating on top (see localframe.ts). */
+.frame-scene {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    cursor: grab;
+}
+.frame-scene:active {
+    cursor: grabbing;
+}
+/* Square on a narrow screen, like the other scenes there; the credit line wraps, so the switch moves down a line. */
+@media (max-width: 48rem) {
+    .frame-scene {
+        aspect-ratio: 1 / 1;
+    }
+    .frame-options {
+        top: 3.2rem;
+    }
+}
+.frame-labels {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+/* The angles and labels float over lines, so a halo in the page's background keeps them legible. */
+.frame-label {
+    text-shadow:
+        0 0 3px var(--bg),
+        0 0 3px var(--bg),
+        0 0 3px var(--bg);
+}
+.frame-labels .frame-axis {
+    color: var(--text);
+    white-space: nowrap;
+}
+.frame-labels .frame-angle,
+.frame-labels .frame-direction {
+    color: var(--accent);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+}
+/* The coordinate pipeline: the functions down the middle column, each with its inputs to the left and its result, a
+   position in the next coordinate system, below it on the line into the next box; the scope of each half on the right. */
+.pipeline {
+    /* What every arrow keeps clear of the box it starts or ends at. */
+    --pipeline-gap: 3px;
+    /* The line above a result and, the 6 pixel tip added, below it. */
+    --pipeline-stem: 0.75rem;
+    /* Below the equatorial position, only a line's gap before the divider's label. */
+    --pipeline-into-divider: 0.3rem;
+    display: grid;
+    /* The full width of the text, the outer columns sharing what the boxes leave, never narrower than their lines. */
+    grid-template-columns: 1fr max-content 1fr;
+    row-gap: 0;
+    column-gap: 0;
+    font-size: var(--text-small);
+}
+.pipeline code {
+    font-size: inherit;
+}
+.pipeline-inputs {
+    grid-column: 1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    color: var(--muted);
+    text-align: right;
+}
+/* The inputs one under the other; several are gathered by a bar on their right, where the one arrow leaves. */
+.pipeline-input-list {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.15rem;
+    padding-right: 0.4rem;
+    white-space: nowrap;
+}
+.pipeline-input-list.gathered {
+    border-right: 1px solid var(--line);
+}
+/* Several inputs do not make their row any taller: the list is centered on the function's name and reaches into the
+   rows above and below, so the arrow down the middle arrives at the name as at any other. */
+.pipeline-inputs {
+    position: relative;
+}
+.pipeline-input-list.gathered {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+}
+/* One arrow into the function: its line starts here and runs on, without a gap between the columns, to the name,
+   where the tip is (see .pipeline-function). */
+.pipeline-input-arrow {
+    flex: none;
+    width: 0.75rem;
+    height: 1px;
+    background: var(--line);
+}
+.pipeline-direct-call::before,
+.pipeline-function.fed::before {
+    content: "";
+    flex: none;
+    width: 1.25rem;
+    height: 8px;
+    background: var(--line);
+    /* The arrow down the middle, turned: a 1 pixel line and a tip 6 by 8 pixels that keeps its shape. */
+    mask:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 8'%3E%3Cpath d='M0 0l6 4-6 4z'/%3E%3C/svg%3E")
+        right center / 6px 8px no-repeat,
+        linear-gradient(#000, #000) left center / calc(100% - 6px) 1px no-repeat;
+}
+/* A single input's arrow starts right after it, not a bar's width away. */
+.pipeline-input-list:not(.gathered) {
+    padding-right: 0.3rem;
+}
+/* The conversion: just its name, centered in its column, level with the arrow into it, which fills the room to its
+   left; as much room stays empty on its right. */
+.pipeline-function {
+    grid-column: 2;
+    display: flex;
+    align-items: center;
+    padding: 0.3rem 0;
+}
+.pipeline-function::before,
+.pipeline-function::after {
+    content: "";
+    flex: 1 0 1.25rem;
+}
+.pipeline-function.fed::before {
+    flex: 1 0 1.25rem;
+    width: auto;
+    margin-right: var(--pipeline-gap);
+}
+.pipeline-function::after {
+    margin-left: var(--pipeline-gap);
+}
+.pipeline-function code,
+.pipeline-direct code {
+    background: none;
+    border: none;
+    padding: 0;
+}
+/* The result: a line down out of the box, the coordinate system on it, the line on into the next box. The name sits in
+   the middle of the line, the tip left out, so the line runs as long below it as above and the tip follows. */
+.pipeline-space {
+    grid-column: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: var(--accent);
+}
+.pipeline-space::before,
+.pipeline-space::after,
+.pipeline-through {
+    content: "";
+    width: 8px;
+    height: var(--pipeline-stem);
+    background: var(--line);
+    mask: linear-gradient(#000, #000) center top / 1px 100% no-repeat;
+}
+/* Out of a box and into the next one, each keeping a small gap to it. */
+.pipeline-space::before {
+    margin-top: var(--pipeline-gap);
+    height: var(--pipeline-stem);
+}
+.pipeline-space::after {
+    margin-bottom: var(--pipeline-gap);
+    height: calc(var(--pipeline-stem) + 6px);
+}
+.pipeline-through {
+    margin-bottom: var(--pipeline-gap);
+}
+/* Arrows end in a tip, a triangle 8 by 6 pixels; the line stops short of it. */
+.pipeline-space::after,
+.pipeline-through {
+    mask:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 6'%3E%3Cpath d='M0 0h8l-4 6z'/%3E%3C/svg%3E")
+        center bottom / 8px 6px no-repeat,
+        linear-gradient(#000, #000) center top / 1px calc(100% - 6px) no-repeat;
+}
+/* The equatorial position runs on through the divider, which carries the rest of its arrow. */
+.pipeline-space.into-divider::after {
+    margin-bottom: 0;
+    height: var(--pipeline-into-divider);
+    mask: linear-gradient(#000, #000) center top / 1px 100% no-repeat;
+}
+.pipeline-through {
+    grid-column: 2;
+    justify-self: center;
+    height: auto;
+    z-index: 1;
+}
+.pipeline-space-name {
+    padding: 0.1rem 0;
+    font-family: var(--font-mono);
+}
+.pipeline-space.last::after,
+.pipeline-space.first::before {
+    visibility: hidden;
+}
+/* The column headings, plain, over each column. */
+.pipeline-heading {
+    grid-row: 1;
+    align-self: end;
+    padding-bottom: 0.5rem;
+    color: var(--muted);
+}
+.pipeline-heading.pipeline-inputs {
+    padding-right: 1.55rem;
+}
+.pipeline-heading.pipeline-direct {
+    padding-left: 1.85rem;
+}
+.pipeline-function-heading {
+    grid-column: 2;
+    text-align: center;
+}
+/* The direct call beside each position, an arrow pointing at what it returns. */
+.pipeline-direct {
+    grid-column: 3;
+    color: var(--muted);
+    white-space: nowrap;
+}
+/* Level with the result it returns, which sits off the middle of its row by the arrow's tip. */
+.pipeline-direct:not(.pipeline-heading) {
+    display: flex;
+    align-items: center;
+    padding: calc(var(--pipeline-gap) + var(--pipeline-stem)) 0 calc(var(--pipeline-gap) + var(--pipeline-stem) + 6px);
+}
+.pipeline-direct.into-divider {
+    padding-bottom: var(--pipeline-into-divider);
+}
+/* The calls a renderer most likely makes, in the text's own color. */
+.pipeline-direct.likely {
+    color: var(--text);
+}
+/* Its arrow points back at the position, the other way round. */
+.pipeline-direct-call {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding-left: 0.3rem;
+}
+.pipeline-direct-call::before {
+    margin-right: 0;
+    transform: scaleX(-1);
+}
+
+/* Which half is the same for everyone and which is the observer's: a dashed line across, the one half named over
+   it and the other under it, flush right, clear of the arrow that crosses it. */
+.pipeline-divider {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    row-gap: 0.2rem;
+    color: var(--muted);
+}
+.pipeline-scope {
+    grid-column: 3;
+    text-align: right;
+}
+.pipeline-divider-line {
+    grid-column: 1 / -1;
+    border-top: 1px dashed var(--line);
+}
+/* On a phone the direct calls no longer fit beside the steps; the caption still names them. */
+@media (max-width: 40rem) {
+    .pipeline {
+        grid-template-columns: auto 1fr;
+    }
+    .pipeline-inputs {
+        grid-column: 1;
+    }
+    .pipeline-function,
+    .pipeline-space {
+        grid-column: 2;
+    }
+    .pipeline-direct,
+    .pipeline-direct:not(.pipeline-heading) {
+        display: none;
+    }
+    .pipeline-scope {
+        grid-column: 1;
+        padding-left: 0;
+    }
 }

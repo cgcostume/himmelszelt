@@ -72,6 +72,9 @@ export function labelAboveY(y: number, unitsPerPx: number) {
  */
 export const SUN_SYMBOL = { radius: 8.5, gap: 5, length: 8.5, rays: 8 };
 
+/** The arrowheads in the 3D scenes, flat triangles the same size in screen pixels in every one of them. */
+export const ARROWHEAD_PX = { length: 12, halfWidth: 4.5 };
+
 /** The symbol's rays as segments around its center, in screen pixels. */
 export function sunRays() {
     const { radius, gap, length, rays } = SUN_SYMBOL;

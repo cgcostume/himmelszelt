@@ -1,0 +1,117 @@
+---
+import Term from "../Term.astro";
+import "./sternzeit.css";
+
+// The coordinate systems from a body's ecliptical position to the renderer's vector: down the middle each position and
+// the conversion function, a box, that turns it into the next one, the inputs it takes to its left; to the right of each
+// position the call in sun.* and moon.* that returns it directly, all the steps before it in one.
+type Space = { term: string | null; name: string; coords: string; direct: string; likely?: boolean };
+type Step = { inputs: string[]; fn: string; space: Space };
+const start: Space = {
+    term: "Ecliptic coordinates",
+    name: "ecliptic",
+    coords: "l, β",
+    direct: "apparentEclipticalPosition(t)",
+};
+const steps: Step[] = [
+    {
+        inputs: ["obliquity ε"],
+        fn: "eclipticalToEquatorial",
+        space: { term: "Equatorial coordinates", name: "equatorial", coords: "α, δ", direct: "apparentPosition(t)" },
+    },
+    {
+        inputs: ["parallax π", "sidereal time θ", "observer"],
+        fn: "equatorialToTopocentric",
+        space: {
+            term: "Topocentric",
+            name: "topocentric",
+            coords: "α, δ",
+            direct: "topocentricPosition(time, observer)",
+        },
+    },
+    {
+        inputs: ["sidereal time θ", "observer"],
+        fn: "equatorialToHorizontal",
+        space: {
+            term: "Horizontal coordinates",
+            name: "horizontal",
+            coords: "A, h",
+            direct: "horizontalPosition(time, observer)",
+            likely: true,
+        },
+    },
+    {
+        inputs: [],
+        fn: "horizontalToDirection",
+        space: { term: null, name: "ENU", coords: "x, y, z", direct: "direction(time, observer)", likely: true },
+    },
+];
+// Rows: the headings, the ecliptical position, then a box and its result a step, with the divider after the first.
+const DIVIDER_ROW = 5;
+const rowOf = (i: number) => 3 + 2 * i + (i >= 1 ? 1 : 0);
+---
+
+<figure class="scene-frame pipeline-figure" id="coordinate-pipeline">
+    <div class="pipeline">
+        <div class="pipeline-heading pipeline-inputs">Inputs</div>
+        <div class="pipeline-heading pipeline-function-heading">Coordinates and conversions</div>
+        <div class="pipeline-heading pipeline-direct">Direct access</div>
+        <div class="pipeline-space first" style="grid-row: 2">
+            <span class="pipeline-space-name"><Term of={start.term!}>{start.name}</Term> {start.coords}</span>
+        </div>
+        <div class="pipeline-direct" style="grid-row: 2">
+            <span class="pipeline-direct-call"><code>{start.direct}</code></span>
+        </div>
+        {
+            steps.map(({ inputs, fn, space: { term, name, coords, direct, likely } }, i) => (
+                <>
+                    <div class="pipeline-inputs" style={`grid-row: ${rowOf(i)}`}>
+                        {inputs.length > 0 && (
+                            <>
+                                <span class={`pipeline-input-list${inputs.length > 1 ? " gathered" : ""}`}>
+                                    {inputs.map((input) => (
+                                        <span>{input}</span>
+                                    ))}
+                                </span>
+                                <span class="pipeline-input-arrow" />
+                            </>
+                        )}
+                    </div>
+                    <div class={`pipeline-function${inputs.length > 0 ? " fed" : ""}`} style={`grid-row: ${rowOf(i)}`}>
+                        <code>{fn}</code>
+                    </div>
+                    <div
+                        class={`pipeline-space${i === steps.length - 1 ? " last" : i === 0 ? " into-divider" : ""}`}
+                        style={`grid-row: ${rowOf(i) + 1}`}
+                    >
+                        <span class="pipeline-space-name">
+                            {term ? <Term of={term}>{name}</Term> : name} {coords}
+                        </span>
+                    </div>
+                    <div class={`pipeline-direct${likely ? " likely" : ""}${i === 0 ? " into-divider" : ""}`} style={`grid-row: ${rowOf(i) + 1}`}>
+                        <span class="pipeline-direct-call">
+                            <code>{direct}</code>
+                        </span>
+                    </div>
+                </>
+            ))
+        }
+        <div class="pipeline-through" style={`grid-row: ${DIVIDER_ROW}`}></div>
+        <div class="pipeline-divider" style={`grid-row: ${DIVIDER_ROW}`}>
+            <span class="pipeline-scope">the same for everyone on Earth</span>
+            <span class="pipeline-divider-line"></span>
+            <span class="pipeline-scope">the observer's own</span>
+        </div>
+    </div>
+    <figcaption class="figure-caption">
+        From a body's position to the renderer's vector: each position in its coordinate system (accent), and the
+        function that converts it into the next, the inputs it takes to its left, gathered by a bar where there are
+        several. The inputs have functions of
+        their own, such as <code>earth.trueObliquity</code> and <code>apparentSiderealTime</code>; the observer is a
+        latitude, longitude and height. To the right, the call that returns each position directly, every step before it
+        in one: <code>t</code> a Julian Day in ephemeris time, the even clock of the orbits, as
+        <code>julianEphemerisDay</code> returns it; <code>time</code> the clock time, as <code>fromDate</code> returns
+        it, for the steps that need Earth's rotation. A
+        renderer mostly needs the last two, the horizontal position and the direction (highlighted).
+    </figcaption>
+</figure>

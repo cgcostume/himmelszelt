@@ -10,7 +10,7 @@ const HOUR = 1 / 24;
 const SECOND = 1 / 86_400;
 const elongation = (jd: number) => {
     const t = ephemerisDay(jd);
-    return precise.moon.position(t).longitude + precise.earth.longitudeNutation(t) - precise.sun.apparentLongitude(t);
+    return precise.moon.apparentEclipticalPosition(t).longitude - precise.sun.apparentLongitude(t);
 };
 /** When, near `guess`, the elongation reaches `target` degrees: Newton's method on the mean rate, to a second. */
 function phaseTime(guess: number, target: number) {

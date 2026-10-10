@@ -4,6 +4,7 @@ import Zdog from "zdog";
 import { find } from "../dom";
 import { onDemand } from "../frame";
 import {
+    ARROWHEAD_PX,
     alongVerticalCircle,
     COMPASS,
     cssColor,
@@ -214,8 +215,6 @@ function addPath(samples: HorizontalCoords[], color: string, strokePx: number, d
 // Arrowheads along each path, pointing forward in time: one every 6 hours, starting at 3 in the morning.
 const ARROW_EVERY = 6 * SAMPLES_PER_HOUR;
 const ARROW_OFFSET = 3 * SAMPLES_PER_HOUR;
-const ARROW_LENGTH = 6;
-const ARROW_HALF_WIDTH = 3;
 
 /** A flat arrowhead at sample `i`, lying in the dome's surface and pointing towards sample `i + 1`. */
 function addArrow(samples: HorizontalCoords[], i: number, color: string) {
@@ -231,8 +230,8 @@ function addArrow(samples: HorizontalCoords[], i: number, color: string) {
         y: d.z * tip.x - d.x * tip.z,
         z: d.x * tip.y - d.y * tip.x,
     });
-    side.multiply(ARROW_HALF_WIDTH / side.magnitude());
-    const back = new Vector(tip).subtract(new Vector(d).multiply(ARROW_LENGTH));
+    side.multiply(ARROWHEAD_PX.halfWidth / zoom / side.magnitude());
+    const back = new Vector(tip).subtract(new Vector(d).multiply(ARROWHEAD_PX.length / zoom));
     const path = [tip, new Vector(back).add(side), new Vector(back).subtract(side)];
     styled(new Shape({ addTo: anchorFor(sample.altitude), path, fill: true, color }), 1);
 }
@@ -444,5 +443,6 @@ new ResizeObserver(() => {
     measurePanel();
     requestFrame();
 }).observe(analemmaSvg);
-new ResizeObserver(requestFrame).observe(frameEl);
+// The arrowheads are sized in screen pixels, so a new size rebuilds the paths they sit on.
+new ResizeObserver(update).observe(frameEl);
 update();

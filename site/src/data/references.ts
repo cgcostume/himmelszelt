@@ -57,7 +57,7 @@ export const references: Record<string, Reference> = {
         note: "Traces light through Earth's atmosphere into the umbra: physically based, far from real time.",
     },
     jensen2001: {
-        authors: "Henrik Wann Jensen, Frédo Durand, Julie Dorsey, Michael M. Stark, Peter Shirley, Simon Premože",
+        authors: "Henrik Wann Jensen, Frédo Durand, Michael M. Stark, Simon Premože, Julie Dorsey, Peter Shirley",
         title: "A Physically-Based Night Sky Model",
         venue: "SIGGRAPH",
         year: 2001,

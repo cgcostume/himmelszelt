@@ -24,7 +24,9 @@ import DayArc from "../../components/sternzeit/DayArc.astro";
 import Daylight from "../../components/sternzeit/Daylight.astro";
 import DeltaT from "../../components/sternzeit/DeltaT.astro";
 import Eclipse from "../../components/sternzeit/Eclipse.astro";
+import LocalFrame from "../../components/sternzeit/LocalFrame.astro";
 import MoonCalendar from "../../components/sternzeit/MoonCalendar.astro";
+import Pipeline from "../../components/sternzeit/Pipeline.astro";
 import MoonView from "../../components/sternzeit/MoonView.astro";
 import Scene from "../../components/sternzeit/Scene.astro";
 import SunTimes from "../../components/sternzeit/SunTimes.astro";
@@ -158,13 +160,24 @@ with the observer on the flattened ellipsoid and at their height above sea level
 
 <Term of="Horizontal coordinates">Horizontal coordinates</Term>, finally, are the observer's own: an altitude above the
 horizon and an azimuth from north through east. They follow from the topocentric position through the
-<Term of="Hour angle">hour angle</Term>, which sidereal time provides.
+<Term of="Hour angle">hour angle</Term>, which sidereal time provides. The celestial pole, around which the sky turns,
+stands above the horizon exactly as high as the place's latitude (<Fig id="local-frame" />): overhead at the pole, on
+the horizon at the equator.
 
 For a renderer, all of this ends in a single call. `direction` returns the `horizontalPosition` as a unit vector in
 the observer's east-north-up frame, ENU for short, with x pointing east, y north and z up; an engine with y up, as most
 real-time renderers have it, assigns it as `(x, z, -y)`. Refraction is left out on purpose. The altitude is the true
 one, not the apparent one the eye sees, which at the horizon is lifted by more than the Sun's own diameter, and
 bending the light that way is the job of an atmosphere renderer.
+
+<LocalFrame />
+<Controls height={false} />
+
+A position passes through these systems in turn, one function a step, and each step takes what it needs and nothing
+more (<Fig id="coordinate-pipeline" />). Up to the equatorial position, the result is the same for everyone on Earth;
+only the steps after it belong to the observer.
+
+<Pipeline />
 
 ## The Sun
 
@@ -494,7 +507,7 @@ import { sun as fast } from "@himmelszelt/sternzeit/approx"; // approximate
 
 Almost every number in this library goes back to Jean Meeus, a Belgian meteorologist who worked at Brussels Airport
 until 1993 and computed the sky in his spare time. His _Astronomical Algorithms_ <Cite id="meeus1998" /> turned the
-celestial mechanics of the observatories into recipes for a pocket calculator, and it is still the book every astronomy
+celestial mechanics of the observatories into recipes for a home computer, and it is still the book every astronomy
 library is checked against. The asteroid 2213 Meeus carries his name.
 
 The library's two refraction formulas, one for each direction, come from either end of the craft. George G. Bennett

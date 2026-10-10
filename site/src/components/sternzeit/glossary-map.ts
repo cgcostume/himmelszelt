@@ -20,6 +20,7 @@ export const GLOSSARY_TERMS = {
     trueAnomaly: "True anomaly",
     trueLongitude: "True longitude",
     apparentLongitude: "Apparent position",
+    apparentEclipticalPosition: "Apparent position",
     apparentPosition: "Apparent position",
     equatorialHorizontalParallax: "Parallax",
     topocentricPosition: "Parallax",
