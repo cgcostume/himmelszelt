@@ -10,10 +10,11 @@
     --cyanometer: hsl(207 62% 62%);
     --accent: var(--cyanometer);
     --measure: 46rem;
-    /* The page's text sizes besides body (1rem), lead, h2 and h1: meta for captions, tables, controls and tooltips,
-       small for labels inside figures and the fine print. */
-    --text-meta: 0.875rem;
-    --text-small: 0.75rem;
+    /* The page's text sizes besides body (1rem), lead, h2 and h1: one small size, 13 pixels, for everything that is
+       not running text, captions and labels inside figures alike, tables, controls, tooltips and the fine print. The two
+       names stay, so a size of its own can come back for either. */
+    --text-small: 0.8125rem;
+    --text-meta: var(--text-small);
     --wide: 1140px;
     /* Outlines of panels, boxes and controls. */
     --border: 1px solid var(--line);
@@ -52,7 +53,7 @@ body {
     background: var(--bg);
     color: var(--text);
     font-family: "Roboto", system-ui, sans-serif;
-    font-size: 1.0625rem;
+    font-size: 1rem;
     font-weight: 350;
     line-height: 1.7;
 }
@@ -811,6 +812,16 @@ svg text {
     margin-left: -0.9rem;
     padding-left: 0.9rem;
     border-left: 2px solid var(--accent);
+}
+/* Folded away, a fold (the contents, a value table) steps back, so it does not compete with the text around it; it
+   comes forward again under the pointer or the keyboard's focus, not a click's, which stays behind when the pointer
+   leaves. */
+.fold:not([open]) {
+    opacity: 0.55;
+    transition: opacity 0.15s;
+}
+.fold:not([open]):is(:hover, :has(:focus-visible)) {
+    opacity: 1;
 }
 .fold > summary {
     cursor: pointer;

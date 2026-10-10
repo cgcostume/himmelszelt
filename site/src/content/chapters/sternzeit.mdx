@@ -175,7 +175,10 @@ bending the light that way is the job of an atmosphere renderer.
 
 A position passes through these systems in turn, one function a step, and each step takes what it needs and nothing
 more (<Fig id="coordinate-pipeline" />). Up to the equatorial position, the result is the same for everyone on Earth;
-only the steps after it belong to the observer.
+only the steps after it belong to the observer. You rarely need to walk them yourself: each position also comes
+directly, every step before it in one call, and a renderer mostly needs the last two, `horizontalPosition` and
+`direction`. From the topocentric position on, the calls take the moment as `fromDate` returns it, since they need
+Earth's rotation as well as the orbits; the ones before take a bare Julian Day in ephemeris time.
 
 <Pipeline />
 
@@ -187,9 +190,8 @@ perfect circle traversed at constant speed, where the <Term of="Mean anomaly">me
 Orbits are ellipses, and the <Term of="Equation of the center">equation of the center</Term> gives the
 <Term of="True longitude">true longitude</Term> on one. Nutation and <Term of="Aberration">aberration</Term>, a small
 shift caused by Earth's own orbital speed, turn it into the <Term of="Apparent position">apparent position</Term> in
-right ascension and declination. The topocentric and the horizontal position finally bring it to the observer. The
-function names carry these steps as prefixes, `mean`, `true`, `apparent`, `topocentric` and `horizontal`, as in
-`meanLongitude` or `apparentPosition`.
+right ascension and declination, and from there the steps of the coordinate systems take it to the observer. The
+function names carry the steps as prefixes, `mean`, `true` and `apparent`, as in `meanLongitude` or `apparentPosition`.
 
 Aberration hides a subtlety. The Sun's light takes 8 minutes 20 seconds to reach us, so we see the Sun where it was back
 then. Yet it does not lag the 2° the sky turns in that time: that turning is Earth spinning under the light, which
@@ -253,7 +255,8 @@ Run for the chosen day, place and clock:
 
 Walk the same thresholds through a whole year and they draw the light of every day at once (<Fig id="daylight" />): the
 days lengthening and shortening, the hour by which summer time shifts them, and the twilights, which far enough north
-fill whole summer nights.
+fill whole summer nights. Slide the latitude away from the equator, and the days swing ever more over the year and the
+twilights last ever longer, until past the polar circle the Sun stays up through summer and away through winter.
 
 <Daylight />
 <Controls height={false} />
@@ -335,7 +338,9 @@ const brightLimb = positionAngle(
 ```
 
 The tilt, the libration and the earthshine (`moon.earthshine`) all come together in the Moon below
-(<Fig id="moon-view" />).
+(<Fig id="moon-view" />). Its arrow to the Sun starts at the point beneath the Sun while that faces us, and at the edge
+of the disc once it has turned away. Unlock the view from the Moon, and the zenith turns up: the arc between it and the
+Moon's north is the position angle of the axis less the parallactic angle.
 
 <MoonView />
 <Controls height={false} />

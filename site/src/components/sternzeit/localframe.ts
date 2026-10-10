@@ -10,16 +10,17 @@ import "./export";
 const { Illustration, Anchor, Shape, Ellipse, Vector } = Zdog;
 const DEG = precise.DEG_TO_RAD;
 
-// The horizon's radius in scene units; the whole scene is zoomed to fit its frame. The axes reach a little past it.
+// The horizon's radius in scene units; the whole scene is zoomed to fit its frame. The axes end at the horizon.
 const R = 100;
-const AXIS = 1.3 * R;
+const AXIS = R;
 // The azimuth's arc lies on the ground well inside the horizon, so it does not crowd the altitude's.
 const AZIMUTH_RADIUS = 0.45 * R;
 const CENTER_SHIFT = 0.17;
 const TILT_MIN = -85 * DEG;
 const TILT_MAX = -8 * DEG;
 const DRAG_RADIANS_PER_PX = 0.008;
-const LABEL_GAP_PX = 14;
+// What a label keeps clear of its point, from its edge.
+const LABEL_GAP_PX = 6;
 const BODY_GAP_PX = 4;
 
 const INK = cssColor("--text", "#c5c9d2");
@@ -55,7 +56,7 @@ function layer(name: string) {
         onResize: function (this: Zdog.Illustration, width: number, height: number) {
             stageWidth = width;
             stageHeight = height;
-            zoom = Math.min(width / 2 / (AXIS * 1.15), height / (AXIS * 1.7));
+            zoom = Math.min(width / 2 / (R * 1.4), height / (R * 2.2));
             centerShiftPx = height * CENTER_SHIFT;
             this.translate.y = centerShiftPx / zoom;
             this.zoom = zoom;
@@ -156,7 +157,7 @@ const directionLabel = label(
     "",
     { x: 0, y: 0, z: 0 },
     "frame-direction",
-    SUN_SYMBOL.radius + SUN_SYMBOL.gap + SUN_SYMBOL.length + 12,
+    SUN_SYMBOL.radius + SUN_SYMBOL.gap + SUN_SYMBOL.length + LABEL_GAP_PX,
 );
 let bodyUp = true;
 const billboards: { yaw: Zdog.Anchor; face: Zdog.Anchor }[] = [];
@@ -257,13 +258,13 @@ function rebuild() {
     const body = annotated === "sun" ? sun : moon;
     // The arrow and the altitude's arc stop short of the body's disc, a small gap before it, in screen pixels.
     const short = (SUN_SYMBOL.radius + BODY_GAP_PX) / zoom;
-    arrow(anchorFor(body.altitude), skyPoint(body, R - short), ACCENT, 1.5);
+    arrow(anchorFor(body.altitude), skyPoint(body, R - short), ACCENT, 1);
     const foot = skyPoint({ azimuth: body.azimuth, altitude: 0 });
     styled(new Shape({ addTo: dynamic[1], path: [{ x: 0, y: 0, z: 0 }, foot], color: MUTED }), 1, DOTTED);
     // The azimuth on the ground from north through east, the altitude up the vertical circle through the body.
     const azimuthArc = Array.from({ length: 61 }, (_, i) => ({ azimuth: (body.azimuth * i) / 60, altitude: 0 }));
     addCurve(azimuthArc, ACCENT, 1, AZIMUTH_RADIUS);
-    azimuthLabel.point = skyPoint({ azimuth: body.azimuth / 2, altitude: 0 }, AZIMUTH_RADIUS + 14);
+    azimuthLabel.point = skyPoint({ azimuth: body.azimuth / 2, altitude: 0 }, AZIMUTH_RADIUS + 20);
     azimuthLabel.element.textContent = `A ${degrees(body.azimuth)}`;
     const altitudeEnd = body.altitude - Math.sign(body.altitude) * Math.min(Math.abs(body.altitude), short / R / DEG);
     const altitudeArc = Array.from({ length: 31 }, (_, i) => ({
@@ -315,8 +316,10 @@ function placeLabels() {
         // below it while it is down, clear of the axes either way.
         const reach = Math.hypot(p.x, p.y) || 1;
         const [dx, dy] = element === directionLabel.element ? [0, bodyUp ? -1 : 1] : [p.x / reach, p.y / reach];
-        element.style.left = `${center.x + p.x * zoom + dx * push}px`;
-        element.style.top = `${center.y + p.y * zoom + dy * push}px`;
+        // The gap is kept from the label's edge, not its middle: half its extent that way is added.
+        const edge = push > 0 ? (Math.abs(dx) * element.offsetWidth + Math.abs(dy) * element.offsetHeight) / 2 : 0;
+        element.style.left = `${center.x + p.x * zoom + dx * (push + edge)}px`;
+        element.style.top = `${center.y + p.y * zoom + dy * (push + edge)}px`;
         element.style.opacity = p.z < 0 && !element.matches(".frame-angle, .frame-direction") ? "0.45" : "1";
     }
 }

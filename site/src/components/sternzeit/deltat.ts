@@ -16,13 +16,13 @@ const SCALE_MIN = -60;
 const SCALE_MAX = 36_000;
 // The ticks, minor ones (those in between the units) dimmed.
 const TICKS: [seconds: number, label: string, minor?: boolean][] = [
-    [-10, "\u221210 s", true],
+    [-10, "\u221210\u202fs", true],
     [0, "0"],
-    [10, "10 s", true],
-    [60, "1 m"],
-    [600, "10 m", true],
-    [3600, "1 h"],
-    [36_000, "10 h", true],
+    [10, "10\u202fs", true],
+    [60, "1\u202fm"],
+    [600, "10\u202fm", true],
+    [3600, "1\u202fh"],
+    [36_000, "10\u202fh", true],
 ];
 // Where Espenak and Meeus switch from one polynomial to the next, between -500 and 1962.
 const POLYNOMIAL_JOINS = [500, 1600, 1700, 1800, 1860, 1900, 1920, 1941];

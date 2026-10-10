@@ -18,6 +18,7 @@ import TimeSlider from "./TimeSlider.astro";
         </svg>
         <span class="scene-annotation" data-annotation="observer" data-export-text>observer</span>
         <span class="scene-annotation" data-annotation="ecliptic" data-export-text>ecliptic</span>
+        <span class="scene-annotation" data-annotation="celestialEquator" data-export-text>celestial equator</span>
         <span class="scene-annotation" data-annotation="equinox" data-export-text>vernal equinox</span>
         <span class="scene-annotation pole-label" data-annotation="north" data-export-text>N</span>
         <span class="scene-annotation pole-label" data-annotation="south" data-export-text>S</span>
@@ -39,11 +40,11 @@ import TimeSlider from "./TimeSlider.astro";
     <TimeSlider />
     <figcaption class="figure-caption">
         An <Term of="Armillary sphere">armillary sphere</Term>: Earth's equator and axis, its north (N) and south (S)
-        pole, the ecliptic and its axis, the vernal equinox, the observer's latitude circle and meridian, and the Sun and
+        pole, the celestial equator (dotted), the ecliptic and its axis, the vernal equinox, the observer's latitude circle and meridian, and the Sun and
         the Moon in their directions from Earth's center, all in geocentric equatorial coordinates. Distances are
-        schematic, the Sun and the Moon symbols, not to scale. (a, b) The sky of the chosen place around the Sun and
-        around the Moon, each held at the center while the horizon moves; an arrow points to
-        the other body when it is out of view.
+        schematic, the Sun and the Moon symbols, not to scale. (a, b) The sky as the observer at the chosen place sees
+        it, locked on the Sun and on the Moon: each held at the center while the horizon moves; an arrow points to the
+        other body when it is out of view.
     </figcaption>
 </figure>
 

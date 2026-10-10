@@ -211,6 +211,16 @@ const longitudeNutationLine = new Shape({
     color: INK,
 });
 const trueEquinoxDot = new Shape({ addTo: earthAnchor, stroke: 3, color: INK });
+// The celestial equator: Earth's equator carried out onto the sky, as large as the Sun's orbit, so the two great circles
+// cross where they do, at the equinoxes. Dotted, a fixed reference like the equator it extends.
+const celestialEquator = new Ellipse({
+    addTo: earthAnchor,
+    diameter: 2 * SUN_DIST,
+    rotate: { x: Math.PI / 2 },
+    color: INK,
+    stroke: 1,
+    fill: false,
+});
 // Earth's (equivalently, from here, the sun's apparent) orbital ellipse, real eccentricity (~0.0167), so
 // this will read as very nearly circular, which is itself the honest answer. Centered on Earth rather than
 // offset to the correct focus: that needs the orbit's orientation (longitude of perihelion), which nothing
@@ -272,6 +282,7 @@ const depthLines = [
     inDepth(latitudeRing, true),
     inDepth(meridianRing, true),
     inDepth(orbitEllipse, true),
+    inDepth(celestialEquator, true),
     inDepth(moonOrbit, false),
     inDepth(axisLine, false),
     inDepth(trueEclipticAxis, false),
@@ -696,14 +707,22 @@ function frame() {
     annotate("south", v(0, AXIS_OVERHANG * EARTH_R, 0));
     // At the axis' end, so the arrow runs along the axis and stops short of it like the others do at their dots.
     annotate("eclipticAxis", vScale(truePole, AXIS_OVERHANG));
-    annotateEcliptic(sunPos);
+    annotateRings(sunPos);
     // The line styles are classes (see global.css), set once each shape has an SVG element, i.e. after its first
     // render. Dotted for the fixed references, long dashes for the Sun's orbit, which deserves a style of its own among
     // them, and short dashes for the observer's two circles. radiusLine and longitudeNutationLine are answers, so solid.
     const dashes: [string, Zdog.Shape[]][] = [
         [
             "line-dotted",
-            [equatorRing, axisLine, trueEclipticAxis, trueObliquityArc, trueObliquityArcSouth, atmosphereShell],
+            [
+                equatorRing,
+                celestialEquator,
+                axisLine,
+                trueEclipticAxis,
+                trueObliquityArc,
+                trueObliquityArcSouth,
+                atmosphereShell,
+            ],
         ],
         ["line-long-dashed", [orbitEllipse]],
         ["line-dashed", [latitudeRing, meridianRing]],
@@ -783,13 +802,21 @@ function annotate(name: string, point: Zdog.VectorOptions) {
     head?.setAttribute("points", `${tx},${ty} ${hx - dy * 3.5},${hy + dx * 3.5} ${hx + dy * 3.5},${hy - dx * 3.5}`);
 }
 
-// "ecliptic": a label on the orbit ellipse's upper branch on screen, right of Earth, at its rightmost point inside the
-// stage, left of the alt-az panels and clear of the Sun, so it keeps to one place as the scene turns; hidden if there is
-// none. Lifted off the line, off the dashes.
-const ECLIPTIC_MARGIN_PX = 40;
+// "ecliptic" and "celestial equator": each a label on its great circle's upper branch on screen, the ecliptic's right of
+// Earth at the rightmost point inside the stage, left of the alt-az panels, the equator's left of Earth at the leftmost,
+// both clear of the Sun, so they keep to one place as the scene turns; hidden if there is none. Lifted off the line,
+// off the dashes.
+const RING_LABEL_MARGIN_PX = 40;
 const eclipticLabel = find('.scene-annotation[data-annotation="ecliptic"]');
+const celestialEquatorLabel = find('.scene-annotation[data-annotation="celestialEquator"]');
 
-function annotateEcliptic(sunPos: Point) {
+function annotateRings(sunPos: Point) {
+    annotateRing(eclipticLabel, orbitEllipse, 1, sunPos);
+    annotateRing(celestialEquatorLabel, celestialEquator, -1, sunPos);
+}
+
+/** Places `label` on `ring`'s upper branch, at its outermost point on the `side` of Earth (1 right, -1 left). */
+function annotateRing(label: HTMLElement, ring: Zdog.Ellipse, side: 1 | -1, sunPos: Point) {
     const zoom = illustration.zoom;
     const [cx, cy] = [stageWidth / 2, stageHeight / 2];
     const project = (point: Zdog.VectorOptions): [number, number] => {
@@ -797,35 +824,32 @@ function annotateEcliptic(sunPos: Point) {
         return [cx + p.x * zoom, cy + p.y * zoom];
     };
     const [sx, sy] = project(sunPos);
-    const clearOfSun = SUN_SYMBOL.radius + SUN_SYMBOL.gap + SUN_SYMBOL.length + ECLIPTIC_MARGIN_PX;
+    const clearOfSun = SUN_SYMBOL.radius + SUN_SYMBOL.gap + SUN_SYMBOL.length + RING_LABEL_MARGIN_PX;
     // The panels cover the stage's right side on wide screens; on narrow ones they sit below it.
     const stageBox = stageEl.getBoundingClientRect();
-    const panelBox = eclipticLabel.parentElement?.querySelector(".altaz-panel")?.getBoundingClientRect();
+    const panelBox = label.parentElement?.querySelector(".altaz-panel")?.getBoundingClientRect();
     const right = panelBox && panelBox.top < stageBox.bottom ? panelBox.left - stageBox.left : stageWidth;
+    const [w, h] = [ring.width ?? ring.diameter, ring.height ?? ring.diameter];
     const at = (i: number) => {
         const t = i * DEG;
-        const local = new Vector({
-            x: ((orbitEllipse.width ?? 0) / 2) * Math.cos(t),
-            y: ((orbitEllipse.height ?? 0) / 2) * Math.sin(t),
-        });
-        return project(local.rotate(orbitEllipse.rotate));
+        return project(new Vector({ x: (w / 2) * Math.cos(t), y: (h / 2) * Math.sin(t) }).rotate(ring.rotate));
     };
     const points = Array.from({ length: 360 }, (_, i) => at(i));
     let best: { x: number; y: number } | null = null;
     points.forEach(([x, y], i) => {
-        const inside = x > ECLIPTIC_MARGIN_PX && x < right - ECLIPTIC_MARGIN_PX && y > ECLIPTIC_MARGIN_PX;
-        if (!inside || y > stageHeight - ECLIPTIC_MARGIN_PX || Math.hypot(x - sx, y - sy) < clearOfSun) return;
+        const inside = x > RING_LABEL_MARGIN_PX && x < right - RING_LABEL_MARGIN_PX && y > RING_LABEL_MARGIN_PX;
+        if (!inside || y > stageHeight - RING_LABEL_MARGIN_PX || Math.hypot(x - sx, y - sy) < clearOfSun) return;
         // The upper branch of the ellipse on screen: where its outward normal points up.
         const [[ax, ay], [bx, by]] = [points[(i + 359) % 360] ?? [x, y], points[(i + 1) % 360] ?? [x, y]];
         const [nx, ny] = [by - ay, ax - bx];
         const outward = nx * (x - cx) + ny * (y - cy) > 0 ? 1 : -1;
-        if (x > cx && ny * outward < 0 && (!best || x > best.x)) best = { x, y };
+        if ((x - cx) * side > 0 && ny * outward < 0 && (!best || (x - best.x) * side > 0)) best = { x, y };
     });
     const found = best as { x: number; y: number } | null;
-    eclipticLabel.hidden = !found;
+    label.hidden = !found;
     if (!found) return;
-    eclipticLabel.style.left = `${found.x}px`;
-    eclipticLabel.style.top = `${found.y - 12}px`;
+    label.style.left = `${found.x}px`;
+    label.style.top = `${found.y - 12}px`;
 }
 
 const labelsButton = find('#scene [data-field="labels"]');

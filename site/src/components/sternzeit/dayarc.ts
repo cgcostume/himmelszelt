@@ -294,7 +294,8 @@ function rebuildPaths() {
     styled(
         new Shape({ addTo: anchorFor(sunNow.altitude), translate: skyPoint(sunNow), color: INK }),
         BODY_DOT_PX,
-        sunNow.altitude > 0 ? "figure-sun-glow" : null,
+        // It glows below the horizon too, the translucent ground laid over it like over everything down there.
+        "figure-sun-glow",
     );
     addSunRays(sunNow);
 }

@@ -369,7 +369,7 @@ tbody tr:hover {
     stroke: none;
 }
 /* The glow is a copy of the Sun's disc behind it, clipped at the horizon (see sunGlow); Zdog's Sun, a plain path, is
-   tagged by scene.ts and dayarc.ts once it exists, the latter only while the Sun is up. */
+   tagged by scene.ts and dayarc.ts once it exists. */
 .figure-sun-glow {
     color: var(--text);
     filter: var(--sun-glow);
@@ -437,6 +437,14 @@ tbody tr:hover {
     border-left: 2px solid var(--accent);
     margin-left: -0.9rem;
     padding-left: 0.9rem;
+}
+/* Folded away, the controls step back like every fold (see .fold in global.css). */
+.moment:not([open]) {
+    opacity: 0.55;
+    transition: opacity 0.15s;
+}
+.moment:not([open]):is(:hover, :has(:focus-visible)) {
+    opacity: 1;
 }
 .moment[open] .input-grid {
     margin: 0.75rem 0 0.25rem;
@@ -1622,85 +1630,167 @@ span.daylight-day {
     font-family: var(--font-mono);
     white-space: nowrap;
 }
-/* The coordinate pipeline: the functions down the middle column, each with its inputs to the left and its result, a
-   position in the next coordinate system, below it on the line into the next box; the scope of each half on the right. */
-.pipeline {
-    /* What every arrow keeps clear of the box it starts or ends at. */
+/* The coordinate pipeline, one figure in two parts: over a line, where its inputs come from, and under it, the
+   positions from the ecliptic to the renderer's vector, each conversion between two of them, and the call that returns
+   each position directly. */
+.pipeline-figure {
+    /* What every arrow keeps clear of what it starts or ends at. */
     --pipeline-gap: 3px;
     /* Every arrow is 9 pixels across, an odd number, so its 1 pixel line falls on whole pixels, not between two. */
+    --flow-line: 9px;
+    /* How far a branch runs along its arrow before it turns off. */
+    --flow-branch: 0.75rem;
     /* The line of each arrow down the middle, its 6 pixel tip not counted. */
     --pipeline-stem: 0.75rem;
     /* Below the equatorial position, only a line's gap before the divider's label. */
     --pipeline-into-divider: 0.3rem;
-    display: grid;
-    /* The full width of the text, the outer columns sharing what the boxes leave, never narrower than their lines. */
-    grid-template-columns: 1fr max-content 1fr;
-    row-gap: 0;
-    column-gap: 0;
-    font-size: var(--text-small);
 }
-.pipeline code {
-    font-size: inherit;
-}
-.pipeline-inputs {
-    grid-column: 1;
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    color: var(--muted);
-    text-align: right;
-}
-/* The inputs one under the other; several are gathered by a bar on their right, where the one arrow leaves. */
-.pipeline-input-list {
+/* The inputs: small flows from left to right, each function written over the arrow from what it takes to what it
+   returns, a branch turning off below. Every value sits on its arrow's line, at the bottom of an edge. */
+/* The lines one under the other, flush left as a block, centered in the figure; the moment's broken after t and taken
+   up again in the next, like a sentence. */
+.pipeline-givens {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    gap: 0.15rem;
-    padding-right: 0.4rem;
+    align-items: start;
+    width: fit-content;
+    margin-inline: auto;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    font-size: var(--text-small);
+    color: var(--muted);
+}
+.flow {
+    display: grid;
+    /* The concepts flush right in the first column, so their arrows all start at one line. */
+    grid-template-columns: repeat(7, auto);
+    /* A line and the branch below it, each a row for the function's name and one for its arrow; the moment's line has
+       a second such pair, after a gap, where it is taken up again from t right under time. */
+    grid-template-rows: auto var(--flow-line) auto var(--flow-line);
+    justify-content: start;
+}
+.flow-node {
+    padding-inline: 0.4rem;
+    align-self: center;
+    height: var(--flow-line);
+    display: flex;
+    align-items: center;
+    font-family: var(--font-mono);
+    color: var(--text);
     white-space: nowrap;
 }
-.pipeline-input-list.gathered {
-    border-right: 1px solid var(--line);
+/* An arrow with its function over it, from the value on its left to the one on its right. */
+.flow-edge {
+    display: flex;
+    flex-direction: column;
+    justify-content: end;
+    align-items: center;
+    padding: 0 var(--pipeline-gap);
 }
-/* Several inputs do not make their row any taller: the list is centered on the function's name and reaches into the
-   rows above and below, so the arrow down the middle arrives at the name as at any other. */
-.pipeline-inputs {
-    position: relative;
+.flow-edge code {
+    padding: 0 0.6rem 0.25rem;
+    background: none;
+    border: none;
+    font-size: inherit;
+    color: var(--muted);
 }
-.pipeline-input-list.gathered {
-    position: absolute;
-    right: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-}
-/* One arrow into the function: its line starts here and runs on, without a gap between the columns, to the name,
-   where the tip is (see .pipeline-function). */
-.pipeline-input-arrow {
-    flex: none;
-    width: 0.75rem;
-    height: 9px;
-    background: var(--line);
-    mask: linear-gradient(#000, #000) center / 100% 1px no-repeat;
-}
-.pipeline-function.fed::before {
+.flow-edge::after {
     content: "";
-    flex: none;
-    width: 1.25rem;
-    height: 9px;
+    align-self: stretch;
+    min-width: 1.5rem;
+    height: var(--flow-line);
     background: var(--line);
-    /* The arrow down the middle, turned: a 1 pixel line and a tip 6 by 9 pixels that keeps its shape. */
     mask:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 9'%3E%3Cpath d='M0 0l6 4.5-6 4.5z'/%3E%3C/svg%3E")
         right center / 6px 9px no-repeat,
         linear-gradient(#000, #000) left center / calc(100% - 6px) 1px no-repeat;
 }
-/* A single input's arrow starts right after it, not a bar's width away. */
-.pipeline-input-list:not(.gathered) {
-    padding-right: 0.3rem;
+/* A branch leaves its arrow a little after the value, a line straight down to the branch's own arrow, which starts
+   there. */
+.flow-elbow {
+    position: relative;
+    z-index: 1;
 }
-/* A conversion's name over its arguments, the coordinates it takes in braces, the way the code takes them, and the
-   inputs by their symbols. */
-.pipeline-call {
+.flow-elbow::before {
+    content: "";
+    position: absolute;
+    left: calc(var(--pipeline-gap) + var(--flow-branch));
+    top: 4px;
+    bottom: 4px;
+    width: 1px;
+    background: var(--line);
+}
+.flow-edge.branch {
+    padding-left: calc(var(--pipeline-gap) + var(--flow-branch));
+    /* A little farther off, clear of the names over the main line's arrows. */
+    padding-top: 1.1rem;
+}
+/* The arrow out of a concept carries no function, so it stays short. */
+.flow-edge:empty::after {
+    min-width: 1rem;
+}
+/* The moment's line and its branch, and after a gap t's, taken up again where it ended, its own line and branch. */
+.flow-moment {
+    grid-template-rows: auto var(--flow-line) auto var(--flow-line) 0.75rem auto var(--flow-line) auto var(--flow-line);
+}
+/* t taken up again: flush right in time's column, so its arrows leave where time's do, a dashed arrow leading in
+   from the left. */
+.flow-resumed {
+    justify-self: stretch;
+    justify-content: end;
+    gap: var(--pipeline-gap);
+}
+/* Where t first comes out, a short dashed arrow on: the line goes on below. */
+.flow-continues {
+    gap: var(--pipeline-gap);
+}
+.flow-continues::after,
+.flow-resumed::before {
+    content: "";
+    flex: 1;
+    min-width: 1.25rem;
+    height: var(--flow-line);
+    background: var(--line);
+    mask:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 9'%3E%3Cpath d='M0 0l6 4.5-6 4.5z'/%3E%3C/svg%3E")
+        right center / 6px 9px no-repeat,
+        repeating-linear-gradient(to right, #000 0 3px, transparent 3px 6px) left center / calc(100% - 6px) 1px
+        no-repeat;
+}
+/* What a flow starts from, the moment or the place, in words rather than code, the way the controls name them. */
+.flow-concept {
+    justify-self: end;
+    /* As wide in every line, so the arrows out of the concepts start on one line. */
+    width: 4rem;
+    justify-content: end;
+    font-family: inherit;
+    color: var(--accent);
+}
+/* A value that may be left out, a step back from the others. */
+.flow-optional {
+    opacity: 0.55;
+}
+/* Under the line: the direct calls to the left, each with a short arrow at the position it returns, and the positions
+   to the right of them, a conversion between each two; the halves' names under the calls. */
+.pipeline {
+    /* The line between the inputs and the positions, across the whole figure. */
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--line);
+    display: grid;
+    /* The calls as wide as the longest and the positions after them, the two centered in the figure. */
+    grid-template-columns: 1fr max-content max-content 1fr;
+    font-size: var(--text-small);
+}
+.pipeline code {
+    font-size: inherit;
+    background: none;
+    border: none;
+    padding: 0;
+}
+/* A conversion: its name over its arguments, the coordinates in braces, the way the code takes them, the inputs by
+   their symbols from the flows above. */
+.pipeline-function {
+    grid-column: 3;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1708,36 +1798,10 @@ span.daylight-day {
 .pipeline-args {
     color: var(--muted);
 }
-/* The conversion: just its name, centered in its column, level with the arrow into it, which fills the room to its
-   left; as much room stays empty on its right. */
-.pipeline-function {
-    grid-column: 2;
-    display: flex;
-    align-items: center;
-}
-.pipeline-function::before,
-.pipeline-function::after {
-    content: "";
-    flex: 1 0 1.25rem;
-}
-.pipeline-function.fed::before {
-    flex: 1 0 1.25rem;
-    width: auto;
-    margin-right: var(--pipeline-gap);
-}
-.pipeline-function::after {
-    margin-left: var(--pipeline-gap);
-}
-.pipeline-function code,
-.pipeline-direct code {
-    background: none;
-    border: none;
-    padding: 0;
-}
-/* The result: a line down out of the box, the coordinate system on it, the line on into the next box. The name sits in
-   the middle of the line, the tip left out, so the line runs as long below it as above and the tip follows. */
+/* A position: an arrow down out of the conversion into it, its name, an arrow on into the next conversion, each the
+   same length and keeping a small gap at both ends, so the name sits in the middle. */
 .pipeline-space {
-    grid-column: 2;
+    grid-column: 3;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1748,28 +1812,22 @@ span.daylight-day {
 .pipeline-through {
     content: "";
     width: 9px;
-    height: var(--pipeline-stem);
-    background: var(--line);
-    mask: linear-gradient(#000, #000) center top / 1px 100% no-repeat;
-}
-/* Two arrows, out of the function into its result and out of the result into the next function, each the same length,
-   tip included, and each keeping a small gap at both ends, so the result sits in the middle. */
-.pipeline-space::before,
-.pipeline-space::after {
     height: calc(var(--pipeline-stem) + 6px);
     margin-block: var(--pipeline-gap);
-}
-.pipeline-through {
-    margin-bottom: var(--pipeline-gap);
-}
-/* Arrows end in a tip, a triangle 9 by 6 pixels; the line stops short of it. */
-.pipeline-space::before,
-.pipeline-space::after,
-.pipeline-through {
+    background: var(--line);
+    /* A tip 9 by 6 pixels, the line stopping short of it. */
     mask:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 6'%3E%3Cpath d='M0 0h9l-4.5 6z'/%3E%3C/svg%3E")
         center bottom / 9px 6px no-repeat,
         linear-gradient(#000, #000) center top / 1px calc(100% - 6px) no-repeat;
+}
+.pipeline-space.first::before,
+.pipeline-space.last::after {
+    visibility: hidden;
+}
+.pipeline-space-name {
+    padding: 0.1rem 0;
+    font-family: var(--font-mono);
 }
 /* The equatorial position runs on through the divider, which carries the rest of its arrow. */
 .pipeline-space.into-divider::after {
@@ -1778,47 +1836,23 @@ span.daylight-day {
     mask: linear-gradient(#000, #000) center top / 1px 100% no-repeat;
 }
 .pipeline-through {
-    grid-column: 2;
+    grid-column: 3;
     justify-self: center;
     height: auto;
+    margin-top: 0;
     z-index: 1;
 }
-.pipeline-space-name {
-    padding: 0.1rem 0;
-    font-family: var(--font-mono);
-}
-.pipeline-space.last::after,
-.pipeline-space.first::before {
-    visibility: hidden;
-}
-/* The column headings, plain, over each column. */
-.pipeline-heading {
-    grid-row: 1;
-    align-self: end;
-    padding-bottom: 0.5rem;
-    color: var(--muted);
-}
-.pipeline-heading.pipeline-inputs {
-    padding-right: 1.55rem;
-}
-.pipeline-heading.pipeline-direct {
-    padding-left: calc(1.25rem + var(--pipeline-gap));
-}
-.pipeline-function-heading {
-    grid-column: 2;
-    text-align: center;
-}
-/* The direct call beside each position, an arrow pointing at what it returns. */
+/* A direct call, flush against the middle column, level with the position it returns. */
 .pipeline-direct {
-    grid-column: 3;
+    grid-column: 2;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--pipeline-gap);
+    padding-block: calc(2 * var(--pipeline-gap) + var(--pipeline-stem) + 6px);
+    padding-right: 0.5rem;
     color: var(--muted);
     white-space: nowrap;
-}
-/* Level with the result it returns, which sits off the middle of its row by the arrow's tip. */
-.pipeline-direct:not(.pipeline-heading) {
-    display: flex;
-    align-items: center;
-    padding-block: calc(2 * var(--pipeline-gap) + var(--pipeline-stem) + 6px);
 }
 .pipeline-direct.into-divider {
     padding-bottom: calc(var(--pipeline-gap) + var(--pipeline-into-divider));
@@ -1827,27 +1861,19 @@ span.daylight-day {
 .pipeline-direct.likely {
     color: var(--text);
 }
-/* Its arrow points back at the position, the other way round. */
-/* Right at the start of its column, a short arrow pointing back at the position it returns, the same for every call. */
-.pipeline-direct-call {
-    display: flex;
-    align-items: center;
-    gap: var(--pipeline-gap);
-}
-.pipeline-direct-call::before {
+.pipeline-direct::after {
     content: "";
     flex: none;
     width: 1.25rem;
     height: 9px;
     background: var(--line);
     mask:
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 9'%3E%3Cpath d='M6 0L0 4.5l6 4.5z'/%3E%3C/svg%3E")
-        left center / 6px 9px no-repeat,
-        linear-gradient(#000, #000) right center / calc(100% - 6px) 1px no-repeat;
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 9'%3E%3Cpath d='M0 0l6 4.5-6 4.5z'/%3E%3C/svg%3E")
+        right center / 6px 9px no-repeat,
+        linear-gradient(#000, #000) left center / calc(100% - 6px) 1px no-repeat;
 }
-
-/* Which half is the same for everyone and which is the observer's: a dashed line across, the one half named over
-   it and the other under it, flush right, clear of the arrow that crosses it. */
+/* Which half is the same for everyone and which is the observer's: a dashed line across, the one half named over it
+   and the other under it, under the calls, where nothing else is at that height. */
 .pipeline-divider {
     grid-column: 1 / -1;
     display: grid;
@@ -1856,31 +1882,31 @@ span.daylight-day {
     color: var(--muted);
 }
 .pipeline-scope {
-    grid-column: 3;
-    text-align: right;
+    grid-column: 2;
+    white-space: nowrap;
 }
 .pipeline-divider-line {
     grid-column: 1 / -1;
     border-top: 1px dashed var(--line);
 }
-/* On a phone the direct calls no longer fit beside the steps; the caption still names them. */
+/* On a phone the direct calls no longer fit beside the positions; the text names the two that matter most. */
 @media (max-width: 40rem) {
     .pipeline {
-        grid-template-columns: auto 1fr;
+        grid-template-columns: 0 0 max-content 1fr;
     }
-    .pipeline-inputs {
-        grid-column: 1;
-    }
-    .pipeline-function,
-    .pipeline-space {
-        grid-column: 2;
-    }
-    .pipeline-direct,
-    .pipeline-direct:not(.pipeline-heading) {
+    .pipeline-direct {
         display: none;
     }
+    /* The halves' names to the right of the positions, wrapping where they must. */
     .pipeline-scope {
-        grid-column: 1;
-        padding-left: 0;
+        grid-column: 4;
+        padding-left: 0.5rem;
+        text-align: right;
+        white-space: normal;
+    }
+    /* The flows of the inputs keep their shape and scroll sideways rather than squeeze. */
+    .pipeline-givens {
+        width: auto;
+        overflow-x: auto;
     }
 }

@@ -199,7 +199,7 @@ function greatestNote(jd: number) {
     const direction = COMPASS_16[Math.round(((bearing / precise.DEG_TO_RAD + 360) % 360) / 22.5) % 16];
     const dLongitude = ((((found.longitude - state.longitude + 180) % 360) + 360) % 360) - 180;
     const signed = (n: number) => `${n < 0 ? "\u2212" : "+"}${Math.abs(n).toFixed(1)}°`;
-    const where = km < 30 ? "here" : `${Math.round(km).toLocaleString("en-US")} km ${direction}`;
+    const where = km < 30 ? "here" : `${Math.round(km).toLocaleString("en-US")} km ${direction}`;
     const when = clock(precise.dateFromJulianDay(found.jd), { timeStyle: "short" }).text;
     const y = -HALF + 22;
     // The second line, the way there, takes the reader there: the place and the moment of the greatest eclipse.

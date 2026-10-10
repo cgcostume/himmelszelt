@@ -4,9 +4,9 @@ import * as precise from "@himmelszelt/sternzeit";
 type Vec3 = Direction;
 type Vec2 = readonly [x: number, y: number];
 
-// Text inside the figures' SVGs is at the page's small text size (--text-small, 0.75rem, like the compass labels)
+// Text inside the figures' SVGs is at the page's small text size (--text-small, 13 pixels, like the compass labels)
 // whatever size the SVG is drawn at: each figure passes how many of its own units one screen pixel is.
-const SMALL_TEXT_PX = 12;
+const SMALL_TEXT_PX = 13;
 const DEG = precise.DEG_TO_RAD;
 
 /** Fills a figure's SVG; its CSS sizes text and sun symbols in screen pixels by --units-per-px (see global.css). */

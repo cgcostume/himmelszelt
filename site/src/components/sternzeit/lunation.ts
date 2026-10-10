@@ -61,7 +61,7 @@ function renderLunation(jd: number, lunationInput: HTMLInputElement, lunationVal
     lunationInput.max = String(Math.floor((end - start) / HOUR));
     lunationInput.value = String(Math.floor((jd - start) / HOUR));
     paintRange(lunationInput);
-    lunationValue.textContent = `${(jd - start).toFixed(1)} d`;
+    lunationValue.textContent = `${(jd - start).toFixed(1)} d`;
     const north = state.latitude >= 0;
     phasesEl.innerHTML = phases
         .map(([at, target]) => {
