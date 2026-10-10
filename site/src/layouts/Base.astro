@@ -66,16 +66,16 @@ const current = Astro.url.pathname.replace(/\/$/, "");
         </main>
         <footer class="site-footer">
             <span>
-                Designed and directed by{" "}
-                <a href="https://daniellimberger.de" target="_blank" rel="noopener">Daniel Limberger</a>, implemented with{" "}
-                <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a>. The successor of{" "}
-                <a href="https://github.com/cgcostume/osghimmel" target="_blank" rel="noopener">osgHimmel</a>.
+                <a href={`${base}/#about`}>himmelszelt</a>, small TypeScript + WebGPU libraries for rendering the sky, is
+                the successor of <a href="https://github.com/cgcostume/osghimmel" target="_blank" rel="noopener">osgHimmel</a>.
+                <br />
+                Designed and directed by <a href="https://daniellimberger.de" target="_blank" rel="noopener">Daniel Limberger</a>,
+                implemented with <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a>.
             </span>
             <span>
-                &copy; {new Date().getFullYear()} Daniel Limberger. Code under the{" "}
-                <a href="https://github.com/cgcostume/himmelszelt/blob/main/LICENSE" target="_blank" rel="noopener">MIT
-                license</a>, text and figures under{" "}
-                <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.
+                &copy; {new Date().getFullYear()} Daniel Limberger. Code{" "}
+                <a href="https://github.com/cgcostume/himmelszelt/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a>,
+                text and figures <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.
             </span>
             <Cyanometer />
         </footer>

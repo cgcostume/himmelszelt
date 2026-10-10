@@ -41,7 +41,6 @@ const updated = formatUpdated(lastUpdated(chapter.filePath ?? ""));
             <>
                 <Toc sections={sections} />
                 <Content components={{ Fig, Tab }} />
-                <About />
                 <References chapter={chapter.id} body={chapter.body ?? ""} />
             </>
         )

@@ -42,7 +42,9 @@ site-wide glossary (`site/src/data/glossary.json`); no glossary pages, no per-pa
 Sources are cited with `<Cite>` and listed at the end of each chapter (`site/src/data/references.ts`).
 
 **sternzeit is the blueprint for every chapter.** The layout adds the name's meaning (from the glossary) under the
-title, the lead (the `summary`), a meta line (last updated, term hint), a TOC from three sections on, and after the content the short himmelszelt note before the references. The
+title, the lead (the `summary`), a meta line (last updated, term hint), a TOC from three sections on, and the
+references right after the content; the short himmelszelt note shows only on a withheld chapter's placeholder, as the
+header and footer say the rest. The
 body follows: an interactive scene first, with the moment and place controls under it, still in the opening section, then the concepts building on each other,
 "Precise or approximate?" wherever both variants exist, and the references. There is no separate code examples section:
 each example sits in the section whose concepts it uses, led into from what the section just explained rather than by

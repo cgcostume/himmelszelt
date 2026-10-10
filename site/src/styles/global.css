@@ -90,7 +90,14 @@ strong {
 }
 h2 {
     font-size: 1.5rem;
-    margin-top: 4rem;
+    margin-top: 2rem;
+}
+/* A rule between the sections across the text, in the borders' grey, half of the old space above it and half below. */
+h2::before {
+    content: "";
+    display: block;
+    margin-bottom: 2rem;
+    border-top: var(--border);
 }
 /* The package scope is the same on every chapter: the name after it is what the page is about. */
 h1 .scope {
@@ -189,6 +196,7 @@ h2 {
     color: var(--muted);
     font-size: var(--text-small);
     margin-top: 4rem;
+    padding-bottom: 4rem;
 }
 main {
     counter-reset: figure table;
@@ -283,6 +291,21 @@ pre code {
     background: none;
     border: 0;
     padding: 0;
+}
+/* Line numbers, quiet, from CSS alone: not part of the text, so neither selected nor copied with it. */
+pre code {
+    counter-reset: line;
+}
+pre code .line::before {
+    counter-increment: line;
+    content: counter(line);
+    display: inline-block;
+    width: 2ch;
+    margin-right: 1.5ch;
+    text-align: right;
+    color: var(--muted);
+    opacity: 0.5;
+    user-select: none;
 }
 /* Snippets are wrapped at 80 columns, which a phone cannot show: there the lines wrap rather than scroll sideways. */
 @media (max-width: 48rem) {
