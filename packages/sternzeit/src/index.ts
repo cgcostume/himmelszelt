@@ -18,7 +18,12 @@ export {
 // Coordinate systems.
 export type { Direction, EclipticalCoords, EquatorialCoords, HorizontalCoords, Observer } from "./coords.js";
 export type { RefractionConditions, ViewDistanceOptions } from "./earth.js";
-export { eclipticalToEquatorial, equatorialToHorizontal, horizontalToDirection } from "./coords.js";
+export {
+    eclipticalToEquatorial,
+    equatorialToHorizontal,
+    equatorialToTopocentric,
+    horizontalToDirection,
+} from "./coords.js";
 
 // Time and Julian Day.
 export type { AstronomicalTime, JulianDay } from "./time.js";
@@ -73,6 +78,7 @@ export const sun = {
     trueAnomaly: sunImpl.trueAnomaly,
     trueLongitude: sunImpl.trueLongitude,
     apparentLongitude: sunImpl.apparentLongitude,
+    apparentEclipticalPosition: sunImpl.apparentEclipticalPosition,
     apparentPosition: sunImpl.apparentPosition,
     equatorialHorizontalParallax: sunImpl.equatorialHorizontalParallax,
     topocentricPosition: sunImpl.topocentricPosition,
@@ -94,6 +100,7 @@ export const moon = {
     meanArgumentOfLatitude: moonImpl.meanArgumentOfLatitude,
     meanAscendingNodeLongitude: moonImpl.meanAscendingNodeLongitude,
     position: moonImpl.position,
+    apparentEclipticalPosition: moonImpl.apparentEclipticalPosition,
     apparentPosition: moonImpl.apparentPosition,
     equatorialHorizontalParallax: moonImpl.equatorialHorizontalParallax,
     topocentricPosition: moonImpl.topocentricPosition,

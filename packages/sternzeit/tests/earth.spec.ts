@@ -195,3 +195,17 @@ test("moon.topocentricPosition shifts with the observer's height", () => {
     expect(shift * 3600).toBeGreaterThan(0.05);
     expect(shift * 3600).toBeLessThan(2);
 });
+
+// Meeus, example 40.a: Mars from Palomar Observatory, 2003-08-28 3h17m UT.
+test("equatorialToTopocentric matches Meeus' worked example 40.a", () => {
+    const geocentric = { rightAscension: 339.530208, declination: -15.771083 };
+    const siderealTime = 15 * (1 + 40 / 60 + 45 / 3600);
+    const observer = {
+        latitude: 33 + 21 / 60 + 22 / 3600,
+        longitude: -(15 * (7 + 47 / 60 + 27 / 3600)),
+        heightM: 1706,
+    };
+    const topocentric = precise.equatorialToTopocentric(geocentric, 23.592 / 3600, siderealTime, observer);
+    expect(topocentric.rightAscension).toBeCloseTo(15 * (22 + 38 / 60 + 8.54 / 3600), 4);
+    expect(topocentric.declination).toBeCloseTo(-(15 + 46 / 60 + 30.0 / 3600), 4);
+});

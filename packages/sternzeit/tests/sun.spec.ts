@@ -88,3 +88,10 @@ test("sun.direction and moon.direction are the unit vectors of their horizontal 
         expect(Math.hypot(...direction)).toBeCloseTo(1, 12);
     }
 });
+
+test("sun.apparentEclipticalPosition is the apparent longitude, on the ecliptic", () => {
+    expect(precise.sun.apparentEclipticalPosition(JDE)).toEqual({
+        longitude: precise.sun.apparentLongitude(JDE),
+        latitude: 0,
+    });
+});

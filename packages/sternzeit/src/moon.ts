@@ -1,12 +1,12 @@
 // Terms used here are explained in the himmelszelt site's glossary (site/src/data/glossary.json).
 import {
-    applyParallax,
     type Direction,
     type EclipticalCoords,
     EQUATORIAL_RADIUS_KM,
     type EquatorialCoords,
     eclipticalToEquatorial,
     equatorialToHorizontal,
+    equatorialToTopocentric,
     type HorizontalCoords,
     horizontalToDirection,
     type Observer,
@@ -246,25 +246,31 @@ export function positionApprox(t: JulianDay): EclipticalCoords {
     return { longitude: normalizeDegrees(Sl * RAD_TO_DEG), latitude: Sb * RAD_TO_DEG };
 }
 
-/** Apparent geocentric equatorial position, per Meeus ch. 47: {@link position} moved to the true equinox of the date by
- *  the nutation in longitude (Δψ), at the true obliquity. The Moon's light time of ~1.3 s (~0.7") is left out. */
-export function apparentPosition(t: JulianDay): EquatorialCoords {
+/** Apparent geocentric ecliptical position, per Meeus ch. 47: {@link position} moved to the true equinox of the date by
+ *  the nutation in longitude (Δψ). The Moon's light time of ~1.3 s (~0.7") is left out. */
+export function apparentEclipticalPosition(t: JulianDay): EclipticalCoords {
     const { longitude, latitude } = position(t);
-    return eclipticalToEquatorial(
-        { longitude: longitude + earth.longitudeNutation(t), latitude },
-        earth.trueObliquity(t),
-    );
+    return { longitude: normalizeDegrees(longitude + earth.longitudeNutation(t)), latitude };
+}
+
+/** Approximation of {@link apparentEclipticalPosition}, from the approximate chain. */
+export function apparentEclipticalPositionApprox(t: JulianDay): EclipticalCoords {
+    const { longitude, latitude } = positionApprox(t);
+    return { longitude: normalizeDegrees(longitude + earth.longitudeNutationApprox(t)), latitude };
+}
+
+/** Apparent geocentric equatorial position: the apparent ecliptical position at the true obliquity, per Meeus ch. 47. */
+export function apparentPosition(t: JulianDay): EquatorialCoords {
+    return eclipticalToEquatorial(apparentEclipticalPosition(t), earth.trueObliquity(t));
 }
 
 /** Approximation of {@link apparentPosition}, from the approximate chain. */
 export function apparentPositionApprox(t: JulianDay): EquatorialCoords {
-    const { longitude, latitude } = positionApprox(t);
-    const ecl = { longitude: longitude + earth.longitudeNutationApprox(t), latitude };
-    return eclipticalToEquatorial(ecl, earth.trueObliquityApprox(t));
+    return eclipticalToEquatorial(apparentEclipticalPositionApprox(t), earth.trueObliquityApprox(t));
 }
 
 /** Equatorial horizontal parallax (π), in degrees: the angle Earth's equatorial radius spans at the Moon's distance,
- *  per Meeus ch. 47. The observer's place on the ellipsoid enters in `applyParallax`. */
+ *  per Meeus ch. 47. The observer's place on the ellipsoid enters in `equatorialToTopocentric`. */
 export function equatorialHorizontalParallax(t: JulianDay): number {
     return Math.asin(EQUATORIAL_RADIUS_KM / distance(t)) * RAD_TO_DEG;
 }
@@ -281,7 +287,7 @@ export function topocentricPosition(time: AstronomicalTime, observer: Observer):
     const t = julianEphemerisDay(time);
     const s = apparentSiderealTime(time);
 
-    return applyParallax(apparentPosition(t), equatorialHorizontalParallax(t), s, observer);
+    return equatorialToTopocentric(apparentPosition(t), equatorialHorizontalParallax(t), s, observer);
 }
 
 /** Approximation of {@link topocentricPosition}, from the approximate chain. */
@@ -289,7 +295,7 @@ export function topocentricPositionApprox(time: AstronomicalTime, observer: Obse
     const t = julianEphemerisDay(time);
     const s = apparentSiderealTimeApprox(time);
 
-    return applyParallax(apparentPositionApprox(t), equatorialHorizontalParallaxApprox(t), s, observer);
+    return equatorialToTopocentric(apparentPositionApprox(t), equatorialHorizontalParallaxApprox(t), s, observer);
 }
 
 /** Horizontal position as seen by the observer, in degrees: the topocentric position turned by the local apparent

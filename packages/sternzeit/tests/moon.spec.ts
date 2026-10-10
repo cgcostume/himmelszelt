@@ -55,6 +55,23 @@ test("approx.moon.position roughly agrees with the precise result", () => {
     expect(approxEcl.latitude).toBeCloseTo(preciseEcl.latitude, 0);
 });
 
+test("approx.moon.apparentEclipticalPosition roughly agrees with the precise result", () => {
+    const preciseEcl = precise.moon.apparentEclipticalPosition(JDE);
+    const approxEcl = approx.moon.apparentEclipticalPosition(JDE);
+
+    expect(approxEcl.longitude).toBeCloseTo(preciseEcl.longitude, 0);
+    expect(approxEcl.latitude).toBeCloseTo(preciseEcl.latitude, 0);
+});
+
+// The apparent ecliptical position is the step apparentPosition builds on: tilted by the obliquity, it is that position.
+test("moon.apparentPosition is the apparent ecliptical position at the true obliquity", () => {
+    const equatorial = precise.eclipticalToEquatorial(
+        precise.moon.apparentEclipticalPosition(JDE),
+        precise.earth.trueObliquity(JDE),
+    );
+    expect(precise.moon.apparentPosition(JDE)).toEqual(equatorial);
+});
+
 test("approx.moon.distance roughly agrees with the precise result", () => {
     const preciseDistance = precise.moon.distance(JDE);
     const approxDistance = approx.moon.distance(JDE);
@@ -133,4 +150,11 @@ test("moon.brightLimbAngle points the bright limb at the Sun in the observer's v
         expect(Math.abs(((angle - expected + 540) % 360) - 180)).toBeLessThan(0.5);
         expect(Math.abs(((approx.moon.brightLimbAngle(time, observer) - angle + 540) % 360) - 180)).toBeLessThan(1);
     }
+});
+
+// Meeus, example 47.a: the apparent longitude 133.167265°, the latitude -3.229126°, on 1992-04-12.0 TD.
+test("moon.apparentEclipticalPosition matches Meeus' worked example 47.a", () => {
+    const { longitude, latitude } = precise.moon.apparentEclipticalPosition(2448724.5);
+    expect(longitude).toBeCloseTo(133.167265, 4);
+    expect(latitude).toBeCloseTo(-3.229126, 4);
 });

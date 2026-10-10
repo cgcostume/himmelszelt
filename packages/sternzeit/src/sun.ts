@@ -1,11 +1,12 @@
 // Terms used here are explained in the himmelszelt site's glossary (site/src/data/glossary.json).
 import {
-    applyParallax,
     type Direction,
+    type EclipticalCoords,
     EQUATORIAL_RADIUS_KM,
     type EquatorialCoords,
     eclipticalToEquatorial,
     equatorialToHorizontal,
+    equatorialToTopocentric,
     type HorizontalCoords,
     horizontalToDirection,
     type Observer,
@@ -112,15 +113,24 @@ export function apparentLongitudeApprox(t: JulianDay): number {
     return normalizeDegrees(trueLongitudeApprox(t) + earth.longitudeNutationApprox(t) - 20.4898 / 3600 / R);
 }
 
-/** Apparent equatorial position: the apparent longitude at the true obliquity, per Meeus ch. 25.
- *  Geocentric; the Sun's ecliptical latitude stays below 1.2" and is left out. */
+/** Apparent geocentric ecliptical position: the apparent longitude, and a latitude of 0, the Sun's staying below 1.2". */
+export function apparentEclipticalPosition(t: JulianDay): EclipticalCoords {
+    return { longitude: apparentLongitude(t), latitude: 0 };
+}
+
+/** Approximation of {@link apparentEclipticalPosition}, from the approximate chain. */
+export function apparentEclipticalPositionApprox(t: JulianDay): EclipticalCoords {
+    return { longitude: apparentLongitudeApprox(t), latitude: 0 };
+}
+
+/** Apparent equatorial position: the apparent ecliptical position at the true obliquity, per Meeus ch. 25. */
 export function apparentPosition(t: JulianDay): EquatorialCoords {
-    return eclipticalToEquatorial({ longitude: apparentLongitude(t), latitude: 0 }, earth.trueObliquity(t));
+    return eclipticalToEquatorial(apparentEclipticalPosition(t), earth.trueObliquity(t));
 }
 
 /** Approximation of {@link apparentPosition}, from the approximate chain. */
 export function apparentPositionApprox(t: JulianDay): EquatorialCoords {
-    return eclipticalToEquatorial({ longitude: apparentLongitudeApprox(t), latitude: 0 }, earth.trueObliquityApprox(t));
+    return eclipticalToEquatorial(apparentEclipticalPositionApprox(t), earth.trueObliquityApprox(t));
 }
 
 /** Equatorial horizontal parallax (π), in degrees, per Meeus 40.1: 8.794" at 1 AU.
@@ -142,7 +152,7 @@ export function topocentricPosition(time: AstronomicalTime, observer: Observer):
     const t = julianEphemerisDay(time);
     const s = apparentSiderealTime(time);
 
-    return applyParallax(apparentPosition(t), equatorialHorizontalParallax(t), s, observer);
+    return equatorialToTopocentric(apparentPosition(t), equatorialHorizontalParallax(t), s, observer);
 }
 
 /** Approximation of {@link topocentricPosition}, from the approximate chain. */
@@ -150,7 +160,7 @@ export function topocentricPositionApprox(time: AstronomicalTime, observer: Obse
     const t = julianEphemerisDay(time);
     const s = apparentSiderealTimeApprox(time);
 
-    return applyParallax(apparentPositionApprox(t), equatorialHorizontalParallaxApprox(t), s, observer);
+    return equatorialToTopocentric(apparentPositionApprox(t), equatorialHorizontalParallaxApprox(t), s, observer);
 }
 
 /** Horizontal position as seen by the observer, in degrees: the topocentric position turned by the local apparent

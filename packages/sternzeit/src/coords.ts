@@ -93,12 +93,13 @@ export function observerGeocentric(latitude: number, observerHeightM = 0): { rho
     };
 }
 
-/** Corrects a geocentric equatorial position for parallax as seen from an observer's location, on the ellipsoid and at
- *  its height, per Meeus 40.2, 40.3. Uses the same hour-angle convention as
- *  equatorialToHorizontal. Shared by sun.ts and moon.ts: the Moon's parallax is large enough (~1 degree) to always
- *  matter, the Sun's is tiny (~8.8") but applying it too keeps their topocentric positions on the same footing for
- *  eclipse math. */
-export function applyParallax(
+/**
+ * Geocentric to topocentric equatorial coordinates: a position corrected for the parallax `parallax` (the body's
+ * equatorial horizontal parallax, in degrees) as seen from the observer's place on the ellipsoid and at their height, per
+ * Meeus 40.2, 40.3. `siderealTime` is Greenwich's, in degrees, the hour angle as in equatorialToHorizontal. The Moon's
+ * parallax, up to about a degree, always matters; the Sun's, about 8.8", is applied too, so eclipses compare like with like.
+ */
+export function equatorialToTopocentric(
     position: EquatorialCoords,
     parallax: number,
     siderealTime: number,
