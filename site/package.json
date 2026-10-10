@@ -15,11 +15,11 @@
         "test:browser": "playwright test"
     },
     "dependencies": {
-        "@astrojs/mdx": "^8.0.1",
+        "@astrojs/mdx": "^8.0.3",
         "@himmelszelt/dunstkreis": "workspace:*",
         "@himmelszelt/sternzeit": "workspace:*",
         "@photostructure/tz-lookup": "^11.7.0",
-        "astro": "^7.3.3",
+        "astro": "^7.3.8",
         "shiki": "^4.4.3",
         "zdog": "^1.1.3"
     },
