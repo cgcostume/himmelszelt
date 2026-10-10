@@ -45,9 +45,8 @@ const moon = (x: number, y: number, r: number, w: number) => {
     const terminator = w > 0 ? towards : 1 - towards;
     return `<circle cx="${x}" cy="${y}" r="${r + 3}" class="cover"/><circle cx="${x}" cy="${y}" r="${r}" class="night"/><path d="M${x} ${y - r}A${r} ${r} 0 0 ${towards} ${x} ${y + r}A${Math.abs(w)} ${r} 0 0 ${terminator} ${x} ${y - r}Z" class="lit"/>`;
 };
-// A clock in place of the Sun, a little larger than the other current Suns: the hours as dots just inside the rim, the hands at
-// five past ten, the minute hand reaching the rim. The rim runs from just past the minute hand once around
-// and ends in an arrow just short of it: time going round. The path keeps clear.
+// A clock in place of the Sun, as large as the other current Suns: the hours as dots just inside the rim, the hands at
+// five past ten, the minute hand reaching the rim, which runs from just past it once around and ends just short of it.
 const polar = (deg: number, r: number) =>
     `${(Math.sin((deg * Math.PI) / 180) * r).toFixed(2)} ${(-Math.cos((deg * Math.PI) / 180) * r).toFixed(2)}`;
 // The current Sun's radius in pixels, as .sky-sun.current in global.css draws it; every scene is sized by it.
@@ -55,23 +54,16 @@ const SUN = 7;
 const CLOCK = SUN;
 const MINUTE = 30;
 const HOUR = -57.5;
-// No dot where a hand lies over it, nor at eleven and twelve, where the arrow ends.
+// No dot where a hand lies over it.
 const marks = Array.from({ length: 12 }, (_, i) => i * 30)
-    .filter((deg) => deg !== 0 && deg !== 330 && [MINUTE, HOUR + 360].every((hand) => Math.abs(deg - hand) > 10))
+    .filter((deg) => [MINUTE, HOUR + 360].every((hand) => Math.abs(deg - hand) > 10))
     .map((deg) => {
         const [x, y] = polar(deg, CLOCK - 1.7).split(" ");
         return `<circle cx="${x}" cy="${y}" r="0.4" class="mark"/>`;
     });
 const [rimFrom, rimTo] = [MINUTE + 30, MINUTE + 330];
-// The arrow's two barbs, back along the rim from its tip and to either side of it.
-const tip = (rimTo * Math.PI) / 180;
-const barb = (side: number) => {
-    const [x, y] = [Math.sin(tip) * CLOCK, -Math.cos(tip) * CLOCK];
-    const [bx, by] = [x - Math.cos(tip) * 2.8 + Math.sin(tip) * side, y - Math.sin(tip) * 2.8 - Math.cos(tip) * side];
-    return `${bx.toFixed(2)} ${by.toFixed(2)}`;
-};
-const clock = `<circle r="${CLOCK + 1}" class="face"/><path d="M${polar(rimFrom, CLOCK)}A${CLOCK} ${CLOCK} 0 1 1 ${polar(rimTo, CLOCK)}" class="rim"/><path d="M${barb(2.1)}L${polar(rimTo, CLOCK)}L${barb(-2.1)}Z" class="tip"/>${marks.join("")}<path d="M${polar(MINUTE, CLOCK)}L0 0L${polar(HOUR, CLOCK * 0.65)}" class="hands"/>`;
-// The figures' Sun symbol, shrunk to the size of the other current Suns (5 px across the radius): its rays and their dot
+const clock = `<circle r="${CLOCK}" class="face"/><path d="M${polar(rimFrom, CLOCK)}A${CLOCK} ${CLOCK} 0 1 1 ${polar(rimTo, CLOCK)}" class="rim"/>${marks.join("")}<path d="M${polar(MINUTE, CLOCK)}L0 0L${polar(HOUR, CLOCK * 0.65)}" class="hands"/>`;
+// The figures' Sun symbol, shrunk to the size of the other current Suns: its rays and their dot
 // spacing scaled alike, so each ray still shows two dots.
 const SHRINK = SUN / SUN_SYMBOL.radius;
 const symbol = `<circle r="${SUN}" class="sun"/><path d="${sunRays()
@@ -99,10 +91,10 @@ function observer() {
     return `<path d="${sight}" class="dots"/><path d="${figure}" class="figure"/><circle cx="${head.x.toFixed(2)}" cy="${head.y.toFixed(2)}" r="${1.4 * k}" class="figure"/>`;
 }
 // Drawn behind the Suns, so their rings cut gaps into the lines as into the path; only what covers the Sun goes in
-// front: the clock, the Sun symbol and the Sun's stippled outline with its center in its place, the eclipse's Moon, and the approximate Sun as a dashed outline a
-// little off the precise one.
+// front: in its place the clock, the Sun symbol, or its stippled outline around its center; the eclipse's Moon; and the
+// approximate Sun as a dashed outline a little off the precise one.
 const OVER: Record<string, string> = {
-    grid: `<circle r="${SUN + 1.5}" class="cover"/><circle r="${SUN}" class="dashes"/><circle r="1" class="mark-bright"/>`,
+    grid: `<circle r="${SUN}" class="cover"/><circle r="${SUN}" class="dashes"/><circle r="1" class="mark-bright"/>`,
     eclipse: `<circle cx="${SUN * 0.28}" cy="${-SUN * 0.2}" r="${SUN * 0.92}" class="cover"/>`,
     clock,
     rays: symbol,
@@ -141,7 +133,7 @@ const ALONG: Record<string, { left?: string; right?: string }> = {
             const style = `--x: ${x.toFixed(4)}; --y: ${y.toFixed(4)}`;
             // Every other Sun leads to its section.
             return i === index ? (
-                <span class={`${cls}${scene === "grid" ? " outlined" : ""}`} style={style} aria-current="location" />
+                <span class={`${cls}${scene === "grid" || scene === "clock" ? " replaced" : ""}`} style={style} aria-current="location" />
             ) : (
                 <a class={cls} style={style} href={targets[i].href} aria-label={targets[i].title} />
             );

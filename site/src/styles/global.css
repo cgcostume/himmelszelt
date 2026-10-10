@@ -193,8 +193,15 @@ a.sky-sun:focus-visible::after {
     filter: var(--sun-glow);
 }
 /* Under a stippled outline the full glow reads as a second ring. */
-.sky-sun.current.outlined::after {
-    filter: var(--sun-glow-small);
+/* Where a scene draws its own Sun (the clock, the stippled outline), no disc lies under it whose edge could show past
+   it: only the gap's ring and a glow around the outside. */
+.sky-sun.current.replaced {
+    background: none;
+}
+.sky-sun.current.replaced::after {
+    background: none;
+    filter: none;
+    box-shadow: 0 0 4px 1px color-mix(in srgb, currentColor 40%, transparent);
 }
 a.sky-sun:focus-visible {
     outline: none;
@@ -237,16 +244,8 @@ a.sky-sun:focus-visible {
 .sky-scene .face {
     fill: var(--bg);
     stroke: none;
-    color: var(--text);
-    filter: var(--sun-glow);
 }
 .sky-scene .rim {
-    stroke: var(--text);
-    stroke-width: 1px;
-    stroke-linejoin: round;
-}
-.sky-scene .tip {
-    fill: var(--text);
     stroke: var(--text);
     stroke-width: 1px;
     stroke-linejoin: round;
@@ -275,7 +274,7 @@ a.sky-sun:focus-visible {
     stroke-linejoin: round;
 }
 .sky-scene .dashes {
-    stroke-dasharray: var(--line-dashes);
+    stroke-dasharray: 2 2;
 }
 .sky-scene .rays {
     stroke: var(--text);
@@ -323,8 +322,9 @@ a.sky-sun:focus-visible {
 }
 .sky-rule + h2 {
     margin-top: 0;
-    /* A jump to a section lands on its rule: the rule's height and the space below it, and the usual 1rem above. */
-    scroll-margin-top: calc(2.5rem + 2.5rem + 1rem);
+    /* A jump to a section lands on its rule: the rule's height and the space below it, and room above it for the
+       scenes reaching over its top. */
+    scroll-margin-top: calc(2.5rem + 2.5rem + 2.5rem);
 }
 /* The package scope is the same on every chapter: the name after it is what the page is about. */
 h1 .scope {
