@@ -1,4 +1,5 @@
 import * as precise from "@himmelszelt/sternzeit";
+import { find } from "../dom";
 import {
     drawSvg,
     EARTHSHINE_MAX,
@@ -9,28 +10,28 @@ import {
     toScreen,
     veiledHorizon,
     visibleRuns,
-} from "./figure.js";
-import { ephemerisDay, onChange, state } from "./state.js";
-import "./export.js";
+} from "./figure";
+import { ephemerisDay, onChange, state } from "./state";
+import "./export";
 
 const DEG = precise.DEG_TO_RAD;
 // The Moon's disc at perigee gets this radius in the 200 x 200 viewBox; smaller at any other distance.
 const PERIGEE_RADIUS = 72;
 const PERIGEE_KM = 356_500;
 const APOGEE_KM = 406_700;
-const radiusAt = (km) => Math.asin(precise.moon.MEAN_RADIUS_KM / km);
+const radiusAt = (km: number) => Math.asin(precise.moon.MEAN_RADIUS_KM / km);
 const UNITS_PER_RADIAN = PERIGEE_RADIUS / radiusAt(PERIGEE_KM);
 // Selenographic grid spacing, in degrees.
 const GRID_STEP = 30;
 const SUN_ARROW_GAP = 5;
 const SUN_ARROW_LENGTH = 14;
 
-const view = document.querySelector(".moon-view");
-const svgEl = view.querySelector(".moon-panel > svg");
-const lockButton = view.querySelector('[data-field="lockMoon"]');
+const view = find(".moon-view");
+const svgEl = find<SVGSVGElement>(".moon-panel > svg", view);
+const lockButton = find('[data-field="lockMoon"]', view);
 // Locked to the Moon: its north up rather than the zenith, and no horizon, so only the librations still move.
 let locked = false;
-const opticalButton = view.querySelector('[data-field="opticalLibration"]');
+const opticalButton = find('[data-field="opticalLibration"]', view);
 // Off leaves only the physical libration, the Moon's own wobble, well below a pixel here.
 let optical = true;
 
@@ -51,16 +52,16 @@ const OUTSIDE = PERIGEE_RADIUS + 3;
 const REACH = PERIGEE_RADIUS + SUN_ARROW_GAP + SUN_ARROW_LENGTH;
 const SIDE = REACH + 6;
 
-const f = (n) => n.toFixed(2);
+const f = (n: number) => n.toFixed(2);
 // A one-line readout, its name muted and its value in full, anchored at `x` by `anchor`.
-const readout = (x, y, name, value, anchor) =>
+const readout = (x: number, y: number, name: string, value: string, anchor: string) =>
     `<text x="${f(x)}" y="${f(y)}" dy="0.35em" class="figure-note figure-readout figure-anchor-${anchor}"><tspan class="figure-readout-name">${escapeText(name)}</tspan> ${escapeText(value)}</text>`;
-const polyline = (points, cls) =>
+const polyline = (points: (readonly [number, number])[], cls: string) =>
     `<polyline points="${points.map(([x, y]) => `${f(x)},${f(y)}`).join(" ")}" class="${cls}"/>`;
 
 function render() {
     const { jd } = state;
-    const width = svgEl.parentElement.clientWidth || 416;
+    const width = svgEl.parentElement?.clientWidth || 416;
     const besides = (width * BASE_UNITS_PER_PX) / 2 >= SIDE + READOUT_WIDTH_PX * BASE_UNITS_PER_PX;
     const unitsPerPx = Math.max(BASE_UNITS_PER_PX, (2 * (SIDE + 10)) / width);
     const line = READOUT_LINE_PX * unitsPerPx;
@@ -100,7 +101,7 @@ function render() {
     svg += `<circle r="${f(radius)}" class="moon-night" style="--earthshine: ${glow.toFixed(3)}"/>`;
 
     // The lit part: the half disc towards the Sun, closed by the terminator, an ellipse across it.
-    const lit = [];
+    const lit: [number, number][] = [];
     for (let i = 0; i <= 32; i++) {
         const a = Math.PI / 2 - (i / 32) * Math.PI;
         lit.push([Math.cos(a), Math.sin(a)]);
@@ -112,8 +113,8 @@ function render() {
     }
     const [lc, ls] = [Math.cos(limb), Math.sin(limb)];
     // Local frame: +x towards the bright limb. Screen: clockwise from up by `limb`, y down.
-    const litScreen = lit.map(([x, y]) => [(x * ls - y * lc) * radius, -(x * lc + y * ls) * radius]);
-    svg += polyline([...litScreen, litScreen[0]], "moon-day");
+    const litScreen = lit.map(([x, y]): [number, number] => [(x * ls - y * lc) * radius, -(x * lc + y * ls) * radius]);
+    svg += polyline([...litScreen, ...litScreen.slice(0, 1)], "moon-day");
 
     // The selenographic grid, only its near side.
     for (let lon = -180; lon < 180; lon += GRID_STEP) {
@@ -193,7 +194,7 @@ function render() {
     const shine = `${(earthshine * 100).toFixed(1)}% (Earth's phase ${(earthshine / EARTHSHINE_MAX).toFixed(2)})`;
     const parts = `axis ${axis.toFixed(1)}°, parallactic ${parallactic.toFixed(1)}°`;
     const tiltText = `${tiltDeg.toFixed(1)}° (${parts})`;
-    const stacked = [["size", `${(diameter * 60).toFixed(1)}′`]];
+    const stacked: [string, string][] = [["size", `${(diameter * 60).toFixed(1)}′`]];
     if (besides) {
         // Beside the disc, name over value, so they stay narrow.
         const half = line / 2;

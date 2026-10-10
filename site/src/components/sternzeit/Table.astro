@@ -1,6 +1,6 @@
 ---
 import { findEntry } from "../../lib/glossary";
-import { GLOSSARY_TERMS } from "./glossary-map.js";
+import { GLOSSARY_TERMS } from "./glossary-map";
 import "./sternzeit.css";
 
 interface Props {
@@ -14,5 +14,5 @@ for (const name of Object.values(GLOSSARY_TERMS)) findEntry(name);
 <div class="sternzeit-table" id={`table-${domain}`} data-table data-domain={domain}></div>
 
 <script>
-    import "./tables.js";
+    import "./tables";
 </script>

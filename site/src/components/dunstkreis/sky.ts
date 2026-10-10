@@ -1,3 +1,4 @@
+import type { SkyPass, SkyPassOptions } from "@himmelszelt/dunstkreis";
 import {
     apparentDirection,
     clampObserverHeight,
@@ -5,10 +6,11 @@ import {
     DEFAULT_AUTO_EXPOSURE_KEYS,
 } from "@himmelszelt/dunstkreis";
 import { fromJulianDay, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
-import { onDemand } from "../frame.js";
-import { paintRange } from "../range.js";
-import { COMPASS } from "../sternzeit/figure.js";
-import { onChange, state } from "../sternzeit/state.js";
+import { find } from "../dom";
+import { onDemand } from "../frame";
+import { paintRange } from "../range";
+import { COMPASS } from "../sternzeit/figure";
+import { onChange, state } from "../sternzeit/state";
 import {
     bindHdr,
     bindModelChoice,
@@ -16,6 +18,7 @@ import {
     configureCanvas,
     display,
     displayOutput,
+    gpuDevice,
     onDisplay,
     onTables,
     quality,
@@ -24,20 +27,24 @@ import {
     gpu as shared,
     skyViewChanged,
     tables,
-} from "./atmosphere.js";
+} from "./atmosphere";
 
 // The two libraries meet in one vector: sternzeit says where the Sun is, dunstkreis what the air does to its light.
 const DEG = Math.PI / 180;
-const root = document.querySelector("#sky");
-const field = (name) => root.querySelector(`[data-field="${name}"]`);
-const canvas = field("canvas");
+const root = find("#sky");
+const field = <T extends HTMLElement = HTMLElement>(name: string) => find<T>(`[data-field="${name}"]`, root);
+const canvas = field<HTMLCanvasElement>("canvas");
 const compass = field("compass");
-const pressed = (name) => field(name).getAttribute("aria-pressed") === "true";
+const pressed = (name: string) => field(name).getAttribute("aria-pressed") === "true";
+// Whether `settings` holds every value of `wanted`.
+const holds = (settings: object | null, wanted: object) =>
+    settings !== null &&
+    Object.entries(wanted).every(([key, value]) => (settings as Record<string, unknown>)[key] === value);
 
 // Camera in the observer's ENU frame, yaw a compass azimuth; locked to the sun until dragged.
 const camera = { yaw: 0, pitch: 10 * DEG, fov: 70 * DEG };
 
-function showError(html) {
+function showError(html: string) {
     const error = document.createElement("div");
     error.className = "sky-error";
     error.innerHTML = `<p>${html}</p>`;
@@ -49,27 +56,30 @@ function setup() {
         showError(shared.error);
         return null;
     }
-    const { device, adapterName } = shared;
     const context = canvas.getContext("webgpu");
+    if (!context) return null;
     configureCanvas(context, SDR);
-    return { device, context, format: SDR, adapterName };
+    return { device: gpuDevice(), context, format: SDR, adapterName: shared.adapterName };
 }
 
 // Zooming out past 100 degrees bends the perspective into a stereographic fisheye, complete at the widest view of
 // 200 degrees: the projection's d (see dunstkreis' projectionDistance). Looking up, the whole sky then shows as a disc,
 // with ten degrees below the horizon to spare at the top and bottom edges.
 const MAX_FOV = 200 * DEG;
-const projectionDistance = (fov) => Math.min(1, Math.max(0, (fov - 100 * DEG) / (MAX_FOV - 100 * DEG)));
+const projectionDistance = (fov: number) => Math.min(1, Math.max(0, (fov - 100 * DEG) / (MAX_FOV - 100 * DEG)));
 
 /** The image plane radius at `theta` from the axis, for the projection's d: (d + 1) sin(theta) / (d + cos(theta)). */
-const imageRadius = (theta, d) => ((d + 1) * Math.sin(theta)) / (d + Math.cos(theta));
+const imageRadius = (theta: number, d: number) => ((d + 1) * Math.sin(theta)) / (d + Math.cos(theta));
 
 /** The camera's forward, right and up vectors, the image plane's half extents and the projection's d. */
-function cameraBasis(aspect) {
+type Vec3 = [number, number, number];
+type Basis = ReturnType<typeof cameraBasis>;
+
+function cameraBasis(aspect: number) {
     const { yaw, pitch, fov } = camera;
-    const f = [Math.cos(pitch) * Math.sin(yaw), Math.cos(pitch) * Math.cos(yaw), Math.sin(pitch)];
-    const r = [Math.cos(yaw), -Math.sin(yaw), 0];
-    const u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+    const f: Vec3 = [Math.cos(pitch) * Math.sin(yaw), Math.cos(pitch) * Math.cos(yaw), Math.sin(pitch)];
+    const r: Vec3 = [Math.cos(yaw), -Math.sin(yaw), 0];
+    const u: Vec3 = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
     const d = projectionDistance(fov);
     const ty = imageRadius(fov / 2, d);
     return { f, r, u, tx: ty * aspect, ty, d };
@@ -80,11 +90,11 @@ function cameraBasis(aspect) {
  * an infinite far plane, the near plane at 1, without translation. A clip-space point (x, y) maps to the direction
  * forward + x·tx·right + y·ty·up. Column major, like WGSL.
  */
-function inverseViewProjection({ f, r, u, tx, ty }) {
+function inverseViewProjection({ f, r, u, tx, ty }: Basis) {
     return new Float32Array([...r.map((c) => c * tx), 0, ...u.map((c) => c * ty), 0, 0, 0, 0, 1, ...f, 0]);
 }
 
-const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const dot = (a: readonly number[], b: readonly number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
 // The eight compass directions as labels standing on the horizon, placed by the same projection the sky uses.
 const labels = COMPASS.map((name) =>
@@ -93,10 +103,10 @@ const labels = COMPASS.map((name) =>
 
 /** Where `direction` shows in the view, in pixels from the top left, by the same projection the shader inverts: the
  *  angle from the axis to the image plane radius. Null behind the camera. */
-function project(direction, basis, width, height) {
+function project(direction: Vec3, basis: Basis, width: number, height: number) {
     const cosTheta = dot(direction, basis.f);
     if (basis.d + cosTheta <= 1e-3 || (basis.d === 0 && cosTheta <= 0)) return null;
-    const inPlane = [0, 1, 2].map((c) => direction[c] - basis.f[c] * cosTheta);
+    const inPlane = direction.map((c, i) => c - basis.f[i] * cosTheta);
     const sinTheta = Math.hypot(...inPlane);
     const scale = sinTheta > 1e-9 ? imageRadius(Math.atan2(sinTheta, cosTheta), basis.d) / sinTheta : 1;
     const x = (dot(inPlane, basis.r) * scale) / basis.tx;
@@ -104,28 +114,30 @@ function project(direction, basis, width, height) {
     return { x: ((x + 1) / 2) * width, y: ((1 - y) / 2) * height };
 }
 
-function placeCompass(basis, width, height) {
+function placeCompass(basis: Basis, width: number, height: number) {
     compass.hidden = !pressed("grid");
     labels.forEach((label, i) => {
         const at = project([Math.sin(i * 45 * DEG), Math.cos(i * 45 * DEG), 0], basis, width, height);
         label.hidden = at === null;
-        if (label.hidden) return;
+        if (at === null) return;
         label.style.left = `${at.x}px`;
         label.style.top = `${at.y}px`;
     });
 }
 
 const gpu = setup();
-let pass = null;
-let passFor = {};
+let pass: SkyPass | null = null;
+let passFor: Partial<SkyPassOptions> = {};
+// The pass the environment was last told of.
+let notified: SkyPass | null = null;
 let skyViewFor = "";
 // The settings of the pass being compiled, which takes its place once it is in.
-let building = null;
+let building: SkyPassOptions | null = null;
 const requestRender = onDemand(render);
 
 /** Makes the pass for `settings` without blocking; the last one asked for takes over, and the old tables go with it. */
-function buildPass(settings) {
-    if (building && Object.entries(settings).every(([key, value]) => building[key] === value)) return;
+function buildPass(settings: SkyPassOptions) {
+    if (!gpu || holds(building, settings)) return;
     building = settings;
     const { luts, ...features } = settings;
     createSkyPass(gpu.device, { luts, ...features }).then((next) => {
@@ -144,9 +156,10 @@ function buildPass(settings) {
 }
 
 // Where the time goes, shown with the grid: the astronomy, the sky pass' own CPU work, and when the GPU was done.
-function showTiming(astronomyMs, skyMs, submitted) {
-    const text = (doneMs) =>
-        `${gpu.adapterName} · precompute ${tables().precomputeMs.toFixed(1)} ms · astronomy ${astronomyMs.toFixed(2)} ms · ` +
+function showTiming(astronomyMs: number, skyMs: number, submitted: number) {
+    if (!gpu) return;
+    const text = (doneMs: number) =>
+        `${gpu.adapterName} · precompute ${tables()?.precomputeMs.toFixed(1)} ms · astronomy ${astronomyMs.toFixed(2)} ms · ` +
         `sky ${skyMs.toFixed(2)} ms · GPU done after ${doneMs.toFixed(2)} ms`;
     gpu.device.queue.onSubmittedWorkDone().then(() => {
         field("timing").textContent = pressed("grid") ? text(performance.now() - submitted) : "";
@@ -154,6 +167,8 @@ function showTiming(astronomyMs, skyMs, submitted) {
 }
 
 function render() {
+    const table = tables();
+    if (!gpu || !table) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const width = Math.max(1, Math.round(canvas.clientWidth * dpr));
     const height = Math.max(1, Math.round(canvas.clientHeight * dpr));
@@ -170,9 +185,8 @@ function render() {
     const { format, headroom } = displayOutput();
     // Half floats need no dither: their steps are far finer than 8 bits'.
     const dither = pressed("dither") && format === SDR;
-    field("dither").disabled = format !== SDR;
+    field<HTMLButtonElement>("dither").disabled = format !== SDR;
     const autoExposure = pressed("auto");
-    const table = tables();
     // Where the sun shows, lifted by the same air the sky is traced through.
     const [x, y, z] = apparentDirection(sunDirection, table.luts.model, clampObserverHeight(state.heightM));
     field("sun").textContent =
@@ -184,7 +198,7 @@ function render() {
     }
     const skyStarted = performance.now();
     const { toneCurve: toneMap } = display;
-    const settings = {
+    const settings: SkyPassOptions = {
         luts: table.luts,
         debugGrid,
         groundLight: quality.groundLight,
@@ -194,7 +208,7 @@ function render() {
         format,
         headroom,
     };
-    if (Object.entries(settings).some(([key, value]) => passFor[key] !== value)) {
+    if (!pass || !holds(passFor, settings)) {
         // Shown once it is compiled; until then the canvas keeps the last frame.
         buildPass(settings);
         return;
@@ -217,9 +231,9 @@ function render() {
     gpu.device.queue.submit([encoder.finish()]);
     const submitted = performance.now();
     const skyViewKey = `${state.jd},${state.latitude},${state.longitude},${state.heightM}`;
-    if (skyViewKey !== skyViewFor || pass !== passFor.notified) {
+    if (skyViewKey !== skyViewFor || pass !== notified) {
         skyViewFor = skyViewKey;
-        passFor.notified = pass;
+        notified = pass;
         const observerHeightM = clampObserverHeight(state.heightM);
         skyViewChanged({ pass, sunDirection, apparentSun: [x, y, z], sunAngularDiameter, observerHeightM });
     }
@@ -228,17 +242,17 @@ function render() {
 }
 
 // The slider runs brighter to the right, so it holds minus the EV100: a lower EV lets in more light.
-const evOfSlider = () => -Number(field("exposure").value);
+const evOfSlider = () => -Number(field<HTMLInputElement>("exposure").value);
 
 // Metered, the slider follows the light meter and waits; by hand, it sets the exposure.
 function showExposure() {
-    const slider = field("exposure");
+    const slider = field<HTMLInputElement>("exposure");
     slider.disabled = pressed("auto");
     if (!pressed("auto")) {
         field("ev").textContent = evOfSlider().toFixed(1);
         return;
     }
-    pass.meteredEV100().then((ev100) => {
+    pass?.meteredEV100().then((ev100) => {
         slider.value = String(-ev100);
         paintRange(slider);
         field("ev").textContent = `${ev100.toFixed(1)} metered`;
@@ -246,9 +260,9 @@ function showExposure() {
 }
 
 if (gpu) {
-    bindToneCurveChoice(root.querySelectorAll('input[name="sky-tone"]'));
-    bindModelChoice(root.querySelectorAll('input[name="sky-model"]'));
-    bindHdr(root.querySelector('[data-hdr="note"]'), root.querySelector('[data-hdr="choice"]'));
+    bindToneCurveChoice(root.querySelectorAll<HTMLInputElement>('input[name="sky-tone"]'));
+    bindModelChoice(root.querySelectorAll<HTMLInputElement>('input[name="sky-model"]'));
+    bindHdr(find('[data-hdr="note"]', root), find('[data-hdr="choice"]', root));
     onDisplay(requestRender);
     onChange(requestRender);
     onTables(() => {
@@ -273,7 +287,7 @@ if (gpu) {
     canvas.addEventListener("pointerdown", (event) => {
         canvas.setPointerCapture(event.pointerId);
         const start = { x: event.clientX, y: event.clientY, yaw: camera.yaw, pitch: camera.pitch };
-        const move = (e) => {
+        const move = (e: PointerEvent) => {
             field("lock").setAttribute("aria-pressed", "false");
             // A pixel of drag turns the view by a pixel's worth of the field of view, so the sky follows the pointer.
             const perPixel = Math.min(camera.fov, Math.PI) / canvas.clientHeight;

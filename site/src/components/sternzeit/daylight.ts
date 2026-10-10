@@ -1,10 +1,11 @@
 import * as precise from "@himmelszelt/sternzeit";
 import * as approx from "@himmelszelt/sternzeit/approx";
-import { onDemand } from "../frame.js";
-import { drawSvg, LABEL_GAP, STRIP_MARGIN, stripMoment, svgText } from "./figure.js";
-import { onChange, state, update } from "./state.js";
-import { clockOffsetMs, DAY_MS, wallDayOf } from "./zone.js";
-import "./export.js";
+import { find } from "../dom";
+import { onDemand } from "../frame";
+import { drawSvg, LABEL_GAP, STRIP_MARGIN, stripMoment, svgText } from "./figure";
+import { onChange, state, update } from "./state";
+import { clockOffsetMs, DAY_MS, wallDayOf } from "./zone";
+import "./export";
 
 // Ten-minute rows: a pixel or so each at the strip's height. The approximate Sun is a few thousandths of a degree off,
 // far below that, and some fifty thousand positions a year are then quick.
@@ -13,7 +14,7 @@ const ROWS = (24 * 60) / STEP_MINUTES;
 const MINUTE_MS = 60_000;
 // The bands by the Sun's altitude, from the top: day, the golden hour (-4 to 6 degrees, as photographers count it),
 // the blue hour (-6 to -4), then the three twilights; below -18 degrees it is night, the page's own background.
-const BANDS = [
+const BANDS: [threshold: number, cls: string][] = [
     [6, "daylight-day"],
     [-4, "daylight-golden"],
     [-6, "daylight-blue"],
@@ -25,16 +26,18 @@ const SUNRISE = -0.833;
 const MARGIN = { ...STRIP_MARGIN, right: 1 };
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-const svgEl = document.querySelector(".daylight-panel > svg");
-const f = (n) => n.toFixed(1);
+const svgEl = find<SVGSVGElement>(".daylight-panel > svg");
+const f = (n: number) => n.toFixed(1);
 
 // Where the Sun is at or above a threshold on a day, in rows from its midnight, around its highest sample: the
 // crossings interpolated between samples, read as a circle (a day later the sky is nearly the same), so a span may
 // run past either midnight; a day it stays below is a span of nothing at noon.
-function span(altitudes, peak, threshold) {
-    if (altitudes[peak] < threshold) return [peak + 0.5, peak + 0.5];
-    const at = (i) => altitudes[(i + ROWS) % ROWS];
-    const edge = (direction) => {
+type Span = [start: number, end: number];
+
+function span(altitudes: number[], peak: number, threshold: number): Span {
+    const at = (i: number) => altitudes[(i + ROWS) % ROWS] ?? Number.NaN;
+    if (at(peak) < threshold) return [peak + 0.5, peak + 0.5];
+    const edge = (direction: number) => {
         for (let k = 1; k <= ROWS / 2; k++) {
             const [inside, outside] = [at(peak + direction * (k - 1)), at(peak + direction * k)];
             if (outside < threshold)
@@ -48,18 +51,20 @@ function span(altitudes, peak, threshold) {
 
 // The year's bands, a span of rows per day and band; recomputed only when the year, the place or the clock changes.
 let key = "";
-let year = null;
+type Day = { dayMs: number; offset: number; spans: Span[]; sun: Span };
+type Year = { shownYear: number; first: number; days: Day[] };
+let year: Year | null = null;
 
-function computeYear() {
+function computeYear(): Year {
     const wallDay = wallDayOf(precise.dateFromJulianDay(state.jd).getTime());
     const shownYear = new Date(wallDay * DAY_MS).getUTCFullYear();
     const next = [shownYear, state.latitude, state.longitude, state.heightM, state.timeZone].join();
-    if (next === key) return;
+    if (next === key && year) return year;
     key = next;
     const first = Date.UTC(shownYear, 0, 1) / DAY_MS;
     const count = Date.UTC(shownYear + 1, 0, 1) / DAY_MS - first;
     const observer = { latitude: state.latitude, longitude: state.longitude, heightM: state.heightM };
-    const days = [];
+    const days: Day[] = [];
     for (let d = 0; d < count; d++) {
         const dayMs = (first + d) * DAY_MS;
         // The clock's offset at noon: it changes at night, so the day switching to or from summer time is off by an
@@ -81,9 +86,10 @@ function computeYear() {
         });
     }
     year = { shownYear, first, days };
+    return year;
 }
 
-function layout() {
+function layout(year: Year) {
     const [width, height] = [svgEl.clientWidth || 600, svgEl.clientHeight || 140];
     // The hours flush with the text's left edge, the plot after them: two monospace digits, some 0.6 em each, and the gap.
     const left = 1.2 * parseFloat(getComputedStyle(svgEl).fontSize) + LABEL_GAP;
@@ -94,8 +100,8 @@ function layout() {
 }
 
 function render() {
-    computeYear();
-    const { width, height, plot, column, rowHeight } = layout();
+    const year = computeYear();
+    const { width, height, plot, column, rowHeight } = layout(year);
     svgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
 
     let svg = `<rect x="${plot.left}" y="${plot.top}" width="${plot.right - plot.left}" height="${plot.bottom - plot.top}" class="daylight-night"/>`;
@@ -103,31 +109,32 @@ function render() {
     // shows on the other edge too, so each is drawn a day earlier and later as well, clipped to the plot.
     svg += `<clipPath id="daylight-clip"><rect x="${plot.left}" y="${plot.top}" width="${plot.right - plot.left}" height="${plot.bottom - plot.top}"/></clipPath><g clip-path="url(#daylight-clip)">`;
     const xs = year.days.map((_, d) => plot.left + (d + 0.5) * column);
-    [xs[0], xs[xs.length - 1]] = [plot.left, plot.right];
+    xs[0] = plot.left;
+    xs[xs.length - 1] = plot.right;
     for (let b = BANDS.length - 1; b >= 0; b--) {
         for (const shift of [-ROWS, 0, ROWS]) {
             // Where the clock jumps to or from summer time, the edge steps straight up or down between the two days.
-            const edge = (i) =>
+            const edge = (i: 0 | 1) =>
                 year.days.flatMap(({ spans, offset }, d) => {
-                    const y = (span) => f(plot.top + (span[b][i] + shift) * rowHeight);
-                    const point = `${f(xs[d])},${y(spans)}`;
+                    const y = (spans: Span[]) => f(plot.top + ((spans[b]?.[i] ?? 0) + shift) * rowHeight);
+                    const point = `${f(xs[d] ?? 0)},${y(spans)}`;
                     const before = year.days[d - 1];
                     if (!before || before.offset === offset) return [point];
                     const x = f(plot.left + d * column);
                     return [`${x},${y(before.spans)}`, `${x},${y(spans)}`, point];
                 });
-            svg += `<polygon points="${[...edge(0), ...edge(1).reverse()].join(" ")}" class="${BANDS[b][1]}"/>`;
+            svg += `<polygon points="${[...edge(0), ...edge(1).reverse()].join(" ")}" class="${BANDS[b]?.[1]}"/>`;
         }
     }
     // Sunrise and sunset as two lines, broken off on the days the Sun never rises or never sets, and where the clock
     // jumps to or from summer time.
     for (const shift of [-ROWS, 0, ROWS]) {
-        for (const i of [0, 1]) {
+        for (const i of [0, 1] as const) {
             let [d, pen] = ["", "M"];
             year.days.forEach(({ sun, offset }, day) => {
                 const rises = sun[1] - sun[0] > 0 && sun[1] - sun[0] < ROWS;
-                if (day > 0 && offset !== year.days[day - 1].offset) pen = "M";
-                if (rises) d += `${pen}${f(xs[day])},${f(plot.top + (sun[i] + shift) * rowHeight)}`;
+                if (day > 0 && offset !== year.days[day - 1]?.offset) pen = "M";
+                if (rises) d += `${pen}${f(xs[day] ?? 0)},${f(plot.top + (sun[i] + shift) * rowHeight)}`;
                 pen = rises ? "L" : "M";
             });
             if (d) svg += `<path d="${d}" class="daylight-sunrise"/>`;
@@ -171,12 +178,13 @@ function render() {
 // A click moves the moment to that day and time of day on the clock.
 svgEl.addEventListener("click", (event) => {
     if (!year) return;
-    const { plot, column } = layout();
+    const { plot, column } = layout(year);
     const box = svgEl.getBoundingClientRect();
     const [px, py] = [event.clientX - box.left, event.clientY - box.top];
     if (px < plot.left || px > plot.right || py < plot.top || py > plot.bottom) return;
     const day = year.days[Math.min(year.days.length - 1, Math.floor((px - plot.left) / column))];
     const minutes = Math.round(((py - plot.top) / (plot.bottom - plot.top)) * 24 * 60);
+    if (!day) return;
     const ms = day.dayMs + minutes * MINUTE_MS - day.offset;
     update({ jd: Number(precise.julianDayFromDate(new Date(ms)).toFixed(7)), live: false, animate: false });
 });

@@ -1,8 +1,9 @@
 import * as precise from "@himmelszelt/sternzeit";
-import { drawSvg, svgText, veiledHorizon } from "./figure.js";
-import { arrowAround, offPanelArrowSvg } from "./offpanel.js";
-import { ephemerisDay, onChange, state, update } from "./state.js";
-import "./export.js";
+import { find } from "../dom";
+import { drawSvg, svgText, veiledHorizon } from "./figure";
+import { arrowAround, offPanelArrowSvg } from "./offpanel";
+import { ephemerisDay, onChange, state, update } from "./state";
+import "./export";
 
 // Both panels share a 200 x 200 viewBox centered on the origin: the Sun, or the axis of Earth's shadow, sits in the middle.
 const HALF = 100;
@@ -36,16 +37,17 @@ function corona() {
         <mask id="corona-mask-${id}"><rect x="${f(x)}" y="${f(y)}" width="${f(size)}" height="${f(size)}" fill="url(#corona-fade-${id})"/></mask>
         <image href="${CORONA_IMAGE}" x="${f(x)}" y="${f(y)}" width="${f(size)}" height="${f(size)}" mask="url(#corona-mask-${id})" class="eclipse-corona"/>`;
 }
-const f = (n) => n.toFixed(2);
-const circle = (x, y, r, cls, extra = "") => `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}" class="${cls}" ${extra}/>`;
+const f = (n: number) => n.toFixed(2);
+const circle = (x: number, y: number, r: number, cls: string, extra = "") =>
+    `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}" class="${cls}" ${extra}/>`;
 
 /** The Moon outside the panel: an arrow towards it on a circle around the center, half the panel across by default. */
-function offPanelMoon(dx, dy, radius = HALF / 2) {
+function offPanelMoon(dx: number, dy: number, radius = HALF / 2) {
     // Along the direction from the panel's center (the Sun, or the shadow's axis) to the Moon.
     return offPanelArrowSvg(arrowAround({ x: 0, y: 0 }, { x: dx, y: dy }, radius, unitsPerPx), false);
 }
 
-function renderSolar(jd) {
+function renderSolar(jd: number) {
     const time = precise.fromJulianDay(jd);
     const eclipse = precise.eclipse.solar(time, state);
     const sunAltitude = precise.sun.horizontalPosition(time, state).altitude;
@@ -78,7 +80,7 @@ function renderSolar(jd) {
     svg += veiledHorizon(horizon, HALF, unitsPerPx);
     if (!onPanel) svg += offPanelMoon(mx, my);
 
-    let status;
+    let status: string;
     if (eclipse.separation <= inner) status = total ? "total, only the corona is left" : "annular";
     else if (eclipse.separation < outer) {
         const covered = (outer - eclipse.separation) / (2 * sunRadiusDeg);
@@ -87,7 +89,7 @@ function renderSolar(jd) {
     return { svg, status };
 }
 
-function renderLunar(jd) {
+function renderLunar(jd: number) {
     const eclipse = precise.eclipse.lunar(ephemerisDay(jd));
     const moonRadius = precise.moon.MEAN_RADIUS_KM / KM_PER_UNIT;
     const umbra = eclipse.umbraRadiusKm / KM_PER_UNIT;
@@ -128,7 +130,7 @@ function renderLunar(jd) {
 
     const km = eclipse.axisOffsetKm;
     const moonKm = precise.moon.MEAN_RADIUS_KM;
-    let status;
+    let status: string;
     if (km + moonKm <= eclipse.umbraRadiusKm) status = "total, the Moon is entirely inside the umbra";
     else if (km - moonKm < eclipse.umbraRadiusKm) {
         const inside = (eclipse.umbraRadiusKm + moonKm - km) / (2 * moonKm);
@@ -147,15 +149,15 @@ function renderLunar(jd) {
 }
 
 const RENDERERS = { solar: renderSolar, lunar: renderLunar };
-const views = document.querySelectorAll(".eclipse-view[data-kind]");
+const views = document.querySelectorAll<HTMLElement>(".eclipse-view[data-kind]");
 
 function render() {
     for (const view of views) {
-        const panel = view.querySelector(".eclipse-panel > svg");
+        const panel = find<SVGSVGElement>(".eclipse-panel > svg", view);
         unitsPerPx = (2 * HALF) / (panel.clientWidth || 2 * HALF);
-        const { svg, status } = RENDERERS[view.dataset.kind](state.jd);
+        const { svg, status } = RENDERERS[view.dataset.kind as keyof typeof RENDERERS](state.jd);
         drawSvg(panel, svg, unitsPerPx);
-        view.querySelector('[data-field="status"]').textContent = status;
+        find('[data-field="status"]', view).textContent = status;
     }
 }
 
@@ -173,17 +175,17 @@ const FINE_STEP = 1 / 1440;
 // degree wide, and parallax moves the Moon by up to another degree.
 const SOLAR_REACH_DEG = 2.5;
 
-const timeOf = (jd) => precise.fromJulianDay(jd);
+const timeOf = (jd: number) => precise.fromJulianDay(jd);
 
 /** How far the Moon is from what would eclipse it, as seen from Earth's center. */
-function geocentricDistance(jd, lunar) {
+function geocentricDistance(jd: number, lunar: boolean) {
     if (lunar) return precise.eclipse.lunar(ephemerisDay(jd)).axisOffsetKm;
     const [m, s] = [precise.moon.apparentPosition(ephemerisDay(jd)), precise.sun.apparentPosition(ephemerisDay(jd))];
     return precise.angularSeparation(m.rightAscension, m.declination, s.rightAscension, s.declination);
 }
 
 /** Whether `jd` is close enough to be worth walking minute by minute. */
-function mayEclipse(jd, lunar) {
+function mayEclipse(jd: number, lunar: boolean) {
     if (!lunar) return geocentricDistance(jd, false) < SOLAR_REACH_DEG;
     const shadow = precise.eclipse.lunar(ephemerisDay(jd));
     return shadow.axisOffsetKm < 2 * shadow.penumbraRadiusKm;
@@ -193,7 +195,7 @@ function mayEclipse(jd, lunar) {
  * How far the Moon is from the Sun in this place's own sky, or null while the Sun is down: an eclipse no one here
  * can see is not one to jump to, and skipping the night is what makes the search quick.
  */
-function separationHere(jd) {
+function separationHere(jd: number) {
     const time = timeOf(jd);
     const s = precise.sun.horizontalPosition(time, state);
     if (s.altitude <= 0) return null;
@@ -202,9 +204,11 @@ function separationHere(jd) {
 }
 
 /** The deepest moment within `window` of `middle`, walked coarsely and then refined, or null if there is none. */
-function deepest(middle, lunar) {
-    const distance = lunar ? (jd) => precise.eclipse.lunar(ephemerisDay(jd)).axisOffsetKm : separationHere;
-    let best = null;
+function deepest(middle: number, lunar: boolean) {
+    const distance = lunar
+        ? (jd: number): number | null => precise.eclipse.lunar(ephemerisDay(jd)).axisOffsetKm
+        : separationHere;
+    let best: { jd: number; value: number } | null = null;
     for (let jd = middle - CANDIDATE_WINDOW; jd <= middle + CANDIDATE_WINDOW; jd += COARSE_STEP) {
         const value = distance(jd);
         if (value !== null && (!best || value < best.value)) best = { jd, value };
@@ -226,7 +230,7 @@ function deepest(middle, lunar) {
  * in a few calls unless the two bodies really do come close. Penumbral lunar eclipses are left out, there is nothing
  * to see in them, and solar ones are answered for the chosen place, which is why they are rarer than the almanac's.
  */
-function nearestEclipse(from, direction, lunar) {
+function nearestEclipse(from: number, direction: number, lunar: boolean) {
     const { MEAN_NEW_MOON, MEAN_SYNODIC_MONTH } = precise.moon;
     const offset = lunar ? 0.5 : 0;
     const k0 = (from - MEAN_NEW_MOON) / MEAN_SYNODIC_MONTH - offset;
@@ -245,10 +249,10 @@ function nearestEclipse(from, direction, lunar) {
     return null;
 }
 
-for (const button of document.querySelectorAll(".eclipse-view [data-jump]")) {
+for (const button of document.querySelectorAll<HTMLElement>(".eclipse-view [data-jump]")) {
     button.addEventListener("click", () => {
-        const view = button.closest(".eclipse-view");
-        const status = view.querySelector('[data-field="status"]');
+        const view = button.closest(".eclipse-view") ?? document;
+        const status = find('[data-field="status"]', view);
         const jd = nearestEclipse(state.jd, Number(button.dataset.step), button.dataset.jump === "lunar");
         if (jd === null) status.textContent = `none within ${SEARCH_YEARS} years of this moment`;
         else update({ jd, live: false, animate: false });
@@ -257,5 +261,6 @@ for (const button of document.querySelectorAll(".eclipse-view [data-jump]")) {
 
 onChange(render);
 // The arrows are sized in screen pixels, so a resized panel redraws them.
-new ResizeObserver(render).observe(views[0]);
+const [first] = views;
+if (first) new ResizeObserver(render).observe(first);
 render();

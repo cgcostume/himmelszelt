@@ -11,16 +11,20 @@ export const state = {
     heightM: 1,
     live: false,
     animate: false,
-    timeZone: "yours",
+    timeZone: "yours" as TimeZoneChoice,
 };
+
+/** Whose clock the page reads: the viewer's, the place's civil zone, or the place's local mean time. */
+export type TimeZoneChoice = "yours" | "local" | "mean";
+export type State = typeof state;
 
 const changes = new EventTarget();
 
 // The moment and place are kept in the browser, so the page opens where it was left, on any chapter. Only a
 // convenience: without storage, e.g. in a private window, it opens at the defaults.
 const STORAGE_KEY = "sternwarte:momentAndPlace";
-const STORED = ["jd", "latitude", "longitude", "heightM", "live", "timeZone"];
-let saveTimer = null;
+const STORED: (keyof State)[] = ["jd", "latitude", "longitude", "heightM", "live", "timeZone"];
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
 function save() {
     clearTimeout(saveTimer);
@@ -47,7 +51,7 @@ function restore() {
                     : key === "timeZone"
                       ? value === "local"
                       : Number.isFinite(value);
-            if (valid) state[key] = value;
+            if (valid) Object.assign(state, { [key]: value });
         }
         state.heightM = Math.min(Math.max(state.heightM, 1), 408_000);
         placeOnEarth();
@@ -61,15 +65,15 @@ function placeOnEarth() {
 }
 
 /** Applies `patch` and notifies every listener; `source` is the controls element the change came from, if any. */
-export function update(patch, source = null) {
+export function update(patch: Partial<State>, source: Element | null = null) {
     Object.assign(state, patch);
     placeOnEarth();
     save();
     changes.dispatchEvent(new CustomEvent("change", { detail: source }));
 }
 
-export function onChange(listener) {
-    changes.addEventListener("change", (event) => listener(event.detail));
+export function onChange(listener: (source: Element | null) => void) {
+    changes.addEventListener("change", (event) => listener((event as CustomEvent<Element | null>).detail));
 }
 
 /** Seconds, the finest step any control offers; "now" and stepping snap to it. */
@@ -86,4 +90,4 @@ restore();
 if (state.live) state.jd = julianDayNow();
 
 /** The page's moments are UT; the orbits take ephemeris time, a minute or so ahead today (see deltaT). */
-export const ephemerisDay = (jd) => julianEphemerisDay(jd);
+export const ephemerisDay = (jd: number) => julianEphemerisDay(jd);

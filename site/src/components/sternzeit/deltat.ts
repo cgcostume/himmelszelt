@@ -1,8 +1,9 @@
 import * as precise from "@himmelszelt/sternzeit";
-import { onDemand } from "../frame.js";
-import { drawSvg, LABEL_GAP as GAP, STRIP_MARGIN as MARGIN, stripMoment, svgText } from "./figure.js";
-import { onChange, state } from "./state.js";
-import "./export.js";
+import { find } from "../dom";
+import { onDemand } from "../frame";
+import { drawSvg, LABEL_GAP as GAP, STRIP_MARGIN as MARGIN, stripMoment, svgText } from "./figure";
+import { onChange, state } from "./state";
+import "./export";
 
 // Far back on the long-term parabola of Espenak and Meeus, beyond their canon's −2000, to the end of their polynomials,
 // and where the measurements take over from them.
@@ -14,7 +15,7 @@ const YEAR_STEP = 2;
 const SCALE_MIN = -60;
 const SCALE_MAX = 36_000;
 // The ticks, minor ones (those in between the units) dimmed.
-const TICKS = [
+const TICKS: [seconds: number, label: string, minor?: boolean][] = [
     [-10, "\u221210 s", true],
     [0, "0"],
     [10, "10 s", true],
@@ -33,21 +34,21 @@ const LINEAR_SHARE = 0.5;
 const LOG_SCALE_YEARS = 71;
 const LOG_SPAN = Math.log1p((LINEAR_SINCE - FIRST_YEAR) / LOG_SCALE_YEARS);
 
-const svgEl = document.querySelector(".deltat-panel > svg");
+const svgEl = find<SVGSVGElement>(".deltat-panel > svg");
 // The year under the pointer, while it hovers the plot.
-let hovered = null;
+let hovered: number | null = null;
 const requestRender = onDemand(() => render());
-const f = (n) => n.toFixed(1);
-const yearOf = (jd) => 2000 + (jd - precise.J2000) / 365.25;
-const jdOf = (year) => precise.J2000 + (year - 2000) * 365.25;
-const yearText = (year) => `${String(year).replace("-", "\u2212")}:`;
-const log = (seconds) => Math.sign(seconds) * Math.log10(1 + Math.abs(seconds));
-const deltaT = (year) => precise.deltaT(jdOf(year));
+const f = (n: number) => n.toFixed(1);
+const yearOf = (jd: number) => 2000 + (jd - precise.J2000) / 365.25;
+const jdOf = (year: number) => precise.J2000 + (year - 2000) * 365.25;
+const yearText = (year: number) => `${String(year).replace("-", "\u2212")}:`;
+const log = (seconds: number) => Math.sign(seconds) * Math.log10(1 + Math.abs(seconds));
+const deltaT = (year: number) => precise.deltaT(jdOf(year));
 // The year this year: where the measurements end and the extrapolation begins, give or take the last table update.
 const today = new Date().getUTCFullYear();
 
 /** ΔT as people read it: seconds, minutes, or hours and minutes. */
-function duration(seconds) {
+function duration(seconds: number) {
     const s = Math.abs(seconds);
     const sign = seconds < 0 ? "−" : "";
     if (s < 120) return `${sign}${s.toFixed(1)} s`;
@@ -60,20 +61,20 @@ function layout() {
     // The plot runs the full width, so its left edge is 0 and its right the width.
     const plot = { top: MARGIN.top, bottom: height - MARGIN.bottom };
     const split = (1 - LINEAR_SHARE) * width;
-    const x = (year) =>
+    const x = (year: number) =>
         year >= LINEAR_SINCE
             ? split + ((year - LINEAR_SINCE) / (LAST_YEAR - LINEAR_SINCE)) * (width - split)
             : split * (1 - Math.log1p((LINEAR_SINCE - year) / LOG_SCALE_YEARS) / LOG_SPAN);
-    const y = (seconds) =>
+    const y = (seconds: number) =>
         plot.bottom - ((log(seconds) - log(SCALE_MIN)) / (log(SCALE_MAX) - log(SCALE_MIN))) * (plot.bottom - plot.top);
-    const yearAt = (px) =>
+    const yearAt = (px: number) =>
         px >= split
             ? LINEAR_SINCE + ((px - split) / (width - split)) * (LAST_YEAR - LINEAR_SINCE)
             : LINEAR_SINCE - LOG_SCALE_YEARS * Math.expm1((1 - px / split) * LOG_SPAN);
     return { width, height, plot, x, y, yearAt };
 }
 
-function path(from, to, { x, y }) {
+function path(from: number, to: number, { x, y }: ReturnType<typeof layout>) {
     const points = [];
     for (let year = from; year < to; year += YEAR_STEP) points.push(`${f(x(year))},${f(y(deltaT(year)))}`);
     points.push(`${f(x(to))},${f(y(deltaT(to)))}`);
@@ -86,7 +87,7 @@ function render() {
     svgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
 
     let svg = "";
-    const line = (x1, y1, x2, y2, cls) =>
+    const line = (x1: number, y1: number, x2: number, y2: number, cls: string) =>
         `<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" class="${cls}"/>`;
     for (const [seconds, label, minor] of TICKS) {
         if (seconds !== 0)
@@ -125,17 +126,18 @@ function render() {
 
     // Where ΔT dipped below zero, the area between the curve and the zero line hatched, as the moon calendar hatches a
     // Moon below the horizon.
-    const negative = [];
+    const negative: number[] = [];
     for (let year = 1860; year <= 1910; year += 0.25) if (deltaT(year) < 0) negative.push(year);
     if (negative.length > 1) {
         const points = negative.map((year) => `${f(x(year))},${f(y(deltaT(year)))}`).join(" ");
-        const [first, last] = [x(negative[0]), x(negative.at(-1))].map(f);
+        const [first, last] = [x(negative[0] ?? 0), x(negative.at(-1) ?? 0)].map(f);
         svg += `<defs><pattern id="deltat-hatch" width="2" height="2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="2" class="calendar-hatch-line"/></pattern></defs>`;
         svg += `<polygon points="${first},${f(y(0))} ${points} ${last},${f(y(0))}" class="deltat-negative"/>`;
     }
 
     // A small dot where one of Espenak and Meeus' polynomials hands over to the next.
-    const dot = (year, r, cls) => `<circle cx="${f(x(year))}" cy="${f(y(deltaT(year)))}" r="${r}" class="${cls}"/>`;
+    const dot = (year: number, r: number, cls: string) =>
+        `<circle cx="${f(x(year))}" cy="${f(y(deltaT(year)))}" r="${r}" class="${cls}"/>`;
     for (const year of POLYNOMIAL_JOINS) svg += dot(year, 2.2, "deltat-join");
     for (const year of handovers) svg += dot(year, 3, "deltat-bubble");
 
@@ -153,7 +155,7 @@ function render() {
     // A year marked on the curve. The moment's label keeps to the row between the 1 h and 10 h lines, the same height
     // wherever it is; the hovered year's sits by its dot, on the side with more room, below it in the upper half and
     // above it in the lower one.
-    const mark = (year, name, cls, labelY = null) => {
+    const mark = (year: number, name: string, cls: string, labelY: number | null = null) => {
         if (year < FIRST_YEAR || year > LAST_YEAR) return "";
         const seconds = deltaT(year);
         const [mx, my] = [x(year), y(seconds)];
@@ -171,13 +173,13 @@ function render() {
     if (hovered !== null) svg += mark(hovered, yearText(Math.round(hovered)), "deltat-hover");
     drawSvg(svgEl, svg, 1);
     // The rows stop a gap short of their labels, measured once drawn.
-    const labels = [...svgEl.querySelectorAll(".strip-tick")].map((text) => text.getBBox());
+    const labels = [...svgEl.querySelectorAll<SVGTextElement>(".strip-tick")].map((text) => text.getBBox());
     const edge = Math.max(...labels.map((box) => box.x + box.width)) + GAP;
     for (const row of svgEl.querySelectorAll(".deltat-row")) row.setAttribute("x1", f(edge));
 }
 
 // Hovering reads the curve off at the pointer, without touching the page's moment.
-svgEl.addEventListener("pointermove", (event) => {
+svgEl.addEventListener("pointermove", (event: PointerEvent) => {
     const { width, yearAt } = layout();
     const px = event.clientX - svgEl.getBoundingClientRect().left;
     hovered = px < 0 || px > width ? null : yearAt(px);

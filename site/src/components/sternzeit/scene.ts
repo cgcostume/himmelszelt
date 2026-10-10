@@ -1,6 +1,8 @@
+import type { HorizontalCoords } from "@himmelszelt/sternzeit";
 import * as precise from "@himmelszelt/sternzeit";
 import Zdog from "zdog";
-import { onDemand } from "../frame.js";
+import { find } from "../dom";
+import { onDemand } from "../frame";
 import {
     alongVerticalCircle,
     COMPASS,
@@ -14,10 +16,10 @@ import {
     sunSymbol,
     svgText,
     sunRays as symbolRays,
-} from "./figure.js";
-import { arrowAround, offPanelArrowSvg } from "./offpanel.js";
-import { ephemerisDay, onChange, state } from "./state.js";
-import "./export.js";
+} from "./figure";
+import { arrowAround, offPanelArrowSvg } from "./offpanel";
+import { ephemerisDay, onChange, state } from "./state";
+import "./export";
 
 const { Illustration, Anchor, Shape, Ellipse, Vector } = Zdog;
 const DEG = precise.DEG_TO_RAD;
@@ -44,10 +46,12 @@ const INK = cssColor("--text", "#c5c9d2");
 // The Moon's color in every figure except the eclipse panels (which show how it really looks): muted grey.
 const MOON_INK = cssColor("--muted", "#808899");
 
-function v(x, y, z) {
+type Point = { x: number; y: number; z: number };
+
+function v(x: number, y: number, z: number): Point {
     return { x, y, z };
 }
-function vScale(a, s) {
+function vScale(a: Point, s: number) {
     return v(a.x * s, a.y * s, a.z * s);
 }
 
@@ -55,7 +59,7 @@ function vScale(a, s) {
 // +dec is -Y (Zdog is screen-convention y-down, so "up"/north is negative y). Used for every body
 // (sun/moon apparentPosition) and, via siderealTime + longitude standing in for RA, for points on Earth's
 // own surface, so a ground point's position here rotates in sync with the sky exactly as it does in reality.
-function sphericalToVector(raDeg, decDeg, radius) {
+function sphericalToVector(raDeg: number, decDeg: number, radius: number) {
     const ra = raDeg * DEG;
     const dec = decDeg * DEG;
     return v(radius * Math.cos(dec) * Math.cos(ra), -radius * Math.sin(dec), radius * Math.cos(dec) * Math.sin(ra));
@@ -67,7 +71,7 @@ function sphericalToVector(raDeg, decDeg, radius) {
 // node_modules/zdog/dist/zdog.dist.js) applied to (0,0,1): the result is (-sin(ry), -cos(ry)*sin(rx),
 // cos(ry)*cos(rx)); solved for rx/ry given a target. The twist around the normal (the remaining free
 // parameter) doesn't matter since a circle is rotationally symmetric about it.
-function rotateToFace(dir) {
+function rotateToFace(dir: Point) {
     return { x: Math.atan2(-dir.y, dir.z), y: Math.asin(-dir.x), z: 0 };
 }
 
@@ -77,7 +81,7 @@ function rotateToFace(dir) {
 // rotateY(rotY)-then-rotateX(rotX) (illustration.rotate below), lands back on screen-facing (0,0,1): that
 // target is (cos(rotX)*sin(rotY), sin(rotX), cos(rotX)*cos(rotY)), fed into rotateToFace like any other
 // target direction (a circle's own twist around its normal still doesn't matter, so this reuses it as-is).
-function billboardRotate(rotX, rotY) {
+function billboardRotate(rotX: number, rotY: number) {
     const cx = Math.cos(rotX);
     return rotateToFace(v(cx * Math.sin(rotY), Math.sin(rotX), cx * Math.cos(rotY)));
 }
@@ -94,7 +98,7 @@ const illustration = new Illustration({
     // would leave a stale viewBox until the next resize; setSize() re-derives it with the new zoom. Uses
     // `this` (Zdog calls it as this.onResize(...)) rather than closing over `illustration`: onResize fires
     // synchronously during the `new Illustration(...)` call below, before that const binding exists.
-    onResize: function (width, height) {
+    onResize: function (width: number, height: number) {
         stageWidth = width;
         stageHeight = height;
         // Most of the Sun's orbit in view: about as wide as the stage, as tall as a wide stage allows.
@@ -141,7 +145,7 @@ const SPIN_ARC_DEG = 280;
 const SPIN_SEGMENTS = 28;
 const SPIN_HEAD_DEG = 16;
 const SPIN_HEAD_HALF_WIDTH = 0.05 * EARTH_R;
-const spinPoint = (deg, radius = SPIN_RING_RADIUS) =>
+const spinPoint = (deg: number, radius = SPIN_RING_RADIUS) =>
     v(radius * Math.cos(deg * DEG), SPIN_RING_Y, radius * Math.sin(deg * DEG));
 const spinArc = new Shape({
     addTo: earthAnchor,
@@ -234,10 +238,16 @@ const atmosphereShell = new Ellipse({
 // above only hold the geometry, hidden; their halves are split anew every frame, since what is in front depends on
 // the view. Zdog draws a one-point path as a dot, so a half with nothing in it is hidden instead.
 const RING_SEGMENTS = 96;
-const inDepth = (source, closed) => {
+const inDepth = (source: Zdog.Shape, closed: boolean) => {
     source.visible = false;
     const half = () =>
-        new Shape({ addTo: earthAnchor, path: [v(0, 0, 0)], closed: false, stroke: source.stroke, color: INK });
+        new Shape({
+            addTo: earthAnchor,
+            path: [v(0, 0, 0)],
+            closed: false,
+            stroke: source.stroke || false,
+            color: INK,
+        });
     return { source, closed, front: half(), back: half() };
 };
 const depthLines = [
@@ -251,36 +261,36 @@ const depthLines = [
     inDepth(trueObliquityArcSouth, false),
     inDepth(radiusLine, false),
 ];
-const depthOf = (source) => depthLines.find((line) => line.source === source);
+const depthOf = (source: Zdog.Shape) => depthLines.find((line) => line.source === source);
 
 // The source's points in Earth's frame: an ellipse sampled around, a shape's own path, both turned and moved as Zdog
 // turns and moves them.
-function sourcePoints(source) {
-    const local =
+function sourcePoints(source: Zdog.Shape) {
+    const local: Zdog.VectorOptions[] =
         source instanceof Ellipse
             ? Array.from({ length: RING_SEGMENTS }, (_, i) => {
                   const t = (i / RING_SEGMENTS) * 2 * Math.PI;
                   const [w, h] = [source.width ?? source.diameter, source.height ?? source.diameter];
                   return { x: (w / 2) * Math.cos(t), y: (h / 2) * Math.sin(t) };
               })
-            : source.path;
+            : (source.path as Zdog.VectorOptions[]);
     return local.map((point) => new Vector(point).rotate(source.rotate).add(source.translate));
 }
 
 // Splits each line where it passes Earth's center in depth, a crossing point interpolated between the two either side.
-function splitInDepth(view) {
+function splitInDepth(view: Zdog.Vector) {
     for (const { source, closed, front, back } of depthLines) {
         const points = sourcePoints(source);
-        if (closed) points.push(points[0]);
+        if (closed) points.push(...points.slice(0, 1));
         const depth = points.map((point) => point.copy().rotate(view).z);
-        const paths = { front: [], back: [] };
-        let side = null;
+        const paths: Record<"front" | "back", Zdog.PathCommand[]> = { front: [], back: [] };
+        let side: "front" | "back" | null = null;
         points.forEach((point, i) => {
-            const here = depth[i] >= 0 ? "front" : "back";
+            const here = (depth[i] ?? 0) >= 0 ? "front" : "back";
             if (side === null) paths[here].push({ move: point });
             else if (here !== side) {
-                const t = depth[i - 1] / (depth[i - 1] - depth[i]);
-                const crossing = points[i - 1].copy().lerp(point, t);
+                const [before = 0, now = 0] = [depth[i - 1], depth[i]];
+                const crossing = (points[i - 1] ?? point).copy().lerp(point, before / (before - now));
                 paths[side].push({ line: crossing });
                 paths[here].push({ move: crossing });
             }
@@ -290,7 +300,7 @@ function splitInDepth(view) {
         for (const [shape, path] of [
             [front, paths.front],
             [back, paths.back],
-        ]) {
+        ] as const) {
             shape.visible = path.length > 1;
             if (shape.visible) {
                 shape.path = path;
@@ -321,14 +331,23 @@ const ALTAZ_ARROW_RADIUS = ALTAZ_FIELD_OF_VIEW_DEG / 4;
 
 // A fixed per-species look, regardless of anchor/other role: the sun is a white disc plus rays, the moon carries its
 // phase, lit towards wherever the sun stands in the same panel.
-function altAzBody(point, isSun, unitsPerPx, towardsSun, lit, earthshine) {
+type Flat = { x: number; y: number };
+
+function altAzBody(
+    point: Flat,
+    isSun: boolean,
+    unitsPerPx: number,
+    towardsSun = { x: 0, y: 0 },
+    lit = 0,
+    earthshine = 0,
+) {
     if (isSun) return sunSymbol(point.x, point.y, unitsPerPx);
     const radius = SUN_SYMBOL.radius * unitsPerPx;
     return moonSymbol(point.x, point.y, radius, lit, towardsSun.x, towardsSun.y, earthshine);
 }
 
-function makeAltAzPanel(elementSelector, anchorIsSun) {
-    const element = document.querySelector(elementSelector);
+function makeAltAzPanel(elementSelector: string, anchorIsSun: boolean) {
+    const element = find<SVGSVGElement>(elementSelector);
     // Appended here (not hardcoded in the markup) so the caption can never drift out of sync with the field of view.
     const caption = element.closest(".altaz-panel")?.querySelector(".altaz-caption");
     // Appended as text, so the accented name already in the caption survives.
@@ -338,7 +357,14 @@ function makeAltAzPanel(elementSelector, anchorIsSun) {
 const sunView = makeAltAzPanel("#sunView", true);
 const moonView = makeAltAzPanel("#moonView", false);
 
-function updateAltAzPanel(panel, anchorHorizontal, otherHorizontal, lit, earthshine, towardsSun) {
+function updateAltAzPanel(
+    panel: ReturnType<typeof makeAltAzPanel>,
+    anchorHorizontal: HorizontalCoords,
+    otherHorizontal: HorizontalCoords,
+    lit: number,
+    earthshine: number,
+    towardsSun: Flat,
+) {
     // The panel is drawn at whatever size the page gives it; arrows and labels keep their size in screen pixels.
     const unitsPerPx = ALTAZ_FIELD_OF_VIEW_DEG / (panel.element.clientWidth || ALTAZ_FIELD_OF_VIEW_DEG);
     // Redrawn only when something changed, not every frame of the main scene.
@@ -396,7 +422,7 @@ function updateAltAzPanel(panel, anchorHorizontal, otherHorizontal, lit, earthsh
     drawSvg(panel.element, svg, unitsPerPx);
 }
 
-const stageEl = document.getElementById("stage");
+const stageEl = find("#stage");
 
 // Manual drag-rotate (rather than Zdog's built-in dragRotate), since billboardRotate() needs the rotation as
 // readable state, not hidden inside Zdog's Dragger.
@@ -443,7 +469,7 @@ function frame() {
     const moonHorizontal = precise.moon.horizontalPosition(time, state);
     // The locked views show sunrise and sunset to the second, so their altitudes are over the visible horizon: lifted by
     // refraction, the horizon lowered by the observer's height (see earth.apparentAltitude). The horizon line stays where it is.
-    const overHorizon = (h) => ({
+    const overHorizon = (h: HorizontalCoords) => ({
         ...h,
         altitude: precise.earth.apparentAltitude(h.altitude, { observerHeightM: state.heightM }),
     });
@@ -458,33 +484,33 @@ function frame() {
     updateAltAzPanel(sunView, sunSeen, moonSeen, lit, earthshine, towardsSun);
     updateAltAzPanel(moonView, moonSeen, sunSeen, lit, earthshine, towardsSun);
 
-    sunAnchor.translate = sunPos;
+    sunAnchor.translate.set(sunPos);
     const rays = symbolRays();
     sunRays.forEach((ray, i) => {
-        ray.rotate = billboardRotate(rotX, rotY);
-        ray.path = rays[i].map((p) => v(p.x / illustration.zoom, p.y / illustration.zoom, 0));
+        ray.rotate.set(billboardRotate(rotX, rotY));
+        ray.path = (rays[i] ?? []).map((p) => v(p.x / illustration.zoom, p.y / illustration.zoom, 0));
         ray.updatePath();
     });
-    moonAnchor.translate = moonPos;
-    atmosphereShell.rotate = billboardRotate(rotX, rotY);
+    moonAnchor.translate.set(moonPos);
+    atmosphereShell.rotate.set(billboardRotate(rotX, rotY));
     // observerPos already has magnitude EARTH_R (sphericalToVector's radius arg), so this only needs a
     // plain 1.02x nudge above the surface, not a divide-by-EARTH_R (that previously collapsed the whole
     // vector down to magnitude ~1, putting the dot at the center instead of on the sphere).
-    observerMarker.translate = vScale(observerPos, 1.02);
+    observerMarker.translate.set(vScale(observerPos, 1.02));
     latitudeRing.diameter = 2 * EARTH_R * Math.cos(latitude * DEG);
-    latitudeRing.translate = { y: -EARTH_R * Math.sin(latitude * DEG) };
+    latitudeRing.translate.set({ y: -EARTH_R * Math.sin(latitude * DEG) });
     latitudeRing.updatePath();
-    meridianRing.rotate = { y: observerRa * DEG };
+    meridianRing.rotate.set({ y: observerRa * DEG });
     // The turn arrow starts on the observer's own meridian, so it sweeps around with sidereal time: step the clock
     // and it turns the way Earth does, one full round a day.
-    spinArc.rotate = { y: observerRa * DEG };
-    spinHead.rotate = { y: observerRa * DEG };
+    spinArc.rotate.set({ y: observerRa * DEG });
+    spinHead.rotate.set({ y: observerRa * DEG });
     radiusLine.path[1] = observerPos;
     radiusLine.updatePath();
 
     // Same rotate-the-Y-axis-by-obliquity-about-X derivation the ecliptic-plane ring used, applied to just
     // the pole direction instead of a whole ring.
-    const eclipticPoleAt = (obliquityDeg) =>
+    const eclipticPoleAt = (obliquityDeg: number) =>
         v(0, -Math.cos(obliquityDeg * DEG) * EARTH_R, Math.sin(obliquityDeg * DEG) * EARTH_R);
     const truePole = eclipticPoleAt(obliquity);
     trueEclipticAxis.path[0] = vScale(truePole, -AXIS_OVERHANG);
@@ -508,15 +534,15 @@ function frame() {
     longitudeNutationLine.path[0] = sphericalToVector(0, 0, EARTH_R);
     longitudeNutationLine.path[1] = trueEquinoxPoint;
     longitudeNutationLine.updatePath();
-    trueEquinoxDot.translate = vScale(trueEquinoxPoint, 1.02);
+    trueEquinoxDot.translate.set(vScale(trueEquinoxPoint, 1.02));
 
     const orbitEccentricity = precise.earth.orbitEccentricity(ephemerisDay(jd));
     orbitEllipse.width = 2 * SUN_DIST;
     orbitEllipse.height = 2 * SUN_DIST * Math.sqrt(1 - orbitEccentricity * orbitEccentricity);
-    orbitEllipse.rotate = { x: Math.PI / 2 + obliquity * DEG };
+    orbitEllipse.rotate.set({ x: Math.PI / 2 + obliquity * DEG });
     orbitEllipse.updatePath();
 
-    illustration.rotate = { x: rotX, y: rotY, z: 0 };
+    illustration.rotate.set({ x: rotX, y: rotY, z: 0 });
     splitInDepth(illustration.rotate);
     illustration.updateRenderGraph();
     annotate("observer", vScale(observerPos, 1.02));
@@ -529,7 +555,7 @@ function frame() {
     // The line styles are classes (see global.css), set once each shape has an SVG element, i.e. after its first
     // render. Dotted for the fixed references, long dashes for the Sun's orbit, which deserves a style of its own among
     // them, and short dashes for the observer's two circles. radiusLine and longitudeNutationLine are answers, so solid.
-    const dashes = [
+    const dashes: [string, Zdog.Shape[]][] = [
         [
             "line-dotted",
             [equatorRing, axisLine, trueEclipticAxis, trueObliquityArc, trueObliquityArcSouth, atmosphereShell],
@@ -561,18 +587,24 @@ const POLE_LABEL_GAP_PX = 6;
 // Room between a label's box and the start of its arrow.
 const ANNOTATION_LABEL_PAD_PX = 3;
 const ANNOTATION_TIP_GAP_PX = 7;
-const annotationParts = (name) =>
-    ["scene-annotation", "annotation-arrow", "annotation-arrowhead"].map((c) =>
-        document.querySelector(`.${c}[data-annotation="${name}"]`),
-    );
+const annotationParts = (name: string) => {
+    const part = <T extends Element>(c: string) => document.querySelector<T>(`.${c}[data-annotation="${name}"]`);
+    return {
+        label: find(`.scene-annotation[data-annotation="${name}"]`),
+        arrow: part<SVGPathElement>("annotation-arrow"),
+        head: part<SVGPolygonElement>("annotation-arrowhead"),
+    };
+};
 const annotations = Object.fromEntries(
     ["observer", "equinox", "north", "south", "eclipticAxis"].map((n) => [n, annotationParts(n)]),
 );
 
 // "observer", "vernal equinox" and "ecliptic axis" ride the circle with a straight arrow to their marker; N and S sit
 // right past the ends of Earth's axis and need none.
-function annotate(name, point) {
-    const [label, arrow, head] = annotations[name];
+function annotate(name: string, point: Zdog.VectorOptions) {
+    const parts = annotations[name];
+    if (!parts) return;
+    const { label, arrow, head } = parts;
     const p = new Vector(point).rotate(illustration.rotate);
     const zoom = illustration.zoom;
     const [cx, cy] = [stageWidth / 2, stageHeight / 2];
@@ -602,57 +634,58 @@ function annotate(name, point) {
     const [tx, ty] = [px - dx * ANNOTATION_TIP_GAP_PX, py - dy * ANNOTATION_TIP_GAP_PX];
     arrow.setAttribute("d", `M ${sx} ${sy} L ${tx} ${ty}`);
     const [hx, hy] = [tx - dx * 7, ty - dy * 7];
-    head.setAttribute("points", `${tx},${ty} ${hx - dy * 3.5},${hy + dx * 3.5} ${hx + dy * 3.5},${hy - dx * 3.5}`);
+    head?.setAttribute("points", `${tx},${ty} ${hx - dy * 3.5},${hy + dx * 3.5} ${hx + dy * 3.5},${hy - dx * 3.5}`);
 }
 
 // "ecliptic": a label on the orbit ellipse's upper branch on screen, right of Earth, at its rightmost point inside the
 // stage, left of the alt-az panels and clear of the Sun, so it keeps to one place as the scene turns; hidden if there is
 // none. Lifted off the line, off the dashes.
 const ECLIPTIC_MARGIN_PX = 40;
-const eclipticLabel = document.querySelector('.scene-annotation[data-annotation="ecliptic"]');
+const eclipticLabel = find('.scene-annotation[data-annotation="ecliptic"]');
 
-function annotateEcliptic(sunPos) {
+function annotateEcliptic(sunPos: Point) {
     const zoom = illustration.zoom;
     const [cx, cy] = [stageWidth / 2, stageHeight / 2];
-    const project = (point) => {
+    const project = (point: Zdog.VectorOptions): [number, number] => {
         const p = new Vector(point).rotate(illustration.rotate);
         return [cx + p.x * zoom, cy + p.y * zoom];
     };
     const [sx, sy] = project(sunPos);
     const clearOfSun = SUN_SYMBOL.radius + SUN_SYMBOL.gap + SUN_SYMBOL.length + ECLIPTIC_MARGIN_PX;
     // The panels cover the stage's right side on wide screens; on narrow ones they sit below it.
-    const stageBox = eclipticLabel.parentElement.querySelector("#stage").getBoundingClientRect();
-    const panelBox = eclipticLabel.parentElement.querySelector(".altaz-panel")?.getBoundingClientRect();
+    const stageBox = stageEl.getBoundingClientRect();
+    const panelBox = eclipticLabel.parentElement?.querySelector(".altaz-panel")?.getBoundingClientRect();
     const right = panelBox && panelBox.top < stageBox.bottom ? panelBox.left - stageBox.left : stageWidth;
-    const at = (i) => {
+    const at = (i: number) => {
         const t = i * DEG;
         const local = new Vector({
-            x: (orbitEllipse.width / 2) * Math.cos(t),
-            y: (orbitEllipse.height / 2) * Math.sin(t),
+            x: ((orbitEllipse.width ?? 0) / 2) * Math.cos(t),
+            y: ((orbitEllipse.height ?? 0) / 2) * Math.sin(t),
         });
         return project(local.rotate(orbitEllipse.rotate));
     };
     const points = Array.from({ length: 360 }, (_, i) => at(i));
-    let best = null;
+    let best: { x: number; y: number } | null = null;
     points.forEach(([x, y], i) => {
         const inside = x > ECLIPTIC_MARGIN_PX && x < right - ECLIPTIC_MARGIN_PX && y > ECLIPTIC_MARGIN_PX;
         if (!inside || y > stageHeight - ECLIPTIC_MARGIN_PX || Math.hypot(x - sx, y - sy) < clearOfSun) return;
         // The upper branch of the ellipse on screen: where its outward normal points up.
-        const [[ax, ay], [bx, by]] = [points[(i + 359) % 360], points[(i + 1) % 360]];
+        const [[ax, ay], [bx, by]] = [points[(i + 359) % 360] ?? [x, y], points[(i + 1) % 360] ?? [x, y]];
         const [nx, ny] = [by - ay, ax - bx];
         const outward = nx * (x - cx) + ny * (y - cy) > 0 ? 1 : -1;
         if (x > cx && ny * outward < 0 && (!best || x > best.x)) best = { x, y };
     });
-    eclipticLabel.hidden = !best;
-    if (!best) return;
-    eclipticLabel.style.left = `${best.x}px`;
-    eclipticLabel.style.top = `${best.y - 12}px`;
+    const found = best as { x: number; y: number } | null;
+    eclipticLabel.hidden = !found;
+    if (!found) return;
+    eclipticLabel.style.left = `${found.x}px`;
+    eclipticLabel.style.top = `${found.y - 12}px`;
 }
 
-const labelsButton = document.querySelector('#scene [data-field="labels"]');
+const labelsButton = find('#scene [data-field="labels"]');
 labelsButton.addEventListener("click", () => {
     const on = labelsButton.getAttribute("aria-pressed") !== "true";
     labelsButton.setAttribute("aria-pressed", String(on));
-    document.querySelector("#scene").classList.toggle("labels-off", !on);
+    find("#scene").classList.toggle("labels-off", !on);
     requestFrame();
 });

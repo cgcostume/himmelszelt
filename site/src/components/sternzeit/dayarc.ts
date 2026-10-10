@@ -1,6 +1,8 @@
+import type { AstronomicalTime, HorizontalCoords } from "@himmelszelt/sternzeit";
 import * as precise from "@himmelszelt/sternzeit";
 import Zdog from "zdog";
-import { onDemand } from "../frame.js";
+import { find } from "../dom";
+import { onDemand } from "../frame";
 import {
     alongVerticalCircle,
     COMPASS,
@@ -12,9 +14,9 @@ import {
     sunRays,
     sunSymbol,
     svgText,
-} from "./figure.js";
-import { onChange, state } from "./state.js";
-import "./export.js";
+} from "./figure";
+import { onChange, state } from "./state";
+import "./export";
 
 const { Illustration, Anchor, Shape, Ellipse, Vector } = Zdog;
 const DEG = precise.DEG_TO_RAD;
@@ -43,15 +45,15 @@ const MUTED = cssColor("--muted", "#808899");
 const SURFACE = cssColor("--surface", "#12151c");
 const ACCENT = cssColor("--accent", "#5aa9ff");
 
-const frameEl = document.querySelector(".dome-scene");
-const compassEl = frameEl.querySelector(".dome-compass");
-const analemmaPanel = frameEl.querySelector(".analemma-panel");
-const analemmaSvg = analemmaPanel.querySelector(":scope > svg");
-const analemmaNote = frameEl.querySelector('[data-field="analemmaNote"]');
+const frameEl = find(".dome-scene");
+const compassEl = find(".dome-compass", frameEl);
+const analemmaPanel = find(".analemma-panel", frameEl);
+const analemmaSvg = find<SVGSVGElement>(":scope > svg", analemmaPanel);
+const analemmaNote = find('[data-field="analemmaNote"]', frameEl);
 
 // Strokes are in screen pixels (see .zdog in global.css); the dash patterns are classes there too, set on each shape's
 // SVG element once it has one.
-const dashes = new Map();
+const dashes = new Map<Zdog.Anchor, string>();
 const DOTTED = "line-dotted";
 const DASHED = "line-dashed";
 let zoom = 1;
@@ -61,7 +63,7 @@ let centerShiftPx = 0;
 // Seen from the southeast and a little above, so a day arc, a circle tilted towards the south, shows as an ellipse.
 const rotation = { x: -20 * DEG, y: 40 * DEG, z: 0 };
 
-function styled(shape, strokePx, dash = null) {
+function styled<T extends Zdog.Shape>(shape: T, strokePx: number, dash: string | null = null) {
     if (dash) dashes.set(shape, dash);
     shape.stroke = strokePx;
     return shape;
@@ -69,12 +71,12 @@ function styled(shape, strokePx, dash = null) {
 
 // Zdog sorts shapes by their center only, which gets a dome's near and far sides wrong. Three stacked illustrations
 // sort by construction instead: whatever is below the horizon, the translucent ground, whatever is above.
-function layer(name) {
+function layer(name: string) {
     return new Illustration({
-        element: frameEl.querySelector(`.dome-layer[data-layer="${name}"]`),
+        element: find<SVGSVGElement>(`.dome-layer[data-layer="${name}"]`, frameEl),
         resize: true,
         rotate: rotation,
-        onResize: function (width, height) {
+        onResize: function (this: Zdog.Illustration, width: number, height: number) {
             stageWidth = width;
             stageHeight = height;
             zoom = Math.min(width / 2 / (R * 1.2), height / 2 / (R * 1.1));
@@ -92,7 +94,9 @@ const layers = [below, ground, above];
 
 // Every altitude here is over the visible horizon, as in the other figures: lifted by refraction, the horizon lowered by
 // the observer's height (see earth.apparentAltitude). So rising and setting line up with the horizon ring and line to the second.
-function seen(body, time, latitude, longitude) {
+type Body = typeof precise.sun | typeof precise.moon;
+
+function seen(body: Body, time: AstronomicalTime, latitude: number, longitude: number): HorizontalCoords {
     const horizontal = body.horizontalPosition(time, { latitude, longitude, heightM: state.heightM });
     return {
         ...horizontal,
@@ -101,7 +105,7 @@ function seen(body, time, latitude, longitude) {
 }
 
 // ENU to Zdog, which is y down and z towards the viewer: x east, y up (negated), z north (negated, away from the viewer).
-function skyPoint(horizontal, radius = R) {
+function skyPoint(horizontal: HorizontalCoords, radius = R) {
     const [e, n, u] = precise.horizontalToDirection(horizontal);
     return { x: e * radius, y: -u * radius, z: -n * radius };
 }
@@ -120,7 +124,7 @@ for (const altitude of [30, 60]) {
     styled(ring, 1, DOTTED);
 }
 // Half a great circle from the horizon at `azimuth` over the zenith to the opposite horizon.
-const overhead = (azimuth) =>
+const overhead = (azimuth: number) =>
     Array.from({ length: 37 }, (_, i) =>
         skyPoint(i <= 18 ? { azimuth, altitude: i * 5 } : { azimuth: azimuth + 180, altitude: 180 - i * 5 }),
     );
@@ -146,9 +150,9 @@ const compassLabels = COMPASS.map((text, i) => {
 });
 
 /** Julian Day of local mean solar noon on the moment's day: JDs are integers at noon UT, shifted by the longitude. */
-const localNoon = (jd, longitude) => Math.round(jd + longitude / 360) - longitude / 360;
+const localNoon = (jd: number, longitude: number) => Math.round(jd + longitude / 360) - longitude / 360;
 
-function samplePath(body, noon, latitude, longitude) {
+function samplePath(body: Body, noon: number, latitude: number, longitude: number) {
     const count = HOURS * SAMPLES_PER_HOUR;
     return Array.from({ length: count + 1 }, (_, i) =>
         seen(body, precise.fromJulianDay(noon + (i - count / 2) / count), latitude, longitude),
@@ -156,20 +160,20 @@ function samplePath(body, noon, latitude, longitude) {
 }
 
 /** Splits a path into runs above and below the horizon; consecutive runs share their boundary sample. */
-function runsByHorizon(samples) {
-    const runs = [];
+function runsByHorizon(samples: HorizontalCoords[]) {
+    const runs: { up: boolean; samples: HorizontalCoords[] }[] = [];
     for (const sample of samples) {
         const up = sample.altitude >= 0;
         const last = runs.at(-1);
         if (last?.up === up) last.samples.push(sample);
-        else runs.push({ up, samples: last ? [last.samples.at(-1), sample] : [sample] });
+        else runs.push({ up, samples: [...(last?.samples.slice(-1) ?? []), sample] });
     }
     return runs;
 }
 
-const anchorFor = (altitude) => dynamic[altitude >= 0 ? 1 : 0];
+const anchorFor = (altitude: number) => dynamic[altitude >= 0 ? 1 : 0];
 
-function addPath(samples, color, strokePx, dashBelow) {
+function addPath(samples: HorizontalCoords[], color: string, strokePx: number, dashBelow: string) {
     for (const run of runsByHorizon(samples)) {
         const path = run.samples.map((s) => skyPoint(s));
         const shape = new Shape({ addTo: dynamic[run.up ? 1 : 0], path, closed: false, color });
@@ -184,9 +188,11 @@ const ARROW_LENGTH = 6;
 const ARROW_HALF_WIDTH = 3;
 
 /** A flat arrowhead at sample `i`, lying in the dome's surface and pointing towards sample `i + 1`. */
-function addArrow(samples, i, color) {
-    const tip = skyPoint(samples[i]);
-    const next = skyPoint(samples[i + 1]);
+function addArrow(samples: HorizontalCoords[], i: number, color: string) {
+    const [sample, following] = [samples[i], samples[i + 1]];
+    if (!sample || !following) return;
+    const tip = skyPoint(sample);
+    const next = skyPoint(following);
     const d = new Vector(next).subtract(tip);
     d.multiply(1 / d.magnitude());
     // Perpendicular to both the path and the radius: sideways within the dome's surface.
@@ -198,23 +204,23 @@ function addArrow(samples, i, color) {
     side.multiply(ARROW_HALF_WIDTH / side.magnitude());
     const back = new Vector(tip).subtract(new Vector(d).multiply(ARROW_LENGTH));
     const path = [tip, new Vector(back).add(side), new Vector(back).subtract(side)];
-    styled(new Shape({ addTo: anchorFor(samples[i].altitude), path, fill: true, color }), 1);
+    styled(new Shape({ addTo: anchorFor(sample.altitude), path, fill: true, color }), 1);
 }
 
-function addArrows(samples, color) {
+function addArrows(samples: HorizontalCoords[], color: string) {
     for (let i = ARROW_OFFSET; i < samples.length - 1; i += ARROW_EVERY) addArrow(samples, i, color);
 }
 
-function addDot(horizontal, color, strokePx) {
+function addDot(horizontal: HorizontalCoords, color: string, strokePx: number) {
     styled(new Shape({ addTo: anchorFor(horizontal.altitude), translate: skyPoint(horizontal), color }), strokePx);
 }
 
 // The Sun and the Moon are the same size here; the Sun is told apart by the same ring of dotted rays it wears in the
 // locked views (SUN_SYMBOL), always square to the viewer (see frame()).
 const BODY_DOT_PX = 2 * SUN_SYMBOL.radius;
-const billboards = [];
+const billboards: { yaw: Zdog.Anchor; face: Zdog.Anchor }[] = [];
 
-function addSunRays(horizontal) {
+function addSunRays(horizontal: HorizontalCoords) {
     const at = new Anchor({ addTo: anchorFor(horizontal.altitude), translate: skyPoint(horizontal) });
     const yaw = new Anchor({ addTo: at });
     const face = new Anchor({ addTo: yaw });
@@ -252,8 +258,8 @@ function renderAnalemma() {
     const { jd, latitude, longitude } = state;
     const today = seen(precise.sun, precise.fromJulianDay(jd), latitude, longitude);
     // Seen along the vertical circle through today's Sun, smooth past the zenith (see alongVerticalCircle).
-    const project = (horizontal) => alongVerticalCircle(horizontal, today.azimuth);
-    const points = [];
+    const project = (horizontal: HorizontalCoords) => alongVerticalCircle(horizontal, today.azimuth);
+    const points: { day: number; firstOfMonth: boolean; x: number; y: number }[] = [];
     for (let day = -ANALEMMA_DAYS; day <= ANALEMMA_DAYS; day++) {
         const sun = seen(precise.sun, precise.fromJulianDay(jd + day), latitude, longitude);
         const firstOfMonth = precise.dateFromJulianDay(jd + day).getUTCDate() === 1;
@@ -273,7 +279,7 @@ function renderAnalemma() {
     const [x0, y0] = [centerX - ANALEMMA_HALF_WIDTH, centerY - ANALEMMA_HEIGHT / 2];
     analemmaSvg.setAttribute("viewBox", `${x0} ${y0} ${2 * ANALEMMA_HALF_WIDTH} ${ANALEMMA_HEIGHT}`);
 
-    const f = (n) => n.toFixed(3);
+    const f = (n: number) => n.toFixed(3);
     // The panel may be wider than the viewBox's aspect ratio, so the ground and lines reach well past it.
     const [left, right] = [centerX - 1000, centerX + 1000];
     let svg = `<rect x="${f(left)}" y="0" width="${f(right - left)}" height="1090" class="figure-ground"/>`;
@@ -309,7 +315,7 @@ function renderAnalemma() {
 // Where the analemma panel covers the scene, in scene coordinates: the compass labels that fall behind it are left
 // out, since the horizon they belong to is hidden there and they would read as floating free. Measured on resize
 // only, not per frame.
-let panelBox = null;
+let panelBox: { left: number; top: number; right: number; bottom: number } | null = null;
 function measurePanel() {
     const scene = frameEl.getBoundingClientRect();
     const box = analemmaPanel.getBoundingClientRect();
@@ -333,14 +339,14 @@ function placeCompass() {
         label.style.left = `${x}px`;
         label.style.top = `${y}px`;
         label.style.visibility = covered ? "hidden" : "visible";
-        label.style.opacity = p.z < 0 ? 0.45 : 1;
+        label.style.opacity = p.z < 0 ? "0.45" : "1";
     }
 }
 
-let dragFrom = null;
+let dragFrom: { x: number; y: number } | null = null;
 frameEl.addEventListener("pointerdown", (event) => {
     // Not over the analemma, which floats on top of the dome.
-    if (event.target.closest(".analemma-panel")) return;
+    if (event.target instanceof Element && event.target.closest(".analemma-panel")) return;
     dragFrom = { x: event.clientX, y: event.clientY };
     frameEl.setPointerCapture(event.pointerId);
 });

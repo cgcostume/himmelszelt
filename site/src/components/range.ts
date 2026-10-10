@@ -2,7 +2,7 @@
  * Keeps every slider's --range-fill, how far along its value is, which the rail left of the thumb is drawn to (see
  * global.css). Input events update it by themselves; a script that sets a value calls `paintRange` after.
  */
-export function paintRange(input) {
+export function paintRange(input: HTMLInputElement) {
     const min = Number(input.min || 0);
     const max = Number(input.max || 100);
     input.style.setProperty("--range-fill", String(max > min ? (Number(input.value) - min) / (max - min) : 0));
@@ -11,19 +11,20 @@ export function paintRange(input) {
 document.addEventListener("input", (event) => {
     if (event.target instanceof HTMLInputElement && event.target.type === "range") paintRange(event.target);
 });
-for (const input of document.querySelectorAll('input[type="range"]')) paintRange(input);
+for (const input of document.querySelectorAll<HTMLInputElement>('input[type="range"]')) paintRange(input);
 
 // The wheel steps every slider, over the slider itself and over the label around it: up for more. A step moves it as
 // dragging would, an input event at once and a change event once the wheel rests, so work done on release, such as
 // recomputing the tables, runs once rather than per notch. A slider that handles the wheel itself prevents the default,
 // and is left alone here.
 const WHEEL_REST_MS = 300;
-const resting = new WeakMap();
+const resting = new WeakMap<HTMLInputElement, ReturnType<typeof setTimeout>>();
 
-function sliderFor(target) {
+function sliderFor(target: EventTarget | null) {
     if (!(target instanceof Element)) return null;
     const input =
-        target.closest('input[type="range"]') ?? target.closest("label")?.querySelector('input[type="range"]');
+        target.closest<HTMLInputElement>('input[type="range"]') ??
+        target.closest("label")?.querySelector<HTMLInputElement>('input[type="range"]');
     return input && !input.disabled ? input : null;
 }
 

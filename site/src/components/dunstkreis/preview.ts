@@ -1,5 +1,5 @@
 import { MULTI_SCATTERING_LOG2_OFFSET, spectrumToRgb, wgsl } from "@himmelszelt/dunstkreis";
-import { gpu, tables } from "./atmosphere.js";
+import { gpuDevice, tables } from "./atmosphere";
 
 /**
  * Previews of the tables and cube maps, drawn on the GPU straight into a canvas: sampled nearest or linear, tone mapped
@@ -19,7 +19,7 @@ export const SCALE = { none: 0, max: 1, mean: 2 };
 /** How each table is shown: transmittance as it is, multiple scattering by its maximum, the sky view tone mapped around
  *  its geometric mean, since it spans from night to the sun's glow. Altitude up, like a plot; the sky view as seen, the
  *  zenith at the top and its halves apart. */
-export const TABLE_PREVIEW = {
+export const TABLE_PREVIEW: Record<"transmittance" | "multiScattering" | "skyView", PreviewOptions> = {
     transmittance: { scale: SCALE.none, flip: true, spectral: SPECTRAL.ratio },
     // Stored as log2, decoded to the values themselves.
     multiScattering: { scale: SCALE.max, flip: true, log2: true, spectral: SPECTRAL.ratio },
@@ -30,10 +30,10 @@ export const TABLE_PREVIEW = {
 // Params: nine scalars, padded to twelve, the mat4x3f at byte 48, the sun's spectrum at 112.
 const PARAMS_SIZE = 128;
 
-export const texelOf = (p, n, pixels) => Math.floor(((2 * p + 1) * n) / (2 * pixels));
+export const texelOf = (p: number, n: number, pixels: number) => Math.floor(((2 * p + 1) * n) / (2 * pixels));
 
 // The output in rgba8unorm stores the values tone mapped, for the canvas and a PNG; in rgba32float as they are, for HDR.
-const source = (cube, format) => `
+const source = (cube: boolean, format: GPUTextureFormat) => `
 ${cube ? wgsl.cube : ""}
 ${wgsl.spiral}
 struct Params {
@@ -180,32 +180,59 @@ fn display(@builtin(global_invocation_id) id: vec3u) {
 }
 `;
 
-const pipelines = new Map();
-function pipelinesFor(cube, format) {
+type Pipelines = { reduce: GPUComputePipeline; display: GPUComputePipeline };
+const pipelines = new Map<string, Pipelines>();
+function pipelinesFor(cube: boolean, format: GPUTextureFormat) {
     const key = `${cube},${format}`;
-    if (!pipelines.has(key)) {
-        const { device } = gpu;
+    let found = pipelines.get(key);
+    if (!found) {
+        const device = gpuDevice();
         const module = device.createShaderModule({ label: "sternwarte:preview", code: source(cube, format) });
-        const create = (entryPoint) =>
+        const create = (entryPoint: string) =>
             device.createComputePipeline({
                 label: `sternwarte:${entryPoint}`,
                 layout: "auto",
                 compute: { module, entryPoint },
             });
-        pipelines.set(key, { reduce: create("reduce"), display: create("display") });
+        found = { reduce: create("reduce"), display: create("display") };
+        pipelines.set(key, found);
     }
-    return pipelines.get(key);
+    return found;
 }
 
-let samplers = null;
+let samplers: { linear: GPUSampler; nearest: GPUSampler } | null = null;
+
+/** How `encode` draws a texture, as its documentation describes. */
+export type PreviewOptions = {
+    cube?: boolean;
+    filter?: "nearest" | "linear";
+    scale?: number;
+    flip?: boolean;
+    split?: boolean;
+    level?: number;
+    cubified?: boolean;
+    log2?: boolean;
+    spectral?: number;
+    mirror?: boolean;
+};
+type Buffers = ReturnType<typeof createBuffers>;
 
 /**
  * Records `texture` drawn into `output`, a storage view of `width` by `height` in `format`: a 2D table, or with `cube`,
  * a cube map unrolled into a panorama at mip `level`, `cubified` or not. `filter` is "nearest" or "linear", `scale` one
  * of `SCALE`; `flip` shows a table's rows bottom up, `split` keeps its halves apart, `mirror` adds it mirrored, dimmed.
  */
-function encode(encoder, texture, options, output, width, height, format, buffers) {
-    const { device } = gpu;
+function encode(
+    encoder: GPUCommandEncoder,
+    texture: GPUTexture,
+    options: PreviewOptions,
+    output: GPUTextureView,
+    width: number,
+    height: number,
+    format: GPUTextureFormat,
+    buffers: Buffers,
+) {
+    const device = gpuDevice();
     const { cube = false, filter = "nearest", scale = SCALE.none, flip = false, split = false } = options;
     const { level = 0, cubified = false, log2 = false, spectral = SPECTRAL.none, mirror = false } = options;
     samplers ??= {
@@ -222,7 +249,11 @@ function encode(encoder, texture, options, output, width, height, format, buffer
     const model = tables()?.luts.model;
     if (spectral !== SPECTRAL.none && model) {
         const matrix = spectrumToRgb(model);
-        for (let j = 0; j < 4; ++j) floats.set([matrix[0][j], matrix[1][j], matrix[2][j]], 12 + j * 4);
+        for (let j = 0; j < 4; ++j)
+            floats.set(
+                [0, 1, 2].map((i) => matrix[i]?.[j] ?? 0),
+                12 + j * 4,
+            );
         floats.set(model.solarSpectrum, 28);
     }
     device.queue.writeBuffer(buffers.params, 0, data);
@@ -235,7 +266,7 @@ function encode(encoder, texture, options, output, width, height, format, buffer
         { binding: 5, resource: output },
     ];
     // "auto" layouts hold only what each entry point uses.
-    const bindGroup = (pipeline, bindings) =>
+    const bindGroup = (pipeline: GPUComputePipeline, bindings: number[]) =>
         device.createBindGroup({
             layout: pipeline.getBindGroupLayout(0),
             entries: all.filter(({ binding }) => bindings.includes(binding)),
@@ -256,14 +287,15 @@ function encode(encoder, texture, options, output, width, height, format, buffer
 }
 
 const createBuffers = () => ({
-    params: gpu.device.createBuffer({ size: PARAMS_SIZE, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
-    reduced: gpu.device.createBuffer({ size: 8, usage: GPUBufferUsage.STORAGE }),
+    params: gpuDevice().createBuffer({ size: PARAMS_SIZE, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+    reduced: gpuDevice().createBuffer({ size: 8, usage: GPUBufferUsage.STORAGE }),
 });
 
 /** A preview drawing into `canvas`, which it takes over as a WebGPU canvas. */
-export function createPreview(canvas) {
-    const { device } = gpu;
+export function createPreview(canvas: HTMLCanvasElement) {
+    const device = gpuDevice();
     const context = canvas.getContext("webgpu");
+    if (!context) throw new Error("No WebGPU canvas context");
     context.configure({
         device,
         format: "rgba8unorm",
@@ -273,7 +305,7 @@ export function createPreview(canvas) {
     const buffers = createBuffers();
     return {
         /** Draws `texture` over the canvas' device pixels, with the options `encode` takes. */
-        draw(texture, options) {
+        draw(texture: GPUTexture, options: PreviewOptions) {
             const dpr = window.devicePixelRatio || 1;
             const width = Math.max(1, Math.round(canvas.clientWidth * dpr));
             const height = Math.max(1, Math.round(canvas.clientHeight * dpr));
@@ -290,9 +322,15 @@ export function createPreview(canvas) {
  * `texture` rendered offscreen at `width` by `height` and read back: tone mapped as 8-bit RGBA for a PNG, or with
  * `hdr`, the values themselves as 32-bit floats, four a pixel, row after row.
  */
-export async function renderPixels(texture, options, width, height, hdr = false) {
-    const { device } = gpu;
-    const format = hdr ? "rgba32float" : "rgba8unorm";
+export async function renderPixels(
+    texture: GPUTexture,
+    options: PreviewOptions,
+    width: number,
+    height: number,
+    hdr = false,
+) {
+    const device = gpuDevice();
+    const format: GPUTextureFormat = hdr ? "rgba32float" : "rgba8unorm";
     const target = device.createTexture({
         size: { width, height },
         format,

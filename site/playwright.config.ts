@@ -7,7 +7,7 @@ export default defineConfig({
     reporter: "list",
     timeout: 60_000,
     use: {
-        baseURL: "http://localhost:4321/himmelszelt/",
+        baseURL: "http://localhost:4321/",
         viewport: { width: 1280, height: 900 },
         launchOptions: {
             // WebGPU only in a secure context, which localhost is. Without the Vulkan flags Chromium falls back to
@@ -16,5 +16,5 @@ export default defineConfig({
         },
         channel: "chromium",
     },
-    webServer: { command: "pnpm dev", url: "http://localhost:4321/himmelszelt/", reuseExistingServer: true },
+    webServer: { command: "pnpm dev", url: "http://localhost:4321/", reuseExistingServer: true },
 });

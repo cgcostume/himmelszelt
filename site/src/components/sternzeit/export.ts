@@ -27,38 +27,43 @@ const PROPERTIES = [
 ];
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-const f = (n) => Number(n.toFixed(2));
-const ownedBy = (root, element) => element.closest("[data-export]") === root;
+const f = (n: number) => String(Number(n.toFixed(2)));
+const ownedBy = (root: Element, element: Element) => element.closest("[data-export]") === root;
 
 // Mixed colors (color-mix in the CSS) compute to color(srgb ...), which not every SVG viewer reads; rgb() they all do.
-const plainColors = (value) =>
-    value.replace(/color\(srgb ([\d.e-]+) ([\d.e-]+) ([\d.e-]+)(?: \/ ([\d.e-]+))?\)/g, (_, r, g, b, a) => {
-        const [R, G, B] = [r, g, b].map((c) => Math.round(Math.min(1, Math.max(0, Number(c))) * 255));
-        return a === undefined ? `rgb(${R}, ${G}, ${B})` : `rgba(${R}, ${G}, ${B}, ${a})`;
-    });
+const plainColors = (value: string) =>
+    value.replace(
+        /color\(srgb ([\d.e-]+) ([\d.e-]+) ([\d.e-]+)(?: \/ ([\d.e-]+))?\)/g,
+        (_, r: string, g: string, b: string, a: string | undefined) => {
+            const [R, G, B] = [r, g, b].map((c) => Math.round(Math.min(1, Math.max(0, Number(c))) * 255));
+            return a === undefined ? `rgb(${R}, ${G}, ${B})` : `rgba(${R}, ${G}, ${B}, ${a})`;
+        },
+    );
 
-function inlineStyles(original, clone) {
+function inlineStyles(original: Element, clone: Element) {
     const originals = [original, ...original.querySelectorAll("*")];
     const clones = [clone, ...clone.querySelectorAll("*")];
     originals.forEach((element, i) => {
         const computed = getComputedStyle(element);
-        clones[i].setAttribute(
+        const target = clones[i];
+        if (!target) return;
+        target.setAttribute(
             "style",
             PROPERTIES.map((name) => `${name}:${plainColors(computed.getPropertyValue(name))}`).join(";"),
         );
-        clones[i].removeAttribute("class");
+        target.removeAttribute("class");
     });
 }
 
 // Images (the corona photograph) as data URLs, so the file stands alone.
-async function embedImages(clone) {
+async function embedImages(clone: Element) {
     for (const image of clone.querySelectorAll("image")) {
         const href = image.getAttribute("href");
         if (!href || href.startsWith("data:")) continue;
         const blob = await (await fetch(href)).blob();
-        const url = await new Promise((resolve) => {
+        const url = await new Promise<string>((resolve) => {
             const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
+            reader.onload = () => resolve(String(reader.result));
             reader.readAsDataURL(blob);
         });
         image.setAttribute("href", url);
@@ -66,16 +71,16 @@ async function embedImages(clone) {
 }
 
 // The panel's own background, rounded corners and outline, which the page draws in CSS around the SVG.
-function frame(svg, box, index) {
+function frame(svg: SVGSVGElement, box: Box, index: number) {
     const style = getComputedStyle(svg);
     const border = Number.parseFloat(style.borderTopWidth) || 0;
     const background = style.backgroundColor;
     const opaque = background !== "rgba(0, 0, 0, 0)" && background !== "transparent";
-    const rect = (attributes) => {
+    const rect = (attributes: Record<string, string | number>) => {
         const element = document.createElementNS(SVG_NS, "rect");
-        const geometry = { x: box.x, y: box.y, width: box.width, height: box.height };
-        geometry.rx = Number.parseFloat(style.borderTopLeftRadius) || 0;
-        for (const [name, value] of Object.entries({ ...geometry, ...attributes })) element.setAttribute(name, value);
+        const geometry = { ...box, rx: Number.parseFloat(style.borderTopLeftRadius) || 0 };
+        for (const [name, value] of Object.entries({ ...geometry, ...attributes }))
+            element.setAttribute(name, String(value));
         return element;
     };
     const clip = document.createElementNS(SVG_NS, "clipPath");
@@ -88,18 +93,20 @@ function frame(svg, box, index) {
         : null;
     outline?.setAttribute("fill", "none");
     outline?.setAttribute("stroke", style.borderTopColor);
-    outline?.setAttribute("stroke-width", border);
+    outline?.setAttribute("stroke-width", String(border));
     return { clip, fill, outline };
 }
 
-async function compose(root) {
+type Box = { x: number; y: number; width: number; height: number };
+
+async function compose(root: HTMLElement) {
     const svgs = [...root.querySelectorAll("svg")].filter(
         (svg) => ownedBy(root, svg) && !svg.closest("button") && getComputedStyle(svg).visibility !== "hidden",
     );
     const labels = [...root.querySelectorAll("[data-export-text]")].filter(
         (label) => ownedBy(root, label) && getComputedStyle(label).visibility !== "hidden",
     );
-    const rects = svgs.map((svg) => svg.getBoundingClientRect());
+    const rects: DOMRect[] = svgs.map((svg) => svg.getBoundingClientRect());
     const left = Math.min(...rects.map((r) => r.left));
     const top = Math.min(...rects.map((r) => r.top));
     const width = Math.max(...rects.map((r) => r.right)) - left;
@@ -122,8 +129,9 @@ async function compose(root) {
     out.append(background);
 
     svgs.forEach((svg, i) => {
-        const box = { x: rects[i].left - left, y: rects[i].top - top, width: rects[i].width, height: rects[i].height };
-        const clone = svg.cloneNode(true);
+        const { left: x, top: y, width, height } = rects[i] as DOMRect;
+        const box = { x: x - left, y: y - top, width, height };
+        const clone = svg.cloneNode(true) as SVGSVGElement;
         inlineStyles(svg, clone);
         for (const name of ["id", "aria-hidden"]) clone.removeAttribute(name);
         if (!clone.hasAttribute("viewBox")) clone.setAttribute("viewBox", `0 0 ${f(box.width)} ${f(box.height)}`);
@@ -131,8 +139,8 @@ async function compose(root) {
         const { clip, fill, outline } = frame(svg, box, i);
         const group = document.createElementNS(SVG_NS, "g");
         group.setAttribute("clip-path", `url(#${clip.id})`);
-        group.append(...[fill, clone].filter(Boolean));
-        out.append(clip, group, ...[outline].filter(Boolean));
+        group.append(...[fill, clone].filter((node) => node !== null));
+        out.append(clip, group, ...[outline].filter((node) => node !== null));
     });
 
     for (const label of labels) {
@@ -152,7 +160,7 @@ async function compose(root) {
     return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(out)}`;
 }
 
-async function download(root) {
+async function download(root: HTMLElement) {
     const blob = new Blob([await compose(root)], { type: "image/svg+xml" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -161,7 +169,7 @@ async function download(root) {
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }
 
-for (const root of document.querySelectorAll("[data-export]")) {
+for (const root of document.querySelectorAll<HTMLElement>("[data-export]")) {
     if (root.querySelector(":scope > .svg-download")) continue;
     const button = document.createElement("button");
     button.type = "button";

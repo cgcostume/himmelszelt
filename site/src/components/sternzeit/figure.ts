@@ -1,4 +1,8 @@
+import type { AstronomicalTime, Direction, HorizontalCoords, Observer } from "@himmelszelt/sternzeit";
 import * as precise from "@himmelszelt/sternzeit";
+
+type Vec3 = Direction;
+type Vec2 = readonly [x: number, y: number];
 
 // Text inside the figures' SVGs is at the page's small text size (--text-small, 0.75rem, like the compass labels)
 // whatever size the SVG is drawn at: each figure passes how many of its own units one screen pixel is.
@@ -6,16 +10,17 @@ const SMALL_TEXT_PX = 12;
 const DEG = precise.DEG_TO_RAD;
 
 /** Fills a figure's SVG; its CSS sizes text and sun symbols in screen pixels by --units-per-px (see global.css). */
-export function drawSvg(element, svg, unitsPerPx) {
+export function drawSvg(element: HTMLElement | SVGElement, svg: string, unitsPerPx: number) {
     element.style.setProperty("--units-per-px", unitsPerPx.toFixed(4));
     element.innerHTML = svg;
 }
 
 /** Text made safe for HTML and SVG, in element content and in quoted attributes alike. */
-export const escapeText = (text) => String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+export const escapeText = (text: string | number) =>
+    String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 /** A color of the page's theme, from its custom property, for figures drawn by script (Zdog takes no CSS). */
-export const cssColor = (name, fallback) =>
+export const cssColor = (name: string, fallback: string) =>
     getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 
 /** The eight compass directions, from north through east, 45 degrees apart. */
@@ -26,12 +31,12 @@ export const LABEL_GAP = 6;
 export const STRIP_MARGIN = { top: 12, bottom: 20 };
 
 /** The moment on a flat strip: a line across the plot at `x`, from `top` to `bottom`, and a dot at `y` on it. */
-export function stripMoment(x, y, top, bottom, cls = "") {
+export function stripMoment(x: number, y: number, top: number, bottom: number, cls = "") {
     const [px, py] = [x.toFixed(1), y.toFixed(1)];
     return `<line x1="${px}" y1="${top}" x2="${px}" y2="${bottom}" class="strip-moment ${cls}"/><circle cx="${px}" cy="${py}" r="3" class="strip-moment-dot ${cls}"/>`;
 }
 
-export function svgText(x, y, text, cls) {
+export function svgText(x: number, y: number, text: string | number, cls: string) {
     return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" class="${cls}">${escapeText(text)}</text>`;
 }
 
@@ -39,7 +44,7 @@ export function svgText(x, y, text, cls) {
 const TOP_PADDING_PX = 8;
 
 /** The y of a middle-aligned label just inside the top of a panel whose half size is `half`, in panel units. */
-function topLabelY(half, unitsPerPx) {
+function topLabelY(half: number, unitsPerPx: number) {
     return -half + (TOP_PADDING_PX + SMALL_TEXT_PX / 2) * unitsPerPx;
 }
 
@@ -49,14 +54,14 @@ function topLabelY(half, unitsPerPx) {
  * azimuth and altitude, but unlike them it stays smooth near the zenith, where the azimuth swings through half the
  * compass within a few degrees.
  */
-export function alongVerticalCircle({ azimuth, altitude }, azimuth0) {
+export function alongVerticalCircle({ azimuth, altitude }: HorizontalCoords, azimuth0: number) {
     const [a, h] = [((azimuth - azimuth0) * Math.PI) / 180, (altitude * Math.PI) / 180];
     const x = (Math.asin(Math.cos(h) * Math.sin(a)) * 180) / Math.PI;
     return { x, y: (-Math.atan2(Math.sin(h), Math.cos(h) * Math.cos(a)) * 180) / Math.PI };
 }
 
 /** The y of a middle-aligned label sitting just above a line at `y`, such as a compass direction on the horizon. */
-export function labelAboveY(y, unitsPerPx) {
+export function labelAboveY(y: number, unitsPerPx: number) {
     return y - (2 + SMALL_TEXT_PX / 2) * unitsPerPx;
 }
 
@@ -81,7 +86,7 @@ export function sunRays() {
 }
 
 /** The Sun as a symbol at (x, y) in an SVG drawn at `unitsPerPx` of its units to a screen pixel. */
-export function sunSymbol(x, y, unitsPerPx) {
+export function sunSymbol(x: number, y: number, unitsPerPx: number) {
     const r = (SUN_SYMBOL.radius * unitsPerPx).toFixed(2);
     let svg = `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${r}" class="figure-sun"/>`;
     for (const [a, b] of sunRays()) {
@@ -103,17 +108,21 @@ const GRID_LABEL_PADDING_PX = 6;
 const GRID_LABEL_WIDTH_PX = 30;
 
 /** A dotted altitude line at `y`, from `left` to `right` in figure units, labeled with `label` at its left end. */
-export function gridLine(y, left, right, label, unitsPerPx) {
+export function gridLine(y: number, left: number, right: number, label: string, unitsPerPx: number) {
     const start = left + (GRID_LABEL_PADDING_PX + GRID_LABEL_WIDTH_PX) * unitsPerPx;
     const line = `<line x1="${start.toFixed(2)}" y1="${y.toFixed(2)}" x2="${right.toFixed(2)}" y2="${y.toFixed(2)}" class="figure-grid"/>`;
     return svgText(start - LABEL_GAP * unitsPerPx, y, label, "figure-grid-label") + line;
 }
 
-const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const normalize = (a) => {
+const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a: Vec3, b: Vec3): Vec3 => [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+];
+const normalize = (a: Vec3): Vec3 => {
     const length = Math.hypot(...a);
-    return a.map((c) => c / length);
+    return [a[0] / length, a[1] / length, a[2] / length];
 };
 
 /**
@@ -121,7 +130,7 @@ const normalize = (a) => {
  * across the view, up towards the zenith, and toward the viewer. It is what tilts the crescent, and it belongs to
  * the observer, not to any one panel, so every figure that shows the Moon from here has to agree on it.
  */
-export function sunInViewFrame(time, observer) {
+export function sunInViewFrame(time: AstronomicalTime, observer: Observer) {
     const lineOfSight = precise.moon.direction(time, observer);
     // (v x z) x v is the zenith with the line of sight taken out of it: straight up, across the view.
     const up = normalize(cross(cross(lineOfSight, [0, 0, 1]), lineOfSight));
@@ -138,7 +147,7 @@ export const EARTHSHINE_MAX = 0.095;
  * A point on the Moon at selenographic longitude `lon` and latitude `lat` (degrees), seen with the sub-observer point at
  * (`l`, `b`), the libration: x right (selenographic east, which is sky west), y up (lunar north), z towards the viewer.
  */
-export function selenographic(lon, lat, l, b) {
+export function selenographic(lon: number, lat: number, l: number, b: number): Vec3 {
     const [dl, la, bb] = [(lon - l) * DEG, lat * DEG, b * DEG];
     return [
         Math.cos(la) * Math.sin(dl),
@@ -148,15 +157,15 @@ export function selenographic(lon, lat, l, b) {
 }
 
 /** Rotates (x right, y up) counterclockwise by `angle` degrees and flips y for SVG (y down). */
-export function toScreen([x, y], angle, radius) {
+export function toScreen([x, y]: Vec2 | Vec3, angle: number, radius: number): Vec2 {
     const [c, s] = [Math.cos(angle * DEG), Math.sin(angle * DEG)];
     return [(x * c - y * s) * radius, -(x * s + y * c) * radius];
 }
 
 /** Splits a curve on the Moon into the runs facing the viewer (z > 0), in screen coordinates. */
-export function visibleRuns(points, angle, radius) {
-    const runs = [];
-    let run = null;
+export function visibleRuns(points: Vec3[], angle: number, radius: number) {
+    const runs: Vec2[][] = [];
+    let run: Vec2[] | null = null;
     for (const p of points) {
         if (p[2] > 0) {
             if (!run) {
@@ -169,7 +178,7 @@ export function visibleRuns(points, angle, radius) {
     return runs.filter((r) => r.length > 1);
 }
 
-const polylinePoints = (points) => points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
+const polylinePoints = (points: Vec2[]) => points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
 
 /**
  * The Moon as a symbol at (x, y): a disc of `radius` with `lit` of it (0 to 1) shining towards (dx, dy), the way it
@@ -178,7 +187,16 @@ const polylinePoints = (points) => points.map(([x, y]) => `${x.toFixed(2)},${y.t
  * ({ longitude, latitude } of the libration and the `tilt` of the Moon's north, counterclockwise from up, in degrees),
  * its equator and prime meridian show which way the Moon is turned and how far we see around it.
  */
-export function moonSymbol(x, y, radius, lit, dx, dy, earthshine = 0, graticule = null) {
+export function moonSymbol(
+    x: number,
+    y: number,
+    radius: number,
+    lit: number,
+    dx: number,
+    dy: number,
+    earthshine = 0,
+    graticule: Graticule | null = null,
+) {
     const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
     const waist = (radius * Math.abs(1 - 2 * lit)).toFixed(2);
     // Counterclockwise back over the bright side for a crescent, clockwise around the dark one for a gibbous moon.
@@ -191,7 +209,9 @@ export function moonSymbol(x, y, radius, lit, dx, dy, earthshine = 0, graticule 
         <path d="${limb} ${terminator} Z" class="figure-moon-lit"/></g>${graticule ? moonGraticule(x, y, radius, graticule) : ""}`;
 }
 
-function moonGraticule(x, y, radius, { longitude, latitude, tilt }) {
+type Graticule = { longitude: number; latitude: number; tilt: number };
+
+function moonGraticule(x: number, y: number, radius: number, { longitude, latitude, tilt }: Graticule) {
     const equator = Array.from({ length: 73 }, (_, i) => selenographic(-180 + i * 5, 0, longitude, latitude));
     const meridian = Array.from({ length: 37 }, (_, i) => selenographic(0, -90 + i * 5, longitude, latitude));
     const runs = [...visibleRuns(equator, tilt, radius), ...visibleRuns(meridian, tilt, radius)];
@@ -203,7 +223,13 @@ function moonGraticule(x, y, radius, { longitude, latitude, tilt }) {
  * The visible horizon at `y` across a square panel of half size `half`, the ground beneath veiling what it hides; or,
  * with the horizon above the panel, the whole panel veiled and a note saying so.
  */
-export function veiledHorizon(y, half, unitsPerPx, halfWidth = half, label = null) {
+export function veiledHorizon(
+    y: number,
+    half: number,
+    unitsPerPx: number,
+    halfWidth = half,
+    label: { x?: number; y?: number; cls?: string } | null = null,
+) {
     if (y >= half) return "";
     const top = Math.max(y, -half);
     const veil = `<rect x="${-halfWidth}" y="${top.toFixed(2)}" width="${2 * halfWidth}" height="${(half - top).toFixed(2)}" class="figure-veil"/>`;

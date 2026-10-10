@@ -1,14 +1,16 @@
 import { wgsl } from "@himmelszelt/dunstkreis";
 import blueNoiseUrl from "./bluenoise.bin?url";
-import { GOLDEN_SET_8, GOLDEN_SET_64 } from "./goldenset.js";
+import { GOLDEN_SET_8, GOLDEN_SET_64 } from "./goldenset";
 import scene from "./scene.comp.wgsl";
 
 // 64x64 texels of blue noise, two channels, from scripts/bluenoise.mjs.
 const blueNoise = new Uint8Array(await (await fetch(blueNoiseUrl)).arrayBuffer());
 
-const goldenSet = (name, set) =>
+type Vec3 = [number, number, number];
+
+const goldenSet = (name: string, set: number[][]) =>
     `var<private> ${name}: array<vec2f, ${set.length}> = array<vec2f, ${set.length}>(` +
-    `${set.map(([x, y]) => `vec2f(${x}, ${y})`).join(", ")});`;
+    `${set.map(([x = 0, y = 0]) => `vec2f(${x}, ${y})`).join(", ")});`;
 const source = [
     goldenSet("goldenSet8", GOLDEN_SET_8),
     goldenSet("goldenSet64", GOLDEN_SET_64),
@@ -29,7 +31,7 @@ const DEG = Math.PI / 180;
 const PARAMS_SIZE = 528;
 
 /** Rotation about a unit axis by an angle, as a column-major 3x3 matrix padded to WGSL's mat3x3f: 12 floats. */
-function rotation([x, y, z], angle) {
+function rotation([x, y, z]: Vec3, angle: number) {
     const c = Math.cos(angle);
     const s = Math.sin(angle);
     const t = 1 - c;
@@ -43,7 +45,7 @@ function rotation([x, y, z], angle) {
 
 // Each polyhedron turns about its own tilted axis, at its own pace, so they never line up: tetrahedron, cube,
 // octahedron, dodecahedron, icosahedron.
-const SPINS = [
+const SPINS: { axis: Vec3; speed: number; start: number }[] = [
     { axis: [0.3, 0.2, 0.93], speed: 0.21, start: 0.4 },
     { axis: [-0.2, 0.35, 0.91], speed: -0.17, start: 0.7 },
     { axis: [0.35, 0.3, 0.89], speed: 0.19, start: 1.1 },
@@ -56,7 +58,7 @@ const SPINS = [
 const ORBIT = { radius: 1.3, height: 0.7, speed: 0.05, tilt: 6 * DEG };
 
 /** Where each solid is after `seconds`, the five polyhedra and the sphere, as vec4f: 24 floats. */
-function centers(seconds) {
+function centers(seconds: number) {
     const polyhedra = SPINS.map((_, i) => {
         const angle = (i * 2 * Math.PI) / 5 + ORBIT.speed * seconds;
         const node = i * 2.1;
@@ -65,14 +67,20 @@ function centers(seconds) {
     });
     return [...polyhedra, [0, 0, ORBIT.height, 0]].flat();
 }
-const normalized = (v) => v.map((c) => c / Math.hypot(...v));
+const normalized = (v: Vec3): Vec3 => {
+    const length = Math.hypot(...v);
+    return [v[0] / length, v[1] / length, v[2] / length];
+};
 
 /** Where an orbiting `camera` stands and how it is turned: it looks at the solids' center, 0.6 above the ground. */
-export function cameraFrame({ yaw, pitch, distance }) {
-    const forward = [-Math.cos(pitch) * Math.sin(yaw), -Math.cos(pitch) * Math.cos(yaw), -Math.sin(pitch)];
-    const eye = [-forward[0] * distance, -forward[1] * distance, 0.6 - forward[2] * distance];
+/** An orbiting camera: yaw from north through east, pitch, distance, and the vertical field of view, in radians. */
+export type Camera = { yaw: number; pitch: number; distance: number; fov: number };
+
+export function cameraFrame({ yaw, pitch, distance }: Omit<Camera, "fov">) {
+    const forward: Vec3 = [-Math.cos(pitch) * Math.sin(yaw), -Math.cos(pitch) * Math.cos(yaw), -Math.sin(pitch)];
+    const eye: Vec3 = [-forward[0] * distance, -forward[1] * distance, 0.6 - forward[2] * distance];
     const right = normalized([forward[1], -forward[0], 0]);
-    const up = [
+    const up: Vec3 = [
         right[1] * forward[2] - right[2] * forward[1],
         right[2] * forward[0] - right[0] * forward[2],
         right[0] * forward[1] - right[1] * forward[0],
@@ -80,18 +88,54 @@ export function cameraFrame({ yaw, pitch, distance }) {
     return { eye, forward, right, up };
 }
 
-export function createScene(device) {
+export type ToneCurve = "neutral" | "agx" | "aces" | "clip";
+
+/** What `encode` draws, as its documentation describes. */
+export type SceneOptions = {
+    cube: GPUTexture;
+    sh: GPUBuffer;
+    camera: Camera;
+    sunDirection: Iterable<number>;
+    sunAngularDiameter: number;
+    sunIlluminance: Iterable<number>;
+    ev100: number;
+    sunDisc?: boolean;
+    occlusionRays?: number;
+    seconds?: number;
+    shadowRays?: number;
+    background?: GPUTexture | null;
+    groundRadius?: number;
+    sunLight?: boolean;
+    skyLight?: boolean;
+    ground?: "floor" | "backdrop";
+    bloom?: number;
+    godRaySamples?: number;
+    airDensity?: number;
+    hazeDensity?: number;
+    cubified?: boolean;
+    dither?: boolean;
+    toneCurve?: ToneCurve;
+    discDirection?: Iterable<number>;
+    horizonZ?: number;
+    discIlluminance?: Iterable<number>;
+    skyScale?: number;
+    headroom?: number;
+};
+
+export function createScene(device: GPUDevice) {
     // One pipeline per output format, rgba8unorm or rgba16float for an HDR canvas, made when first drawn into.
-    const pipelines = new Map();
-    const pipelineFor = (format) => {
-        if (!pipelines.has(format)) {
+    const pipelines = new Map<GPUTextureFormat, GPUComputePipeline>();
+    const pipelineFor = (format: GPUTextureFormat) => {
+        let pipeline = pipelines.get(format);
+        if (!pipeline) {
             const code = source.replace("OUTPUT_FORMAT", format);
             const module = device.createShaderModule({ label: "sternwarte:scene", code });
             const layout = "auto";
             const compute = { module, entryPoint: "render" };
-            pipelines.set(format, device.createComputePipeline({ label: "sternwarte:scene", layout, compute }));
+            pipeline = device.createComputePipeline({ label: "sternwarte:scene", layout, compute });
+            pipelines.set(format, pipeline);
         }
-        return pipelines.get(format);
+        return pipeline;
     };
     const params = device.createBuffer({ size: PARAMS_SIZE, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const sampler = device.createSampler({ magFilter: "linear", minFilter: "linear", mipmapFilter: "linear" });
@@ -132,9 +176,9 @@ export function createScene(device) {
          * `headroom`, 1 by default, how many times SDR white an HDR display shows, which Neutral and "clip" go up to.
          */
         encode(
-            encoder,
-            target,
-            { cube, sh, camera, sunDirection, sunAngularDiameter, sunIlluminance, ev100, ...rest },
+            encoder: GPUCommandEncoder,
+            target: GPUTexture,
+            { cube, sh, camera, sunDirection, sunAngularDiameter, sunIlluminance, ev100, ...rest }: SceneOptions,
         ) {
             const { eye, forward, right, up } = cameraFrame(camera);
             const data = new Float32Array(PARAMS_SIZE / 4);
@@ -142,8 +186,8 @@ export function createScene(device) {
             data.set([...forward, target.width / target.height], 4);
             data.set([...right, 1 / (1.2 * 2 ** ev100)], 8);
             data.set([...up, (sunAngularDiameter / 2) * DEG], 12);
-            data.set(sunDirection, 16);
-            data.set(sunIlluminance, 20);
+            data.set([...sunDirection], 16);
+            data.set([...sunIlluminance], 20);
             const flags = new Uint32Array(data.buffer);
             flags[19] = rest.sunDisc ? 1 : 0;
             flags[23] = rest.occlusionRays ?? 8;
@@ -164,9 +208,9 @@ export function createScene(device) {
             flags[117] = rest.cubified ? 1 : 0;
             flags[118] = rest.dither === false ? 0 : 1;
             flags[119] = { neutral: 1, agx: 2, aces: 3, clip: 4 }[rest.toneCurve ?? "neutral"];
-            data.set(rest.discDirection ?? sunDirection, 120);
+            data.set([...(rest.discDirection ?? sunDirection)], 120);
             data[123] = rest.horizonZ ?? -1;
-            data.set(rest.discIlluminance ?? sunIlluminance, 124);
+            data.set([...(rest.discIlluminance ?? sunIlluminance)], 124);
             data[127] = rest.skyScale ?? 1;
             data[128] = rest.headroom ?? 1;
             device.queue.writeBuffer(params, 0, data);

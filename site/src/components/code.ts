@@ -4,7 +4,7 @@
  * TypeScript grammar and the one theme, with the JavaScript regex engine rather than the WebAssembly one, and loaded
  * only once there is code to show, so the figures never wait for it.
  */
-let highlighter = null;
+let highlighter: ReturnType<typeof load> | null = null;
 async function load() {
     const [{ createHighlighterCoreSync }, { createJavaScriptRegexEngine }, typescript, githubDark] = await Promise.all([
         import("shiki/core"),
@@ -19,10 +19,10 @@ async function load() {
     });
 }
 
-const latest = new WeakMap();
+const latest = new WeakMap<Element, string>();
 
 /** Replaces the contents of `element` with `code` as a highlighted TypeScript block, the latest call's winning. */
-export async function showCode(element, code) {
+export async function showCode(element: Element, code: string) {
     latest.set(element, code);
     highlighter ??= load();
     const html = (await highlighter).codeToHtml(code, {

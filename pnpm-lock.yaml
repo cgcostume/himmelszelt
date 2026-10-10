@@ -87,6 +87,12 @@ importers:
       '@playwright/test':
         specifier: ^1.62.1
         version: 1.63.0
+      '@types/zdog':
+        specifier: ^1.1.7
+        version: 1.1.7
+      '@webgpu/types':
+        specifier: ^0.1.74
+        version: 0.1.74
       typescript:
         specifier: ^6.0.0
         version: 6.0.3
@@ -883,6 +889,9 @@ packages:
 
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
+
+  '@types/zdog@1.1.7':
+    resolution: {integrity: sha512-Jh/WnSj9BpyKhXynv56djo3JcpNaCze3BhUv3oT45pDMM4YzCQ/KjWekj9IUJlNEIMg+do1yjAeLxhgDsXEB8g==}
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     resolution: {integrity: sha512-MTKKkWB7p/0E9xi1d1tHtZ5PiLkGEMIq88pK2CubZjOsLtYTLqhgIgi6zepFa+9GHZ6h05NMCkQxGKiPXMxXtQ==}
@@ -2843,6 +2852,8 @@ snapshots:
       undici-types: 8.9.0
 
   '@types/unist@3.0.3': {}
+
+  '@types/zdog@1.1.7': {}
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     optional: true

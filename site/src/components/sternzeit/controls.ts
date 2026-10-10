@@ -1,10 +1,11 @@
 import { dateFromJulianDay, julianDayFromDate } from "@himmelszelt/sternzeit";
-import { julianDayNow, onChange, state, update } from "./state.js";
-import { clock } from "./zone.js";
+import { find } from "../dom";
+import { julianDayNow, onChange, state, type TimeZoneChoice, update } from "./state";
+import { clock } from "./zone";
 
 // Every set of controls on the page (see Controls.astro) is wired the same way: user input writes to the shared
 // state, and every state change is written back to all of them, so they always show the one moment and place.
-const roots = [...document.querySelectorAll(".moment")];
+const roots = [...document.querySelectorAll<HTMLElement>(".moment")];
 const LATLONG_DECIMALS = 7;
 
 // jd is UT; shown in the viewer's own time zone or in the place's, as the clock toggle says.
@@ -13,7 +14,7 @@ const julianDayOf = julianDayFromDate;
 
 // Days, weeks, months and years step in UT, so time flows on evenly: across daylight saving time the clock shows an
 // hour more or less instead of the sky jumping. A month from 31 January is the last of February.
-function stepCalendar(jd, unit, sign) {
+function stepCalendar(jd: number, unit: string, sign: number) {
     const date = dateOf(jd);
     if (unit === "day" || unit === "week") date.setUTCDate(date.getUTCDate() + sign * (unit === "week" ? 7 : 1));
     else {
@@ -27,7 +28,7 @@ function stepCalendar(jd, unit, sign) {
     return julianDayOf(date);
 }
 
-const formatClock = (options) => {
+const formatClock = (options: Intl.DateTimeFormatOptions) => {
     const { offset, text } = clock(dateOf(state.jd), options);
     return `${text} ${offset}`;
 };
@@ -56,31 +57,31 @@ function momentAndPlaceJson() {
 
 // Snapping to an exact multiple of minStep (not just rounding the display) matters because the steps themselves are
 // repeating decimals (1/86400, 1/3600, ...): a step landing a hair off a whole second would make the time jitter.
-function roundToStep(value, minStep, decimals = Math.max(0, Math.ceil(-Math.log10(minStep)) + 2)) {
+function roundToStep(value: number, minStep: number, decimals = Math.max(0, Math.ceil(-Math.log10(minStep)) + 2)) {
     return Number((Math.round(value / minStep) * minStep).toFixed(decimals));
 }
 
-const capDecimals = (value, decimals) => Number(value.toFixed(decimals));
+const capDecimals = (value: number, decimals: number) => Number(value.toFixed(decimals));
 // A step size is picked from a group of radio buttons (see Controls.astro), one per granularity.
-const stepChoices = (steps) => [...steps.querySelectorAll('input[type="radio"]')];
-const chosenStep = (steps) => steps.querySelector('input[type="radio"]:checked');
-const minStepOf = (steps) => Math.min(...stepChoices(steps).map((choice) => Number(choice.value)));
+const stepChoices = (steps: Element) => [...steps.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
+const chosenStep = (steps: Element) => steps.querySelector<HTMLInputElement>('input[type="radio"]:checked');
+const minStepOf = (steps: Element) => Math.min(...stepChoices(steps).map((choice) => Number(choice.value)));
 
 // Arrow keys, wheel and the two buttons beside the input step by the chosen granularity, by hand rather than via
 // input.step: the browser's stepUp()/stepDown() silently no-ops on values that aren't exact multiples of `step`,
 // which ours never are.
-function wireStepping(input, steps, commit, decimals) {
+function wireStepping(input: HTMLInputElement, steps: Element, commit: () => void, decimals?: number) {
     input.step = "any";
     const minStep = minStepOf(steps);
-    const applyStep = (sign) => {
+    const applyStep = (sign: number) => {
         const value = Number(input.value) || 0;
         const choice = chosenStep(steps);
         const unit = choice?.dataset.calendar;
         const next = unit ? stepCalendar(value, unit, sign) : value + sign * Number(choice?.value ?? 0);
-        input.value = roundToStep(next, minStep, decimals);
+        input.value = String(roundToStep(next, minStep, decimals));
         commit();
     };
-    for (const button of input.closest(".stepper").querySelectorAll("[data-step]")) {
+    for (const button of input.closest(".stepper")?.querySelectorAll<HTMLElement>("[data-step]") ?? []) {
         button.addEventListener("click", () => applyStep(Number(button.dataset.step)));
     }
     input.addEventListener("keydown", (event) => {
@@ -102,7 +103,7 @@ function wireStepping(input, steps, commit, decimals) {
 // The browser knows where, not how high: coords.altitude is null on anything but a GPS fix, and ellipsoidal where it
 // is not. Open-Meteo's elevation endpoint answers with the Copernicus DEM (90 m grid) above sea level, no key needed;
 // it is asked only when the location button is pressed, and a failure just leaves the height as it was.
-async function lookupElevation(latitude, longitude) {
+async function lookupElevation(latitude: number, longitude: number) {
     try {
         const url = `https://api.open-meteo.com/v1/elevation?latitude=${latitude}&longitude=${longitude}`;
         const answer = await (await fetch(url)).json();
@@ -113,25 +114,25 @@ async function lookupElevation(latitude, longitude) {
     }
 }
 
-let liveIntervalId = null;
-let animateIntervalId = null;
+let liveIntervalId: ReturnType<typeof setInterval> | null = null;
+let animateIntervalId: ReturnType<typeof setInterval> | null = null;
 const ANIMATE_PER_SECOND = 30;
 
 function stopAnimate() {
-    clearInterval(animateIntervalId);
+    if (animateIntervalId !== null) clearInterval(animateIntervalId);
     animateIntervalId = null;
 }
 
 // Both drive the moment, so turning one on turns the other off.
-function setLive(live, source) {
-    clearInterval(liveIntervalId);
+function setLive(live: boolean, source: Element | null) {
+    if (liveIntervalId !== null) clearInterval(liveIntervalId);
     liveIntervalId = live ? setInterval(() => update({ jd: julianDayNow() }), 1000) : null;
     if (live) stopAnimate();
     update({ live, ...(live ? { jd: julianDayNow(), animate: false } : {}) }, source);
 }
 
 // The same step the buttons take, taken over and over: whatever granularity is chosen becomes the speed.
-function setAnimate(animate, source, steps) {
+function setAnimate(animate: boolean, source: Element | null, steps: Element) {
     stopAnimate();
     if (animate && state.live) setLive(false, source);
     const minStep = minStepOf(steps);
@@ -146,11 +147,12 @@ function setAnimate(animate, source, steps) {
 }
 
 for (const root of roots) {
-    const field = (name) => root.querySelector(`[data-field="${name}"]`);
-    const jd = field("jd");
-    const latitude = field("latitude");
-    const longitude = field("longitude");
-    const height = field("height");
+    const field = <T extends HTMLElement = HTMLElement>(name: string) => find<T>(`[data-field="${name}"]`, root);
+    const jd = field<HTMLInputElement>("jd");
+    const latitude = field<HTMLInputElement>("latitude");
+    const longitude = field<HTMLInputElement>("longitude");
+    // Not every set offers the height (see Controls.astro).
+    const height = root.querySelector<HTMLInputElement>('[data-field="height"]');
 
     const commitJd = () => {
         if (state.live) setLive(false, root);
@@ -166,10 +168,10 @@ for (const root of roots) {
     // From eye level, give or take, up to the International Space Station's orbit: parallax and horizon dip hold at
     // any height, refraction fades out with the air.
     const commitHeight = () => {
-        height.value = Math.min(Number(height.max), Math.max(Number(height.min), Number(height.value) || 0));
+        if (!height) return;
+        height.value = String(Math.min(Number(height.max), Math.max(Number(height.min), Number(height.value) || 0)));
         update({ heightM: Number(height.value) }, root);
     };
-    // Not every set offers the height (see Controls.astro).
     if (height) {
         wireStepping(height, field("heightStep"), commitHeight, 0);
         height.addEventListener("change", commitHeight);
@@ -191,7 +193,9 @@ for (const root of roots) {
     });
     // One button for both: while it is on the moment follows the clock, and switching it off leaves it at "now".
     // Only how the clock reads changes, never the instant, so the sky stays where it is.
-    field("timeZone").addEventListener("change", (event) => update({ timeZone: event.target.value }, root));
+    field("timeZone").addEventListener("change", (event) =>
+        update({ timeZone: (event.target as HTMLInputElement).value as TimeZoneChoice }, root),
+    );
     field("live").addEventListener("click", () => setLive(!state.live, root));
     field("animate").addEventListener("click", () => setAnimate(!state.animate, root, field("jdStep")));
     field("geolocate").addEventListener("click", () => {
@@ -221,22 +225,22 @@ for (const root of roots) {
 
 // Writes the state into every set of controls, except into the input the change is being typed into, so its caret and
 // partial input stay put.
-function sync(source) {
+function sync(source: Element | null) {
     for (const root of roots) {
-        const field = (name) => root.querySelector(`[data-field="${name}"]`);
-        const set = (input, value) => {
-            if (!(root === source && input === document.activeElement)) input.value = value;
+        const field = <T extends HTMLElement = HTMLElement>(name: string) => find<T>(`[data-field="${name}"]`, root);
+        const set = (input: HTMLInputElement | null, value: number) => {
+            if (input && !(root === source && input === document.activeElement)) input.value = String(value);
         };
         set(field("jd"), state.jd);
         set(field("latitude"), state.latitude);
         set(field("longitude"), state.longitude);
-        if (field("height")) set(field("height"), state.heightM);
+        set(root.querySelector<HTMLInputElement>('[data-field="height"]'), state.heightM);
         field("live").setAttribute("aria-pressed", String(state.live));
         field("animate").setAttribute("aria-pressed", String(state.animate));
         // Nothing to set or step by hand while the clock or the animation is driving it.
         const driven = state.live || state.animate;
-        field("jd").disabled = driven;
-        for (const button of root.querySelectorAll('.stepper:has([data-field="jd"]) [data-step]')) {
+        field<HTMLInputElement>("jd").disabled = driven;
+        for (const button of root.querySelectorAll<HTMLButtonElement>('.stepper:has([data-field="jd"]) [data-step]')) {
             button.disabled = driven;
         }
         for (const choice of stepChoices(field("timeZone"))) choice.checked = choice.value === state.timeZone;
