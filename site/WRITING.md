@@ -126,7 +126,8 @@ number or a model, not the general background. Every id in the frontmatter's `re
   dashes, arrows), subfigures as "(a) ... (b) ...", then scale ("Symbols, not to scale", "Magnified, discs and horizon
   true to each other"), credits, and what to do with it last ("Hover to read off any other.", "Click to move the moment
   there."). "The chosen place" and "the chosen moment" for whatever the controls are set to.
-- Figures render on demand, never in a continuous loop, and are built so the later Tafeln can lift them out (colors
+- Figures render on demand, never in a continuous loop (the one exception: the corona in the eclipse figure turns
+  while it shows and is in view), and are built so the later Tafeln can lift them out (colors
   from CSS tokens, UI switchable off, no reach into the chapter's DOM).
 - `<Planned>` boxes for figures not yet built render under `pnpm dev` only; the published text never relies on them.
 

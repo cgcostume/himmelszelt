@@ -1,5 +1,6 @@
 ---
 import "./sternzeit.css";
+import TimeSlider from "./TimeSlider.astro";
 ---
 
 <figure class="moon-calendar" id="moon-calendar">
@@ -20,14 +21,7 @@ import "./sternzeit.css";
     <div class="calendar-weekdays" aria-hidden="true"></div>
     <div class="calendar-weeks" data-field="weeks"></div>
     {/* The time of day the discs are drawn at, on the chosen clock: the moment's, the date kept. */}
-    <label class="figure-slider" title="The time of day on the chosen clock: drag, or turn the mouse wheel">
-        <span class="note">Time</span>
-        <span class="figure-slider-rail">
-            <input type="range" data-field="time" min="0" max="1440" step="5" aria-label="Time of day" />
-            <span class="figure-slider-scale" aria-hidden="true">{["00", "06", "12", "18", "24"].map((hour, i) => <span class="figure-slider-mark" style={`left: ${i * 25}%`}>{hour}</span>)}</span>
-        </span>
-        <output data-field="timeValue"></output>
-    </label>
+    <TimeSlider />
     </div>
     {/* One hatching for every disc below the horizon, referenced from each day's own SVG. */}
     <svg width="0" height="0" aria-hidden="true" style="position: absolute">

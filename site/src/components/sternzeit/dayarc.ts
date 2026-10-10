@@ -26,7 +26,12 @@ const R = 100;
 // Paths cover the local mean solar day of the chosen moment, midnight to midnight, sampled every 10 minutes: one dot
 // per hour on the Sun's.
 const SAMPLES_PER_HOUR = 6;
-const HOURS = 24;
+// The Moon's path: a day either way of the moment, fading all the way from the Moon itself to nothing.
+const MOON_SPAN_HOURS = 24;
+const MOON_FADE_HOURS = 24;
+// The Sun's: half a day either way, its last hour at either end fading out, so the two ends meet without overlapping.
+const SUN_SPAN_HOURS = 12;
+const SUN_FADE_HOURS = 1;
 // The analemma: the Sun at the same time of day, on every day of the half year before and after the moment.
 const ANALEMMA_DAYS = 182;
 // Half the analemma panel's width and its height in degrees: some 47 degrees of analemma, with room around it.
@@ -149,16 +154,6 @@ const compassLabels = COMPASS.map((text, i) => {
     return { label, point: skyPoint({ azimuth: i * 45, altitude: 0 }, R) };
 });
 
-/** Julian Day of local mean solar noon on the moment's day: JDs are integers at noon UT, shifted by the longitude. */
-const localNoon = (jd: number, longitude: number) => Math.round(jd + longitude / 360) - longitude / 360;
-
-function samplePath(body: Body, noon: number, latitude: number, longitude: number) {
-    const count = HOURS * SAMPLES_PER_HOUR;
-    return Array.from({ length: count + 1 }, (_, i) =>
-        seen(body, precise.fromJulianDay(noon + (i - count / 2) / count), latitude, longitude),
-    );
-}
-
 /** Splits a path into runs above and below the horizon; consecutive runs share their boundary sample. */
 function runsByHorizon(samples: HorizontalCoords[]) {
     const runs: { up: boolean; samples: HorizontalCoords[] }[] = [];
@@ -172,6 +167,41 @@ function runsByHorizon(samples: HorizontalCoords[]) {
 }
 
 const anchorFor = (altitude: number) => dynamic[altitude >= 0 ? 1 : 0];
+
+/**
+ * A body's path `span` hours either way of the moment, sampled on the grid of local mean time, so every
+ * SAMPLES_PER_HOUR-th sample is a whole hour, with how strongly each shows: fully, then fading to nothing over the last
+ * `fade` hours at either end.
+ */
+function fadingPath(body: Body, jd: number, latitude: number, longitude: number, span: number, fade: number) {
+    const half = span * SAMPLES_PER_HOUR;
+    const perDay = 24 * SAMPLES_PER_HOUR;
+    const shift = longitude / 360;
+    const firstStep = Math.floor((jd + shift - span / 24) * perDay);
+    const samples = Array.from({ length: 2 * half + 1 }, (_, i) =>
+        seen(body, precise.fromJulianDay((firstStep + i) / perDay - shift), latitude, longitude),
+    );
+    return {
+        samples,
+        alpha: (i: number) => Math.max(0, Math.min(1, (half - Math.abs(i - half)) / (fade * SAMPLES_PER_HOUR))),
+        hour: (i: number) => (firstStep + i) % SAMPLES_PER_HOUR === 0,
+        // Arrows at 3, 9, 15 and 21 local mean time, wherever the path is.
+        arrow: (i: number) => (firstStep + i - ARROW_OFFSET) % ARROW_EVERY === 0,
+    };
+}
+
+/** A fading path in runs at the same tenth of opacity, each in `color` mixed down to it. */
+function addFadingPath(path: ReturnType<typeof fadingPath>, color: string, strokePx: number, dash: string) {
+    const level = (i: number) => Math.round(path.alpha(i) * 10);
+    let start = 0;
+    for (let i = 1; i < path.samples.length; i++) {
+        if (i < path.samples.length - 1 && level(i) === level(start)) continue;
+        const alpha = Math.max(level(start), level(i)) * 10;
+        const mixed = alpha >= 100 ? color : `color-mix(in srgb, ${color} ${alpha}%, transparent)`;
+        if (alpha > 0) addPath(path.samples.slice(start, i + 1), mixed, strokePx, dash);
+        start = i;
+    }
+}
 
 function addPath(samples: HorizontalCoords[], color: string, strokePx: number, dashBelow: string) {
     for (const run of runsByHorizon(samples)) {
@@ -207,10 +237,6 @@ function addArrow(samples: HorizontalCoords[], i: number, color: string) {
     styled(new Shape({ addTo: anchorFor(sample.altitude), path, fill: true, color }), 1);
 }
 
-function addArrows(samples: HorizontalCoords[], color: string) {
-    for (let i = ARROW_OFFSET; i < samples.length - 1; i += ARROW_EVERY) addArrow(samples, i, color);
-}
-
 function addDot(horizontal: HorizontalCoords, color: string, strokePx: number) {
     styled(new Shape({ addTo: anchorFor(horizontal.altitude), translate: skyPoint(horizontal), color }), strokePx);
 }
@@ -237,20 +263,40 @@ function rebuildPaths() {
             child.remove();
         }
     }
-    const noon = localNoon(jd, longitude);
-    const sunSamples = samplePath(precise.sun, noon, latitude, longitude);
-    const moonSamples = samplePath(precise.moon, noon, latitude, longitude);
-    addPath(moonSamples, MUTED, 1, DASHED);
-    addPath(sunSamples, INK, 1.5, DOTTED);
-    addArrows(moonSamples, MUTED);
-    addArrows(sunSamples, INK);
-    sunSamples.forEach((sample, i) => {
-        if (i % SAMPLES_PER_HOUR === 0 && sample.altitude >= 0) addDot(sample, INK, 4);
+    // Both paths are drawn around the moment and fade out at their ends, so they move along with the bodies. The
+    // Moon's does not close: it moves on by some 13 degrees a day and winds on as a spiral, a day either
+    // way, fading from the Moon itself. The Sun's nearly closes after a day: half a day either way, the last hour
+    // at either end fading, so its two ends meet without overlapping.
+    const moon = fadingPath(precise.moon, jd, latitude, longitude, MOON_SPAN_HOURS, MOON_FADE_HOURS);
+    addFadingPath(moon, MUTED, 1, DASHED);
+    const sun = fadingPath(precise.sun, jd, latitude, longitude, SUN_SPAN_HOURS, SUN_FADE_HOURS);
+    addFadingPath(sun, INK, 1.5, DOTTED);
+    for (const [path, color] of [
+        [moon, MUTED],
+        [sun, INK],
+    ] as const) {
+        for (let i = 0; i < path.samples.length - 1; i++) {
+            const alpha = path.alpha(i);
+            if (!path.arrow(i) || alpha < 0.2) continue;
+            addArrow(
+                path.samples,
+                i,
+                alpha >= 1 ? color : `color-mix(in srgb, ${color} ${Math.round(alpha * 100)}%, transparent)`,
+            );
+        }
+    }
+    // The Sun's hour dots on whole hours of the day it is drawn for, where it is up.
+    sun.samples.forEach((sample, i) => {
+        if (sun.hour(i) && sun.alpha(i) >= 1 && sample.altitude >= 0) addDot(sample, INK, 4);
     });
     const time = precise.fromJulianDay(jd);
     addDot(seen(precise.moon, time, latitude, longitude), MUTED, BODY_DOT_PX);
     const sunNow = seen(precise.sun, time, latitude, longitude);
-    styled(new Shape({ addTo: anchorFor(sunNow.altitude), translate: skyPoint(sunNow), color: INK }), BODY_DOT_PX, sunNow.altitude > 0 ? "figure-sun-glow" : null);
+    styled(
+        new Shape({ addTo: anchorFor(sunNow.altitude), translate: skyPoint(sunNow), color: INK }),
+        BODY_DOT_PX,
+        sunNow.altitude > 0 ? "figure-sun-glow" : null,
+    );
     addSunRays(sunNow);
 }
 

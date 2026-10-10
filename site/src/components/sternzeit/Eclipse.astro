@@ -14,7 +14,7 @@ import "./sternzeit.css";
             <button type="button" data-jump="solar" data-step="1" title="The eclipse after this moment" aria-label="The eclipse after this moment">later</button>
         </span>
         </div>
-        <label class="figure-slider" title="The moment, up to 2 hours either way from where it was set: drag, or turn the mouse wheel for a minute a notch">
+        <label class="figure-slider" data-offset title="The moment, up to 2 hours either way from where it was set: drag, or turn the mouse wheel for a minute a notch">
             <span class="figure-slider-rail">
                 <input type="range" data-field="offset" min="-120" max="120" step="1" value="0" aria-label="Minutes from the moment" />
                 <span class="figure-slider-scale" aria-hidden="true">{["−2", "0", "+2"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 50}%`}>{mark}{i !== 1 && <span class="figure-slider-unit"> h</span>}</span>)}</span>
@@ -35,7 +35,7 @@ import "./sternzeit.css";
             <button type="button" data-jump="lunar" data-step="1" title="The eclipse after this moment" aria-label="The eclipse after this moment">later</button>
         </span>
         </div>
-        <label class="figure-slider" title="The moment, up to 3 hours either way from where it was set: drag, or turn the mouse wheel for a minute a notch">
+        <label class="figure-slider" data-offset title="The moment, up to 3 hours either way from where it was set: drag, or turn the mouse wheel for a minute a notch">
             <span class="figure-slider-rail">
                 <input type="range" data-field="offset" min="-180" max="180" step="1" value="0" aria-label="Minutes from the moment" />
                 <span class="figure-slider-scale" aria-hidden="true">{["−3", "0", "+3"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 50}%`}>{mark}{i !== 1 && <span class="figure-slider-unit"> h</span>}</span>)}</span>

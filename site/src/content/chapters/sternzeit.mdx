@@ -59,7 +59,7 @@ faintly, by earthshine.
 
 Every figure and table on this page is computed live by the library, in your browser, and follows one moment and one
 place. The same controls sit folded up below every figure and every unfolded table, so there is no need to scroll back
-up here. The pin fills in your location. Animate with a step of a day, and the Moon's phases and libration show best.
+up here. The pin fills in your location.
 
 ## Counting time the astronomer's way
 
@@ -85,9 +85,9 @@ Then there is <Term of="Sidereal time">sidereal time</Term>. A solar day, noon t
 moves along its orbit, so it has to turn a little more than once for the Sun to come back to the same spot. Relative to
 the distant stars, one rotation takes about 23 hours and 56 minutes. Sidereal time measures that rotation, as an angle.
 It is what connects the sky's coordinates to your spot on the ground: the dashed meridian through your location rotates
-with it (<Fig id="armillary-sphere" />). Step the moment a day at a time, and sidereal time gains almost a degree with
-every step (<Tab id="time" />). Over a year, these add up to one whole turn: Earth rotates 366 times while the Sun comes
-back only 365.
+with it (<Fig id="armillary-sphere" />). From one day to the next, sidereal time gains almost a degree
+(<Tab id="time" />). Over a year, these add up to one whole turn: Earth rotates 366 times while the Sun comes back only
+365.
 
 In code, a moment is a JavaScript `Date` or the same moment spelled out, and each of these counts is one call away:
 
@@ -362,9 +362,9 @@ orbit crosses the ecliptic, and a season lasts longer than the month from one ne
 the Sun has one of the Moon about two weeks before or after it, if often only a faint penumbral one. The total solar
 eclipse of August 12, 2026, over Greenland, Iceland and Spain, was followed by a partial lunar eclipse on August 28.
 
-Jump to a total lunar eclipse, step back three hours from its maximum, then forward by minutes, and watch it unfold. The
-Moon darkens in the penumbra first, barely noticeable, then turns a dark red in the umbra, lit only by sunlight that
-Earth's atmosphere bends around the planet, its outer rim tinged blue by the ozone the light passes through.
+In a total lunar eclipse, the Moon darkens in the penumbra first, barely noticeable, then turns a dark red in the umbra,
+lit only by sunlight that Earth's atmosphere bends around the planet, its outer rim tinged blue by the ozone the light
+passes through.
 
 Tracing that light through the atmosphere gives the colors physically <Cite id="yapo2009" />, but far from real time. A
 renderer can approximate them from the eclipse's `phase` instead <Cite id="mueller2012vmv" />, and the panel only hints

@@ -1,9 +1,9 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { find } from "../dom";
 import { onDemand } from "../frame";
-import { paintRange } from "../range";
 import { drawSvg, sunGlow, svgText, veiledHorizon } from "./figure";
 import { arrowAround, offPanelArrowSvg } from "./offpanel";
+import { offsetSliders } from "./offset";
 import { ephemerisDay, onChange, state, update } from "./state";
 import "./export";
 
@@ -30,14 +30,68 @@ const CORONA_DISC_DIAMETER_PX = 419;
 let idCount = 0;
 
 /** The corona photograph, scaled and centered so its disc covers exactly the Sun's. */
-function corona() {
-    const scale = (2 * SUN_RADIUS_UNITS) / CORONA_DISC_DIAMETER_PX;
+// The corona fades in as totality nears, from this much of the Sun's diameter covered: first its innermost ring,
+// faint, then all of it once the Sun is gone.
+const CORONA_FROM = 0.97;
+const CORONA_GROWTH = 0.2;
+// The added copies are lifted by this much, so the edge of the Moon glares.
+const CORONA_GAIN = 1.5;
+// The falloff's exponent, and how many stops draw it.
+const CORONA_FALLOFF = 1.8;
+const CORONA_FALLOFF_STOPS = 8;
+// Copies of the photograph laid over each other and added, each weighted by its strength over all of theirs, so the
+// corona is at its brightest only where all of them are bright (see .eclipse-corona-layer); each turning on its own, continuously about the Sun's
+// center, in seconds a turn, so the streamers drift through each other while it shows. The first slow, the second
+// mirrored, smaller, so the two never line up, and fast: their periods apart by the golden ratio cubed, an irrational
+// ratio, so they never come back into the same phase. A third, full size and half as strong, starts at a random angle
+// and turns at a random pace, new on every visit. Not for a reader who prefers less motion.
+const GOLDEN = (1 + Math.sqrt(5)) / 2;
+type CoronaLayer = { seconds: number; size: number; mirrored: boolean; strength: number; offset: number };
+const CORONA_LAYERS: CoronaLayer[] = [
+    { seconds: 360, size: 1, mirrored: false, strength: 1, offset: 0 },
+    { seconds: -360 / GOLDEN ** 3, size: 0.8, mirrored: true, strength: 1, offset: 0 },
+    {
+        seconds: (Math.random() < 0.5 ? -1 : 1) * (120 + Math.random() * 300),
+        size: 1,
+        mirrored: Math.random() < 0.5,
+        strength: 0.5,
+        offset: Math.random() * 360,
+    },
+];
+const CORONA_STRENGTH = CORONA_LAYERS.reduce((sum, layer) => sum + layer.strength, 0);
+const stillCorona = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** The corona photograph at `amount` of the way to totality, 0 to 1, scaled and centered so its disc covers the Sun's. */
+function corona(amount: number) {
+    // Redrawn on every change, so each turn picks up where the clock has it rather than starting over.
+    const now = performance.now() / 1000;
+    // It grows on the way, its disc from a fifth smaller than the Sun's, hidden behind it, to exactly the Sun's at
+    // totality, where the corona starts right at the Moon's edge.
+    const scale = ((2 * SUN_RADIUS_UNITS) / CORONA_DISC_DIAMETER_PX) * (1 - CORONA_GROWTH * (1 - amount));
     const size = CORONA_PHOTO_PX * scale;
     const [x, y] = CORONA_DISC_CENTER_PX.map((px) => -px * scale);
     const id = ++idCount;
-    return `<radialGradient id="corona-fade-${id}"><stop offset="0.55" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient>
+    // The mask opens outward as totality nears, from the photograph's disc to its edge at totality, falling off as the
+    // real corona does: brightest at the Moon's edge, dropping fast, then a long faint tail.
+    const [inner, outer] = [0.34, 0.45 + 0.55 * amount];
+    const fade = Array.from({ length: CORONA_FALLOFF_STOPS + 1 }, (_, k) => {
+        const t = k / CORONA_FALLOFF_STOPS;
+        const level = Math.round(255 * (1 - t) ** CORONA_FALLOFF);
+        return `<stop offset="${f(inner + (outer - inner) * t)}" stop-color="rgb(${level},${level},${level})"/>`;
+    }).join("");
+    return `<radialGradient id="corona-fade-${id}">${fade}</radialGradient>
         <mask id="corona-mask-${id}"><rect x="${f(x)}" y="${f(y)}" width="${f(size)}" height="${f(size)}" fill="url(#corona-fade-${id})"/></mask>
-        <image href="${CORONA_IMAGE}" x="${f(x)}" y="${f(y)}" width="${f(size)}" height="${f(size)}" mask="url(#corona-mask-${id})" class="eclipse-corona"/>`;
+        <g class="eclipse-corona" opacity="${f(amount ** 1.5)}" style="filter: brightness(${CORONA_GAIN})">${CORONA_LAYERS.map(
+            ({ seconds, size: scaled, mirrored, strength, offset }) => {
+                const image = `<image href="${CORONA_IMAGE}" x="${f(x)}" y="${f(y)}" width="${f(size)}" height="${f(size)}" mask="url(#corona-mask-${id})"/>`;
+                const [from, to] = [offset, offset + (seconds < 0 ? -360 : 360)];
+                const turn = stillCorona
+                    ? ""
+                    : `<animateTransform attributeName="transform" type="rotate" from="${f(from)} 0 0" to="${f(to)} 0 0" dur="${f(Math.abs(seconds))}s" begin="-${f(now % Math.abs(seconds))}s" repeatCount="indefinite"/>`;
+                const still = stillCorona ? ` transform="rotate(${f(offset)})"` : "";
+                return `<g class="eclipse-corona-layer" opacity="${f(strength / CORONA_STRENGTH)}"${still}>${turn}<g transform="scale(${f(mirrored ? -scaled : scaled)}, ${f(scaled)})">${image}</g></g>`;
+            },
+        ).join("")}</g>`;
 }
 const f = (n: number) => n.toFixed(2);
 const circle = (x: number, y: number, r: number, cls: string, extra = "") =>
@@ -54,7 +108,8 @@ function renderSolar(jd: number) {
     const eclipse = precise.eclipse.solar(time, state);
     const sunAltitude = precise.sun.horizontalPosition(time, state).altitude;
     const sunRadiusDeg = precise.sun.apparentAngularDiameter(ephemerisDay(jd)) / 2;
-    const moonRadiusDeg = precise.moon.apparentAngularDiameter(ephemerisDay(jd)) / 2;
+    // As seen from the chosen place, as the library classifies the eclipse: the Moon a little larger than from Earth's center.
+    const moonRadiusDeg = precise.moon.topocentricAngularDiameter(time, state) / 2;
     const scale = SUN_RADIUS_UNITS / sunRadiusDeg;
     const moonRadius = moonRadiusDeg * scale;
 
@@ -67,10 +122,13 @@ function renderSolar(jd: number) {
     const outer = sunRadiusDeg + moonRadiusDeg;
     const total = eclipse.separation <= inner && moonRadiusDeg > sunRadiusDeg;
 
+    // How near totality, by the diameter covered; an annular eclipse leaves a ring too bright for any corona.
+    const covered = (outer - eclipse.separation) / (2 * sunRadiusDeg);
+    const near =
+        moonRadiusDeg > sunRadiusDeg ? Math.min(1, Math.max(0, (covered - CORONA_FROM) / (1 - CORONA_FROM))) : 0;
+    const amount = total ? 1 : near * near * (3 - 2 * near);
     let svg = "";
-    if (total) {
-        svg += corona();
-    }
+    if (amount > 0) svg += corona(amount);
     // The Sun sits at the center, so the visible horizon is the Sun's apparent altitude over it below; refraction lifts
     // the Sun, the observer's height lowers the horizon. The ground veils whatever is beneath.
     const sunAbove = precise.earth.apparentAltitude(sunAltitude, { observerHeightM: state.heightM });
@@ -160,29 +218,9 @@ function renderLunar(jd: number) {
 const RENDERERS = { solar: renderSolar, lunar: renderLunar };
 const views = document.querySelectorAll<HTMLElement>(".eclipse-view[data-kind]");
 
-// Under each panel, a slider through the eclipse in minutes: two hours either way for the Sun, three for the Moon, which
-// takes longer to cross Earth's shadow. It moves the moment around where something else last set it, a jump to an
-// eclipse's maximum most of all; a change of place alone keeps that anchor.
-const MINUTE = 1 / 1440;
-const sliders = [...views].map((view) => {
-    const input = find<HTMLInputElement>('[data-field="offset"]', view);
-    const output = find('[data-field="offsetValue"]', view);
-    const slider = { input, output, anchor: state.jd, slid: Number.NaN };
-    input.addEventListener("input", () => {
-        slider.slid = Number((slider.anchor + Number(input.value) * MINUTE).toFixed(7));
-        update({ jd: slider.slid, live: false, animate: false }, input);
-    });
-    onChange(() => {
-        if (state.jd !== slider.slid) slider.anchor = state.jd;
-    });
-    return slider;
-});
-
-/** Signed hours and minutes, as the offset beside a slider: "+1:05", "−0:30". */
-function signedTime(minutes: number) {
-    const m = Math.round(Math.abs(minutes));
-    return `${minutes < 0 ? "\u2212" : "+"}${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
-}
+// Under each panel, a slider through the eclipse in minutes (see offset.ts): two hours either way for the Sun, three
+// for the Moon, which takes longer to cross Earth's shadow.
+offsetSliders();
 
 function render() {
     for (const view of views) {
@@ -191,12 +229,6 @@ function render() {
         const { svg, status } = RENDERERS[view.dataset.kind as keyof typeof RENDERERS](state.jd);
         drawSvg(panel, svg, unitsPerPx);
         find('[data-field="status"]', view).textContent = status;
-    }
-    for (const { input, output, anchor } of sliders) {
-        const minutes = Math.round((state.jd - anchor) / MINUTE);
-        input.value = String(minutes);
-        paintRange(input);
-        output.textContent = signedTime(minutes);
     }
 }
 
@@ -296,6 +328,14 @@ for (const button of document.querySelectorAll<HTMLElement>(".eclipse-view [data
         if (jd === null) status.textContent = `none within ${SEARCH_YEARS} years of this moment`;
         else update({ jd, live: false, animate: false });
     });
+}
+
+// The corona turns only while its panel is in view: off screen its animations pause, where they are.
+for (const panel of document.querySelectorAll<SVGSVGElement>('.eclipse-view[data-kind="solar"] .eclipse-panel > svg')) {
+    new IntersectionObserver(([entry]) => {
+        if (entry?.isIntersecting) panel.unpauseAnimations();
+        else panel.pauseAnimations();
+    }).observe(panel);
 }
 
 const [first] = views;

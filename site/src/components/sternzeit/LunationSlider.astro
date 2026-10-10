@@ -1,0 +1,17 @@
+---
+// The lunation the moment is in, from one full moon to the next, its true phases marked (see lunation.ts).
+---
+
+<label class="figure-slider" data-lunation title="The lunation, full moon to full moon: drag, or turn the mouse wheel for an hour a notch">
+    <span class="note">Lunation</span>
+    <span class="figure-slider-rail">
+        <input type="range" data-field="lunation" min="0" max="708" step="1" aria-label="Hours since the full moon" />
+        <span class="figure-slider-scale" data-field="phases" aria-hidden="true"></span>
+    </span>
+    <output data-field="lunationValue" title="Days since the full moon"></output>
+</label>
+
+<script>
+    import { lunationSliders } from "./lunation";
+    lunationSliders();
+</script>

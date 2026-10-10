@@ -11,7 +11,7 @@
         "preview": "astro preview",
         "typecheck": "astro check",
         "bluenoise": "node scripts/bluenoise.mjs",
-        "images": "magick src/data/corona-2023-04-20-exmouth-phil-hart.png -resize 1000x1000 -strip -quality 80 -define webp:method=6 public/images/corona-2023-04-20-exmouth.webp",
+        "images": "magick src/data/corona-2023-04-20-exmouth-phil-hart.png -resize 1024x1024 -strip -quality 80 -define webp:method=6 public/images/corona-2023-04-20-exmouth.webp",
         "test:browser": "playwright test"
     },
     "dependencies": {

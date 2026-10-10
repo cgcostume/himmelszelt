@@ -1,10 +1,10 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { find } from "../dom";
 import { onDemand } from "../frame";
-import { paintRange } from "../range";
 import { moonSymbol, sunInViewFrame } from "./figure";
 import { onChange, state, update } from "./state";
-import { clock, clockOffsetMs, DAY_MS, instantOf, wallDayOf } from "./zone";
+import { momentOnClock } from "./timeofday";
+import { clock, DAY_MS, instantOf, wallDayOf } from "./zone";
 
 // Ten-minute steps: rise and set are then found to the minute by bisection, and the lanes are smooth enough.
 const SAMPLES_PER_DAY = 144;
@@ -29,9 +29,6 @@ const weeksEl = find('[data-field="weeks"]', figure);
 const titleEl = find('[data-field="title"]', figure);
 const monthButtons = [...figure.querySelectorAll<HTMLButtonElement>("[data-month]")];
 const lockButton = find('[data-field="lock"]', figure);
-const timeInput = find<HTMLInputElement>('[data-field="time"]', figure);
-const timeValue = find('[data-field="timeValue"]', figure);
-const MINUTE_MS = 60_000;
 // Locked, the calendar shows the moment's month and follows it; neither months nor days can be picked.
 let locked = false;
 
@@ -219,16 +216,8 @@ function render() {
         lanesKey = key;
         lanesByDay = new Map(days.map((day) => [day, dayLanes(day)]));
     }
-    const page = pageMs();
-    // The slider's 24:00 is the next midnight, still counted to the day it ends, so the thumb stays at the end.
-    const atEnd = state.jd === sliderEnd;
-    const pageDay = wallDayOf(page) - (atEnd ? 1 : 0);
-    // The time of day on the page's clock, the same for every day of the grid.
-    const timeOfDay = page + clockOffsetMs(new Date(page)) - pageDay * DAY_MS;
-    const minutes = Math.round(timeOfDay / MINUTE_MS);
-    timeInput.value = String(minutes);
-    paintRange(timeInput);
-    timeValue.textContent = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+    // The moment's day and its time of day on the page's clock, the same time for every day of the grid.
+    const { day: pageDay, timeOfDay } = momentOnClock();
 
     let html = "";
     for (let week = 0; week < days.length / 7; week++) {
@@ -328,18 +317,6 @@ weeksEl.addEventListener("click", (event) => {
     }
     const jd = precise.julianDayFromDate(new Date(Number(day.dataset.at)));
     update({ jd: Number(jd.toFixed(7)), live: false, animate: false });
-});
-
-// The slider sets the moment's time of day on the clock and keeps its date; 24:00 is the next midnight, which the
-// calendar still counts to the day it ends, until something else moves the moment.
-let sliderEnd = Number.NaN;
-timeInput.addEventListener("input", () => {
-    const page = pageMs();
-    const day = wallDayOf(page) - (state.jd === sliderEnd ? 1 : 0);
-    const minutes = Number(timeInput.value);
-    const jd = Number(precise.julianDayFromDate(new Date(instantOf(day * DAY_MS + minutes * MINUTE_MS))).toFixed(7));
-    sliderEnd = minutes === 24 * 60 ? jd : Number.NaN;
-    update({ jd, live: false, animate: false });
 });
 
 find(".calendar-weekdays", figure).innerHTML = WEEKDAYS.map((day) => `<span>${day}</span>`).join("");

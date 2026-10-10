@@ -4,7 +4,6 @@ import Zdog from "zdog";
 import { find } from "../dom";
 import { onDemand } from "../frame";
 import {
-    alongVerticalCircle,
     COMPASS,
     cssColor,
     drawSvg,
@@ -19,6 +18,7 @@ import {
 } from "./figure";
 import { arrowAround, offPanelArrowSvg } from "./offpanel";
 import { ephemerisDay, onChange, state } from "./state";
+import { clockOffsetMs } from "./zone";
 import "./export";
 
 const { Illustration, Anchor, Shape, Ellipse, Vector } = Zdog;
@@ -56,13 +56,15 @@ function vScale(a: Point, s: number) {
 }
 
 // Earth-centered equatorial frame: RA=0/dec=0 is the +X axis, the celestial equator is the XZ plane,
-// +dec is -Y (Zdog is screen-convention y-down, so "up"/north is negative y). Used for every body
+// +dec is -Y (Zdog is screen-convention y-down, so "up"/north is negative y), and RA 90° is -Z: with Zdog's +Z
+// towards the viewer and y down, that keeps the frame right-handed on screen, so Earth turns counterclockwise as
+// seen from the north and the Sun crosses the sky from east to west. Used for every body
 // (sun/moon apparentPosition) and, via siderealTime + longitude standing in for RA, for points on Earth's
 // own surface, so a ground point's position here rotates in sync with the sky exactly as it does in reality.
 function sphericalToVector(raDeg: number, decDeg: number, radius: number) {
     const ra = raDeg * DEG;
     const dec = decDeg * DEG;
-    return v(radius * Math.cos(dec) * Math.cos(ra), -radius * Math.sin(dec), radius * Math.cos(dec) * Math.sin(ra));
+    return v(radius * Math.cos(dec) * Math.cos(ra), -radius * Math.sin(dec), -radius * Math.cos(dec) * Math.sin(ra));
 }
 
 // A circle's default normal is its local +Z (see equatorRing's rotate:{x:PI/2} comment above); this finds
@@ -135,7 +137,7 @@ const axisLine = new Shape({
     color: INK,
 });
 // Which way Earth turns, as an arrow curving around the axis above the north pole, clear of the globe itself: west
-// to east, carrying every point on the surface towards increasing right ascension (+X towards +Z here). Built from
+// to east, carrying every point on the surface towards increasing right ascension (+X towards -Z here). Built from
 // right ascension 0 and turned to the observer's meridian each frame (see frame), so it tracks the rotation itself. Solid, not
 // dotted like the references it circles: it is one mark to be read as a whole, and small enough that dots would
 // leave little of it.
@@ -146,7 +148,7 @@ const SPIN_SEGMENTS = 28;
 const SPIN_HEAD_DEG = 16;
 const SPIN_HEAD_HALF_WIDTH = 0.05 * EARTH_R;
 const spinPoint = (deg: number, radius = SPIN_RING_RADIUS) =>
-    v(radius * Math.cos(deg * DEG), SPIN_RING_Y, radius * Math.sin(deg * DEG));
+    v(radius * Math.cos(deg * DEG), SPIN_RING_Y, -radius * Math.sin(deg * DEG));
 const spinArc = new Shape({
     addTo: earthAnchor,
     path: Array.from({ length: SPIN_SEGMENTS + 1 }, (_, i) => spinPoint((i / SPIN_SEGMENTS) * SPIN_ARC_DEG)),
@@ -220,6 +222,21 @@ const orbitEllipse = new Ellipse({
     stroke: 1,
     fill: false,
 });
+// The Moon's orbit, dimmed: where it stands over the sidereal month around the moment, a day's 13 degrees a step at a
+// time, at the schematic distance the Moon is drawn at. Rebuilt only when the moment changes.
+const MOON_ORBIT_DAYS = 27.321661;
+const MOON_ORBIT_SAMPLES = 120;
+const moonOrbit = new Shape({ addTo: earthAnchor, path: [v(0, 0, 0)], closed: false, stroke: 1, color: MOON_INK });
+let moonOrbitJd = Number.NaN;
+function updateMoonOrbit(jd: number) {
+    if (jd === moonOrbitJd) return;
+    moonOrbitJd = jd;
+    moonOrbit.path = Array.from({ length: MOON_ORBIT_SAMPLES + 1 }, (_, i) => {
+        const at = precise.moon.apparentPosition(ephemerisDay(jd + (i / MOON_ORBIT_SAMPLES - 0.5) * MOON_ORBIT_DAYS));
+        return sphericalToVector(at.rightAscension, at.declination, MOON_DIST);
+    });
+    moonOrbit.updatePath();
+}
 // The atmosphere shell as a constant, always-on presence, layered on top of everything else: a single
 // billboarded circle (see billboardRotate) at the atmosphere's outer radius, rather than three fixed
 // wireframe rings, so it always reads as a clean full disc regardless of how the scene is rotated. No
@@ -246,7 +263,7 @@ const inDepth = (source: Zdog.Shape, closed: boolean) => {
             path: [v(0, 0, 0)],
             closed: false,
             stroke: source.stroke || false,
-            color: INK,
+            color: source.color || INK,
         });
     return { source, closed, front: half(), back: half() };
 };
@@ -255,6 +272,7 @@ const depthLines = [
     inDepth(latitudeRing, true),
     inDepth(meridianRing, true),
     inDepth(orbitEllipse, true),
+    inDepth(moonOrbit, false),
     inDepth(axisLine, false),
     inDepth(trueEclipticAxis, false),
     inDepth(trueObliquityArc, false),
@@ -321,11 +339,15 @@ const sunRays = symbolRays().map(
 const moonAnchor = new Anchor({ addTo: illustration });
 new Shape({ addTo: moonAnchor, stroke: BODY_STROKE_PX, color: MOON_INK });
 
-// Two small, flat (never rotated), transparent panels overlaid on the main scene, each locked to one body: seen along
-// the vertical circle through it, as in the analemma (see alongVerticalCircle), with that body always at the center and
-// the horizon, the altitude lines and the other body moving around it instead. Units are degrees.
+// Two small, flat (never rotated), transparent panels overlaid on the main scene, each locked to one body: plain azimuth
+// across and altitude up, as in a sun path diagram, centered on the body's azimuth, so the altitude lines, the compass
+// points and the paths all read alike; the horizon and the other body move around it. Units are degrees.
+const altAz = ({ azimuth, altitude }: HorizontalCoords, azimuth0: number) => ({
+    x: ((azimuth - azimuth0 + 540) % 360) - 180,
+    y: -altitude,
+});
 const ALTAZ_FIELD_OF_VIEW_DEG = 120;
-const ALTAZ_GRID_ANGLES = [-150, -120, -90, -60, -30, 30, 60, 90, 120, 150];
+const ALTAZ_GRID_ANGLES = [-90, -60, -30, 30, 60, 90];
 // The arrow towards the other body sits on a circle around the center, half the panel across.
 const ALTAZ_ARROW_RADIUS = ALTAZ_FIELD_OF_VIEW_DEG / 4;
 
@@ -340,9 +362,11 @@ function altAzBody(
     towardsSun = { x: 0, y: 0 },
     lit = 0,
     earthshine = 0,
+    moonToSun = 1,
 ) {
     if (isSun) return sunSymbol(point.x, point.y, unitsPerPx);
-    const radius = SUN_SYMBOL.radius * unitsPerPx;
+    // Enlarged like the Sun's symbol, but in proportion to it: the Moon's apparent diameter over the Sun's.
+    const radius = SUN_SYMBOL.radius * unitsPerPx * moonToSun;
     return moonSymbol(point.x, point.y, radius, lit, towardsSun.x, towardsSun.y, earthshine);
 }
 
@@ -357,6 +381,113 @@ function makeAltAzPanel(elementSelector: string, anchorIsSun: boolean) {
 const sunView = makeAltAzPanel("#sunView", true);
 const moonView = makeAltAzPanel("#moonView", false);
 
+// The locked views show sunrise and sunset to the second, so their altitudes are over the visible horizon: lifted by
+// refraction, the horizon lowered by the observer's height (see earth.apparentAltitude). The horizon line stays where it is.
+const seen = (h: HorizontalCoords) => ({
+    ...h,
+    altitude: precise.earth.apparentAltitude(h.altitude, { observerHeightM: state.heightM }),
+});
+
+// The bodies' paths across the sky, dimmed, twelve hours either way of the moment: a line in ten-minute steps and a
+// dot on every whole hour of the chosen clock. Computed once per moment and place, and shared by both panels.
+const PATH_HOURS = 12;
+const PATH_STEP_MIN = 10;
+// Each point with how strongly it shows: the Moon's path fades out over the last hour at either end, where it stops
+// rather than closes, as the Moon has moved on by half a day's 13 degrees.
+type PathPoint = { at: HorizontalCoords; alpha: number };
+type Path = { line: PathPoint[]; hours: PathPoint[] };
+const PATH_FADE_MIN = 60;
+let pathsKey = "";
+let paths: { sun: Path; moon: Path } = { sun: { line: [], hours: [] }, moon: { line: [], hours: [] } };
+
+function dayPaths() {
+    const key = [state.jd, state.latitude, state.longitude, state.heightM, state.timeZone].join();
+    if (key === pathsKey) return paths;
+    pathsKey = key;
+    const now = precise.dateFromJulianDay(state.jd).getTime();
+    const sun: Path = { line: [], hours: [] };
+    const moon: Path = { line: [], hours: [] };
+    const fade = (minute: number) => Math.min(1, Math.max(0, (PATH_HOURS * 60 - Math.abs(minute)) / PATH_FADE_MIN));
+    const add = (into: "line" | "hours", ms: number) => {
+        const time = precise.fromJulianDay(precise.julianDayFromDate(new Date(ms)));
+        sun[into].push({ at: seen(precise.sun.horizontalPosition(time, state)), alpha: 1 });
+        moon[into].push({ at: seen(precise.moon.horizontalPosition(time, state)), alpha: fade((ms - now) / 60_000) });
+    };
+    for (let minute = -PATH_HOURS * 60; minute <= PATH_HOURS * 60; minute += PATH_STEP_MIN)
+        add("line", now + minute * 60_000);
+    const HOUR_MS = 3_600_000;
+    const offset = clockOffsetMs(new Date(now));
+    const first = Math.ceil((now - PATH_HOURS * HOUR_MS + offset) / HOUR_MS) * HOUR_MS - offset;
+    for (let ms = first; ms <= now + PATH_HOURS * HOUR_MS; ms += HOUR_MS) add("hours", ms);
+    paths = { sun, moon };
+    return paths;
+}
+
+/** A path in a locked panel: broken wherever the projection wraps around behind the observer, faded where it fades. */
+function pathSvg(path: Path, azimuth0: number, cls: string, other = false) {
+    const faint = other ? " altaz-path-other" : "";
+    const f = (n: number) => n.toFixed(2);
+    const fading = (alpha: number) => (alpha < 1 ? ` style="opacity: ${alpha.toFixed(2)}"` : "");
+    let svg = "";
+    let run: Flat[] = [];
+    const flush = () => {
+        if (run.length > 1)
+            svg += `<polyline points="${run.map((p) => `${f(p.x)},${f(p.y)}`).join(" ")}" class="${cls}${faint}"/>`;
+        run = [];
+    };
+    let last: PathPoint | null = null;
+    for (const point of path.line) {
+        const [from, to] = [last ? altAz(last.at, azimuth0) : null, altAz(point.at, azimuth0)];
+        const wraps = from && (Math.abs(to.x - from.x) > 90 || Math.abs(to.y - from.y) > 90);
+        const alpha = Math.min(point.alpha, last?.alpha ?? 1);
+        if (wraps || alpha < 1) flush();
+        if (from && !wraps && alpha < 1 && alpha > 0)
+            svg += `<polyline points="${f(from.x)},${f(from.y)} ${f(to.x)},${f(to.y)}" class="${cls}${faint}"${fading(alpha)}/>`;
+        if (point.alpha >= 1) run.push(to);
+        last = point;
+    }
+    flush();
+    for (const { at, alpha } of path.hours) {
+        if (alpha <= 0) continue;
+        const point = altAz(at, azimuth0);
+        svg += `<circle cx="${f(point.x)}" cy="${f(point.y)}" r="0.9" class="${cls}-hour${faint}"${fading(alpha)}/>`;
+    }
+    return svg;
+}
+
+// An arrowhead's size in screen pixels, drawn like the path's hour dots.
+const PATH_HEAD_LENGTH_PX = 7.5;
+const PATH_HEAD_HALF_WIDTH_PX = 3.75;
+const PATH_HEAD_INSET_PX = 4;
+
+/**
+ * Where the path of a body outside the panel leaves the panel closest to it along the path, as the points of an
+ * arrowhead there pointing on towards the body, or null when the path never comes into view.
+ */
+function pathHead(path: Path, azimuth0: number, center: Flat, half: number, unitsPerPx: number) {
+    const inset = half - PATH_HEAD_INSET_PX * unitsPerPx;
+    const points = path.line.map((p) => altAz(p.at, azimuth0));
+    const inside = (p: Flat | undefined) => !!p && Math.abs(p.x - center.x) < inset && Math.abs(p.y - center.y) < inset;
+    const now = Math.floor(points.length / 2);
+    for (let step = 1; step < now; step++) {
+        for (const i of [now - step, now + step]) {
+            const [at, toward] = [points[i], points[i < now ? i + 1 : i - 1]];
+            if (!inside(at) || !at || !toward || (path.line[i]?.alpha ?? 0) <= 0) continue;
+            const length = Math.hypot(toward.x - at.x, toward.y - at.y);
+            if (length === 0 || length > 90) continue;
+            const [ux, uy] = [(toward.x - at.x) / length, (toward.y - at.y) / length];
+            const [bx, by] = [
+                at.x - ux * PATH_HEAD_LENGTH_PX * unitsPerPx,
+                at.y - uy * PATH_HEAD_LENGTH_PX * unitsPerPx,
+            ];
+            const [sx, sy] = [-uy * PATH_HEAD_HALF_WIDTH_PX * unitsPerPx, ux * PATH_HEAD_HALF_WIDTH_PX * unitsPerPx];
+            const f = (n: number) => n.toFixed(2);
+            return `${f(at.x)},${f(at.y)} ${f(bx + sx)},${f(by + sy)} ${f(bx - sx)},${f(by - sy)}`;
+        }
+    }
+    return null;
+}
+
 function updateAltAzPanel(
     panel: ReturnType<typeof makeAltAzPanel>,
     anchorHorizontal: HorizontalCoords,
@@ -364,6 +495,7 @@ function updateAltAzPanel(
     lit: number,
     earthshine: number,
     towardsSun: Flat,
+    moonToSun: number,
 ) {
     // The panel is drawn at whatever size the page gives it; arrows and labels keep their size in screen pixels.
     const unitsPerPx = ALTAZ_FIELD_OF_VIEW_DEG / (panel.element.clientWidth || ALTAZ_FIELD_OF_VIEW_DEG);
@@ -376,14 +508,16 @@ function updateAltAzPanel(
         lit,
         earthshine,
         towardsSun.x,
+        moonToSun,
         unitsPerPx,
     ].join();
-    if (key === panel.drawn) return;
-    panel.drawn = key;
+    const { sun: sunPath, moon: moonPath } = dayPaths();
+    if (`${key},${pathsKey}` === panel.drawn) return;
+    panel.drawn = `${key},${pathsKey}`;
 
     const half = ALTAZ_FIELD_OF_VIEW_DEG / 2;
-    const anchorPoint = alongVerticalCircle(anchorHorizontal, anchorHorizontal.azimuth);
-    const otherPoint = alongVerticalCircle(otherHorizontal, anchorHorizontal.azimuth);
+    const anchorPoint = altAz(anchorHorizontal, anchorHorizontal.azimuth);
+    const otherPoint = altAz(otherHorizontal, anchorHorizontal.azimuth);
     const [sunPoint, moonPoint] = panel.anchorIsSun ? [anchorPoint, otherPoint] : [otherPoint, anchorPoint];
     const center = anchorPoint;
     const [left, right] = [center.x - half, center.x + half];
@@ -391,12 +525,10 @@ function updateAltAzPanel(
 
     // The ground below the horizon first, so everything else draws on top of it; it reaches past the nadir's view.
     let svg = `<rect x="${left}" y="0" width="${2 * half}" height="${180 + half}" class="figure-ground"/>`;
-    // Past the zenith the altitude falls again, on the far side of the sky, and past the nadir it rises again.
     for (const angle of ALTAZ_GRID_ANGLES) {
         // Only lines whose label fits whole into the panel.
         if (Math.abs(-angle - center.y) > half - 8 * unitsPerPx) continue;
-        const altitude = angle > 90 ? 180 - angle : angle < -90 ? -180 - angle : angle;
-        svg += gridLine(-angle, left, right, `${altitude}°`, unitsPerPx);
+        svg += gridLine(-angle, left, right, `${angle}°`, unitsPerPx);
     }
     svg += `<line x1="${left}" y1="0" x2="${right}" y2="0" class="figure-horizon"/>`;
     // The compass directions on the horizon, where the x axis is plain azimuth: they pass by as the body moves.
@@ -404,10 +536,23 @@ function updateAltAzPanel(
         const x = ((i * 45 - anchorHorizontal.azimuth + 540) % 360) - 180;
         if (Math.abs(x) < half - 12 * unitsPerPx) svg += svgText(x, labelAboveY(0, unitsPerPx), label, "figure-label");
     });
+    // The other body's path faintly, then the locked body's own: the panel follows that one, so it is the one to read.
+    const sunPathSvg = (other: boolean) => pathSvg(sunPath, anchorHorizontal.azimuth, "altaz-path-sun", other);
+    const moonPathSvg = (other: boolean) => pathSvg(moonPath, anchorHorizontal.azimuth, "altaz-path-moon", other);
+    svg += panel.anchorIsSun ? moonPathSvg(true) + sunPathSvg(false) : sunPathSvg(true) + moonPathSvg(false);
     // The sun before the moon, whichever is the anchor, so the moon renders in front whenever the two nearly overlap.
-    svg += altAzBody(sunPoint, true, unitsPerPx) + altAzBody(moonPoint, false, unitsPerPx, towardsSun, lit, earthshine);
-    // The other body outside the panel gets an arrow around the anchor, along the great circle towards it.
-    if (Math.abs(otherPoint.x - center.x) > half || Math.abs(otherPoint.y - center.y) > half) {
+    svg +=
+        altAzBody(sunPoint, true, unitsPerPx) +
+        altAzBody(moonPoint, false, unitsPerPx, towardsSun, lit, earthshine, moonToSun);
+    // The other body outside the panel gets an arrowhead on its own path, where the path leaves the panel on the way to
+    // it, pointing along it; if its path never crosses the panel, an arrow around the anchor towards it instead.
+    const outside = Math.abs(otherPoint.x - center.x) > half || Math.abs(otherPoint.y - center.y) > half;
+    const head = outside
+        ? pathHead(panel.anchorIsSun ? moonPath : sunPath, anchorHorizontal.azimuth, center, half, unitsPerPx)
+        : null;
+    if (head)
+        svg += `<polygon points="${head}" class="${panel.anchorIsSun ? "altaz-path-moon-hour" : "altaz-path-sun-hour"} altaz-path-other"/>`;
+    else if (outside) {
         const angle =
             precise.positionAngle(
                 anchorHorizontal.azimuth,
@@ -467,22 +612,18 @@ function frame() {
 
     const sunHorizontal = precise.sun.horizontalPosition(time, state);
     const moonHorizontal = precise.moon.horizontalPosition(time, state);
-    // The locked views show sunrise and sunset to the second, so their altitudes are over the visible horizon: lifted by
-    // refraction, the horizon lowered by the observer's height (see earth.apparentAltitude). The horizon line stays where it is.
-    const overHorizon = (h: HorizontalCoords) => ({
-        ...h,
-        altitude: precise.earth.apparentAltitude(h.altitude, { observerHeightM: state.heightM }),
-    });
-    const sunSeen = overHorizon(sunHorizontal);
-    const moonSeen = overHorizon(moonHorizontal);
+    const sunSeen = seen(sunHorizontal);
+    const moonSeen = seen(moonHorizontal);
     const lit = precise.moon.illuminatedFraction(ephemerisDay(jd));
     const earthshine = precise.moon.earthshine(ephemerisDay(jd));
     // The tilt of the crescent is the observer's, not the panel's: taken from the sky itself, so it matches the
     // Moon's own figure rather than following this panel's stretched projection.
     const sunFrame = sunInViewFrame(time, state);
     const towardsSun = { x: sunFrame.right, y: -sunFrame.up };
-    updateAltAzPanel(sunView, sunSeen, moonSeen, lit, earthshine, towardsSun);
-    updateAltAzPanel(moonView, moonSeen, sunSeen, lit, earthshine, towardsSun);
+    const moonToSun =
+        precise.moon.topocentricAngularDiameter(time, state) / precise.sun.apparentAngularDiameter(ephemerisDay(jd));
+    updateAltAzPanel(sunView, sunSeen, moonSeen, lit, earthshine, towardsSun, moonToSun);
+    updateAltAzPanel(moonView, moonSeen, sunSeen, lit, earthshine, towardsSun, moonToSun);
 
     sunAnchor.translate.set(sunPos);
     const rays = symbolRays();
@@ -500,16 +641,17 @@ function frame() {
     latitudeRing.diameter = 2 * EARTH_R * Math.cos(latitude * DEG);
     latitudeRing.translate.set({ y: -EARTH_R * Math.sin(latitude * DEG) });
     latitudeRing.updatePath();
-    meridianRing.rotate.set({ y: observerRa * DEG });
+    // Zdog's rotateY turns +X towards +Z, the opposite way to right ascension here (see sphericalToVector).
+    meridianRing.rotate.set({ y: -observerRa * DEG });
     // The turn arrow starts on the observer's own meridian, so it sweeps around with sidereal time: step the clock
     // and it turns the way Earth does, one full round a day.
-    spinArc.rotate.set({ y: observerRa * DEG });
-    spinHead.rotate.set({ y: observerRa * DEG });
+    spinArc.rotate.set({ y: -observerRa * DEG });
+    spinHead.rotate.set({ y: -observerRa * DEG });
     radiusLine.path[1] = observerPos;
     radiusLine.updatePath();
 
-    // Same rotate-the-Y-axis-by-obliquity-about-X derivation the ecliptic-plane ring used, applied to just
-    // the pole direction instead of a whole ring.
+    // The ecliptic's north pole, at right ascension 270° and declination 90° minus the obliquity: tilted from the
+    // celestial pole about the X axis, towards +Z (see sphericalToVector).
     const eclipticPoleAt = (obliquityDeg: number) =>
         v(0, -Math.cos(obliquityDeg * DEG) * EARTH_R, Math.sin(obliquityDeg * DEG) * EARTH_R);
     const truePole = eclipticPoleAt(obliquity);
@@ -539,8 +681,10 @@ function frame() {
     const orbitEccentricity = precise.earth.orbitEccentricity(ephemerisDay(jd));
     orbitEllipse.width = 2 * SUN_DIST;
     orbitEllipse.height = 2 * SUN_DIST * Math.sqrt(1 - orbitEccentricity * orbitEccentricity);
-    orbitEllipse.rotate.set({ x: Math.PI / 2 + obliquity * DEG });
+    // Tilted about the equinox line so that right ascension 90° (-Z) lies north of the equator, by the obliquity.
+    orbitEllipse.rotate.set({ x: Math.PI / 2 - obliquity * DEG });
     orbitEllipse.updatePath();
+    updateMoonOrbit(jd);
 
     illustration.rotate.set({ x: rotX, y: rotY, z: 0 });
     splitInDepth(illustration.rotate);
@@ -563,6 +707,7 @@ function frame() {
         ],
         ["line-long-dashed", [orbitEllipse]],
         ["line-dashed", [latitudeRing, meridianRing]],
+        ["moon-orbit", [moonOrbit]],
     ];
     for (const ray of sunRays) ray.svgElement?.classList.add("figure-sun-ray");
     for (const [dash, shapes] of dashes) {

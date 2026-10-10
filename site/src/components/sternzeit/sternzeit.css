@@ -19,6 +19,12 @@
     margin-inline: auto;
     padding: 0.75rem 0;
 }
+/* Its time slider likewise keeps the reading column's width, under a scene that breaks out of it. */
+.scene-frame > .figure-slider {
+    width: calc(var(--measure) - 3rem);
+    max-width: 100%;
+    margin-inline: auto;
+}
 .eclipse-figure {
     margin: 1.5rem 0;
 }
@@ -352,14 +358,15 @@ tbody tr:hover {
 }
 /* The Sun wherever it stands as a symbol (the locked views, the line off the Moon's bright limb): a white disc with
    dotted rays. The Moon beside it in the locked views is a muted disc. */
-.figure-sun,
 .figure-sun-ray {
     stroke: var(--text);
     stroke-width: var(--sun-stroke);
     vector-effect: non-scaling-stroke;
 }
+/* A filled disc without an outline, so its radius is the symbol's and the Moon's beside it can be set against it. */
 .figure-sun {
     fill: var(--text);
+    stroke: none;
 }
 /* The glow is a copy of the Sun's disc behind it, clipped at the horizon (see sunGlow); Zdog's Sun, a plain path, is
    tagged by scene.ts and dayarc.ts once it exists, the latter only while the Sun is up. */
@@ -510,6 +517,14 @@ figure[id] {
 }
 .eclipse-corona {
     mix-blend-mode: screen;
+}
+/* The turning copies add up within their own group, each weighted so the weights sum to one, a normalized sum, before
+   it screens onto the panel: fully bright only where every copy is, then lifted (see corona in eclipse.ts). */
+g.eclipse-corona {
+    isolation: isolate;
+}
+.eclipse-corona-layer {
+    mix-blend-mode: plus-lighter;
 }
 .eclipse-moon-new {
     fill: var(--bg);
@@ -1000,7 +1015,7 @@ figure[id] {
     text-align: right;
 }
 /* The days since the full moon, as wide as two digits ever need, so the rail stays put as they drop to one. */
-.moon-figure .figure-slider output {
+.figure-slider[data-lunation] output {
     min-width: 6ch;
     text-align: right;
 }
@@ -1494,4 +1509,42 @@ span.daylight-blue {
 }
 span.daylight-day {
     color: var(--accent);
+}
+
+/* The Sun's and the Moon's paths in the locked views, dimmed beneath the bodies: a line, and a dot every whole hour. */
+.altaz-path-sun,
+.altaz-path-moon {
+    fill: none;
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+.altaz-path-sun {
+    stroke: color-mix(in srgb, var(--text) 35%, transparent);
+}
+.altaz-path-moon {
+    stroke: color-mix(in srgb, var(--muted) 45%, transparent);
+}
+.altaz-path-sun-hour {
+    fill: color-mix(in srgb, var(--text) 55%, transparent);
+}
+.altaz-path-moon-hour {
+    fill: color-mix(in srgb, var(--muted) 65%, transparent);
+}
+/* The other body's path, there for orientation only: much fainter than the locked body's own. */
+.altaz-path-other {
+    opacity: 0.35;
+}
+/* The Moon's orbit in Figure 1: its muted gray, dimmed further and dotted, beneath the Sun's long dashes. */
+.moon-orbit {
+    opacity: 0.45;
+    stroke-dasharray: var(--line-dots);
+    stroke-linecap: round;
+}
+.moon-orbit.line-behind {
+    opacity: 0.2;
+}
+/* An offset from the moment, as wide as "+24:00", so the rail stays put as the hours gain a digit. */
+.figure-slider[data-offset] output {
+    min-width: 6ch;
+    text-align: right;
 }

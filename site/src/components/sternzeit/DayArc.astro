@@ -20,13 +20,27 @@ import "./sternzeit.css";
             Drag to rotate. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
         </p>
     </div>
+    <label class="figure-slider" data-offset title="The moment, up to a day either way from where it was set: drag, or turn the mouse wheel for ten minutes a notch">
+        <span class="note">Time</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="offset" min="-1440" max="1440" step="10" value="0" aria-label="Minutes from the moment" />
+            <span class="figure-slider-scale" aria-hidden="true">{["−1", "0", "+1"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 50}%`}>{mark}{i !== 1 && <span class="figure-slider-unit">{"\u202fd"}</span>}</span>)}</span>
+        </span>
+        <output data-field="offsetValue"></output>
+    </label>
     <figcaption class="figure-caption">
-        A <Term of="Sun path diagram">sun path diagram</Term>: the Sun's path (a dot per hour) and the Moon's (gray)
-        across the sky of the chosen place, in horizontal coordinates, local midnight to midnight, dotted below the
-        horizon, arrows pointing forward in time. Symbols, not to scale. (a) The Sun's{" "}
+        A <Term of="Sun path diagram">sun path diagram</Term>: the Sun's path (a dot per hour) across the sky of the
+        chosen place, in horizontal coordinates, a day around the moment, its ends blending, and the Moon's (gray), a
+        spiral a day either way, fading from the Moon itself. Dotted below the horizon, arrows pointing forward in
+        time. Symbols, not to scale. (a) The Sun's{" "}
         <Term of="Analemma">analemma</Term> at this time of day, a dot on the first of every month.
     </figcaption>
 </figure>
+
+<script>
+    import { offsetSliders } from "./offset";
+    offsetSliders();
+</script>
 
 <script>
     import "./dayarc";

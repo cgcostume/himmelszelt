@@ -3,7 +3,11 @@ import "./sternzeit.css";
 
 // The slider's marks: the poles and the equator named, the tropics and the polar circles as ticks, at today's tilt.
 const percent = (latitude: number) => `left: ${((latitude + 90) / 180) * 100}%`;
-const named: [number, string, string][] = [[-90, "90°", " S"], [0, "0°", ""], [90, "90°", " N"]];
+const named: [number, string, string][] = [
+    [-90, "90°", " S"],
+    [0, "0°", ""],
+    [90, "90°", " N"],
+];
 const ticks: [number, string][] = [
     [-66.6, "Antarctic Circle"],
     [-23.4, "Tropic of Capricorn"],
