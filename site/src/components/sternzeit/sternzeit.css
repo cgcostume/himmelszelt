@@ -1548,3 +1548,12 @@ span.daylight-day {
     min-width: 6ch;
     text-align: right;
 }
+/* The greatest eclipse over the solar panel, what and how far away, a link there; the degrees and the time below it
+   are dimmed, as figure labels are. */
+.eclipse-goto {
+    cursor: pointer;
+    pointer-events: auto;
+}
+.eclipse-goto:hover {
+    fill: var(--accent);
+}

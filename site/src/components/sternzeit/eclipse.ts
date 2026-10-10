@@ -1,10 +1,11 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { find } from "../dom";
 import { onDemand } from "../frame";
-import { drawSvg, sunGlow, svgText, veiledHorizon } from "./figure";
+import { drawSvg, escapeText, sunGlow, svgText, veiledHorizon } from "./figure";
 import { arrowAround, offPanelArrowSvg } from "./offpanel";
 import { offsetSliders } from "./offset";
 import { ephemerisDay, onChange, state, update } from "./state";
+import { clock } from "./zone";
 import "./export";
 
 // Both panels share a 200 x 200 viewBox centered on the origin: the Sun, or the axis of Earth's shadow, sits in the middle.
@@ -103,6 +104,110 @@ function offPanelMoon(dx: number, dy: number, radius = HALF / 2) {
     return offPanelArrowSvg(arrowAround({ x: 0, y: 0 }, { x: dx, y: dy }, radius, unitsPerPx), false);
 }
 
+// Where on Earth this eclipse is greatest: the point the line from the Sun through the Moon passes closest to Earth's
+// center, at the moment it does, as Meeus' greatest eclipse. Found from the two positions alone, Earth flattened by
+// stretching its axis to a sphere's, and told as how far, which way and how many degrees from the chosen place.
+const FLATTENING = 1 / 298.257;
+const EQUATORIAL_KM = precise.earth.EQUATORIAL_RADIUS_KM;
+type Vec = [number, number, number];
+const dot = (a: Vec, b: Vec) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+// Equatorial coordinates to kilometers, z stretched so the flattened Earth becomes a sphere of the equator's radius.
+const toVec = ({ rightAscension, declination }: precise.EquatorialCoords, km: number): Vec => {
+    const [a, d] = [rightAscension * precise.DEG_TO_RAD, declination * precise.DEG_TO_RAD];
+    return [km * Math.cos(d) * Math.cos(a), km * Math.cos(d) * Math.sin(a), (km * Math.sin(d)) / (1 - FLATTENING)];
+};
+
+function shadowAxis(jd: number) {
+    const t = ephemerisDay(jd);
+    const sun = toVec(precise.sun.apparentPosition(t), precise.sun.distance(t));
+    const moon = toVec(precise.moon.apparentPosition(t), precise.moon.distance(t));
+    const along: Vec = [moon[0] - sun[0], moon[1] - sun[1], moon[2] - sun[2]];
+    const length = Math.hypot(...along);
+    const d: Vec = [along[0] / length, along[1] / length, along[2] / length];
+    const s = -dot(moon, d);
+    const closest: Vec = [moon[0] + d[0] * s, moon[1] + d[1] * s, moon[2] + d[2] * s];
+    return { moon, d, s, closest, miss: Math.hypot(...closest) };
+}
+
+const GREATEST_WINDOW = 0.25;
+const GREATEST_STEP = 1 / 1440;
+let greatest: { jd: number; latitude: number; longitude: number } | null = null;
+
+/** The greatest eclipse around `jd`, or null when the Moon is nowhere near the Sun or its shadow misses Earth. */
+function greatestAround(jd: number) {
+    if (greatest && Math.abs(greatest.jd - jd) < GREATEST_WINDOW) return greatest;
+    const t = ephemerisDay(jd);
+    const [m, sn] = [precise.moon.apparentPosition(t), precise.sun.apparentPosition(t)];
+    if (precise.angularSeparation(m.rightAscension, m.declination, sn.rightAscension, sn.declination) > SOLAR_REACH_DEG)
+        return null;
+    let best = { jd, miss: Number.POSITIVE_INFINITY };
+    for (let at = jd - GREATEST_WINDOW; at <= jd + GREATEST_WINDOW; at += GREATEST_STEP) {
+        const { miss } = shadowAxis(at);
+        if (miss < best.miss) best = { jd: at, miss };
+    }
+    // Past about one and a half Earth radii even the penumbra misses: no eclipse anywhere.
+    if (best.miss > 1.55 * EQUATORIAL_KM) return null;
+    const { moon, d, s, closest, miss } = shadowAxis(best.jd);
+    // Where the axis meets Earth, the near side; when it misses, the point of Earth closest to it.
+    const reach = miss < EQUATORIAL_KM ? s - Math.sqrt(EQUATORIAL_KM ** 2 - miss ** 2) : s;
+    const point: Vec =
+        miss < EQUATORIAL_KM
+            ? [moon[0] + d[0] * reach, moon[1] + d[1] * reach, moon[2] + d[2] * reach]
+            : [
+                  closest[0] * (EQUATORIAL_KM / miss),
+                  closest[1] * (EQUATORIAL_KM / miss),
+                  closest[2] * (EQUATORIAL_KM / miss),
+              ];
+    const [x, y, z] = [point[0], point[1], point[2] * (1 - FLATTENING)];
+    const geocentric = Math.atan2(z, Math.hypot(x, y));
+    const latitude = Math.atan(Math.tan(geocentric) / (1 - FLATTENING) ** 2) / precise.DEG_TO_RAD;
+    const sidereal = precise.apparentSiderealTime(precise.fromJulianDay(best.jd));
+    const longitude = ((((Math.atan2(y, x) / precise.DEG_TO_RAD - sidereal + 180) % 360) + 360) % 360) - 180;
+    greatest = { jd: best.jd, latitude, longitude };
+    return greatest;
+}
+
+const COMPASS_16 = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+const MEAN_EARTH_KM = 6371;
+// The note's two lines this far apart, in screen pixels, with air between them.
+const NOTE_LINE_PX = 19;
+
+/**
+ * Two lines over the solar panel: what the greatest eclipse is, its magnitude there as the catalogs give it (for a
+ * central eclipse the ratio of the diameters, otherwise the share of the Sun's diameter covered), and how far away;
+ * then how far in degrees and when.
+ */
+function greatestNote(jd: number) {
+    const found = greatestAround(jd);
+    if (!found) return "";
+    const time = precise.fromJulianDay(found.jd);
+    const observer = { latitude: found.latitude, longitude: found.longitude };
+    const there = precise.eclipse.solar(time, observer);
+    const sunR = precise.sun.apparentAngularDiameter(ephemerisDay(found.jd)) / 2;
+    const moonR = precise.moon.topocentricAngularDiameter(time, observer) / 2;
+    const central = there.separation <= Math.abs(moonR - sunR);
+    const kind = central ? (moonR > sunR ? "total" : "annular") : "partial";
+    const [p1, p2] = [state.latitude * precise.DEG_TO_RAD, found.latitude * precise.DEG_TO_RAD];
+    const dl = (found.longitude - state.longitude) * precise.DEG_TO_RAD;
+    const km =
+        MEAN_EARTH_KM *
+        Math.acos(Math.min(1, Math.sin(p1) * Math.sin(p2) + Math.cos(p1) * Math.cos(p2) * Math.cos(dl)));
+    const bearing = Math.atan2(
+        Math.sin(dl) * Math.cos(p2),
+        Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl),
+    );
+    const direction = COMPASS_16[Math.round(((bearing / precise.DEG_TO_RAD + 360) % 360) / 22.5) % 16];
+    const dLongitude = ((((found.longitude - state.longitude + 180) % 360) + 360) % 360) - 180;
+    const signed = (n: number) => `${n < 0 ? "\u2212" : "+"}${Math.abs(n).toFixed(1)}°`;
+    const where = km < 30 ? "here" : `${Math.round(km).toLocaleString("en-US")} km ${direction}`;
+    const when = clock(precise.dateFromJulianDay(found.jd), { timeStyle: "short" }).text;
+    const y = -HALF + 22;
+    // The first line takes the reader there: the place and the moment of the greatest eclipse (see the click below).
+    const goto = `<text x="0" y="${f(y)}" class="figure-note eclipse-goto" data-goto="${found.jd},${found.latitude},${found.longitude}"><title>Go to the greatest eclipse, that place and moment</title>${escapeText(`greatest eclipse, ${kind}, ${Math.round((central ? moonR / sunR : there.magnitude) * 100)}%: ${where}`)}</text>`;
+    const detail = `${signed(found.latitude - state.latitude)} latitude, ${signed(dLongitude)} longitude, at ${when}`;
+    return goto + svgText(0, y + NOTE_LINE_PX * unitsPerPx, detail, "figure-label");
+}
+
 function renderSolar(jd: number) {
     const time = precise.fromJulianDay(jd);
     const eclipse = precise.eclipse.solar(time, state);
@@ -146,7 +251,7 @@ function renderSolar(jd: number) {
         const covered = (outer - eclipse.separation) / (2 * sunRadiusDeg);
         status = `partial, ${Math.round(covered * 100)}% of the Sun's diameter covered`;
     } else status = `none, the Moon is ${eclipse.separation.toFixed(1)}° away`;
-    return { svg, status };
+    return { svg: svg + greatestNote(jd), status };
 }
 
 function renderLunar(jd: number) {
@@ -336,6 +441,16 @@ for (const panel of document.querySelectorAll<SVGSVGElement>('.eclipse-view[data
         if (entry?.isIntersecting) panel.unpauseAnimations();
         else panel.pauseAnimations();
     }).observe(panel);
+}
+
+// A click on the greatest eclipse's note goes there: its moment, and its place, at the observer's height.
+for (const panel of document.querySelectorAll<SVGSVGElement>('.eclipse-view[data-kind="solar"] .eclipse-panel > svg')) {
+    panel.addEventListener("click", (event) => {
+        const target = (event.target as Element).closest?.("[data-goto]");
+        const [jd, latitude, longitude] = (target?.getAttribute("data-goto") ?? "").split(",").map(Number);
+        if (jd === undefined || latitude === undefined || longitude === undefined || Number.isNaN(jd)) return;
+        update({ jd: Number(jd.toFixed(7)), latitude, longitude, live: false, animate: false });
+    });
 }
 
 const [first] = views;
