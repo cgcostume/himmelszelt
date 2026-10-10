@@ -33,3 +33,18 @@ into a decision into CLAUDE.md.
 - `lookup.js` grew in steps (billboards, labels, the sun line, the slider): reread it as a whole and tidy.
 - Fig. 1 of sternzeit now sizes its Moon by `SUN_SYMBOL` in pixels: check it next to the Sun at phone width.
 - Check the dither toggles (Fig. 1, Fig. 5) and the rail cursor in Chrome by eye.
+
+## Later
+
+- **Tafeln**, a site section for all schematic figures, once dunstkreis and nachtgestirn stand: it references the
+  figures and does not move them out of their chapters. Each figure can be embedded on its own, with or without its UI,
+  themed light, dark or custom, and downloaded as SVG. Until then, build every new figure so it can be lifted out:
+  colors only from CSS tokens, the UI switchable off, no reach into the chapter's DOM.
+- **sternenheer: constellations**, their lines and names, and possibly their boundaries, not only the stars.
+- **gewoelk: more than clouds**: contrails, flocks of birds.
+- **gewoelk: rainbows and halos**, optics in raindrops and in the ice crystals of cirrus, not in the clear sky of
+  dunstkreis.
+- **Aurora**, last of all: references are hard to come by. No package decided yet.
+- **Weather as input**: cloud cover, rain and haze as plain parameters for every package, like the sun direction. A live
+  local weather approximation from an online service would then be an adapter on the site or an extra package, never a
+  dependency of a library.
