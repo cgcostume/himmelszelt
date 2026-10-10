@@ -155,6 +155,42 @@ const compassLabels = COMPASS.map((text, i) => {
     return { label, point: skyPoint({ azimuth: i * 45, altitude: 0 }, R) };
 });
 
+// The observer's ENU axes, small, at the dome's center, where the observer stands: the same frame as the observer's
+// frame figure, x east, y north and z up. Each arrowhead two crossed triangles, so it reads from any side.
+const ENU_AXIS = 0.2 * R;
+const ENU_HEAD = { length: 4, halfWidth: 1.6 };
+const enuTips: [string, Zdog.VectorOptions][] = [
+    ["x", { x: ENU_AXIS, y: 0, z: 0 }],
+    ["y", { x: 0, y: 0, z: -ENU_AXIS }],
+    ["z", { x: 0, y: -ENU_AXIS, z: 0 }],
+];
+for (const [, tip] of enuTips) {
+    const d = new Vector(tip);
+    d.multiply(1 / ENU_AXIS);
+    const base = new Vector(d).multiply(ENU_AXIS - ENU_HEAD.length);
+    styled(new Shape({ addTo: above, path: [{ x: 0, y: 0, z: 0 }, base], color: INK }), 1);
+    // Two directions square to the axis: the other two axes.
+    const sides = [
+        { x: 1, y: 0, z: 0 },
+        { x: 0, y: 1, z: 0 },
+        { x: 0, y: 0, z: 1 },
+    ].filter((axis) => axis.x * d.x + axis.y * d.y + axis.z * d.z === 0);
+    for (const side of sides) {
+        const offset = new Vector(side).multiply(ENU_HEAD.halfWidth);
+        const path = [tip, new Vector(base).add(offset), new Vector(base).subtract(offset)];
+        styled(new Shape({ addTo: above, path, fill: true, color: INK }), 1);
+    }
+}
+const ENU_LABEL_GAP_PX = 8;
+const enuLabels = enuTips.map(([text, tip]) => {
+    const label = document.createElement("span");
+    label.className = "dome-compass-label dome-axis-label";
+    label.dataset.exportText = "";
+    label.textContent = text;
+    compassEl.append(label);
+    return { label, point: new Vector(tip) };
+});
+
 /** Splits a path into runs above and below the horizon; consecutive runs share their boundary sample. */
 function runsByHorizon(samples: HorizontalCoords[]) {
     const runs: { up: boolean; samples: HorizontalCoords[] }[] = [];
@@ -386,6 +422,12 @@ function placeCompass() {
         label.style.top = `${y}px`;
         label.style.visibility = covered ? "hidden" : "visible";
         label.style.opacity = p.z < 0 ? "0.45" : "1";
+    }
+    for (const { label, point } of enuLabels) {
+        const p = new Vector(point).rotate(rotation);
+        const reach = Math.hypot(p.x, p.y) || 1;
+        label.style.left = `${stageWidth / 2 + p.x * zoom + (p.x / reach) * ENU_LABEL_GAP_PX}px`;
+        label.style.top = `${stageHeight / 2 + centerShiftPx + p.y * zoom + (p.y / reach) * ENU_LABEL_GAP_PX}px`;
     }
 }
 

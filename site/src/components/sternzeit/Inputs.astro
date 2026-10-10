@@ -1,0 +1,38 @@
+---
+import "./sternzeit.css";
+---
+
+<figure class="scene-frame pipeline-figure" id="pipeline-inputs">
+    <div class="pipeline-givens">
+        <div class="flow flow-moment">
+            <span class="flow-node flow-concept" style="grid-area: 2 / 1">moment</span>
+            <span class="flow-edge" style="grid-area: 1 / 2 / 3"></span>
+            <span class="flow-node" style="grid-area: 2 / 3">Date</span>
+            <span class="flow-edge" style="grid-area: 1 / 4 / 3"><code>fromDate</code></span>
+            <span class="flow-node" style="grid-area: 2 / 5">time</span>
+            <span class="flow-edge" style="grid-area: 1 / 6 / 3"><code>apparentSiderealTime</code></span>
+            <span class="flow-node" style="grid-area: 2 / 7">θ</span>
+            <span class="flow-elbow" style="grid-area: 2 / 6 / 5"></span>
+            <span class="flow-edge branch" style="grid-area: 3 / 6 / 5"><code>julianEphemerisDay</code></span>
+            <span class="flow-node flow-continues" style="grid-area: 4 / 7">jde</span>
+            <span class="flow-node flow-resumed" style="grid-area: 7 / 2 / 8 / 6">jde</span>
+            <span class="flow-edge" style="grid-area: 6 / 6 / 8"><code>earth.trueObliquity</code></span>
+            <span class="flow-node" style="grid-area: 7 / 7">ε</span>
+            <span class="flow-elbow" style="grid-area: 7 / 6 / 10"></span>
+            <span class="flow-edge branch" style="grid-area: 8 / 6 / 10"><code>equatorialHorizontalParallax</code></span>
+            <span class="flow-node" style="grid-area: 9 / 7">π</span>
+        </div>
+        <div class="flow">
+            <span class="flow-node flow-concept" style="grid-area: 2 / 1">place</span>
+            <span class="flow-edge" style="grid-area: 1 / 2 / 3"></span>
+            <span class="flow-node" style="grid-area: 2 / 3">
+                obs = &lbrace; latitude, longitude,&nbsp;<span class="flow-optional" title="Optional">heightM</span>&nbsp;&rbrace;
+            </span>
+        </div>
+    </div>
+    <figcaption class="figure-caption">
+        Where the coordinate systems' inputs come from: the moment, through a <code>Date</code> and the
+        <code>time</code> it becomes, to the sidereal time θ and the ephemeris day <code>jde</code>, and from that to the
+        obliquity ε and the parallax π; the place, as the observer <code>obs</code>. Each function on its arrow.
+    </figcaption>
+</figure>

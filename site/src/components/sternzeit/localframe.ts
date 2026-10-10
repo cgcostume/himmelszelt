@@ -3,7 +3,7 @@ import * as precise from "@himmelszelt/sternzeit";
 import Zdog from "zdog";
 import { find } from "../dom";
 import { onDemand } from "../frame";
-import { ARROWHEAD_PX, cssColor, SUN_SYMBOL, sunRays } from "./figure";
+import { ARROWHEAD_PX, COMPASS, cssColor, SUN_SYMBOL, sunRays } from "./figure";
 import { onChange, state } from "./state";
 import "./export";
 
@@ -116,7 +116,7 @@ function turnArrowheads() {
 
 // Fixed: the ground and the horizon, the dotted meridian from north over the zenith to south, and the ENU axes.
 new Ellipse({ addTo: ground, diameter: 2 * R, rotate: { x: Math.PI / 2 }, color: SURFACE, fill: true, stroke: false });
-styled(new Ellipse({ addTo: ground, diameter: 2 * R, rotate: { x: Math.PI / 2 }, color: MUTED }), 1);
+styled(new Ellipse({ addTo: ground, diameter: 2 * R, rotate: { x: Math.PI / 2 }, color: ACCENT }), 1);
 const meridian = Array.from({ length: 37 }, (_, i) =>
     skyPoint(i <= 18 ? { azimuth: 0, altitude: i * 5 } : { azimuth: 180, altitude: 180 - i * 5 }),
 );
@@ -139,11 +139,12 @@ function label(text: string, point: Point, cls = "", push = LABEL_GAP_PX) {
     labels.push(entry);
     return entry;
 }
-label("x / E", enu([1, 0, 0], AXIS), "frame-axis");
-label("y / N", enu([0, 1, 0], AXIS), "frame-axis");
+// The eight compass directions on the horizon, as in the sun path diagram; east and north also name their axes.
+const AXIS_NAMES: Record<string, string> = { N: "y / N", E: "x / E" };
+COMPASS.forEach((point, i) => {
+    label(AXIS_NAMES[point] ?? point, skyPoint({ azimuth: i * 45, altitude: 0 }), "frame-compass");
+});
 label("z / up", enu([0, 0, 1], AXIS), "frame-axis");
-label("S", skyPoint({ azimuth: 180, altitude: 0 }), "frame-axis");
-label("W", skyPoint({ azimuth: 270, altitude: 0 }), "frame-axis");
 
 // Rebuilt whenever the moment or place changes: the pole and the equator for the place, the Sun with its angles.
 const dynamic = [new Anchor({ addTo: below }), new Anchor({ addTo: above })];

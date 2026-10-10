@@ -358,6 +358,9 @@ const FINE_STEP = 1 / 1440;
 // Geocentric separation under which the Moon may cover the Sun somewhere on Earth: the two discs are about half a
 // degree wide, and parallax moves the Moon by up to another degree.
 const SOLAR_REACH_DEG = 2.5;
+// An eclipse this close to the moment shown is the one already on screen, its deepest moment found on the minute grid
+// a little off the greatest eclipse jumped to, and not the next one.
+const SAME_ECLIPSE = 1 / 24;
 
 const timeOf = (jd: number) => precise.fromJulianDay(jd);
 
@@ -428,7 +431,7 @@ function nearestEclipse(from: number, direction: number, lunar: boolean) {
         }
         if (!near) continue;
         const found = deepest(middle, lunar);
-        if (found !== null && (direction > 0 ? found > from : found < from)) return found;
+        if (found !== null && (found - from) * direction > SAME_ECLIPSE) return found;
     }
     return null;
 }

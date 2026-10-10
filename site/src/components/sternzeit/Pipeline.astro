@@ -11,77 +11,52 @@ const start: Space = {
     term: "Ecliptic coordinates",
     name: "ecliptic",
     coords: "l, β",
-    direct: "apparentEclipticalPosition(t)",
+    direct: "apparentEclipticalPosition(jde)",
 };
 const steps: Step[] = [
     {
         fn: "eclipticalToEquatorial",
-        args: "({ l, β }, ε)",
-        space: { term: "Equatorial coordinates", name: "equatorial", coords: "α, δ", direct: "apparentPosition(t)" },
+        args: "({l, β}, ε)",
+        space: { term: "Equatorial coordinates", name: "equatorial", coords: "α, δ", direct: "apparentPosition(jde)" },
     },
     {
         fn: "equatorialToTopocentric",
-        args: "({ α, δ }, π, θ, observer)",
+        args: "({α, δ}, π, θ, obs)",
         space: {
             term: "Topocentric",
             name: "topocentric",
             coords: "α′, δ′",
-            direct: "topocentricPosition(time, observer)",
+            direct: "topocentricPosition(time, obs)",
         },
     },
     {
         fn: "equatorialToHorizontal",
-        args: "({ α′, δ′ }, θ, observer)",
+        args: "({α′, δ′}, θ, obs)",
         space: {
             term: "Horizontal coordinates",
             name: "horizontal",
             coords: "A, h",
-            direct: "horizontalPosition(time, observer)",
+            direct: "horizontalPosition(time, obs)",
             likely: true,
         },
     },
     {
         fn: "horizontalToDirection",
-        args: "({ A, h })",
-        space: { term: null, name: "ENU", coords: "x, y, z", direct: "direction(time, observer)", likely: true },
+        args: "({A, h})",
+        space: { term: null, name: "ENU", coords: "x, y, z", direct: "direction(time, obs)", likely: true },
     },
 ];
-// Rows: the ecliptical position, then a conversion and its result a step, with the divider after the first.
-const DIVIDER_ROW = 4;
-const rowOf = (i: number) => 2 + 2 * i + (i >= 1 ? 1 : 0);
+// Rows: the headings, the ecliptical position, then a conversion and its result a step, the divider after the first.
+const DIVIDER_ROW = 5;
+const rowOf = (i: number) => 3 + 2 * i + (i >= 1 ? 1 : 0);
 ---
 
 <figure class="scene-frame pipeline-figure" id="coordinate-pipeline">
-    <div class="pipeline-givens">
-        <div class="flow flow-moment">
-            <span class="flow-node flow-concept" style="grid-area: 2 / 1">moment</span>
-            <span class="flow-edge" style="grid-area: 1 / 2 / 3"></span>
-            <span class="flow-node" style="grid-area: 2 / 3">Date</span>
-            <span class="flow-edge" style="grid-area: 1 / 4 / 3"><code>fromDate</code></span>
-            <span class="flow-node" style="grid-area: 2 / 5">time</span>
-            <span class="flow-edge" style="grid-area: 1 / 6 / 3"><code>apparentSiderealTime</code></span>
-            <span class="flow-node" style="grid-area: 2 / 7">θ</span>
-            <span class="flow-elbow" style="grid-area: 2 / 6 / 5"></span>
-            <span class="flow-edge branch" style="grid-area: 3 / 6 / 5"><code>julianEphemerisDay</code></span>
-            <span class="flow-node flow-continues" style="grid-area: 4 / 7">t</span>
-            <span class="flow-node flow-resumed" style="grid-area: 7 / 2 / 8 / 6">t</span>
-            <span class="flow-edge" style="grid-area: 6 / 6 / 8"><code>earth.trueObliquity</code></span>
-            <span class="flow-node" style="grid-area: 7 / 7">ε</span>
-            <span class="flow-elbow" style="grid-area: 7 / 6 / 10"></span>
-            <span class="flow-edge branch" style="grid-area: 8 / 6 / 10"><code>equatorialHorizontalParallax</code></span>
-            <span class="flow-node" style="grid-area: 9 / 7">π</span>
-        </div>
-        <div class="flow">
-            <span class="flow-node flow-concept" style="grid-area: 2 / 1">place</span>
-            <span class="flow-edge" style="grid-area: 1 / 2 / 3"></span>
-            <span class="flow-node" style="grid-area: 2 / 3">
-                observer = &lbrace; latitude, longitude,&nbsp;<span class="flow-optional" title="Optional">heightM</span>&nbsp;&rbrace;
-            </span>
-        </div>
-    </div>
     <div class="pipeline">
-        <div class="pipeline-direct" style="grid-row: 1"><code>{start.direct}</code></div>
-        <div class="pipeline-space first" style="grid-row: 1">
+        <div class="pipeline-heading pipeline-heading-direct">in one call</div>
+        <div class="pipeline-heading pipeline-heading-steps">step by step</div>
+        <div class="pipeline-direct first" style="grid-row: 2"><code>{start.direct}</code></div>
+        <div class="pipeline-space first" style="grid-row: 2">
             <span class="pipeline-space-name"><Term of={start.term!}>{start.name}</Term> {start.coords}</span>
         </div>
         {
@@ -116,8 +91,7 @@ const rowOf = (i: number) => 2 + 2 * i + (i >= 1 ? 1 : 0);
         </div>
     </div>
     <figcaption class="figure-caption">
-        From the moment and the place to the renderer's vector. Over the line, where the inputs come from, each function
-        on its arrow. Under it, the positions (accent), each conversion with its arguments, and to the left the call that
-        returns each position directly, highlighted the two a renderer mostly needs.
+        From a body's position to the renderer's vector: the positions (accent), each conversion with its arguments, and
+        to the left, dashed, the call that returns each position directly, highlighted the two a renderer mostly needs.
     </figcaption>
 </figure>

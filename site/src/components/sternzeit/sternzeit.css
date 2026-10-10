@@ -664,6 +664,10 @@ g.eclipse-corona {
     line-height: 1;
     color: var(--muted);
 }
+/* The ENU axes' letters at the observer, in the text's color like the axes. */
+.dome-axis-label {
+    color: var(--text);
+}
 /* As wide as the locked panels are, centered on the scene's height, with the caption hanging below it. Square while
    the scene is, and five thirds as tall as wide once the scene turns wide itself (see the media query below), where the
    analemma, a tall figure, has the room for it. */
@@ -851,7 +855,7 @@ g.eclipse-corona {
 .frame-scene.over-body {
     cursor: pointer;
 }
-.frame-scene.labels-off .frame-label:not(.frame-axis) {
+.frame-scene.labels-off .frame-label:not(.frame-axis, .frame-compass) {
     visibility: hidden;
 }
 /* No box around the controls any more, so their copy button sits in the corner of the summary line itself. It is
@@ -1630,9 +1634,8 @@ span.daylight-day {
     font-family: var(--font-mono);
     white-space: nowrap;
 }
-/* The coordinate pipeline, one figure in two parts: over a line, where its inputs come from, and under it, the
-   positions from the ecliptic to the renderer's vector, each conversion between two of them, and the call that returns
-   each position directly. */
+/* The coordinate pipeline in two figures: where its inputs come from, and the positions from the ecliptic to the
+   renderer's vector, each conversion between two of them, and the call that returns each position directly. */
 .pipeline-figure {
     /* What every arrow keeps clear of what it starts or ends at. */
     --pipeline-gap: 3px;
@@ -1656,7 +1659,6 @@ span.daylight-day {
     width: fit-content;
     margin-inline: auto;
     gap: 0.75rem;
-    margin-bottom: 1.25rem;
     font-size: var(--text-small);
     color: var(--muted);
 }
@@ -1688,7 +1690,7 @@ span.daylight-day {
     padding: 0 var(--pipeline-gap);
 }
 .flow-edge code {
-    padding: 0 0.6rem 0.25rem;
+    padding: 0 0.6rem 0.05rem;
     background: none;
     border: none;
     font-size: inherit;
@@ -1738,17 +1740,18 @@ span.daylight-day {
 .flow-resumed {
     justify-self: stretch;
     justify-content: end;
-    gap: var(--pipeline-gap);
+    gap: 0.4rem;
 }
 /* Where t first comes out, a short dashed arrow on: the line goes on below. */
 .flow-continues {
-    gap: var(--pipeline-gap);
+    gap: 0.4rem;
 }
+/* Both dashed arrows equally short, the one out of jde and the one back into it, each a gap from the name. */
 .flow-continues::after,
 .flow-resumed::before {
     content: "";
-    flex: 1;
-    min-width: 1.25rem;
+    flex: none;
+    width: 1.75rem;
     height: var(--flow-line);
     background: var(--line);
     mask:
@@ -1770,12 +1773,9 @@ span.daylight-day {
 .flow-optional {
     opacity: 0.55;
 }
-/* Under the line: the direct calls to the left, each with a short arrow at the position it returns, and the positions
+/* The direct calls to the left, each with a short arrow at the position it returns, and the positions
    to the right of them, a conversion between each two; the halves' names under the calls. */
 .pipeline {
-    /* The line between the inputs and the positions, across the whole figure. */
-    padding-top: 1.25rem;
-    border-top: 1px solid var(--line);
     display: grid;
     /* The calls as wide as the longest and the positions after them, the two centered in the figure. */
     grid-template-columns: 1fr max-content max-content 1fr;
@@ -1787,24 +1787,23 @@ span.daylight-day {
     border: none;
     padding: 0;
 }
-/* A conversion: its name over its arguments, the coordinates in braces, the way the code takes them, the inputs by
+/* A conversion, flush left: its name and its arguments on one line, the coordinates in braces, the way the code takes them, the inputs by
    their symbols from the flows above. */
 .pipeline-function {
     grid-column: 3;
     display: flex;
-    flex-direction: column;
-    align-items: center;
+    white-space: nowrap;
 }
 .pipeline-args {
     color: var(--muted);
 }
-/* A position: an arrow down out of the conversion into it, its name, an arrow on into the next conversion, each the
-   same length and keeping a small gap at both ends, so the name sits in the middle. */
+/* A position, flush left like the conversions: an arrow down out of the conversion into it, its name, an arrow on into
+   the next conversion, each the same length and keeping a small gap at both ends, so the name sits in the middle. */
 .pipeline-space {
     grid-column: 3;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: start;
     color: var(--accent);
 }
 .pipeline-space::before,
@@ -1812,6 +1811,8 @@ span.daylight-day {
 .pipeline-through {
     content: "";
     width: 9px;
+    /* Under the second character of the names, which all start at the column's left edge. */
+    margin-left: 0.5ch;
     height: calc(var(--pipeline-stem) + 6px);
     margin-block: var(--pipeline-gap);
     background: var(--line);
@@ -1821,9 +1822,15 @@ span.daylight-day {
         center bottom / 9px 6px no-repeat,
         linear-gradient(#000, #000) center top / 1px calc(100% - 6px) no-repeat;
 }
-.pipeline-space.first::before,
 .pipeline-space.last::after {
     visibility: hidden;
+}
+/* Nothing leads into the first position, so it sits right under the headings, its call level with it. */
+.pipeline-space.first::before {
+    display: none;
+}
+.pipeline-direct.first {
+    padding-top: 0;
 }
 .pipeline-space-name {
     padding: 0.1rem 0;
@@ -1837,10 +1844,26 @@ span.daylight-day {
 }
 .pipeline-through {
     grid-column: 3;
-    justify-self: center;
+    justify-self: start;
     height: auto;
     margin-top: 0;
     z-index: 1;
+}
+/* The two ways to a position, named over their columns, quietly: the calls flush right, the steps flush left. */
+.pipeline-heading {
+    grid-row: 1;
+    padding-bottom: 0.25rem;
+    color: var(--muted);
+    opacity: 0.8;
+}
+/* Ending where the call names end, before their arrows. */
+.pipeline-heading-direct {
+    grid-column: 2;
+    justify-self: end;
+    padding-right: calc(0.3rem + 1.75rem + var(--pipeline-gap));
+}
+.pipeline-heading-steps {
+    grid-column: 3;
 }
 /* A direct call, flush against the middle column, level with the position it returns. */
 .pipeline-direct {
@@ -1850,7 +1873,7 @@ span.daylight-day {
     align-items: center;
     gap: var(--pipeline-gap);
     padding-block: calc(2 * var(--pipeline-gap) + var(--pipeline-stem) + 6px);
-    padding-right: 0.5rem;
+    padding-right: 0.3rem;
     color: var(--muted);
     white-space: nowrap;
 }
@@ -1861,16 +1884,18 @@ span.daylight-day {
 .pipeline-direct.likely {
     color: var(--text);
 }
+/* Dashed: another way to the same position, not a second input to it. */
 .pipeline-direct::after {
     content: "";
     flex: none;
-    width: 1.25rem;
+    width: 1.75rem;
     height: 9px;
     background: var(--line);
     mask:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 9'%3E%3Cpath d='M0 0l6 4.5-6 4.5z'/%3E%3C/svg%3E")
         right center / 6px 9px no-repeat,
-        linear-gradient(#000, #000) left center / calc(100% - 6px) 1px no-repeat;
+        repeating-linear-gradient(to right, #000 0 3px, transparent 3px 6px) left center / calc(100% - 6px) 1px
+        no-repeat;
 }
 /* Which half is the same for everyone and which is the observer's: a dashed line across, the one half named over it
    and the other under it, under the calls, where nothing else is at that height. */
@@ -1894,15 +1919,18 @@ span.daylight-day {
     .pipeline {
         grid-template-columns: 0 0 max-content 1fr;
     }
-    .pipeline-direct {
+    .pipeline-direct,
+    .pipeline-heading {
         display: none;
     }
-    /* The halves' names to the right of the positions, wrapping where they must. */
-    .pipeline-scope {
-        grid-column: 4;
-        padding-left: 0.5rem;
-        text-align: right;
+    /* A conversion too long for the screen breaks between its arguments. */
+    .pipeline-function {
         white-space: normal;
+    }
+    /* The halves' names flush right across the positions' column, clear of the arrows down its left. */
+    .pipeline-scope {
+        grid-column: 3 / 5;
+        text-align: right;
     }
     /* The flows of the inputs keep their shape and scroll sideways rather than squeeze. */
     .pipeline-givens {

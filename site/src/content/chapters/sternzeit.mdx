@@ -24,6 +24,7 @@ import DayArc from "../../components/sternzeit/DayArc.astro";
 import Daylight from "../../components/sternzeit/Daylight.astro";
 import DeltaT from "../../components/sternzeit/DeltaT.astro";
 import Eclipse from "../../components/sternzeit/Eclipse.astro";
+import Inputs from "../../components/sternzeit/Inputs.astro";
 import LocalFrame from "../../components/sternzeit/LocalFrame.astro";
 import MoonCalendar from "../../components/sternzeit/MoonCalendar.astro";
 import Pipeline from "../../components/sternzeit/Pipeline.astro";
@@ -57,11 +58,11 @@ faintly, by earthshine.
 
 <Scene />
 
-<Controls height={false} open />
+<Controls height={false} />
 
 Every figure and table on this page is computed live by the library, in your browser, and follows one moment and one
-place. The same controls sit folded up below every figure and every unfolded table, so there is no need to scroll back
-up here. The pin fills in your location.
+place. Unfold the controls right under the figure to change them; the same controls sit folded up below every figure
+and every unfolded table, so there is no need to scroll back up here. The pin fills in your location.
 
 ## Counting time the astronomer's way
 
@@ -173,12 +174,19 @@ bending the light that way is the job of an atmosphere renderer.
 <LocalFrame />
 <Controls height={false} />
 
+Whatever the steps between these systems need comes from just two things, the moment and the place
+(<Fig id="pipeline-inputs" />). The moment gives the sidereal time and the Julian Day in ephemeris time, `jde`, both
+first met in [counting time](#counting-time-the-astronomers-way), and from `jde` the obliquity and the body's parallax
+follow; the place is the observer, a latitude, a longitude and, if you like, a height.
+
+<Inputs />
+
 A position passes through these systems in turn, one function a step, and each step takes what it needs and nothing
 more (<Fig id="coordinate-pipeline" />). Up to the equatorial position, the result is the same for everyone on Earth;
 only the steps after it belong to the observer. You rarely need to walk them yourself: each position also comes
 directly, every step before it in one call, and a renderer mostly needs the last two, `horizontalPosition` and
 `direction`. From the topocentric position on, the calls take the moment as `fromDate` returns it, since they need
-Earth's rotation as well as the orbits; the ones before take a bare Julian Day in ephemeris time.
+Earth's rotation as well as the orbits; the ones before take `jde`.
 
 <Pipeline />
 
@@ -302,9 +310,9 @@ import {
 const time = fromDate(new Date());
 // Unit vectors in the observer's ENU frame: x east, y north, z up.
 // Real-time rendering mostly puts y up: assign them as (x, z, -y).
-const observer = { latitude, longitude, heightM }; // heightM is optional
-const toSun = sun.direction(time, observer);
-const toMoon = moon.direction(time, observer);
+const obs = { latitude, longitude, heightM }; // heightM is optional
+const toSun = sun.direction(time, obs);
+const toMoon = moon.direction(time, obs);
 // Functions of a bare Julian Day take ephemeris time.
 const moonlight = moon.illuminatedFraction(julianEphemerisDay(time));
 ```
@@ -324,13 +332,13 @@ import {
     fromDate, julianEphemerisDay, moon, positionAngle, sun,
 } from "@himmelszelt/sternzeit";
 
-const jd = julianEphemerisDay(fromDate(new Date()));
-const lit = moon.illuminatedFraction(jd); // 0 new, 1 full
+const jde = julianEphemerisDay(fromDate(new Date()));
+const lit = moon.illuminatedFraction(jde); // 0 new, 1 full
 // Half a day on tells waxing from waning without a calendar.
-const waxing = moon.illuminatedFraction(jd + 0.5) > lit;
+const waxing = moon.illuminatedFraction(jde + 0.5) > lit;
 
-const m = moon.apparentPosition(jd);
-const s = sun.apparentPosition(jd);
+const m = moon.apparentPosition(jde);
+const s = sun.apparentPosition(jde);
 const brightLimb = positionAngle(
     m.rightAscension, m.declination,
     s.rightAscension, s.declination,
@@ -451,32 +459,32 @@ with it. How to draw them is up to you, so here they are two functions you bring
 import { fromDate, julianEphemerisDay, moon, sun } from "@himmelszelt/sternzeit";
 
 const DAY_MS = 86_400_000;
-const observer = { latitude, longitude };
+const obs = { latitude, longitude };
 // Upper limb on the horizon, refraction included, as for sunrise.
 const isUp = (altitude: number) => altitude > -0.833;
 
 // firstDay: the first midnight, timeOfDay: milliseconds after it.
 for (let day = 0; day < days; day++) {
     const time = fromDate(new Date(firstDay + day * DAY_MS + timeOfDay));
-    const jd = julianEphemerisDay(time);
+    const jde = julianEphemerisDay(time);
     // The parallactic angle turns the sky's north into the zenith.
-    const q = moon.parallacticAngle(time, observer);
+    const q = moon.parallacticAngle(time, obs);
     drawMoonDisc(day, {
-        lit: moon.illuminatedFraction(jd),
-        earthshine: moon.earthshine(jd),
-        libration: moon.librations(jd),
+        lit: moon.illuminatedFraction(jde),
+        earthshine: moon.earthshine(jde),
+        libration: moon.librations(jde),
         // Counterclockwise from up, already turned into this sky.
-        brightLimb: moon.brightLimbAngle(time, observer),
-        north: moon.positionAngleOfAxis(jd) - q,
-        up: isUp(moon.horizontalPosition(time, observer).altitude),
+        brightLimb: moon.brightLimbAngle(time, obs),
+        north: moon.positionAngleOfAxis(jde) - q,
+        up: isUp(moon.horizontalPosition(time, obs).altitude),
     });
 }
 
 // The lanes, in ten-minute steps: the altitude picks the color.
 for (let minute = 0; minute < days * 1440; minute += 10) {
     const time = fromDate(new Date(firstDay + minute * 60_000));
-    drawLane("moon", minute, moon.horizontalPosition(time, observer).altitude);
-    drawLane("sun", minute, sun.horizontalPosition(time, observer).altitude);
+    drawLane("moon", minute, moon.horizontalPosition(time, obs).altitude);
+    drawLane("sun", minute, sun.horizontalPosition(time, obs).altitude);
 }
 ```
 
