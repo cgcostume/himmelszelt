@@ -202,10 +202,11 @@ function greatestNote(jd: number) {
     const where = km < 30 ? "here" : `${Math.round(km).toLocaleString("en-US")} km ${direction}`;
     const when = clock(precise.dateFromJulianDay(found.jd), { timeStyle: "short" }).text;
     const y = -HALF + 22;
-    // The first line takes the reader there: the place and the moment of the greatest eclipse (see the click below).
-    const goto = `<text x="0" y="${f(y)}" class="figure-note eclipse-goto" data-goto="${found.jd},${found.latitude},${found.longitude}"><title>Go to the greatest eclipse, that place and moment</title>${escapeText(`greatest eclipse, ${kind}, ${Math.round((central ? moonR / sunR : there.magnitude) * 100)}%: ${where}`)}</text>`;
+    // The second line, the way there, takes the reader there: the place and the moment of the greatest eclipse.
+    const what = `greatest eclipse, ${kind}, ${Math.round((central ? moonR / sunR : there.magnitude) * 100)}%: ${where}`;
     const detail = `${signed(found.latitude - state.latitude)} latitude, ${signed(dLongitude)} longitude, at ${when}`;
-    return goto + svgText(0, y + NOTE_LINE_PX * unitsPerPx, detail, "figure-label");
+    const goto = `<text x="0" y="${f(y + NOTE_LINE_PX * unitsPerPx)}" class="figure-label eclipse-goto" data-goto="${found.jd},${found.latitude},${found.longitude}"><title>Go to the greatest eclipse, that place and moment</title>${escapeText(detail)}</text>`;
+    return svgText(0, y, what, "figure-note") + goto;
 }
 
 function renderSolar(jd: number) {
@@ -327,13 +328,20 @@ const views = document.querySelectorAll<HTMLElement>(".eclipse-view[data-kind]")
 // for the Moon, which takes longer to cross Earth's shadow.
 offsetSliders();
 
+// The status line's height above the panel's foot, clear of the buttons there.
+const STATUS_BOTTOM_PX = 48;
+const searchMessages = new WeakMap<Element, string>();
+
 function render() {
     for (const view of views) {
         const panel = find<SVGSVGElement>(".eclipse-panel > svg", view);
         unitsPerPx = (2 * HALF) / (panel.clientWidth || 2 * HALF);
         const { svg, status } = RENDERERS[view.dataset.kind as keyof typeof RENDERERS](state.jd);
-        drawSvg(panel, svg, unitsPerPx);
-        find('[data-field="status"]', view).textContent = status;
+        // What the panel shows, in words, under the discs and above the buttons; a search that found nothing says so
+        // there instead, until the next change.
+        const line = searchMessages.get(view) ?? status;
+        searchMessages.delete(view);
+        drawSvg(panel, svg + svgText(0, HALF - STATUS_BOTTOM_PX * unitsPerPx, line, "figure-note"), unitsPerPx);
     }
 }
 
@@ -427,11 +435,13 @@ function nearestEclipse(from: number, direction: number, lunar: boolean) {
 
 for (const button of document.querySelectorAll<HTMLElement>(".eclipse-view [data-jump]")) {
     button.addEventListener("click", () => {
-        const view = button.closest(".eclipse-view") ?? document;
-        const status = find('[data-field="status"]', view);
+        const view = button.closest(".eclipse-view");
         const jd = nearestEclipse(state.jd, Number(button.dataset.step), button.dataset.jump === "lunar");
-        if (jd === null) status.textContent = `none within ${SEARCH_YEARS} years of this moment`;
-        else update({ jd, live: false, animate: false });
+        if (jd !== null) update({ jd, live: false, animate: false });
+        else if (view) {
+            searchMessages.set(view, `none within ${SEARCH_YEARS} years of this moment`);
+            render();
+        }
     });
 }
 
