@@ -1,0 +1,33 @@
+---
+// The chosen place's latitude, the longitude kept: under the observer's frame and the daylight figure (see latitude.ts).
+// Its marks: the poles and the equator named, the tropics and the polar circles as ticks, at today's tilt.
+const percent = (latitude: number) => `left: ${((latitude + 90) / 180) * 100}%`;
+const named: [number, string, string][] = [
+    [-90, "90°", " S"],
+    [0, "0°", ""],
+    [90, "90°", " N"],
+];
+const ticks: [number, string][] = [
+    [-66.6, "Antarctic Circle"],
+    [-23.4, "Tropic of Capricorn"],
+    [23.4, "Tropic of Cancer"],
+    [66.6, "Arctic Circle"],
+];
+---
+
+<label class="figure-slider" data-latitude title="The chosen place's latitude: drag, or turn the mouse wheel for a degree a notch">
+    <span class="note">Latitude</span>
+    <span class="figure-slider-rail">
+        <input type="range" data-field="latitude" min="-90" max="90" step="1" aria-label="Latitude" />
+        <span class="figure-slider-scale" aria-hidden="true">
+            {named.map(([latitude, name, side]) => <span class="figure-slider-mark" style={percent(latitude)}>{name}{side && <span class="figure-slider-unit">{side}</span>}</span>)}
+            {ticks.map(([latitude, name]) => <span class="figure-slider-mark figure-slider-tick" style={percent(latitude)} title={name}></span>)}
+        </span>
+    </span>
+    <output data-field="latitudeValue"></output>
+</label>
+
+<script>
+    import { latitudeSliders } from "./latitude";
+    latitudeSliders();
+</script>

@@ -126,13 +126,13 @@ const current = Astro.url.pathname.replace(/\/$/, "");
             const figures = [...document.querySelectorAll("figure[id]:has(> .figure-caption)")].map((f) => f.id);
             for (const ref of document.querySelectorAll<HTMLAnchorElement>("a.figref")) {
                 const number = figures.indexOf(ref.hash.slice(1)) + 1;
-                if (number > 0) ref.textContent = `Figure ${number}`;
+                if (number > 0) ref.textContent = `Figure\u00a0${number}`;
             }
             // Table references likewise, and a folded table opens when one is followed.
             const tables = [...document.querySelectorAll("[data-table][id]")].map((t) => t.id);
             for (const ref of document.querySelectorAll<HTMLAnchorElement>("a.tabref")) {
                 const number = tables.indexOf(ref.hash.slice(1)) + 1;
-                if (number > 0) ref.textContent = `Table ${number}`;
+                if (number > 0) ref.textContent = `Table\u00a0${number}`;
                 ref.addEventListener("click", () => {
                     const fold = document.querySelector(`${ref.hash} details`);
                     if (fold instanceof HTMLDetailsElement) fold.open = true;

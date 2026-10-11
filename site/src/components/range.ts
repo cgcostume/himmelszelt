@@ -8,6 +8,16 @@ export function paintRange(input: HTMLInputElement) {
     input.style.setProperty("--range-fill", String(max > min ? (Number(input.value) - min) / (max - min) : 0));
 }
 
+// The rail 3 px and its empty part 1 px thick, rounded to whole device pixels, again whenever the zoom changes them.
+function railToPixels() {
+    const ratio = devicePixelRatio;
+    const whole = (px: number) => `${Math.max(1, Math.round(px * ratio)) / ratio}px`;
+    document.documentElement.style.setProperty("--rail", whole(3));
+    document.documentElement.style.setProperty("--rail-thin", whole(1));
+    matchMedia(`(resolution: ${ratio}dppx)`).addEventListener("change", railToPixels, { once: true });
+}
+railToPixels();
+
 document.addEventListener("input", (event) => {
     if (event.target instanceof HTMLInputElement && event.target.type === "range") paintRange(event.target);
 });

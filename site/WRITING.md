@@ -94,6 +94,8 @@ list, and never a promise the chapter does not keep yet.
 - Parentheses only for figure and table references, a one-word label ("(total)"), or a very short aside. Anything
   longer is its own sentence.
 - No runts: never a single word alone on a paragraph's last line (`text-wrap: pretty` handles most; reword if not).
+- No personification: things do only what they can. Thresholds, numbers and functions do not draw, tell or want; say who
+  or what acts ("computed for every day, the crossings can be used to visualize the year", not "the thresholds draw").
 - Say each thing once. If a later section needs it again, refer back in half a sentence instead of re-explaining.
 - Signposts are links in the sentence ("[the next eclipse](#eclipses)"), not "as shown below" or "see the next section".
 - MDX source wrapped at 120 columns.
@@ -118,6 +120,9 @@ list, and never a promise the chapter does not keep yet.
 - **Small counts** in words ("four tasks", "two weeks", "nine tenths"), measurements in digits.
 - **Dates** the American way: "August 12, 2026", "January 1, 2000", "4713 BCE". Times on a 24-hour clock with the zone
   said in words ("20:09 local time", "16:18 UTC"). ISO dates only inside code.
+- **Symbols** (φ, ε, θ, α, δ, l, β, π, A, h) only for what the figures and code use, each introduced once, as a
+  one-word aside where its concept first appears ("the obliquity of the ecliptic, ε."), and words after that. No
+  formulas in prose, no symbol a reader meets nowhere else.
 - **Directions** are ENU everywhere: x east, y north, z up; azimuths from north through east. Say once per chapter how
   a y-up engine assigns them, `(x, z, -y)`.
 

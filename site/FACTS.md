@@ -29,6 +29,7 @@ confirmed yet.
 | Celestial pole as high as the latitude | Coordinates | src | Meeus ch. 13 | ok | 2026-10-11 |
 | Light from the Sun 8 min 20 s, sky turns 2° meanwhile | The Sun | derived | 499 s; 2.08° | ok | 2026-10-11 |
 | Aberration 20.5″, under a ninetieth of the Sun's disc | The Sun | src, derived | Meeus 25; 1/94 | ok | 2026-10-11 |
+| Earth 30 km/s, 15,000 km in 8 min 20 s; aberration moves eclipse contacts by some 40 s | The Sun | derived | 29.8 km/s × 500 s = 14,900 km; 20.5″ / 0.51″/s (Moon against Sun) = 40 s | ok | 2026-10-12 |
 | Moon's light 1.3 s, Moon moves 0.7″ meanwhile | The Sun | derived | 1.28 s; 0.70″ | ok | 2026-10-11 |
 | Moon moves about 13° a day against the stars | The Sun | src | 13.18° | ok | 2026-10-11 |
 | Equation of time: 16 min ahead in November, 14 behind in February | The Sun | src | Meeus ch. 28 | ok | 2026-10-11 |
@@ -45,8 +46,12 @@ confirmed yet.
 | Eclipse phase: 0.5 and 1 for the Moon at its center on the shadow edges | Eclipses | lib | `eclipse.ts` | fixed | 2026-10-11 |
 | Every solar eclipse has a lunar one two weeks before or after | Eclipses | derived | limits 18.5° and about 17° | ok | 2026-10-11 |
 | Total solar eclipse August 12, 2026; partial lunar August 28 | Eclipses | lib, web | umbral magnitude 0.91 | ok | 2026-10-11 |
-| Next total lunar eclipse from late 2026: 2028-12-31, 16:18 UTC | Eclipses, code | lib | 16:18:49 UTC | ok | 2026-10-11 |
+| Next total lunar eclipse from late 2026: 2028-12-31, 16:18 UTC | Eclipses, code | lib | 16:18:42 UTC by bisection (16:18:49 on the minute grid) | ok | 2026-10-12 |
 | True full moon up to 14 hours from the mean one | Eclipses, code | lib | 0.58 days | fixed | 2026-10-11 |
+| Totality lasts less than two hours, so it began within the hour of the deepest moment | Eclipses, code | web | longest total lunar eclipses about 106 minutes (July 16, 2000: 106.4 min) | ok | 2026-10-12 |
+| Bisection: a day to the minute in 11 tests, a walk up to 1,440 | Glossary | derived | log2(1440) = 10.5 | ok | 2026-10-12 |
+| Eclipse snippet: bisection matches the minute walk | Eclipses, code | lib | six starts 2000 to 2032, all within a minute; 934 instead of 25,428 calls, 3.8 instead of 92 ms | ok | 2026-10-12 |
+| Sunrise snippet: altitudes once per minute | The Sun, code | lib | same four times at four places; 1,441 instead of 5,760 calls, 2.7 instead of 7.5 ms | ok | 2026-10-12 |
 | Approximate Sun within 0.002°, Moon almost a tenth | Precise and approximate | lib | 0.0013°; 0.091° (Berlin, 2026) | ok | 2026-10-11 |
 | Meeus: meteorologist at Brussels Airport until 1993, amateur astronomer | People | src | rasc2003, rasc2213 | ok | 2026-10-11 |
 | Asteroid 2213 Meeus named for him | People | src | rasc2213 | ok | 2026-10-11 |
@@ -65,6 +70,7 @@ confirmed yet.
 | Full Moon about 1,900 arcseconds wide | Earth | lib | 1760″ to 2050″, 1798″ on 2026-09-21 | ok | 2026-10-11 |
 | Moon rises some 50 minutes later every day, on average | The Moon | derived | 1440 min / (synodic month - 1) = 50.5 min | ok | 2026-10-11 |
 | Sunrise example: nothing found in midnight sun or polar night | The Sun, code | derived | no threshold crossing, `sunrise` undefined | ok | 2026-10-11 |
+| Analemma's dots crowd at top and bottom: the solstices, Latin for the Sun standing still | The Sun | lib, web | monthly dots closest around June and December; solstitium from sol + sistere | ok | 2026-10-12 |
 
 ### Experiments in the captions
 
@@ -90,6 +96,8 @@ confirmed yet.
 | Umbra about 4,600 km, penumbra 8,200 km at the Moon | Umbra / penumbra | lib | geometric shadow | ok | 2026-10-11 |
 | Horizon dip 1° from 1000 m, 2.9° from 8000 m | Horizon dip | lib | 1.02°; 2.87° | ok | 2026-10-11 |
 | ΔT about 69 s in 2026 | Delta T | lib | 69.1 s | ok | 2026-10-11 |
+| ENU: x east, y north, z up, right-handed; y-up engines take (x, z, -y) | ENU | lib | `horizontalToDirection`, README conventions | ok | 2026-10-11 |
+| Ephemeris time: atomic, today TT, ahead of UT by ΔT, about a minute | Ephemeris time | src, lib | iers; ΔT 69.1 s; `julianEphemerisDay` adds it | ok | 2026-10-11 |
 | Equation of time 16 min ahead, 14 behind | Local mean time | src | Meeus ch. 28 | fixed | 2026-10-11 |
 | Golden hour 6° to -4°, blue hour -4° to -6° | Golden hour, Blue hour | lib | `daylight.ts` thresholds | ok | 2026-10-11 |
 | Sternzeit: sidereal time, kept by the stars; German for Star Trek's stardate. "Since 1799" and "one culmination of a star to the next" (the stellar day, not the sidereal) removed | sternzeit | web | German dub: "Sternzeit" | fixed | 2026-10-11 |

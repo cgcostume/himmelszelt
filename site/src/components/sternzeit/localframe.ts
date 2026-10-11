@@ -116,7 +116,7 @@ function turnArrowheads() {
 
 // Fixed: the ground and the horizon, the dotted meridian from north over the zenith to south, and the ENU axes.
 new Ellipse({ addTo: ground, diameter: 2 * R, rotate: { x: Math.PI / 2 }, color: SURFACE, fill: true, stroke: false });
-styled(new Ellipse({ addTo: ground, diameter: 2 * R, rotate: { x: Math.PI / 2 }, color: ACCENT }), 1);
+styled(new Ellipse({ addTo: ground, diameter: 2 * R, rotate: { x: Math.PI / 2 }, color: MUTED }), 1);
 const meridian = Array.from({ length: 37 }, (_, i) =>
     skyPoint(i <= 18 ? { azimuth: 0, altitude: i * 5 } : { azimuth: 180, altitude: 180 - i * 5 }),
 );
@@ -212,7 +212,8 @@ function rebuild() {
     const poleArc = Array.from({ length: 31 }, (_, i) => ({ azimuth: poleAzimuth, altitude: (phi * i) / 30 }));
     addCurve(poleArc, ACCENT, 1, 0.35 * R);
     latitudeLabel.point = skyPoint({ azimuth: poleAzimuth, altitude: phi / 2 }, 0.48 * R);
-    latitudeLabel.element.textContent = `φ ${degrees(phi)}`;
+    // The angle drawn is the visible pole's height, so without a sign; the hemisphere says which latitude it is.
+    latitudeLabel.element.textContent = `φ ${degrees(phi)} ${latitude < 0 ? "S" : "N"}`;
 
     const [s, c] = [Math.sin(latitude * DEG), Math.cos(latitude * DEG)];
     const equator = Array.from({ length: 121 }, (_, i) => {

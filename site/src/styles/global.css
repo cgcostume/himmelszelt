@@ -613,19 +613,21 @@ input[type="range"] {
     border-radius: 0;
     background: transparent;
 }
+/* The rail's two thicknesses in whole device pixels (see range.ts): at 150%, 3 px are 4.5 of them, which Firefox draws
+   as 4 or 5 depending on where the slider sits on the page. */
 input[type="range"]::-webkit-slider-runnable-track {
-    height: 3px;
-    border-radius: 1.5px;
+    height: var(--rail, 3px);
+    border-radius: calc(var(--rail, 3px) / 2);
     background:
-        linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) 3px no-repeat,
-        linear-gradient(var(--line), var(--line)) right center / 100% 1px no-repeat;
+        linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) var(--rail, 3px) no-repeat,
+        linear-gradient(var(--line), var(--line)) right center / 100% var(--rail-thin, 1px) no-repeat;
 }
 input[type="range"]::-moz-range-track {
-    height: 3px;
-    border-radius: 1.5px;
+    height: var(--rail, 3px);
+    border-radius: calc(var(--rail, 3px) / 2);
     background:
-        linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) 3px no-repeat,
-        linear-gradient(var(--line), var(--line)) right center / 100% 1px no-repeat;
+        linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) var(--rail, 3px) no-repeat,
+        linear-gradient(var(--line), var(--line)) right center / 100% var(--rail-thin, 1px) no-repeat;
 }
 input[type="range"]::-webkit-slider-thumb {
     appearance: none;
@@ -802,7 +804,7 @@ svg text {
 }
 .figure-caption::before {
     counter-increment: figure;
-    content: "Figure " counter(figure) ". ";
+    content: "Figure\a0" counter(figure) ". ";
     color: var(--accent);
 }
 /* A fold drawn like the moment and place: a rule down the left and a line saying what is inside. */

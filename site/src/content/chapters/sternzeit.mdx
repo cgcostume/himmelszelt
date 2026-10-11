@@ -82,7 +82,7 @@ npm install @himmelszelt/sternzeit
 ```ts
 import { fromDate, moon, sun } from "@himmelszelt/sternzeit";
 
-const obs = { latitude: 52.39, longitude: 13.09 }; // Potsdam
+const obs = { latitude: 52.39, longitude: 13.09 };
 const now = fromDate(new Date());
 // Unit vectors from where you stand: x east, y north, z up.
 const toSun = sun.direction(now, obs);
@@ -104,22 +104,24 @@ shape of an orbit, is written as a polynomial in time, and counted in centuries 
 tiny coefficients multiplied by millions of days.
 
 Earth's rotation makes a fine clock, but not a perfect one. Tidal friction slows it, by an amount that varies over the
-centuries, so time counted by the turning Earth falls behind the uniform time in which the orbits are computed. The gap
-between the two is <Term of="Delta T">ΔT</Term>: about a minute today, and hours in antiquity <Cite id="iers" />
+centuries, so time counted by the turning Earth, universal time or UT, falls behind
+<Term of="Ephemeris time">ephemeris time</Term>, the uniform time in which the orbits are computed. The gap between the
+two is <Term of="Delta T">ΔT</Term>: about a minute today, and hours in antiquity <Cite id="iers" />
 <Cite id="espenak2006" /> (<Fig id="delta-t" />). In code, one rule covers every function. One that takes a moment, as
 `fromDate` returns it, reads it as UT and adds ΔT itself. One that takes a bare Julian Day expects it in ephemeris time
-already, and `julianEphemerisDay` gives you that. Mix the two up, and the Moon lands a fiftieth of its own width off
-today, and half of it in the year 1000.
+already, and `julianEphemerisDay` gives you that. Mixed up, they misplace the Moon by a fiftieth of its width today, by
+half in the year 1000.
 
 <DeltaT />
 
 Then there is <Term of="Sidereal time">sidereal time</Term>. A solar day, noon to noon, is 24 hours. But Earth also
 moves along its orbit, so it has to turn a little more than once for the Sun to come back to the same spot. Relative to
-the distant stars, one rotation takes about 23 hours and 56 minutes. Sidereal time measures that rotation, as an angle.
-It is what connects the sky's coordinates to your spot on the ground: the dashed meridian through your location rotates
-with it (<Fig id="armillary-sphere" />). From one day to the next, sidereal time gains almost a degree
-(<Tab id="time" />). Over a year, these add up to one whole turn: Earth rotates 366 times while the Sun comes back only
-365.
+the distant stars, one rotation takes about 23 hours and 56 minutes. Sidereal time, θ, measures that rotation, as an
+angle. It is what connects the sky's coordinates to your spot on the ground: the dashed meridian through your location
+rotates with it (<Fig id="armillary-sphere" />). That little more is Earth's daily step along its orbit, almost a
+degree, 360° in a year of 365 days, so sidereal time gains almost a degree from one day to the next (<Tab id="time" />).
+Over a year, the steps add up to one whole extra turn: Earth turns 366 times against the stars, but only 365 times from
+noon to noon.
 
 In code, a moment is a JavaScript `Date` or the same moment spelled out, and each of these counts is one call away:
 
@@ -150,15 +152,15 @@ const date = toDate(fromJulianDay(jd)); // and back to a Date
 ## Earth, the platform we observe from
 
 Summer is not warm because Earth is closer to the Sun: it is closest in early January. Earth's rotation axis is tilted
-against the plane of its orbit by about 23.4°, the <Term of="Obliquity of the ecliptic">obliquity of the
-ecliptic</Term>. In June the northern half leans towards the Sun, which then stands higher and stays up longer there,
-and in December it leans away; the southern half has it the other way round. The tilt drifts
-slowly over millennia (the mean obliquity), and the Moon's pull on Earth's equatorial bulge adds a nod with a period of
-18.6 years, the <Term of="Nutation">nutation</Term>. The nod tilts the axis a little more and a little less, and slides
-the <Term of="Vernal equinox">vernal equinox</Term>, the point where the Sun crosses the equator northwards in March.
-Both stay below 20 <Term of="Arcsecond">arcseconds</Term>. An arcsecond is a 3600th of a degree, and the full Moon is
-about 1,900 of them wide; 20 are about a sixth of a pixel on a full HD screen showing 60° of sky. Small as they are,
-they separate a position that is almost right from one that is right (<Tab id="earth" />).
+against the plane of its orbit by about 23.4°, the
+<Term of="Obliquity of the ecliptic">obliquity of the ecliptic</Term>, ε. In June the northern half leans towards the
+Sun, which then stands higher and stays up longer there, and in December it leans away; the southern half has it the
+other way round. The tilt drifts slowly over millennia, and the Moon's pull on Earth's equatorial bulge adds a nod with
+a period of 18.6 years, the <Term of="Nutation">nutation</Term>. The nod tilts the axis a little more and a little less,
+and slides the <Term of="Vernal equinox">vernal equinox</Term>, the point where the Sun crosses the equator northwards
+in March. Both stay below 20 <Term of="Arcsecond">arcseconds</Term>. An arcsecond is a 3600th of a degree, and the full
+Moon is about 1,900 of them wide; 20 are about a sixth of a pixel on a full HD screen showing 60° of sky. Small as they
+are, they separate a position that is almost right from one that is right (<Tab id="earth" />).
 
 <Table domain="earth" />
 <Controls />
@@ -172,30 +174,31 @@ cruising altitude, and the <Term of="Horizon dip">horizon dips</Term> by more th
 
 ## Coordinates on the sky
 
-To say where something stands on the sky takes two angles, as longitude and latitude do on Earth, and every pair needs
-a reference: a plane to measure from, and a zero on it. Astronomy has four such systems, and each exists because one
-step of the computation is simplest in it. Two of them are built on the tilt and the vernal equinox. The equinox makes
-a natural zero: it is one of the two points where the equator and the ecliptic cross, so it lies on both, and the Sun
-marks it every March, no star needed. <Term of="Ecliptic coordinates">Ecliptic coordinates</Term> take the plane of Earth's orbit, the ecliptic
-(<Fig id="armillary-sphere" />), as their equator. The Sun never leaves it, and the Moon and the planets stay within a
-few degrees, so orbits are computed here: an ecliptic longitude counted from the vernal equinox, and a small latitude
-off the plane.
+To say where something stands on the sky takes two angles, as longitude and latitude do on Earth, and every pair needs a
+reference: a plane to measure from, and a zero on it. Astronomy has four such systems, and each exists because one step
+of the computation is simplest in it. Two of them are built on the tilt and the vernal equinox. The equinox makes a
+natural zero: it is one of the two points where the equator and the ecliptic cross, so it lies on both, and the Sun
+marks it every March, no star needed. <Term of="Ecliptic coordinates">Ecliptic coordinates</Term> take the plane of
+Earth's orbit, the ecliptic (<Fig id="armillary-sphere" />), as their equator. The Sun never leaves it, and the Moon and
+the planets stay within a few degrees, so orbits are computed here: an ecliptic longitude, l, counted from the vernal
+equinox, and a small latitude, β, off the plane.
 
-<Term of="Equatorial coordinates">Equatorial coordinates</Term> take Earth's equator instead: right ascension along it,
-also counted from the vernal equinox, and declination north or south of it. This is the sky's own map, the one star
-catalogs use, since a star keeps both values while Earth turns underneath. The two systems differ only by the
-obliquity, a tilt about the line towards the vernal equinox.
+<Term of="Equatorial coordinates">Equatorial coordinates</Term> take Earth's equator instead, carried out onto the sky
+as the celestial equator (<Fig id="armillary-sphere" />): right ascension, α, along it, also counted from the vernal
+equinox, and declination, δ, north or south of it. This is the sky's own map, the one star catalogs use, since a star
+keeps both values while Earth turns underneath. The two systems, ecliptic and equatorial, differ only by the obliquity,
+a tilt about the line towards the vernal equinox.
 
-Both are <Term of="Geocentric">geocentric</Term>, and nobody stands at Earth's center. From the surface, a nearby
-body appears slightly shifted by its <Term of="Parallax">parallax</Term>: not at all for the stars, by 8.8 arcseconds
-for the Sun, and by up to a degree for the Moon, two of its own diameters. The topocentric position corrects for it,
-with the observer on the flattened ellipsoid and at their height above sea level.
+Both are <Term of="Geocentric">geocentric</Term>, and nobody stands at Earth's center. From the surface, a nearby body
+appears slightly shifted by its <Term of="Parallax">parallax</Term>, π: not at all for the stars, by 8.8 arcseconds for
+the Sun, and by up to a degree for the Moon, two of its own diameters. The topocentric position, α′ and δ′, corrects for
+it, with the observer on the flattened ellipsoid and at their height above sea level.
 
-<Term of="Horizontal coordinates">Horizontal coordinates</Term>, finally, are the observer's own: an altitude above the
-horizon and an azimuth from north through east. They follow from the topocentric position through the
+<Term of="Horizontal coordinates">Horizontal coordinates</Term>, finally, are the observer's own: an altitude, h, above
+the horizon and an azimuth, A, from north through east. They follow from the topocentric position through the
 <Term of="Hour angle">hour angle</Term>, which sidereal time provides. The celestial pole, around which the sky turns,
-stands above the horizon exactly as high as the place's latitude (<Fig id="local-frame" />): overhead at the pole, on
-the horizon at the equator.
+stands above the horizon exactly as high as the place's latitude, φ (<Fig id="local-frame" />): at the North Pole,
+latitude 90°, it stands straight overhead, and at the equator, latitude 0°, it lies on the horizon.
 
 <LocalFrame />
 <Controls height={false} />
@@ -206,59 +209,66 @@ code, the figure above holds the gist, and [the Sun](#the-sun) is next.
 Whatever the steps between these systems need comes from just two things, the moment and the place
 (<Fig id="pipeline-inputs" />). The moment gives the sidereal time and `jde`, the Julian Day in ephemeris time, both
 first met in [counting time](#counting-time-the-astronomers-way). From `jde` follow the obliquity and the body's
-parallax. The place is the observer: a latitude, a longitude and, if you like, a height.
+parallax. All of these are the same for everyone on Earth. Only the place is your own: the observer, given by a
+latitude, a longitude and, if you like, a height.
 
 <Inputs />
 
-A position passes through these systems in turn, one function a step, and each step takes what it needs and nothing
-more (<Fig id="coordinate-pipeline" />). Up to the equatorial position, the result is the same for everyone on Earth;
-only the steps after it belong to the observer. You rarely need to walk them yourself: each position also comes
-directly, every step before it in one call, and a renderer mostly needs the last two, `horizontalPosition` and
-`direction`. From the topocentric position on, the calls take the moment as `fromDate` returns it, since they need
-Earth's rotation as well as the orbits. The ones before take `jde`, as the rule from counting time has it.
+A position moves through these systems one function at a time (<Fig id="coordinate-pipeline" />). The ecliptic and the
+equatorial position are the same wherever you stand; the observer comes in only on the way to the topocentric one. You
+rarely need to walk them yourself: each position also comes from a single call that covers the whole way there, and a
+renderer mostly needs the last two, i.e., `horizontalPosition` and `direction`. From the topocentric position on, the
+calls take the moment as `fromDate` returns it, since they need Earth's rotation as well as the orbits. The ones before
+need only the orbits, so they take `jde`, a bare Julian Day in ephemeris time.
 
 <Pipeline />
 
 The last call is the one a renderer places and lights things by: `direction` returns the `horizontalPosition` as a unit
-vector in the observer's east-north-up frame, ENU for short, with x pointing east, y north and z up; an engine with y
-up, as most real-time renderers have it, assigns it as `(x, z, -y)`. Refraction is left out on purpose. The altitude is
-the true one, not the apparent one the eye sees, which at the horizon is lifted by more than the Sun's own diameter, and
-bending the light that way is the job of an atmosphere renderer.
+vector in the observer's east-north-up frame, <Term of="ENU">ENU</Term> for short, with x pointing east, y north and z
+up; an engine with y up, as most real-time renderers have it, assigns it as `(x, z, -y)`. Refraction is left out on
+purpose. The altitude is the geometric one, where the body stands, not where the air lifts it for the eye, at the
+horizon by more than the Sun's own diameter. Bending the light that way is the job of an atmosphere renderer such as
+[dunstkreis](../dunstkreis/), and `earth.atmosphericRefraction` gives an estimated lift where you need it.
 
 ## The Sun
 
-Seen from Earth, the Sun circles the sky once a year along the ecliptic, against stars we cannot see by day.
-Computing where it stands follows a pattern that most of this library repeats. It starts on an idealized orbit, a
-perfect circle traversed at constant speed, where the <Term of="Mean anomaly">mean anomaly</Term> and the
-<Term of="Mean longitude">mean longitude</Term> grow almost linearly in time. Then each step corrects for reality.
-Orbits are ellipses, and the <Term of="Equation of the center">equation of the center</Term> gives the
-<Term of="True longitude">true longitude</Term> on one. Nutation and <Term of="Aberration">aberration</Term>, a small
-shift caused by Earth's own orbital speed, turn it into the <Term of="Apparent position">apparent position</Term> in
-right ascension and declination, and from there the steps of the coordinate systems take it to the observer. The
-function names carry the steps as prefixes, `mean`, `true` and `apparent`, as in `meanLongitude` or `apparentPosition`.
+Seen from Earth, the Sun circles the sky once a year along the ecliptic, against stars we cannot see by day. Computing
+where it stands follows a pattern that most of this library repeats: a rough position, a corrected one, and the one we
+see, named in the functions' prefixes `mean`, `true` and `apparent`, respectively. The mean one comes from a Sun moving
+around the sky at a steady pace, just under a degree a day, as if Earth's orbit were a perfect circle: the
+<Term of="Mean longitude">mean longitude</Term>. Orbits are ellipses, though, and the
+<Term of="Equation of the center">equation of the center</Term> turns it into the
+<Term of="True longitude">true longitude</Term>. Nutation and <Term of="Aberration">aberration</Term>, a small shift
+caused by Earth's own orbital speed, then give the <Term of="Apparent position">apparent position</Term> in right
+ascension and declination, and from there the conversions between the coordinate systems take it to the observer
+(<Fig id="coordinate-pipeline" />).
 
-Aberration hides a subtlety. The Sun's light takes 8 minutes 20 seconds to reach us, so we see the Sun where it was back
-then. Yet it does not lag the 2° the sky turns in that time: that turning is Earth spinning under the light, which
-changes nothing about where the light comes from. Only the Sun's own drift against the stars counts, Earth's orbit
-mirrored, and in 8 minutes 20 seconds that is 20.5 arcseconds <Cite id="meeus1998" />, under a ninetieth of the Sun's
-disc. The true longitude leaves it out. The apparent position adds it, and so does everything built on it, up to
-`sun.direction`, which therefore points where the Sun shows. The Moon's light is underway for only 1.3 seconds, in which
-the Moon moves some 0.7 arcseconds, and sternzeit leaves that out.
+Aberration hides a subtlety. Sunlight is 8 minutes 20 seconds old, but the delay matters only together with motion.
+Earth's spin carries the Sun 2° across your sky meanwhile, but that is you turning, not the Sun moving. Earth's motion
+along its orbit is different: at 30 km/s it carries us some 15,000 km sideways while the light is underway, so the Sun
+appears 20.5 arcseconds behind where it actually stands <Cite id="meeus1998" />. That is a ninetieth of the Sun's width,
+invisible to the eye, but it moves the start and end of an eclipse by some 40 seconds. The true longitude leaves it out,
+the apparent position adds it, and so `sun.direction` points where the Sun shows. Moonlight takes only 1.3 seconds, in
+which the Moon moves some 0.7 arcseconds, and sternzeit leaves that out.
 
 Over a day, the Sun and the Moon cross your sky along a path, and the Sun followed through a year, always at the same
-hour, traces an <Term of="Analemma">analemma</Term> (<Fig id="sun-path" />). The Moon's path never quite closes, as it
-moves about 13° a day against the stars. The analemma's height swings with the seasons, from the tilt of Earth's axis,
-and its sideways swing comes from the <Term of="Equation of time">equation of time</Term>: Earth moves faster along its
-orbit in January than in July, and the tilt adds a second, twice-yearly wobble, so the Sun runs up to about 16 minutes
-ahead of the clock in November and 14 behind it in February <Cite id="meeus1998" />. Where its dots crowd, the Sun is
-turning around.
+hour, traces an <Term of="Analemma">analemma</Term> (<Fig id="sun-path" />). The Moon's path, in contrast, never quite
+closes, as it moves about 13° a day against the stars. The analemma's height swings with the seasons, from the tilt of
+Earth's axis, and its sideways swing comes from the <Term of="Equation of time">equation of time</Term>: Earth moves
+faster along its orbit in January than in July, and the tilt adds a second, twice-yearly wobble, so the Sun runs up to
+about 16 minutes ahead of the clock in November and 14 behind it in February <Cite id="meeus1998" />. Where the
+analemma's dots crowd, at the top and the bottom, the Sun lingers before it turns back: the solstices, Latin for the Sun
+standing still.
 
 <DayArc />
 <Controls height={false} />
 
-`distance` and `apparentAngularDiameter` belong together (<Tab id="sun" />). Earth's orbit is almost a circle, at an
-<Term of="Orbital eccentricity">eccentricity</Term> of about 0.0167 <Cite id="meeus1998" />. Yet that puts Earth about
-3% closer to the Sun in early January than in early July, and the Sun's disc looks about 3% larger then.
+So far, the Sun is a direction: where it stands at any moment, and the paths it takes over a day and over a year. To
+draw it, a renderer also needs its size, and the analemma already hinted that the size changes: Earth runs faster in
+January because it is closer to the Sun then (<Tab id="sun" />). Its orbit is almost a circle, at an
+<Term of="Orbital eccentricity">eccentricity</Term> of about 0.0167 <Cite id="meeus1998" />, yet that puts Earth about
+3% closer to the Sun in early January than in early July: `distance` shrinks, and `apparentAngularDiameter`, the width
+of the Sun's disc, grows by as much.
 
 <Table domain="sun" />
 <Controls height={false} />
@@ -278,41 +288,35 @@ import {
 const offset = longitude / 360;
 const today = julianDayUT(fromDate(new Date())) + offset;
 const midnight = Math.floor(today - 0.5) + 0.5 - offset;
-const above = (jd: number, deg: number) =>
-    sun.horizontalPosition(fromJulianDay(jd), { latitude, longitude })
-        .altitude > deg;
+const at = (minute: number) => fromJulianDay(midnight + minute / 1440);
+// One altitude a minute, computed once for every threshold below.
+const altitude = Array.from({ length: 1441 }, (_, minute) =>
+    sun.horizontalPosition(at(minute), { latitude, longitude }).altitude);
 
 function crossings(deg: number): Date[] {
     const found: Date[] = [];
     for (let minute = 1; minute <= 1440; minute++) {
-        const [before, now] = [minute - 1, minute]
-            .map((m) => midnight + m / 1440);
-        if (above(before, deg) !== above(now, deg)) {
-            found.push(toDate(fromJulianDay(now)));
+        if ((altitude[minute - 1] > deg) !== (altitude[minute] > deg)) {
+            found.push(toDate(at(minute)));
         }
     }
     return found;
 }
 
 // The Sun is up once its refracted upper limb clears the horizon,
-// the -0.833 degrees every almanac uses.
+// the -0.833 degrees every almanac uses. Both stay undefined in the
+// midnight sun or the polar night.
 const [sunrise, sunset] = crossings(-0.833);
 const [dawn, dusk] = crossings(-6); // civil twilight
 ```
 
-The search starts at the place's own midnight, by the Sun rather than by Greenwich. Counted from Greenwich's midnight,
-a day far east or west would cut the place's day in two and could hold its sunset before its sunrise. Where the Sun
-crosses no threshold at all, in the midnight sun or the polar night, `crossings` finds nothing, and `sunrise` stays
-`undefined`.
-
 Run for the chosen day, place and clock:
 <SunTimes />
 
-Walk the same thresholds through a whole year and they draw the light of every day at once (<Fig id="daylight" />): the
-days lengthening and shortening, the hour by which summer time shifts them, and the
-<Term of="Twilight">twilights</Term>, which far enough north fill whole summer nights. Slide the latitude away from the
-equator, and the days swing ever more over the year and the twilights last ever longer, until past the polar circle the
-Sun stays up through summer and away through winter.
+Computed for every day of a year, the same crossings can be used to visualize the year's light (<Fig id="daylight" />):
+the days lengthening and shortening, summer time shifting them by an hour, and the <Term of="Twilight">twilights</Term>
+in between. Away from the equator, the days swing more and the twilights last longer, until past the polar circle the
+Sun stays up all summer and away all winter.
 
 <Daylight />
 <Controls height={false} />
@@ -446,8 +450,9 @@ give (<Tab id="eclipse" />).
 
 Rare as they are, eclipses should not cost a renderer anything on every frame, yet they are special enough to be worth a
 notification when one comes. This example finds the next total lunar eclipse: it steps from full moon to full moon,
-checks each one in coarse steps for whether the Moon gets near Earth's shadow at all, and only then walks it minute by
-minute. This is, give or take the search window, what the buttons above do (<Fig id="eclipse-views" />):
+finds the moment each one comes closest to Earth's shadow in three-hour steps, and then narrows it down to the minute
+by halving the gap, a <Term of="Bisection">bisection</Term>: once to the eclipse's deepest moment, once back to where
+totality began. The buttons above search much the same way (<Fig id="eclipse-views" />):
 
 ```ts
 import {
@@ -460,26 +465,42 @@ import {
 const { MEAN_NEW_MOON, MEAN_SYNODIC_MONTH } = moon;
 const firstFullMoon = MEAN_NEW_MOON + MEAN_SYNODIC_MONTH / 2;
 
-// Totality: the whole disc fits inside the umbra. The search runs in UT,
-// the orbits in ephemeris time.
-const total = (jd: number) =>
-    eclipse.lunar(julianEphemerisDay(jd)).umbralMagnitude >= 1;
+const MINUTE = 1 / 1440;
+
+// The search runs in UT, the orbits in ephemeris time.
+const shadow = (jd: number) => eclipse.lunar(julianEphemerisDay(jd));
+const offset = (jd: number) => shadow(jd).axisOffsetKm;
+// Totality: the whole disc fits inside the umbra.
+const total = (jd: number) => shadow(jd).umbralMagnitude >= 1;
+
+// The first minute between a and b where test turns true, by halving.
+function bisect(a: number, b: number, test: (jd: number) => boolean) {
+    while (b - a > MINUTE) {
+        const mid = (a + b) / 2;
+        if (test(mid)) b = mid;
+        else a = mid;
+    }
+    return b;
+}
 
 function nextTotalLunarEclipse(from: number): Date | null {
     const gone = (from - firstFullMoon) / MEAN_SYNODIC_MONTH;
     for (let month = Math.floor(gone); month < gone + 250; month++) {
         const full = firstFullMoon + month * MEAN_SYNODIC_MONTH;
         // The true full moon wanders up to 14 hours from the mean one;
-        // three-hour steps say whether to bother looking closer.
-        let near = false;
-        for (let jd = full - 1; jd <= full + 1 && !near; jd += 1 / 8) {
-            const shadow = eclipse.lunar(julianEphemerisDay(jd));
-            near = shadow.axisOffsetKm < 2 * shadow.penumbraRadiusKm;
+        // three-hour steps find the one closest to the shadow's axis.
+        let [closest, km] = [full, Infinity];
+        for (let jd = full - 0.75; jd <= full + 0.75; jd += 1 / 8) {
+            const away = offset(jd);
+            if (away < km) [closest, km] = [jd, away];
         }
-        if (!near) continue;
-        for (let jd = full - 1; jd <= full + 1; jd += 1 / 1440) {
-            if (jd > from && total(jd)) return toDate(fromJulianDay(jd));
-        }
+        // The deepest moment: where the Moon stops closing in on the axis.
+        const greatest = bisect(closest - 1 / 8, closest + 1 / 8,
+            (jd) => offset(jd + MINUTE) > offset(jd));
+        if (!total(greatest)) continue;
+        // Totality lasts less than two hours, so it began within the hour.
+        const start = bisect(greatest - 1 / 24, greatest, total);
+        if (start > from) return toDate(fromJulianDay(start));
     }
     return null;
 }
@@ -560,7 +581,7 @@ import { sun as fast } from "@himmelszelt/sternzeit/approx"; // approximate
 ```
 
 Neither costs a frame anything: a call takes a few microseconds, the approximate ones about one. Imported alone, the
-Sun adds about 4 kB to a bundle, minified and compressed, and the whole library under 8 kB.
+Sun adds about 4 kB to a bundle, minified and compressed, and the whole library under 8 kB.
 
 ## The people behind the numbers
 

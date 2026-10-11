@@ -2,7 +2,6 @@ import * as precise from "@himmelszelt/sternzeit";
 import * as approx from "@himmelszelt/sternzeit/approx";
 import { find } from "../dom";
 import { onDemand } from "../frame";
-import { paintRange } from "../range";
 import { drawSvg, LABEL_GAP, STRIP_MARGIN, stripMoment, svgText } from "./figure";
 import { onChange, state, update } from "./state";
 import { clockOffsetMs, DAY_MS, wallDayOf } from "./zone";
@@ -31,8 +30,6 @@ const MARGIN = { ...STRIP_MARGIN, right: 1 };
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const svgEl = find<SVGSVGElement>(".daylight-panel > svg");
-const latitudeInput = find<HTMLInputElement>('#daylight [data-field="latitude"]');
-const latitudeValue = find('#daylight [data-field="latitudeValue"]');
 const f = (n: number) => n.toFixed(1);
 
 // Where the Sun is at or above a threshold on a day, in rows from its midnight, around its highest sample: the
@@ -252,14 +249,6 @@ function pointAt(event: MouseEvent) {
     return { day, minutes: Math.round(((py - plot.top) / (plot.bottom - plot.top)) * 24 * 60) };
 }
 
-// The slider sets the place's latitude, whole degrees at a time; the longitude stays.
-latitudeInput.addEventListener("input", () => update({ latitude: Number(latitudeInput.value) }));
-function renderLatitude() {
-    latitudeInput.value = String(state.latitude);
-    paintRange(latitudeInput);
-    latitudeValue.textContent = `${Math.abs(state.latitude).toFixed(1)}° ${state.latitude < 0 ? "S" : "N"}`;
-}
-
 // A click moves the moment to that day and time of day on the clock.
 svgEl.addEventListener("click", (event) => {
     const at = pointAt(event);
@@ -280,7 +269,5 @@ svgEl.addEventListener("pointerleave", () => {
     requestRender();
 });
 onChange(requestRender);
-onChange(renderLatitude);
 new ResizeObserver(requestRender).observe(svgEl);
 render();
-renderLatitude();

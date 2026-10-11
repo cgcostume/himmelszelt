@@ -429,7 +429,7 @@ tbody tr:hover {
 }
 .table-caption::before {
     counter-increment: table;
-    content: "Table " counter(table) ". ";
+    content: "Table\a0" counter(table) ". ";
     color: var(--accent);
 }
 /* A set of moment-and-place controls, foldable behind a one-line summary of the current values. No box around it,
@@ -1065,7 +1065,17 @@ g.eclipse-corona {
     background: currentColor;
 }
 /* The latitude, as wide as "90.0° S", so the rail stays put. */
-#daylight .figure-slider output {
+.figure-slider[data-latitude] output {
+    min-width: 7ch;
+    text-align: right;
+}
+/* Sliders stacked under one figure line their rails up: the same room for every name and every value. */
+.figure-slider:has(+ .figure-slider) > .note,
+.figure-slider + .figure-slider > .note {
+    min-width: 4em;
+}
+.figure-slider:has(+ .figure-slider) > output,
+.figure-slider + .figure-slider > output {
     min-width: 7ch;
     text-align: right;
 }
@@ -1662,7 +1672,8 @@ span.daylight-day {
 .pipeline-figure {
     /* What every arrow keeps clear of what it starts or ends at. */
     --pipeline-gap: 3px;
-    /* Every arrow is 9 pixels across, an odd number, so its 1 pixel line falls on whole pixels, not between two. */
+    /* Every arrow is 9 pixels across, an odd number, so its line falls on whole pixels, not between two. Its line as
+       thick as a slider's empty rail, in whole device pixels (see range.ts). */
     --flow-line: 9px;
     /* How far a branch runs along its arrow before it turns off. */
     --flow-branch: 0.75rem;
@@ -1713,7 +1724,9 @@ span.daylight-day {
     padding: 0 var(--pipeline-gap);
 }
 .flow-edge code {
-    padding: 0 0.6rem 0.05rem;
+    /* Flush left over its arrow, from where the arrow starts. */
+    align-self: start;
+    padding: 0 0.6rem 0.05rem 0.5rem;
     background: none;
     border: none;
     font-size: inherit;
@@ -1728,7 +1741,7 @@ span.daylight-day {
     mask:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 9'%3E%3Cpath d='M0 0l6 4.5-6 4.5z'/%3E%3C/svg%3E")
         right center / 6px 9px no-repeat,
-        linear-gradient(#000, #000) left center / calc(100% - 6px) 1px no-repeat;
+        linear-gradient(#000, #000) left center / calc(100% - 6px) var(--rail-thin, 1px) no-repeat;
 }
 /* A branch leaves its arrow a little after the value, a line straight down to the branch's own arrow, which starts
    there. */
@@ -1742,7 +1755,7 @@ span.daylight-day {
     left: calc(var(--pipeline-gap) + var(--flow-branch));
     top: 4px;
     bottom: 4px;
-    width: 1px;
+    width: var(--rail-thin, 1px);
     background: var(--line);
 }
 .flow-edge.branch {
@@ -1780,7 +1793,7 @@ span.daylight-day {
     mask:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 9'%3E%3Cpath d='M0 0l6 4.5-6 4.5z'/%3E%3C/svg%3E")
         right center / 6px 9px no-repeat,
-        repeating-linear-gradient(to right, #000 0 3px, transparent 3px 6px) left center / calc(100% - 6px) 1px
+        repeating-linear-gradient(to right, #000 0 3px, transparent 3px 6px) left center / calc(100% - 6px) var(--rail-thin, 1px)
         no-repeat;
 }
 /* What a flow starts from, the moment or the place, in words rather than code, the way the controls name them. */
@@ -1843,7 +1856,7 @@ span.daylight-day {
     mask:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 6'%3E%3Cpath d='M0 0h9l-4.5 6z'/%3E%3C/svg%3E")
         center bottom / 9px 6px no-repeat,
-        linear-gradient(#000, #000) center top / 1px calc(100% - 6px) no-repeat;
+        linear-gradient(#000, #000) center top / var(--rail-thin, 1px) calc(100% - 6px) no-repeat;
 }
 .pipeline-space.last::after {
     visibility: hidden;
@@ -1859,11 +1872,15 @@ span.daylight-day {
     padding: 0.1rem 0;
     font-family: var(--font-mono);
 }
+/* A comment after a position, as in code: what its symbols mean. */
+.pipeline-note {
+    color: var(--muted);
+}
 /* The equatorial position runs on through the divider, which carries the rest of its arrow. */
 .pipeline-space.into-divider::after {
     margin-bottom: 0;
     height: var(--pipeline-into-divider);
-    mask: linear-gradient(#000, #000) center top / 1px 100% no-repeat;
+    mask: linear-gradient(#000, #000) center top / var(--rail-thin, 1px) 100% no-repeat;
 }
 .pipeline-through {
     grid-column: 3;
@@ -1917,7 +1934,7 @@ span.daylight-day {
     mask:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 9'%3E%3Cpath d='M0 0l6 4.5-6 4.5z'/%3E%3C/svg%3E")
         right center / 6px 9px no-repeat,
-        repeating-linear-gradient(to right, #000 0 3px, transparent 3px 6px) left center / calc(100% - 6px) 1px
+        repeating-linear-gradient(to right, #000 0 3px, transparent 3px 6px) left center / calc(100% - 6px) var(--rail-thin, 1px)
         no-repeat;
 }
 /* Which half is the same for everyone and which is the observer's: a dashed line across, the one half named over it
@@ -1929,13 +1946,15 @@ span.daylight-day {
     row-gap: 0.2rem;
     color: var(--muted);
 }
+/* As quiet as the headings: notes on the figure, not part of it. */
 .pipeline-scope {
     grid-column: 2;
     white-space: nowrap;
+    opacity: 0.8;
 }
 .pipeline-divider-line {
     grid-column: 1 / -1;
-    border-top: 1px dashed var(--line);
+    border-top: var(--rail-thin, 1px) dashed var(--line);
 }
 /* On a phone the direct calls no longer fit beside the positions; the text names the two that matter most. */
 @media (max-width: 40rem) {

@@ -5,7 +5,7 @@ import "./sternzeit.css";
 // The coordinate systems from a body's ecliptical position to the renderer's vector: down the middle each position and
 // the conversion that turns it into the next one, with its arguments; to the left of each position the call in sun.*
 // and moon.* that returns it directly, all the steps before it in one.
-type Space = { term: string | null; name: string; coords: string; direct: string; likely?: boolean };
+type Space = { term: string | null; name: string; coords: string; note?: string; direct: string; likely?: boolean };
 type Step = { fn: string; args: string; space: Space };
 const start: Space = {
     term: "Ecliptic coordinates",
@@ -43,7 +43,14 @@ const steps: Step[] = [
     {
         fn: "horizontalToDirection",
         args: "({A, h})",
-        space: { term: null, name: "ENU", coords: "x, y, z", direct: "direction(time, obs)", likely: true },
+        space: {
+            term: "ENU",
+            name: "ENU",
+            coords: "x, y, z",
+            note: "// x east, y north, and z up",
+            direct: "direction(time, obs)",
+            likely: true,
+        },
     },
 ];
 // Rows: the headings, the ecliptical position, then a conversion and its result a step, the divider after the first.
@@ -60,7 +67,7 @@ const rowOf = (i: number) => 3 + 2 * i + (i >= 1 ? 1 : 0);
             <span class="pipeline-space-name"><Term of={start.term!}>{start.name}</Term> {start.coords}</span>
         </div>
         {
-            steps.map(({ fn, args, space: { term, name, coords, direct, likely } }, i) => (
+            steps.map(({ fn, args, space: { term, name, coords, note, direct, likely } }, i) => (
                 <>
                     <div class="pipeline-function" style={`grid-row: ${rowOf(i)}`}>
                         <code>{fn}</code>
@@ -77,7 +84,7 @@ const rowOf = (i: number) => 3 + 2 * i + (i >= 1 ? 1 : 0);
                         style={`grid-row: ${rowOf(i) + 1}`}
                     >
                         <span class="pipeline-space-name">
-                            {term ? <Term of={term}>{name}</Term> : name} {coords}
+                            {term ? <Term of={term}>{name}</Term> : name} {coords}{note && <span class="pipeline-note"> {note}</span>}
                         </span>
                     </div>
                 </>
