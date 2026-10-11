@@ -24,6 +24,8 @@ const suns = Array.from({ length: total }, (_, i) => ({
     state: i < index ? "passed" : i === index ? "current" : "ahead",
 }));
 const here = suns[index];
+const sunClass = (state: string, i: number) => `sky-sun ${state}${i === 0 || i === total - 1 ? " on-horizon" : ""}`;
+const sunStyle = (x: number, y: number) => `--x: ${x.toFixed(4)}; --y: ${y.toFixed(4)}`;
 const scene = SCENES[id];
 // The path's direction at the current Sun, from its neighbors, for the scenes that line up along it.
 const place = `--x: ${here.x.toFixed(4)}; --y: ${here.y.toFixed(4)}`;
@@ -124,21 +126,12 @@ const ALONG: Record<string, { left?: string; right?: string }> = {
         {index > 0 && <polyline class="passed" points={points(0, index)} vector-effect="non-scaling-stroke" />}
         {index < total - 1 && <polyline class="ahead" points={points(index, total - 1)} vector-effect="non-scaling-stroke" />}
     </svg>
+    {/* The other Suns first, so the current section's scene is drawn over them; every one of them leads to its section. */}
+    {suns.map(({ x, y, state }, i) => i !== index && <a class={sunClass(state, i)} style={sunStyle(x, y)} href={targets[i].href} aria-label={targets[i].title} />)}
     {scene && <svg class="sky-scene" aria-hidden="true" viewBox="-24 -16 48 32" style={place} set:html={drawings[scene]} />}
     {ALONG[scene]?.left && <svg class="sky-scene along" aria-hidden="true" viewBox="-24 -16 48 32" style={along(before, here)} set:html={ALONG[scene].left} />}
     {ALONG[scene]?.right && <svg class="sky-scene along" aria-hidden="true" viewBox="-24 -16 48 32" style={along(here, after)} set:html={ALONG[scene].right} />}
-    {
-        suns.map(({ x, y, state }, i) => {
-            const cls = `sky-sun ${state}${i === 0 || i === total - 1 ? " on-horizon" : ""}`;
-            const style = `--x: ${x.toFixed(4)}; --y: ${y.toFixed(4)}`;
-            // Every other Sun leads to its section.
-            return i === index ? (
-                <span class={`${cls}${scene === "grid" || scene === "clock" ? " replaced" : ""}`} style={style} aria-current="location" />
-            ) : (
-                <a class={cls} style={style} href={targets[i].href} aria-label={targets[i].title} />
-            );
-        })
-    }
+    <span class={`${sunClass(here.state, index)}${scene === "grid" || scene === "clock" ? " replaced" : ""}`} style={sunStyle(here.x, here.y)} aria-current="location" />
     {
         scene === "earth" && (
             <span class="term sky-observer" tabindex="0" style={place}>

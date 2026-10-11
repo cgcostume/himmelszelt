@@ -47,9 +47,9 @@ const READOUT_WIDTH_PX = 100;
 const READOUT_LINE_PX = 16;
 // Never lower than this, so a shrunk disc still leaves room above and below it for the tilt and the buttons.
 const MIN_HEIGHT_PX = 300;
-// The corners' inset and the middle of their row, as for the switches there (see .view-toggle).
-const CORNER_PX = 10;
-const CORNER_ROW_PX = 20;
+// The corners' inset, the switches' own (see .view-toggle), and the middle of their row, as tall as a switch.
+const CORNER_PX = 6;
+const cornerRowPx = () => CORNER_PX + lockButton.offsetHeight / 2;
 // The north tick and the tilt arc reach this far from the center; the readouts start just beyond.
 const OUTSIDE = PERIGEE_RADIUS + 3;
 // The Sun's arrows reach this far at most; the readouts stay beyond them, whichever way they point.
@@ -67,14 +67,17 @@ function render() {
     const { jd } = state;
     const width = svgEl.parentElement?.clientWidth || 416;
     const besides = (width * BASE_UNITS_PER_PX) / 2 >= SIDE + READOUT_WIDTH_PX * BASE_UNITS_PER_PX;
-    const unitsPerPx = Math.max(BASE_UNITS_PER_PX, (2 * (SIDE + 10)) / width);
-    const line = READOUT_LINE_PX * unitsPerPx;
-    // Under the disc, a row each: its size, then where they do not fit around it the tilt, the libration and the
-    // earthshine, and below those the corners' row, with the switch and the note that the Moon is below the horizon.
-    const rows = besides ? 1 : locked ? 3 : 4;
     const firstRow = REACH + 10;
-    const halfHeight = Math.max(100, firstRow + (rows + (besides ? 1 : 2)) * line, (MIN_HEIGHT_PX / 2) * unitsPerPx);
+    // Where they do not fit beside it, the panel is square and the readouts go to the right corners, two rows each: the
+    // size in the top one and the tilt under it, the earthshine level with the switch in the bottom one and the
+    // libration over it. The disc is as large as leaves both rows clear of it.
+    const square = REACH / (width / 2 - 3 * READOUT_LINE_PX);
+    const unitsPerPx = besides ? BASE_UNITS_PER_PX : Math.max(BASE_UNITS_PER_PX, square > 0 ? square : Infinity);
+    const line = READOUT_LINE_PX * unitsPerPx;
     const halfWidth = (width * unitsPerPx) / 2;
+    // Beside the disc, the size under it and below that the corners' row, with the switch and the note that the Moon is
+    // below the horizon.
+    const halfHeight = besides ? Math.max(100, firstRow + 2 * line, (MIN_HEIGHT_PX / 2) * unitsPerPx) : halfWidth;
     svgEl.style.height = `${f((2 * halfHeight) / unitsPerPx)}px`;
     svgEl.setAttribute("viewBox", `${f(-halfWidth)} ${f(-halfHeight)} ${f(2 * halfWidth)} ${f(2 * halfHeight)}`);
     const time = precise.fromJulianDay(jd);
@@ -181,9 +184,9 @@ function render() {
             DEG *
             UNITS_PER_RADIAN;
         svg += veiledHorizon(horizon, halfHeight, unitsPerPx, halfWidth, {
-            // In the bottom right corner, level with the switch in the bottom left one.
+            // In the bottom right corner, level with the switch in the bottom left one, or over the readouts there.
             x: halfWidth - CORNER_PX * unitsPerPx,
-            y: halfHeight - CORNER_ROW_PX * unitsPerPx,
+            y: halfHeight - cornerRowPx() * unitsPerPx - (besides ? 0 : 2.5 * line),
             cls: "figure-note figure-anchor-end",
         });
     }
@@ -193,11 +196,10 @@ function render() {
     const ew = l >= 0 ? "E" : "W";
     const ns = b >= 0 ? "N" : "S";
     const libration = `${Math.abs(l).toFixed(1)}° ${ew}, ${Math.abs(b).toFixed(1)}° ${ns}`;
-    // With its phase factor: how full the Earth looks from the Moon, 1 at new moon, where the earthshine peaks.
-    const shine = `${(earthshine * 100).toFixed(1)}% (Earth's phase ${(earthshine / EARTHSHINE_MAX).toFixed(2)})`;
+    const shine = `${(earthshine * 100).toFixed(1)}%`;
     const parts = `axis ${axis.toFixed(1)}°, parallactic ${parallactic.toFixed(1)}°`;
     const tiltText = `${tiltDeg.toFixed(1)}° (${parts})`;
-    const stacked: [string, string][] = [["size", `${(diameter * 60).toFixed(1)}′`]];
+    const size = `${(diameter * 60).toFixed(1)}′`;
     if (besides) {
         // Beside the disc, name over value, so they stay narrow.
         const half = line / 2;
@@ -207,13 +209,15 @@ function render() {
         svg += svgText(SIDE, half, shine, "figure-note figure-anchor-start");
         // Centered above the tick and the arc, as far up as the size is down.
         if (!locked) svg += readout(0, -firstRow, "tilt", tiltText, "middle");
+        svg += readout(0, firstRow, "size", size, "middle");
     } else {
-        if (!locked) stacked.push(["tilt", tiltText]);
-        stacked.push(["libration", libration], ["earthshine", shine]);
+        const corner = halfHeight - cornerRowPx() * unitsPerPx;
+        const right = halfWidth - CORNER_PX * unitsPerPx;
+        svg += readout(right, -corner, "size", size, "end");
+        if (!locked) svg += readout(right, -corner + line * 1.25, "tilt", tiltText, "end");
+        svg += readout(right, corner - line * 1.25, "libration", libration, "end");
+        svg += readout(right, corner, "earthshine", shine, "end");
     }
-    stacked.forEach(([name, value], i) => {
-        svg += readout(0, firstRow + i * line, name, value, "middle");
-    });
     drawSvg(svgEl, svg, unitsPerPx);
 }
 

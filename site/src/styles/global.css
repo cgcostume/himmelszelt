@@ -65,8 +65,12 @@ figcaption,
 .term-tip {
     text-wrap: pretty;
 }
-/* Phone-width lines hold some 40 characters, where one long word otherwise leaves a wide gap; code is never split. */
+/* Phone-width lines hold some 40 characters, where one long word otherwise leaves a wide gap; code is never split. Every
+   size there a step smaller, 15 rather than 16 pixels to the rem, which takes the small text to some 12. */
 @media (max-width: 40rem) {
+    html {
+        font-size: 93.75%;
+    }
     p,
     li,
     figcaption {
@@ -508,7 +512,8 @@ pre {
     padding: 0.1rem 0.35rem;
 }
 /* More room below than a paragraph's 1em: a paragraph's line-height already adds air under its last line, a box doesn't.
-   A size smaller than inline code: a block is read line by line, and more of each line fits. */
+   A size smaller than inline code: a block is read line by line, and more of each line fits. Lines never wrap, as the
+   indentation is the code's structure: where 80 columns do not fit, on a phone, the block scrolls sideways. */
 pre {
     font-size: var(--text-small);
     margin: 1rem 0 1.75rem;
@@ -535,13 +540,6 @@ pre code .line::before {
     color: var(--muted);
     opacity: 0.5;
     user-select: none;
-}
-/* Snippets are wrapped at 80 columns, which a phone cannot show: there the lines wrap rather than scroll sideways. */
-@media (max-width: 48rem) {
-    pre {
-        white-space: pre-wrap;
-        overflow-wrap: break-word;
-    }
 }
 /* Form controls, shared by every chapter's interactive parts. */
 input,

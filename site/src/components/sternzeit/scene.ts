@@ -383,10 +383,6 @@ function altAzBody(
 
 function makeAltAzPanel(elementSelector: string, anchorIsSun: boolean) {
     const element = find<SVGSVGElement>(elementSelector);
-    // Appended here (not hardcoded in the markup) so the caption can never drift out of sync with the field of view.
-    const caption = element.closest(".altaz-panel")?.querySelector(".altaz-caption");
-    // Appended as text, so the accented name already in the caption survives.
-    if (caption) caption.append(`, ${ALTAZ_FIELD_OF_VIEW_DEG}° field of view`);
     return { element, anchorIsSun, drawn: "" };
 }
 const sunView = makeAltAzPanel("#sunView", true);

@@ -79,7 +79,7 @@
     "Standard equinox / J2000.0": "The reference epoch, January 1, 2000, 12:00 Terrestrial Time. Mean orbital elements are defined relative to this fixed date rather than now, which is why they need corrections such as nutation and the equation of the center to become an apparent, as-seen-right-now position.",
     "sternenheer": "German, \"host of stars\". The countless stars of the night sky. Poetic, since 1741; Kant in 1755 speaks of \"an inconceivably numerous host of stars\".",
     "sternwarte": "German, \"star watchtower\". An observatory, first a tower for watching the stars. 18th century.",
-    "sternzeit": "German, \"star time\". Sidereal time, counted from one culmination of a star to the next. Since 1799; also the German for Star Trek's stardate.",
+    "sternzeit": "German, \"star time\": sidereal time, the time kept by the stars rather than the Sun. Also the German for Star Trek's stardate.",
     "Storage texture": "A WebGPU texture a compute shader can write to directly. What the precompute passes target, replacing the original's render-to-FBO ping-pong.",
     "Sun path diagram": "A chart of the Sun's track across the sky of one place, over a day, often for several dates at once: flat, as altitude over azimuth, or on a dome. Architects and solar engineers use it to plan shading and daylight.",
     "Transmittance (T)": "The fraction of light surviving a path, `T = exp(-τ)`, from Beer-Lambert's law. This is the quantity the transmittance LUT stores.",

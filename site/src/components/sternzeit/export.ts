@@ -184,4 +184,16 @@ for (const root of document.querySelectorAll<HTMLElement>("[data-export]")) {
     });
     button.addEventListener("pointerdown", (event) => event.stopPropagation());
     root.append(button);
+    // Beside a switch of the figure's own, level with it and just past wherever its label ends.
+    const beside = root.dataset.downloadBeside ? root.querySelector(root.dataset.downloadBeside) : null;
+    if (beside) {
+        const place = () => {
+            const [from, to] = [root.getBoundingClientRect(), beside.getBoundingClientRect()];
+            button.style.left = `${to.right - from.left + 6}px`;
+            button.style.top = `${to.top - from.top}px`;
+        };
+        const observer = new ResizeObserver(place);
+        observer.observe(root);
+        observer.observe(beside);
+    }
 }

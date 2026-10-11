@@ -5,7 +5,7 @@ import LunationSlider from "./LunationSlider.astro";
 ---
 
 <figure class="moon-figure" id="moon-view">
-    <div class="moon-view" data-export="moon">
+    <div class="moon-view" data-export="moon" data-download-beside=":scope > .view-toggle">
         <button type="button" class="view-toggle" data-field="lockMoon" aria-pressed="true" title="Lock the view to the Moon itself: north up, no horizon">moon frame</button>
         <div class="moon-panel">
             <svg viewBox="-100 -100 200 200" aria-hidden="true"></svg>

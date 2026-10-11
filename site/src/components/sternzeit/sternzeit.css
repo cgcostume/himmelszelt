@@ -267,9 +267,12 @@ tbody tr:hover {
     aspect-ratio: 4 / 3;
     max-height: 80vh;
     overflow: hidden;
-    touch-action: none;
     user-select: none;
     cursor: grab;
+}
+/* Not on the scene itself: a child cannot undo it, and the panels on top of it, which do not rotate, scroll the page. */
+:is(#scene, .dome-scene) > :not(.altaz-panels, .analemma-panel) {
+    touch-action: none;
 }
 #scene:active,
 .dome-scene:active {
@@ -402,6 +405,7 @@ tbody tr:hover {
    would show through the lines of text. */
 .altaz-caption,
 .analemma-caption {
+    text-wrap: balance;
     background: var(--bg);
     font-size: var(--text-small);
     line-height: 1.3;
@@ -838,11 +842,10 @@ g.eclipse-corona {
     color: var(--accent);
     border-color: var(--accent);
 }
-/* The observer's frame's labels switch, under the credit line, where the armillary
-   sphere has its labels switch. */
+/* The observer's frame's labels switch in the top left corner, as the armillary sphere has its own. */
 .frame-options {
     position: absolute;
-    top: 2.2rem;
+    top: 0.5rem;
     left: var(--content-inset);
     z-index: 5;
     display: flex;
@@ -865,18 +868,38 @@ g.eclipse-corona {
     right: 0;
 }
 /* The big scenes have no panel frame to hang the button off, so it lines up with the figure's own content instead:
-   the same gutter the credit line and the caption use. Their right side is taken by the panels floating over it. */
-[data-export="armillary-sphere"] > .svg-download,
+   the same gutter the credit line and the caption use, in the top left corner. Their right side is taken by the panels
+   floating over it. */
 [data-export="sun-path-diagram"] > .svg-download {
-    top: auto;
+    top: 0.5rem;
     right: auto;
-    bottom: 0.5rem;
     left: var(--content-inset);
 }
-/* The labels switch sits under the credit line, lined up with it and the download button. */
+/* The download placed beside a switch of the figure's own instead (see export.ts). */
+[data-download-beside] > .svg-download {
+    right: auto;
+}
+/* The labels switch in the top left corner, lined up with the text, the download beside it (see export.ts); the credit
+   line then moves to the bottom, or to the top right corner where no panels float (see the narrow media query). */
 #scene > .view-toggle {
-    top: 2.2rem;
+    top: 0.5rem;
     left: var(--content-inset);
+}
+#scene > .vis-credit {
+    top: auto;
+    bottom: 0.5rem;
+}
+/* The sun path's credit line in the top right corner, right-aligned up to the analemma floating there. */
+.dome-scene > .vis-credit {
+    left: auto;
+    right: calc(1.5rem + var(--analemma-width, 38cqh) + 1rem);
+    text-align: right;
+}
+/* Nothing floats over the observer's frame: its credit line goes to the top right corner at any width. */
+.frame-scene > .vis-credit {
+    left: auto;
+    right: var(--content-inset);
+    text-align: right;
 }
 [data-export]:hover > .svg-download,
 .svg-download:focus-visible,
@@ -1212,7 +1235,7 @@ g.eclipse-corona {
    the two big scenes moves below them, the tables become cards folded behind their name (a hundred of them would
    bury the text around them), and everything tappable grows to a finger's size. The scenes keep their square stage,
    with the layers stacked and absolute, so a pseudo element reserves their height in the column. Touch still rotates
-   in both axes (touch-action stays none), so a drag on a scene turns it rather than scrolling the page. */
+   in both axes (touch-action stays none on all but the panels), so a drag on a scene turns it rather than scrolling. */
 @media (max-width: 48rem) {
     .scene-frame.wide {
         width: auto;
@@ -1222,6 +1245,15 @@ g.eclipse-corona {
     #scene > .view-toggle,
     .frame-options {
         left: 0;
+    }
+    #scene > .vis-credit,
+    .dome-scene > .vis-credit,
+    .frame-scene > .vis-credit {
+        top: 0.5rem;
+        bottom: auto;
+        left: auto;
+        right: 0;
+        text-align: right;
     }
     .moon-view {
         max-width: none;
@@ -1282,9 +1314,10 @@ g.eclipse-corona {
         display: block;
         margin-top: 0.3em;
     }
-    /* Square and as wide as the text, standing in the column: the tall shape needs a scene to float over. */
+    /* Wide and as wide as the text, standing in the column: the tall shape needs a scene to float over, and a square
+       would be mostly empty sky beside the curve. */
     .analemma-panel > svg {
-        aspect-ratio: 1 / 1;
+        aspect-ratio: 16 / 10;
     }
     .analemma-panel {
         /* Relative, not static: its own download button would otherwise anchor itself to the scene above. Relative
@@ -1295,15 +1328,6 @@ g.eclipse-corona {
         transform: none;
         width: 100%;
         margin: 0.75rem 0 0;
-    }
-    /* No panels floating over the scene here, so the button goes back over the stage's top right corner, where it
-       stays on the figure rather than sitting above it, in the same gutter as everything else. */
-    [data-export="armillary-sphere"] > .svg-download,
-    [data-export="sun-path-diagram"] > .svg-download {
-        top: 0;
-        right: var(--content-inset);
-        bottom: auto;
-        left: auto;
     }
     /* Two columns, labels and notes right-aligned in the first as on a wide screen: a field stays on the line of its
        label, and what does not fit beside it (now, animate) wraps under it. */
@@ -1386,8 +1410,10 @@ g.eclipse-corona {
         order: 2;
         color: var(--muted);
     }
+    /* The toggle right-aligned, over the cards' values, as in the value column's heading of the wide table. */
     .table-note {
-        display: block;
+        display: flex;
+        justify-content: space-between;
         margin: 0 0 0.6rem;
         font-size: var(--text-meta);
     }
@@ -1603,13 +1629,10 @@ span.daylight-day {
 .frame-scene:active {
     cursor: grabbing;
 }
-/* Square on a narrow screen, like the other scenes there; the credit line wraps, so the switch moves down a line. */
+/* Square on a narrow screen, like the other scenes there. */
 @media (max-width: 48rem) {
     .frame-scene {
         aspect-ratio: 1 / 1;
-    }
-    .frame-options {
-        top: 3.2rem;
     }
 }
 .frame-labels {

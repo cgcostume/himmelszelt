@@ -5,7 +5,7 @@ import TimeSlider from "./TimeSlider.astro";
 ---
 
 <figure class="scene-frame" id="local-frame">
-    <div class="frame-scene" data-export="local-frame">
+    <div class="frame-scene" data-export="local-frame" data-download-beside=".frame-options > .view-toggle">
         <svg class="dome-layer zdog" data-layer="below" aria-hidden="true"></svg>
         <svg class="dome-layer zdog" data-layer="ground" aria-hidden="true"></svg>
         <svg class="dome-layer zdog" data-layer="above" aria-hidden="true"></svg>
@@ -14,7 +14,7 @@ import TimeSlider from "./TimeSlider.astro";
             <button type="button" class="view-toggle" data-field="labels" aria-pressed="true" title="Show or hide the annotations, all but the axes and the compass">show labels</button>
         </div>
         <p class="vis-credit footnote">
-            Drag to rotate, click the Sun or the Moon to annotate it. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
+            Drag to rotate. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
         </p>
     </div>
     <TimeSlider />

@@ -38,6 +38,8 @@ const ANALEMMA_DAYS = 182;
 // Half the analemma panel's width and its height in degrees: some 47 degrees of analemma, with room around it.
 const ANALEMMA_HALF_WIDTH = 25;
 const ANALEMMA_HEIGHT = 110;
+// Less in a panel wider than tall, standing in the column on a phone: the curve's 47 degrees with some room above and below.
+const ANALEMMA_HEIGHT_WIDE = 70;
 // The dome sits below the frame's middle: seen from high up it reaches as far above the horizon plane as the sky
 // grid does, and centered it would be cut off at the top.
 const CENTER_SHIFT = 0.04;
@@ -350,16 +352,17 @@ function renderAnalemma() {
     // A fixed scale, so analemmas from different places compare directly, always centered on the analemma, so it glides
     // rather than jumps as the moment and place change. The viewBox is fitted into the panel keeping its aspect ratio, so
     // the larger scale applies.
+    const height = analemmaSvg.clientWidth > analemmaSvg.clientHeight ? ANALEMMA_HEIGHT_WIDE : ANALEMMA_HEIGHT;
     const unitsPerPx = Math.max(
         (2 * ANALEMMA_HALF_WIDTH) / (analemmaSvg.clientWidth || 1),
-        ANALEMMA_HEIGHT / (analemmaSvg.clientHeight || 1),
+        height / (analemmaSvg.clientHeight || 1),
     );
     const xs = points.map((p) => p.x);
     const ys = points.map((p) => p.y);
     const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
     const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
-    const [x0, y0] = [centerX - ANALEMMA_HALF_WIDTH, centerY - ANALEMMA_HEIGHT / 2];
-    analemmaSvg.setAttribute("viewBox", `${x0} ${y0} ${2 * ANALEMMA_HALF_WIDTH} ${ANALEMMA_HEIGHT}`);
+    const [x0, y0] = [centerX - ANALEMMA_HALF_WIDTH, centerY - height / 2];
+    analemmaSvg.setAttribute("viewBox", `${x0} ${y0} ${2 * ANALEMMA_HALF_WIDTH} ${height}`);
 
     const f = (n: number) => n.toFixed(3);
     // The panel may be wider than the viewBox's aspect ratio, so the ground and lines reach well past it.
