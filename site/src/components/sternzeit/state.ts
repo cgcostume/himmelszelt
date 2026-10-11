@@ -84,10 +84,50 @@ export function julianDayNow() {
     return Number((Math.round(jd / JD_MIN_STEP) * JD_MIN_STEP).toFixed(7));
 }
 
+// A moment and a place passed in a link: `jd` (a Julian Day, UT) or `date` (anything a JavaScript Date reads, such as
+// 2026-08-12T18:29Z), and `lat`, `lon` and `h` (meters), each optional. Returns the patch, or null if there is none.
+function fromSearch(search: string): Partial<State> | null {
+    const params = new URLSearchParams(search);
+    const patch: Partial<State> = {};
+    const number = (key: string) => (params.has(key) ? Number(params.get(key)) : Number.NaN);
+    const jd = params.has("date") ? julianDayFromDate(new Date(params.get("date") ?? "")) : number("jd");
+    if (Number.isFinite(jd)) Object.assign(patch, { jd, live: false });
+    for (const [key, field] of [
+        ["lat", "latitude"],
+        ["lon", "longitude"],
+        ["h", "heightM"],
+    ] as const) {
+        if (Number.isFinite(number(key))) patch[field] = number(key);
+    }
+    if (patch.heightM !== undefined) patch.heightM = Math.min(Math.max(patch.heightM, 1), 408_000);
+    return Object.keys(patch).length > 0 ? patch : null;
+}
+
 state.jd = julianDayNow();
 restore();
 // Live goes on from now, not from when the page was left.
 if (state.live) state.jd = julianDayNow();
+// A link's moment and place win over the stored ones, once: the address drops them again, so a reload keeps whatever
+// was changed since.
+const linked = fromSearch(location.search);
+if (linked) {
+    Object.assign(state, linked);
+    placeOnEarth();
+    save();
+    history.replaceState(history.state, "", location.pathname + location.hash);
+}
+// A link on the page that only sets the moment and the place (the experiments in the captions) does so in place,
+// without reloading, and scrolls to its figure.
+document.addEventListener("click", (event) => {
+    const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href^='?']") : null;
+    const patch =
+        link && !event.ctrlKey && !event.metaKey && !event.shiftKey ? fromSearch(new URL(link.href).search) : null;
+    if (!link || !patch) return;
+    event.preventDefault();
+    update(patch, link);
+    const target = link.hash ? document.getElementById(decodeURIComponent(link.hash.slice(1))) : null;
+    target?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+});
 
 /** The page's moments are UT; the orbits take ephemeris time, a minute or so ahead today (see deltaT). */
 export const ephemerisDay = (jd: number) => julianEphemerisDay(jd);

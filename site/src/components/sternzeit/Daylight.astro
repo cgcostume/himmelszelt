@@ -1,5 +1,6 @@
 ---
 import Term from "../Term.astro";
+import Try from "../Try.astro";
 import "./sternzeit.css";
 
 // The slider's marks: the poles and the equator named, the tropics and the polar circles as ticks, at today's tilt.
@@ -39,6 +40,9 @@ const ticks: [number, string][] = [
         > and the <span class="daylight-key daylight-blue">blue</span> hour, then nautical and astronomical <Term of="Twilight">twilight</Term>,
         each a shade darker, and night. The line through the golden hour is sunrise and sunset. The slider's ticks are the
         tropics and the polar circles.
+        <Try label="Tromsø" set="lat=69.65&lon=18.96" fig="daylight">
+            midnight sun from May 18 to July 24, polar night from November 28 to January 14.
+        </Try>
     </figcaption>
 </figure>
 

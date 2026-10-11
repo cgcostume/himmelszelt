@@ -55,6 +55,29 @@ confirmed yet.
 | van de Hulst predicted the 21 cm line in 1944 as a student; spin flip; found 1951; maps the Milky Way | People | src | hovenier2001 | ok | 2026-10-11 |
 | van de Hulst's book gives the sphere's phase law behind `moon.earthshine` | People | lib | `moon.ts` comment, osgHimmel; book not seen | open | 2026-10-11 |
 | Espenak: NASA Goddard until 2009, Mr. Eclipse, canons with Meeus | People | src | anderson2025 | ok | 2026-10-11 |
+| Sunlight some eight minutes old, moonlight a second and a bit | Opening | derived | 499 s; 1.3 s, as in The Sun | ok | 2026-10-11 |
+| A few microseconds per call; frame at 60 Hz over 16,000 µs | Opening | lib | measured, Ryzen 7 7800X3D: sun 1.8, moon 3.8 µs | ok | 2026-10-11 |
+| A few microseconds a call, approximate about one | Precise and approximate | lib | measured: 1.84, 3.76; 0.79, 0.94 µs | ok | 2026-10-11 |
+| Sun alone about 4 kB, whole library under 8 kB, minified and gzipped | Precise and approximate | lib | rolldown --minify, gzip -9: 4.4 kB; 7.5 kB | ok | 2026-10-11 |
+| Positions do not depend on the browser's time zone | Counting time, code | lib | `fromDate` keeps the instant, offset only for the wall clock | ok | 2026-10-11 |
+| Mixing UT and TT: Moon a fiftieth of its width off today, half in the year 1000 | Counting time | derived | 0.55°/h: 0.011° of 0.52°; 0.24° at ΔT 26.2 min | ok | 2026-10-11 |
+| Earth closest to the Sun in early January | Earth | lib | perihelion 2026-01-04 | ok | 2026-10-11 |
+| Full Moon about 1,900 arcseconds wide | Earth | lib | 1760″ to 2050″, 1798″ on 2026-09-21 | ok | 2026-10-11 |
+| Moon rises some 50 minutes later every day, on average | The Moon | derived | 1440 min / (synodic month - 1) = 50.5 min | ok | 2026-10-11 |
+| Sunrise example: nothing found in midnight sun or polar night | The Sun, code | derived | no threshold crossing, `sunrise` undefined | ok | 2026-10-11 |
+
+### Experiments in the captions
+
+| Claim | Figure | Against | Result | Status | Checked |
+|---|---|---|---|---|---|
+| June solstice: Sun 23.4° above the celestial equator | Armillary sphere | lib | δ 23.44° on 2026-06-21 12:00 UTC | ok | 2026-10-11 |
+| Year 1000: ΔT 26 minutes, eclipse 6.5° of longitude off | ΔT | lib, derived | 1571 s; 15°/h × 26.2 min = 6.5° | ok | 2026-10-11 |
+| Berlin, sunset June 21: northwest, azimuth 312°, 42° past west | Observer's frame | lib | 19:34 UTC, 312.4°; March 20 271°, December 21 231° | ok | 2026-10-11 |
+| Sydney: path through the north, analemma on its head | Sun path | lib | noon azimuth 351° to 1° all year; big loop (January) at 77°, small (July) at 35° | ok | 2026-10-11 |
+| Tromsø: Sun up May 18 to July 24, down November 28 to January 14 | Daylight | lib | upper limb at -0.833°, 2026/27 | ok | 2026-10-11 |
+| A day and a half after new moon: earthshine at its bluest | Moon | lib | new moon 2026-11-09 07 UTC; 8.9% on Nov 10, 18 UTC | ok | 2026-10-11 |
+| Burgos, August 12, 2026, 18:29 UTC: totality, Sun 8° up | Eclipses | lib | phase 0.153, magnitude 1.012, altitude 8.2° | ok | 2026-10-11 |
+| Quito in December: evening crescents on their backs | Moon calendar | lib | bright limb 181° and 178.5° at 19:00 local, Dec 12 and 13 | ok | 2026-10-11 |
 
 ### Glossary and table tooltips
 

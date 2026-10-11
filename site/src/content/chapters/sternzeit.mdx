@@ -40,22 +40,25 @@ import SunTimes from "../../components/sternzeit/SunTimes.astro";
 import Table from "../../components/sternzeit/Table.astro";
 import Term from "../../components/Term.astro";
 
-A sky can look reasonable without any astronomy: for a mood, a game level or a film shot, the Sun, the Moon and the
-stars may stand wherever they serve the picture. A sky display faithful to a georeferenced site at a given hour,
-however, first has to know how the real sky is composed at that moment and place. Where is the Sun? Is the Moon up, and
-how high? How large does it appear, which way is its crescent tilted? None of this is guesswork: Jean Meeus wrote it all
-down as recipes <Cite id="meeus1998" />, and libraries such as [SunCalc](https://github.com/mourner/suncalc),
+Every sky you have ever seen could have been computed before you looked up, and can be computed back through history:
+where the Sun stood, when the Moon rose, which way its crescent turned. Even its light keeps a schedule. Sunlight left
+the Sun some eight minutes before it reaches you, moonlight the Moon a second and a bit, so a computed sky, too, looks a
+little into the past. sternzeit computes the Sun's and the Moon's part of it, for any place on Earth and any moment, and
+leaves the stars to [sternenheer](../sternenheer/). It answers the way a renderer asks: with the direction to point a
+light along, the angle to turn a crescent by, how brightly Earth lights the Moon's night side, and how far an eclipse
+has come, as a number a shader can use. None of it is guesswork. Jean Meeus wrote the recipes down
+<Cite id="meeus1998" />, and [SunCalc](https://github.com/mourner/suncalc),
 [astronomia](https://github.com/commenthol/astronomia) and [Astronomy Engine](https://github.com/cosinekitty/astronomy)
-compute it in JavaScript already. sternzeit is one more implementation of the same recipes, made for real-time
-rendering: it answers with directions a renderer can use as they are, says which way the Moon is turned and how it is
-lit, and how far an eclipse has come, all with plain, fast functions.
+compute them in JavaScript already; sternzeit is the one made for real-time rendering.
 
-`@himmelszelt/sternzeit` has no dependencies, touches neither the DOM nor the GPU, and runs anywhere JavaScript runs. It
-returns plain numbers, and what to do with them is up to you: give a CAD or architecture viewer the right light and
-shadows for a real site and hour, let a game's day follow the player's clock, label what is up right now in augmented
-reality, or show the sky over a date in history. Four tasks are worked out below, code included: [the golden
-hour](#the-sun) for any day and place, a crescent [turned the right way](#the-moon), [the next eclipse](#eclipses), and
-[a moon calendar of your own](#a-month-of-moons).
+`@himmelszelt/sternzeit` is written in TypeScript and ships as typed ES modules without a single dependency. It touches
+neither the DOM nor the GPU, so it runs anywhere JavaScript runs, in a worker or on a server too, and it is cheap enough
+to call every frame: a few microseconds for the Sun or the Moon, where a frame at 60 Hz lasts more than 16,000.
+Everything comes [twice](#precise-and-approximate), precise and approximate. What to do with the numbers is up to you:
+give a CAD or architecture viewer the right light and shadows for a real site and hour, let a game's day follow the
+player's clock, label what is up right now in augmented reality, or show the sky over a date in history. Four tasks are
+worked out below, code included: [the golden hour](#the-sun) for any day and place, a crescent [turned the right
+way](#the-moon), [the next eclipse](#eclipses), and [a moon calendar of your own](#a-month-of-moons).
 
 All of them start from the same three bodies. Earth, tilted and turning, is where we watch from
 (<Fig id="armillary-sphere" />), and its turning is what sweeps the sky around us once a day. It circles the Sun once a
@@ -69,6 +72,24 @@ faintly, by <Term of="Earthshine">earthshine</Term>.
 Every figure and table on this page is computed live by the library, in your browser, and follows one moment and one
 place. Unfold the controls right under the figure to change them; the same controls sit folded up below every figure
 and every unfolded table, so there is no need to scroll back up here. The pin fills in your location.
+
+In code, it takes one install and two calls:
+
+```sh
+npm install @himmelszelt/sternzeit
+```
+
+```ts
+import { fromDate, moon, sun } from "@himmelszelt/sternzeit";
+
+const obs = { latitude: 52.39, longitude: 13.09 }; // Potsdam
+const now = fromDate(new Date());
+// Unit vectors from where you stand: x east, y north, z up.
+const toSun = sun.direction(now, obs);
+const toMoon = moon.direction(now, obs);
+```
+
+The sections below explain what lies behind these two calls, from the sky down to the code.
 
 ## Counting time the astronomer's way
 
@@ -85,8 +106,10 @@ tiny coefficients multiplied by millions of days.
 Earth's rotation makes a fine clock, but not a perfect one. Tidal friction slows it, by an amount that varies over the
 centuries, so time counted by the turning Earth falls behind the uniform time in which the orbits are computed. The gap
 between the two is <Term of="Delta T">ΔT</Term>: about a minute today, and hours in antiquity <Cite id="iers" />
-<Cite id="espenak2006" /> (<Fig id="delta-t" />). Wherever you pass a date and a place, ΔT is taken care of. A function
-that takes a bare Julian Day expects it in ephemeris time, which `julianEphemerisDay` gives you.
+<Cite id="espenak2006" /> (<Fig id="delta-t" />). In code, one rule covers every function. One that takes a moment, as
+`fromDate` returns it, reads it as UT and adds ΔT itself. One that takes a bare Julian Day expects it in ephemeris time
+already, and `julianEphemerisDay` gives you that. Mix the two up, and the Moon lands a fiftieth of its own width off
+today, and half of it in the year 1000.
 
 <DeltaT />
 
@@ -106,8 +129,8 @@ import {
     toDate,
 } from "@himmelszelt/sternzeit";
 
-// Any JavaScript Date, e.g., new Date() for now; its time zone
-// offset comes along.
+// Any JavaScript Date, e.g., new Date() for now. Only the instant
+// counts: no position depends on the browser's time zone.
 const time = fromDate(new Date("2026-09-21T20:00:00+02:00"));
 // Or the same moment spelled out: 20:00 in Berlin (UTC+2).
 const same = {
@@ -126,13 +149,16 @@ const date = toDate(fromJulianDay(jd)); // and back to a Date
 
 ## Earth, the platform we observe from
 
-Earth's rotation axis is tilted against the plane of its orbit by about 23.4°, the
-<Term of="Obliquity of the ecliptic">obliquity of the ecliptic</Term>, and that is why we have seasons. The tilt drifts
+Summer is not warm because Earth is closer to the Sun: it is closest in early January. Earth's rotation axis is tilted
+against the plane of its orbit by about 23.4°, the <Term of="Obliquity of the ecliptic">obliquity of the
+ecliptic</Term>. In June the northern half leans towards the Sun, which then stands higher and stays up longer there,
+and in December it leans away; the southern half has it the other way round. The tilt drifts
 slowly over millennia (the mean obliquity), and the Moon's pull on Earth's equatorial bulge adds a nod with a period of
 18.6 years, the <Term of="Nutation">nutation</Term>. The nod tilts the axis a little more and a little less, and slides
 the <Term of="Vernal equinox">vernal equinox</Term>, the point where the Sun crosses the equator northwards in March.
-Both stay below 20 <Term of="Arcsecond">arcseconds</Term>, about a sixth of a pixel on a full HD screen showing 60° of
-sky, but they separate a position that is almost right from one that is right (<Tab id="earth" />).
+Both stay below 20 <Term of="Arcsecond">arcseconds</Term>. An arcsecond is a 3600th of a degree, and the full Moon is
+about 1,900 of them wide; 20 are about a sixth of a pixel on a full HD screen showing 60° of sky. Small as they are,
+they separate a position that is almost right from one that is right (<Tab id="earth" />).
 
 <Table domain="earth" />
 <Controls />
@@ -146,10 +172,11 @@ cruising altitude, and the <Term of="Horizon dip">horizon dips</Term> by more th
 
 ## Coordinates on the sky
 
-The tilt and the vernal equinox are also what the sky's coordinates are built on. The equinox makes a natural zero: it
-is one of the two points where the equator and the ecliptic cross, so it lies on both, and the Sun marks it every March,
-no star needed. There are several coordinate systems, and each exists because one step of the computation is simplest in
-it. <Term of="Ecliptic coordinates">Ecliptic coordinates</Term> take the plane of Earth's orbit, the ecliptic
+To say where something stands on the sky takes two angles, as longitude and latitude do on Earth, and every pair needs
+a reference: a plane to measure from, and a zero on it. Astronomy has four such systems, and each exists because one
+step of the computation is simplest in it. Two of them are built on the tilt and the vernal equinox. The equinox makes
+a natural zero: it is one of the two points where the equator and the ecliptic cross, so it lies on both, and the Sun
+marks it every March, no star needed. <Term of="Ecliptic coordinates">Ecliptic coordinates</Term> take the plane of Earth's orbit, the ecliptic
 (<Fig id="armillary-sphere" />), as their equator. The Sun never leaves it, and the Moon and the planets stay within a
 few degrees, so orbits are computed here: an ecliptic longitude counted from the vernal equinox, and a small latitude
 off the plane.
@@ -173,10 +200,13 @@ the horizon at the equator.
 <LocalFrame />
 <Controls height={false} />
 
+The rest of this section follows a position through these systems in code. If you came for the sky rather than the
+code, the figure above holds the gist, and [the Sun](#the-sun) is next.
+
 Whatever the steps between these systems need comes from just two things, the moment and the place
-(<Fig id="pipeline-inputs" />). The moment gives the sidereal time and the Julian Day in ephemeris time, `jde`, both
-first met in [counting time](#counting-time-the-astronomers-way), and from `jde` the obliquity and the body's parallax
-follow; the place is the observer, a latitude, a longitude and, if you like, a height.
+(<Fig id="pipeline-inputs" />). The moment gives the sidereal time and `jde`, the Julian Day in ephemeris time, both
+first met in [counting time](#counting-time-the-astronomers-way). From `jde` follow the obliquity and the body's
+parallax. The place is the observer: a latitude, a longitude and, if you like, a height.
 
 <Inputs />
 
@@ -185,7 +215,7 @@ more (<Fig id="coordinate-pipeline" />). Up to the equatorial position, the resu
 only the steps after it belong to the observer. You rarely need to walk them yourself: each position also comes
 directly, every step before it in one call, and a renderer mostly needs the last two, `horizontalPosition` and
 `direction`. From the topocentric position on, the calls take the moment as `fromDate` returns it, since they need
-Earth's rotation as well as the orbits; the ones before take `jde`.
+Earth's rotation as well as the orbits. The ones before take `jde`, as the rule from counting time has it.
 
 <Pipeline />
 
@@ -197,7 +227,8 @@ bending the light that way is the job of an atmosphere renderer.
 
 ## The Sun
 
-Computing the Sun's position follows a pattern that most of this library repeats. It starts on an idealized orbit, a
+Seen from Earth, the Sun circles the sky once a year along the ecliptic, against stars we cannot see by day.
+Computing where it stands follows a pattern that most of this library repeats. It starts on an idealized orbit, a
 perfect circle traversed at constant speed, where the <Term of="Mean anomaly">mean anomaly</Term> and the
 <Term of="Mean longitude">mean longitude</Term> grow almost linearly in time. Then each step corrects for reality.
 Orbits are ellipses, and the <Term of="Equation of the center">equation of the center</Term> gives the
@@ -269,6 +300,11 @@ const [sunrise, sunset] = crossings(-0.833);
 const [dawn, dusk] = crossings(-6); // civil twilight
 ```
 
+The search starts at the place's own midnight, by the Sun rather than by Greenwich. Counted from Greenwich's midnight,
+a day far east or west would cut the place's day in two and could hold its sunset before its sunrise. Where the Sun
+crosses no threshold at all, in the midnight sun or the polar night, `crossings` finds nothing, and `sunrise` stays
+`undefined`.
+
 Run for the chosen day, place and clock:
 <SunTimes />
 
@@ -283,7 +319,8 @@ Sun stays up through summer and away through winter.
 
 ## The Moon
 
-The Moon is close, its orbit is tilted against Earth's by about 5°, and the Sun actually pulls on it about twice as hard
+The Moon rises some 50 minutes later every day, on average, and it is the hardest of the three bodies to follow. It is
+close, its orbit is tilted against Earth's by about 5°, and the Sun actually pulls on it about twice as hard
 as Earth does: a three-body problem, the original one, which has no exact solution. Its position needs dozens of
 periodic correction terms, all built from four angles that each turn at their own pace. Being close also means a large
 parallax, which is why the topocentric correction matters most here (<Tab id="moon" />).
@@ -299,8 +336,8 @@ The <Term of="Position angle of axis">position angle of the axis</Term> says how
 the sky, and the <Term of="Parallactic angle">parallactic angle</Term> how that sky direction relates to your local
 "up". Together they determine how the Moon's surface, and its lit crescent, appear rotated for you.
 
-The last four rows light it. The <Term of="Phase angle">phase angle</Term>, the angle Sun-Moon-Earth, says how much of
-the lit half faces us, and the <Term of="Illuminated fraction">illuminated fraction</Term> turns that into what the
+The last four rows light it. Half of the Moon is always in sunshine, and its phase is how much of that half we see. The
+<Term of="Phase angle">phase angle</Term>, the angle Sun-Moon-Earth, measures it, and the <Term of="Illuminated fraction">illuminated fraction</Term> turns that into what the
 phase looks like, from 0 at new moon to 1 at full moon <Cite id="meeus1998" />. For actual shading, a renderer wants
 the light direction itself: `sunDirection` points from the Moon's center to the Sun, in the same frame as every other
 direction here, east-north-up. It is not quite the Sun's direction as seen from Earth, since the Moon sits a few
@@ -521,6 +558,9 @@ moment of sunset or a telescope view. Both live behind the same names, so switch
 import { sun } from "@himmelszelt/sternzeit"; // precise
 import { sun as fast } from "@himmelszelt/sternzeit/approx"; // approximate
 ```
+
+Neither costs a frame anything: a call takes a few microseconds, the approximate ones about one. Imported alone, the
+Sun adds about 4 kB to a bundle, minified and compressed, and the whole library under 8 kB.
 
 ## The people behind the numbers
 

@@ -2,20 +2,21 @@
 /**
  * A figure that is planned but not built yet: what it will show, in a few sentences. Shown under `pnpm dev` only. Not
  * numbered like a figure. `plan` notes what is likely to happen to it: merged into another figure, dropped or moved
- * elsewhere.
+ * elsewhere. `what` names something other than a figure held the same way, such as an opening still to be chosen.
  */
 interface Props {
     title: string;
     plan?: string;
+    what?: string;
 }
-const { title, plan } = Astro.props;
+const { title, plan, what = "figure" } = Astro.props;
 ---
 
 {/* A note for working on the chapter, not for its readers: only under pnpm dev. */}
 {
     import.meta.env.DEV && (
         <aside class="planned-figure">
-            <p class="planned-figure-title">Planned figure: {title}</p>
+            <p class="planned-figure-title">Planned {what}: {title}</p>
             <slot />
             {plan && <p class="planned-figure-plan">Plan: {plan}</p>}
         </aside>

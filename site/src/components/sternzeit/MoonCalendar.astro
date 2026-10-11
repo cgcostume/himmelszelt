@@ -1,4 +1,5 @@
 ---
+import Try from "../Try.astro";
 import "./sternzeit.css";
 import TimeSlider from "./TimeSlider.astro";
 ---
@@ -36,6 +37,9 @@ import TimeSlider from "./TimeSlider.astro";
         the date its compass point and, after the arrow, its altitude, hatched while it is below the horizon. Under each
         week, midnight to midnight, when the Moon is up (yellow while low) and the Sun (fading through civil twilight);
         the ticks mark the time of day, which the slider below sets.
+        <Try label="Quito in December" set="date=2026-12-13T00:00Z&lat=-0.18&lon=-78.47" fig="moon-calendar">
+            on the equator, the evening crescents lie on their backs.
+        </Try>
     </figcaption>
 </figure>
 

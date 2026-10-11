@@ -5,8 +5,13 @@ any chapter text, caption, glossary entry or code example. When this file and st
 
 ## Audience and voice
 
-- Developers who want to use the libraries, curious about the sky but not astronomers or physicists. The text should be
-  a joy to read, educational, and nerdy.
+- Written first for two readers: developers who want to use the libraries, and people interested in science who want
+  to understand the sky. Neither is an astronomer or a physicist. The text should be a joy to read, educational, and
+  nerdy.
+- Welcome, not targeted: students from the upper school years on, and readers new to code, who follow the sky and skip
+  the code. Every paragraph before a code block says what the code computes, so skipping it loses nothing. Inclusive
+  and plain, but neither written for children nor a course: no exercises, no talking down.
+- Someone who only wants to know what a library is about learns it from the first two sentences of the opening.
 - Address the reader as **you** ("your sky", "the place you chose"). **We** is humanity on the ground looking up ("where
   we watch from", "we see the Sun where it was"), never the authors. Never **I**, and nothing personal: no places,
   dates or sightings from the authors' lives.
@@ -31,7 +36,8 @@ any chapter text, caption, glossary entry or code example. When this file and st
 - **Name the classic mistakes** renderers make and show the reasoning that rules them out (the crescent lit from above,
   the unlit Moon as a hole). This is where the text earns its keep with developers.
 - **Invite the reader to try something** in a figure, and say what they will see: "Raise the height to 10 km, and the
-  horizon sinks by more than 3°", "Step the moment a day at a time, and sidereal time gains almost a degree".
+  horizon sinks by more than 3°", "Step the moment a day at a time, and sidereal time gains almost a degree". The
+  captions add one experiment each, a click away (see Figures and tables).
 - **People, briefly.** The sources are people: a closing section ("The people behind the numbers") gives every source
   a library function rests on a sentence or two of who they were and ties them to that function. The authors' own
   papers are cited, but their authors not portrayed.
@@ -44,13 +50,18 @@ note shows only on a withheld chapter's placeholder, as the header and footer sa
 
 The body, in this order:
 
-1. **Opening, without a heading.** A hook from the sky (what a faithful sky needs to know, or a question a reader has
-   asked themselves). Then what the library is, in plain words, and where it stands next to existing work. Then what it
-   can be used for, ending in links to the worked tasks further down. Then a bridge to the interactive scene, which
-   follows with the moment and place controls under it, and one short paragraph on how the figures and controls work.
-   Keep the opening to three paragraphs before the scene; anything that is a concept belongs in a section.
+1. **Opening, without a heading.** A hook from the sky, a thought or a question, answered at once by what the library
+   computes, then where
+   it stands next to existing work, and which neighboring chapter covers what it leaves out. Then the developer's facts
+   in a sentence each (language, dependencies, where it runs, what a call costs, measured) and what it can be used for,
+   ending in links to the worked tasks further down. Then a bridge to the interactive scene, which follows with the
+   moment and place controls under it, and one short paragraph on how the figures and controls work. Then a quick
+   start: the install line and the few lines a developer came for, and one sentence leading into the sections. Keep
+   the opening to three paragraphs before the scene; anything that is a concept belongs in a section.
 2. **Concept sections** building on each other: each uses only what earlier ones explained, and the chapter gets
-   harder only as slowly as it has to. A section reads phenomenon, concept, number, function, figure or table, an
+   harder only as slowly as it has to. Each opens with what anyone can see in the sky, never with the computation.
+   Where a section turns to code a reader after the sky can skip, one sentence says so and links to the next section;
+   at most once a chapter, never as a box or a label on paragraphs. A section reads phenomenon, concept, number, function, figure or table, an
    invitation to try it, and a code example where one fits. Within a section, too, the parts build up: what a reader
    sees first, the machinery after it, and the call a renderer actually uses closes it.
 3. **A capstone section** that combines the pieces into one thing worth building (sternzeit: "A month of Moons"), with
@@ -151,6 +162,11 @@ can, or goes.
   true to each other"), then credits. Not how to use it: hovering, clicking and tapping are left to be found, the cursor
   hints at them. The one exception is a scene that turns, whose credit line starts with "Drag to rotate." "The chosen
   place" and "the chosen moment" for whatever the controls are set to.
+- **One experiment per figure** that follows the moment and the place, last in its caption, as `<Try>`: a link that
+  sets a moment and a place, named by what it sets ("Tromsø", "The year 1000"), then what the figure shows there, one
+  sentence, true and checked ("the Sun never sets from May 18 to July 24"). Something worth seeing, not a tour of the
+  controls. The link is the page's address with `date` (anything a JavaScript Date reads) or `jd`, and `lat`, `lon`
+  and `h`; it works from outside the page as well.
 - Figures render on demand, never in a continuous loop (the one exception: the corona in the eclipse figure turns
   while it shows and is in view), and are built so the later Tafeln can lift them out (colors
   from CSS tokens, UI switchable off, no reach into the chapter's DOM).

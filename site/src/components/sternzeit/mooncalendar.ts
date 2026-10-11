@@ -321,5 +321,9 @@ weeksEl.addEventListener("click", (event) => {
 
 find(".calendar-weekdays", figure).innerHTML = WEEKDAYS.map((day) => `<span>${day}</span>`).join("");
 
-onChange(schedule);
+// A link that sets the moment (an experiment in a caption, see state.ts) takes the calendar to its month too.
+onChange((source) => {
+    if (source instanceof HTMLAnchorElement) shown = pageMonth();
+    schedule();
+});
 schedule();

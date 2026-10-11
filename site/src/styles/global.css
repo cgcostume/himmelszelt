@@ -108,7 +108,7 @@ h2 {
     position: relative;
     container-type: inline-size;
     height: 2.5rem;
-    margin: 5rem 0 2.5rem;
+    margin: 8rem 0 2.5rem;
 }
 .sky-rule::before,
 .sky-rule::after {
