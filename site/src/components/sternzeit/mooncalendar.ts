@@ -242,7 +242,7 @@ function render() {
             const current = day === pageDay ? ' aria-current="date"' : "";
             cells += `<button type="button" class="${classes}" data-day="${day}" data-at="${at}" aria-label="${tip.label}"${current}>
                 <span class="calendar-date">${String(date.getUTCDate()).padStart(2, "0")}<span class="calendar-where">${moon.below ? "" : `<span>${moon.direction}</span><span>\u2191${moon.altitude.toFixed(0)}°</span>`}</span></span>
-                <svg viewBox="-20 -20 40 40" aria-hidden="true">${moon.svg}</svg>
+                <svg class="as-seen" viewBox="-20 -20 40 40" aria-hidden="true">${moon.svg}</svg>
                 <span class="term-tip" aria-hidden="true">${tip.html}</span></button>`;
 
             const x0 = column * SAMPLES_PER_DAY;

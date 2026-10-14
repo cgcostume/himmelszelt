@@ -3,8 +3,9 @@ import * as precise from "@himmelszelt/sternzeit";
 import Zdog from "zdog";
 import { find } from "../dom";
 import { onDemand } from "../frame";
-import { ARROWHEAD_PX, COMPASS, cssColor, SUN_SYMBOL, sunRays } from "./figure";
+import { ARROWHEAD_PX, COMPASS, SUN_SYMBOL, sunRays, themeColor, themeColors } from "./figure";
 import { onChange, state } from "./state";
+import { zdogMoon, zdogSun } from "./zdogmoon";
 import "./export";
 
 const { Illustration, Anchor, Shape, Ellipse, Vector } = Zdog;
@@ -23,10 +24,10 @@ const DRAG_RADIANS_PER_PX = 0.008;
 const LABEL_GAP_PX = 6;
 const BODY_GAP_PX = 4;
 
-const INK = cssColor("--text", "#c5c9d2");
-const MUTED = cssColor("--muted", "#808899");
-const SURFACE = cssColor("--surface", "#12151c");
-const ACCENT = cssColor("--accent", "#5aa9ff");
+const INK = themeColor("--text");
+const MUTED = themeColor("--muted");
+const SURFACE = themeColor("--surface");
+const ACCENT = themeColor("--accent");
 
 const frameEl = find(".frame-scene");
 const labelsEl = find(".frame-labels", frameEl);
@@ -242,7 +243,7 @@ function rebuild() {
     bodyPoints.sun = sunPoint;
     bodyPoints.moon = skyPoint(moon);
     styled(
-        new Shape({ addTo: anchorFor(sun.altitude), translate: sunPoint, color: INK }),
+        zdogSun(anchorFor(sun.altitude), sunPoint),
         2 * SUN_SYMBOL.radius,
         sun.altitude > 0 ? "figure-sun-glow" : null,
     );
@@ -251,10 +252,7 @@ function rebuild() {
     const face = new Anchor({ addTo: yaw });
     billboards.push({ yaw, face });
     for (const path of sunRays()) styled(new Shape({ addTo: face, path, color: INK }), 1, "figure-sun-ray");
-    styled(
-        new Shape({ addTo: anchorFor(moon.altitude), translate: bodyPoints.moon, color: MUTED }),
-        2 * SUN_SYMBOL.radius,
-    );
+    moonPhase = zdogMoon(anchorFor(moon.altitude), bodyPoints.moon);
 
     // The chosen body's direction and its angles.
     const body = annotated === "sun" ? sun : moon;
@@ -284,6 +282,8 @@ function rebuild() {
 
 // Which body the arrow and the angles are for, switched by a click on the other one.
 let annotated: "sun" | "moon" = "sun";
+// The Moon, lit from the Sun's direction, its phase following every turn of the scene (see zdogmoon.ts).
+let moonPhase: ReturnType<typeof zdogMoon> | null = null;
 const bodyPoints = { sun: { x: 0, y: 0, z: 0 }, moon: { x: 0, y: 0, z: 0 } };
 // The labels switch hides every label but the axes' and the compass', as the armillary sphere's does.
 const labelsButton = find('[data-field="labels"]', frameEl);
@@ -363,6 +363,7 @@ frameEl.addEventListener("pointerup", (event) => {
 
 function frame() {
     turnArrowheads();
+    moonPhase?.update(bodyPoints.sun, bodyPoints.moon, rotation, zoom);
     for (const { yaw, face } of billboards) {
         yaw.rotate.set({ x: 0, y: -rotation.y, z: 0 });
         face.rotate.set({ x: -rotation.x, y: 0, z: 0 });
@@ -371,6 +372,7 @@ function frame() {
     for (const illustration of layers) {
         illustration.rotate.set(rotation);
         illustration.updateRenderGraph();
+        themeColors(illustration.element);
     }
     for (const [shape, dash] of dashes) shape.svgElement?.classList.add(dash);
     placeLabels();

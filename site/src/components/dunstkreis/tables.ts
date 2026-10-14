@@ -237,7 +237,7 @@ function drawOverlay(name: TableName) {
     const columns = table.columns.start.length - 1;
     if (mirrored(name)) {
         const axis = table.columns.start[columns / 2] ?? 0;
-        context.strokeStyle = "rgba(255, 255, 255, 0.5)";
+        context.strokeStyle = "oklch(1 0 0 / 0.5)";
         context.setLineDash([4 * dpr, 4 * dpr]);
         context.beginPath();
         context.moveTo(axis, 0);
@@ -248,7 +248,7 @@ function drawOverlay(name: TableName) {
     if (!table.hover) return;
     const { column, row } = table.hover;
     const [y0 = 0, y1 = 0] = [table.rows.start[row], table.rows.start[row + 1]];
-    context.fillStyle = "rgba(255, 255, 255, 0.14)";
+    context.fillStyle = "oklch(1 0 0 / 0.14)";
     context.fillRect(0, y0, overlay.width, y1 - y0);
     context.strokeStyle = getComputedStyle(root).getPropertyValue("--accent");
     for (const c of mirrored(name) ? [column, columns - 1 - column] : [column]) {

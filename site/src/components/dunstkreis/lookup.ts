@@ -3,7 +3,7 @@ import Zdog from "zdog";
 import { find } from "../dom";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
-import { COMPASS, cssColor } from "../sternzeit/figure";
+import { COMPASS, themeColor, themeColors } from "../sternzeit/figure";
 import { onChange, state } from "../sternzeit/state";
 import { gpu, onSkyView, onTables, quality, recompute, type Sky, tables } from "./atmosphere";
 import {
@@ -39,9 +39,9 @@ const COMPASS_RING = 24;
 const COMPASS_LABEL_GAP_PX = 14;
 const DRAG_RADIANS_PER_PX = 0.008;
 
-const INK = cssColor("--text", "#c5c9d2");
-const MUTED = cssColor("--muted", "#808899");
-const color = (name: string) => getComputedStyle(root).getPropertyValue(`--lookup-${name}`).trim();
+const INK = themeColor("--text");
+const MUTED = themeColor("--muted");
+const color = (name: string) => themeColor(`--lookup-${name}`);
 
 let zoom = 1;
 let stageWidth = 0;
@@ -297,6 +297,7 @@ function frame() {
     }
     illustration.rotate.set(rotation);
     illustration.updateRenderGraph();
+    themeColors(illustration.element);
     for (const [shape, { dash, opacity }] of styles) {
         if (!shape.svgElement) continue;
         if (dash) shape.svgElement.classList.add(dash);
@@ -352,7 +353,7 @@ function drawMarks(name: TableName) {
         // The texel under the pointer: a dashed outline, apart from the kept ones.
         const [w, h] = [width / texture.width, height / texture.height];
         const [x0, y0] = [hovered.column * w, hovered.shownRow * h];
-        context.strokeStyle = color("skyView");
+        context.strokeStyle = getComputedStyle(root).getPropertyValue("--lookup-skyView").trim();
         context.lineWidth = Math.max(1, dpr);
         context.setLineDash([3 * dpr, 2 * dpr]);
         context.strokeRect(x0 - 2 * dpr, y0 - 2 * dpr, Math.max(w, 4 * dpr) + 4 * dpr, Math.max(h, 4 * dpr) + 4 * dpr);

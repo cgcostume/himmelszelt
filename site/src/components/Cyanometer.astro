@@ -1,9 +1,11 @@
 ---
-import { CYANOMETER_STEPS, DEFAULT_STEP, stepColor } from "../lib/cyanometer";
+import { CYANOMETER_STEPS, DEFAULT_STEPS, LIGHT_FROM_STEP, stepColor } from "../lib/cyanometer";
 import Term from "./Term.astro";
 
 // Saussure's instrument as a ring of 53 swatches, step 0 at the top and darker clockwise, as on the original disc.
-const [CENTER, INNER, OUTER] = [120, 84, 108];
+const [CENTER, INNER, OUTER] = [128, 84, 108];
+// Around it a band of the page each step makes, dark up to LIGHT_FROM_STEP and light from there on, a gap away.
+const [BAND_INNER, BAND_OUTER] = [OUTER + 4, OUTER + 13];
 // The chosen and the hovered step are marked by an arc just inside the ring, a gap away from it.
 const MARK_RADIUS = INNER - 6;
 const MARK_INSET = 0.12;
@@ -18,15 +20,32 @@ const steps = Array.from({ length: CYANOMETER_STEPS }, (_, step) => {
     const mark = `M ${point(MARK_RADIUS, start)} A ${MARK_RADIUS} ${MARK_RADIUS} 0 0 1 ${point(MARK_RADIUS, end)}`;
     return { step, d, mark, color: stepColor(step) };
 });
+const band = (from: number, to: number) => {
+    const [a, b] = [from / CYANOMETER_STEPS, to / CYANOMETER_STEPS];
+    const large = b - a > 0.5 ? 1 : 0;
+    return `M ${point(BAND_OUTER, a)} A ${BAND_OUTER} ${BAND_OUTER} 0 ${large} 1 ${point(BAND_OUTER, b)} L ${point(BAND_INNER, b)} A ${BAND_INNER} ${BAND_INNER} 0 ${large} 0 ${point(BAND_INNER, a)} Z`;
+};
+// Each band's name along its middle, read left to right: the dark one over the upper right, the light one along the bottom.
+const BAND_MIDDLE = (BAND_INNER + BAND_OUTER) / 2;
+const along = (from: number, to: number) =>
+    `M ${point(BAND_MIDDLE, from / CYANOMETER_STEPS)} A ${BAND_MIDDLE} ${BAND_MIDDLE} 0 0 ${from < to ? 1 : 0} ${point(BAND_MIDDLE, to / CYANOMETER_STEPS)}`;
 ---
 
 <span>
-    The accent blue is step <span data-cyanometer-step>{DEFAULT_STEP}</span> of Saussure's{" "}
+    The accent blue is step <span data-cyanometer-step>{DEFAULT_STEPS.dark}</span> of Saussure's{" "}
     <span class="cyanometer-trigger"><Term of="Cyanometer">cyanometer</Term></span>.
 </span>
 
 <dialog class="cyanometer" aria-label="Cyanometer">
-    <svg viewBox="0 0 240 240" role="radiogroup" aria-label="The accent's step">
+    <svg viewBox="0 0 256 256" role="radiogroup" aria-label="The accent's step">
+        <path d={band(0, LIGHT_FROM_STEP)} class="cyanometer-band" data-page="dark" />
+        <path d={band(LIGHT_FROM_STEP, CYANOMETER_STEPS)} class="cyanometer-band" data-page="light" />
+        <defs>
+            <path id="cyanometer-dark-path" d={along(3, 15)} />
+            <path id="cyanometer-light-path" d={along(34, 24)} />
+        </defs>
+        <text class="cyanometer-band-name" data-page="dark"><textPath href="#cyanometer-dark-path" startOffset="50%">dark page</textPath></text>
+        <text class="cyanometer-band-name" data-page="light"><textPath href="#cyanometer-light-path" startOffset="50%">light page</textPath></text>
         {
             steps.map(({ step, d, mark, color }) => (
                 <path
@@ -45,21 +64,29 @@ const steps = Array.from({ length: CYANOMETER_STEPS }, (_, step) => {
 
         <path class="cyanometer-mark" data-mark="chosen" d="" />
         <path class="cyanometer-mark" data-mark="hover" d="" />
-        <text x={CENTER} y={CENTER - 6} class="cyanometer-number" data-cyanometer-step>{DEFAULT_STEP}</text>
+        <text x={CENTER} y={CENTER - 6} class="cyanometer-number" data-cyanometer-step>{DEFAULT_STEPS.dark}</text>
         <text x={CENTER} y={CENTER + 22} class="cyanometer-unit">of 52</text>
     </svg>
     <p>
         Saussure held 53 steps of Prussian blue against the sky, from white to black, and noted the one that matched.
-        Pick the blue of your own sky for this site, even a night one; it stays in this browser.
+        Pick the blue of your own sky for this site, even a night one; from step {LIGHT_FROM_STEP} on, the page turns
+        light. It stays in this browser.
     </p>
     <form method="dialog" class="cyanometer-actions">
-        <button type="button" data-cyanometer-reset>step {DEFAULT_STEP} again</button>
+        <button type="button" data-cyanometer-reset>step <span data-cyanometer-default>{DEFAULT_STEPS.dark}</span> again</button>
         <button>close</button>
     </form>
 </dialog>
 
 <script>
-    import { applyStep, DEFAULT_STEP, STORAGE_KEY, storedStep } from "../lib/cyanometer";
+    import { applyStep, defaultStep, stepFor, storedStep, storeStep, themeOf } from "../lib/cyanometer";
+
+    // What the header's button does, with a word for the dark page, which suits the figures best.
+    const TOGGLE_TITLES = {
+        dark: "A light page. Most figures and renderings read better with dark around them.",
+        light: "Back to the dark page: most figures and renderings read better with dark around them.",
+    };
+    const toggle = document.querySelector<HTMLButtonElement>(".theme-toggle");
 
     const dialog = document.querySelector<HTMLDialogElement>("dialog.cyanometer");
     const swatches = [...document.querySelectorAll<SVGPathElement>("dialog.cyanometer path[data-step]")];
@@ -68,6 +95,8 @@ const steps = Array.from({ length: CYANOMETER_STEPS }, (_, step) => {
     const show = (step: number) => {
         applyStep(step);
         for (const label of document.querySelectorAll("[data-cyanometer-step]")) label.textContent = String(step);
+        toggle?.setAttribute("title", TOGGLE_TITLES[themeOf(step)]);
+        toggle?.setAttribute("aria-label", TOGGLE_TITLES[themeOf(step)]);
     };
     const outline = (name: string, step: number | null) =>
         dialog
@@ -79,18 +108,30 @@ const steps = Array.from({ length: CYANOMETER_STEPS }, (_, step) => {
     };
     const choose = (step: number) => {
         chosen = step;
-        try {
-            if (step === DEFAULT_STEP) localStorage.removeItem(STORAGE_KEY);
-            else localStorage.setItem(STORAGE_KEY, String(step));
-        } catch {}
+        storeStep(step);
         show(step);
         mark();
     };
+    const showDefault = () => {
+        for (const label of document.querySelectorAll("[data-cyanometer-default]")) label.textContent = String(defaultStep());
+    };
     show(chosen);
     mark();
+    showDefault();
+    // A reader who never picked a step follows their system's theme, also when it changes, as it may at dusk.
+    matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
+        showDefault();
+        chosen = storedStep();
+        show(chosen);
+        mark();
+    });
 
     // The word opens the instrument; hovering it still shows the definition, as every term does.
-    document.querySelector(".cyanometer-trigger")?.addEventListener("click", () => dialog?.showModal());
+    // Focus lands on the chosen step, not the first, which would preview step 0 and could turn the page.
+    document.querySelector(".cyanometer-trigger")?.addEventListener("click", () => {
+        dialog?.showModal();
+        swatches[chosen]?.focus();
+    });
     for (const swatch of swatches) {
         const step = Number(swatch.dataset.step);
         // Hovering a step previews it on the whole page, leaving it goes back to the chosen one.
@@ -114,7 +155,11 @@ const steps = Array.from({ length: CYANOMETER_STEPS }, (_, step) => {
             }
         });
     }
-    document.querySelector("[data-cyanometer-reset]")?.addEventListener("click", () => choose(DEFAULT_STEP));
+    document.querySelector("[data-cyanometer-reset]")?.addEventListener("click", () => choose(defaultStep()));
+    // The header's button turns the page: to the step last chosen on the other theme's page, or its default.
+    toggle?.addEventListener("click", () =>
+        choose(stepFor(themeOf(chosen) === "dark" ? "light" : "dark")),
+    );
     // A click on the backdrop, outside the dialog's box, closes it.
     dialog?.addEventListener("click", (event) => {
         const box = dialog.getBoundingClientRect();

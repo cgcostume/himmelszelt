@@ -1,7 +1,7 @@
 ---
 import { getCollection } from "astro:content";
 import Cyanometer from "../components/Cyanometer.astro";
-import { HUE, LIGHTNESS_AT_ZERO, LIGHTNESS_PER_STEP, SATURATION, STORAGE_KEY } from "../lib/cyanometer";
+import { CYANOMETER_STEPS, DEFAULT_STEPS, LIGHT_FROM_STEP, STORAGE_KEY, stepColor } from "../lib/cyanometer";
 import "../styles/global.css";
 
 interface Props {
@@ -12,6 +12,7 @@ const { title, description } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const chapters = (await getCollection("chapters")).sort((a, b) => a.data.order - b.data.order);
 const current = Astro.url.pathname.replace(/\/$/, "");
+const colors = Array.from({ length: CYANOMETER_STEPS }, (_, step) => stepColor(step));
 ---
 
 <!doctype html>
@@ -19,33 +20,35 @@ const current = Astro.url.pathname.replace(/\/$/, "");
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="color-scheme" content="dark" />
+        <meta name="color-scheme" content="dark light" />
         <title>{title}</title>
         <meta name="description" content={description} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
-            href="https://fonts.googleapis.com/css2?family=Roboto:wght@300..700&family=Roboto+Mono:wght@300;400;700&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Roboto:wght@300..700&family=Roboto+Mono:wght@300..700&display=swap"
             rel="stylesheet"
         />
-        {/* The accent a reader picked on the cyanometer (see Cyanometer.astro), set before the first paint. */}
-        <script
-            is:inline
-            define:vars={{ key: STORAGE_KEY, hue: HUE, saturation: SATURATION, top: LIGHTNESS_AT_ZERO, per: LIGHTNESS_PER_STEP }}
-        >
+        {/* The accent a reader picked on the cyanometer (see Cyanometer.astro), and the theme it picks, before the first paint. */}
+        <script is:inline define:vars={{ key: STORAGE_KEY, colors, lightFrom: LIGHT_FROM_STEP, defaults: DEFAULT_STEPS }}>
+            let step = defaults[matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"];
             try {
                 const stored = localStorage.getItem(key);
-                if (stored !== null) {
-                    const lightness = top - Number(stored) * per;
-                    document.documentElement.style.setProperty("--cyanometer", `hsl(${hue} ${saturation}% ${lightness}%)`);
-                }
+                if (stored !== null && colors[Number(stored)]) step = Number(stored);
             } catch {}
+            document.documentElement.style.setProperty("--cyanometer", colors[step]);
+            document.documentElement.dataset.theme = step >= lightFrom ? "light" : "dark";
         </script>
     </head>
     <body>
         <header class="site-header">
             <a class="brand" href={`${base}/`}>himmelszelt / sternwarte</a>
             <span class="beta" title="Pre-1.0: the APIs can still change">beta</span>
+            {/* Turns the page light or dark, by moving the cyanometer's step (see Cyanometer.astro): ☉ and ☾, as astronomers write them. */}
+            <button class="theme-toggle" type="button" aria-label="A light or a dark page" title="A light or a dark page; most figures read better with dark around them">
+                <span class="theme-sun" aria-hidden="true"></span>
+                <span class="theme-moon" aria-hidden="true"></span>
+            </button>
             {/* Only shown where the chapters no longer fit on one line; see the script at the end of the body. */}
             <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Chapters">
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5h12M2 8h12M2 11.5h12" /></svg>

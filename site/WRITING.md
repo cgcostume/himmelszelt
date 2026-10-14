@@ -175,6 +175,10 @@ can, or goes.
 - Figures render on demand, never in a continuous loop (the one exception: the corona in the eclipse figure turns
   while it shows and is in view), and are built so the later Tafeln can lift them out (colors
   from CSS tokens, UI switchable off, no reach into the chapter's DOM).
+- Figures follow the theme, light or dark, which the cyanometer's step picks. A diagram is ink on paper and turns with
+  the page; whatever shows the sky as it is seen (the Moon's phases, eclipses, the WebGPU skies) sits in `.as-seen`
+  and stays dark. Zdog takes its colors as `themeColor("--text")` and resolves them with `themeColors` after each
+  render. Captions name colors that hold in both themes ("the accent", "dashed"), never "white" or "black".
 - `<Planned>` boxes for figures not yet built render under `pnpm dev` only; the published text never relies on them.
 
 ## Code examples

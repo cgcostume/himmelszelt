@@ -5,7 +5,6 @@ import { find } from "../dom";
 import { onDemand } from "../frame";
 import {
     COMPASS,
-    cssColor,
     drawSvg,
     gridLine,
     labelAboveY,
@@ -15,9 +14,12 @@ import {
     sunSymbol,
     svgText,
     sunRays as symbolRays,
+    themeColor,
+    themeColors,
 } from "./figure";
 import { arrowAround, offPanelArrowSvg } from "./offpanel";
 import { ephemerisDay, onChange, state } from "./state";
+import { zdogMoon, zdogSun } from "./zdogmoon";
 import { clockOffsetMs } from "./zone";
 import "./export";
 
@@ -40,11 +42,11 @@ const ORBIT_MARGIN = 32;
 
 const KM_TO_SCENE = EARTH_R / precise.earth.MEAN_RADIUS_KM;
 const ATMOSPHERE_SHELL_DIAMETER = 2 * (EARTH_R + precise.earth.ATMOSPHERE_THICKNESS_KM * KM_TO_SCENE);
-const PAGE_ACCENT = cssColor("--accent", "#5aa9ff");
+const PAGE_ACCENT = themeColor("--accent");
 // Every stroke that was plain black on the old light page: the site's text color, so the scene follows the theme.
-const INK = cssColor("--text", "#c5c9d2");
-// The Moon's color in every figure except the eclipse panels (which show how it really looks): muted gray.
-const MOON_INK = cssColor("--muted", "#808899");
+const INK = themeColor("--text");
+// The Moon's orbit: muted gray, as the Moon was before it was drawn lit.
+const MOON_INK = themeColor("--muted");
 
 type Point = { x: number; y: number; z: number };
 
@@ -339,16 +341,16 @@ function splitInDepth(view: Zdog.Vector) {
     }
 }
 
-// The Sun and the Moon as in the sun path diagram (see SUN_SYMBOL): a filled dot each, the Moon's muted, the Sun's with
-// its ring of dotted rays, in screen pixels whatever the zoom; the rays are turned square to the viewer in frame().
-const BODY_STROKE_PX = 2 * SUN_SYMBOL.radius;
+// The Sun and the Moon as in the sun path diagram (see SUN_SYMBOL), in screen pixels whatever the zoom: the Sun a filled
+// dot with its ring of dotted rays, turned square to the viewer in frame(); the Moon as the camera sees it lit (see
+// zdogmoon.ts).
 const sunAnchor = new Anchor({ addTo: illustration });
-const sunDisc = new Shape({ addTo: sunAnchor, stroke: BODY_STROKE_PX, color: INK });
+const sunDisc = zdogSun(sunAnchor);
 const sunRays = symbolRays().map(
     () => new Shape({ addTo: sunAnchor, path: [v(0, 0, 0), v(0, 0, 0)], stroke: 1, color: INK }),
 );
 const moonAnchor = new Anchor({ addTo: illustration });
-new Shape({ addTo: moonAnchor, stroke: BODY_STROKE_PX, color: MOON_INK });
+const moon = zdogMoon(moonAnchor);
 
 // Two small, flat (never rotated), transparent panels overlaid on the main scene, each locked to one body: plain azimuth
 // across and altitude up, as in a sun path diagram, centered on the body's azimuth, so the altitude lines, the compass
@@ -640,6 +642,7 @@ function frame() {
         ray.updatePath();
     });
     moonAnchor.translate.set(moonPos);
+    moon.update(sunPos, moonPos, { x: rotX, y: rotY, z: 0 }, illustration.zoom);
     atmosphereShell.rotate.set(billboardRotate(rotX, rotY));
     // observerPos already has magnitude EARTH_R (sphericalToVector's radius arg), so this only needs a
     // plain 1.02x nudge above the surface, not a divide-by-EARTH_R (that previously collapsed the whole
@@ -696,6 +699,7 @@ function frame() {
     illustration.rotate.set({ x: rotX, y: rotY, z: 0 });
     splitInDepth(illustration.rotate);
     illustration.updateRenderGraph();
+    themeColors(illustration.element);
     (sunDisc as unknown as { svgElement?: SVGElement }).svgElement?.classList.add("figure-sun-glow");
     annotate("observer", vScale(observerPos, 1.02));
     annotate("equinox", trueEquinoxDot.translate);

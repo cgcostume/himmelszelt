@@ -1,9 +1,11 @@
 import glossary from "../data/glossary.json";
+import images from "../data/glossary-images.json";
 
 /**
  * The site-wide glossary (src/data/glossary.json: term -> definition, both with inline markdown), the single
  * source for every tooltip, in the text (Term.astro) and in the tables (built in the browser). No node imports,
- * so it bundles into client scripts as is.
+ * so it bundles into client scripts as is. A few entries carry a picture (src/data/glossary-images.json: term ->
+ * a square image in public/images, its alt text and its credit), part of the entry's html.
  */
 export interface GlossaryEntry {
     term: string;
@@ -21,10 +23,17 @@ function inlineMarkdown(text: string): string {
         .replace(/(^|\W)_([^_]+)_(?=\W|$)/g, "$1<em>$2</em>");
 }
 
+type GlossaryImage = { src: string; alt: string; credit: string };
+
+// Square, at the start of the definition, which flows around it; loaded once the tooltip is near the screen.
+const imageHtml = ({ src, alt, credit }: GlossaryImage) =>
+    `<span class="term-image"><img src="${import.meta.env.BASE_URL}images/${src}" alt="${escapeHtml(alt).replace(/"/g, "&quot;")}" width="256" height="256" loading="lazy" decoding="async" /><span class="term-image-credit">${escapeHtml(credit)}</span></span>`;
+
 // Every name an entry answers to, lowercased: the term before any parenthesis, split on " / ".
 const byName = new Map<string, GlossaryEntry>();
 for (const [term, definition] of Object.entries(glossary as Record<string, string>)) {
-    const entry = { term: term.replace(/`/g, ""), html: inlineMarkdown(definition) };
+    const image = (images as Record<string, GlossaryImage>)[term];
+    const entry = { term: term.replace(/`/g, ""), html: (image ? imageHtml(image) : "") + inlineMarkdown(definition) };
     for (const name of term.replace(/\s*\(.*$/, "").split(" / "))
         byName.set(name.replace(/`/g, "").trim().toLowerCase(), entry);
 }

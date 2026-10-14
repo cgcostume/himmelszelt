@@ -30,15 +30,37 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const f = (n: number) => String(Number(n.toFixed(2)));
 const ownedBy = (root: Element, element: Element) => element.closest("[data-export]") === root;
 
-// Mixed colors (color-mix in the CSS) compute to color(srgb ...), which not every SVG viewer reads; rgb() they all do.
+// The page's colors compute to oklch() and oklab(), and mixed ones (color-mix) to color(srgb ...), which not every SVG
+// viewer reads; rgb() they all do. Out of gamut, each channel is clipped.
+const NUMBER = "(-?[\\d.e-]+%?)";
+const COLOR = new RegExp(`(oklch|oklab|color\\(srgb)\\(? ?${NUMBER} ${NUMBER} ${NUMBER}(?: / ${NUMBER})?\\)`, "g");
+const fraction = (value: string) => (value.endsWith("%") ? Number.parseFloat(value) / 100 : Number(value));
+
+function oklabToSrgb(l: number, a: number, b: number) {
+    const [L, M, S] = [
+        (l + 0.3963377774 * a + 0.2158037573 * b) ** 3,
+        (l - 0.1055613458 * a - 0.0638541728 * b) ** 3,
+        (l - 0.0894841775 * a - 1.291485548 * b) ** 3,
+    ];
+    return [
+        4.0767416621 * L - 3.3077115913 * M + 0.2309699292 * S,
+        -1.2684380046 * L + 2.6097574011 * M - 0.3413193965 * S,
+        -0.0041960863 * L - 0.7034186147 * M + 1.707614701 * S,
+    ].map((c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055));
+}
+
 const plainColors = (value: string) =>
-    value.replace(
-        /color\(srgb ([\d.e-]+) ([\d.e-]+) ([\d.e-]+)(?: \/ ([\d.e-]+))?\)/g,
-        (_, r: string, g: string, b: string, a: string | undefined) => {
-            const [R, G, B] = [r, g, b].map((c) => Math.round(Math.min(1, Math.max(0, Number(c))) * 255));
-            return a === undefined ? `rgb(${R}, ${G}, ${B})` : `rgba(${R}, ${G}, ${B}, ${a})`;
-        },
-    );
+    value.replace(COLOR, (_, space: string, x: string, y: string, z: string, alpha: string | undefined) => {
+        const [p, q, r] = [fraction(x), Number.parseFloat(y), Number.parseFloat(z)];
+        const rgb =
+            space === "oklch"
+                ? oklabToSrgb(p, q * Math.cos((r * Math.PI) / 180), q * Math.sin((r * Math.PI) / 180))
+                : space === "oklab"
+                  ? oklabToSrgb(p, q, r)
+                  : [p, q, r];
+        const [R, G, B] = rgb.map((c) => Math.round(Math.min(1, Math.max(0, c)) * 255));
+        return alpha === undefined ? `rgb(${R}, ${G}, ${B})` : `rgba(${R}, ${G}, ${B}, ${fraction(alpha)})`;
+    });
 
 function inlineStyles(original: Element, clone: Element) {
     const originals = [original, ...original.querySelectorAll("*")];
@@ -173,7 +195,9 @@ for (const root of document.querySelectorAll<HTMLElement>("[data-export]")) {
     if (root.querySelector(":scope > .svg-download")) continue;
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "svg-download";
+    // Dark over a panel that stays dark on the light page (see .as-seen in global.css).
+    const dark = root.matches(".as-seen") || root.querySelector(":scope > .as-seen") !== null;
+    button.className = dark ? "svg-download as-seen" : "svg-download";
     button.title = "Download this panel as SVG";
     button.setAttribute("aria-label", button.title);
     // A tray with an arrow down into it.

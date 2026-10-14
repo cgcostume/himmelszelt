@@ -3,7 +3,7 @@
     aspect-ratio: 16 / 9;
     max-height: 80vh;
     width: 100%;
-    background: #000;
+    background: oklch(0 0 0);
     touch-action: none;
     user-select: none;
 }
@@ -18,8 +18,8 @@
 }
 .sky-view .vis-credit,
 .sky-overlay {
-    color: #ccc;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    color: oklch(0.85 0 0);
+    text-shadow: 0 1px 3px oklch(0 0 0 / 0.8);
 }
 /* Along the bottom edge, lined up with the credit line at the top. */
 .sky-overlay {
@@ -64,9 +64,9 @@
     position: absolute;
     transform: translate(-50%, -100%);
     padding-bottom: 0.2rem;
-    color: #fff;
+    color: oklch(1 0 0);
     font-size: var(--text-small);
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    text-shadow: 0 1px 3px oklch(0 0 0 / 0.8);
 }
 .sky-error {
     position: absolute;
@@ -74,7 +74,7 @@
     display: grid;
     place-items: center;
     padding: 1rem;
-    color: #ccc;
+    color: oklch(0.85 0 0);
     text-align: center;
 }
 /* The tables figure: a bar of switches, then each table with its controls over it. */
@@ -184,7 +184,7 @@
 .lut-stage {
     position: relative;
     width: 100%;
-    background: #000;
+    background: oklch(0 0 0);
 }
 .lut-stage canvas {
     position: absolute;
@@ -344,8 +344,11 @@
    scattering, and the sky view a view ray ends in. */
 :root {
     --lookup-transmittance: var(--accent);
-    --lookup-multiScattering: hsl(32 80% 62%);
+    --lookup-multiScattering: oklch(0.771 0.13 67);
     --lookup-skyView: var(--text);
+}
+:root[data-theme="light"] {
+    --lookup-multiScattering: oklch(0.62 0.14 60);
 }
 /* Laid out like the sun path diagram: the scene fills the frame, the three tables float on its right, as wide as the
    analemma there, and below it in a row where the page is narrow. Equal boxes: their axes are parameters, so their

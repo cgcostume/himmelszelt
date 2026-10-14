@@ -7,7 +7,6 @@ import {
     ARROWHEAD_PX,
     alongVerticalCircle,
     COMPASS,
-    cssColor,
     drawSvg,
     gridLine,
     labelAboveY,
@@ -15,8 +14,11 @@ import {
     sunRays,
     sunSymbol,
     svgText,
+    themeColor,
+    themeColors,
 } from "./figure";
 import { onChange, state } from "./state";
+import { zdogMoon, zdogSun } from "./zdogmoon";
 import "./export";
 
 const { Illustration, Anchor, Shape, Ellipse, Vector } = Zdog;
@@ -48,10 +50,10 @@ const TILT_MIN = -85 * DEG;
 const TILT_MAX = -8 * DEG;
 const DRAG_RADIANS_PER_PX = 0.008;
 
-const INK = cssColor("--text", "#c5c9d2");
-const MUTED = cssColor("--muted", "#808899");
-const SURFACE = cssColor("--surface", "#12151c");
-const ACCENT = cssColor("--accent", "#5aa9ff");
+const INK = themeColor("--text");
+const MUTED = themeColor("--muted");
+const SURFACE = themeColor("--surface");
+const ACCENT = themeColor("--accent");
 
 const frameEl = find(".dome-scene");
 const compassEl = find(".dome-compass", frameEl);
@@ -282,6 +284,9 @@ function addDot(horizontal: HorizontalCoords, color: string, strokePx: number) {
 // locked views (SUN_SYMBOL), always square to the viewer (see frame()).
 const BODY_DOT_PX = 2 * SUN_SYMBOL.radius;
 const billboards: { yaw: Zdog.Anchor; face: Zdog.Anchor }[] = [];
+// The Moon, lit from the Sun's direction, its phase following every turn of the scene (see zdogmoon.ts).
+let moonPhase: ReturnType<typeof zdogMoon> | null = null;
+let bodyPoints = { sun: { x: 0, y: 0, z: 1 }, moon: { x: 0, y: 0, z: 1 } };
 
 function addSunRays(horizontal: HorizontalCoords) {
     const at = new Anchor({ addTo: anchorFor(horizontal.altitude), translate: skyPoint(horizontal) });
@@ -327,10 +332,12 @@ function rebuildPaths() {
         if (sun.hour(i) && sun.alpha(i) >= 1 && sample.altitude >= 0) addDot(sample, INK, 4);
     });
     const time = precise.fromJulianDay(jd);
-    addDot(seen(precise.moon, time, latitude, longitude), MUTED, BODY_DOT_PX);
+    const moonNow = seen(precise.moon, time, latitude, longitude);
     const sunNow = seen(precise.sun, time, latitude, longitude);
+    bodyPoints = { sun: skyPoint(sunNow), moon: skyPoint(moonNow) };
+    moonPhase = zdogMoon(anchorFor(moonNow.altitude), bodyPoints.moon);
     styled(
-        new Shape({ addTo: anchorFor(sunNow.altitude), translate: skyPoint(sunNow), color: INK }),
+        zdogSun(anchorFor(sunNow.altitude), skyPoint(sunNow)),
         BODY_DOT_PX,
         // It glows below the horizon too, the translucent ground laid over it like over everything down there.
         "figure-sun-glow",
@@ -456,6 +463,7 @@ frameEl.addEventListener("pointerup", () => {
 });
 
 function frame() {
+    moonPhase?.update(bodyPoints.sun, bodyPoints.moon, rotation, zoom);
     // Undoing the scene's rotation, outermost turn first, leaves these anchors facing the viewer; the scale makes
     // their own units screen pixels.
     for (const { yaw, face } of billboards) {
@@ -466,6 +474,7 @@ function frame() {
     for (const illustration of layers) {
         illustration.rotate.set(rotation);
         illustration.updateRenderGraph();
+        themeColors(illustration.element);
     }
     for (const [shape, dash] of dashes) shape.svgElement?.classList.add(dash);
     placeCompass();

@@ -4,7 +4,7 @@ export const sunAt = (i: number, n: number) => ({ x: (i + 0.5) / n, y: Math.sin(
 
 /** The small scene around the current Sun, by section id; a section without one shows the Sun alone. */
 export const SCENES: Record<string, string> = {
-    "counting-time-the-astronomers-way": "clock",
+    "counting-time-the-astronomers-way": "astrolabe",
     "earth-the-platform-we-observe-from": "earth",
     "coordinates-on-the-sky": "grid",
     "the-sun": "rays",

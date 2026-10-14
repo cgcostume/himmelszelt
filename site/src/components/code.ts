@@ -1,19 +1,21 @@
 /**
  * Code built in the page, highlighted like the chapters' code blocks: Shiki, as Astro runs it at build time, with the
- * same theme, and the theme's background dropped so the block takes the site's own (see astro.config.mjs). Only the
- * TypeScript grammar and the one theme, with the JavaScript regex engine rather than the WebAssembly one, and loaded
+ * same two themes, and their background dropped so the block takes the site's own (see astro.config.mjs). Only the
+ * TypeScript grammar and the two themes, with the JavaScript regex engine rather than the WebAssembly one, and loaded
  * only once there is code to show, so the figures never wait for it.
  */
 let highlighter: ReturnType<typeof load> | null = null;
 async function load() {
-    const [{ createHighlighterCoreSync }, { createJavaScriptRegexEngine }, typescript, githubDark] = await Promise.all([
-        import("shiki/core"),
-        import("shiki/engine/javascript"),
-        import("shiki/langs/typescript.mjs"),
-        import("shiki/themes/github-dark.mjs"),
-    ]);
+    const [{ createHighlighterCoreSync }, { createJavaScriptRegexEngine }, typescript, githubLight, githubDark] =
+        await Promise.all([
+            import("shiki/core"),
+            import("shiki/engine/javascript"),
+            import("shiki/langs/typescript.mjs"),
+            import("shiki/themes/github-light.mjs"),
+            import("shiki/themes/github-dark.mjs"),
+        ]);
     return createHighlighterCoreSync({
-        themes: [githubDark.default],
+        themes: [githubLight.default, githubDark.default],
         langs: [typescript.default],
         engine: createJavaScriptRegexEngine(),
     });
@@ -27,11 +29,12 @@ export async function showCode(element: Element, code: string) {
     highlighter ??= load();
     const html = (await highlighter).codeToHtml(code, {
         lang: "typescript",
-        theme: "github-dark",
+        themes: { light: "github-light", dark: "github-dark" },
+        defaultColor: false,
         transformers: [
             {
                 pre(node) {
-                    node.properties.class = "astro-code github-dark";
+                    node.properties.class = "astro-code astro-code-themes github-light github-dark";
                     node.properties.style = String(node.properties.style ?? "").replace(/background-color:[^;]+;?/, "");
                 },
             },

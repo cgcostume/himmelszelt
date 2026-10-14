@@ -16,8 +16,9 @@ const targets = [
     { href: "#references", title: "References" },
 ];
 const total = targets.length;
-// The stick figure's glossary entry, an easter egg under it (see observer()).
+// The stick figure's and the astrolabe's glossary entries, easter eggs under them (see observer() and astrolabe).
 const observerTip = findEntry("Observer");
+const astrolabeTip = findEntry("Astrolabe");
 const index = targets.findIndex((target) => target.href === `#${id}`);
 const suns = Array.from({ length: total }, (_, i) => ({
     ...sunAt(i, total),
@@ -47,24 +48,15 @@ const moon = (x: number, y: number, r: number, w: number) => {
     const terminator = w > 0 ? towards : 1 - towards;
     return `<circle cx="${x}" cy="${y}" r="${r + 3}" class="cover"/><circle cx="${x}" cy="${y}" r="${r}" class="night"/><path d="M${x} ${y - r}A${r} ${r} 0 0 ${towards} ${x} ${y + r}A${Math.abs(w)} ${r} 0 0 ${terminator} ${x} ${y - r}Z" class="lit"/>`;
 };
-// A clock in place of the Sun, as large as the other current Suns: the hours as dots just inside the rim, the hands at
-// five past ten, the minute hand reaching the rim, which runs from just past it once around and ends just short of it.
-const polar = (deg: number, r: number) =>
-    `${(Math.sin((deg * Math.PI) / 180) * r).toFixed(2)} ${(-Math.cos((deg * Math.PI) / 180) * r).toFixed(2)}`;
 // The current Sun's radius in pixels, as .sky-sun.current in global.css draws it; every scene is sized by it.
 const SUN = 7;
-const CLOCK = SUN;
-const MINUTE = 30;
-const HOUR = -57.5;
-// No dot where a hand lies over it.
-const marks = Array.from({ length: 12 }, (_, i) => i * 30)
-    .filter((deg) => [MINUTE, HOUR + 360].every((hand) => Math.abs(deg - hand) > 10))
-    .map((deg) => {
-        const [x, y] = polar(deg, CLOCK - 1.7).split(" ");
-        return `<circle cx="${x}" cy="${y}" r="0.4" class="mark"/>`;
-    });
-const [rimFrom, rimTo] = [MINUTE + 30, MINUTE + 330];
-const clock = `<circle r="${CLOCK}" class="face"/><path d="M${polar(rimFrom, CLOCK)}A${CLOCK} ${CLOCK} 0 1 1 ${polar(rimTo, CLOCK)}" class="rim"/>${marks.join("")}<path d="M${polar(MINUTE, CLOCK)}L0 0L${polar(HOUR, CLOCK * 0.65)}" class="hands"/>`;
+// An astrolabe in place of the Sun, its body as large as the other current Suns: the ring it hangs from, the rim, the
+// limb inside it, the rete's ecliptic off its center, and the rule across.
+const RULE_DEG = 70;
+const onDial = (deg: number, r: number) =>
+    `${(Math.sin((deg * Math.PI) / 180) * r).toFixed(2)} ${(-Math.cos((deg * Math.PI) / 180) * r).toFixed(2)}`;
+const astrolabe = `<circle r="${SUN}" class="face"/><circle r="${SUN}" class="rim"/><circle cy="${-(SUN + 1.6)}" r="1.5" class="rim"/><circle r="${SUN - 1.3}" class="rim limb"/><circle cy="-1.6" r="3.3" class="rim thin"/><path d="M${onDial(RULE_DEG, SUN - 0.6)}L${onDial(RULE_DEG + 180, SUN - 0.6)}" class="rim rule"/><circle r="0.8" class="mark-bright"/>`;
+
 // The figures' Sun symbol, shrunk to the size of the other current Suns: its rays and their dot
 // spacing scaled alike, so each ray still shows two dots.
 const SHRINK = SUN / SUN_SYMBOL.radius;
@@ -93,18 +85,18 @@ function observer() {
     return `<path d="${sight}" class="dots"/><path d="${figure}" class="figure"/><circle cx="${head.x.toFixed(2)}" cy="${head.y.toFixed(2)}" r="${1.4 * k}" class="figure"/>`;
 }
 // Drawn behind the Suns, so their rings cut gaps into the lines as into the path; only what covers the Sun goes in
-// front: in its place the clock, the Sun symbol, or its stippled outline around its center; the eclipse's Moon; and the
+// front: in its place the astrolabe, the Sun symbol, or its stippled outline around its center; the eclipse's Moon; and the
 // approximate Sun as a dashed outline a little off the precise one.
 const OVER: Record<string, string> = {
     grid: `<circle r="${SUN}" class="cover"/><circle r="${SUN}" class="dashes"/><circle r="1" class="mark-bright"/>`,
     eclipse: `<circle cx="${SUN * 0.28}" cy="${-SUN * 0.2}" r="${SUN * 0.92}" class="cover"/>`,
-    clock,
+    astrolabe,
     rays: symbol,
     approx: `<circle cx="${SUN * 0.5}" cy="${-SUN * 0.4}" r="${SUN}" class="dashes"/>`,
 };
 const drawings: Record<string, string> = {
     eclipse: "",
-    clock: `<circle r="${CLOCK + 4}" class="cover"/>`,
+    astrolabe: `<circle r="${SUN + 4}" class="cover"/>`,
     earth: observer(),
     grid: `<path d="M0 0V${(here.y * RULE_PX).toFixed(2)}" class="dashes"/>`,
     rays: `<circle r="${(SUN_SYMBOL.radius + SUN_SYMBOL.gap + SUN_SYMBOL.length) * SHRINK + 3}" class="cover"/>`,
@@ -131,12 +123,21 @@ const ALONG: Record<string, { left?: string; right?: string }> = {
     {scene && <svg class="sky-scene" aria-hidden="true" viewBox="-24 -16 48 32" style={place} set:html={drawings[scene]} />}
     {ALONG[scene]?.left && <svg class="sky-scene along" aria-hidden="true" viewBox="-24 -16 48 32" style={along(before, here)} set:html={ALONG[scene].left} />}
     {ALONG[scene]?.right && <svg class="sky-scene along" aria-hidden="true" viewBox="-24 -16 48 32" style={along(here, after)} set:html={ALONG[scene].right} />}
-    <span class={`${sunClass(here.state, index)}${scene === "grid" || scene === "clock" ? " replaced" : ""}`} style={sunStyle(here.x, here.y)} aria-current="location" />
+    <span class={`${sunClass(here.state, index)}${scene === "grid" || scene === "astrolabe" ? " replaced" : ""}`} style={sunStyle(here.x, here.y)} aria-current="location" />
     {
         scene === "earth" && (
             <span class="term sky-observer" tabindex="0" style={place}>
                 <span class="term-tip" role="tooltip">
                     <strong>{observerTip.term}</strong> <Fragment set:html={observerTip.html} />
+                </span>
+            </span>
+        )
+    }
+    {
+        scene === "astrolabe" && (
+            <span class="term sky-astrolabe" tabindex="0" style={place}>
+                <span class="term-tip" role="tooltip">
+                    <strong>{astrolabeTip.term}</strong> <Fragment set:html={astrolabeTip.html} />
                 </span>
             </span>
         )

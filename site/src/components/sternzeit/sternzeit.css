@@ -368,8 +368,10 @@ tbody tr:hover {
 }
 /* A filled disc without an outline, so its radius is the symbol's and the Moon's beside it can be set against it. */
 .figure-sun {
-    fill: var(--text);
-    stroke: none;
+    fill: var(--sun-fill);
+    stroke: var(--sun-edge);
+    stroke-width: var(--body-edge);
+    vector-effect: non-scaling-stroke;
 }
 /* The glow is a copy of the Sun's disc behind it, clipped at the horizon (see sunGlow); Zdog's Sun, a plain path, is
    tagged by scene.ts and dayarc.ts once it exists. */
@@ -381,6 +383,10 @@ tbody tr:hover {
 [style*="--units-per-px"] .figure-sun-glow {
     filter: drop-shadow(0 0 calc(4px * var(--units-per-px)) color-mix(in srgb, currentColor 45%, transparent));
 }
+/* On the light page none, as --sun-glow, except where the figure shows the sky as it is seen. */
+:root[data-theme="light"] .figure-sun-glow:not(.as-seen *) {
+    filter: none;
+}
 .figure-sun-ray {
     stroke-dasharray: var(--sun-dots);
     stroke-linecap: round;
@@ -388,10 +394,14 @@ tbody tr:hover {
 /* The Moon wherever it stands as a symbol: the lit part in the Sun's own shade, the night side in the earthshine it
    is actually seen by, which is at its bluest around new moon and gone by full moon (--earthshine, 0 to 1). */
 .figure-moon {
-    fill: color-mix(in srgb, var(--accent) calc(var(--earthshine, 0) * 45%), var(--surface));
+    fill: color-mix(in srgb, var(--accent) calc(var(--earthshine, 0) * 45%), var(--moon-night));
+    stroke: var(--moon-edge);
+    /* Twice as wide: the lit part, drawn over the disc, covers the inner half of it. */
+    stroke-width: calc(2 * var(--body-edge));
+    vector-effect: non-scaling-stroke;
 }
 .figure-moon-lit {
-    fill: var(--muted);
+    fill: var(--moon-lit);
 }
 /* The Moon's equator and prime meridian on the symbol, faint: they only have to show which way it is turned. */
 .figure-moon-graticule {
@@ -564,23 +574,23 @@ g.eclipse-corona {
 /* A totally eclipsed Moon is not black: Earth's atmosphere bends sunset-red light into the umbra, least into its
    center, which stays very nearly dark. */
 .eclipse-umbra-core {
-    stop-color: hsl(6 55% 5%);
+    stop-color: oklch(0.149 0.024 29);
 }
 .eclipse-umbra-inner {
-    stop-color: hsl(6 58% 9%);
+    stop-color: oklch(0.193 0.042 28);
 }
 .eclipse-umbra-mid {
-    stop-color: hsl(10 60% 15%);
+    stop-color: oklch(0.261 0.062 33);
 }
 .eclipse-umbra-rim {
-    stop-color: hsl(18 60% 26%);
+    stop-color: oklch(0.388 0.087 43);
 }
 /* The blue rim of Earth's shadow: sunlight grazing the ozone layer loses its red before it reaches the Moon. */
 .eclipse-umbra-ozone {
-    stop-color: hsl(205 45% 30%);
+    stop-color: oklch(0.423 0.066 242);
 }
 .eclipse-umbra-fade {
-    stop-color: hsl(205 40% 34%);
+    stop-color: oklch(0.46 0.066 241);
     stop-opacity: 0;
 }
 .eclipse-edge {
@@ -911,9 +921,12 @@ g.eclipse-corona {
 /* The moon calendar: a month in whole weeks, a Moon per day, and under each week the lanes of the Moon and the Sun. */
 .moon-calendar {
     /* The Moon low in the sky, yellowed by the long path through the air. */
-    --moon-low: hsl(36 80% 62%);
+    --moon-low: oklch(0.791 0.131 75);
     --calendar-lanes-height: 10px;
     margin: 1.5rem 0;
+}
+:root[data-theme="light"] .moon-calendar {
+    --moon-low: oklch(0.62 0.13 70);
 }
 /* Set off from its caption by the same gap as the moon view. */
 .calendar {
@@ -1533,26 +1546,28 @@ g.eclipse-corona {
 /* The year's light, a sky from night to day: the twilights in ever more of the accent, the golden hour a soft amber
    rather than orange, the blue hour a deep blue, darker than the day as in the sky. */
 #daylight {
-    --golden: hsl(40 65% 68%);
-    --blue-hour: hsl(222 70% 52%);
+    --golden: oklch(0.82 0.098 84);
+    --blue-hour: oklch(0.534 0.192 264);
+    --night: var(--bg);
+    --day: var(--accent);
 }
 .daylight-night {
-    fill: var(--bg);
+    fill: var(--night);
 }
 .daylight-astronomical {
-    fill: color-mix(in srgb, var(--accent) 12%, var(--bg));
+    fill: color-mix(in srgb, var(--accent) 12%, var(--night));
 }
 .daylight-nautical {
-    fill: color-mix(in srgb, var(--accent) 25%, var(--bg));
+    fill: color-mix(in srgb, var(--accent) 25%, var(--night));
 }
 .daylight-blue {
-    fill: color-mix(in srgb, var(--blue-hour) 70%, var(--bg));
+    fill: color-mix(in srgb, var(--blue-hour) 70%, var(--night));
 }
 .daylight-golden {
-    fill: color-mix(in srgb, var(--golden) 80%, var(--bg));
+    fill: color-mix(in srgb, var(--golden) 80%, var(--night));
 }
 .daylight-day {
-    fill: var(--accent);
+    fill: var(--day);
 }
 .daylight-sunrise {
     fill: none;
@@ -1578,6 +1593,13 @@ span.daylight-blue {
 }
 span.daylight-day {
     color: var(--accent);
+}
+/* On a light page the night stays dark and the day light, whichever the page's background and accent are. */
+:root[data-theme="light"] #daylight,
+:root[data-theme="light"] .daylight-key {
+    --night: oklch(0.3 0.03 266);
+    --day: color-mix(in oklab, var(--accent), white 55%);
+    --golden: oklch(0.66 0.11 80);
 }
 
 /* The Sun's and the Moon's paths in the locked views, dimmed beneath the bodies: a line, and a dot every whole hour. */
@@ -1611,6 +1633,13 @@ span.daylight-day {
 }
 .moon-orbit.line-behind {
     opacity: 0.2;
+}
+/* Muted dots on paper fade far more than on the night: stronger there. */
+:root[data-theme="light"] .moon-orbit {
+    opacity: 0.85;
+}
+:root[data-theme="light"] .moon-orbit.line-behind {
+    opacity: 0.4;
 }
 /* An offset from the moment, as wide as "+24:00", so the rail stays put as the hours gain a digit. */
 .figure-slider[data-offset] output {
@@ -1681,6 +1710,10 @@ span.daylight-day {
     --pipeline-stem: 0.75rem;
     /* Below the equatorial position, only a line's gap before the divider's label. */
     --pipeline-into-divider: 0.3rem;
+}
+/* The code in both a little heavier than the page's text: at its weight the monospace reads too thin this small. */
+.pipeline-figure :is(code, .flow-node, .pipeline-space-name) {
+    font-weight: 400;
 }
 /* The inputs: small flows from left to right, each function written over the arrow from what it takes to what it
    returns, a branch turning off below. Every value sits on its arrow's line, at the bottom of an edge. */
@@ -1793,8 +1826,8 @@ span.daylight-day {
     mask:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 9'%3E%3Cpath d='M0 0l6 4.5-6 4.5z'/%3E%3C/svg%3E")
         right center / 6px 9px no-repeat,
-        repeating-linear-gradient(to right, #000 0 3px, transparent 3px 6px) left center / calc(100% - 6px) var(--rail-thin, 1px)
-        no-repeat;
+        repeating-linear-gradient(to right, #000 0 3px, transparent 3px 6px) left center / calc(100% - 6px)
+        var(--rail-thin, 1px) no-repeat;
 }
 /* What a flow starts from, the moment or the place, in words rather than code, the way the controls name them. */
 .flow-concept {
@@ -1934,8 +1967,8 @@ span.daylight-day {
     mask:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 9'%3E%3Cpath d='M0 0l6 4.5-6 4.5z'/%3E%3C/svg%3E")
         right center / 6px 9px no-repeat,
-        repeating-linear-gradient(to right, #000 0 3px, transparent 3px 6px) left center / calc(100% - 6px) var(--rail-thin, 1px)
-        no-repeat;
+        repeating-linear-gradient(to right, #000 0 3px, transparent 3px 6px) left center / calc(100% - 6px)
+        var(--rail-thin, 1px) no-repeat;
 }
 /* Which half is the same for everyone and which is the observer's: a dashed line across, the one half named over it
    and the other under it, under the calls, where nothing else is at that height. */

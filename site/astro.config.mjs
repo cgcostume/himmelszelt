@@ -18,6 +18,9 @@ export default defineConfig({
     integrations: [mdx()],
     markdown: {
         shikiConfig: {
+            // Both themes as CSS variables, which global.css picks from by the page's theme.
+            themes: { light: "github-light", dark: "github-dark" },
+            defaultColor: false,
             // Drops the theme's inline background, so code blocks take the site's own (see pre in global.css).
             transformers: [
                 {

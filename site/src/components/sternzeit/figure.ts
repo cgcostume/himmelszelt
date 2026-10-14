@@ -19,9 +19,23 @@ export function drawSvg(element: HTMLElement | SVGElement, svg: string, unitsPer
 export const escapeText = (text: string | number) =>
     String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
-/** A color of the page's theme, from its custom property, for figures drawn by script (Zdog takes no CSS). */
-export const cssColor = (name: string, fallback: string) =>
-    getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+/** A color of the page's theme for a Zdog shape, by its custom property; `themeColors` makes it resolve. */
+export const themeColor = (name: string) => `var(${name})`;
+
+/**
+ * Zdog writes a shape's color into the SVG attributes `stroke` and `fill`, where var() does not resolve. Copies every
+ * such color into the element's style, where it does, so the figure follows the theme and the accent without a redraw.
+ * Call after every render: Zdog adds elements and rewrites their attributes.
+ */
+export function themeColors(svg: Element) {
+    for (const element of svg.querySelectorAll<SVGElement>("[stroke], [fill]")) {
+        for (const name of ["stroke", "fill"]) {
+            const value = element.getAttribute(name);
+            if (value?.includes("var(")) element.style.setProperty(name, value);
+            else element.style.removeProperty(name);
+        }
+    }
+}
 
 /** The eight compass directions, from north through east, 45 degrees apart. */
 export const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
