@@ -100,10 +100,66 @@ at worst, and the GPU does not notice: it computes on four components either way
 described before. The model choice in <Fig id="sky" /> shows the sky as it was colored before, Bruneton's three
 wavelengths taken as red, green, and blue, and as osgHimmel computed it.
 
-<Planned title="A few wavelengths or the whole spectrum">
-    The same sky computed from the full spectrum and from a few representative wavelengths, side by side with their
-    difference: Bruneton's three as red, green, and blue, dunstkreis' four through the fitted matrix. Which wavelengths
-    are picked shifts how strongly each color appears to scatter, and so the sky's hue, most of all at sunset.
+<Planned what="section" title="Any wavelengths you like" plan="the library computes any number in batches of four.">
+    The text above explains why four and which four. Still missing: that the four are a choice the reader can make, and
+    what "the whole spectrum" means when the GPU computes four at a time. dunstkreis takes any number of wavelengths, in
+    batches of four, each batch a full set of tables, summed into one sky through its own matrix: slow, the reference,
+    never the default. And it takes them at random, a few per frame, summed over frames: the Monte Carlo way to an
+    integral over the spectrum, and the one to compare the fixed sets against. Why the fixed set wins for the sky, whose
+    spectra are smooth, and where randomness would win: spectra with sharp lines, such as the airglow or a sodium street
+    lamp, which belong to other chapters.
+</Planned>
+
+<Planned
+    title="Pick your wavelengths"
+    plan="keep: the core of the section, and the reason the library takes any wavelengths."
+>
+    The visible spectrum as a strip, with the eye's three color matching functions over it, and four markers to drag
+    along it (or more, or fewer). The matrix is refitted at once and shown, the sky follows, next to the reference and
+    their difference in ΔE. Presets: Bruneton's three as red, green, and blue, dunstkreis' four, Bruneton's fifteen.
+    Drag all four into the blue and watch the sunset go wrong.
+</Planned>
+
+<Planned title="One pixel's spectrum" plan="perhaps a panel of Pick your wavelengths rather than its own figure.">
+    The spectrum of one picked direction of the sky, from the reference, with the samples marked on it: at noon a
+    smooth slope falling towards the red, at sunset bent by ozone around 600 nm, between two of Bruneton's three
+    samples. Shows what four samples can and cannot see.
+</Planned>
+
+<Planned
+    title="The whole spectrum, two ways"
+    plan="decide after building the reference: may be one switch in the figure above."
+>
+    The reference sky built up live in two ways side by side: a fixed set of wavelengths, batch by batch, and random
+    hero wavelengths, frame by frame, with the number of samples so far and the error against the converged sky. The
+    fixed set is done after twelve batches, the random one likely still noisy after a hundred frames: the cost of being
+    unbiased.
+</Planned>
+
+## Color spaces
+
+<Planned what="section" title="Linear light, then perception">
+    Where the sky's colors live on their way to the screen. The physics works in radiance per wavelength, and only
+    there does adding light mean adding numbers. The fitted matrix turns it into linear sRGB, though it could just as
+    well target Display P3 or Rec. 2020, for a wide-gamut canvas: the fit only swaps the matrix from XYZ. How much of a
+    sunset lies outside sRGB at all, measured on the model's own skies, decides how much this matters. Why not compute
+    in OKLCH: it is built to measure how different two colors look, its lightness a cube root of light, and a sum of
+    two skies in it is not the sky of their light combined. OKLCH comes in after the physics: for gamut mapping, for
+    comparing colors (ΔE, as in the section before), and for the site's own colors.
+</Planned>
+
+<Planned
+    title="The sky's colors on the chromaticity diagram"
+    plan="keep, if the measurement shows the sky leaving sRGB."
+>
+    Every pixel of the live sky as a point on the CIE xy diagram, or on the OKLab ab plane, with the triangles of sRGB,
+    Display P3 and Rec. 2020 over it. Drag the time: at noon the cloud sits near the white point, slightly blue; at
+    sunset it stretches towards orange and violet, and some of it leaves the sRGB triangle.
+</Planned>
+
+<Planned title="Mixing in the wrong space" plan="small; drop if the text alone carries it.">
+    Two lights, a blue sky and an orange sunlight, added in linear RGB, in gamma-encoded sRGB and in OKLCH: only the
+    first is the light of both. A strip of three swatches and two sliders.
 </Planned>
 
 ## More than one bounce
@@ -254,7 +310,10 @@ pixel wide, instead of picking one texel of many and flickering as the view turn
 
 ## Encoding
 
-<Planned title="Storing light">
+<Planned
+    title="Storing light"
+    plan="the sky-view table's power of two that follows the Sun, now in From light to pixels, belongs here too."
+>
     The same table stored as 32-bit and 16-bit float, as RGBE and as 8 bits with a logarithmic or gamma curve: what
     each keeps and loses. Why lookups aim at texel centers, how four dimensions are packed into a 3D texture, and which
     of these dunstkreis uses.
@@ -272,6 +331,8 @@ The sky spans more than that in a day: its brightest value falls by 37 stops fro
 cd/m², deep twilight would coarsen into steps that an exposure for the night magnifies into colored blocks. So the table
 holds the luminance times a power of two that follows the Sun, which keeps its brightest value near 2¹⁰ at any hour,
 and whatever reads it divides by the same.
+
+## Exposure
 
 Exposure is set in EV100, as on a camera and in engines like Frostbite and Unreal <Cite id="lagarde2014" />: the
 luminance that just saturates is 1.2 × 2^EV100 cd/m². A sunny day is about EV 15, an overcast one 10, twilight 0,
@@ -298,6 +359,25 @@ The floor of EV 4 is for now. A camera exposes a landscape by full moon at about
 to −7. Once the Moon lights the air and the stars are drawn, the floor drops and the night follows. Exposed that far
 today, the sky would show only the Sun's last twilight, amplified beyond what the table can hold.
 
+<Planned what="section" title="A default exposure for any atmosphere">
+    Metering needs the table on the GPU and a reading back, which not every renderer wants. So the meter runs once per
+    atmosphere instead, at precompute time or offline, over sun altitudes from twilight to noon, the compensations
+    added: the result is a handful of absolute EV100 values at sun altitudes, joined by the same monotone cubic, small
+    enough to keep as numbers in code. The default atmosphere's ships with dunstkreis. A hazier or a thinner air gets
+    its own from the same function. Where it falls short: the curve knows only the Sun, not the observer's height
+    unless it gets a second dimension, and nothing of clouds or a Moon. Why the exposure is still not baked into the
+    tables, though they already carry a power of two that follows the Sun: it is one multiply when reading, and the
+    tables keep their physical units, which lighting a scene and aerial perspective rely on.
+</Planned>
+
+<Planned title="Exposure over a day" plan="keep; the curve's keys are the controls the sky figure lacks today.">
+    EV100 over the Sun's altitude, from 18° below to 90°: the meter's reading as a line, the default curve over it, and
+    its keys to drag. The sky above follows. Switch the atmosphere, clear, hazy, high up, and see the metered line move
+    away from the default and its own curve follow it.
+</Planned>
+
+## Tone mapping
+
 For a display, the pass then tone maps: exposed, compressed into the display's range, and encoded for sRGB, dithered
 against banding. Khronos PBR Neutral <Cite id="khronos2024" /> keeps colors exactly as they are up to three quarters of
 white and compresses only the brightest, so the sky's blue stays the blue the model computes. AgX
@@ -319,6 +399,26 @@ and unclamped, for a float target.
 <Planned title="Banding and dithering" plan="merge into Exposure and tone mapping, as a zoomed-in switch.">
     A smooth twilight gradient quantized to 8 bits, zoomed in: the bands, and the same with a single step of noise
     added before quantizing.
+</Planned>
+
+## On the display
+
+<Planned what="section" title="HDR and wide gamut">
+    What the last step does with a screen that can show more. HDR: an rgba16float canvas with extended tone mapping
+    lets values above white through, up to the display's headroom, which dunstkreis' tone curves already take as a
+    parameter; the Sun's glow and a bright horizon then stay bright instead of compressed. Wide gamut: a canvas in
+    Display P3, with the matrix fitted for it, shows the saturated part of a sunset the sRGB canvas has to give up.
+    And what happens to a color outside the display's gamut either way: clipped per channel it shifts in hue, mapped
+    in OKLCH, with the chroma reduced at the same lightness and hue, it keeps it, as CSS maps colors since Color 4.
+</Planned>
+
+<Planned
+    title="Beyond white"
+    plan="keep if HDR displays are common enough among readers; shows nothing on an SDR screen."
+>
+    The same sunset, SDR and HDR side by side, with the headroom to drag, and the gamut mapping as a switch: clipped
+    per channel, or reduced in OKLCH. On a screen without HDR or P3 the figure says so instead of showing two equal
+    halves.
 </Planned>
 
 ## Precise and approximate

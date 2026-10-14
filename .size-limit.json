@@ -1,0 +1,12 @@
+[
+    { "name": "sternzeit: everything", "path": "packages/sternzeit/dist/index.js", "limit": "7.5 kB" },
+    { "name": "sternzeit/approx: everything", "path": "packages/sternzeit/dist/approx.js", "limit": "6.5 kB" },
+    { "name": "sternzeit: Sun and Moon", "path": "packages/sternzeit/size/sun-and-moon.js", "limit": "6 kB" },
+    { "name": "dunstkreis: everything", "path": "packages/dunstkreis/dist/index.js", "limit": "34 kB" },
+    {
+        "name": "dunstkreis: sky cube map and display",
+        "path": "packages/dunstkreis/size/sky-cube.js",
+        "limit": "31 kB"
+    },
+    { "name": "dunstkreis: tables and display", "path": "packages/dunstkreis/size/luts.js", "limit": "28.5 kB" }
+]
