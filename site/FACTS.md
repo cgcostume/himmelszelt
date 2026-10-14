@@ -69,6 +69,10 @@ confirmed yet.
 | Earth closest to the Sun in early January | Earth | lib | perihelion 2026-01-04 | ok | 2026-10-11 |
 | Full Moon about 1,900 arcseconds wide | Earth | lib | 1760″ to 2050″, 1798″ on 2026-09-21 | ok | 2026-10-11 |
 | Moon rises some 50 minutes later every day, on average | The Moon | derived | 1440 min / (synodic month - 1) = 50.5 min | ok | 2026-10-11 |
+| Moon about 14% wider at its closest than at its farthest | The Moon | lib | 0.489° to 0.558° over 19 years, ratio 1.14 | ok | 2026-10-12 |
+| Over time we see 59% of the Moon's surface | The Moon | web | libration in longitude and latitude, standard figure | ok | 2026-10-12 |
+| A half moon gives about a tenth of the full moon's light | The Moon | web | about 2.5 magnitudes fainter at phase angle 90° (opposition surge, crater shadows) | ok | 2026-10-12 |
+| Moon's `sunDirection` within 0.16° of the Sun's from Earth, under a third of the Sun's width | The Moon | lib | 0.157° max over 19 years, Berlin; Sun 0.53° | ok | 2026-10-12 |
 | Sunrise example: nothing found in midnight sun or polar night | The Sun, code | derived | no threshold crossing, `sunrise` undefined | ok | 2026-10-11 |
 | Analemma's dots crowd at top and bottom: the solstices, Latin for the Sun standing still | The Sun | lib, web | monthly dots closest around June and December; solstitium from sol + sistere | ok | 2026-10-12 |
 

@@ -264,8 +264,8 @@ standing still.
 <Controls height={false} />
 
 So far, the Sun is a direction: where it stands at any moment, and the paths it takes over a day and over a year. To
-draw it, a renderer also needs its size, and the analemma already hinted that the size changes: Earth runs faster in
-January because it is closer to the Sun then (<Tab id="sun" />). Its orbit is almost a circle, at an
+draw it, a renderer also needs its size, and the analemma's uneven loops already hinted that it changes: Earth moves
+faster in January because it is closer to the Sun then (<Tab id="sun" />). Its orbit is almost a circle, at an
 <Term of="Orbital eccentricity">eccentricity</Term> of about 0.0167 <Cite id="meeus1998" />, yet that puts Earth about
 3% closer to the Sun in early January than in early July: `distance` shrinks, and `apparentAngularDiameter`, the width
 of the Sun's disc, grows by as much.
@@ -275,8 +275,8 @@ of the Sun's disc, grows by as much.
 
 With the Sun's altitude at hand, the library leaves out the conveniences on purpose: there is no `sunrise()`, and no
 `dawn()` or `dusk()` either. Each is the moment the altitude crosses a threshold, so walking a day in one-minute steps
-finds all of them, the <Term of="Golden hour">golden</Term> and the <Term of="Blue hour">blue hour</Term> too, or any
-other threshold you care to render.
+finds all of them, the start and end of the <Term of="Golden hour">golden</Term> and the
+<Term of="Blue hour">blue hour</Term> too, or any other threshold you care to render.
 
 ```ts
 import {
@@ -290,13 +290,13 @@ const today = julianDayUT(fromDate(new Date())) + offset;
 const midnight = Math.floor(today - 0.5) + 0.5 - offset;
 const at = (minute: number) => fromJulianDay(midnight + minute / 1440);
 // One altitude a minute, computed once for every threshold below.
-const altitude = Array.from({ length: 1441 }, (_, minute) =>
+const altitudes = Array.from({ length: 1441 }, (_, minute) =>
     sun.horizontalPosition(at(minute), { latitude, longitude }).altitude);
 
 function crossings(deg: number): Date[] {
     const found: Date[] = [];
     for (let minute = 1; minute <= 1440; minute++) {
-        if ((altitude[minute - 1] > deg) !== (altitude[minute] > deg)) {
+        if ((altitudes[minute - 1] > deg) !== (altitudes[minute] > deg)) {
             found.push(toDate(at(minute)));
         }
     }
@@ -323,80 +323,69 @@ Sun stays up all summer and away all winter.
 
 ## The Moon
 
-The Moon rises some 50 minutes later every day, on average, and it is the hardest of the three bodies to follow. It is
-close, its orbit is tilted against Earth's by about 5°, and the Sun actually pulls on it about twice as hard
-as Earth does: a three-body problem, the original one, which has no exact solution. Its position needs dozens of
-periodic correction terms, all built from four angles that each turn at their own pace. Being close also means a large
-parallax, which is why the topocentric correction matters most here (<Tab id="moon" />).
+Seen from Earth, the Moon circles the sky as well, not in a year but in a month: it rises some 50 minutes later every
+day. It is also the hardest body to follow. It is close, its orbit is tilted against Earth's by about 5°, and the Sun
+actually pulls on it about twice as hard as Earth does: a three-body problem, the original one, which has no exact
+solution. Its position follows the Sun's pattern, a mean longitude corrected into the apparent one, but where the Sun
+needs a single equation of the center, the Moon needs dozens of periodic terms, built from four angles, each turning at
+its own pace. Being close also means a parallax of up to a degree, so the topocentric position matters most here
+(<Tab id="moon" />).
 
 <Table domain="moon" />
 <Controls height={false} />
 
-The rows after `distance` are for rendering the Moon rather than locating it. The Moon always shows the same face,
-almost: tilted orbit and varying speed let us peek a few degrees around its edges over a month, the optical
-<Term of="Libration">libration</Term>, and the Moon's own slight wobble adds a few hundredths of a degree.
+Beyond the Moon's position, the table holds what a renderer needs to draw the Moon. Its size swings far more than the
+Sun's: the Moon looks about 14% wider at its closest than at its farthest, the gap between a supermoon and a micromoon.
+It always shows the same face, almost: its tilted orbit and varying speed let us peek a few degrees around its edges
+over a month, the optical <Term of="Libration">libration</Term>, so that over time we see 59% of its surface. The Moon's
+own slight wobble adds a few hundredths of a degree.
 
 The <Term of="Position angle of axis">position angle of the axis</Term> says how the Moon's north pole is oriented on
 the sky, and the <Term of="Parallactic angle">parallactic angle</Term> how that sky direction relates to your local
 "up". Together they determine how the Moon's surface, and its lit crescent, appear rotated for you.
 
-The last four rows light it. Half of the Moon is always in sunshine, and its phase is how much of that half we see. The
-<Term of="Phase angle">phase angle</Term>, the angle Sun-Moon-Earth, measures it, and the <Term of="Illuminated fraction">illuminated fraction</Term> turns that into what the
-phase looks like, from 0 at new moon to 1 at full moon <Cite id="meeus1998" />. For actual shading, a renderer wants
-the light direction itself: `sunDirection` points from the Moon's center to the Sun, in the same frame as every other
-direction here, east-north-up. It is not quite the Sun's direction as seen from Earth, since the Moon sits a few
-hundred thousand kilometers off to the side, but it is close.
+Then there is its light. Half of the Moon is always in sunshine, and its phase is how much of that half we see. The
+<Term of="Phase angle">phase angle</Term>, the angle Sun-Moon-Earth, measures it, and the
+<Term of="Illuminated fraction">illuminated fraction</Term> turns that into what the phase looks like, from 0 at new
+moon to 1 at full moon <Cite id="meeus1998" />. It is only a first measure of moonlight, though: a half moon gives about
+a tenth of the full moon's light, not half, as the shadows of its craters grow longer away from full moon. For shading
+the Moon itself, a renderer wants the light direction: `sunDirection` points from the Moon's center to the Sun, in ENU
+like every other direction here. It differs from the Sun's direction seen from Earth by at most 0.16°, under a third of
+the Sun's width, since the Moon stands 384,000 km off to the side.
 
-The night side is not entirely dark either, and it is not a hole: no star has ever shone through the Moon. Earth
-reflects sunlight too, and around new moon, when the Moon sees an almost full Earth, that earthshine gives the unlit
-part of a thin crescent a faint, ashen glow. How strong it is follows from Earth's phase as seen from the Moon
+The night side is not entirely dark, and not a hole either: no star has ever shone through the Moon. Earth reflects
+sunlight too, and around new moon, when Earth seen from the Moon is almost full, that earthshine gives the unlit part of
+a thin crescent a faint, ashen glow. How strong it is follows from Earth's phase as seen from the Moon
 <Cite id="vandehulst1980" />, scaled by Earth's albedo <Cite id="jensen2001" />.
 
-With the Moon located as well, a scene can be lit. The two directions a renderer wants are one call each, and the lit
-fraction comes with them, a first measure of moonlight. Only a first one: the Moon dims faster than its lit part
-shrinks, as the shadows of its craters grow longer away from full moon.
-
-```ts
-import {
-    fromDate, julianEphemerisDay, moon, sun,
-} from "@himmelszelt/sternzeit";
-
-const time = fromDate(new Date());
-// Unit vectors in the observer's ENU frame: x east, y north, z up.
-// Real-time rendering mostly puts y up: assign them as (x, z, -y).
-const obs = { latitude, longitude, heightM }; // heightM is optional
-const toSun = sun.direction(time, obs);
-const toMoon = moon.direction(time, obs);
-// Functions of a bare Julian Day take ephemeris time.
-const lit = moon.illuminatedFraction(julianEphemerisDay(time));
-```
-
-Shading the Moon itself is a different, optional question. It takes the Moon's own `sunDirection` rather than `toSun`,
-along with the libration and the earthshine.
-
-Even a Moon drawn without any shading needs one angle: the tilt of its crescent. The lit side always faces the Sun,
-and that is rarely straight down. Getting it wrong is a classic: games and illustrations like to hang a crescent in the
-night sky with its lit side up. That cannot happen. A crescent stands less than 90° from the Sun, so with its lit side
-up, the Sun would stand above it, and above the horizon too: it would be day. The exact tilt is the
-<Term of="Position angle">position angle</Term> from the Moon to the Sun, measured on the sky from north through east,
-turned into your sky by the parallactic angle. `moon.brightLimbAngle` does both:
+Even a Moon drawn without any shading needs one angle: the tilt of its crescent. Getting it wrong is a classic: games
+and illustrations like to hang a crescent in the night sky with its lit side up. That cannot happen. The lit side always
+faces the Sun, and a crescent stands less than 90° from it, so with its lit side up, the Sun would stand above it, and
+above the horizon too: it would be day. The exact tilt is the <Term of="Position angle">position angle</Term> from the
+Moon to the Sun, measured on the sky from north through east, turned into your sky by the parallactic angle.
+`moon.brightLimbAngle` does both, and the rest of the Moon's light is a call each:
 
 ```ts
 import { fromDate, julianEphemerisDay, moon } from "@himmelszelt/sternzeit";
 
 const time = fromDate(new Date());
+const obs = { latitude, longitude };
+// Functions of a bare Julian Day take ephemeris time.
 const jde = julianEphemerisDay(time);
 const lit = moon.illuminatedFraction(jde); // 0 new, 1 full
 // Half a day on tells waxing from waning without a calendar.
 const waxing = moon.illuminatedFraction(jde + 0.5) > lit;
 // Counterclockwise from up, as the crescent stands in your sky.
-const brightLimb = moon.brightLimbAngle(time, { latitude, longitude });
+const brightLimb = moon.brightLimbAngle(time, obs);
+// For shading: from the Moon's center to the Sun, and Earth's glow.
+const light = moon.sunDirection(time, obs);
+const glow = moon.earthshine(jde);
 ```
 
-The tilt, the libration and the earthshine (`moon.earthshine`) all come together in the Moon below
-(<Fig id="moon-view" />). Its arrow to the Sun starts at the point beneath the Sun while that faces us, and at the edge
-of the disc once it has turned away. Unlock the view from the Moon, and the zenith turns up: the arc between it and the
-Moon's north is the position angle of the axis less the parallactic angle.
+The tilt, the libration and the earthshine all come together in the Moon below (<Fig id="moon-view" />). Its arrow to
+the Sun starts at the point beneath the Sun while that faces us, and at the edge of the disc once it has turned away.
+Unlock the view from the Moon, and the zenith turns up: the arc between it and the Moon's north is the position angle of
+the axis less the parallactic angle.
 
 <MoonView />
 <Controls height={false} />

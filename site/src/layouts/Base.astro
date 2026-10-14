@@ -138,6 +138,12 @@ const current = Astro.url.pathname.replace(/\/$/, "");
                     if (fold instanceof HTMLDetailsElement) fold.open = true;
                 });
             }
+            // A reference stays on the line of the word before it, so it never ends a paragraph alone: "here (Table 4)."
+            // wraps as one word, which text-wrap: pretty then keeps company.
+            for (const ref of document.querySelectorAll("a.figref, a.tabref")) {
+                const before = ref.previousSibling;
+                if (before instanceof Text) before.data = before.data.replace(/ (\(?)$/, "\u00a0$1");
+            }
             // Keeps glossary and citation tooltips inside the viewport: shifted left by however far they would overflow.
             const host = (event: Event) => (event.target as Element).closest?.(".term, .cite") ?? null;
             const fit = (element: Element | null) => {
