@@ -27,7 +27,9 @@ jobs:
       - run: pnpm size
       - run: pnpm typecheck
       - run: pnpm lint
-      - run: npx playwright install --with-deps chromium
+      # The browser for the Playwright the packages' tests use, from the workspace: npx at the root, where no package
+      # depends on it, resolves whatever it finds or fetches.
+      - run: pnpm --filter @himmelszelt/sternzeit exec playwright install --with-deps chromium
       - run: pnpm test
       # The site, built above, becomes the Pages artifact; deployed only from main, once everything passed.
       - if: github.ref == 'refs/heads/main' && github.event_name == 'push'
