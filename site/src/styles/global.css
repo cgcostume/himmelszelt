@@ -535,16 +535,16 @@ h2 {
 .theme-toggle:hover {
     color: var(--accent);
 }
+/* A touch larger than the Octocat's 16 pixels, as the rays make the Sun read smaller than it is. */
 .theme-icon {
-    width: 16px;
-    height: 16px;
-    overflow: visible;
+    width: 19px;
+    height: 19px;
 }
 .theme-disc {
     fill: currentColor;
 }
 .theme-rays {
-    stroke: currentColor;
+    stroke: color-mix(in srgb, currentColor 70%, transparent);
     stroke-width: 1.2;
     stroke-linecap: round;
     transform-origin: 8px 8px;
