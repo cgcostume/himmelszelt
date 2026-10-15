@@ -32,6 +32,9 @@ const SAMPLES_PER_HOUR = 6;
 // The Moon's path: a day either way of the moment, fading all the way from the Moon itself to nothing.
 const MOON_SPAN_HOURS = 24;
 const MOON_FADE_HOURS = 24;
+// Faint beneath it, the Moon's path over a whole lunation, half a synodic month either way, sampled every half hour.
+const LUNATION_SAMPLES_PER_HOUR = 2;
+const LUNATION_ALPHA = { above: 11, below: 5 };
 // The Sun's: half a day either way, its last hour at either end fading out, so the two ends meet without overlapping.
 const SUN_SPAN_HOURS = 12;
 const SUN_FADE_HOURS = 1;
@@ -110,7 +113,7 @@ function seen(body: Body, time: AstronomicalTime, latitude: number, longitude: n
     const horizontal = body.horizontalPosition(time, { latitude, longitude, heightM: state.heightM });
     return {
         ...horizontal,
-        altitude: precise.earth.apparentAltitude(horizontal.altitude, { observerHeightM: state.heightM }),
+        altitude: precise.earth.apparentAltitude(horizontal.altitude, state),
     };
 }
 
@@ -244,12 +247,30 @@ function addFadingPath(path: ReturnType<typeof fadingPath>, color: string, strok
     }
 }
 
-function addPath(samples: HorizontalCoords[], color: string, strokePx: number, dashBelow: string) {
+function addPath(samples: HorizontalCoords[], color: string, strokePx: number, dashBelow: string, colorBelow = color) {
     for (const run of runsByHorizon(samples)) {
         const path = run.samples.map((s) => skyPoint(s));
-        const shape = new Shape({ addTo: dynamic[run.up ? 1 : 0], path, closed: false, color });
+        const shape = new Shape({
+            addTo: dynamic[run.up ? 1 : 0],
+            path,
+            closed: false,
+            color: run.up ? color : colorBelow,
+        });
         styled(shape, strokePx, run.up ? null : dashBelow);
     }
+}
+
+/** The Moon's path over the lunation around the moment: the band its daily arcs sweep across the sky in a month. */
+function lunationPath(jd: number, latitude: number, longitude: number) {
+    const steps = Math.round((precise.moon.MEAN_SYNODIC_MONTH / 2) * 24 * LUNATION_SAMPLES_PER_HOUR);
+    return Array.from({ length: 2 * steps + 1 }, (_, i) =>
+        seen(
+            precise.moon,
+            precise.fromJulianDay(jd + (i - steps) / (24 * LUNATION_SAMPLES_PER_HOUR)),
+            latitude,
+            longitude,
+        ),
+    );
 }
 
 // Arrowheads along each path, pointing forward in time: one every 6 hours, starting at 3 in the morning.
@@ -309,6 +330,9 @@ function rebuildPaths() {
     // Moon's does not close: it moves on by some 13 degrees a day and winds on as a spiral, a day either
     // way, fading from the Moon itself. The Sun's nearly closes after a day: half a day either way, the last hour
     // at either end fading, so its two ends meet without overlapping.
+    const band = (alpha: number) => `color-mix(in srgb, ${MUTED} ${alpha}%, transparent)`;
+    const lunation = lunationPath(jd, latitude, longitude);
+    addPath(lunation, band(LUNATION_ALPHA.above), 0.75, DASHED, band(LUNATION_ALPHA.below));
     const moon = fadingPath(precise.moon, jd, latitude, longitude, MOON_SPAN_HOURS, MOON_FADE_HOURS);
     addFadingPath(moon, MUTED, 1, DASHED);
     const sun = fadingPath(precise.sun, jd, latitude, longitude, SUN_SPAN_HOURS, SUN_FADE_HOURS);

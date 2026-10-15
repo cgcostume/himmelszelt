@@ -1,6 +1,7 @@
 // A download button on every figure panel marked `data-export="<name>"`: its SVGs (and HTML labels marked
 // `data-export-text`) composed into one standalone SVG file, styles inlined, so it opens anywhere as it looks here.
-// Nested panels (the locked views over Figure 1, the analemma over Figure 2) are exported on their own, not twice.
+// Nested panels (the locked views over the armillary sphere, the analemma over the sun path) are exported on their
+// own, not twice.
 
 // The properties the figures' CSS and Zdog set; inlined from the computed style, since the file carries no stylesheet.
 const PROPERTIES = [

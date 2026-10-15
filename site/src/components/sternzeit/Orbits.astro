@@ -1,0 +1,61 @@
+---
+import Term from "../Term.astro";
+import Try from "../Try.astro";
+import "./sternzeit.css";
+---
+
+<figure class="scene-frame wide" id="orbits">
+    <div class="orbit-scene" data-export="orbits">
+        <svg class="zdog" aria-hidden="true"></svg>
+        <div class="orbit-labels" aria-hidden="true"></div>
+        <p class="vis-credit footnote">
+            Drag to rotate. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
+        </p>
+    </div>
+    <label class="figure-slider" data-zoom title="From the Moon's orbit out to Earth's: drag, or turn the mouse wheel">
+        <span class="note">Zoom</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="zoom" min="0" max="100" step="1" value="0" aria-label="Zoom, from the Moon's orbit to Earth's" />
+            <span class="figure-slider-scale" aria-hidden="true">
+                <span class="figure-slider-mark" style="left: 0%">Moon's orbit</span>
+                <span class="figure-slider-mark" style="left: 100%">Earth's orbit</span>
+            </span>
+        </span>
+        <output data-field="zoomValue" title="From the center of the frame to its nearer edge"></output>
+    </label>
+    <label class="figure-slider" data-offset="hours" title="The moment, a lunation either way from where it was set: drag, or turn the mouse wheel for an hour a notch">
+        <span class="note">Time</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="offset" min="-720" max="720" step="1" value="0" aria-label="Hours from the moment" />
+            <span class="figure-slider-scale" aria-hidden="true">{["−30", "0", "+30"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 50}%`}>{mark}{i !== 1 && <span class="figure-slider-unit">{" d"}</span>}</span>)}</span>
+        </span>
+        <output data-field="offsetValue"></output>
+    </label>
+    <figcaption class="figure-caption">
+        Earth's orbit around the Sun and the Moon's around Earth, seen from above the ecliptic: Earth's path over the
+        year (faint), and dotted, its path over the coming <Term of="Lunation">lunation</Term> and the Moon's around it,
+        with fainter still the Moon's own path along the Sun. Earth turns with the{" "}
+        <Term of="Sidereal time">sidereal time</Term> about its tilted axis, the chosen place a dot on it with its
+        zenith as a short line, and both are lit by the Sun where it stands. The crosses are the{" "}
+        <Term of="Lagrange points">Lagrange points</Term>, with the lines they keep still on as Earth goes round, the
+        equinoxes and solstices, the perihelion and the aphelion,
+        and on the Moon's loop its <Term of="Apogee">apogee</Term> and <Term of="Perigee">perigee</Term> and its nodes,
+        where it crosses the ecliptic (☊ northwards), each shown once it stands clear; the dotted ray from the Sun
+        points to the vernal equinox. The zoom runs from the Moon's orbit out to
+        Earth's, its readout the reach from the center of the frame to its nearer edge. Orbits to
+        scale; the Sun,
+        Earth and the Moon are not, and grow as the zoom brings them in.
+        <Try label="A total lunar eclipse" set="date=2026-03-03T11:34Z" fig="orbits">
+            the Moon in line behind Earth, full, in its shadow; zoom out, and Earth is a few weeks from the March equinox.
+        </Try>
+    </figcaption>
+</figure>
+
+<script>
+    import { offsetSliders } from "./offset";
+    offsetSliders();
+</script>
+
+<script>
+    import "./orbits";
+</script>

@@ -35,6 +35,7 @@ import LocalFrame from "../../components/sternzeit/LocalFrame.astro";
 import MoonCalendar from "../../components/sternzeit/MoonCalendar.astro";
 import Pipeline from "../../components/sternzeit/Pipeline.astro";
 import MoonView from "../../components/sternzeit/MoonView.astro";
+import Orbits from "../../components/sternzeit/Orbits.astro";
 import Scene from "../../components/sternzeit/Scene.astro";
 import SunTimes from "../../components/sternzeit/SunTimes.astro";
 import Table from "../../components/sternzeit/Table.astro";
@@ -153,14 +154,17 @@ const date = toDate(fromJulianDay(jd)); // and back to a Date
 
 Summer is not warm because Earth is closer to the Sun: it is closest in early January. Earth's rotation axis is tilted
 against the plane of its orbit by about 23.4°, the
-<Term of="Obliquity of the ecliptic">obliquity of the ecliptic</Term>, ε. In June the northern half leans towards the
-Sun, which then stands higher and stays up longer there, and in December it leans away; the southern half has it the
-other way round. The tilt drifts slowly over millennia, and the Moon's pull on Earth's equatorial bulge adds a nod with
+<Term of="Obliquity of the ecliptic">obliquity of the ecliptic</Term>, ε (<Fig id="orbits" />). In June the northern
+half leans towards the Sun, which then stands higher and stays up longer there, and in December it leans away; the
+southern half has it the other way round. The tilt drifts slowly over millennia, and the Moon's pull on Earth's equatorial bulge adds a nod with
 a period of 18.6 years, the <Term of="Nutation">nutation</Term>. The nod tilts the axis a little more and a little less,
 and slides the <Term of="Vernal equinox">vernal equinox</Term>, the point where the Sun crosses the equator northwards
 in March. Both stay below 20 <Term of="Arcsecond">arcseconds</Term>. An arcsecond is a 3600th of a degree, and the full
 Moon is about 1,900 of them wide; 20 are about a sixth of a pixel on a full HD screen showing 60° of sky. Small as they
 are, they separate a position that is almost right from one that is right (<Tab id="earth" />).
+
+<Orbits />
+<Controls height={false} />
 
 <Table domain="earth" />
 <Controls />
@@ -399,7 +403,7 @@ live in the stretch of Earth's history in which the sky can go dark in the middl
 
 With both bodies located, eclipses follow from their positions. A solar eclipse is a matter of perspective: the Moon
 passing in front of the Sun, which depends on where you stand. On the line the Moon's shadow sweeps, the Sun goes out
-(total), or, with the Moon near apogee and too small to cover it, leaves a ring of light around the black disc
+(total), or, with the Moon near <Term of="Apogee">apogee</Term> and too small to cover it, leaves a ring of light around the black disc
 (annular). A few hundred kilometers to the side, the Moon only takes a bite out of it (partial). A lunar eclipse is the
 Moon passing through Earth's shadow, and it looks the same from anywhere the Moon is up: total once the whole disc is
 inside the <Term of="Umbra">umbra</Term>, partial while only part of it is, and penumbral, barely a dimming, when the

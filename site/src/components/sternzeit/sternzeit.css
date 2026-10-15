@@ -261,7 +261,8 @@ tbody tr:hover {
    page is wide enough for it (see the media query at the end). Dragging one rotates it, so it neither scrolls the
    page away under the finger (touch-action) nor smears a selection across the labels drawn on top (user-select). */
 #scene,
-.dome-scene {
+.dome-scene,
+.orbit-scene {
     position: relative;
     width: 100%;
     aspect-ratio: 4 / 3;
@@ -271,12 +272,29 @@ tbody tr:hover {
     cursor: grab;
 }
 /* Not on the scene itself: a child cannot undo it, and the panels on top of it, which do not rotate, scroll the page. */
-:is(#scene, .dome-scene) > :not(.altaz-panels, .analemma-panel) {
+:is(#scene, .dome-scene, .orbit-scene) > :not(.altaz-panels, .analemma-panel) {
     touch-action: none;
 }
 #scene:active,
-.dome-scene:active {
+.dome-scene:active,
+.orbit-scene:active {
     cursor: grabbing;
+}
+/* The orbits: the scene fills the frame, nothing floats over it but the credit line in the top right corner. */
+.orbit-scene > svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.orbit-labels {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+.orbit-scene > .vis-credit {
+    left: auto;
+    right: var(--content-inset);
+    text-align: right;
 }
 #stage {
     display: block;
@@ -744,6 +762,13 @@ g.eclipse-corona {
     stroke-width: 1;
     stroke-dasharray: 3 3;
     vector-effect: non-scaling-stroke;
+}
+/* The circles' names cross the disc's edge and grid, so a halo in the panel's background keeps them legible. */
+.moon-reference-label {
+    paint-order: stroke;
+    stroke: var(--bg);
+    stroke-width: 3px;
+    stroke-linejoin: round;
 }
 .moon-night {
     fill: color-mix(in srgb, var(--accent) calc(var(--earthshine, 0) * 45%), var(--surface));
@@ -1222,7 +1247,8 @@ g.eclipse-corona {
 @media (min-width: 64rem) {
     /* The flatter frame the reading column no longer constrains: room for the orbits to either side of Earth. */
     #scene,
-    .dome-scene {
+    .dome-scene,
+    .orbit-scene {
         aspect-ratio: 16 / 9;
     }
     /* Flatter still for the armillary sphere: its tilted ecliptic leaves the top and bottom of 16:9 empty. */
@@ -1547,6 +1573,7 @@ g.eclipse-corona {
    rather than orange, the blue hour a deep blue, darker than the day as in the sky. */
 #daylight {
     --golden: oklch(0.82 0.098 84);
+    --golden-band: color-mix(in srgb, var(--golden) 80%, var(--night));
     --blue-hour: oklch(0.534 0.192 264);
     --night: var(--bg);
     --day: var(--accent);
@@ -1564,7 +1591,7 @@ g.eclipse-corona {
     fill: color-mix(in srgb, var(--blue-hour) 70%, var(--night));
 }
 .daylight-golden {
-    fill: color-mix(in srgb, var(--golden) 80%, var(--night));
+    fill: var(--golden-band);
 }
 .daylight-day {
     fill: var(--day);
@@ -1594,12 +1621,14 @@ span.daylight-blue {
 span.daylight-day {
     color: var(--accent);
 }
-/* On a light page the night stays dark and the day light, whichever the page's background and accent are. */
+/* On a light page the night stays dark and the day light, whichever the page's background and accent are. The golden
+   hour is a clear amber, not dimmed by the night: mixed with it, it turned olive between the pale day and the blue hour. */
 :root[data-theme="light"] #daylight,
 :root[data-theme="light"] .daylight-key {
     --night: oklch(0.3 0.03 266);
     --day: color-mix(in oklab, var(--accent), white 55%);
-    --golden: oklch(0.66 0.11 80);
+    --golden: oklch(0.62 0.12 72);
+    --golden-band: oklch(0.81 0.115 80);
 }
 
 /* The Sun's and the Moon's paths in the locked views, dimmed beneath the bodies: a line, and a dot every whole hour. */
@@ -1645,6 +1674,11 @@ span.daylight-day {
 .figure-slider[data-offset] output {
     min-width: 6ch;
     text-align: right;
+}
+/* In days over a lunation, "+12.5 d": a character more, so a one-digit day does not shift the slider. */
+.figure-slider[data-offset="hours"] output,
+.figure-slider[data-zoom] output {
+    min-width: 7ch;
 }
 /* The greatest eclipse over the solar panel, what and how far away, a link there; the degrees and the time below it
    are dimmed, as figure labels are. */

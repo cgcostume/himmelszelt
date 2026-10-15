@@ -86,6 +86,8 @@ confirmed yet.
 | Sydney: path through the north, analemma on its head | Sun path | lib | noon azimuth 351° to 1° all year; big loop (January) at 77°, small (July) at 35° | ok | 2026-10-11 |
 | Tromsø: Sun up May 18 to July 24, down November 28 to January 14 | Daylight | lib | upper limb at -0.833°, 2026/27 | ok | 2026-10-11 |
 | A day and a half after new moon: earthshine at its bluest | Moon | lib | new moon 2026-11-09 07 UTC; 8.9% on Nov 10, 18 UTC | ok | 2026-10-11 |
+| Moon almost 2% larger high in the sky than on the horizon | Moon | lib | 1 + sin π at most 1.0179, 2000-2100 | ok | 2026-10-15 |
+| Total lunar eclipse 2026-03-03 11:34 UTC, a few weeks before the March equinox | Orbits | lib | phase 0.262, umbral magnitude 1.129; equinox March 20, 14:46 UTC | ok | 2026-10-15 |
 | Burgos, August 12, 2026, 18:29 UTC: totality, Sun 8° up | Eclipses | lib | phase 0.153, magnitude 1.012, altitude 8.2° | ok | 2026-10-11 |
 | Quito in December: evening crescents on their backs | Moon calendar | lib | bright limb 181° and 178.5° at 19:00 local, Dec 12 and 13 | ok | 2026-10-11 |
 
@@ -104,6 +106,8 @@ confirmed yet.
 | Ephemeris time: atomic, today TT, ahead of UT by ΔT, about a minute | Ephemeris time | src, lib | iers; ΔT 69.1 s; `julianEphemerisDay` adds it | ok | 2026-10-11 |
 | Equation of time 16 min ahead, 14 behind | Local mean time | src | Meeus ch. 28 | fixed | 2026-10-11 |
 | Golden hour 6° to -4°, blue hour -4° to -6° | Golden hour, Blue hour | lib | `daylight.ts` thresholds | ok | 2026-10-11 |
+| Apogee up to about 406,700 km, perigee down to about 356,400 km, 14% wider | Apogee, Perigee | lib | 356,437 to 406,705 km, 2000-2100; ratio 1.141 | ok | 2026-10-15 |
+| L1 and L2 about 1.5 million km from Earth | Lagrange points | derived | (μ/3)^(1/3) AU with μ = 1/328,900: 1.50 million km | ok | 2026-10-15 |
 | Sternzeit: sidereal time, kept by the stars; German for Star Trek's stardate. "Since 1799" and "one culmination of a star to the next" (the stellar day, not the sidereal) removed | sternzeit | web | German dub: "Sternzeit" | fixed | 2026-10-11 |
 
 ## dunstkreis

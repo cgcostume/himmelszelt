@@ -30,6 +30,9 @@ const SUN_NORMAL_LENGTH = 19;
 const SUN_HEAD_LENGTH = 4;
 // Past the quarters, the common arrow (see offpanel.ts) on this fixed circle, outside the disc at perigee.
 const SUN_CIRCLE = PERIGEE_RADIUS + 9;
+// The reference circles' names at the lower left, counterclockwise from up as the position angles, along their circles
+// with their tops towards the center: clear of the pole, the readouts and, mostly, the Sun's arrow.
+const REFERENCE_LABEL_ANGLE = 135;
 
 const view = find(".moon-view");
 const svgEl = find<SVGSVGElement>(".moon-panel > svg", view);
@@ -81,7 +84,10 @@ function render() {
     svgEl.style.height = `${f((2 * halfHeight) / unitsPerPx)}px`;
     svgEl.setAttribute("viewBox", `${f(-halfWidth)} ${f(-halfHeight)} ${f(2 * halfWidth)} ${f(2 * halfHeight)}`);
     const time = precise.fromJulianDay(jd);
-    const diameter = precise.moon.topocentricAngularDiameter(time, state);
+    // Locked to the Moon, its size from Earth's center; unlocked, the observer's, larger with the Moon high in the sky.
+    const diameter = locked
+        ? precise.moon.apparentAngularDiameter(ephemerisDay(jd))
+        : precise.moon.topocentricAngularDiameter(time, state);
     const radius = (diameter / 2) * DEG * UNITS_PER_RADIAN;
     const total = precise.moon.librations(ephemerisDay(jd));
     const opticalPart = optical ? { longitude: 0, latitude: 0 } : precise.moon.opticalLibrations(ephemerisDay(jd));
@@ -135,9 +141,17 @@ function render() {
         for (const run of visibleRuns(parallel, tilt, radius)) svg += polyline(run, cls);
     }
     svg += `<circle r="${f(radius)}" class="moon-limb"/>`;
-    // Apogee and perigee sizes on top of the disc: the smaller one mostly falls inside it.
-    for (const km of [APOGEE_KM, PERIGEE_KM]) {
-        svg += `<circle r="${f(radiusAt(km) * UNITS_PER_RADIAN)}" class="moon-reference"/>`;
+    // Apogee and perigee sizes on top of the disc: the smaller one mostly falls inside it. Named between the two
+    // circles and just outside the larger one, the text along the circle.
+    const [apogee, perigee] = [APOGEE_KM, PERIGEE_KM].map((km) => radiusAt(km) * UNITS_PER_RADIAN);
+    for (const r of [apogee, perigee]) svg += `<circle r="${f(r)}" class="moon-reference"/>`;
+    const [lx, ly] = toScreen([0, 1], REFERENCE_LABEL_ANGLE, 1);
+    for (const [name, r] of [
+        ["apogee", (apogee + perigee) / 2],
+        ["perigee", perigee + 2.2 * unitsPerPx + 2],
+    ] as const) {
+        const [x, y] = [lx * r, ly * r];
+        svg += `<text x="${f(x)}" y="${f(y)}" transform="rotate(${180 - REFERENCE_LABEL_ANGLE} ${f(x)} ${f(y)})" class="figure-label moon-reference-label">${name}</text>`;
     }
 
     // The lunar north pole and the axis' tilt against the zenith, outside the perigee circle so they never overlap it: a
@@ -179,10 +193,7 @@ function render() {
     // The visible horizon, below the Moon by its apparent altitude over it, at the disc's own scale (so it only shows
     // within a few tenths of a degree); the ground beneath veils what it hides.
     if (!locked) {
-        const horizon =
-            precise.earth.apparentAltitude(horizontal.altitude, { observerHeightM: state.heightM }) *
-            DEG *
-            UNITS_PER_RADIAN;
+        const horizon = precise.earth.apparentAltitude(horizontal.altitude, state) * DEG * UNITS_PER_RADIAN;
         svg += veiledHorizon(horizon, halfHeight, unitsPerPx, halfWidth, {
             // In the bottom right corner, level with the switch in the bottom left one, or over the readouts there.
             x: halfWidth - CORNER_PX * unitsPerPx,
