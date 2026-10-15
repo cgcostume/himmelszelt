@@ -2,7 +2,7 @@ import * as precise from "@himmelszelt/sternzeit";
 import Zdog from "zdog";
 import { find } from "../dom";
 import { onDemand } from "../frame";
-import { SUN_SYMBOL, sunRays, themeColor, themeColors } from "./figure";
+import { ARROWHEAD_PX, SUN_SYMBOL, sunRays, themeColor, themeColors } from "./figure";
 import { ephemerisDay, onChange, state } from "./state";
 import { type Point, type Rotation, turn, viewToScene, zdogBody, zdogMoon, zdogSun } from "./zdogmoon";
 import "./export";
@@ -26,9 +26,17 @@ const MOON_PX = 7;
 const BODY_GAP_PX = 3;
 // Where on the zoom the bodies grow and shrink, as fractions of it.
 const GROW = { from: 0.3, to: 0.8 };
-// The paths: both bodies a lunation either way of the moment, every hour, and Earth's whole year, every six hours, so
-// that zoomed in the orbit's chords still fall under a pixel. Every path keeps a gap of a diameter around each body.
+// The paths: the Moon's loop around Earth two lunations either way of the moment, its path along the Sun one, every
+// hour, and Earth's whole year, every six hours, so that zoomed in the orbit's chords still fall under a pixel. Every
+// path keeps a gap of a diameter around each body.
 const LUNATION_DAYS = precise.moon.MEAN_SYNODIC_MONTH;
+const LOOP_LUNATIONS = 2;
+// The coming lunation in full, the loops either side of it this faint, as the sun path's lunation band.
+const OTHER_LOOPS_ALPHA = 15;
+// Arrowheads pointing forward in time, one behind and one ahead of each body, this far along its path on screen, so
+// they stay in view at every zoom, and at least this many of the body's diameters off, clear of it.
+const ARROW_OFFSET_PX = 42;
+const ARROW_DIAMETERS = 4;
 const PATH_STEP_DAYS = 1 / 24;
 const YEAR_DAYS = 365.25;
 const YEAR_STEP_DAYS = 0.25;
@@ -36,16 +44,17 @@ const GAP_DIAMETERS = 1;
 // The Sun's mean anomaly and its longitude advance this much a day: perihelion is where the anomaly passes 0, aphelion
 // 180, the equinoxes where the longitude passes 0 and 180, the solstices 90 and 270.
 const SOLAR_RATE = 0.9856;
+// At the September equinox Earth stands in the direction of the vernal equinox from the Sun, so the two share a label.
 const SEASONS: [longitude: number, name: string][] = [
     [0, "March equinox"],
     [90, "June solstice"],
-    [180, "September equinox"],
+    [180, "vernal equinox (September)"],
     [270, "December solstice"],
 ];
 // The Moon's loop gets its nodes and apsides once it is this large on screen.
 const LOOP_CLEAR_PX = 60;
-// The Moon's path fades out as its orbit shrinks to a few pixels around Earth's.
-const MOON_PATH_FADE_PX = { from: 4, to: 16 };
+// The Moon's path, with its arrows and marks, fades out as its orbit shrinks to a few dozen pixels around Earth.
+const MOON_PATH_FADE_PX = { from: 30, to: 90 };
 // The reference points show once they stand clear of what they refer to: the Lagrange points L1 and L2 this far from
 // Earth, L3 to L5 and the perihelion and aphelion this far from the Sun, on screen.
 const CLEAR_PX = 28;
@@ -246,6 +255,50 @@ function addPath(points: Point[], color: string, strokePx: number, dash: string 
     flush(run);
 }
 
+// The arrowheads, kept from the rebuild and drawn square to the viewer on every turn, with Earth's marks.
+const arrows: { tip: Point; d: Point; color: string }[] = [];
+
+/** An arrowhead facing the viewer, its tip at `tip`, pointing the way `d` runs on screen. */
+function drawArrow({ tip, d, color }: { tip: Point; d: Point; color: string }) {
+    const v = turn(d, rotation);
+    const length = Math.hypot(v.x, v.y) || 1;
+    const [ux, uy] = [v.x / length, v.y / length];
+    const [L, W] = [ARROWHEAD_PX.length, ARROWHEAD_PX.halfWidth];
+    const toScene = viewToScene(rotation);
+    const at = (x: number, y: number) => {
+        const q = toScene(x, y, 0);
+        return { x: tip.x + q.x, y: tip.y + q.y, z: tip.z + q.z };
+    };
+    const path = [tip, at(-ux * L - uy * W, -uy * L + ux * W), at(-ux * L + uy * W, -uy * L - ux * W)];
+    styled(new Shape({ addTo: marks, path, closed: true, fill: true, color }), 1);
+}
+
+/**
+ * Arrowheads `offsetPx` along a path behind and ahead of `points[at]`, both pointing forward in time, which runs
+ * with the index: the path is walked each way until that far, and the tip interpolated there.
+ */
+function addArrowsAround(points: Point[], at: number, color: string, wrap = false, offsetPx = ARROW_OFFSET_PX) {
+    for (const step of [-1, 1]) {
+        let i = at;
+        let left = offsetPx;
+        for (;;) {
+            const j = wrap ? (i + step + points.length) % points.length : i + step;
+            const [a, b] = [points[i], points[j]];
+            if (!a || !b) break;
+            const d = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z };
+            const span = Math.hypot(d.x, d.y, d.z);
+            if (span >= left) {
+                const t = left / span;
+                const tip = { x: a.x + d.x * t, y: a.y + d.y * t, z: a.z + d.z * t };
+                arrows.push({ tip, d: step > 0 ? d : { x: -d.x, y: -d.y, z: -d.z }, color });
+                break;
+            }
+            left -= span;
+            i = j;
+        }
+    }
+}
+
 // The bodies, rebuilt with the scene, lit and turned on every frame.
 let earth: ReturnType<typeof zdogBody> | null = null;
 let moon: ReturnType<typeof zdogMoon> | null = null;
@@ -254,13 +307,16 @@ let bodyPoints = { sun: { x: 0, y: 0, z: 0 }, earth: { x: 0, y: 0, z: 0 }, moon:
 const billboards: { yaw: Zdog.Anchor; face: Zdog.Anchor }[] = [];
 // The reference points' labels float over the scene in HTML, placed wherever their points project on each frame,
 // each pushed away from what its point refers to: the Lagrange points L1 and L2 from Earth, the rest from the Sun.
-const labels: { text: string; point: Point; away: Point }[] = [];
+// What the section is about, the seasons and Earth's distance, in the accent; the rest in the muted gray.
+type Tone = "accent" | "muted";
+const labels: { text: string; point: Point; away: Point; tone: Tone }[] = [];
 const LABEL_GAP_PX = 10;
 const LABEL_LINE_PX = 13;
 
-/** A small cross at a point, labeled beside it, on the side away from `away`. */
-function addMark(point: Point, text: string, away: Point) {
+/** A small cross at a point, labeled beside it, on the side away from `away`, in the tone's color. */
+function addMark(point: Point, text: string, away: Point, tone: Tone = "muted") {
     const cross = 3;
+    const color = tone === "accent" ? ACCENT : MUTED;
     for (const [a, b] of [
         [
             { x: -cross, y: 0 },
@@ -281,12 +337,12 @@ function addMark(point: Point, text: string, away: Point) {
                     { ...a, z: 0 },
                     { ...b, z: 0 },
                 ],
-                color: MUTED,
+                color,
             }),
             1,
         );
     }
-    labels.push({ text, point, away });
+    labels.push({ text, point, away, tone });
 }
 
 function rebuild() {
@@ -296,6 +352,7 @@ function rebuild() {
     clear(scene);
     billboards.length = 0;
     labels.length = 0;
+    arrows.length = 0;
     zoomValue.textContent = reachText(reach);
 
     const sunPoint = scenePoint([0, 0, 0], frame);
@@ -314,56 +371,50 @@ function rebuild() {
         { at: earthPoint, radius: 2 * GAP_DIAMETERS * earthRadiusPx },
         { at: sunPoint, radius: 2 * GAP_DIAMETERS * sunRadius },
     ];
-    if (moonShown) gaps.push({ at: moonPoint, radius: 2 * GAP_DIAMETERS * moonRadius });
+    const moonGap = { at: moonPoint, radius: 2 * GAP_DIAMETERS * moonRadius };
+    if (moonShown) gaps.push(moonGap);
 
-    // Earth's orbit over the rest of the year, faint, from the end of the coming lunation, drawn in full below, round to
-    // the moment.
-    const year = Math.round((YEAR_DAYS - LUNATION_DAYS) / YEAR_STEP_DAYS);
-    const orbit = Array.from({ length: year + 1 }, (_, i) =>
-        scenePoint(earthAt(jd + LUNATION_DAYS + i * YEAR_STEP_DAYS), frame),
-    );
-    addPath(orbit, faint(INK, 25), 1, null);
+    // Earth's orbit over the year from the moment, in the accent like the horizon of the other figures.
+    const year = Math.round(YEAR_DAYS / YEAR_STEP_DAYS);
+    const orbit = Array.from({ length: year + 1 }, (_, i) => scenePoint(earthAt(jd + i * YEAR_STEP_DAYS), frame));
+    addPath(orbit, ACCENT, 1, null);
+    addArrowsAround(orbit, 0, ACCENT, true, Math.max(ARROW_OFFSET_PX, 2 * ARROW_DIAMETERS * earthRadiusPx));
     const orbitPx = AU * pxPerKm;
     // The direction of the vernal equinox from the Sun, the ecliptic longitude 0 the positions are counted from, and
     // the nearest and farthest Earth comes to the Sun over the year.
     if (orbitPx > ORBIT_CLEAR_PX) {
-        addPath([scenePoint([0, 0, 0], frame), scenePoint([1.12 * AU, 0, 0], frame)], faint(INK, 35), 1, DOTTED);
-        labels.push({ text: "vernal equinox", point: scenePoint([1.12 * AU, 0, 0], frame), away: sunPoint });
-        addMark(scenePoint(earthAt(solarTime(precise.sun.meanAnomaly, jd, 0)), frame), "perihelion", sunPoint);
-        addMark(scenePoint(earthAt(solarTime(precise.sun.meanAnomaly, jd, 180)), frame), "aphelion", sunPoint);
+        addPath([scenePoint([0, 0, 0], frame), scenePoint([1.12 * AU, 0, 0], frame)], faint(ACCENT, 60), 1, DOTTED);
+        const apsis = (anomaly: number) => scenePoint(earthAt(solarTime(precise.sun.meanAnomaly, jd, anomaly)), frame);
+        addMark(apsis(0), "perihelion", sunPoint, "accent");
+        addMark(apsis(180), "aphelion", sunPoint, "accent");
         for (const [longitude, name] of SEASONS) {
             const at = solarTime(precise.sun.apparentLongitude, jd, longitude);
-            addMark(scenePoint(earthAt(at), frame), name, sunPoint);
+            addMark(scenePoint(earthAt(at), frame), name, sunPoint, "accent");
         }
     }
 
-    // Both paths over the coming lunation, dotted; the lunation behind is sampled too, for the Moon's nodes and
-    // apsides nearest to the moment, but not drawn, as the Moon's loop would cover the coming one. Earth's is its path
-    // around the Sun, the Moon's its path around Earth, drawn around Earth where it stands now: along the Sun, Earth
-    // moves seven times the Moon's distance a day, which would stretch the Moon's orbit into a wave too shallow to see.
+    // The Moon's path around Earth, two lunations either way, dashed and drawn around Earth where it stands now: along
+    // the Sun, Earth moves seven times the Moon's distance a day, which would stretch the Moon's orbit into a wave too
+    // shallow to see. The loops never quite close: the orbit's ellipse turns, and its size breathes with the Sun's pull.
     const steps = Math.round(LUNATION_DAYS / PATH_STEP_DAYS);
-    const at = (i: number) => jd + (i - steps) * PATH_STEP_DAYS;
-    const earthPath = Array.from({ length: steps + 1 }, (_, i) => scenePoint(earthAt(at(steps + i)), frame));
-    addPath(earthPath, INK, 1, DOTTED);
+    const span = LOOP_LUNATIONS * steps;
+    const at = (i: number) => jd + (i - span) * PATH_STEP_DAYS;
     const moonPathAlpha = smoothstep(MOON_PATH_FADE_PX.from, MOON_PATH_FADE_PX.to, moonOrbitPx);
     if (moonPathAlpha > 0) {
-        const fromEarth = Array.from({ length: 2 * steps + 1 }, (_, i) => moonFromEarth(at(i)));
+        const fromEarth = Array.from({ length: 2 * span + 1 }, (_, i) => moonFromEarth(at(i)));
         const moonPath = fromEarth.map((v) => scenePoint(add(earthNow, v), frame));
         const color = faint(MUTED, Math.round(moonPathAlpha * 100));
-        addPath(moonPath.slice(steps), color, 1, DOTTED);
-        // On the loop, the nearest of each to the moment: the nodes, where the Moon crosses the ecliptic, the ascending
-        // one northwards, and the apsides, where it is nearest to and farthest from Earth.
+        const dim = faint(MUTED, Math.round(moonPathAlpha * OTHER_LOOPS_ALPHA));
+        addPath(moonPath.slice(0, span + 1), dim, 1, DASHED);
+        addPath(moonPath.slice(span, span + steps + 1), color, 1, DASHED);
+        addPath(moonPath.slice(span + steps), dim, 1, DASHED);
+        addArrowsAround(moonPath, span, color, false, Math.max(ARROW_OFFSET_PX, 2 * ARROW_DIAMETERS * moonRadius));
+        // On the loop, the nearest of each to the moment: the apsides, where the Moon is nearest to and farthest from
+        // Earth.
         if (moonOrbitPx > LOOP_CLEAR_PX) {
             const events: { text: string; i: number; point: Point }[] = [];
             const distance = fromEarth.map((v) => Math.hypot(...v));
             for (let i = 1; i < fromEarth.length - 1; i++) {
-                const [here, next] = [fromEarth[i] as Km, fromEarth[i + 1] as Km];
-                if (here[2] <= 0 !== next[2] <= 0) {
-                    const f = here[2] / (here[2] - next[2]);
-                    const crossing = add(here, scale(add(next, scale(here, -1)), f));
-                    const text = next[2] > 0 ? "☊ ascending node" : "☋ descending node";
-                    events.push({ text, i: i + f, point: scenePoint(add(earthNow, crossing), frame) });
-                }
                 const [a, b, c] = [distance[i - 1] as number, distance[i] as number, distance[i + 1] as number];
                 if ((b < a && b <= c) || (b > a && b >= c)) {
                     events.push({ text: b < a ? "perigee" : "apogee", i, point: moonPath[i] as Point });
@@ -372,18 +423,19 @@ function rebuild() {
             const nearest = new Map<string, { i: number; point: Point }>();
             for (const { text, i, point } of events) {
                 const held = nearest.get(text);
-                if (!held || Math.abs(i - steps) < Math.abs(held.i - steps)) nearest.set(text, { i, point });
+                if (!held || Math.abs(i - span) < Math.abs(held.i - span)) nearest.set(text, { i, point });
             }
             for (const [text, { point }] of nearest) addMark(point, text, earthPoint);
         }
         // The Moon's own path along the Sun, fainter: that shallow wave, which never crosses Earth's within the frame.
-        // The lunation behind as well, as Earth has its orbit behind it, dotted ahead like every coming path.
+        // A lunation either way, as Earth has its orbit all round.
         const trace = Array.from({ length: 2 * steps + 1 }, (_, i) =>
-            scenePoint(add(earthAt(at(i)), moonFromEarth(at(i))), frame),
+            scenePoint(add(earthAt(at(span - steps + i)), moonFromEarth(at(span - steps + i))), frame),
         );
-        const traceColor = faint(MUTED, Math.round(moonPathAlpha * 40));
-        addPath(trace.slice(0, steps + 1), traceColor, 1, null);
-        addPath(trace.slice(steps), traceColor, 1, DOTTED);
+        // It keeps twice the gap at the Moon, as the loop runs there too, with the usual one.
+        moonGap.radius *= 2;
+        addPath(trace, faint(MUTED, Math.round(moonPathAlpha * 40)), 1, null);
+        moonGap.radius /= 2;
     }
 
     // The Lagrange points, each once it stands clear on screen: L1 and L2 of Earth, the others of the Sun.
@@ -441,6 +493,7 @@ function earthUnit(ra: number, dec: number, obliquity: number): Point {
 // faces the camera. Redrawn on every turn, since the near side changes with it.
 function drawMarks() {
     clear(marks);
+    for (const arrow of arrows) drawArrow(arrow);
     const { jd, latitude, longitude } = state;
     const r = earthRadiusPx;
     if (r < EARTH_PX.in / 2) return;
@@ -483,8 +536,8 @@ function drawMarks() {
 /** The labels, each beside its point as the scene now shows it, on the far side from what it refers to; one that
  *  would sit on another moves down a line. */
 function placeLabels() {
-    const placed: { x: number; y: number; text: string; anchor: string }[] = [];
-    for (const { text, point, away } of labels) {
+    const placed: { x: number; y: number; text: string; anchor: string; tone: Tone }[] = [];
+    for (const { text, point, away, tone } of labels) {
         const p = turn(point, rotation);
         const from = turn(away, rotation);
         const [dx, dy] = [p.x - from.x, p.y - from.y];
@@ -497,12 +550,12 @@ function placeLabels() {
         while (placed.some((other) => Math.abs(other.y - y) < LABEL_LINE_PX && Math.abs(other.x - x) < 70)) {
             y += LABEL_LINE_PX;
         }
-        placed.push({ x, y, text, anchor });
+        placed.push({ x, y, text, anchor, tone });
     }
     labelsEl.replaceChildren(
-        ...placed.map(({ x, y, text, anchor }) => {
+        ...placed.map(({ x, y, text, anchor, tone }) => {
             const label = document.createElement("span");
-            label.className = "dome-compass-label";
+            label.className = `dome-compass-label orbit-label-${tone}`;
             label.dataset.exportText = "";
             label.textContent = text;
             label.style.left = `${x}px`;
