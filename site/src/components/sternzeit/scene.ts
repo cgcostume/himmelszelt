@@ -394,7 +394,7 @@ const moonView = makeAltAzPanel("#moonView", false);
 // refraction, the horizon lowered by the observer's height (see earth.apparentAltitude). The horizon line stays where it is.
 const seen = (h: HorizontalCoords) => ({
     ...h,
-    altitude: precise.earth.apparentAltitude(h.altitude, { observerHeightM: state.heightM }),
+    altitude: precise.earth.apparentAltitude(h.altitude, state),
 });
 
 // The bodies' paths across the sky, dimmed, twelve hours either way of the moment: a line in ten-minute steps and a

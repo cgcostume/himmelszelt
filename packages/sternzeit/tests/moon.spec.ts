@@ -90,6 +90,29 @@ test("approx.moon.phaseAngle and illuminatedFraction match Meeus' 48.4 result fo
     expect(approx.moon.illuminatedFraction(JDE)).toBeCloseTo(0.6802, 2);
 });
 
+// A step no month divides, so the samples fall on every phase, through a saros and more either side of J2000.
+const sweep: number[] = [];
+for (let t = precise.J2000 - 7000; t < precise.J2000 + 7000; t += 3.7) sweep.push(t);
+
+test("approx.moon stays within a quarter of a degree of the precise Moon, and 700 km of its distance", () => {
+    for (const t of sweep) {
+        const [p, a] = [precise.moon.position(t), approx.moon.position(t)];
+        expect(precise.angularSeparation(p.longitude, p.latitude, a.longitude, a.latitude)).toBeLessThan(0.25);
+        expect(Math.abs(precise.moon.distance(t) - approx.moon.distance(t))).toBeLessThan(700);
+    }
+});
+
+// Near new and full moon the Moon's latitude keeps the precise angle a few degrees from 180 and 0, which 48.4 ignores.
+test("approx.moon.phaseAngle stays in 0-180, within 5° of the precise one, and its illuminated fraction within 0.005", () => {
+    for (const t of sweep) {
+        const a = approx.moon.phaseAngle(t);
+        expect(a).toBeGreaterThanOrEqual(0);
+        expect(a).toBeLessThanOrEqual(180);
+        expect(Math.abs(a - precise.moon.phaseAngle(t))).toBeLessThan(5);
+        expect(Math.abs(approx.moon.illuminatedFraction(t) - precise.moon.illuminatedFraction(t))).toBeLessThan(0.005);
+    }
+});
+
 test("moon.earthshine peaks near new moon, vanishes near full moon, and approx stays within 3% of its peak", () => {
     // 2026-08-12 (new moon, the solar eclipse) and 2026-08-28 (full moon).
     const newMoon = 2461265.27;

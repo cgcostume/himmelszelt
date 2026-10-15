@@ -26,21 +26,23 @@ export {
 } from "./coords.js";
 
 // Time and Julian Day.
-export type { AstronomicalTime, JulianDay } from "./time.js";
+export type { AstronomicalTime, JulianCenturies, JulianDay } from "./time.js";
 export { J2000, J2050, B1900, B1950, STANDARD_EQUINOX } from "./time.js"; // reference epochs
 export {
+    dateFromJulianDay,
+    fromDate,
+    fromJulianDay,
     julianDay,
     julianDay0UT,
+    julianDayFromDate,
     julianDayUT,
     julianEphemerisDay,
     deltaT,
-    fromDate,
-    fromJulianDay,
+    julianDaysSinceStandardEquinox,
+    julianCenturiesSinceStandardEquinox,
     modifiedJulianDay,
     toDate,
     toUT,
-    julianDaysSinceStandardEquinox,
-    julianCenturiesSinceStandardEquinox,
 } from "./time.js"; // Julian Day conversions
 
 // Sidereal time.

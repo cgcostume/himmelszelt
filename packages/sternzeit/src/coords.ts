@@ -82,11 +82,11 @@ export const EQUATORIAL_RADIUS_KM = 6378.14;
 const POLAR_AXIS_RATIO = 0.99664719;
 
 /** The observer's geocentric position (ρ sin φ', ρ cos φ') in Earth equatorial radii, on the ellipsoid and
- *  `observerHeightM` above it, per Meeus ch. 11. */
-export function observerGeocentric(latitude: number, observerHeightM = 0): { rhoSinPhi: number; rhoCosPhi: number } {
+ *  `heightM` above it, per Meeus ch. 11. */
+export function observerGeocentric(latitude: number, heightM = 0): { rhoSinPhi: number; rhoCosPhi: number } {
     const phi = latitude * DEG_TO_RAD;
     const u = Math.atan(POLAR_AXIS_RATIO * Math.tan(phi));
-    const h = observerHeightM / (EQUATORIAL_RADIUS_KM * 1000);
+    const h = heightM / (EQUATORIAL_RADIUS_KM * 1000);
     return {
         rhoSinPhi: POLAR_AXIS_RATIO * Math.sin(u) + h * Math.sin(phi),
         rhoCosPhi: Math.cos(u) + h * Math.cos(phi),

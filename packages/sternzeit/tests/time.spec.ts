@@ -8,11 +8,13 @@ import {
     fromJulianDay,
     J2000,
     julianDay,
+    julianDay0UT,
     julianDayFromDate,
     julianDayUT,
     julianEphemerisDay,
     modifiedJulianDay,
     toDate,
+    toUT,
 } from "../src/time.js";
 
 function utc(year: number, month: number, day: number, hour = 0, minute = 0, second = 0): AstronomicalTime {
@@ -77,6 +79,9 @@ test("julianEphemerisDay runs ahead of UT by deltaT", () => {
 // Meeus, "Astronomical Algorithms", example 7.b: before the reform, the Julian calendar.
 test("julianDay counts dates before 1582 in the Julian calendar", () => {
     expect(julianDay(utc(333, 1, 27, 12))).toBe(1842713);
+    // October 4 was followed by October 15; the days between are no dates.
+    expect(julianDay(utc(1582, 10, 15))).toBe(julianDay(utc(1582, 10, 4)) + 1);
+    expect(julianDay(utc(1582, 10, 10))).toBeNaN();
 });
 
 test("fromJulianDay shifts the clock into the requested time zone", () => {
@@ -89,6 +94,21 @@ test("fromJulianDay keeps fractional seconds, to the millisecond", () => {
     const time = { ...utc(2026, 9, 21, 12, 0, 30.75), utcOffsetSeconds: 3600 };
     expect(fromJulianDay(julianDayUT(time), 3600)).toEqual(time);
     expect(fromJulianDay(J2000 - 0.0000001)).toEqual(utc(2000, 1, 1, 11, 59, 59.991));
+});
+
+test("toUT moves the clock back by the offset and leaves UT alone", () => {
+    const berlin = { ...utc(2000, 1, 1, 1, 30), utcOffsetSeconds: 7200 };
+    expect(toUT(berlin)).toEqual(utc(1999, 12, 31, 23, 30));
+    const greenwich = utc(2000, 1, 1, 1, 30);
+    expect(toUT(greenwich)).toBe(greenwich);
+});
+
+// Meeus ch. 12 takes JD0 at 0h UT of the date, whichever clock the moment was given on.
+test("julianDay0UT is 0h UT of the UT date, so it always ends in .5", () => {
+    expect(julianDay0UT(utc(2000, 1, 1, 12))).toBe(J2000 - 0.5);
+    expect(julianDay0UT(utc(2000, 1, 1, 23, 59))).toBe(J2000 - 0.5);
+    // 01:30 in Berlin is still December 31 in UT.
+    expect(julianDay0UT({ ...utc(2000, 1, 1, 1, 30), utcOffsetSeconds: 7200 })).toBe(J2000 - 1.5);
 });
 
 test("modifiedJulianDay applies the time zone offset", () => {

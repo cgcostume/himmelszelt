@@ -237,7 +237,7 @@ function renderSolar(jd: number) {
     if (amount > 0) svg += corona(amount);
     // The Sun sits at the center, so the visible horizon is the Sun's apparent altitude over it below; refraction lifts
     // the Sun, the observer's height lowers the horizon. The ground veils whatever is beneath.
-    const sunAbove = precise.earth.apparentAltitude(sunAltitude, { observerHeightM: state.heightM });
+    const sunAbove = precise.earth.apparentAltitude(sunAltitude, state);
     const horizon = sunAbove * scale;
     svg += sunGlow(0, 0, SUN_RADIUS_UNITS, horizon, "eclipse-sun") + circle(0, 0, SUN_RADIUS_UNITS, "eclipse-sun");
     const onPanel = distance < HALF * Math.SQRT2 + moonRadius;
@@ -314,7 +314,7 @@ function renderLunar(jd: number) {
 
     // An eclipse happens for everyone at once, but only those with the Moon above their horizon get to see it.
     const moonAltitude = precise.moon.horizontalPosition(time, state).altitude;
-    const apparent = precise.earth.apparentAltitude(moonAltitude, { observerHeightM: state.heightM });
+    const apparent = precise.earth.apparentAltitude(moonAltitude, state);
     // The horizon lies the Moon's apparent altitude below it, at the panel's scale of kilometers at its distance.
     const unitsPerDegree = (precise.moon.distance(ephemerisDay(jd)) * precise.DEG_TO_RAD) / KM_PER_UNIT;
     svg += veiledHorizon(my + apparent * unitsPerDegree, HALF, unitsPerPx);

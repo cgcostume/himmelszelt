@@ -164,7 +164,7 @@ const REFRACTION_FLOOR_DEG = -1;
 function refractionTowardsSun(fn: Fn, jd: number, apparent: boolean) {
     const altitude = sunAltitude(jd);
     if (altitude < REFRACTION_FLOOR_DEG) return null;
-    const conditions = { observerHeightM: state.heightM };
+    const conditions = state;
     return fn(apparent ? altitude + precise.earth.atmosphericRefraction(altitude, conditions) : altitude, conditions);
 }
 
@@ -175,8 +175,7 @@ const CALL_OVERRIDES: Record<string, (fn: Fn, jd: number) => unknown> = {
     // Fed the apparent altitude it expects: the true one lifted by the refraction from the row above.
     atmosphericRefractionFromApparent: (fn, jd) => refractionTowardsSun(fn, jd, true),
     // y = sin(altitude), the vertical component of a unit view direction vector.
-    viewDistanceWithinAtmosphere: (fn, jd) =>
-        fn(Math.sin(sunAltitude(jd) * precise.DEG_TO_RAD), { observerHeightM: state.heightM }),
+    viewDistanceWithinAtmosphere: (fn, jd) => fn(Math.sin(sunAltitude(jd) * precise.DEG_TO_RAD), state),
     // jd is already an absolute instant; fromJulianDay(jd) (offset 0) round-trips it as a UT AstronomicalTime,
     // which is what julianDayUT() inside horizontalPosition/parallacticAngle expects. A nonzero offset here
     // would double-shift the instant, since jd carries no timezone to begin with.
@@ -184,7 +183,7 @@ const CALL_OVERRIDES: Record<string, (fn: Fn, jd: number) => unknown> = {
     topocentricPosition: (fn, jd) => fn(precise.fromJulianDay(jd), state),
     parallacticAngle: (fn, jd) => fn(precise.fromJulianDay(jd), state),
     brightLimbAngle: (fn, jd) => fn(precise.fromJulianDay(jd), state),
-    apparentAltitude: (fn, jd) => fn(sunAltitude(jd), { observerHeightM: state.heightM }),
+    apparentAltitude: (fn, jd) => fn(sunAltitude(jd), state),
     sunDirection: (fn, jd) => fn(precise.fromJulianDay(jd), state),
     direction: (fn, jd) => fn(precise.fromJulianDay(jd), state),
     airPressureRatio: (fn) => fn(state.heightM),

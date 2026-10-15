@@ -234,7 +234,7 @@ function rebuild() {
         const horizontal = body.horizontalPosition(time, observer);
         return {
             ...horizontal,
-            altitude: precise.earth.apparentAltitude(horizontal.altitude, { observerHeightM: heightM }),
+            altitude: precise.earth.apparentAltitude(horizontal.altitude, { heightM }),
         };
     };
     const sun = seen(precise.sun);

@@ -33,8 +33,8 @@ export const STANDARD_EQUINOX: JulianDay = J2000;
 
 /**
  * Julian Day for a given calendar date/time, as given, without applying `utcOffsetSeconds` (see {@link julianDayUT}),
- * per Meeus ch. 7. Dates from 1582-10-15 on are Gregorian, earlier ones Julian, as in
- * Meeus; the ten days the reform skipped return 0. Valid for years from -4712 on.
+ * per Meeus ch. 7. Dates from 1582-10-15 on are Gregorian, earlier ones Julian, as in Meeus; the ten days the reform
+ * skipped, 1582 October 5 to 14, never happened and give NaN. Valid for years from -4712 on.
  */
 export function julianDay(time: AstronomicalTime): JulianDay {
     let { year, month } = time;
@@ -54,7 +54,7 @@ export function julianDay(time: AstronomicalTime): JulianDay {
         const a = toInt(year * 0.01);
         b = 2 - a + toInt(a * 0.25);
     } else if (cutover > 15821004) {
-        return 0;
+        return Number.NaN;
     }
 
     return toInt(365.25 * (year + 4716)) + toInt(30.600001 * (month + 1)) + day + h + b - 1524.5;
@@ -122,9 +122,9 @@ export function julianEphemerisDay(time: AstronomicalTime | JulianDay): JulianDa
     return jd + deltaT(jd) / 86_400;
 }
 
-/** Julian Day at 0h UT of the same calendar date as `time`. */
+/** Julian Day at 0h UT of the UT date `time` falls on, Meeus' JD0 (ch. 12): always ending in .5. */
 export function julianDay0UT(time: AstronomicalTime): JulianDay {
-    return julianDayUT({ ...time, hour: 0, minute: 0, second: 0 });
+    return Math.floor(julianDayUT(time) - 0.5) + 0.5;
 }
 
 /** Modified Julian Day (JD - 2400000.5) of `time` converted to UT first. */
@@ -204,7 +204,7 @@ export function toDate(time: AstronomicalTime): Date {
 /** `time` converted to UT (utcOffsetSeconds = 0). */
 export function toUT(time: AstronomicalTime): AstronomicalTime {
     if (time.utcOffsetSeconds === 0) return time;
-    return fromJulianDay(julianDay(time) - time.utcOffsetSeconds / 3600 / 24, 0);
+    return fromJulianDay(julianDay(time) - time.utcOffsetSeconds / 86_400, 0);
 }
 
 /** Days since the standard equinox (J2000.0). */

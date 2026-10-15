@@ -92,10 +92,10 @@ export function trueLongitude(t: JulianDay): number {
     return meanLongitude(t) + equationOfCenter(t);
 }
 
-/** Approximation of {@link trueLongitude} per Jensen et al. 2001, from their own mean longitude. */
+/** Approximation of {@link trueLongitude}, from the approximate chain. Jensen et al.'s own mean longitude is Meeus'
+ *  short one to a ten-thousandth of a degree, so the chain holds together: L0 + C, as in the precise one. */
 export function trueLongitudeApprox(t: JulianDay): number {
-    const T = julianCenturiesSinceStandardEquinox(t);
-    return normalizeDegrees((4.895048 + 628.331951 * T) * RAD_TO_DEG + equationOfCenterApprox(t));
+    return normalizeDegrees(meanLongitudeApprox(t) + equationOfCenterApprox(t));
 }
 
 /**

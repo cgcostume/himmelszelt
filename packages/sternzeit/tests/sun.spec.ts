@@ -73,9 +73,16 @@ test("sun.apparentAngularDiameter is in degrees", () => {
     expect(approx.sun.apparentAngularDiameter(JDE)).toBeCloseTo(0.5344, 3);
 });
 
-test("approx.sun.equationOfCenter stays within a hundredth of a degree of the precise one", () => {
+test("approx.sun stays within a hundredth of a degree of the precise Sun, and holds together as a chain", () => {
     for (let t = precise.J2000; t < precise.J2050; t += 11.7) {
         expect(Math.abs(approx.sun.equationOfCenter(t) - precise.sun.equationOfCenter(t))).toBeLessThan(0.01);
+        const [p, a] = [precise.sun.apparentPosition(t), approx.sun.apparentPosition(t)];
+        expect(
+            precise.angularSeparation(p.rightAscension, p.declination, a.rightAscension, a.declination),
+        ).toBeLessThan(0.01);
+        // The true longitude is the mean one plus the equation of the center, in both chains.
+        const chain = precise.normalizeDegrees(approx.sun.meanLongitude(t) + approx.sun.equationOfCenter(t));
+        expect(chain).toBeCloseTo(approx.sun.trueLongitude(t), 9);
     }
 });
 

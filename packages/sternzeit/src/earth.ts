@@ -132,14 +132,15 @@ export const PRESSURE_SCALE_HEIGHT_M = 8434.5;
  * thinner air bends light less, which is why a body's apparent position gets closer to its true one the
  * higher the observer is, and why refraction vanishes at the top of the atmosphere.
  */
-export function airPressureRatio(observerHeightM: number): number {
-    return Math.exp(-observerHeightM / PRESSURE_SCALE_HEIGHT_M);
+export function airPressureRatio(heightM: number): number {
+    return Math.exp(-heightM / PRESSURE_SCALE_HEIGHT_M);
 }
 
-/** Local conditions at the observer. Both default to the ones both refraction fits assume: sea level and 10 °C. */
+/** Local conditions at the observer, an `Observer` among them. Both default to the ones both refraction fits assume:
+ *  sea level and 10 °C. */
 export interface RefractionConditions {
-    /** Observer height above sea level, in meters (not to be confused with `altitude`, a sky angle). */
-    observerHeightM?: number;
+    /** Height above sea level, in meters, as `Observer` carries it (not to be confused with `altitude`, a sky angle). */
+    heightM?: number;
     /** Local air temperature, in degrees Celsius. */
     temperatureC?: number;
 }
@@ -176,8 +177,8 @@ export function atmosphericRefraction(altitude: number, conditions: RefractionCo
  * ~34.5' at the horizon, slightly more than the Sun's own ~32' apparent diameter, which is why a Sun that
  * looks like it is touching the horizon has geometrically already set.
  *
- * Meeus' fit is stated for apparent altitudes of 0 and above, and diverges below (it has a pole at -4.4°), so
- * the input is clamped at 0. Rays below the horizontal therefore all get the horizon value; they are either
+ * Meeus' fit is stated for apparent altitudes of 0 and above; below, it peaks at -1.7° and turns back down, so the
+ * input is clamped at 0. Rays below the horizontal therefore all get the horizon value; they are either
  * ground or, for an elevated observer, within ~1° of the horizon, where that is a good approximation anyway.
  */
 export function atmosphericRefractionFromApparent(
@@ -193,47 +194,48 @@ export function atmosphericRefractionFromApparent(
 }
 
 /** Meeus' `P/1010 · 283/(273+T)` scaling (ch. 16) shared by both fits, as a plain multiplier that is 1 by default. */
-function refractionConditionFactor({ observerHeightM = 0, temperatureC = 10 }: RefractionConditions): number {
-    return airPressureRatio(observerHeightM) * (283 / (273 + temperatureC));
+function refractionConditionFactor({ heightM = 0, temperatureC = 10 }: RefractionConditions): number {
+    return airPressureRatio(heightM) * (283 / (273 + temperatureC));
 }
 
+/** Options, an `Observer` among them. */
 export interface ViewDistanceOptions {
-    /** Observer height above sea level, in meters. */
-    observerHeightM?: number;
-    /** Bend the ray by atmospheric refraction first, treating `y` as the true direction. Precise variant only. */
+    /** Height above sea level, in meters, as `Observer` carries it. */
+    heightM?: number;
+    /** Bend the ray by atmospheric refraction first, treating `up` as the true direction. Precise variant only. */
     refractionCorrected?: boolean;
 }
 
 /**
- * Distance traveled through the atmosphere, in kilometers, along a view direction whose vertical (up) component
- * is `y` (i.e. `y = sin(altitude)`), through the uniform-density shell of `ATMOSPHERE_THICKNESS_KM`: an air mass
- * in kilometers. A ray that hits the ground ends there, so looking down from sea level gives 0, while an elevated
+ * Distance traveled through the atmosphere, in kilometers, along a view direction whose up component is `up` (the z of
+ * an ENU direction, `sin(altitude)`), through the uniform-density shell of `ATMOSPHERE_THICKNESS_KM`: an air mass in
+ * kilometers. A ray that hits the ground ends there, so looking down from sea level gives 0, while an elevated
  * observer's slightly downward ray still crosses some air before it reaches the ground.
  */
-export function viewDistanceWithinAtmosphere(y: number, options: ViewDistanceOptions = {}): number {
-    const { observerHeightM = 0, refractionCorrected = false } = options;
-    let yy = y;
+export function viewDistanceWithinAtmosphere(up: number, options: ViewDistanceOptions = {}): number {
+    const { heightM = 0, refractionCorrected = false } = options;
+    let lifted = up;
     if (refractionCorrected) {
-        const altitude = Math.asin(Math.max(-1, Math.min(1, y))) * RAD_TO_DEG;
-        yy = Math.sin((altitude + atmosphericRefraction(altitude, { observerHeightM })) * DEG_TO_RAD);
+        const altitude = Math.asin(Math.max(-1, Math.min(1, up))) * RAD_TO_DEG;
+        lifted = Math.sin((altitude + atmosphericRefraction(altitude, { heightM })) * DEG_TO_RAD);
     }
-    return rayThroughShell(yy, observerHeightM);
+    return rayThroughShell(lifted, heightM);
 }
 
 /** The same distance without refraction; it is exact and cheap, so the approximate variant needs no fit. */
 export function viewDistanceWithinAtmosphereApprox(
-    y: number,
+    up: number,
     options: Omit<ViewDistanceOptions, "refractionCorrected"> = {},
 ): number {
-    return rayThroughShell(y, options.observerHeightM ?? 0);
+    return rayThroughShell(up, options.heightM ?? 0);
 }
 
-// Ray from radius `ro` with vertical component `y` against two concentric spheres: the ground (R) and the top of
+// Ray from radius `ro` with up component `y` against two concentric spheres: the ground (R) and the top of
 // the shell (R + t). Distances along the ray solve |o + d·v|² = ρ², i.e. d = -ro·y ± sqrt(ro²y² - ro² + ρ²).
-function rayThroughShell(y: number, observerHeightM: number): number {
+function rayThroughShell(y: number, heightM: number): number {
     const R = MEAN_RADIUS_KM;
     const top = R + ATMOSPHERE_THICKNESS_KM;
-    const ro = Math.min(R + Math.max(0, observerHeightM) / 1000, top);
+    const ro = Math.min(R + Math.max(0, heightM) / 1000, top);
     const b = ro * y;
     const toGround = b * b - ro * ro + R * R;
     // Downward and the ground in the way: the first (near) intersection with it.
@@ -243,16 +245,16 @@ function rayThroughShell(y: number, observerHeightM: number): number {
 
 /**
  * Dip of the horizon, in degrees: how far below the true horizontal the visible horizon lies for an observer
- * `observerHeightM` meters above the ground, from the tangent to a spherical Earth, `acos(R / (R + h))`. Geometric
+ * `heightM` meters above the ground, from the tangent to a spherical Earth, `acos(R / (R + h))`. Geometric
  * only: terrestrial refraction, which lifts the visible horizon by roughly a tenth of that, is left out.
  */
-export function horizonDip(observerHeightM: number): number {
+export function horizonDip(heightM: number): number {
     const R = MEAN_RADIUS_KM * 1000;
-    return Math.acos(R / (R + Math.max(observerHeightM, 0))) * RAD_TO_DEG;
+    return Math.acos(R / (R + Math.max(heightM, 0))) * RAD_TO_DEG;
 }
 
-// The refraction fit (Meeus 16.4) holds down to about a degree below the horizon and has a pole near -1.9°; lower, it
-// is taken as constant.
+// The refraction fit (Meeus 16.4) holds down to about a degree below the horizon; it peaks at -1.9° and turns back down
+// below, so lower it is taken as constant.
 const REFRACTION_FLOOR_DEG = -1;
 
 /**
@@ -263,16 +265,16 @@ const REFRACTION_FLOOR_DEG = -1;
  */
 export function apparentAltitude(trueAltitude: number, conditions: RefractionConditions = {}): number {
     const refraction = atmosphericRefraction(Math.max(trueAltitude, REFRACTION_FLOOR_DEG), conditions);
-    return trueAltitude + refraction + horizonDip(conditions.observerHeightM ?? 0);
+    return trueAltitude + refraction + horizonDip(conditions.heightM ?? 0);
 }
 
 /** `apparentAltitude` with the small-angle `horizonDipApprox`. */
 export function apparentAltitudeApprox(trueAltitude: number, conditions: RefractionConditions = {}): number {
     const refraction = atmosphericRefraction(Math.max(trueAltitude, REFRACTION_FLOOR_DEG), conditions);
-    return trueAltitude + refraction + horizonDipApprox(conditions.observerHeightM ?? 0);
+    return trueAltitude + refraction + horizonDipApprox(conditions.heightM ?? 0);
 }
 
 /** The small-angle form of `horizonDip`, `sqrt(2h / R)`: within 0.01% of it anywhere within the atmosphere. */
-export function horizonDipApprox(observerHeightM: number): number {
-    return Math.sqrt((2 * Math.max(observerHeightM, 0)) / (MEAN_RADIUS_KM * 1000)) * RAD_TO_DEG;
+export function horizonDipApprox(heightM: number): number {
+    return Math.sqrt((2 * Math.max(heightM, 0)) / (MEAN_RADIUS_KM * 1000)) * RAD_TO_DEG;
 }

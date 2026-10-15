@@ -361,6 +361,7 @@ export function topocentricAngularDiameter(time: AstronomicalTime, observer: Obs
     return apparentAngularDiameter(t) * (1 + Math.sin(h) * Math.sin(equatorialHorizontalParallax(t) * DEG_TO_RAD));
 }
 
+/** Approximation of {@link topocentricAngularDiameter}, from the approximate chain. */
 export function topocentricAngularDiameterApprox(time: AstronomicalTime, observer: Observer): number {
     const t = julianEphemerisDay(time);
     const h = horizontalPositionApprox(time, observer).altitude * DEG_TO_RAD;
@@ -570,7 +571,10 @@ export function phaseAngle(t: JulianDay): number {
     return Math.atan2(R * Math.sin(psi), distance(t) - R * Math.cos(psi)) * RAD_TO_DEG;
 }
 
-/** Phase angle from the mean elements alone, per Meeus 48.4; within ~0.2° of 48.3. */
+/** Phase angle from the mean elements alone, per Meeus 48.4, folded back into 0-180, where {@link phaseAngle} stays:
+ *  the series runs a little past 0 at full moon and past 180 at new moon. Within half a degree of 48.3 otherwise, but
+ *  up to 5° off right there, where the Moon's latitude keeps the precise angle from 0 and 180; the illuminated fraction
+ *  hardly notices, within 0.005 throughout. */
 export function phaseAngleApprox(t: JulianDay): number {
     const D = meanElongationApprox(t) * DEG_TO_RAD;
     const M = sun.meanAnomalyApprox(t) * DEG_TO_RAD;
@@ -586,7 +590,7 @@ export function phaseAngleApprox(t: JulianDay): number {
         0.214 * Math.sin(2 * Mm) -
         0.11 * Math.sin(D);
 
-    return normalizeDegrees(i);
+    return Math.abs(wrap180(i));
 }
 
 /** Illuminated fraction of the Moon's disc (k), 0 at new moon to 1 at full moon, per Meeus 48.1. */
