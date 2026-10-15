@@ -291,10 +291,6 @@ tbody tr:hover {
     inset: 0;
     pointer-events: none;
 }
-/* The seasons and Earth's distance, what the section is about, in the accent; the rest stays in the muted gray. */
-.dome-compass-label.orbit-label-accent {
-    color: var(--accent);
-}
 .orbit-scene > .vis-credit {
     left: auto;
     right: var(--content-inset);

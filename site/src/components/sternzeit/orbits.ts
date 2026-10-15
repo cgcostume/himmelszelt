@@ -307,7 +307,7 @@ let bodyPoints = { sun: { x: 0, y: 0, z: 0 }, earth: { x: 0, y: 0, z: 0 }, moon:
 const billboards: { yaw: Zdog.Anchor; face: Zdog.Anchor }[] = [];
 // The reference points' labels float over the scene in HTML, placed wherever their points project on each frame,
 // each pushed away from what its point refers to: the Lagrange points L1 and L2 from Earth, the rest from the Sun.
-// What the section is about, the seasons and Earth's distance, in the accent; the rest in the muted gray.
+// What the section is about, the seasons and Earth's distance, gets its cross in the accent; the labels stay gray.
 type Tone = "accent" | "muted";
 const labels: { text: string; point: Point; away: Point; tone: Tone }[] = [];
 const LABEL_GAP_PX = 10;
@@ -536,8 +536,8 @@ function drawMarks() {
 /** The labels, each beside its point as the scene now shows it, on the far side from what it refers to; one that
  *  would sit on another moves down a line. */
 function placeLabels() {
-    const placed: { x: number; y: number; text: string; anchor: string; tone: Tone }[] = [];
-    for (const { text, point, away, tone } of labels) {
+    const placed: { x: number; y: number; text: string; anchor: string }[] = [];
+    for (const { text, point, away } of labels) {
         const p = turn(point, rotation);
         const from = turn(away, rotation);
         const [dx, dy] = [p.x - from.x, p.y - from.y];
@@ -550,12 +550,12 @@ function placeLabels() {
         while (placed.some((other) => Math.abs(other.y - y) < LABEL_LINE_PX && Math.abs(other.x - x) < 70)) {
             y += LABEL_LINE_PX;
         }
-        placed.push({ x, y, text, anchor, tone });
+        placed.push({ x, y, text, anchor });
     }
     labelsEl.replaceChildren(
-        ...placed.map(({ x, y, text, anchor, tone }) => {
+        ...placed.map(({ x, y, text, anchor }) => {
             const label = document.createElement("span");
-            label.className = `dome-compass-label orbit-label-${tone}`;
+            label.className = "dome-compass-label";
             label.dataset.exportText = "";
             label.textContent = text;
             label.style.left = `${x}px`;
