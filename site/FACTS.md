@@ -23,6 +23,7 @@ confirmed yet.
 | Obliquity about 23.4°, nutation period 18.6 years | Earth | lib, src | 23.44°; Meeus ch. 22 | ok | 2026-10-11 |
 | Nod and slide stay below 20 arcseconds | Earth | lib | Δψ max 18.9″, Δε max 9.9″ (2000 to 2018) | ok | 2026-10-11 |
 | 20 arcseconds a hundredth of the Moon's width, covered by the Moon in half a minute | Earth | derived | 20″ / 1,865″ (mean diameter 31.1′) = 1/93; 360° / 27.32 d = 0.549″/s, 20″ in 36 s | ok | 2026-10-16 |
+| Perihelion January 3, 2026, 147 million km (orbits Try) | Earth | lib | sun.distance minimum, hourly: 2026-01-03 18:00 UTC, 147.10 million km; aphelion 2026-07-05, 152.10 | ok | 2026-10-16 |
 | Horizon dips more than 3° at 10 km | Earth | lib | 3.21°, geometric | ok | 2026-10-11 |
 | Parallax: Sun 8.8″, Moon up to a degree, two diameters | Coordinates | lib | 8.76″; 0.90° to 1.02° | ok | 2026-10-11 |
 | Refraction at the horizon more than the Sun's diameter | Coordinates | lib | 34.5′ from apparent 0°, Sun 32′ | ok | 2026-10-11 |
