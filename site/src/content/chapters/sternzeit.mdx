@@ -41,14 +41,12 @@ import SunTimes from "../../components/sternzeit/SunTimes.astro";
 import Table from "../../components/sternzeit/Table.astro";
 import Term from "../../components/Term.astro";
 
-Every sky you have ever seen could have been computed before you looked up, and can be computed back through history:
-where the Sun stood, when the Moon rose, which way its crescent turned. Even its light keeps a schedule. Sunlight left
-the Sun some eight minutes before it reaches you, moonlight the Moon a second and a bit, so a computed sky, too, looks a
-little into the past. sternzeit computes the Sun's and the Moon's part of it, for any place on Earth and any moment, and
-leaves the stars to [sternenheer](../sternenheer/). It answers the way a renderer asks: with the direction to point a
-light along, the angle to turn a crescent by, how brightly Earth lights the Moon's night side, and how far an eclipse
-has come, as a number a shader can use. None of it is guesswork. Jean Meeus wrote the recipes down
-<Cite id="meeus1998" />, and [SunCalc](https://github.com/mourner/suncalc),
+Before there were clocks, the sky was the clock: the Sun set the day, the Moon the month, the seasons the year. That is
+why its motions can be predicted so well, forward or back, for any place and any moment. sternzeit computes the Sun's
+and the Moon's part of them and leaves the stars to [sternenheer](../sternenheer/). It answers the way a renderer
+asks: with the direction to point a light along, the angle to turn a crescent by, how brightly Earth lights the Moon's
+night side, and how far an eclipse has come, as a number a shader can use. None of it is guesswork. Jean Meeus wrote
+the recipes down <Cite id="meeus1998" />, and [SunCalc](https://github.com/mourner/suncalc),
 [astronomia](https://github.com/commenthol/astronomia) and [Astronomy Engine](https://github.com/cosinekitty/astronomy)
 compute them in JavaScript already; sternzeit is the one made for real-time rendering.
 
@@ -115,14 +113,15 @@ half in the year 1000.
 
 <DeltaT />
 
-Then there is <Term of="Sidereal time">sidereal time</Term>. A solar day, noon to noon, is 24 hours. But Earth also
-moves along its orbit, so it has to turn a little more than once for the Sun to come back to the same spot. Relative to
-the distant stars, one rotation takes about 23 hours and 56 minutes. Sidereal time, θ, measures that rotation, as an
-angle. It is what connects the sky's coordinates to your spot on the ground: the dashed meridian through your location
-rotates with it (<Fig id="armillary-sphere" />). That little more is Earth's daily step along its orbit, almost a
-degree, 360° in a year of 365 days, so sidereal time gains almost a degree from one day to the next (<Tab id="time" />).
-Over a year, the steps add up to one whole extra turn: Earth turns 366 times against the stars, but only 365 times from
-noon to noon.
+Then there is <Term of="Sidereal time">sidereal time</Term>, which is Earth's rotation measured against the stars
+rather than the Sun. The two differ, because Earth does not only turn, it also moves along its orbit, by almost a degree
+a day: 360° in a year of 365 days. After one full turn against the stars, the Sun has shifted by that degree, and Earth
+has to turn a little longer, about four minutes, to face it again. So a day by the stars lasts about 23 hours and
+56 minutes, a day by the Sun 24 hours, and over a year the four minutes add up to one whole extra turn: Earth turns 366
+times against the stars, but only 365 times from noon to noon. Sidereal time, θ, is that rotation as an angle. It is
+what connects the sky's coordinates to your spot on the ground: the dashed meridian through your location rotates with
+it (<Fig id="armillary-sphere" />), and from one day to the next, at the same clock time, it has gained almost a degree
+(<Tab id="time" />).
 
 In code, a moment is a JavaScript `Date` or the same moment spelled out, and each of these counts is one call away:
 
@@ -155,13 +154,14 @@ const date = toDate(fromJulianDay(jd)); // and back to a Date
 Summer is not warm because Earth is closer to the Sun: it is closest in early January. Earth's rotation axis is tilted
 against the plane of its orbit by about 23.4°, the
 <Term of="Obliquity of the ecliptic">obliquity of the ecliptic</Term>, ε (<Fig id="orbits" />). In June the northern
-half leans towards the Sun, which then stands higher and stays up longer there, and in December it leans away; the
-southern half has it the other way round. The tilt drifts slowly over millennia, and the Moon's pull on Earth's equatorial bulge adds a nod with
-a period of 18.6 years, the <Term of="Nutation">nutation</Term>. The nod tilts the axis a little more and a little less,
-and slides the <Term of="Vernal equinox">vernal equinox</Term>, the point where the Sun crosses the equator northwards
-in March. Both stay below 20 <Term of="Arcsecond">arcseconds</Term>. An arcsecond is a 3600th of a degree, and the full
-Moon is about 1,900 of them wide; 20 are about a sixth of a pixel on a full HD screen showing 60° of sky. Small as they
-are, they separate a position that is almost right from one that is right (<Tab id="earth" />).
+half leans towards the Sun, which then stands higher and stays up longer there, so its light arrives steeper and for
+longer; in December it leans away, and the southern half has it the other way round. Where the tilted equator crosses
+the orbit's plane lies the <Term of="Vernal equinox">vernal equinox</Term>, the point where the Sun crosses the
+equator northwards in March. Neither is quite fixed: the tilt drifts slowly over millennia, and the Moon's pull adds a
+small nod, the <Term of="Nutation">nutation</Term>, which shifts the tilt and the equinox by under 20{" "}
+<Term of="Arcsecond">arcseconds</Term>, 3600ths of a degree. That is a hundredth of the Moon's width, nothing a sky
+dome shows, but the Moon covers it in half a minute, and drawn among the stars it would stand that far from its place
+without it (<Tab id="earth" />).
 
 <Orbits />
 <Controls height={false} />
@@ -172,9 +172,8 @@ are, they separate a position that is almost right from one that is right (<Tab 
 The table also holds the constants the atmosphere needs: Earth's radius <Cite id="nssdc" />, the thickness of the
 atmosphere <Cite id="nishita1993" /> <Cite id="bruneton2008" />, and the
 <Term of="Atmospheric refraction">refraction</Term> that keeps the Sun visible for a few minutes after it has
-geometrically set <Cite id="saemundsson1986" />. The rows look towards the Sun, so once it is more than a degree below
-the horizon, refraction shows as `n/a`: the line of sight ends in the ground. Raise the height to 10 km, a jet's
-cruising altitude, and the <Term of="Horizon dip">horizon dips</Term> by more than 3° (`horizonDip`).
+geometrically set <Cite id="saemundsson1986" />. Raise the height to 10 km, a jet's cruising altitude, and the{" "}
+<Term of="Horizon dip">horizon dips</Term> by more than 3° (`horizonDip`).
 
 ## Coordinates on the sky
 
@@ -221,9 +220,9 @@ latitude, a longitude and, if you like, a height.
 A position moves through these systems one function at a time (<Fig id="coordinate-pipeline" />). The ecliptic and the
 equatorial position are the same wherever you stand; the observer comes in only on the way to the topocentric one. You
 rarely need to walk them yourself: each position also comes from a single call that covers the whole way there, and a
-renderer mostly needs the last two, i.e., `horizontalPosition` and `direction`. From the topocentric position on, the
-calls take the moment as `fromDate` returns it, since they need Earth's rotation as well as the orbits. The ones before
-need only the orbits, so they take `jde`, a bare Julian Day in ephemeris time.
+renderer mostly needs the last two, `horizontalPosition` and `direction`. The calls follow [the one rule from counting
+time](#counting-time-the-astronomers-way): the first two need only the orbits and take `jde`, and from the topocentric
+position on, where Earth's rotation comes in, they take the moment as `fromDate` returns it.
 
 <Pipeline />
 
@@ -236,25 +235,6 @@ horizon by more than the Sun's own diameter. Bending the light that way is the j
 
 ## The Sun
 
-Seen from Earth, the Sun circles the sky once a year along the ecliptic, against stars we cannot see by day. Computing
-where it stands follows a pattern that most of this library repeats: a rough position, a corrected one, and the one we
-see, named in the functions' prefixes `mean`, `true` and `apparent`, respectively. The mean one comes from a Sun moving
-around the sky at a steady pace, just under a degree a day, as if Earth's orbit were a perfect circle: the
-<Term of="Mean longitude">mean longitude</Term>. Orbits are ellipses, though, and the
-<Term of="Equation of the center">equation of the center</Term> turns it into the
-<Term of="True longitude">true longitude</Term>. Nutation and <Term of="Aberration">aberration</Term>, a small shift
-caused by Earth's own orbital speed, then give the <Term of="Apparent position">apparent position</Term> in right
-ascension and declination, and from there the conversions between the coordinate systems take it to the observer
-(<Fig id="coordinate-pipeline" />).
-
-Aberration hides a subtlety. Sunlight is 8 minutes 20 seconds old, but the delay matters only together with motion.
-Earth's spin carries the Sun 2° across your sky meanwhile, but that is you turning, not the Sun moving. Earth's motion
-along its orbit is different: at 30 km/s it carries us some 15,000 km sideways while the light is underway, so the Sun
-appears 20.5 arcseconds behind where it actually stands <Cite id="meeus1998" />. That is a ninetieth of the Sun's width,
-invisible to the eye, but it moves the start and end of an eclipse by some 40 seconds. The true longitude leaves it out,
-the apparent position adds it, and so `sun.direction` points where the Sun shows. Moonlight takes only 1.3 seconds, in
-which the Moon moves some 0.7 arcseconds, and sternzeit leaves that out.
-
 Over a day, the Sun and the Moon cross your sky along a path, and the Sun followed through a year, always at the same
 hour, traces an <Term of="Analemma">analemma</Term> (<Fig id="sun-path" />). The Moon's path, in contrast, never quite
 closes, as it moves about 13° a day against the stars. The analemma's height swings with the seasons, from the tilt of
@@ -266,6 +246,24 @@ standing still.
 
 <DayArc />
 <Controls height={false} />
+
+Seen from Earth, the Sun circles the sky once a year along the ecliptic, against stars we cannot see by day. Computing
+where it stands follows a pattern that most of this library repeats: a rough position, a corrected one, and the one we
+see, named in the functions' prefixes `mean`, `true` and `apparent`. The mean one comes from a Sun moving
+around the sky at a steady pace, just under a degree a day, as if Earth's orbit were a perfect circle: the
+<Term of="Mean longitude">mean longitude</Term>. Orbits are ellipses, though, and the
+<Term of="Equation of the center">equation of the center</Term> turns it into the
+<Term of="True longitude">true longitude</Term>. Nutation and <Term of="Aberration">aberration</Term>, a small shift
+caused by Earth's own orbital speed, then give the <Term of="Apparent position">apparent position</Term> in right
+ascension and declination, and from there the conversions between the coordinate systems take it to the observer
+(<Fig id="coordinate-pipeline" />).
+
+Aberration hides a subtlety. Sunlight is 8 minutes 20 seconds old, but the delay matters only together with motion: at
+30 km/s along its orbit, Earth carries us some 15,000 km sideways while the light is underway, so the Sun appears
+20.5 arcseconds behind where it actually stands <Cite id="meeus1998" />. That is a ninetieth of the Sun's width,
+invisible to the eye, but it moves the start and end of an eclipse by some 40 seconds. The true longitude leaves it
+out, the apparent position adds it, and so `sun.direction` points where the Sun shows. For the Moon, 1.3 light seconds
+away, the shift is under an arcsecond, and sternzeit leaves it out.
 
 So far, the Sun is a direction: where it stands at any moment, and the paths it takes over a day and over a year. To
 draw it, a renderer also needs its size, and the analemma's uneven loops already hinted that it changes: Earth moves
@@ -341,12 +339,7 @@ its own pace. Being close also means a parallax of up to a degree, so the topoce
 Beyond the Moon's position, the table holds what a renderer needs to draw the Moon. Its size swings far more than the
 Sun's: the Moon looks about 14% wider at its closest than at its farthest, the gap between a supermoon and a micromoon.
 It always shows the same face, almost: its tilted orbit and varying speed let us peek a few degrees around its edges
-over a month, the optical <Term of="Libration">libration</Term>, so that over time we see 59% of its surface. The Moon's
-own slight wobble adds a few hundredths of a degree.
-
-The <Term of="Position angle of axis">position angle of the axis</Term> says how the Moon's north pole is oriented on
-the sky, and the <Term of="Parallactic angle">parallactic angle</Term> how that sky direction relates to your local
-"up". Together they determine how the Moon's surface, and its lit crescent, appear rotated for you.
+over a month, the optical <Term of="Libration">libration</Term>, so that over time we see 59% of its surface.
 
 Then there is its light. Half of the Moon is always in sunshine, and its phase is how much of that half we see. The
 <Term of="Phase angle">phase angle</Term>, the angle Sun-Moon-Earth, measures it, and the
@@ -365,9 +358,15 @@ a thin crescent a faint, ashen glow. How strong it is follows from Earth's phase
 Even a Moon drawn without any shading needs one angle: the tilt of its crescent. Getting it wrong is a classic: games
 and illustrations like to hang a crescent in the night sky with its lit side up. That cannot happen. The lit side always
 faces the Sun, and a crescent stands less than 90° from it, so with its lit side up, the Sun would stand above it, and
-above the horizon too: it would be day. The exact tilt is the <Term of="Position angle">position angle</Term> from the
-Moon to the Sun, measured on the sky from north through east, turned into your sky by the parallactic angle.
-`moon.brightLimbAngle` does both, and the rest of the Moon's light is a call each:
+above the horizon too: it would be day. Nor do the horns ever reach around the disc, as they do on a crescent cut out
+with a smaller circle: the edge of the lit half is a circle on the sphere seen at a slant, a half-ellipse on the disc,
+so its two tips always lie at the ends of one diameter, however thin the crescent gets.
+
+The exact tilt is the <Term of="Position angle">position angle</Term> from the Moon to the Sun, measured on the sky from
+north through east, and the <Term of="Parallactic angle">parallactic angle</Term> turns that from the sky's north to
+your own up. `moon.brightLimbAngle` does both; the{" "}
+<Term of="Position angle of axis">position angle of the axis</Term> turns the Moon's north pole, and with it its face,
+the same way. The rest of the Moon's light is a call each:
 
 ```ts
 import { fromDate, julianEphemerisDay, moon } from "@himmelszelt/sternzeit";
@@ -386,10 +385,7 @@ const light = moon.sunDirection(time, obs);
 const glow = moon.earthshine(jde);
 ```
 
-The tilt, the libration and the earthshine all come together in the Moon below (<Fig id="moon-view" />). Its arrow to
-the Sun starts at the point beneath the Sun while that faces us, and at the edge of the disc once it has turned away.
-Unlock the view from the Moon, and the zenith turns up: the arc between it and the Moon's north is the position angle of
-the axis less the parallactic angle.
+The tilt, the libration and the earthshine all come together in the Moon below (<Fig id="moon-view" />).
 
 <MoonView />
 <Controls height={false} />
@@ -403,11 +399,11 @@ live in the stretch of Earth's history in which the sky can go dark in the middl
 
 With both bodies located, eclipses follow from their positions. A solar eclipse is a matter of perspective: the Moon
 passing in front of the Sun, which depends on where you stand. On the line the Moon's shadow sweeps, the Sun goes out
-(total), or, with the Moon near <Term of="Apogee">apogee</Term> and too small to cover it, leaves a ring of light around the black disc
-(annular). A few hundred kilometers to the side, the Moon only takes a bite out of it (partial). A lunar eclipse is the
-Moon passing through Earth's shadow, and it looks the same from anywhere the Moon is up: total once the whole disc is
-inside the <Term of="Umbra">umbra</Term>, partial while only part of it is, and penumbral, barely a dimming, when the
-Moon misses the umbra altogether (<Fig id="eclipse-views" />).
+(total), or, with the Moon near <Term of="Apogee">apogee</Term> and too small to cover it, leaves a ring of light
+around the black disc (annular). A few hundred kilometers to the side, the Moon only takes a bite out of it (partial).
+A lunar eclipse is the Moon passing through Earth's shadow, and it looks the same from anywhere the Moon is up: total
+once the whole disc is inside the <Term of="Umbra">umbra</Term>, partial while only part of it is, and penumbral,
+barely a dimming, when the Moon misses the umbra altogether (<Fig id="eclipse-views" />).
 
 <Eclipse />
 <Controls height={false} />
@@ -431,21 +427,18 @@ eclipse of August 12, 2026, over Greenland, Iceland and Spain, was followed by a
 
 In a total lunar eclipse, the Moon darkens in the penumbra first, barely noticeable, then turns a dark red in the umbra,
 lit only by sunlight that Earth's atmosphere bends around the planet, its outer rim tinged blue by the ozone the light
-passes through.
-
-Tracing that light through the atmosphere gives the colors physically <Cite id="yapo2009" />, but far from real time. A
-renderer can approximate them from the eclipse's `phase` instead <Cite id="mueller2012vmv" />, and the panel only hints
-at them. Next to the phase, the table lists the <Term of="Eclipse magnitude">magnitude</Term>, the number the catalogs
-give (<Tab id="eclipse" />).
+passes through. Tracing that light through the atmosphere gives the colors physically <Cite id="yapo2009" />, but far
+from real time. A renderer can approximate them from the eclipse's `phase` instead <Cite id="mueller2012vmv" />, and
+the panel only hints at them. Next to the phase, the table lists the <Term of="Eclipse magnitude">magnitude</Term>,
+the number the catalogs give (<Tab id="eclipse" />).
 
 <Table domain="eclipse" />
 <Controls height={false} />
 
 Rare as they are, eclipses should not cost a renderer anything on every frame, yet they are special enough to be worth a
-notification when one comes. This example finds the next total lunar eclipse: it steps from full moon to full moon,
-finds the moment each one comes closest to Earth's shadow in three-hour steps, and then narrows it down to the minute
-by halving the gap, a <Term of="Bisection">bisection</Term>: once to the eclipse's deepest moment, once back to where
-totality began. The buttons above search much the same way (<Fig id="eclipse-views" />):
+notification when one comes. This example finds the next total lunar eclipse, stepping from full moon to full moon and
+narrowing each candidate down to the minute by <Term of="Bisection">bisection</Term>. The buttons above search much
+the same way (<Fig id="eclipse-views" />):
 
 ```ts
 import {
@@ -508,7 +501,7 @@ const next = nextTotalLunarEclipse(julianDayUT(fromDate(new Date())));
 Put together, the pieces above make a moon calendar that shows more than the phase: which way the Moon is turned where
 you are, and whether it is up while it is dark. In the calendar below (<Fig id="moon-calendar" />), the discs are the
 Moon at the same time of day all month, turned as it stands in the sky there; the lanes say when it is up, and the Sun
-with it. How to draw them is up to you, so here they are two functions you bring yourself:
+with it. How to draw them is up to you, so the drawing falls to two functions you bring yourself:
 
 ```ts
 import {
@@ -573,8 +566,10 @@ import { sun } from "@himmelszelt/sternzeit"; // precise
 import { sun as fast } from "@himmelszelt/sternzeit/approx"; // approximate
 ```
 
-Neither costs a frame anything: a call takes a few microseconds, the approximate ones about one. Imported alone, the
-Sun adds about 4 kB to a bundle, minified and compressed, and the whole library under 8 kB.
+Neither costs a frame anything. On a desktop CPU, a Ryzen 7 7800X3D, the precise Sun takes about 2 µs a call, the
+Moon about 5 µs, and the approximate ones about 1 µs, so the quick start's two calls fit into a frame at 60 Hz some
+two thousand times over. Imported alone, the Sun adds about 4 kB to a bundle, minified and compressed, the quick
+start's Sun and Moon under 6 kB, and the whole library under 7 kB.
 
 ## The people behind the numbers
 
@@ -590,8 +585,8 @@ The approximate variants follow the night sky model of Henrik Wann Jensen and hi
 which renders the Moon, the stars, zodiacal light and airglow together with the atmosphere they shine through.
 
 Hendrik van de Hulst wrote the book on light scattering whose law for a sphere's phase `moon.earthshine` applies to
-Earth seen from the Moon <Cite id="vandehulst1980" />. In 1944, still a student, he predicted that cold hydrogen between
-the stars glows faintly in radio waves 21 cm long, whenever the electron of one of its atoms flips its spin; found in
-1951, that glow is how radio astronomers have mapped the Milky Way ever since <Cite id="hovenier2001" />. And Fred
+Earth seen from the Moon <Cite id="vandehulst1980" />. As a student in 1944, he predicted the faint 21 cm radio glow
+of hydrogen between the stars, the signal radio astronomers have mapped the Milky Way with ever since
+<Cite id="hovenier2001" />. And Fred
 Espenak, for decades at NASA's Goddard Space Flight Center and known as Mr. Eclipse <Cite id="anderson2025" />, compiled
 the eclipse canons with Meeus, along with the polynomials for ΔT <Cite id="espenak2006" />.

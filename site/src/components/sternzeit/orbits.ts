@@ -31,7 +31,9 @@ const GROW = { from: 0.3, to: 0.8 };
 // path keeps a gap of a diameter around each body.
 const LUNATION_DAYS = precise.moon.MEAN_SYNODIC_MONTH;
 const LOOP_LUNATIONS = 2;
-// The coming lunation in full, the loops either side of it this faint, as the sun path's lunation band.
+// The coming revolution in full, a sidereal month, as around Earth held still the loop closes after it, not after a
+// lunation; the loops either side of it this faint, as the sun path's lunation band.
+const SIDEREAL_MONTH_DAYS = 27.321661;
 const OTHER_LOOPS_ALPHA = 15;
 // Arrowheads pointing forward in time, one behind and one ahead of each body, this far along its path on screen, so
 // they stay in view at every zoom, and at least this many of the body's diameters off, clear of it.
@@ -44,11 +46,10 @@ const GAP_DIAMETERS = 1;
 // The Sun's mean anomaly and its longitude advance this much a day: perihelion is where the anomaly passes 0, aphelion
 // 180, the equinoxes where the longitude passes 0 and 180, the solstices 90 and 270.
 const SOLAR_RATE = 0.9856;
-// At the September equinox Earth stands in the direction of the vernal equinox from the Sun, so the two share a label.
 const SEASONS: [longitude: number, name: string][] = [
     [0, "March equinox"],
     [90, "June solstice"],
-    [180, "vernal equinox (September)"],
+    [180, "September equinox"],
     [270, "December solstice"],
 ];
 // The Moon's loop gets its nodes and apsides once it is this large on screen.
@@ -275,12 +276,13 @@ function drawArrow({ tip, d, color }: { tip: Point; d: Point; color: string }) {
 
 /**
  * Arrowheads `offsetPx` along a path behind and ahead of `points[at]`, both pointing forward in time, which runs
- * with the index: the path is walked each way until that far, and the tip interpolated there.
+ * with the index: the path is walked each way until that far, and the tip interpolated there, half a head further
+ * ahead and nearer behind, so both heads' middles keep the same distance.
  */
 function addArrowsAround(points: Point[], at: number, color: string, wrap = false, offsetPx = ARROW_OFFSET_PX) {
     for (const step of [-1, 1]) {
         let i = at;
-        let left = offsetPx;
+        let left = offsetPx + (step * ARROWHEAD_PX.length) / 2;
         for (;;) {
             const j = wrap ? (i + step + points.length) % points.length : i + step;
             const [a, b] = [points[i], points[j]];
@@ -397,6 +399,7 @@ function rebuild() {
     // the Sun, Earth moves seven times the Moon's distance a day, which would stretch the Moon's orbit into a wave too
     // shallow to see. The loops never quite close: the orbit's ellipse turns, and its size breathes with the Sun's pull.
     const steps = Math.round(LUNATION_DAYS / PATH_STEP_DAYS);
+    const loop = Math.round(SIDEREAL_MONTH_DAYS / PATH_STEP_DAYS);
     const span = LOOP_LUNATIONS * steps;
     const at = (i: number) => jd + (i - span) * PATH_STEP_DAYS;
     const moonPathAlpha = smoothstep(MOON_PATH_FADE_PX.from, MOON_PATH_FADE_PX.to, moonOrbitPx);
@@ -406,8 +409,8 @@ function rebuild() {
         const color = faint(MUTED, Math.round(moonPathAlpha * 100));
         const dim = faint(MUTED, Math.round(moonPathAlpha * OTHER_LOOPS_ALPHA));
         addPath(moonPath.slice(0, span + 1), dim, 1, DASHED);
-        addPath(moonPath.slice(span, span + steps + 1), color, 1, DASHED);
-        addPath(moonPath.slice(span + steps), dim, 1, DASHED);
+        addPath(moonPath.slice(span, span + loop + 1), color, 1, DASHED);
+        addPath(moonPath.slice(span + loop), dim, 1, DASHED);
         addArrowsAround(moonPath, span, color, false, Math.max(ARROW_OFFSET_PX, 2 * ARROW_DIAMETERS * moonRadius));
         // On the loop, the nearest of each to the moment: the apsides, where the Moon is nearest to and farthest from
         // Earth.

@@ -22,7 +22,7 @@ confirmed yet.
 | 1582: ten days skipped | Counting time | web | Oct 4 to Oct 15, 1582 | ok | 2026-10-11 |
 | Obliquity about 23.4°, nutation period 18.6 years | Earth | lib, src | 23.44°; Meeus ch. 22 | ok | 2026-10-11 |
 | Nod and slide stay below 20 arcseconds | Earth | lib | Δψ max 18.9″, Δε max 9.9″ (2000 to 2018) | ok | 2026-10-11 |
-| 20 arcseconds about a sixth of a pixel, full HD over 60° | Earth | derived | 0.18 px | ok | 2026-10-11 |
+| 20 arcseconds a hundredth of the Moon's width, covered by the Moon in half a minute | Earth | derived | 20″ / 1,865″ (mean diameter 31.1′) = 1/93; 360° / 27.32 d = 0.549″/s, 20″ in 36 s | ok | 2026-10-16 |
 | Horizon dips more than 3° at 10 km | Earth | lib | 3.21°, geometric | ok | 2026-10-11 |
 | Parallax: Sun 8.8″, Moon up to a degree, two diameters | Coordinates | lib | 8.76″; 0.90° to 1.02° | ok | 2026-10-11 |
 | Refraction at the horizon more than the Sun's diameter | Coordinates | lib | 34.5′ from apparent 0°, Sun 32′ | ok | 2026-10-11 |
@@ -30,13 +30,13 @@ confirmed yet.
 | Light from the Sun 8 min 20 s, sky turns 2° meanwhile | The Sun | derived | 499 s; 2.08° | ok | 2026-10-11 |
 | Aberration 20.5″, under a ninetieth of the Sun's disc | The Sun | src, derived | Meeus 25; 1/94 | ok | 2026-10-11 |
 | Earth 30 km/s, 15,000 km in 8 min 20 s; aberration moves eclipse contacts by some 40 s | The Sun | derived | 29.8 km/s × 500 s = 14,900 km; 20.5″ / 0.51″/s (Moon against Sun) = 40 s | ok | 2026-10-12 |
-| Moon's light 1.3 s, Moon moves 0.7″ meanwhile | The Sun | derived | 1.28 s; 0.70″ | ok | 2026-10-11 |
+| Moon 1.3 light seconds away, its shift under an arcsecond | The Sun | derived | 1.28 s; 0.70″ | ok | 2026-10-16 |
 | Moon moves about 13° a day against the stars | The Sun | src | 13.18° | ok | 2026-10-11 |
 | Equation of time: 16 min ahead in November, 14 behind in February | The Sun | src | Meeus ch. 28 | ok | 2026-10-11 |
 | Eccentricity about 0.0167; 3% closer, 3% larger in January | The Sun | lib | 0.01670; 3.4% | ok | 2026-10-11 |
 | Golden hour example finds sunrise before sunset anywhere | The Sun, code | lib | Los Angeles, Tokyo, Berlin | fixed | 2026-10-11 |
 | Moon's orbit tilted about 5°, Sun pulls about twice as hard as Earth | The Moon | src | 5.14°; 2.2 times | ok | 2026-10-11 |
-| Libration: a few degrees optical, hundredths physical | The Moon | lib | 8.1° and 6.9° max | ok | 2026-10-11 |
+| Libration: a few degrees optical | The Moon | lib | 8.1° and 6.9° max | ok | 2026-10-16 |
 | Lit fraction is only a first measure of moonlight | The Moon | src | opposition surge | fixed | 2026-10-11 |
 | Crescent lit from above implies daylight | The Moon | derived | elongation under 90° | ok | 2026-10-11 |
 | `moon.brightLimbAngle` is the tilt in the observer's sky | The Moon, code | lib | chi minus q, topocentric | fixed | 2026-10-11 |
@@ -60,10 +60,9 @@ confirmed yet.
 | van de Hulst predicted the 21 cm line in 1944 as a student; spin flip; found 1951; maps the Milky Way | People | src | hovenier2001 | ok | 2026-10-11 |
 | van de Hulst's book gives the sphere's phase law behind `moon.earthshine` | People | lib | `moon.ts` comment, osgHimmel; book not seen | open | 2026-10-11 |
 | Espenak: NASA Goddard until 2009, Mr. Eclipse, canons with Meeus | People | src | anderson2025 | ok | 2026-10-11 |
-| Sunlight some eight minutes old, moonlight a second and a bit | Opening | derived | 499 s; 1.3 s, as in The Sun | ok | 2026-10-11 |
-| A few microseconds per call; frame at 60 Hz over 16,000 µs | Opening | lib | measured, Ryzen 7 7800X3D: sun 1.8, moon 3.8 µs | ok | 2026-10-11 |
-| A few microseconds a call, approximate about one | Precise and approximate | lib | measured: 1.84, 3.76; 0.79, 0.94 µs | ok | 2026-10-11 |
-| Sun alone about 4 kB, whole library under 8 kB, minified and gzipped | Precise and approximate | lib | rolldown --minify, gzip -9: 4.4 kB; 7.5 kB | ok | 2026-10-11 |
+| A few microseconds per call; frame at 60 Hz over 16,000 µs | Opening | lib | measured, Ryzen 7 7800X3D, node, 1000 distinct moments: sun.direction 2.4, moon.direction 5.4 µs | ok | 2026-10-16 |
+| Precise Sun about 2 µs, Moon about 5, approximate about 1; quick start fits a 60 Hz frame some two thousand times | Precise and approximate | lib | same run: 2.40, 5.39; approx 1.00, 1.23 µs; 16,667 / 7.8 = 2,100 | ok | 2026-10-16 |
+| Sun alone about 4 kB, Sun and Moon under 6 kB, whole library under 7 kB, minified and compressed | Precise and approximate | lib | rolldown --minify, brotli 11: 3.9, 5.6, 6.7 kB (gzip 9: 4.4, 6.3, 7.5 kB); pnpm size | ok | 2026-10-16 |
 | Positions do not depend on the browser's time zone | Counting time, code | lib | `fromDate` keeps the instant, offset only for the wall clock | ok | 2026-10-11 |
 | Mixing UT and TT: Moon a fiftieth of its width off today, half in the year 1000 | Counting time | derived | 0.55°/h: 0.011° of 0.52°; 0.24° at ΔT 26.2 min | ok | 2026-10-11 |
 | Earth closest to the Sun in early January | Earth | lib | perihelion 2026-01-04 | ok | 2026-10-11 |
