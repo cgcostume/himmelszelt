@@ -36,13 +36,18 @@ fn dkIntegrateMultiScattering(a: DkAtmosphere, h: f32, direction: vec3f, sunDire
     result.transfer = vec4f(0.0);
 
     var path = dkPathStart(direction.z);
+    let total = dkPathRemainingStart(a, h, path, hitsGround);
     var throughput = vec4f(1.0);
     for (var i = 0u; i < DK_SAMPLES_MULTI_SCATTERING; i = i + 1u) {
-        let ds = dkPathRemaining(a, h, path, hitsGround) / f32(DK_SAMPLES_MULTI_SCATTERING - i);
+        var remaining = total * f32(DK_SAMPLES_MULTI_SCATTERING - i) / f32(DK_SAMPLES_MULTI_SCATTERING);
+        if (DK_REFRACTION) {
+            remaining = dkPathRemaining(a, h, path, hitsGround);
+        }
+        let ds = remaining / f32(DK_SAMPLES_MULTI_SCATTERING - i);
         let step = dkPathAdvance(a, h, path, ds);
         path = step.next;
 
-        let altitude = dkPathAltitude(a, h, step.middle.position);
+        let altitude = step.altitude;
         let pointUp = dkPathToWorld(dkPathUp(a, h, step.middle.position), up, horizontal);
         let muS = clamp(dot(pointUp, sunDirection), -1.0, 1.0);
 

@@ -116,10 +116,12 @@ fn dkInSpace() -> bool {
     return dkParams.observerAltitude > dkAtmosphere.Rt - dkAtmosphere.Rg;
 }
 
-// For an observer inside the atmosphere, from the sky-view table.
-fn dkSkyFromInside(a: DkAtmosphere, view: vec3f, h: f32) -> DkSkySample {
+// For an observer inside the atmosphere, from the sky-view table, at the altitude it was built for.
+fn dkSkyFromInside(a: DkAtmosphere, view: vec3f) -> DkSkySample {
     var result: DkSkySample;
-    result.hitsGround = dkIntersectsGround(a, h, view.z);
+    // The observer's horizon, written by the light meter whenever the table is rebuilt: of the altitude alone.
+    let horizon = dkMetering.horizon.xyz;
+    result.hitsGround = dkBelowHorizon(horizon, view.z);
 
     // Azimuth measured from the sun, the frame the sky-view table is indexed in. Degenerate when either vector points
     // straight up, where azimuth is meaningless and any value gives the same lookup.
@@ -130,7 +132,7 @@ fn dkSkyFromInside(a: DkAtmosphere, view: vec3f, h: f32) -> DkSkySample {
     }
 
     let size = vec2f(textureDimensions(dkSkyViewLut));
-    var uv = dkSkyViewUv(a, h, view.z, cosAzimuth, size);
+    var uv = dkSkyViewUvAt(horizon, view.z, cosAzimuth, size);
     // The table's upper half is sky, the lower half ground, split exactly at the horizon. Kept to its own half, so the
     // linear filter does not blend the last row of sky with the first of ground.
     let half = 0.5 / size.y;
@@ -166,7 +168,7 @@ fn dkSkyAt(view: vec3f) -> DkSkySample {
     if (dkInSpace()) {
         return dkSkyFromSpace(dkAtmosphere, view, altitude);
     }
-    return dkSkyFromInside(dkAtmosphere, view, altitude);
+    return dkSkyFromInside(dkAtmosphere, view);
 }
 
 // Transmittance towards the sun along a sampled ray, zero where the planet is in the way. Per ray rather than for the
@@ -277,7 +279,7 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
     var ground = select(0.0, 1.0, sky.hitsGround);
     var luminance = sky.luminance;
     if (!dkInSpace()) {
-        let horizon = dkHorizonMu(dkAtmosphere, max(dkParams.observerAltitude, 0.0));
+        let horizon = dkMetering.horizon.x;
         let below = clamp((horizon - view.z) / footprint + 0.5, 0.0, 1.0);
         if (below > 0.0 && below < 1.0) {
             let above = dkSkyAt(dkWithMu(view, horizon + 0.25 * footprint));

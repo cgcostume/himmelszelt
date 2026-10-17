@@ -104,18 +104,33 @@ fn dkMultiScatteringAltitudeMuS(a: DkAtmosphere, uv: vec2f, size: vec2f) -> vec2
 // within a few degrees of it, which is where nearly all of the sky's variation lives. Measured from the horizon rather
 // than through acos and cos, which WGSL promises only to 2^-11: enough to put the rows next to it on the wrong side.
 fn dkSkyViewUv(a: DkAtmosphere, h: f32, mu: f32, cosLightAzimuth: f32, size: vec2f) -> vec2f {
+    return dkSkyViewUvAt(dkHorizonOf(a, h), mu, cosLightAzimuth, size);
+}
+
+// The visible horizon from altitude h, as the mappings use it: its cosine, its sine and the angle from the zenith to
+// it. Of the observer alone, so a pass computes it once and hands it to dkSkyViewUvAt per direction.
+fn dkHorizonOf(a: DkAtmosphere, h: f32) -> vec3f {
     let horizon = dkHorizonMu(a, h);
-    let horizonSin = sqrt(max(1.0 - horizon * horizon, 0.0));
-    let zenithHorizonAngle = acos(clamp(horizon, -1.0, 1.0));
+    return vec3f(horizon, sqrt(max(1.0 - horizon * horizon, 0.0)), acos(clamp(horizon, -1.0, 1.0)));
+}
+
+// Whether a direction with cosine mu looks at the ground below `horizon`, from dkHorizonOf: the same test as
+// dkIntersectsGround, which the horizon's cosine already resolved.
+fn dkBelowHorizon(horizon: vec3f, mu: f32) -> bool {
+    return mu <= horizon.x;
+}
+
+// dkSkyViewUv with the horizon from dkHorizonOf.
+fn dkSkyViewUvAt(horizon: vec3f, mu: f32, cosLightAzimuth: f32, size: vec2f) -> vec2f {
     let viewSin = sqrt(max(1.0 - mu * mu, 0.0));
     // The angle below the horizon, negative above it: atan2 is accurate relative to its result, so also close to 0.
-    let below = atan2(viewSin * horizon - mu * horizonSin, mu * horizon + viewSin * horizonSin);
+    let below = atan2(viewSin * horizon.x - mu * horizon.y, mu * horizon.x + viewSin * horizon.y);
 
     var y: f32;
     if (below < 0.0) {
-        y = (1.0 - sqrt(-below / max(zenithHorizonAngle, 1e-6))) * 0.5;
+        y = (1.0 - sqrt(-below / max(horizon.z, 1e-6))) * 0.5;
     } else {
-        y = sqrt(below / max(DK_PI - zenithHorizonAngle, 1e-6)) * 0.5 + 0.5;
+        y = sqrt(below / max(DK_PI - horizon.z, 1e-6)) * 0.5 + 0.5;
     }
 
     // The sky is symmetric about the sun's meridian, so only half a turn of azimuth has to be stored. The sun

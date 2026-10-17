@@ -53,13 +53,18 @@ export interface SkyPassOptions {
 
 /** Byte size of DkSkyParams in frame.wgsl: a vec3 and a scalar, a mat4x4, four scalars, a vec2 and a scalar, padded. */
 const SKY_PARAMS_SIZE = 112;
-/** Byte size of DkMetering before its bend per sky-view row: a scalar, a vec3 and a vec4, each aligned to 16. */
-const METERING_SIZE = 48;
+/** The light meter's directions per cap, `DK_METER_SAMPLES` in frame.wgsl, one per invocation of 128 per workgroup. */
+const METER_SAMPLES = 4096;
+const METER_WORKGROUPS = METER_SAMPLES / 128;
+/** Byte size of DkMetering before its bend per sky-view row: a scalar, a vec3 and two vec4s, each aligned to 16, then
+ *  the meter's samples, a vec2f each. */
+const METERING_SIZE = 64 + METER_SAMPLES * 8;
 
 const DEFAULTS: SkyParams = {
     sunDirection: [0, 0, 1],
     observerHeightM: MIN_OBSERVER_HEIGHT_M,
-    inverseViewProjection: new Float32Array(16),
+    // A camera looking north with a 90° field of view, until the caller sets its own: all zeros would make every ray NaN.
+    inverseViewProjection: new Float32Array([1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0]),
     ev100: 14,
     autoExposureRange: [4, 20],
     autoExposureKeys: DEFAULT_AUTO_EXPOSURE_KEYS,
@@ -192,25 +197,29 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             wgsl.exposure,
         ].join("\n"),
     });
-    const [skyViewPipeline, groundIrradiancePipeline, groundPipeline, meterPipeline, skyPipeline] = await Promise.all([
-        skyViewStep("dkPrecomputeSkyView", groundLight ? 1 : 0),
-        groundLight ? skyViewStep("dkGroundIrradiance", 0) : null,
-        groundLight ? skyViewStep("dkPrecomputeSkyView", 2) : null,
+    const meterStep = (entryPoint: string) =>
         device.createComputePipelineAsync({
-            label: "dunstkreis:meter",
+            label: `dunstkreis:${entryPoint}`,
             layout: "auto",
-            compute: { module: meterModule, entryPoint: "dkMeterSky", constants: refractionConstants(model) },
-        }),
-        device.createComputePipelineAsync({
-            label: "dunstkreis:sky",
-            layout: "auto",
-            compute: {
-                module: device.createShaderModule({ code: skySource(wgsl.skyOutput(format)) }),
-                entryPoint: "dkSky",
-                constants: constants({ toneMap, headroom, dither, autoExposure, debugGrid, sunDisc }),
-            },
-        }),
-    ]);
+            compute: { module: meterModule, entryPoint, constants: refractionConstants(model) },
+        });
+    const [skyViewPipeline, groundIrradiancePipeline, groundPipeline, samplePipeline, meterPipeline, skyPipeline] =
+        await Promise.all([
+            skyViewStep("dkPrecomputeSkyView", groundLight ? 1 : 0),
+            groundLight ? skyViewStep("dkGroundIrradiance", 0) : null,
+            groundLight ? skyViewStep("dkPrecomputeSkyView", 2) : null,
+            meterStep("dkMeterSample"),
+            meterStep("dkMeterSky"),
+            device.createComputePipelineAsync({
+                label: "dunstkreis:sky",
+                layout: "auto",
+                compute: {
+                    module: device.createShaderModule({ code: skySource(wgsl.skyOutput(format)) }),
+                    entryPoint: "dkSky",
+                    constants: constants({ toneMap, headroom, dither, autoExposure, debugGrid, sunDisc }),
+                },
+            }),
+        ]);
 
     const skyViewEntries: GPUBindGroupEntry[] = [
         { binding: 0, resource: { buffer: luts.atmosphereBuffer } },
@@ -233,10 +242,19 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             { binding: 6, resource: { buffer: metering } },
             { binding: 7, resource: skyView.createView() },
         ]);
-    const meterBindGroup = bindGroup(meterPipeline, [
+    // The meter's sampling reads the table, its summing only the samples; "auto" layouts hold what each one reads.
+    const sampleBindGroup = bindGroup(samplePipeline, [
         { binding: 0, resource: { buffer: luts.atmosphereBuffer } },
         { binding: 1, resource: { buffer: skyParams } },
         { binding: 2, resource: skyView.createView() },
+        { binding: 3, resource: luts.sampler },
+        { binding: 4, resource: { buffer: metering } },
+        { binding: 5, resource: luts.transmittance.createView() },
+        { binding: 6, resource: luts.multiScattering.createView() },
+    ]);
+    const meterBindGroup = bindGroup(meterPipeline, [
+        { binding: 0, resource: { buffer: luts.atmosphereBuffer } },
+        { binding: 1, resource: { buffer: skyParams } },
         { binding: 3, resource: luts.sampler },
         { binding: 4, resource: { buffer: metering } },
         { binding: 5, resource: luts.transmittance.createView() },
@@ -262,6 +280,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     };
 
     let params: SkyParams = { ...DEFAULTS };
+    const outputs = new WeakMap<GPUTexture, GPUBindGroup>();
     let skyViewKey = "";
     let compensation = 0;
     let scale = 1;
@@ -287,7 +306,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             return scale;
         },
 
-        update(next) {
+        update(next, frameEncoder) {
             params = { ...params, ...next };
             const [sx, sy, sz] = params.sunDirection;
             const height = clampObserverHeight(params.observerHeightM);
@@ -312,14 +331,16 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
 
             // Rebuilding the sky-view table is the expensive part, and it is why the sky pass itself is one fetch
             // per pixel rather than a raymarch. It depends on nothing but the Sun and the observer. Above the
-            // atmosphere the sky pass raymarches per pixel; the table, which only the meter reads then, stays at the top.
+            // atmosphere nothing reads the table: the sky pass raymarches per pixel, and so does the meter.
             const key = `${sx},${sy},${sz},${height}`;
             if (key === skyViewKey) return;
             skyViewKey = key;
-            const encoder = device.createCommandEncoder({ label: "dunstkreis:skyView" });
+            const encoder = frameEncoder ?? device.createCommandEncoder({ label: "dunstkreis:skyView" });
             const pass = encoder.beginComputePass({ label: "dunstkreis:skyView" });
             const { height: rows } = config.skyView;
-            if (groundPipeline && groundBindGroup && groundIrradiancePipeline && groundIrradianceBindGroup) {
+            if (height / 1000 > model.planet.thicknessKm) {
+                // In space: the meter alone.
+            } else if (groundPipeline && groundBindGroup && groundIrradiancePipeline && groundIrradianceBindGroup) {
                 sweep(pass, skyViewPipeline, skyViewBindGroup, Math.floor(rows / 2));
                 pass.setPipeline(groundIrradiancePipeline);
                 pass.setBindGroup(0, groundIrradianceBindGroup);
@@ -328,12 +349,16 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             } else {
                 sweep(pass, skyViewPipeline, skyViewBindGroup, rows);
             }
-            // The light meter reads the table just built, so its reading always matches the sky.
+            // The light meter reads the table just built, so its reading always matches the sky, and writes the
+            // observer's horizon for the sky pass.
+            pass.setPipeline(samplePipeline);
+            pass.setBindGroup(0, sampleBindGroup);
+            pass.dispatchWorkgroups(METER_WORKGROUPS);
             pass.setPipeline(meterPipeline);
             pass.setBindGroup(0, meterBindGroup);
             pass.dispatchWorkgroups(1);
             pass.end();
-            device.queue.submit([encoder.finish()]);
+            if (!frameEncoder) device.queue.submit([encoder.finish()]);
         },
 
         async meteredEV100() {
@@ -460,10 +485,16 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         },
 
         encode(encoder, target) {
-            const output = device.createBindGroup({
-                layout: skyPipeline.getBindGroupLayout(1),
-                entries: [{ binding: 0, resource: target.createView() }],
-            });
+            // One bind group per target, kept as long as the target lives: a canvas hands out a new texture every
+            // frame, an offscreen target is the same one each time.
+            let output = outputs.get(target);
+            if (!output) {
+                output = device.createBindGroup({
+                    layout: skyPipeline.getBindGroupLayout(1),
+                    entries: [{ binding: 0, resource: target.createView() }],
+                });
+                outputs.set(target, output);
+            }
             const pass = encoder.beginComputePass({ label: "dunstkreis:sky" });
             pass.setPipeline(skyPipeline);
             pass.setBindGroup(0, skyBindGroup);

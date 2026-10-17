@@ -6,8 +6,8 @@
 // quality preset switched at most a handful of times, and wrong for something read per frame. Set them through
 // `constants` on the pipeline descriptor; `pipelineConstants()` builds that record.
 
-// Samples along each ray traced for the transmittance LUT, 18 rays per texel with refraction, to find the one arriving
-// from the texel's direction. The single largest quality/cost lever in the precompute.
+// Samples along each ray traced for the transmittance LUT, some 8 rays per texel with refraction, to find the one
+// arriving from the texel's direction. The single largest quality/cost lever in the precompute.
 override DK_SAMPLES_TRANSMITTANCE: u32 = 100u;
 
 // Samples for Hillaire's multiple-scattering LUT.

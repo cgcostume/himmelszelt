@@ -108,17 +108,20 @@ fn dkPathUp(a: DkAtmosphere, h0: f32, p: vec2f) -> vec2f {
     return normalize(vec2f(p.x, a.Rg + h0 + p.y));
 }
 
-// How the direction turns per km, the ray equation: towards denser air, by the part of grad(n) / n across the ray.
-fn dkPathTurn(a: DkAtmosphere, h0: f32, p: vec2f, direction: vec2f) -> vec2f {
-    let refractivity = dkRefractivity(a, dkPathAltitude(a, h0, p));
+// How the direction turns per km at a point of known altitude, the ray equation: towards denser air, by the part of
+// grad(n) / n across the ray.
+fn dkPathTurn(a: DkAtmosphere, h0: f32, p: vec2f, altitude: f32, direction: vec2f) -> vec2f {
+    let refractivity = dkRefractivity(a, altitude);
     let gradient = -refractivity / (a.HR * (1.0 + refractivity)) * dkPathUp(a, h0, p);
     return gradient - dot(gradient, direction) * direction;
 }
 
-// One step of ds km by the midpoint rule. The middle is where the integrators sample.
+// One step of ds km by the midpoint rule. The middle is where the integrators sample, at `altitude`, which the step
+// needed anyway to bend there.
 struct DkPathStep {
     middle: DkPath,
     next: DkPath,
+    altitude: f32,
 }
 
 fn dkPathAdvance(a: DkAtmosphere, h0: f32, path: DkPath, ds: f32) -> DkPathStep {
@@ -126,12 +129,14 @@ fn dkPathAdvance(a: DkAtmosphere, h0: f32, path: DkPath, ds: f32) -> DkPathStep 
     if (!DK_REFRACTION) {
         step.middle = DkPath(path.position + path.direction * (0.5 * ds), path.direction);
         step.next = DkPath(path.position + path.direction * ds, path.direction);
+        step.altitude = dkPathAltitude(a, h0, step.middle.position);
         return step;
     }
-    let turn = dkPathTurn(a, h0, path.position, path.direction);
+    let turn = dkPathTurn(a, h0, path.position, dkPathAltitude(a, h0, path.position), path.direction);
     let direction = normalize(path.direction + turn * (0.5 * ds));
     step.middle = DkPath(path.position + direction * (0.5 * ds), direction);
-    let middleTurn = dkPathTurn(a, h0, step.middle.position, direction);
+    step.altitude = dkPathAltitude(a, h0, step.middle.position);
+    let middleTurn = dkPathTurn(a, h0, step.middle.position, step.altitude, direction);
     step.next = DkPath(path.position + direction * ds, normalize(path.direction + middleTurn * ds));
     return step;
 }
@@ -150,6 +155,15 @@ fn dkPathRemaining(a: DkAtmosphere, h0: f32, path: DkPath, hitsGround: bool) -> 
         return dkDistanceToBottomAtmosphereBoundary(a, h, mu);
     }
     return max(-r * mu, 0.0);
+}
+
+// The whole of a straight path, measured once: its march takes its steps as shares of it, where the bent march aims
+// anew at every step with dkPathRemaining. 0 with refraction, where it is not used.
+fn dkPathRemainingStart(a: DkAtmosphere, h0: f32, path: DkPath, hitsGround: bool) -> f32 {
+    if (DK_REFRACTION) {
+        return 0.0;
+    }
+    return dkPathRemaining(a, h0, path, hitsGround);
 }
 
 // A path's 2D vectors in the world, from its start's up and the horizontal it starts in.

@@ -215,7 +215,6 @@ function render() {
     }
 
     const basis = cameraBasis(width / height);
-    placeCompass(basis, canvas.clientWidth, canvas.clientHeight);
     pass.update({
         sunDirection,
         sunAngularDiameter,
@@ -225,11 +224,6 @@ function render() {
         ev100: evOfSlider(),
         autoExposureKeys: pressed("ramp") ? DEFAULT_AUTO_EXPOSURE_KEYS : [],
     });
-
-    const encoder = gpu.device.createCommandEncoder();
-    pass.encode(encoder, gpu.context.getCurrentTexture());
-    gpu.device.queue.submit([encoder.finish()]);
-    const submitted = performance.now();
     const skyViewKey = `${state.jd},${state.latitude},${state.longitude},${state.heightM}`;
     if (skyViewKey !== skyViewFor || pass !== notified) {
         skyViewFor = skyViewKey;
@@ -237,9 +231,31 @@ function render() {
         const observerHeightM = clampObserverHeight(state.heightM);
         skyViewChanged({ pass, sunDirection, apparentSun: [x, y, z], sunAngularDiameter, observerHeightM });
     }
+    // The pass above is kept current whatever shows, since the other figures take their sky from it; the canvas is
+    // drawn only while it is on screen or about to be.
+    if (!onScreen) return;
+
+    placeCompass(basis, canvas.clientWidth, canvas.clientHeight);
+    const encoder = gpu.device.createCommandEncoder();
+    pass.encode(encoder, gpu.context.getCurrentTexture());
+    gpu.device.queue.submit([encoder.finish()]);
+    const submitted = performance.now();
     showTiming(astronomyMs, submitted - skyStarted, submitted);
     showExposure();
 }
+
+// Whether the canvas is within a screen of the viewport, as onDemand gates a figure; a draw skipped while it was not
+// is made up for when it is again.
+let onScreen = true;
+new IntersectionObserver(
+    ([entry]) => {
+        const now = entry?.isIntersecting ?? true;
+        if (now === onScreen) return;
+        onScreen = now;
+        if (onScreen) requestRender();
+    },
+    { rootMargin: "100% 0px" },
+).observe(canvas);
 
 // The slider runs brighter to the right, so it holds minus the EV100: a lower EV lets in more light.
 const evOfSlider = () => -Number(field<HTMLInputElement>("exposure").value);

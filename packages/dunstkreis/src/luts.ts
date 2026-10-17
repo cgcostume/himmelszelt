@@ -36,7 +36,8 @@ export function createLut(device: GPUDevice, label: string, width: number, heigh
 
 /**
  * Precomputes the transmittance and multiple-scattering tables, after Hillaire 2020. Cheap enough to re-run
- * whenever a model parameter changes.
+ * whenever a model parameter changes; the sky pass and its cube pass hold the old tables and are specialized on the old
+ * model's refraction, so make them anew from the new tables too.
  *
  * Neither table depends on the sun or the observer, so this runs once per model, not per frame. Resolves once the
  * pipelines are compiled, without blocking on them, and the work is submitted; whatever reads the tables after it is

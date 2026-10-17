@@ -49,8 +49,8 @@ nothing. Bodies stay visible while geometrically below the horizon, and the Sun 
 special-cased. Near the ground the result lands within a few percent of Bennett's fit (Meeus 16.3), some 10% above it
 at the horizon, where the model's single scale height makes the lowest air denser than the real one.
 
-Set `refractivity: 0` to turn it off, which means recomputing the tables; the passes then compile the straight march
-(`DK_REFRACTION` off), which skips the bending's two exponentials per step. `airRefractivity(temperatureC, pressureHPa)`
+Set `refractivity: 0` to turn it off, which means recomputing the tables and making the passes anew; they then compile
+the straight march (`DK_REFRACTION` off), which skips the bending's two exponentials per step and aims each step once. `airRefractivity(temperatureC, pressureHPa)`
 gives the value for other air, and `apparentDirection` traces where a body shows on the CPU. Feed the true sun
 direction: an already refracted one would be lifted twice.
 
@@ -67,9 +67,9 @@ Exposure is in EV100, the convention of cameras, Frostbite and Unreal (Lagarde &
 the same EV100 looks the same in any renderer that follows it.
 
 `autoExposure: true` on `createSkyPass` exposes by a light meter instead, for a renderer without an exposure of its own or to follow day
-into night. Whenever the sky-view table is rebuilt, a compute pass reads it in directions spread evenly over the sky
-above the horizon and, apart, below it, and writes the brighter of the two geometric mean luminances to a buffer the sky
-pass reads, so there is no round trip to the CPU. On the ground that is mostly the sky; the ground below is darker,
+into night. Whenever the sky-view table is rebuilt, a compute pass reads it in 4096 directions spread evenly over the sky
+above the horizon and as many, apart, below it, and a second sums them and writes the brighter of the two geometric mean
+luminances to a buffer the sky pass reads, so there is no round trip to the CPU. On the ground that is mostly the sky; the ground below is darker,
 except, as for a camera, over snow. High up it is the lit air below, while the sky above turns black. Above the
 atmosphere, beyond the table, the meter raymarches its directions instead and so reads the lit planet. The reading is
 EV100 = log2(L · 100 / 12.5) (`ev100FromLuminance`), held within `autoExposureRange`, [4, 20] by default, less
@@ -77,7 +77,8 @@ EV100 = log2(L · 100 / 12.5) (`ev100FromLuminance`), held within `autoExposureR
 with the Sun 6° down, at the end of civil twilight, so the earth's shadow and the belt of Venus are still exposed as
 metered. Metering the
 table rather than the frame keeps the reading still as the camera turns and leaves the Sun's disc out of it. It follows at
-once, with no eye adaptation over time. `meteredEV100()` reads it back, e.g. for a UI.
+once, with no eye adaptation over time. `meteredEV100()` reads it back, e.g. for a UI. The rebuild and the meter are submitted by `update()` itself, or recorded
+into a command encoder passed to it, to go with the frame's own submission.
 
 `autoExposureKeys` shapes the ramp over the day: compensations at sun altitudes above the observer's horizon, which
 sinks with height (some 10° at 100 km, so a sun 5° below the horizontal still shines on the observer and is keyed so),
@@ -188,7 +189,7 @@ Implemented so far:
 - `src/exposure.ts`: EV100 and the automatic exposure's ramp.
 - `src/ibl.ts`: spherical harmonics and irradiance from a cube map, `createIrradiancePass()`.
 
-Aerial perspective, Bruneton's table as another filler, and the lit ground seen from inside follow.
+Aerial perspective, specular image-based lighting and Bruneton's table as another filler follow.
 
 ### Composing the shaders
 
@@ -209,7 +210,7 @@ ${wgsl.scattering}                                        // DkAtmosphere + the 
     ...
 }` });
 
-device.queue.writeBuffer(buffer, 0, atmosphereUniformData(DEFAULT_ATMOSPHERE_MODEL)); // 112 bytes
+device.queue.writeBuffer(buffer, 0, atmosphereUniformData(DEFAULT_ATMOSPHERE_MODEL)); // 192 bytes
 ```
 
 Three properties make this composable:
@@ -219,7 +220,7 @@ first argument rather than reading a `var<uniform>`, so nothing here can collide
 indices, and you decide where the data lives.
 
 **Parameters are a uniform block, not string substitution.** `atmosphereUniformData()` packs a model into the
-112-byte layout `atmosphere.wgsl` declares. A test parses that struct, walks it applying WGSL's uniform layout
+192-byte layout `atmosphere.wgsl` declares. A test parses that struct, walks it applying WGSL's uniform layout
 rules, and checks the packer writes the right value at every offset, since nothing in the toolchain would
 otherwise catch the two drifting apart.
 

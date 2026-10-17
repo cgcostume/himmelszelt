@@ -41,7 +41,19 @@ struct DkAtmosphere {
     refractivity: f32,
 }
 
-// A spectral quantity, light or a transmittance at the four wavelengths, in linear sRGB.
+// A spectral quantity, light or a transmittance at the four wavelengths, in linear sRGB. A spectrum redder than sRGB's
+// red, the sun's through the whole horizon's air, lands outside the gamut with a channel below zero: it is desaturated
+// towards the gray of its own luminance until every channel is in, rather than cut off, which a tone curve would do per
+// channel, turning the setting sun's lower half pure yellow at a hard edge where blue crossed zero.
 fn dkToRgb(a: DkAtmosphere, spectral: vec4f) -> vec3f {
-    return a.toRgb * spectral;
+    let rgb = a.toRgb * spectral;
+    let lowest = min(rgb.r, min(rgb.g, rgb.b));
+    if (lowest >= 0.0) {
+        return rgb;
+    }
+    let luminance = dot(rgb, vec3f(0.2126, 0.7152, 0.0722));
+    if (luminance <= 0.0) {
+        return vec3f(0.0);
+    }
+    return mix(rgb, vec3f(luminance), -lowest / (luminance - lowest));
 }

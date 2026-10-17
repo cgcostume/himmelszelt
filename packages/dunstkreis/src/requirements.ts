@@ -42,10 +42,11 @@ export function skyRequirements(options: RequirementOptions = {}, adapter?: GPUA
         maxSamplersPerShaderStage: 1,
         maxStorageBuffersPerShaderStage: 1,
         maxStorageTexturesPerShaderStage: 1,
-        // The light meter's workgroup, and its sums in workgroup memory without subgroups.
+        // The light meter's workgroup: 128 vec2f for the brightest of each cap, and without subgroups 128 vec4f for
+        // its sums, 3072 bytes.
         maxComputeInvocationsPerWorkgroup: 128,
         maxComputeWorkgroupSizeX: 128,
-        maxComputeWorkgroupStorageSize: 2048,
+        maxComputeWorkgroupStorageSize: 3072,
         maxTextureDimension2D: Math.max(outputSize, cube?.size ?? 0, ...tables),
     };
     if (cube) requiredLimits.maxTextureArrayLayers = 6;

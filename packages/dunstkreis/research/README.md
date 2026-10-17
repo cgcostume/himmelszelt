@@ -106,6 +106,12 @@ in the sky pass, the cube map, the light meter and the sun's illuminance. The gr
 spread over the wavelengths through the primaries' dominant wavelengths. On the GPU, four wavelengths cost nothing
 measurable over three: 0.072 ms per sky-view rebuild either way.
 
+**Out of gamut.** The sun through the whole horizon's air is redder than sRGB's red: the matrix then gives it a blue
+below zero, and a tone curve that cuts each channel off at zero turned the disc's lower half pure yellow at a hard edge
+where blue crossed zero, and the sunlit ground near the horizon a saturated orange. `dkToRgb` now desaturates such a
+color towards the gray of its own luminance until every channel is in, which keeps its luminance and its hue as far as
+the gamut allows.
+
 **New, as far as we know:** fitting the conversion to sky spectra, and choosing the wavelengths by it. The step from
 three to four as a middle road between three used as RGB and full spectral rendering.
 
@@ -228,8 +234,8 @@ The air's refractive index follows its density, and every ray bends as it is tra
 same samples that integrate its scattering; Bouguer's invariant n r sin z decides where the ground starts. Near the
 ground it lands within a few percent of Bennett's fit above 5°, and some 10% above it at the horizon, where the model's
 single scale height makes the lowest air denser than the real one (tests/refraction.spec.ts). The transmittance table
-is indexed by the true direction light arrives from, found by bisection over traced rays, the sky-view table by the
-apparent one, storing how far each ray bent. **New, as far as we know**, in Hillaire's tables.
+is indexed by the true direction light arrives from, solved for over traced rays by regula falsi (the Illinois variant,
+some 8 traces per texel where a bisection took 18), the sky-view table by the apparent one, storing how far each ray bent. **New, as far as we know**, in Hillaire's tables.
 
 ## Tone curves
 
@@ -260,3 +266,30 @@ down, -3.4 at 10° and -14.5 at 18° down (`research/measure.mjs` does not cover
 The WGSL tests run real shaders through Dawn in Node. For months they crashed or deadlocked a worker every few
 evaluations, which was put down to the `webgpu` binding. It was the harness: the GPU instance from `create()` went
 unreferenced, and the garbage collector took the device with it. Held for the process' life, the tests pass every time.
+
+## The review of October 2026
+
+An audit of the passes, measured before and after on the same GPU, under Dawn in Node rather than Chromium: timestamp
+queries around every compute pass, Dawn's timestamp quantization off (`disable-dawn-features=timestamp_quantization`,
+which otherwise rounds to 65 µs), both builds loaded into one process and run turn and turn about, 61 runs each, the
+median. Even so a pass of a quarter millisecond varies twofold between runs, so differences within some 15% are noise.
+`ab.mjs` of that session is not kept; `measure.mjs` remains the script of record.
+
+| pass, RX 7900 XT | before | after | what changed |
+|---|---|---|---|
+| transmittance table, refraction | 0.68 ms | 0.27 ms | regula falsi for the ray that arrives from a texel's direction, 8 traces instead of 18 |
+| transmittance table, straight | 0.037 ms | 0.018 ms | the straight march measures its path once and steps by shares of it |
+| multiple scattering, straight | 0.27 ms | 0.23 ms | the same |
+| multiple scattering, refraction | 0.32 ms | 0.35 ms | within noise |
+| sky-view rebuild and meter, inside the atmosphere | 0.17 to 0.29 ms | 0.14 to 0.27 ms | within noise, which spans twofold here |
+| sky-view rebuild and meter, in space | 1.00 ms | 0.043 ms | nothing reads the table in space, so it is not rebuilt; the meter's raymarches run on 32 workgroups instead of one |
+| sky pass, 1080p, from the ground | 0.065 ms | 0.054 ms | the observer's horizon read from the meter's buffer instead of computed per pixel, exponentials and an arc cosine |
+| sky pass, 1080p, from 30 km | 0.065 ms | 0.052 ms | the same |
+| sky pass, 1080p, from space | 0.23 ms | 0.23 ms | raymarched per pixel as before |
+
+No value of the tables moved by more than 0.2%, the sky-view table's and the meter's not at all; `tests/tables.spec.ts`
+pins them now, through Dawn, so the next change that moves them is seen. Also from the review: the light meter keeps its
+lookups to the table's sky or ground half as the sky pass does, the declared workgroup storage limit matches the meter's
+3072 bytes without subgroups, a sky pass renders a camera looking north until it is given a matrix rather than NaN, the
+sky pass keeps one output bind group per target, and `update()` records into a frame's encoder when given one.
+

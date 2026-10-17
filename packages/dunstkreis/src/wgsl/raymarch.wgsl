@@ -41,14 +41,20 @@ fn dkRaymarchSky(
     let quadratic = mu >= 0.0;
     let n = f32(samples);
     var path = dkPathStart(mu);
+    let total = dkPathRemainingStart(a, h, path, result.hitsGround);
     for (var i = 0u; i < samples; i = i + 1u) {
         let k = f32(i);
         let share = select(1.0 / (n - k), (2.0 * k + 1.0) / (n * n - k * k), quadratic);
-        let ds = dkPathRemaining(a, h, path, result.hitsGround) * share;
+        // What is left before this step: the straight ray's share of its whole, or aimed anew along the bent tangent.
+        var remaining = total * select((n - k) / n, (n * n - k * k) / (n * n), quadratic);
+        if (DK_REFRACTION) {
+            remaining = dkPathRemaining(a, h, path, result.hitsGround);
+        }
+        let ds = remaining * share;
         let step = dkPathAdvance(a, h, path, ds);
         path = step.next;
 
-        let altitude = dkPathAltitude(a, h, step.middle.position);
+        let altitude = step.altitude;
         let pointUp = dkPathToWorld(dkPathUp(a, h, step.middle.position), up, horizontal);
         let muS = clamp(dot(pointUp, sunDirection), -1.0, 1.0);
         let nu = dot(dkPathToWorld(step.middle.direction, up, horizontal), sunDirection);

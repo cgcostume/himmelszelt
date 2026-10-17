@@ -24,6 +24,9 @@ struct DkSkyParams {
     skyViewScale: f32,
 }
 
+// Directions the light meter reads per cap, above and below the horizon: 32 workgroups of 128 sample one each.
+const DK_METER_SAMPLES: u32 = 4096u;
+
 struct DkMetering {
     // log2 of the geometric mean luminance, in cd/m².
     log2Luminance: f32,
@@ -32,6 +35,13 @@ struct DkMetering {
     sunIlluminance: vec3f,
     // The sky's irradiance on the ground at the four wavelengths, gathered by dkGroundIrradiance.
     groundLight: vec4f,
+    // The observer's visible horizon, of its altitude alone, as dkHorizonOf gives it: the cosine, the sine and the
+    // angle from the zenith. Written by the light meter whenever the table is rebuilt, so the sky pass reads it per
+    // pixel instead of computing it there, exponentials and an arc cosine, millions of times over.
+    horizon: vec4f,
+    // The light meter's samples, log2 of the luminance above and below the horizon, written by many workgroups and
+    // summed by one.
+    samples: array<vec2f, DK_METER_SAMPLES>,
     // How far the sky-view table's rays bent on their way out, per row, as the sine of the angle: the same for every
     // azimuth. The sky pass turns a view ray by it to find where the sun disc shows; 0 for rows on the ground.
     bend: array<f32>,

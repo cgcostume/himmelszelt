@@ -133,7 +133,12 @@ export interface SkyPass {
      * two that follows the sun, set by `update()`, so the table's values sit where half floats resolve them best.
      */
     readonly skyViewScale: number;
-    update(params: Partial<SkyParams>): void;
+    /**
+     * Takes the parameters over, writes the uniforms, and, when the sun or the observer moved, rebuilds the sky-view
+     * table and meters it: submitted on its own, or recorded into `encoder` to go with the frame's own submission.
+     * Above the atmosphere only the meter runs; the sky pass raymarches there and reads no table.
+     */
+    update(params: Partial<SkyParams>, encoder?: GPUCommandEncoder): void;
     /** The EV100 `autoExposure` exposes with: the light meter's latest reading, read back from the GPU, compensated and
      *  held within `autoExposureRange`. */
     meteredEV100(): Promise<number>;
