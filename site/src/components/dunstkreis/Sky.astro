@@ -6,6 +6,7 @@ import {
     OSGHIMMEL_ATMOSPHERE_MODEL,
     RGB_ATMOSPHERE_MODEL,
 } from "@himmelszelt/dunstkreis";
+import Try from "../Try.astro";
 import Choice from "./Choice.astro";
 import Hdr from "./Hdr.astro";
 import "./dunstkreis.css";
@@ -50,37 +51,104 @@ const CHOICES = [
         checked: "neutral",
     },
 ];
+
+/**
+ * The sky figure, once per page as the primary, which the other figures take their sky from, shown as a reader meets it:
+ * the grid, metered, refracted, and only the Sun lock to press. With `full`, every option over it: exposure, the tone
+ * curve, HDR, the model, dither and refraction, bound to the page's shared choices.
+ */
+interface Props {
+    id?: string;
+    full?: boolean;
+    primary?: boolean;
+    /** Switches for the sky's parts: Rayleigh, Mie and ozone, single and multiple scattering. */
+    parts?: boolean;
+    /** The caption's text. */
+    caption?: string;
+    /** The caption's experiment: a Try's label, what it sets, and what the figure then shows. */
+    try?: { label: string; set: string; text: string };
+}
+const {
+    id = "sky",
+    full = false,
+    primary = false,
+    parts = false,
+    caption = "The sky at the chosen moment and place: every pixel one lookup into a table of the whole sky, rebuilt whenever the Sun or the observer moves. Altitude lines every 10°, the compass directions on the horizon, and the Sun's symbol where it truly is, unbent by the air: near the horizon its disc shows above it.",
+    try: experiment,
+} = Astro.props;
 ---
 
-<figure class="scene-frame wide" id="sky">
+<figure class="scene-frame wide" id={id} data-sky data-full={full ? "" : undefined} data-primary={primary ? "" : undefined} data-parts={parts ? "" : undefined}>
     <div class="sky-view as-seen">
         <canvas data-field="canvas" aria-label="The sky at the chosen moment and place"></canvas>
         <div class="sky-compass" data-field="compass"></div>
-        <div class="sky-overlay">
-            <span class="note" data-field="sun"></span>
-            <label class="note">EV<sub>100</sub> <input data-field="exposure" type="range" min="-20" max="8" step="0.1" value="-14" title="Brighter to the right: a lower EV lets in more light" /> <output data-field="ev"></output></label>
-            <span class="note" data-field="timing"></span>
-            <span class="sky-toggles">
-                <button type="button" class="view-toggle" data-field="auto" aria-pressed="true" title="Expose by a light meter reading the whole sky">auto</button>
-                <button type="button" class="view-toggle" data-field="ramp" aria-pressed="true" title="Shape the metered exposure over the day by the Sun's altitude: night and the minutes around sunrise and sunset darker, the blue hour lifted. Off, the light meter's reading as it is, for the tone curve alone">ramp</button>
-                <button type="button" class="view-toggle" data-field="lock" aria-pressed="true" title="Keep the view on the Sun; dragging lets go">sun-locked</button>
-                <button type="button" class="view-toggle" data-field="grid" aria-pressed="true" title="Lines of altitude every 10°, the compass directions, a ring around the Sun's disc and timings">grid</button>
-                <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="Dither the 8-bit output by a step of noise, against banding in the sky's smooth gradients">dither</button>
-                <button type="button" class="view-toggle" data-field="refraction" aria-pressed="true" title="Traced through the air, bending the light. Switches it for the whole page, recomputing every table and cube map">refracted</button>
-            </span>
-            <span class="sky-toggles">
-                <Hdr figure="sky" />
-                {CHOICES.map((choice) => <Choice figure="sky" {...choice} />)}
-            </span>
-        </div>
+        {
+            !full && (
+                <>
+                <div class="sky-corner">
+                    <button type="button" class="view-toggle" data-field="lock" aria-pressed="true" title="Keep the view on the Sun's true direction; dragging lets go">sun-locked</button>
+                    <button type="button" class="view-toggle sky-icon" data-field="grid" aria-pressed="true" title="Grid: lines of altitude every 10°, the compass directions, and the Sun's symbol where it truly is" aria-label="Grid"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 12h13M2 8.5Q8 5 14 8.5M2.5 5Q8 1.5 13.5 5M5.5 2.5v11M10.5 2.5v11" /></svg></button>
+                </div>
+                <div class="sky-corner sky-corner-end">
+                    <button type="button" class="view-toggle sky-icon" data-field="png" title="Download the view as PNG" aria-label="Download the view as PNG"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v7.5M4.75 6.75 8 10l3.25-3.25M2.5 10v3.5h11V10" /></svg></button>
+                    <button type="button" class="view-toggle sky-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="sky-enter" d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" /><path class="sky-exit" d="M6 2.5V6H2.5M13.5 6H10V2.5M10 13.5V10h3.5M2.5 10H6v3.5" /></svg></button>
+                </div>
+                {parts && (
+                    <div class="sky-parts">
+                        <button type="button" class="view-toggle" data-field="rayleigh" aria-pressed="true" title="Scattering by the air's molecules, Rayleigh's: the blue">Rayleigh</button>
+                        <button type="button" class="view-toggle" data-field="mie" aria-pressed="true" title="Scattering by haze, Mie's: the glow around the Sun and the pale horizon">Mie</button>
+                        <button type="button" class="view-toggle" data-field="ozone" aria-pressed="true" title="Absorption by ozone: the deep blue of twilight">ozone</button>
+                        <span class="sky-parts-gap" />
+                        <button type="button" class="view-toggle" data-field="single" aria-pressed="true" title="Light scattered once, straight from the Sun">single</button>
+                        <button type="button" class="view-toggle" data-field="multiple" aria-pressed="true" title="Light scattered more than once: the shadow side of the sky, twilight">multiple</button>
+                    </div>
+                )}
+                </>
+            )
+        }
+        {
+            full && (
+                <div class="sky-overlay">
+                    <span class="note" data-field="sun" />
+                    <label class="note">EV<sub>100</sub> <input data-field="exposure" type="range" min="-20" max="8" step="0.1" value="-14" title="Brighter to the right: a lower EV lets in more light" /> <output data-field="ev" /></label>
+                    <span class="note" data-field="timing" />
+                    <span class="sky-toggles">
+                        <button type="button" class="view-toggle" data-field="auto" aria-pressed="true" title="Expose by a light meter reading the whole sky">auto</button>
+                        <button type="button" class="view-toggle" data-field="ramp" aria-pressed="true" title="Shape the metered exposure over the day by the Sun's altitude: night and the minutes around sunrise and sunset darker, the blue hour lifted. Off, the light meter's reading as it is, for the tone curve alone">ramp</button>
+                        <button type="button" class="view-toggle" data-field="lock" aria-pressed="true" title="Keep the view on the Sun; dragging lets go">sun-locked</button>
+                        <button type="button" class="view-toggle" data-field="grid" aria-pressed="true" title="Lines of altitude every 10°, the compass directions, a ring around the Sun's disc and timings">grid</button>
+                        <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="Dither the 8-bit output by a step of noise, against banding in the sky's smooth gradients">dither</button>
+                        <button type="button" class="view-toggle" data-field="refraction" aria-pressed="true" title="Traced through the air, bending the light. Switches it for the whole page, recomputing every table and cube map">refracted</button>
+                    </span>
+                    <span class="sky-toggles">
+                        <Hdr figure={id} />
+                        {CHOICES.map((choice) => <Choice figure={id} {...choice} />)}
+                    </span>
+                </div>
+            )
+        }
         <p class="vis-credit footnote">Drag to look around, scroll to zoom. Rendered with WebGPU.</p>
     </div>
+    {
+        !full && (
+            <label class="figure-slider" data-offset title="The moment, up to half a day either way from where it was set: drag, or turn the mouse wheel for ten minutes a notch">
+                <span class="note">Time</span>
+                <span class="figure-slider-rail">
+                    <input type="range" data-field="offset" min="-720" max="720" step="5" value="0" aria-label="Minutes from the moment" />
+                    <span class="figure-slider-scale" aria-hidden="true">{["−12", "0", "+12"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 50}%`}>{mark}{i !== 1 && <span class="figure-slider-unit">{"\u202fh"}</span>}</span>)}</span>
+                </span>
+                <output data-field="offsetValue" />
+            </label>
+        )
+    }
     <figcaption class="figure-caption">
-        The sky at the chosen moment and place: every pixel one lookup into a table of the whole sky, rebuilt whenever
-        the Sun or the observer moves.
+        {caption}
+        {experiment && <Try label={experiment.label} set={experiment.set} fig={id}>{experiment.text}</Try>}
     </figcaption>
 </figure>
 
 <script>
-    import "./sky";
+    import { skyFigure } from "./sky";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-sky]")) skyFigure(root);
 </script>

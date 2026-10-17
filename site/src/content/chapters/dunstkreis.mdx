@@ -11,12 +11,14 @@ references:
     - bruneton2017
     - edlen1966
     - fritsch1980
+    - hillaire2020
     - kelly2019
     - khronos2024
     - kopp2011
     - lagarde2014
     - mueller2012thesis
     - narkowicz2016
+    - nishita1993
     - nowell2005
     - ramamoorthi2001
     - sobotka2023
@@ -28,8 +30,11 @@ import Cite from "../../components/Cite.astro";
 import Controls from "../../components/sternzeit/Controls.astro";
 import Planned from "../../components/Planned.astro";
 import Term from "../../components/Term.astro";
+import Scattering from "../../components/dunstkreis/Scattering.astro";
 import Sky from "../../components/dunstkreis/Sky.astro";
+import Stages from "../../components/dunstkreis/Stages.astro";
 import Tables from "../../components/dunstkreis/Tables.astro";
+import Distance from "../../components/dunstkreis/Distance.astro";
 import Environment from "../../components/dunstkreis/Environment.astro";
 import Lighting from "../../components/dunstkreis/Lighting.astro";
 import Lookup from "../../components/dunstkreis/Lookup.astro";
@@ -38,25 +43,70 @@ import Fig from "../../components/Fig.astro";
 This chapter is being written. The sky below is live, and it grows with the chapter; the dashed boxes are the figures
 still to come.
 
-<Sky />
+Look up on a clear day and the sky is blue, look west at the end of it and it is red, and the same air does both. The
+light of the Sun, white above the atmosphere, is scattered by the air on its way down, blue far more than red, so blue
+reaches you from every direction while the Sun itself, seen through the longest stretch of air at sunset, keeps what is
+left. dunstkreis computes that sky: the light of the Sun scattered, absorbed and bent by a model of Earth's air, for any
+Sun, any height from eye level to orbit, and any camera, in physical units, on the GPU. It follows Hillaire's technique
+<Cite id="hillaire2020" /> on the atmosphere model of Bruneton and Neyret <Cite id="bruneton2008" />, which osgHimmel
+used <Cite id="mueller2012thesis" />, and adds the air's refraction, four wavelengths instead of three, and a sky that
+holds from the ground to the orbit of the International Space Station. Clouds, the Moon and the stars are other
+chapters' business; the sky here is clear, and empty.
 
-## Pick a moment and a place
+For a developer: TypeScript and WGSL, WebGPU compute passes, no dependency on any other package, the Sun handed over as
+a direction vector. Two small tables are computed once per atmosphere, one of the whole sky whenever the Sun or the
+observer moves, in a quarter of a millisecond on a desktop GPU, and every frame after that costs one texture lookup per
+pixel. It writes into a texture you own and records into a command encoder you own; the code example in [What to compute when](#what-to-compute-when) is
+the whole setup. The same sky lights a scene, as a cube map and nine numbers, and
+can be exported as files for a renderer that never runs dunstkreis at all.
+
+The sky below is that pass, drawn into a canvas: drag to look around, scroll to zoom, and set the moment and the place
+under it, which every figure of the chapter follows.
+
+<Sky
+    primary
+    try={{
+        label: "Sunset over Potsdam",
+        set: "date=2026-04-06T18:05:00Z&lat=52.395&lon=13.085&h=8000",
+        text: "8 km up, as from a plane, just after sunset. Drag to look east, where the Belt of Venus glows over the horizon.",
+    }}
+/>
+
 
 <Controls open />
 
 dunstkreis knows nothing of dates: it takes the Sun as a plain direction, here from sternzeit's `sun.direction`. That is
 already where the Sun shows rather than where it is, its light 8 minutes 20 seconds underway, as
 [sternzeit explains](../sternzeit/#the-sun). It is the true direction nonetheless, not yet bent by the air: dunstkreis
-traces the refraction itself. How to hand it over is the first of the [code examples](#code-examples).
+traces the refraction itself. How to hand it over is the code example in [What to compute when](#what-to-compute-when).
 
 ## Why the sky is blue
 
-<Planned title="How strongly each color scatters">
-    The visible spectrum against how much of it a column of air scatters: violet many times more than red. Why the
-    sky is still blue and not violet, from the Sun's spectrum and the eye's sensitivity.
+Sunlight that reaches the ground has crossed some 8 km worth of sea-level air, and about a tenth of it never arrives
+as a beam: the molecules of the air scatter it aside, into every direction, and the sky is that sideways light. It is
+blue because the molecules are far smaller than the light's wavelength, and for such particles the scattering grows with
+the fourth power of the frequency, <Term of="Rayleigh scattering">Rayleigh scattering</Term>: the 440 nm of blue is
+scattered nearly six times as strongly as the 680 nm of red. Violet is scattered more still, and the sky is not violet
+only because the Sun sends less of it and the eye sees it poorly. The strength of it, the
+<Term of="Scattering coefficient">scattering coefficient</Term>, β, is one of the model's few numbers: at sea level
+3.3 × 10⁻² per kilometer for blue and 5.8 × 10⁻³ for red <Cite id="bruneton2008" />, falling off upward with the air's
+density, by a factor of e every 8 km, its <Term of="Scale height">scale height</Term>.
+
+Dust, haze and water droplets scatter too, by <Term of="Mie scattering">Mie scattering</Term>, which hardly depends
+on the wavelength and throws most of the light forward, within a few degrees of its direction. That is the white glow
+around the Sun, the pale horizon of a hazy day, and the model's second layer, hugging the ground with a scale height of
+1.2 km. Its <Term of="Phase function">phase function</Term>, how much goes where, is set by one number, the
+<Term of="Henyey-Greenstein g">asymmetry</Term>, g, 0.8 by default. And a third layer only absorbs: the ozone in the
+stratosphere, a tent around 25 km, takes out the orange and yellow of the spectrum and leaves twilight its deep blue.
+Without it, as in osgHimmel, twilight goes gray.
+
+<Scattering />
+
+<Planned what="revision" title="How strongly each wavelength scatters" plan="rework once the rest of the chapter stands.">
+    Not settled yet: is the figure easy to understand? Four curves on one scale of multiples of red's, two strips of
+    spectra under them and two legends may be too much for the first figure after the sky.
 </Planned>
 
-## The red of the sunset
 
 Turn away from the Sun just after it has set, and the sky above the opposite horizon splits in two: a dark blue-gray
 band along it, the <Term of="Earth's shadow" />, and above that a band of pink, the <Term of="Belt of Venus" />. The
@@ -67,108 +117,29 @@ As the Sun sinks the shadow rises, and some 6° below the horizon it has merged 
 dunstkreis draws either: a ray that crosses the shadow simply finds the Sun's light hidden there, the multiple
 scattering still lit. Set <Fig id="sky" /> to a clear evening, look east and watch them rise.
 
-<Planned title="The long way through the air">
-    One ray from the observer to the top of the atmosphere, the Sun's elevation to drag: how the path lengthens towards
-    the horizon, what the optical depth along it is, and how much of each color survives. The transmittance table
-    below is the same thing for every height and angle at once.
-</Planned>
 
-<Planned
-    title="Taking the sky apart"
-    plan="merge with Scattering orders into one figure, Rayleigh, Mie, ozone, and each order as switches."
->
-    The same sunset with Rayleigh, Mie and ozone switched on and off one by one. Without ozone, twilight turns gray.
-</Planned>
+Every pixel of the sky is a sum, and the parts can be switched off one at a time. Rayleigh alone gives a blue sky with
+a dark, violet horizon and no glow around the Sun. Mie adds the glow and whitens the horizon. Ozone takes the yellow
+out of twilight. And the light scattered once, straight from the Sun into your eye, is only part of it: the rest has
+bounced two, three, many times, and it is what lights the shadow side of the sky, Earth's shadow after sunset among
+it. Bruneton computed each <Term of="Scattering order">order</Term> in turn and stopped after four.
+Hillaire assumed that light scattered more than once has lost any preferred direction, which makes every further order
+a fixed fraction of the one before and the whole infinite sum one table lookup <Cite id="hillaire2020" />, held in the
+<Term of="Multi-scattering LUT">multiple scattering table</Term>. For Earth's air the two agree to a few percent, and at
+twilight that table carries most of the sky.
 
-## Four wavelengths
+<Sky
+    id="sky-parts"
+    parts
+    caption="The sky taken apart: the air's molecules, the haze and the ozone, each switched off on its own, and the light scattered once or more than once. Each part off takes away what it adds."
+    try={{
+        label: "Twilight without ozone",
+        set: "date=2026-04-06T18:30:00Z&lat=52.395&lon=13.085&h=1",
+        text: "Half an hour after sunset. Switch the ozone off, and the blue over the afterglow turns a pale yellow.",
+    }}
+/>
 
-Scattering, absorption and the Sun's own light all change with the wavelength, so the sky is computed per wavelength,
-not per color. A color on a screen is something else: its red, green, and blue each sum the whole spectrum, weighted by
-how the eye responds to it <Cite id="wyman2013" />. Bruneton and Neyret computed three wavelengths, 680, 550, and
-440 nm, and showed them as red, green, and blue <Cite id="bruneton2008" />, as real-time skies have mostly done since,
-osgHimmel's included. Weighted by the eye instead, the same light comes out 12% off in hue on average, and a third at
-sunset: none of the three samples sees the orange around 600 nm, where red peaks for the eye and ozone absorbs.
-Bruneton's later implementation computes some fifteen wavelengths and converts them exactly <Cite id="bruneton2017" />,
-at about five times the cost.
-
-dunstkreis takes a middle road. It computes four wavelengths, one per channel of its tables, which have four anyway,
-and turns them into red, green, and blue by a matrix fitted for it: by least squares, to 85 sky spectra built from the
-model's own physics, sunlight through every depth of air and ozone, scattered by molecules or by haze, with the Sun
-itself held white. Which four was a search: every set on 10 nm steps between 420 and 690 nm, 4,788 of them, each fitted
-and then tested on 72 skies it was not fitted to. 630, 580, 510, and 440 nm came out best, 0.6% off on average and 1.7%
-at worst, and the GPU does not notice: it computes on four components either way. We have not found this middle road
-described before. The model choice in <Fig id="sky" /> shows the sky as it was colored before, Bruneton's three
-wavelengths taken as red, green, and blue, and as osgHimmel computed it.
-
-<Planned what="section" title="Any wavelengths you like" plan="the library computes any number in batches of four.">
-    The text above explains why four and which four. Still missing: that the four are a choice the reader can make, and
-    what "the whole spectrum" means when the GPU computes four at a time. dunstkreis takes any number of wavelengths, in
-    batches of four, each batch a full set of tables, summed into one sky through its own matrix: slow, the reference,
-    never the default. And it takes them at random, a few per frame, summed over frames: the Monte Carlo way to an
-    integral over the spectrum, and the one to compare the fixed sets against. Why the fixed set wins for the sky, whose
-    spectra are smooth, and where randomness would win: spectra with sharp lines, such as the airglow or a sodium street
-    lamp, which belong to other chapters.
-</Planned>
-
-<Planned
-    title="Pick your wavelengths"
-    plan="keep: the core of the section, and the reason the library takes any wavelengths."
->
-    The visible spectrum as a strip, with the eye's three color matching functions over it, and four markers to drag
-    along it (or more, or fewer). The matrix is refitted at once and shown, the sky follows, next to the reference and
-    their difference in ΔE. Presets: Bruneton's three as red, green, and blue, dunstkreis' four, Bruneton's fifteen.
-    Drag all four into the blue and watch the sunset go wrong.
-</Planned>
-
-<Planned title="One pixel's spectrum" plan="perhaps a panel of Pick your wavelengths rather than its own figure.">
-    The spectrum of one picked direction of the sky, from the reference, with the samples marked on it: at noon a
-    smooth slope falling towards the red, at sunset bent by ozone around 600 nm, between two of Bruneton's three
-    samples. Shows what four samples can and cannot see.
-</Planned>
-
-<Planned
-    title="The whole spectrum, two ways"
-    plan="decide after building the reference: may be one switch in the figure above."
->
-    The reference sky built up live in two ways side by side: a fixed set of wavelengths, batch by batch, and random
-    hero wavelengths, frame by frame, with the number of samples so far and the error against the converged sky. The
-    fixed set is done after twelve batches, the random one likely still noisy after a hundred frames: the cost of being
-    unbiased.
-</Planned>
-
-## Color spaces
-
-<Planned what="section" title="Linear light, then perception">
-    Where the sky's colors live on their way to the screen. The physics works in radiance per wavelength, and only
-    there does adding light mean adding numbers. The fitted matrix turns it into linear sRGB, though it could just as
-    well target Display P3 or Rec. 2020, for a wide-gamut canvas: the fit only swaps the matrix from XYZ. How much of a
-    sunset lies outside sRGB at all, measured on the model's own skies, decides how much this matters. Why not compute
-    in OKLCH: it is built to measure how different two colors look, its lightness a cube root of light, and a sum of
-    two skies in it is not the sky of their light combined. OKLCH comes in after the physics: for gamut mapping, for
-    comparing colors (ΔE, as in the section before), and for the site's own colors.
-</Planned>
-
-<Planned
-    title="The sky's colors on the chromaticity diagram"
-    plan="keep, if the measurement shows the sky leaving sRGB."
->
-    Every pixel of the live sky as a point on the CIE xy diagram, or on the OKLab ab plane, with the triangles of sRGB,
-    Display P3 and Rec. 2020 over it. Drag the time: at noon the cloud sits near the white point, slightly blue; at
-    sunset it stretches towards orange and violet, and some of it leaves the sRGB triangle.
-</Planned>
-
-<Planned title="Mixing in the wrong space" plan="small; drop if the text alone carries it.">
-    Two lights, a blue sky and an orange sunlight, added in linear RGB, in gamma-encoded sRGB and in OKLCH: only the
-    first is the light of both. A strip of three swatches and two sliders.
-</Planned>
-
-## More than one bounce
-
-<Planned title="Scattering orders" plan="merge into Taking the sky apart.">
-    Light scattered once, twice, three times, side by side, and the difference each order still makes. Bruneton
-    iterates a fixed number of orders, Hillaire sums all of them at once under the assumption that light scattered more
-    than once no longer has a preferred direction.
-</Planned>
+<Controls />
 
 ## Bent light
 
@@ -197,38 +168,35 @@ being a special case.
 
 <Planned
     title="With and without refraction"
-    plan="keep, perhaps as a split view of the sky figure above rather than a figure of its own."
+    plan="a split view of the sky figure zoomed at the horizon; next to it a NASA photograph of the flattened Sun from
+        the ISS, public domain, with its credit."
 >
-    The setting Sun side by side, bent and unbent, zoomed in on the horizon: the disc flattened, still in view while
-    geometrically already below the horizon, and the altitude grid to measure it against.
+    The setting Sun side by side, bent and unbent: the disc flattened, still in view while geometrically below the
+    horizon, and the altitude grid to measure it against. From the ISS, where the disc is squeezed to a sixth of its
+    height, against the photograph. Its experiment, already checked: "Sunrise from the ISS",
+    date=2026-04-06T02:04:00Z, lat=52.395, lon=13.085, h=408000, the Sun right on the planet's rim, its lower limb
+    lifted by a degree and its upper one by less.
 </Planned>
 
-## Luftperspektive
+## Through the air, from the ground to orbit
 
-<Planned title="Distance in the air" plan="keep, once the aerial perspective volume is in.">
-    Mountain ridges one behind another, with and without the air between them: contrast fades and colors shift
-    towards the sky's with every kilometer, the cue painters since Leonardo use to paint depth. A small game: how far
-    away is this ridge?
-</Planned>
+The observer can stand anywhere from eye level up to the orbit of the International Space Station, 408 km. Rising, the
+horizon sinks below the horizontal, by some 3° from an airliner's 10 km and 20° from the station, and the sky overhead
+darkens as the air thins, until above 100 km the pass stops looking the sky up and raymarches every pixel from where its
+ray enters the atmosphere: the planet's lit face, its thin glowing rim, and the line between day and night. The lower
+bound is 1 m, eye level give or take, and it is a bound for a reason: exactly on the ground the horizon is level, every
+downward ray ends at once, and the sky looks like nothing a person sees. Raise the height in <Fig id="sky" /> and
+watch the horizon drop; at 100 km the sky is black at noon.
 
-<Planned
-    title="Beyond the atmosphere"
-    plan="move to nachtgestirn or the final demo, where there is a Moon to put behind the air."
->
-    The Moon, planets or a spaceship behind the atmosphere get the same treatment: dimmed and tinted by the air in
-    front of them, and lit by sunlight that crossed the atmosphere on its way to them.
-</Planned>
 
-## From the ground to orbit
+A mountain ridge behind another is paler, bluer and lower in contrast, and painters since Leonardo have used that to
+paint depth: the air between you and the ridge scatters sky light into the line of sight and takes some of the ridge's
+own light out. The same tables give it, the light scattered along a ray of a known length and what is left of what
+started at its end, and it is next on dunstkreis' list.
 
-<Planned
-    title="Leaving the ground"
-    plan="drop as a figure: presets for eye level, an airliner and the ISS in the sky figure above, the text stays."
->
-    The observer from eye level up to the orbit of the International Space Station: the horizon dips, the sky darkens
-    overhead, and from above the atmosphere the whole planet appears, its thin glowing rim and the terminator between
-    day and night.
-</Planned>
+<Distance />
+
+<Controls />
 
 ## Tables instead of raymarching
 
@@ -248,13 +216,248 @@ and all of them follow the same ray.
 
 <Controls />
 
-The tables' sizes and sample counts are open here to play with; the sky above follows. Every table is traced through
+The tables' sizes and sample counts are open here to play with, and [Resolution and sampling](#tables-instead-of-raymarching)
+says what each costs; the sky above follows. Every table is traced through
 the bent air of the section before, and each has a switch for it: off, the rays run straight. It is one setting for the
 whole page, so every table, cube map, and figure follows it.
 
 <Tables />
 
 <Controls open />
+
+
+Every table's size and every sample count is a parameter, and the defaults were chosen by measuring: each table against
+one with many more texels or samples, by the error it causes in the sky. The transmittance table at 256 by 64 moves the
+sky by 0.04% on average and 0.6% at worst; the multiple scattering table at 128 by 64 by 1.2% on average with the Sun
+12° down, where Hillaire's 32 by 32 is off by 14%, since twilight leans on that table's sun angles. The sky view is 128
+by 256, taller than wide, because its rows, the angle from the horizon, need the texels and its columns, the azimuth
+from the Sun, hardly do: Hillaire's 192 by 108 with as many texels is four times as far off. Thirty steps along each
+ray, short ones first where the ray goes up and the air is densest, keep the sky within 0.4% on average, and the
+worst of it is deep twilight, at 5%. Half the samples cost a tenth of a millisecond less per rebuild and start to show
+at the Sun's cutoff on the horizon. The numbers and how they were measured are in the package's research notes.
+
+<Planned title="Starving the tables" plan="a switch on the tables figure above, not a figure of its own.">
+    The tables figure with a high-resolution reference and a heat map of the difference: where bands and seams
+    appear first as a size or a sample count is turned down.
+</Planned>
+
+
+The tables are 16-bit float textures, four channels, one per wavelength, which hold full precision over some 30 stops.
+Two of them need help. The multiple scattering table falls by orders of magnitude across the planet's shadow, within a
+single texel, and a linear filter between two such texels would leak the lit side into the shadow, making twilight
+skies several times too bright; so the table holds the logarithm of its values, and the filter interpolates
+geometrically, as an exponential falloff does. The sky view holds the luminance times a power of two that follows the
+Sun, as [From light to pixels](#from-light-to-pixels) explains, so its brightest value sits near 2¹⁰ at any hour. And
+every lookup aims at the centers of texels, not their corners: half a texel off and the sky shows a seam at the horizon
+rather than an obvious error. Each table's mapping from angle and height to texel is exactly invertible, so the pass
+that writes a table and the one that reads it agree to the bit.
+
+## What to compute when
+
+Nothing in the sky moves at a frame's pace. The Sun crosses its own diameter in about two minutes, a quarter of a
+degree a minute; the air changes with the weather, over hours; only the camera turns every frame. dunstkreis is cut
+along those lines, into four pieces that each have their own reason to run, and a renderer chooses how often each one
+does. The choice is the whole art of using it: the same code renders a sky that is fixed for good and one that follows
+a clock, at a cost from nothing per frame to a few tenths of a millisecond.
+
+The two tables of the air, transmittance and multiple scattering, know only the atmosphere: the planet, the air's
+density and its dust, the ozone, the refraction. They run once per atmosphere, in 0.6 ms on a desktop GPU, and never
+again until the air itself changes. A renderer with one fixed atmosphere computes them at startup, or not at all: the
+[generator](#make-your-own) exports them as files.
+
+The sky view, the whole sky from where the observer stands, knows the Sun and the observer's height. It is rebuilt
+whenever either moves, together with the light meter that reads it, in about a quarter of a millisecond, and the
+rebuild is skipped when neither did. A sky fixed at one moment rebuilds it once. A sky following the clock rebuilds it
+whenever the Sun has moved far enough to matter: every frame, if you like, since a quarter millisecond is cheap, or
+every ten seconds, when the Sun has moved a tenth of its diameter. Refraction lives here and in the tables, never in
+the per-pixel pass, so bent rays cost the same per frame as straight ones.
+
+The sky pass runs every frame, one lookup per pixel into the sky view, 0.05 ms for a full HD frame, and it is where the
+camera comes in. It is also where the [exposure and the tone curve](#from-light-to-pixels) are applied, or not: a
+renderer with a pipeline of its own takes the exposed luminance, linear and unclamped, and tone maps the whole frame
+with the sky in it. Lighting a scene adds a fourth piece behind the sky view: the cube map and its nine coefficients,
+rebuilt when the sky view is, at the cost of a few sky passes, and sampled every frame after that.
+
+Two renderers at the extremes: a skybox and a live sky. The skybox computes the tables and the sky view once, writes
+the cube map, and keeps nothing of dunstkreis at runtime but a texture and nine numbers, tone mapped in whatever
+pipeline draws the rest of the scene; its refraction, its exposure and its colors are the same as the live sky's,
+since they were decided when the map was written. The live sky keeps the tables, rebuilds the sky view as the Sun
+moves, and runs the sky pass every frame, exposed by its own meter if the renderer has no exposure. Anything in between
+is a matter of how often `update` is called and whether a cube map is asked for.
+
+<Planned title="Four pieces, four clocks" plan="keep: the developer's decision figure.">
+    The four pieces as boxes in a row, the tables, the sky view with its meter, the sky pass, and the cube map with its
+    coefficients, and under each its cost on this very GPU at the sizes chosen above, measured as the page runs. Three
+    scenarios to pick, a skybox, a live sky, a live sky lighting a scene, each lighting up which boxes run once, per move
+    or per frame, with the sum per frame. Sliders only for what the scenario can trade: the table sizes and the cube
+    map's.
+</Planned>
+
+dunstkreis records into a command encoder you own, writing into a texture you own. It creates no device, no canvas and
+no render pass of its own, so it slots in before whatever else your frame draws. Every further example builds on this
+one.
+
+**Feed it a sky.** Precompute the tables once per atmosphere, create a sky pass for your target, and hand it the Sun and
+a camera. The Sun's direction is any unit vector in ENU: sternzeit computes it here, but dunstkreis does not depend on
+it, and a fixed vector or your engine's own light does just as well.
+
+```ts
+import { createSkyPass, precomputeAtmosphere } from "@himmelszelt/dunstkreis";
+import { fromDate, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
+
+// Once per atmosphere: the transmittance and multiple scattering tables.
+const luts = await precomputeAtmosphere(device);
+// Into a canvas configured with rgba8unorm and STORAGE_BINDING usage.
+const sky = await createSkyPass(device, { luts, format: "rgba8unorm", autoExposure: true });
+
+// Whenever the moment, the place or the camera changes.
+const time = fromDate(new Date());
+const observer = { latitude: 52.39, longitude: 13.13, heightM: 10 };
+sky.update({
+    // Unit vectors in ENU: x east, y north, z up. True, not refracted.
+    sunDirection: sun.direction(time, observer),
+    sunAngularDiameter: sun.apparentAngularDiameter(julianEphemerisDay(time)),
+    observerHeightM: observer.heightM,
+    inverseViewProjection, // your camera's without translation, column-major; reversed-z works too
+});
+const encoder = device.createCommandEncoder();
+sky.encode(encoder, context.getCurrentTexture());
+device.queue.submit([encoder.finish()]);
+```
+
+`update` only rewrites a few numbers when just the camera moves. A new Sun or a new height also rebuilds the table of
+the whole sky, which the pass then reads once per pixel.
+
+## Four wavelengths
+
+Scattering, absorption and the Sun's own light all change with the wavelength, so the sky is computed per wavelength,
+not per color. A color on a screen is something else: its red, green, and blue each sum the whole spectrum, weighted by
+how the eye responds to it <Cite id="wyman2013" />. Bruneton and Neyret computed three wavelengths, 680, 550, and
+440 nm, and showed them as red, green, and blue <Cite id="bruneton2008" />, as real-time skies have mostly done since,
+osgHimmel's included. Weighted by the eye instead, the same light comes out 12% off in hue on average, and a third at
+sunset: none of the three samples sees the orange around 600 nm, where red peaks for the eye and ozone absorbs.
+Bruneton's later implementation computes some fifteen wavelengths and converts them exactly <Cite id="bruneton2017" />,
+at about five times the cost.
+
+dunstkreis takes a middle road. It computes four wavelengths, one per channel of its tables, which have four anyway,
+and turns them into red, green, and blue by a matrix fitted for it: by least squares, to 85 sky spectra built from the
+model's own physics, sunlight through every depth of air and ozone, scattered by molecules or by haze, with the Sun
+itself held white. Which four was a search: every set on 10 nm steps between 420 and 690 nm, 4,788 of them, each fitted
+and then tested on 72 skies it was not fitted to. 630, 580, 510, and 440 nm came out best, 0.6% off on average and 1.7%
+at worst, and the GPU does not notice: it computes on four components either way. We have not found this middle road
+described before. The model choice in <Fig id="sky" /> shows the sky as it was colored before, Bruneton's three
+wavelengths taken as red, green, and blue, and as osgHimmel computed it.
+
+The four are a field of the model, and a model with other four gets its own matrix, fitted the same way; one default
+set is what ships, and the figure below is where to see why.
+
+<Planned title="Pick your wavelengths" plan="keep: the one figure of the section.">
+    The visible spectrum as a strip, with the eye's three color matching functions over it, and four markers to drag
+    along it. The matrix is refitted at once, the sky follows next to a reference, with their difference. Presets:
+    Bruneton's three as red, green and blue, and dunstkreis' four. Drag all four into the blue and watch the sunset go
+    wrong.
+</Planned>
+
+## From light to pixels
+
+The sky comes out in physical units: luminance, in candela per square meter. The model's sun has the spectrum
+Bruneton's tables use and the illuminance it has above the atmosphere, 128 000 lux: the solar constant of
+1361 W/m² <Cite id="kopp2011" /> times about 94 lumens per watt for sunlight. That puts a clear midday sky at some
+thousands of cd/m², the Sun's disc near 1.6 × 10⁹, and the sky at the end of twilight around a thousandth.
+
+The sky-view table holds them in 16-bit floats, which keep full precision over some 30 stops, from 6 × 10⁻⁵ to 65 504.
+The sky spans more than that in a day: its brightest value falls by 37 stops from noon to the Sun 30° down, and held in
+cd/m², deep twilight would coarsen into steps that an exposure for the night magnifies into colored blocks. So the table
+holds the luminance times a power of two that follows the Sun, which keeps its brightest value near 2¹⁰ at any hour,
+and whatever reads it divides by the same.
+
+Between those numbers and a pixel lie five steps, and every one of them is a choice a renderer makes: which three
+numbers stand for the light, how bright it is shown, how its range is squeezed into the screen's, what becomes of a
+color the screen cannot show, and how the result is written into eight bits. dunstkreis takes all five by default and
+hands each one back on request, so the rest of this section walks them in order.
+
+The light leaves the tables at four wavelengths, and a screen wants red, green and blue. The matrix from
+[Four wavelengths](#four-wavelengths) does that, into linear sRGB, where a number is proportional to light and adding
+two skies adds their light. Linear is the keyword: the physics works here and nowhere else, which is why neither the
+tables nor the sky pass ever see a gamma curve or a perceptual space. The matrix is fitted, and a fitted matrix can give
+a color the screen has no red for. The Sun at the horizon is one: its light has crossed thirty times the air that stands
+above us, and what is left of it is redder than the reddest red of sRGB, so its true sRGB has a blue below zero, not by
+a rounding error but by five percent of its brightness. Three wavelengths shown as red, green and blue cannot say so,
+since each channel is a measured amount of light and never negative; four fitted ones can, and do. dunstkreis pulls
+such a color back into the gamut by mixing in the gray of its own brightness until no channel is negative, which keeps
+what it can of the hue. Left to a tone curve, that negative blue would be cut off at zero per channel, and the setting
+Sun's disc split into a white upper and a yellow lower half at a hard line.
+
+Then the exposure scales the light to the screen's white, the tone curve folds what is
+brighter than white into it, and the last step writes the result for the display: through the sRGB transfer curve, the
+"gamma" that spends more of the eight bits on dark values, where the eye tells them apart, and with a step of noise
+against the bands a smooth twilight would otherwise fall into. Two displays want more, and both are the last step's
+business alone: a float canvas with extended tone mapping shows values above white, up to its headroom, and a canvas in
+Display P3 shows the saturated reds an sRGB screen gives up; what either does with a color still outside its range is
+the gamut mapping at the end of the section.
+
+<Stages />
+
+
+Exposure is set in EV100, as on a camera and in engines like Frostbite and Unreal <Cite id="lagarde2014" />: the
+luminance that just saturates is 1.2 × 2^EV100 cd/m². A sunny day is about EV 15, an overcast one 10, twilight 0,
+moonlight −6. Since the sky is in cd/m², it takes the same exposure as any other scene built on this convention, and
+looks the same under it.
+
+Automatic exposure is an option, for a renderer without an exposure of its own, or to follow day into night. A light
+meter on the GPU reads the sky-view table in directions spread evenly over the sky above the horizon, and takes the
+geometric mean of their luminance, as a camera's averaging meter does: EV100 = log2(L · 100 / 12.5). It meters the
+directions below the horizon apart and takes the brighter: on the ground that is the sky, high up the lit air below,
+while the sky above turns black, and from space the lit planet, raymarched like the view. No direction counts more than
+ten stops below the brightest, a camera's range, so the black sky and the night side do not drown out the day side. The
+sky pass reads that straight from the meter's buffer. Metering the table rather than the image means the reading does
+not change as the camera turns, and the Sun's disc, which is not in the table, does not darken everything. The meter
+reads again whenever the table is rebuilt; the exposure follows at once, without the eye's slow adaptation. The day
+meters around EV 14, a sunset around 12, and twilight follows down to 4, with the Sun 6° below the horizon, where it
+stops: exposed like day, the night would look like day, only noisier. On top, a ramp over the day shapes it:
+compensations at sun altitudes above the observer's horizon, which sinks as the observer rises, joined by a smooth curve
+that never overshoots them <Cite id="fritsch1980" />. By default they keep the night and the minutes around sunrise and
+sunset darker than metered, lift the blue hour a little so its blue shows, make the sunset a little brighter than the
+sunrise, and leave noon as metered. Mornings and evenings may differ, though the model's air is the same for both.
+
+The floor of EV 4 is for now. A camera exposes a landscape by full moon at about EV −3 and the Milky Way at about −6
+to −7. Once the Moon lights the air and the stars are drawn, the floor drops and the night follows. Exposed that far
+today, the sky would show only the Sun's last twilight, amplified beyond what the table can hold.
+
+Metering needs the table on the GPU and a reading back, which not every renderer wants. So the meter can run once per
+atmosphere instead, over sun altitudes from twilight to noon, the compensations added, and the result kept as a handful
+of EV100 values at sun altitudes, joined by the same curve: a default exposure for that air, small enough to keep as
+numbers in code. The default atmosphere's is to ship with dunstkreis. It knows only the Sun, not the observer's height,
+and nothing of clouds or a Moon.
+
+<Planned title="Exposure over a day" plan="keep: its keys are the controls the sky figure lacks.">
+    EV100 over the Sun's altitude, from 18° below to 90°: the meter's reading as a line, the default curve over it, and
+    its keys to drag, with the sky above following. Switch the air, clear, hazy, high up, and see the metered line move
+    away from the curve.
+</Planned>
+
+
+For a display, the pass then tone maps: exposed, compressed into the display's range, and encoded for sRGB, dithered
+against banding. Khronos PBR Neutral <Cite id="khronos2024" /> keeps colors exactly as they are up to three quarters of
+white and compresses only the brightest, so the sky's blue stays the blue the model computes. AgX
+<Cite id="sobotka2023" />, in Wrensch's fit <Cite id="wrensch2023" />, fades bright colors towards white as film does:
+the glow around the Sun and a sunset's brightest band turn white instead of clipping to a flat hue, but the daytime sky
+comes out flatter and grayer. Narkowicz's fit of the ACES filmic curve <Cite id="narkowicz2016" />, which dunstkreis
+used first, is the third: saturated, and it pushes bright hues towards yellow. The exposure follows a camera's
+convention, which puts a metered average at about a tenth of white, where ACES expects it; Neutral and AgX expect the
+scene's middle gray at 0.18, and are lifted by the difference. The tone curve choice in <Fig id="sky" /> switches every
+figure between them. A renderer with its own HDR pipeline turns that off and gets the exposed luminance itself, linear
+and unclamped, for a float target.
+
+
+A display that shows more gets more, and only the last step changes. An rgba16float canvas with extended tone mapping
+shows values above white up to the display's headroom, a few times SDR white on today's screens, and the Neutral
+curve takes that headroom as its ceiling, so the Sun's glow and a bright horizon stay bright instead of compressed to
+white. The HDR choice in <Fig id="sky" /> switches to it where the browser and the screen offer it. A canvas in
+Display P3 would show the saturated reds an sRGB screen gives up, with the matrix fitted for P3 instead; whether enough
+of a sunset leaves sRGB to be worth it is being measured. Either way a color still outside the display's range is cut
+off per channel today, which shifts its hue; reducing its chroma at the same lightness and hue, as CSS does since
+Color 4, keeps it, and is the next option of the tone map.
 
 ## Lighting a scene
 
@@ -292,185 +495,70 @@ whatever lies between, so it reads the level whose texels are about as many as i
 the cube map through a wide lens spans several texels with each pixel, so it reads the level where a texel is about a
 pixel wide, instead of picking one texel of many and flickering as the view turns.
 
+Nine numbers per color channel hold the sky's diffuse light, as a sound is held by a few of its lowest tones: the first is the
+sky's average brightness, the next three say how much brighter it is above than below and towards the Sun than away
+from it, and the last five bend that into the shape of a lit horizon over a dark ground. A diffuse surface sees the
+sky blurred over the whole hemisphere it faces, and nine terms of that blur keep more than 99% of the light it receives,
+for any sky <Cite id="ramamoorthi2001" />. A shader turns them into the light on any surface with nine multiplies and
+no texture lookup, which is what `createIrradiancePass` writes into a buffer, next to an irradiance cube map computed
+from the same nine for shaders that prefer a lookup.
+
 <Environment />
 
 <Lighting />
 
 <Controls />
 
-## Resolution and sampling
+## Make your own
 
-<Planned
-    title="Starving the tables"
-    plan="merge into the tables figure, a high-resolution reference and the difference heat map as a switch there."
->
-    Table sizes and sample counts to turn down, next to a reference computed at high resolution, and a heat map of the
-    difference: where bands and seams appear first, and why the mappings spend their texels near the horizon.
-</Planned>
+Everything this chapter changed along the way, the atmosphere's numbers, the table sizes, the sample counts, the
+wavelengths and the encoding, comes together here, previewed, and leaves as files: the tables, the sky cube map and
+its irradiance as RGBE images that any engine reads, and the nine coefficients as numbers. A renderer that never runs
+dunstkreis gets its sky from them.
 
-## Encoding
+<Sky
+    id="sky-full"
+    full
+    caption="The sky with every option over it, the same pass as the first figure's: exposure by hand or metered, with or without the ramp over the day, the tone curve, the HDR headroom, the atmosphere model, dither and refraction. The model, the tone curve, HDR and refraction switch every figure of the page."
+/>
 
-<Planned
-    title="Storing light"
-    plan="the sky-view table's power of two that follows the Sun, now in From light to pixels, belongs here too."
->
-    The same table stored as 32-bit and 16-bit float, as RGBE and as 8 bits with a logarithmic or gamma curve: what
-    each keeps and loses. Why lookups aim at texel centers, how four dimensions are packed into a 3D texture, and which
-    of these dunstkreis uses.
-</Planned>
+<Controls />
 
-## From light to pixels
-
-The sky comes out in physical units: luminance, in candela per square meter. The model's sun has the spectrum
-Bruneton's tables use and the illuminance it has above the atmosphere, 128 000 lux: the solar constant of
-1361 W/m² <Cite id="kopp2011" /> times about 94 lumens per watt for sunlight. That puts a clear midday sky at some
-thousands of cd/m², the Sun's disc near 1.6 × 10⁹, and the sky at the end of twilight around a thousandth.
-
-The sky-view table holds them in 16-bit floats, which keep full precision over some 30 stops, from 6 × 10⁻⁵ to 65 504.
-The sky spans more than that in a day: its brightest value falls by 37 stops from noon to the Sun 30° down, and held in
-cd/m², deep twilight would coarsen into steps that an exposure for the night magnifies into colored blocks. So the table
-holds the luminance times a power of two that follows the Sun, which keeps its brightest value near 2¹⁰ at any hour,
-and whatever reads it divides by the same.
-
-## Exposure
-
-Exposure is set in EV100, as on a camera and in engines like Frostbite and Unreal <Cite id="lagarde2014" />: the
-luminance that just saturates is 1.2 × 2^EV100 cd/m². A sunny day is about EV 15, an overcast one 10, twilight 0,
-moonlight −6. Since the sky is in cd/m², it takes the same exposure as any other scene built on this convention, and
-looks the same under it.
-
-Automatic exposure is an option, for a renderer without an exposure of its own, or to follow day into night. A light
-meter on the GPU reads the sky-view table in directions spread evenly over the sky above the horizon, and takes the
-geometric mean of their luminance, as a camera's averaging meter does: EV100 = log2(L · 100 / 12.5). It meters the
-directions below the horizon apart and takes the brighter: on the ground that is the sky, high up the lit air below,
-while the sky above turns black, and from space the lit planet, raymarched like the view. No direction counts more than
-ten stops below the brightest, a camera's range, so the black sky and the night side do not drown out the day side. The
-sky pass reads that straight from the meter's buffer. Metering the table rather than the image means the reading does
-not change as the camera turns, and the Sun's disc, which is not in the table, does not darken everything. The meter
-reads again whenever the table is rebuilt; the exposure follows at once, without the eye's slow adaptation. The day
-meters around EV 14, a sunset around 12, and twilight follows down to 4, with the Sun 6° below the horizon, where it
-stops: exposed like day, the night would look like day, only noisier. On top, a ramp over the day shapes it:
-compensations at sun altitudes above the observer's horizon, which sinks as the observer rises, joined by a smooth curve
-that never overshoots them <Cite id="fritsch1980" />. By default they keep the night and the minutes around sunrise and
-sunset darker than metered, lift the blue hour a little so its blue shows, make the sunset a little brighter than the
-sunrise, and leave noon as metered. Mornings and evenings may differ, though the model's air is the same for both.
-
-The floor of EV 4 is for now. A camera exposes a landscape by full moon at about EV −3 and the Milky Way at about −6
-to −7. Once the Moon lights the air and the stars are drawn, the floor drops and the night follows. Exposed that far
-today, the sky would show only the Sun's last twilight, amplified beyond what the table can hold.
-
-<Planned what="section" title="A default exposure for any atmosphere">
-    Metering needs the table on the GPU and a reading back, which not every renderer wants. So the meter runs once per
-    atmosphere instead, at precompute time or offline, over sun altitudes from twilight to noon, the compensations
-    added: the result is a handful of absolute EV100 values at sun altitudes, joined by the same monotone cubic, small
-    enough to keep as numbers in code. The default atmosphere's ships with dunstkreis. A hazier or a thinner air gets
-    its own from the same function. Where it falls short: the curve knows only the Sun, not the observer's height
-    unless it gets a second dimension, and nothing of clouds or a Moon. Why the exposure is still not baked into the
-    tables, though they already carry a power of two that follows the Sun: it is one multiply when reading, and the
-    tables keep their physical units, which lighting a scene and aerial perspective rely on.
-</Planned>
-
-<Planned title="Exposure over a day" plan="keep; the curve's keys are the controls the sky figure lacks today.">
-    EV100 over the Sun's altitude, from 18° below to 90°: the meter's reading as a line, the default curve over it, and
-    its keys to drag. The sky above follows. Switch the atmosphere, clear, hazy, high up, and see the metered line move
-    away from the default and its own curve follow it.
-</Planned>
-
-## Tone mapping
-
-For a display, the pass then tone maps: exposed, compressed into the display's range, and encoded for sRGB, dithered
-against banding. Khronos PBR Neutral <Cite id="khronos2024" /> keeps colors exactly as they are up to three quarters of
-white and compresses only the brightest, so the sky's blue stays the blue the model computes. AgX
-<Cite id="sobotka2023" />, in Wrensch's fit <Cite id="wrensch2023" />, fades bright colors towards white as film does:
-the glow around the Sun and a sunset's brightest band turn white instead of clipping to a flat hue, but the daytime sky
-comes out flatter and grayer. Narkowicz's fit of the ACES filmic curve <Cite id="narkowicz2016" />, which dunstkreis
-used first, is the third: saturated, and it pushes bright hues towards yellow. The exposure follows a camera's
-convention, which puts a metered average at about a tenth of white, where ACES expects it; Neutral and AgX expect the
-scene's middle gray at 0.18, and are lifted by the difference. The tone curve choice in <Fig id="sky" /> switches every
-figure between them. A renderer with its own HDR pipeline turns that off and gets the exposed luminance itself, linear
-and unclamped, for a float target.
-
-<Planned title="Exposure and tone mapping">
-    The eye adapts across some fourteen orders of magnitude, from starlight to the midday Sun, and a screen shows about
-    three. The sky's physical radiance with its exposure to drag, tone curves side by side, and an HDR display where
-    the browser offers one.
-</Planned>
-
-<Planned title="Banding and dithering" plan="merge into Exposure and tone mapping, as a zoomed-in switch.">
-    A smooth twilight gradient quantized to 8 bits, zoomed in: the bands, and the same with a single step of noise
-    added before quantizing.
-</Planned>
-
-## On the display
-
-<Planned what="section" title="HDR and wide gamut">
-    What the last step does with a screen that can show more. HDR: an rgba16float canvas with extended tone mapping
-    lets values above white through, up to the display's headroom, which dunstkreis' tone curves already take as a
-    parameter; the Sun's glow and a bright horizon then stay bright instead of compressed. Wide gamut: a canvas in
-    Display P3, with the matrix fitted for it, shows the saturated part of a sunset the sRGB canvas has to give up.
-    And what happens to a color outside the display's gamut either way: clipped per channel it shifts in hue, mapped
-    in OKLCH, with the chroma reduced at the same lightness and hue, it keeps it, as CSS maps colors since Color 4.
-</Planned>
-
-<Planned
-    title="Beyond white"
-    plan="keep if HDR displays are common enough among readers; shows nothing on an SDR screen."
->
-    The same sunset, SDR and HDR side by side, with the headroom to drag, and the gamut mapping as a switch: clipped
-    per channel, or reduced in OKLCH. On a screen without HDR or P3 the figure says so instead of showing two equal
-    halves.
+<Planned title="The generator" plan="keep: the chapter's capstone, grown out of the figure above.">
+    The settings of every figure above in one panel, a preview of the sky they make, and download buttons for the
+    tables, the cube map, the irradiance map and the coefficients.
 </Planned>
 
 ## Precise and approximate
 
-<Planned title="Bruneton and Hillaire" plan="keep, with Bruneton's four-dimensional table next to Hillaire's three.">
-    Both variants side by side at the same moment and place, and their difference.
+The two implementations this chapter rests on make the same sky by different tables. Bruneton's holds the light
+scattered towards an observer at any height, in any direction, for any Sun, in one four-dimensional table of 32 by 128
+by 32 by 8 texels, computed once; aerial perspective between any two points comes from it for free, and the sky needs no
+table of its own per Sun. Hillaire's holds two small tables of the air and rebuilds a table of the whole sky whenever the
+Sun moves, in a quarter of a millisecond; it is what dunstkreis uses, fits in half a megabyte, and its multiple
+scattering is an infinite sum under one assumption where Bruneton's is four orders exactly. For Earth's air the skies
+differ by a few percent, mostly in twilight. Bruneton's table may come to dunstkreis as another way to fill the sky view,
+and the two would then be switchable like sternzeit's precise and approximate variants.
+
+<Planned title="Bruneton and Hillaire" plan="only once Bruneton's table is built; a paragraph until then.">
+    Both skies at the chosen moment side by side, and their difference magnified.
 </Planned>
 
-## Make your own
+## The people behind the numbers
 
-<Planned
-    title="The generator"
-    plan="keep; exports: the tables as files, the nine coefficients, and the sky and irradiance maps as RGBE (.hdr),
-        which any engine reads."
->
-    Everything this chapter changed along the way, the atmosphere, the table sizes, the sample counts, and the encoding,
-    in one place, previewed, and downloaded as files for your own renderer.
-</Planned>
+Eric Bruneton and Fabrice Neyret, at INRIA in Grenoble, wrote the 2008 paper whose model of the air every number here
+starts from <Cite id="bruneton2008" />, and Bruneton's later implementation, which computes fifteen wavelengths exactly,
+is where the solar spectrum and the ozone cross-sections come from <Cite id="bruneton2017" />. Sébastien Hillaire, then
+at Epic Games, replaced the four-dimensional table with the three small ones of this chapter, for a sky cheap enough to
+rebuild every frame <Cite id="hillaire2020" />. Tomoyuki Nishita and his colleagues drew the first computed Earth seen
+through its atmosphere in 1993 <Cite id="nishita1993" />, and the thickness of the shell is still theirs.
 
-## Code examples
-
-dunstkreis records into a command encoder you own, writing into a texture you own. It creates no device, no canvas and
-no render pass of its own, so it slots in before whatever else your frame draws. Every further example builds on this
-one.
-
-**Feed it a sky.** Precompute the tables once per atmosphere, create a sky pass for your target, and hand it the Sun and
-a camera. The Sun's direction is any unit vector in ENU: sternzeit computes it here, but dunstkreis does not depend on
-it, and a fixed vector or your engine's own light does just as well.
-
-```ts
-import { createSkyPass, precomputeAtmosphere } from "@himmelszelt/dunstkreis";
-import { fromDate, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
-
-// Once per atmosphere: the transmittance and multiple scattering tables.
-const luts = await precomputeAtmosphere(device);
-// Into a canvas configured with rgba8unorm and STORAGE_BINDING usage.
-const sky = await createSkyPass(device, { luts, format: "rgba8unorm", autoExposure: true });
-
-// Whenever the moment, the place or the camera changes.
-const time = fromDate(new Date());
-const observer = { latitude: 52.39, longitude: 13.13, heightM: 10 };
-sky.update({
-    // Unit vectors in ENU: x east, y north, z up. True, not refracted.
-    sunDirection: sun.direction(time, observer),
-    sunAngularDiameter: sun.apparentAngularDiameter(julianEphemerisDay(time)),
-    observerHeightM: observer.heightM,
-    inverseViewProjection, // your camera's without translation, column-major; reversed-z works too
-});
-const encoder = device.createCommandEncoder();
-sky.encode(encoder, context.getCurrentTexture());
-device.queue.submit([encoder.finish()]);
-```
-
-`update` only rewrites a few numbers when just the camera moves. A new Sun or a new height also rebuilds the table of
-the whole sky, which the pass then reads once per pixel.
+Bengt Edlén, a physicist at Lund, measured the refractive index of air that bends every ray here
+<Cite id="edlen1966" />, and George G. Bennett's fit for navigators <Cite id="bennett1982" /> is what the traced
+refraction is tested against. Ravi Ramamoorthi and Pat Hanrahan, at Stanford, showed in 2001 that nine numbers hold
+the diffuse light of any environment <Cite id="ramamoorthi2001" />. Greg Kopp and Judith Lean measured the Sun's
+constant anew in 2011, lower than before, 1361 W/m² <Cite id="kopp2011" />, which sets the sky's brightness, and
+Sébastien Lagarde and Charles de Rousiers wrote down for Frostbite the exposure convention the sky is shown with
+<Cite id="lagarde2014" />. The tone curves are Khronos' <Cite id="khronos2024" />, Troy Sobotka's AgX
+<Cite id="sobotka2023" /> in Benjamin Wrensch's fit <Cite id="wrensch2023" />, and Krzysztof Narkowicz's fit of the
+ACES curve <Cite id="narkowicz2016" />.

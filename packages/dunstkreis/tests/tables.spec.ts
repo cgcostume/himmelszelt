@@ -106,3 +106,37 @@ test("the tables, the sky-view table, the meter and a few pixels of sky hold the
     pass.destroy();
     luts.destroy();
 });
+
+test("the light scattered once and the light scattered more than once add up to the whole sky", async () => {
+    const device = await gpuDevice();
+    test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
+    if (!device) return;
+
+    const luts = await precomputeAtmosphere(device);
+    const params = { sunDirection, sunAngularDiameter: 0.533, ev100: 12, inverseViewProjection: camera(16 / 9) };
+    // Towards the sun just above the horizon, and high up away from it: each order alone, and both. Not the ground, whose
+    // own reflection of the sun each order adds once.
+    const skyOf = async (scattering: { single?: boolean; multiple?: boolean }) => {
+        const pass = await createSkyPass(device, { luts, format: "rgba16float", toneMap: false, scattering });
+        pass.update({ ...params, observerHeightM: 10 });
+        const skyView = await readTexture(device, pass.skyViewTexture);
+        const texels = [texel(skyView, 10, 127), texel(skyView, 100, 60)].map((t) =>
+            t.map((v) => v / pass.skyViewScale),
+        );
+        pass.destroy();
+        return texels;
+    };
+    const [both, single, multiple] = await Promise.all([
+        skyOf({}),
+        skyOf({ multiple: false }),
+        skyOf({ single: false }),
+    ]);
+    for (const [i, whole] of both.entries()) {
+        const sum = (single[i] as number[]).map((v, c) => v + ((multiple[i] as number[])[c] as number));
+        near(sum, whole, 0.01);
+        // Each order alone is a part of it, not all.
+        for (const part of [single[i], multiple[i]])
+            expect((part as number[])[0]).toBeLessThan((whole[0] as number) * 0.99);
+    }
+    luts.destroy();
+});

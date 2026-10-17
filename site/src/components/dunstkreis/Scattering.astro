@@ -1,0 +1,21 @@
+---
+import "../sternzeit/sternzeit.css";
+import Term from "../Term.astro";
+import "./dunstkreis.css";
+---
+
+<figure class="strip-figure wide" id="scattering">
+    <div class="strip-panel scattering-panel" data-export="scattering" data-export-timeless>
+        <svg aria-hidden="true"></svg>
+    </div>
+    <figcaption class="figure-caption">
+        How strongly the air scatters each wavelength, its <Term of="Scattering coefficient">scattering coefficient</Term>, as
+        multiples of red's: by air molecules, <Term of="Rayleigh scattering">Rayleigh scattering</Term>, steeply more towards the violet, and by haze, <Term of="Mie scattering">Mie scattering</Term>, the same at every wavelength. Dashed, the sunlight, and dotted, the skylight it scatters, each
+        as a multiple of its own red: the skylight is the sunlight times the air's scattering. Underneath, the two as
+        colors, with what each adds up to.
+    </figcaption>
+</figure>
+
+<script>
+    import "./scattering";
+</script>

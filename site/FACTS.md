@@ -119,3 +119,16 @@ confirmed yet.
 | Bennett: professor of surveying in Sydney (UNSW), Sydney to Hobart navigator | Bent light | src | kelly2019 | ok | 2026-10-11 |
 | Bennett 1982 written for navigators on programmable calculators | Bent light | src | bennett1982 abstract | ok | 2026-10-11 |
 | Bennett 1982 author is the same George Gordon Bennett | Bent light | web | UNSW, Institute of Navigation fellow; affiliation in the paper not seen | open | 2026-10-11 |
+| Blue (440 nm) scattered nearly six times as strongly as red (680 nm): (680/440)⁴ = 5.7 | Why the sky is blue | derived | Rayleigh λ⁻⁴ | ok | 2026-10-17 |
+| Rayleigh coefficients 3.3 × 10⁻² and 5.8 × 10⁻³ per km, scale height 8 km, Mie 1.2 km, g 0.8, ozone tent at 25 km | Why the sky is blue | lib | model.ts defaults | ok | 2026-10-17 |
+| Horizon dip some 3° from 10 km and 20° from 408 km | From the ground to orbit | derived | acos(Rg / (Rg + h)): 3.2°, 19.8° | ok | 2026-10-17 |
+| Table errors: transmittance 0.04% / 0.6%, multiple scattering 1.2% vs 14% at 32 by 32, sky view 128 by 256 vs 192 by 108 four times, 30 steps 0.4% / 5% | Resolution and sampling | lib | packages/dunstkreis/research/README.md | ok | 2026-10-17 |
+| Rebuild in a quarter of a millisecond, tables in 0.6 ms, sky pass 0.05 ms at 1080p | opening, What to compute when | lib | research/README.md, review of 2026-10 | ok | 2026-10-17 |
+| Bruneton's table 32 by 128 by 32 by 8; Hillaire's tables fit in half a megabyte | Precise and approximate | derived | 57k texels at 8 bytes = 460 kB | ok | 2026-10-17 |
+| Hillaire's and Bruneton's skies differ by a few percent, mostly in twilight | Precise and approximate, Taking the sky apart | lib | not measured yet: Bruneton's table is not built | open | 2026-10-17 |
+| Nine SH terms keep more than 99% of the irradiance for any environment | Lighting a scene | src | Ramamoorthi & Hanrahan 2001: error under 1% for the Lambertian kernel; "any sky" is their bound, not a measurement here | ok | 2026-10-17 |
+| Bruneton and Neyret at INRIA Grenoble; Hillaire at Epic Games in 2020; Nishita 1993 the first computed Earth through its atmosphere; Edlén at Lund; Ramamoorthi and Hanrahan at Stanford; Kopp and Lean 2011 | The people behind the numbers | src | affiliations on the papers; "first" for Nishita unverified | open | 2026-10-17 |
+| Sunlight has crossed some 8 km worth of sea-level air; about a tenth scattered aside overhead | Why the sky is blue | derived | scale height 8 km; Rayleigh depth at 550 nm 0.11 plus Mie 0.004: 11% at the zenith | fixed | 2026-10-17 |
+| Potsdam, 1 km, 2026-04-06: sunset 17:57 UTC, so 17:37 is 20 minutes before; at +30 minutes, looking east, Earth's shadow and the Belt of Venus show | Fig. sky, Try | lib | sternzeit sun.direction and apparentDirection at 1 km; rendered in the figure | ok | 2026-10-17 |
+| Sun 408 km up over Potsdam, 2026-04-06 02:04 UTC: on the planet's rim, lower limb lifted by about a degree, the disc a sixth as tall as wide | planned refraction figure | lib | refractionAngle at 408 km; rendered | ok | 2026-10-17 |
+

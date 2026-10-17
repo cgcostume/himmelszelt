@@ -67,7 +67,15 @@ export { createIrradiancePass } from "./ibl.js";
 
 // Pass and LUT interfaces. This package records into passes the caller owns; it creates no device, canvas,
 // context or render pass of its own.
-export type { AtmosphereLUTs, SkyCubeOptions, SkyCubePass, SkyParams, SkyPass } from "./pass.js";
+export type {
+    AerialPerspectiveOptions,
+    AerialPerspectiveVolume,
+    AtmosphereLUTs,
+    SkyCubeOptions,
+    SkyCubePass,
+    SkyParams,
+    SkyPass,
+} from "./pass.js";
 export { clampObserverHeight, MAX_OBSERVER_HEIGHT_M, MIN_OBSERVER_HEIGHT_M } from "./pass.js";
 
 // Atmospheric refraction, traced through the model's air like the view rays: where the sun shows, on the CPU.

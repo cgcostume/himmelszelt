@@ -5,6 +5,9 @@ into a decision into CLAUDE.md.
 
 ## Bugs
 
+- **Metered exposure from orbit at sunrise sits on the floor of EV 4** and blows the lit rim out: the sampling caps
+  above and below the horizon are mostly black space and night side, and the ten-stop range still lets them pull the
+  geometric mean down. Meter the lit directions alone from space, or weight by luminance, as a camera's spot meter would.
 - **Fig. 5 with the sky map: the sun disc vanishes whole** once its true center sinks below the observer's horizon,
   though a sliver of the refracted disc should still show: the scene draws that disc itself, lit by `sunIlluminance`,
   which the meter measures at the center only, and as a round disc, not flattened by the air. Behind the live

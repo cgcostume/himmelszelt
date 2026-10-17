@@ -33,8 +33,8 @@ fn dkR2(i: u32) -> vec2f {
 
 const DK_DEG_TO_RAD: f32 = 0.01745329251994330;
 
-// Debug overlay, in the apparent (camera) frame: lines of altitude every 10 degrees with the horizon stronger, the
-// eight compass directions up to 80 degrees, and a ring around the sun disc that shows where it is at any exposure.
+// Debug overlay, in the observer's frame, unbent: lines of altitude every 10 degrees with the horizon stronger, the
+// eight compass directions up to 80 degrees, and the sun symbol where the Sun truly is, at any exposure.
 fn dkLine(distance: f32, width: f32) -> f32 {
     return 1.0 - smoothstep(0.5 * width, 1.5 * width, distance);
 }
@@ -52,10 +52,33 @@ fn dkAzimuthStep(first: f32, second: f32) -> f32 {
     return abs(fract((second - first) / 360.0 + 0.5) - 0.5) * 360.0;
 }
 
+// sternwarte's sun symbol around the Sun's true direction, unbent by the air: a circle of 8.5 pixels and eight rays of two
+// round dots each, the same size on screen at any zoom. Where it is, rather than where it shows, so near the horizon the
+// disc stands above it, and below the horizon it is drawn over the ground. `pixel` is the angle of one pixel.
+fn dkSunSymbol(view: vec3f, sun: vec3f, pixel: f32) -> f32 {
+    if (dot(view, sun) <= 0.0) {
+        return 0.0;
+    }
+    let level = cross(vec3f(0.0, 0.0, 1.0), sun);
+    let across = select(vec3f(1.0, 0.0, 0.0), normalize(level), length(level) > 1e-6);
+    let up = cross(sun, across);
+    // In pixels from the Sun, in the plane facing it.
+    let p = vec2f(dot(view - sun, across), dot(view - sun, up)) / pixel;
+    let distance = length(p);
+    let circle = dkLine(abs(distance - 8.5), 1.0);
+    // The nearest of the eight rays, and the nearest of its two dots, at 13.5 and 18.8 pixels, 1.7 across.
+    let step = DK_PI / 4.0;
+    let angle = round(atan2(p.y, p.x) / step) * step;
+    let ray = vec2f(cos(angle), sin(angle));
+    let along = dot(p, ray);
+    let center = select(18.8, 13.5, along < 16.15);
+    let bead = 1.0 - smoothstep(0.35, 1.35, length(p - ray * center));
+    return max(circle, bead);
+}
+
 // `right` and `below` are the rays of the neighboring pixels: a compute pass has no fwidth, so the lines' widths come
-// from how much the angles change from one pixel to the next. `sunAngle` is the bent ray's angle from the sun, so the
-// ring goes where the disc shows, flattened by the air as it is.
-fn dkDebugOverlay(color: vec3f, view: vec3f, right: vec3f, below: vec3f, sunAngle: f32, sunRadius: f32) -> vec3f {
+// from how much the angles change from one pixel to the next.
+fn dkDebugOverlay(color: vec3f, view: vec3f, right: vec3f, below: vec3f) -> vec3f {
     let altitude = dkAltitudeDeg(view);
     let azimuth = dkAzimuthDeg(view);
     let altitudeWidth = abs(dkAltitudeDeg(right) - altitude) + abs(dkAltitudeDeg(below) - altitude);
@@ -68,11 +91,16 @@ fn dkDebugOverlay(color: vec3f, view: vec3f, right: vec3f, below: vec3f, sunAngl
     let compassDistance = abs(fract(azimuth / 45.0 + 0.5) - 0.5) * 45.0 * cos(altitude * DK_DEG_TO_RAD);
     let compassLine = dkLine(compassDistance, azimuthWidth * cos(altitude * DK_DEG_TO_RAD))
         * (1.0 - smoothstep(70.0, 80.0, abs(altitude)));
-    // At least a few pixels wide, so it still finds the Sun in a wide view, where its disc is a dot.
-    let ring = dkLine(abs(sunAngle - max(sunRadius * 1.5, 6.0 * pixel)), pixel);
+    let sunPixel = length(right - view);
+    // Faded out as the disc itself grows past the symbol's circle, zoomed in, while the Sun is up and the disc shows;
+    // below the horizon the symbol stays, the only mark of where it is.
+    let discPixels = dkParams.sunAngularRadius / sunPixel;
+    let up = dkParams.sunDirection.z > dkMetering.horizon.x;
+    let fade = select(1.0, 1.0 - smoothstep(6.0, 8.5, discPixels), up);
+    let sun = dkSunSymbol(view, dkParams.sunDirection, sunPixel) * fade;
 
-    // The ring as strong as the compass lines: part of the same grid.
-    let grid = max(max(0.1 * altitudeLine, 0.3 * horizonLine), 0.15 * max(compassLine, ring));
+    // The symbol stronger than the lines, so it finds the Sun in any sky.
+    let grid = max(max(0.1 * altitudeLine, 0.3 * horizonLine), max(0.15 * compassLine, 0.6 * sun));
     return mix(color, vec3f(1.0), grid);
 }
 
@@ -316,8 +344,7 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
 
     if (DK_DEBUG_GRID) {
         let below = dkPixelRay(id.xy + vec2u(0u, 1u), size);
-        let sunAngle = length(sky.direction - dkParams.sunDirection);
-        color = dkDebugOverlay(color, view, right, below, sunAngle, dkParams.sunAngularRadius);
+        color = dkDebugOverlay(color, view, right, below);
     }
     if (DK_TONE_MAP != 0u && DK_DITHER) {
         color = clamp(dkDither(color, id.xy), vec3f(0.0), dkEncodeSrgbExtended(vec3f(DK_HEADROOM), DK_HEADROOM));

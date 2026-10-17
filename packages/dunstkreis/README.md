@@ -143,6 +143,30 @@ The Sun and the sky light a scene apart, the usual split for image-based lightin
   environment's, and may move to `@himmelszelt/rundbild` once that exists. An rgba32float source is read through a
   nearest sampler unless the device has "float32-filterable".
 
+## Aerial perspective
+
+Distant mountains fade into the sky and take its color: the air between the camera and a point adds its own light and
+lets only part of the point's through. `createSkyPass(device, { ..., aerialPerspective: true })` builds Hillaire's
+aerial perspective volume for that, whenever `update()` sees the camera, the Sun or the observer move: froxels over
+the camera's frustum, 32x32 across the screen in 32 slices out to 32 km, or `{ width, height, depth, maxDistanceKm }`.
+Slice k lies `maxDistanceKm * ((k + 0.5) / depth)²` away, thin near the camera. One invocation per column of froxels
+marches its ray once through all slices, some 130 steps, rather than each froxel its own.
+
+`sky.aerialPerspective` holds two 3D rgba16float textures, the light the air adds at the four wavelengths, times
+`sky.skyViewScale` as the sky-view table, and the transmittance at the four wavelengths, and `maxDistanceKm`. A
+renderer binds both with the tables' sampler and the `DkAtmosphere` uniform, and shades its geometry with `wgsl.aerial`:
+
+```wgsl
+// uv on the screen from the top left, the point's distance from the camera in km, its lit color in cd/m².
+let air = dkSampleAerialPerspective(luminanceVolume, transmittanceVolume, lutSampler, uv, distance, maxDistance, scale);
+let seen = dkApplyAerialPerspective(atmosphere, color, air);
+```
+
+`dkApplyAerialPerspective` turns the four wavelengths into linear sRGB as the sky does, the transmittance weighted by
+sunlight's spectrum. Beyond `maxDistanceKm` the last slice holds; short of the first it fades to nothing in the way.
+The volume follows the camera's matrix alone, not the fisheye of `projectionDistance`. `dkRaymarchAerialPerspective`
+in `wgsl.raymarch` marches one such segment directly, from any altitude, for a renderer of its own.
+
 ## Quality and cost
 
 Every sample count and table size is a parameter (`PrecomputedTextureConfig` and the cube pass' `samples`), and the
@@ -188,8 +212,10 @@ Implemented so far:
 - `src/sky.ts`: the sky-view table, the light meter, the sky pass and its cube pass, `createSkyPass()`.
 - `src/exposure.ts`: EV100 and the automatic exposure's ramp.
 - `src/ibl.ts`: spherical harmonics and irradiance from a cube map, `createIrradiancePass()`.
+- `src/wgsl/aerial.wgsl` and `src/wgsl/aerialvolume.comp.wgsl`: the aerial perspective volume, its lookup and how it
+  applies to a color.
 
-Aerial perspective, specular image-based lighting and Bruneton's table as another filler follow.
+Specular image-based lighting and Bruneton's table as another filler follow.
 
 ### Composing the shaders
 

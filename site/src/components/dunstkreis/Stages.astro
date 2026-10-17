@@ -1,0 +1,76 @@
+---
+import Try from "../Try.astro";
+import "../sternzeit/sternzeit.css";
+import "./dunstkreis.css";
+
+// The five stages from the tables' light to a pixel, each with its one control.
+const STAGES = [
+    { name: "Four wavelengths", note: "630, 580, 510 and 440 nm, clockwise from top left" },
+    { name: "Linear RGB", note: "the brightest sky at white" },
+    { name: "Exposed", note: "clipped at white" },
+    { name: "Tone mapped", note: "folded into white" },
+    { name: "The pixel", note: "sRGB encoded, quantized" },
+];
+---
+
+<figure class="scene-frame wide stages" id="stages">
+    <div class="stages-view">
+        <canvas data-field="canvas" aria-label="A patch of sky around the Sun after each stage from light to pixel"></canvas>
+    </div>
+    <div class="stages-row">
+        {
+            STAGES.map(({ name, note }, i) => (
+                <div class="stages-cell">
+                    <p class="stages-name">
+                        {i + 1}. {name}
+                    </p>
+                    <p class="stages-note">{note}</p>
+                    {i === 0 && (
+                        <span class="stages-control" role="radiogroup" aria-label="Matrix">
+                            <button type="button" class="view-toggle" data-matrix="fitted" aria-pressed="true" title="The four wavelengths to RGB by the matrix fitted to sky spectra">fitted</button>
+                            <button type="button" class="view-toggle" data-matrix="samples" aria-pressed="false" title="The first three wavelengths taken as R, G and B, the fourth left out">as RGB</button>
+                        </span>
+                    )}
+                    {i === 1 && (
+                        <span class="stages-control" role="radiogroup" aria-label="Gamut">
+                            <button type="button" class="view-toggle" data-gamut="map" aria-pressed="true" title="A color outside sRGB desaturated towards its own gray until it fits">mapped</button>
+                            <button type="button" class="view-toggle" data-gamut="clip" aria-pressed="false" title="A channel below zero cut off at zero">clipped</button>
+                        </span>
+                    )}
+                    {i === 2 && (
+                        <label class="stages-control stages-ev">
+                            EV<sub>100</sub> <input data-field="ev" type="range" min="-2" max="18" step="0.1" value="12" /> <output data-field="evValue" />
+                        </label>
+                    )}
+                    {i === 3 && (
+                        <span class="stages-control" role="radiogroup" aria-label="Tone curve">
+                            <button type="button" class="view-toggle" data-curve="1" aria-pressed="true">Neutral</button>
+                            <button type="button" class="view-toggle" data-curve="2" aria-pressed="false">AgX</button>
+                            <button type="button" class="view-toggle" data-curve="3" aria-pressed="false">ACES</button>
+                        </span>
+                    )}
+                    {i === 4 && (
+                        <span class="stages-control">
+                            <span class="stages-control" role="radiogroup" aria-label="Bits">
+                                <button type="button" class="view-toggle" data-bits="8" aria-pressed="true">8 bits</button>
+                                <button type="button" class="view-toggle" data-bits="4" aria-pressed="false" title="Four bits per channel: what eight do to a smooth gradient, sixteen times coarser so it shows">4</button>
+                            </span>
+                            <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="A step of noise against the bands a smooth gradient falls into">dither</button>
+                        </span>
+                    )}
+                </div>
+            ))
+        }
+    </div>
+    <figcaption class="figure-caption">
+        One patch of the sky around the Sun, from the light in the tables to a pixel on the screen, each stage with its one
+        choice. Every choice is passed on: clip the gamut, and the exposed, tone mapped and encoded sky inherit it.
+        <Try label="The setting Sun" set="date=2026-04-06T17:50:00Z&lat=52.395&lon=13.085&h=1" fig="stages">
+            The sky around it lies outside sRGB, hatched. Take the wavelengths as RGB instead, and the sunset pales.
+        </Try>
+    </figcaption>
+</figure>
+
+<script>
+    import "./stages";
+</script>

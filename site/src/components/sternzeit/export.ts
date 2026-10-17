@@ -1,7 +1,9 @@
 // A download button on every figure panel marked `data-export="<name>"`: its SVGs (and HTML labels marked
 // `data-export-text`) composed into one standalone SVG file, styles inlined, so it opens anywhere as it looks here.
 // Nested panels (the locked views over the armillary sphere, the analemma over the sun path) are exported on their
-// own, not twice.
+// own, not twice. Each file is signed with the moment and place it shows, unless marked `data-export-timeless`.
+
+import { momentAndPlace, momentStamp } from "./state";
 
 // The properties the figures' CSS and Zdog set; inlined from the computed style, since the file carries no stylesheet.
 const PROPERTIES = [
@@ -120,6 +122,9 @@ function frame(svg: SVGSVGElement, box: Box, index: number) {
     return { clip, fill, outline };
 }
 
+// The height of the row the moment and place are written in, under the figure.
+const STAMP_ROW = 22;
+
 type Box = { x: number; y: number; width: number; height: number };
 
 async function compose(root: HTMLElement) {
@@ -133,7 +138,9 @@ async function compose(root: HTMLElement) {
     const left = Math.min(...rects.map((r) => r.left));
     const top = Math.min(...rects.map((r) => r.top));
     const width = Math.max(...rects.map((r) => r.right)) - left;
-    const height = Math.max(...rects.map((r) => r.bottom)) - top;
+    // The moment and place the figure shows, in a row of its own under it, unless it shows none.
+    const stamp = root.hasAttribute("data-export-timeless") ? null : momentAndPlace();
+    const height = Math.max(...rects.map((r) => r.bottom)) - top + (stamp ? STAMP_ROW : 0);
 
     const out = document.createElementNS(SVG_NS, "svg");
     out.setAttribute("xmlns", SVG_NS);
@@ -179,6 +186,14 @@ async function compose(root: HTMLElement) {
         );
         out.append(text);
     }
+    if (stamp) {
+        const text = document.createElementNS(SVG_NS, "text");
+        text.textContent = stamp;
+        text.setAttribute("x", "0");
+        text.setAttribute("y", f(height - STAMP_ROW / 3));
+        text.setAttribute("style", `fill:${getComputedStyle(root).getPropertyValue("--muted")};font-size:12px`);
+        out.append(text);
+    }
     await embedImages(out);
     return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(out)}`;
 }
@@ -187,7 +202,8 @@ async function download(root: HTMLElement) {
     const blob = new Blob([await compose(root)], { type: "image/svg+xml" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `himmelszelt-${root.dataset.export}.svg`;
+    const stamp = root.hasAttribute("data-export-timeless") ? "" : `-${momentStamp()}`;
+    link.download = `himmelszelt-${root.dataset.export}${stamp}.svg`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }

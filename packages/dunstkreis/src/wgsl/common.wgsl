@@ -11,6 +11,11 @@ const DK_PI: f32 = 3.141592653589793;
 // the cheaper march, for a model without refraction. On by default, which is right for either.
 override DK_REFRACTION: bool = true;
 
+// Which orders of scattering the march adds up: the light scattered once, straight from the sun, and the light scattered
+// more than once, from the multiple scattering table. Both on by default; one off, to see what the other does alone.
+override DK_SINGLE_SCATTERING: bool = true;
+override DK_MULTIPLE_SCATTERING: bool = true;
+
 // The model's refractivity on the ground, or 0 with DK_REFRACTION off.
 fn dkGroundRefractivity(a: DkAtmosphere) -> f32 {
     return select(0.0, a.refractivity, DK_REFRACTION);

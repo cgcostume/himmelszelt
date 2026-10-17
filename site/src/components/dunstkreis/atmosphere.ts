@@ -204,6 +204,8 @@ export type Sky = {
 };
 export const onSkyView = (listener: (sky: Sky) => void) =>
     events.addEventListener("skyView", (event) => listener((event as CustomEvent<Sky>).detail));
+/** The sky last announced, for a figure that subscribes after it was. */
+export const currentSky = () => lastSky;
 export function skyViewChanged(sky: Sky) {
     events.dispatchEvent(new CustomEvent("skyView", { detail: sky }));
     lastSky = sky;

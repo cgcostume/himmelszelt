@@ -16,6 +16,8 @@
  * Every identifier is prefixed `dk` (or `DK_` for constants) so several `@himmelszelt/*` fragments can share one
  * shader module.
  */
+import aerial from "./aerial.wgsl";
+import aerialvolume from "./aerialvolume.comp.wgsl";
 import atmosphere from "./atmosphere.wgsl";
 import common from "./common.wgsl";
 import cube from "./cube.wgsl";
@@ -40,6 +42,8 @@ export { skyCubeOutput, skyOutput } from "./output.js";
 export { workgroupSum } from "./reduce.js";
 
 export {
+    aerial,
+    aerialvolume,
     atmosphere,
     common,
     cube,

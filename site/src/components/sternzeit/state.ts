@@ -131,3 +131,18 @@ document.addEventListener("click", (event) => {
 
 /** The page's moments are UT; the orbits take ephemeris time, a minute or so ahead today (see deltaT). */
 export const ephemerisDay = (jd: number) => julianEphemerisDay(jd);
+
+/** The page's moment and place in one line, for a downloaded figure: in UTC, whatever clock the page reads. */
+export function momentAndPlace() {
+    const utc = minuteOf(state.jd).replace("T", " ");
+    const angle = (value: number, positive: string, negative: string) =>
+        `${Math.abs(value).toFixed(3)}° ${value < 0 ? negative : positive}`;
+    const place = `${angle(state.latitude, "N", "S")}, ${angle(state.longitude, "E", "W")}`;
+    return `${utc} UTC, ${place}, ${Math.round(state.heightM)} m`;
+}
+
+/** The page's moment as part of a file name, e.g. "2026-04-06T1805Z". */
+export const momentStamp = () => `${minuteOf(state.jd).replace(":", "")}Z`;
+
+/** A Julian Day as an ISO date and time in UTC, to the nearest minute: "2026-04-06T18:05". */
+const minuteOf = (jd: number) => new Date(Math.round((jd - 2440587.5) * 1440) * 60_000).toISOString().slice(0, 16);

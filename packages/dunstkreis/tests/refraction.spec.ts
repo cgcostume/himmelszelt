@@ -65,7 +65,7 @@ test("apparentDirection is the inverse of the tracing, and steady looking down f
             const bend = refractionAngle(model, heightM, apparentAltitude);
             if (bend === null) continue;
             // Lifted, never by more than the grazing ray from space, and lowered back exactly. Unless the planet hides
-            // it: then it stays on the horizon, just below which the rays end on the ground.
+            // it: then it is returned as it is, which the ray ending on the ground skips above.
             expect(apparentAltitude).toBeGreaterThanOrEqual(altitude);
             expect(apparentAltitude - altitude).toBeLessThan(1.5);
             const error = (apparentAltitude - bend - altitude) * 3600;
@@ -73,4 +73,10 @@ test("apparentDirection is the inverse of the tracing, and steady looking down f
             if (error > 0.1) expect(refractionAngle(model, heightM, apparentAltitude - 0.001)).toBeNull();
         }
     }
+});
+
+test("a body hidden behind the planet is returned as it is", () => {
+    const a = (-30 * Math.PI) / 180;
+    const hidden: [number, number, number] = [0.6 * Math.cos(a), 0.8 * Math.cos(a), Math.sin(a)];
+    expect(apparentDirection(hidden, model, GROUND_M)).toEqual(hidden);
 });

@@ -117,6 +117,31 @@ export interface SkyCubePass {
     encode(encoder: GPUCommandEncoder, target: GPUTexture): void;
 }
 
+/** The aerial perspective volume's shape, fixed when its sky pass is made. */
+export interface AerialPerspectiveOptions {
+    /** Froxels across and down the screen, 32 each by default, as Hillaire's. */
+    width?: number;
+    height?: number;
+    /** Slices in depth, 32 by default. */
+    depth?: number;
+    /** How far the last slice reaches, in km, 32 by default. */
+    maxDistanceKm?: number;
+}
+
+/**
+ * Hillaire's aerial perspective volume: the air between the camera and the geometry in front of it, over the camera's
+ * frustum, for fading and tinting distant terrain. Froxels follow the screen in x and y, top left first, and the
+ * distance in z, slice k at `maxDistanceKm * ((k + 0.5) / depth) ** 2`. Look it up with `dkSampleAerialPerspective`
+ * and apply it with `dkApplyAerialPerspective`, both from `wgsl.aerial`.
+ */
+export interface AerialPerspectiveVolume {
+    /** The light the air adds at the four wavelengths, times `SkyPass.skyViewScale`, a 3D rgba16float texture. */
+    readonly luminance: GPUTexture;
+    /** The transmittance of the geometry's own light at the four wavelengths, a 3D rgba16float texture. */
+    readonly transmittance: GPUTexture;
+    readonly maxDistanceKm: number;
+}
+
 /**
  * A sky pass: a compute pass that writes every pixel of a target the caller owns, with no rasterization. It goes
  * first, as the background the moon, stars, clouds and the rest of the frame are drawn over. This package never
@@ -133,9 +158,13 @@ export interface SkyPass {
      * two that follows the sun, set by `update()`, so the table's values sit where half floats resolve them best.
      */
     readonly skyViewScale: number;
+    /** The aerial perspective volume, rebuilt by `update()` whenever the camera, the sun or the observer moved; null
+     *  unless the pass was made with `aerialPerspective`. */
+    readonly aerialPerspective: AerialPerspectiveVolume | null;
     /**
      * Takes the parameters over, writes the uniforms, and, when the sun or the observer moved, rebuilds the sky-view
-     * table and meters it: submitted on its own, or recorded into `encoder` to go with the frame's own submission.
+     * table and meters it, and the aerial perspective volume also when the camera moved: submitted on its own, or
+     * recorded into `encoder` to go with the frame's own submission.
      * Above the atmosphere only the meter runs; the sky pass raymarches there and reads no table.
      */
     update(params: Partial<SkyParams>, encoder?: GPUCommandEncoder): void;

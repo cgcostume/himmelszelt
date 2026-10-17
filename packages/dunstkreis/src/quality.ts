@@ -95,3 +95,15 @@ export function featureConstants(features: Partial<Features> = {}): Record<strin
 
 /** `common.wgsl`'s own switch: the straight march for a model whose air does not bend. */
 export const refractionConstants = (model: AtmosphereModel) => ({ DK_REFRACTION: model.refractivity > 0 ? 1 : 0 });
+
+/** `common.wgsl`'s orders of scattering the march adds up: once, more than once, by default both. */
+export const scatteringConstants = ({
+    single = true,
+    multiple = true,
+}: {
+    single?: boolean;
+    multiple?: boolean;
+} = {}) => ({
+    DK_SINGLE_SCATTERING: Number(single),
+    DK_MULTIPLE_SCATTERING: Number(multiple),
+});

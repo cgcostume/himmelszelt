@@ -16,7 +16,7 @@ override DK_DITHER: bool = true;
 // Expose by the light meter's reading, compensated and held within its range, instead of the uniform's exposure.
 override DK_AUTO_EXPOSURE: bool = false;
 
-// Draw the debug overlay: altitude lines, the compass directions and a ring around the Sun.
+// Draw the debug overlay: altitude lines, the compass directions and the sun symbol at the Sun's true direction.
 override DK_DEBUG_GRID: bool = false;
 
 // Draw the sun disc. Off for a cube map lighting a scene, which takes the sun as a light of its own: a disc of some

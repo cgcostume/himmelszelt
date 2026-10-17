@@ -113,7 +113,7 @@ export function refractionAngle(
  * Where a body in the true (geometric) `direction` shows, lifted by the air, as seen from `observerHeightM` meters up:
  * for pointing a camera at the sun, or marking where it shows. ENU, like every direction here. Solved by bisection,
  * since the bending is traced from the apparent direction: its true one only grows with it. A body hidden behind the
- * planet ends up on the horizon.
+ * planet, below even the most bent ray, is returned as it is.
  */
 export function apparentDirection(
     direction: readonly [number, number, number],
@@ -136,6 +136,7 @@ export function apparentDirection(
         else high = middle;
     }
     const altitude = (low + high) / 2;
+    if (lowered(altitude) === Number.NEGATIVE_INFINITY) return [x, y, z];
     const cosAltitude = Math.cos(altitude);
     return [(x / horizontal) * cosAltitude, (y / horizontal) * cosAltitude, Math.sin(altitude)];
 }

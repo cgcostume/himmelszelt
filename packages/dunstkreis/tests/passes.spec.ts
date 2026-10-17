@@ -50,6 +50,7 @@ const PASSES: Record<string, readonly string[]> = {
         "sky",
     ],
     exposure: ["atmosphere", "common", "lut", "sampling", "raymarch", "spiral", "frame", "exposure"],
+    aerialvolume: ["atmosphere", "common", "lut", "sampling", "raymarch", "frame", "aerial", "aerialvolume"],
     irradiance: ["cube", "spiral", "irradiance"],
     mipmap: ["cube", "mipmap"],
 };
@@ -84,6 +85,6 @@ test("the composable fragments compile without any pass, binding or override", a
 
     // The property that makes them droppable into someone else's shader: no bindings, no entry points, and
     // no dependency on the quality overrides.
-    const composable = ["atmosphere", "common", "lut", "sampling", "raymarch"].map(wgslSource).join("\n");
+    const composable = ["atmosphere", "common", "lut", "sampling", "raymarch", "aerial"].map(wgslSource).join("\n");
     expect(await compileWgsl(device, composable)).toEqual([]);
 });

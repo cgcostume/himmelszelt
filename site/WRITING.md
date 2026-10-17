@@ -123,6 +123,8 @@ list, and never a promise the chapter does not keep yet.
 - **Symbols** (φ, ε, θ, α, δ, l, β, π, A, h) only for what the figures and code use, each introduced once, as a
   one-word aside where its concept first appears ("the obliquity of the ecliptic, ε."), and words after that. No
   formulas in prose, no symbol a reader meets nowhere else.
+- **Wavelength, not color**, for what light is made of: scattering "depends on the wavelength", not "cares about the
+  color". Color is what the eye or a screen makes of a spectrum: the sky's color, a color outside the gamut.
 - **Directions** are ENU everywhere: x east, y north, z up; azimuths from north through east. Say once per chapter how
   a y-up engine assigns them, `(x, z, -y)`.
 

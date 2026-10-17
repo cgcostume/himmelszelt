@@ -1,0 +1,31 @@
+---
+import Try from "../Try.astro";
+import "../sternzeit/sternzeit.css";
+import "./dunstkreis.css";
+---
+
+<figure class="scene-frame wide" id="distance">
+    <div class="sky-view distance-view as-seen">
+        <canvas data-field="canvas" aria-label="Four ridges one behind another, faded by the air between"></canvas>
+        <div class="sky-corner">
+            <button type="button" class="view-toggle" data-field="air" aria-pressed="true" title="The air between the ridges and the eye: off, they show as they would in a vacuum">air</button>
+        </div>
+    </div>
+    <label class="figure-slider" title="How far the nearest ridge is; each one behind is twice as far">
+        <span class="note">Nearest ridge</span>
+        <input data-field="distance" type="range" min="0" max="5" step="0.01" value="2" />
+        <output data-field="distanceValue"></output>
+    </label>
+    <figcaption class="figure-caption">
+        Four ridges, each twice as far as the one in front, seen through the air between them and the eye: the light it
+        adds and the light of the ridges it takes away, from dunstkreis' aerial perspective volume. Switch the air off,
+        and they stand as in a vacuum, as dark at 100 km as at 1.
+        <Try label="Hazy noon" set="date=2026-06-21T11:00:00Z&lat=52.395&lon=13.085&h=1" fig="distance">
+            Move the nearest ridge out: the farthest fade into the sky's own blue.
+        </Try>
+    </figcaption>
+</figure>
+
+<script>
+    import "./distance";
+</script>

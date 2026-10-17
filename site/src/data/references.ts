@@ -185,6 +185,13 @@ export const references: Record<string, Reference> = {
         year: 2008,
         url: "https://inria.hal.science/inria-00288758",
     },
+    hillaire2020: {
+        authors: "Sébastien Hillaire",
+        title: "A Scalable and Production Ready Sky and Atmosphere Rendering Technique",
+        venue: "Computer Graphics Forum 39(4), EGSR",
+        year: 2020,
+        url: "https://sebh.github.io/publications/egsr2020.pdf",
+    },
     bruneton2017: {
         authors: "Eric Bruneton",
         title: "Precomputed Atmospheric Scattering: a New Implementation",
