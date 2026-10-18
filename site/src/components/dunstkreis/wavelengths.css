@@ -1,0 +1,199 @@
+/* Pick your wavelengths: the presets over the strip, the spectrum with the markers, the eight skies under it as pairs of
+   swatches, their numbers, and the two live skies, side by side. */
+.wavelengths-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.5rem;
+}
+.wavelengths-strip > svg {
+    height: 13rem;
+    cursor: default;
+    /* Horizontal drags move a marker; vertical ones still scroll the page. */
+    touch-action: pan-y;
+}
+.wavelengths-strip text {
+    paint-order: stroke;
+    stroke: var(--bg);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
+/* The eye's three weights in hues that hold on both pages. */
+.wavelengths-red,
+.wavelengths-green,
+.wavelengths-blue {
+    fill: none;
+    stroke-width: 1.5;
+}
+.wavelengths-red {
+    stroke: oklch(0.62 0.2 28);
+}
+.wavelengths-green {
+    stroke: oklch(0.62 0.16 150);
+}
+.wavelengths-blue {
+    stroke: oklch(0.6 0.17 260);
+}
+.wavelengths-red-label {
+    fill: oklch(0.62 0.2 28);
+}
+.wavelengths-green-label {
+    fill: oklch(0.62 0.16 150);
+}
+.wavelengths-blue-label {
+    fill: oklch(0.6 0.17 260);
+}
+.wavelengths-sky-area {
+    fill: var(--line);
+    opacity: 0.6;
+}
+.wavelengths-sky-name {
+    font-style: italic;
+}
+:root[data-theme="light"] .wavelengths-band {
+    filter: saturate(1.8) brightness(0.75);
+}
+.wavelengths-mark {
+    cursor: ew-resize;
+    outline: none;
+}
+.wavelengths-mark-line {
+    stroke: var(--accent);
+    stroke-width: 1.5;
+}
+.wavelengths-handle {
+    fill: var(--bg);
+    stroke: var(--accent);
+    stroke-width: 2;
+}
+.wavelengths-mark.dragging .wavelengths-handle,
+.wavelengths-mark:focus-visible .wavelengths-handle {
+    fill: var(--accent);
+}
+.wavelengths-mark-label {
+    fill: var(--accent);
+}
+/* Eight pairs in a row, four on a narrow screen. */
+.wavelengths-skies {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 0.75rem 0.5rem;
+    margin-top: 0.75rem;
+}
+@media (min-width: 48rem) {
+    .wide > .wavelengths-skies,
+    .wide > .wavelengths-numbers,
+    .wide > .wavelengths-live,
+    .wide > .wavelengths-bar {
+        margin-inline: 1.5rem;
+    }
+}
+@media (max-width: 40rem) {
+    .wavelengths-skies {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+.wavelengths-pair {
+    display: flex;
+    height: auto;
+    font-family: inherit;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.2rem;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--muted);
+    font-size: var(--text-small);
+    line-height: 1.25;
+    text-align: center;
+    cursor: pointer;
+}
+.wavelengths-pair:hover,
+.wavelengths-pair[aria-checked="true"] {
+    color: var(--text);
+}
+/* The true color left, the samples' right: where they differ, a seam shows down the middle. */
+.wavelengths-swatch {
+    display: flex;
+    flex: none;
+    width: 100%;
+    aspect-ratio: 1;
+    border: 2px solid transparent;
+    border-radius: var(--radius-small);
+    overflow: hidden;
+}
+.wavelengths-swatch > span {
+    flex: 1;
+}
+.wavelengths-pair[aria-checked="true"] .wavelengths-swatch {
+    border-color: var(--accent);
+}
+.wavelengths-pair-error {
+    font-family: var(--font-mono);
+    color: var(--text);
+}
+.wavelengths-numbers {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem 1.5rem;
+    margin-top: 0.75rem;
+    font-size: var(--text-small);
+}
+.wavelengths-score {
+    margin: 0;
+    color: var(--text);
+}
+.wavelengths-matrix {
+    width: auto;
+    margin: 0;
+    border: none;
+    table-layout: auto;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+.wavelengths-matrix th,
+.wavelengths-matrix td {
+    padding: 0 0 0 0.75rem;
+    border: none;
+    background: none;
+    text-align: right;
+    font-weight: normal;
+}
+.wavelengths-matrix td {
+    color: var(--text);
+}
+/* The two skies overhead, side by side, each a disc on black. */
+.wavelengths-live {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 18rem));
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+.wavelengths-live[hidden] {
+    display: none;
+}
+.wavelengths-live > div {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius);
+    background: oklch(0 0 0);
+}
+.wavelengths-live canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    clip-path: circle(50%);
+}
+.wavelengths-live-name {
+    position: absolute;
+    top: 0.4rem;
+    left: 0.5rem;
+    color: oklch(0.85 0 0);
+    font-size: var(--text-small);
+}

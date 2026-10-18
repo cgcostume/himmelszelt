@@ -1,0 +1,46 @@
+---
+import "../sternzeit/sternzeit.css";
+import "./dunstkreis.css";
+import "./clocks.css";
+import Fig from "../Fig.astro";
+
+const SCENARIOS = [
+    ["skybox", "Skybox", "Everything computed once, kept as a cube map and nine numbers"],
+    ["live", "Live sky", "The sky pass every frame, the sky view whenever the Sun moves"],
+    ["lit", "Lighting a scene", "A live sky that also lights a scene by its cube map and coefficients"],
+    ["aerial", "Aerial perspective", "Lighting a scene, and the air in front of it by the aerial perspective volume"],
+];
+---
+
+<figure class="strip-figure wide" id="clocks">
+    <div class="clocks-bar">
+        <span class="steps" role="radiogroup" aria-label="Scenario">
+            {
+                SCENARIOS.map(([value, text, title]) => (
+                    <label title={title}>
+                        <input type="radio" name="clocks-scenario" value={value} checked={value === "lit"} />
+                        <span>{text}</span>
+                    </label>
+                ))
+            }
+        </span>
+    </div>
+    <div class="strip-panel clocks-panel">
+        <svg role="img" aria-label="The pieces of dunstkreis, what each reads, how large it is and when it runs"></svg>
+    </div>
+    <p class="clocks-measured note" data-field="measured"></p>
+    <figcaption class="figure-caption">
+        Four pieces, four clocks: every texture and buffer dunstkreis computes, each in the lane of what makes it run
+        again. A box shows what it holds, read from this page's own textures and shown as in the figures that explain
+        them, the aerial perspective by its middle and its last slice, then its size in texels and its memory, textures
+        at four half floats per texel. An arrow leads to what reads it, and every pass below the tables reads both, but
+        the one computing the coefficients. Dashed, what is yours. A scenario lights up what it runs, and a skybox runs
+        it all once. The timings are measured on this GPU as the page loaded, at the sizes the tables
+        (<Fig id="tables" />) and the cube map (<Fig id="environment" />) are set to, the sky pass into a full HD frame;
+        under the figure, their sums for each occasion.
+    </figcaption>
+</figure>
+
+<script>
+    import "./clocks";
+</script>

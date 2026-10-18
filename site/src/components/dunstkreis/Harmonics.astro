@@ -1,0 +1,118 @@
+---
+import "../sternzeit/sternzeit.css";
+import Try from "../Try.astro";
+import "./dunstkreis.css";
+import "./harmonics.css";
+
+// The nine real spherical harmonics in ENU, band by band, m from -l to l: their polynomials, and what each says of a sky.
+const BANDS = [
+    { kept: "100%", functions: [{ poly: "1", word: "average", title: "The same everywhere: the sky's average" }] },
+    {
+        kept: "67%",
+        functions: [
+            { poly: "y", word: "north", title: "Brighter to the north than to the south, or the other way round" },
+            { poly: "z", word: "up", title: "Brighter above than below, or the other way round" },
+            { poly: "x", word: "east", title: "Brighter to the east than to the west, or the other way round" },
+        ],
+    },
+    {
+        kept: "25%",
+        functions: [
+            { poly: "xy", word: "diagonal", title: "Northeast and southwest against northwest and southeast" },
+            { poly: "yz", word: "tilt north", title: "North high and south low against north low and south high" },
+            { poly: "3z²−1", word: "poles", title: "Zenith and nadir against the horizon all round" },
+            { poly: "xz", word: "tilt east", title: "East high and west low against east low and west high" },
+            { poly: "x²−y²", word: "axes", title: "East and west against north and south" },
+        ],
+    },
+];
+const BUILD = [
+    { name: "band 0", title: "The average alone: the same light from every side" },
+    { name: "bands 0, 1", title: "The average and the three directions" },
+    { name: "bands 0 to 2", title: "All nine coefficients, as createIrradiancePass computes them" },
+    {
+        name: "whole sky",
+        title: "The cube map itself, every direction weighted by the cosine: what the nine approximate",
+    },
+];
+---
+
+<figure class="scene-frame" id="harmonics">
+    <div class="harmonics-panel" data-variant="both">
+        {
+            import.meta.env.DEV && (
+                <p class="harmonics-variants">
+                    <button type="button" class="view-toggle" data-variant="both" aria-pressed="true">both</button>
+                    <button type="button" class="view-toggle" data-variant="a" aria-pressed="false">variant A</button>
+                    <button type="button" class="view-toggle" data-variant="b" aria-pressed="false">variant B</button>
+                </p>
+            )
+        }
+        <div class="harmonics-pyramid">
+            <svg class="harmonics-key" aria-hidden="true"></svg>
+            {
+                BANDS.map((band, l) => (
+                    <div class="harmonics-band" data-band={l}>
+                        <p class="harmonics-band-name">
+                            <span>band {l}</span>
+                            <span class="harmonics-kept" title="The share of this band a diffuse surface receives">
+                                {band.kept}
+                            </span>
+                        </p>
+                        {band.functions.map((f, m) => (
+                            <div class="harmonics-cell" style={`grid-column: ${4 - l + m}`} title={f.title}>
+                                <canvas class="harmonics-basis" data-index={l * l + m} aria-hidden="true" />
+                                <svg class="harmonics-bars" data-index={l * l + m} aria-hidden="true" />
+                                <span class="harmonics-word">{f.word}</span>
+                                <span class="harmonics-poly">{f.poly}</span>
+                            </div>
+                        ))}
+                    </div>
+                ))
+            }
+            <p class="harmonics-higher">
+                <span>bands 3 to 6</span> <span class="harmonics-kept">0%, 4%, 0%, 2%</span>
+            </p>
+        </div>
+        <div class="harmonics-build">
+            {
+                BUILD.map((step, i) => (
+                    <div class="harmonics-step" title={step.title}>
+                        <div class="as-seen harmonics-sphere">
+                            <canvas data-step={i} aria-hidden="true" />
+                        </div>
+                        <span class="harmonics-word">{step.name}</span>
+                        <span class="harmonics-poly" data-error={i} />
+                    </div>
+                ))
+            }
+        </div>
+        <svg class="harmonics-plot" aria-hidden="true"></svg>
+    </div>
+    <label class="figure-slider" data-offset title="The moment, up to half a day either way from where it was set: drag, or turn the mouse wheel for ten minutes a notch">
+        <span class="note">Time</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="offset" min="-720" max="720" step="5" value="0" aria-label="Minutes from the moment" />
+            <span class="figure-slider-scale" aria-hidden="true">{["−12", "0", "+12"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 50}%`}>{mark}{i !== 1 && <span class="figure-slider-unit">{"\u202fh"}</span>}</span>)}</span>
+        </span>
+        <output data-field="offsetValue" />
+    </label>
+    <figcaption class="figure-caption">
+        The nine spherical harmonics and the sky held in them. (a) The basis, band by band, each function as its classic
+        lobes, reaching as far in every direction as its magnitude there: the accent where it is positive, orange where it
+        is negative. Like overtones over a fundamental, each band turns faster around the sphere than the one before;
+        beside it, the share of it a diffuse surface receives, nothing at all of band 3. Under each, the sky's coefficient
+        in red, green and blue, all to one scale. (b) The sky's irradiance as one such shape, reaching as far in every
+        direction as the light on a surface facing it, in its color: from the first band, a sphere, the first two, and all
+        three, next to the whole sky's from the cube map, with the horizon at the farthest reach for scale and the Sun's
+        direction on it, and how far each is off at worst. (c) The same along the vertical circle through the Sun, from the zenith down to the nadir
+        and up again. Drag to rotate.
+        <Try label="Evening" set="date=2026-04-06T17:30:00Z&lat=52.395&lon=13.085&h=1" fig="harmonics">
+            The shape leans west towards the Sun, and the coefficient of up is positive: the sky outshines the ground.
+        </Try>
+    </figcaption>
+</figure>
+
+<script>
+    import "./harmonics";
+</script>

@@ -22,6 +22,8 @@ struct DkSkyParams {
     // What the sky-view table holds luminance multiplied by: a power of two that follows the sun, so the table's values
     // sit where half floats resolve them best, from noon down into the night. Its readers divide by it.
     skyViewScale: f32,
+    // Device pixels per CSS pixel, which the debug overlay's sizes are measured in.
+    pixelRatio: f32,
 }
 
 // Directions the light meter reads per cap, above and below the horizon: 32 workgroups of 128 sample one each.

@@ -305,6 +305,7 @@ export function skyFigure(root: HTMLElement) {
             observerHeightM: state.heightM,
             inverseViewProjection: inverseViewProjection(basis),
             projectionDistance: basis.d,
+            pixelRatio: dpr,
             ev100: evOfSlider(),
             autoExposureKeys: pressed("ramp") ? DEFAULT_AUTO_EXPOSURE_KEYS : [],
         });

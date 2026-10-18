@@ -39,6 +39,12 @@ import Environment from "../../components/dunstkreis/Environment.astro";
 import Lighting from "../../components/dunstkreis/Lighting.astro";
 import Lookup from "../../components/dunstkreis/Lookup.astro";
 import Fig from "../../components/Fig.astro";
+import Generator from "../../components/dunstkreis/Generator.astro";
+import Clocks from "../../components/dunstkreis/Clocks.astro";
+import ExposureDay from "../../components/dunstkreis/ExposureDay.astro";
+import Harmonics from "../../components/dunstkreis/Harmonics.astro";
+import Refraction from "../../components/dunstkreis/Refraction.astro";
+import Wavelengths from "../../components/dunstkreis/Wavelengths.astro";
 
 This chapter is being written. The sky below is live, and it grows with the chapter; the dashed boxes are the figures
 still to come.
@@ -164,19 +170,9 @@ larger: the model's air thins out with one scale height, the real air more slowl
 temperature falls with height. The tables store the result: the sky-view table, indexed by where the ray is seen, how
 far it bent; the transmittance table, indexed by where the light comes from, how much of it arrives. So the sky is
 looked up, and the Sun's disc flattens near the horizon and stays in view after it has geometrically set, without either
-being a special case.
+being a special case (<Fig id="refraction" />).
 
-<Planned
-    title="With and without refraction"
-    plan="a split view of the sky figure zoomed at the horizon; next to it a NASA photograph of the flattened Sun from
-        the ISS, public domain, with its credit."
->
-    The setting Sun side by side, bent and unbent: the disc flattened, still in view while geometrically below the
-    horizon, and the altitude grid to measure it against. From the ISS, where the disc is squeezed to a sixth of its
-    height, against the photograph. Its experiment, already checked: "Sunrise from the ISS",
-    date=2026-04-06T02:04:00Z, lat=52.395, lon=13.085, h=408000, the Sun right on the planet's rim, its lower limb
-    lifted by a degree and its upper one by less.
-</Planned>
+<Refraction />
 
 ## Through the air, from the ground to orbit
 
@@ -236,11 +232,6 @@ ray, short ones first where the ray goes up and the air is densest, keep the sky
 worst of it is deep twilight, at 5%. Half the samples cost a tenth of a millisecond less per rebuild and start to show
 at the Sun's cutoff on the horizon. The numbers and how they were measured are in the package's research notes.
 
-<Planned title="Starving the tables" plan="a switch on the tables figure above, not a figure of its own.">
-    The tables figure with a high-resolution reference and a heat map of the difference: where bands and seams
-    appear first as a size or a sample count is turned down.
-</Planned>
-
 
 The tables are 16-bit float textures, four channels, one per wavelength, which hold full precision over some 30 stops.
 Two of them need help. The multiple scattering table falls by orders of magnitude across the planet's shadow, within a
@@ -283,15 +274,9 @@ the cube map, and keeps nothing of dunstkreis at runtime but a texture and nine 
 pipeline draws the rest of the scene; its refraction, its exposure and its colors are the same as the live sky's,
 since they were decided when the map was written. The live sky keeps the tables, rebuilds the sky view as the Sun
 moves, and runs the sky pass every frame, exposed by its own meter if the renderer has no exposure. Anything in between
-is a matter of how often `update` is called and whether a cube map is asked for.
+is a matter of how often `update` is called and whether a cube map is asked for (<Fig id="clocks" />).
 
-<Planned title="Four pieces, four clocks" plan="keep: the developer's decision figure.">
-    The four pieces as boxes in a row, the tables, the sky view with its meter, the sky pass, and the cube map with its
-    coefficients, and under each its cost on this very GPU at the sizes chosen above, measured as the page runs. Three
-    scenarios to pick, a skybox, a live sky, a live sky lighting a scene, each lighting up which boxes run once, per move
-    or per frame, with the sum per frame. Sliders only for what the scenario can trade: the table sizes and the cube
-    map's.
-</Planned>
+<Clocks />
 
 dunstkreis records into a command encoder you own, writing into a texture you own. It creates no device, no canvas and
 no render pass of its own, so it slots in before whatever else your frame draws. Every further example builds on this
@@ -349,14 +334,11 @@ described before. The model choice in <Fig id="sky" /> shows the sky as it was c
 wavelengths taken as red, green, and blue, and as osgHimmel computed it.
 
 The four are a field of the model, and a model with other four gets its own matrix, fitted the same way; one default
-set is what ships, and the figure below is where to see why.
+set is what ships (<Fig id="wavelengths" />).
 
-<Planned title="Pick your wavelengths" plan="keep: the one figure of the section.">
-    The visible spectrum as a strip, with the eye's three color matching functions over it, and four markers to drag
-    along it. The matrix is refitted at once, the sky follows next to a reference, with their difference. Presets:
-    Bruneton's three as red, green and blue, and dunstkreis' four. Drag all four into the blue and watch the sunset go
-    wrong.
-</Planned>
+<Wavelengths />
+
+<Controls />
 
 ## From light to pixels
 
@@ -398,6 +380,8 @@ the gamut mapping at the end of the section.
 
 <Stages />
 
+<Controls />
+
 
 Exposure is set in EV100, as on a camera and in engines like Frostbite and Unreal <Cite id="lagarde2014" />: the
 luminance that just saturates is 1.2 × 2^EV100 cd/m². A sunny day is about EV 15, an overcast one 10, twilight 0,
@@ -418,7 +402,11 @@ stops: exposed like day, the night would look like day, only noisier. On top, a 
 compensations at sun altitudes above the observer's horizon, which sinks as the observer rises, joined by a smooth curve
 that never overshoots them <Cite id="fritsch1980" />. By default they keep the night and the minutes around sunrise and
 sunset darker than metered, lift the blue hour a little so its blue shows, make the sunset a little brighter than the
-sunrise, and leave noon as metered. Mornings and evenings may differ, though the model's air is the same for both.
+sunrise, and leave noon as metered. Mornings and evenings may differ, though the model's air is the same for both (<Fig id="exposure-day" />).
+
+<ExposureDay />
+
+<Controls />
 
 The floor of EV 4 is for now. A camera exposes a landscape by full moon at about EV −3 and the Milky Way at about −6
 to −7. Once the Moon lights the air and the stars are drawn, the floor drops and the night follows. Exposed that far
@@ -429,12 +417,6 @@ atmosphere instead, over sun altitudes from twilight to noon, the compensations 
 of EV100 values at sun altitudes, joined by the same curve: a default exposure for that air, small enough to keep as
 numbers in code. The default atmosphere's is to ship with dunstkreis. It knows only the Sun, not the observer's height,
 and nothing of clouds or a Moon.
-
-<Planned title="Exposure over a day" plan="keep: its keys are the controls the sky figure lacks.">
-    EV100 over the Sun's altitude, from 18° below to 90°: the meter's reading as a line, the default curve over it, and
-    its keys to drag, with the sky above following. Switch the air, clear, hazy, high up, and see the metered line move
-    away from the curve.
-</Planned>
 
 
 For a display, the pass then tone maps: exposed, compressed into the display's range, and encoded for sRGB, dithered
@@ -495,13 +477,17 @@ whatever lies between, so it reads the level whose texels are about as many as i
 the cube map through a wide lens spans several texels with each pixel, so it reads the level where a texel is about a
 pixel wide, instead of picking one texel of many and flickering as the view turns.
 
-Nine numbers per color channel hold the sky's diffuse light, as a sound is held by a few of its lowest tones: the first is the
+Nine numbers per color channel hold the sky's diffuse light, as a sound is held by a few of its lowest tones (<Fig id="harmonics" />): the first is the
 sky's average brightness, the next three say how much brighter it is above than below and towards the Sun than away
 from it, and the last five bend that into the shape of a lit horizon over a dark ground. A diffuse surface sees the
 sky blurred over the whole hemisphere it faces, and nine terms of that blur keep more than 99% of the light it receives,
 for any sky <Cite id="ramamoorthi2001" />. A shader turns them into the light on any surface with nine multiplies and
 no texture lookup, which is what `createIrradiancePass` writes into a buffer, next to an irradiance cube map computed
 from the same nine for shaders that prefer a lookup.
+
+<Harmonics />
+
+<Controls />
 
 <Environment />
 
@@ -514,7 +500,7 @@ from the same nine for shaders that prefer a lookup.
 Everything this chapter changed along the way, the atmosphere's numbers, the table sizes, the sample counts, the
 wavelengths and the encoding, comes together here, previewed, and leaves as files: the tables, the sky cube map and
 its irradiance as RGBE images that any engine reads, and the nine coefficients as numbers. A renderer that never runs
-dunstkreis gets its sky from them.
+dunstkreis gets its sky from them (<Fig id="generator" />).
 
 <Sky
     id="sky-full"
@@ -524,10 +510,9 @@ dunstkreis gets its sky from them.
 
 <Controls />
 
-<Planned title="The generator" plan="keep: the chapter's capstone, grown out of the figure above.">
-    The settings of every figure above in one panel, a preview of the sky they make, and download buttons for the
-    tables, the cube map, the irradiance map and the coefficients.
-</Planned>
+<Generator />
+
+<Controls />
 
 ## Precise and approximate
 

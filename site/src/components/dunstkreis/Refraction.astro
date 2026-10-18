@@ -1,0 +1,39 @@
+---
+import "../sternzeit/sternzeit.css";
+import "./dunstkreis.css";
+import "./refraction.css";
+
+const PHOTO = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/images/sunrise-2015-07-30-iss.webp`;
+---
+
+<figure class="scene-frame refraction" id="refraction">
+    <div class="refraction-views">
+        <figure class="refraction-view">
+            <div class="sky-view refraction-render as-seen">
+                <canvas data-field="canvas" aria-label="The Sun rising over the planet's rim, seen from 408 km up, rendered"></canvas>
+                <svg class="refraction-overlay" data-field="overlay" aria-hidden="true"></svg>
+                <p class="vis-credit footnote">Drag to look around, scroll to zoom.</p>
+            </div>
+            <figcaption><span class="subfigure-title">rendered</span> by dunstkreis</figcaption>
+        </figure>
+        <figure class="refraction-view">
+            <div class="refraction-photo as-seen">
+                <a href="https://commons.wikimedia.org/wiki/File:ISS-44_Sunrise_seen_from_the_ISS.jpg" target="_blank" rel="noopener" title="The original, 4928 by 3280 pixels"><img src={PHOTO} width="1536" height="1022" loading="lazy" alt="A flattened, glaring Sun on the planet's rim, under bands of red, orange, pale blue and violet air" /></a>
+            </div>
+            <figcaption><span class="subfigure-title">photographed</span> by Scott Kelly from the ISS</figcaption>
+        </figure>
+    </div>
+    <figcaption class="figure-caption">
+        The Sun rising over the planet's rim, seen from the International Space Station 408 km up, both at the field of
+        view of a 500 mm lens. (a) Rendered for a Sun 0.6° below the rim: the air lifts its lower limb by about 1° and its
+        upper one by half that, squeezing the disc to a fifth of its height. The circle is where the Sun truly is, behind
+        the planet; along the edge, the altitude in degrees. The glow is the lens's, spread around the brightest light,
+        not the air's. (b) Photographed on July 30, 2015, at the exposure the rendering uses, the disc squeezed to a sixth.
+        Courtesy NASA, image{" "}
+        <a href="https://commons.wikimedia.org/wiki/File:ISS-44_Sunrise_seen_from_the_ISS.jpg" target="_blank" rel="noopener">ISS044-E-25484</a>.
+    </figcaption>
+</figure>
+
+<script>
+    import "./refraction";
+</script>

@@ -1,10 +1,14 @@
 import { wgsl } from "@himmelszelt/dunstkreis";
 import { find } from "../dom";
 import { onDemand } from "../frame";
+import { paintRange } from "../range";
+import { offsetSliders } from "../sternzeit/offset";
 import { currentSky, gpu, gpuDevice, onSkyView, onTables, type Sky, tables } from "./atmosphere";
+import { plot, type Readout, type Stage } from "./stagesplots";
 
 // From light to pixels, stage by stage: one patch of the sky around the Sun after each of the five stages, drawn by one
-// compute pass that composes dunstkreis' own WGSL, reading the sky-view table of the page's sky.
+// compute pass that composes dunstkreis' own WGSL, reading the sky-view table of the page's sky. A second entry point
+// samples the vertical circle through the Sun after every stage, read back for the transfer plot.
 
 const DEG = Math.PI / 180;
 const PANELS = 5;
@@ -12,6 +16,12 @@ const PANELS = 5;
 const PATCH_DEG = 2;
 // The gap between panels, in CSS pixels.
 const GAP = 8;
+// The plots' samples: the slice every half degree, the Sun, and the gray chain every eighth of a stop around white.
+const SLICE = 181;
+const CURVE_STOPS = [-24, 12] as const;
+const CURVE = (CURVE_STOPS[1] - CURVE_STOPS[0]) * 8 + 1;
+const SAMPLES = SLICE + 1 + CURVE;
+const SAMPLE_FLOATS = 20;
 
 const source = `
 ${wgsl.atmosphere}
@@ -45,6 +55,17 @@ struct Params {
 @group(0) @binding(3) var skyViewLut: texture_2d<f32>;
 @group(0) @binding(4) var lutSampler: sampler;
 @group(0) @binding(5) var output: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(6) var<storage, read_write> samples: array<Sample>;
+
+// One direction after every stage, for the plots: its four wavelengths in cd/m², linear RGB in gamut with the lowest
+// channel the matrix gave in w, the exposed light, tone mapped, and the code values over 1, quantized without dither.
+struct Sample {
+    spectral: vec4f,
+    rgb: vec4f,
+    exposed: vec4f,
+    mapped: vec4f,
+    pixel: vec4f,
+}
 
 const LUMINANCE = vec3f(0.2126, 0.7152, 0.0722);
 
@@ -113,6 +134,11 @@ fn toneMapped(exposed: vec3f) -> vec3f {
     return dkToneMapNeutral(exposed);
 }
 
+fn quantized(mapped: vec3f, offset: f32) -> vec3f {
+    let steps = params.levels - 1.0;
+    return floor(mapped * steps + offset) / steps;
+}
+
 fn noise(p: vec2u) -> f32 {
     var h = p.x * 1664525u + p.y * 1013904223u;
     h = (h ^ (h >> 16u)) * 2246822519u;
@@ -140,9 +166,48 @@ fn shown(spectral: vec4f, panel: u32, band: u32, pixel: vec2u) -> vec3f {
     if (panel == 3u) {
         return mapped;
     }
-    let steps = params.levels - 1.0;
-    let offset = select(0.5, noise(pixel), params.dither == 1u);
-    return floor(mapped * steps + offset) / steps;
+    return quantized(mapped, select(0.5, noise(pixel), params.dither == 1u));
+}
+
+fn stagesOf(spectral: vec4f) -> Sample {
+    var sample: Sample;
+    sample.spectral = spectral;
+    let raw = matrixed(spectral);
+    sample.rgb = vec4f(inGamut(raw), min(raw.r, min(raw.g, raw.b)));
+    sample.exposed = vec4f(sample.rgb.rgb * params.exposure, 0.0);
+    sample.mapped = vec4f(toneMapped(sample.exposed.rgb), 0.0);
+    sample.pixel = vec4f(quantized(sample.mapped.rgb, 0.5), 0.0);
+    return sample;
+}
+
+// The plots' samples: the vertical circle through the Sun from the horizon to the zenith, the Sun's own center, and
+// the chain for a gray light over exposed stops, whose \`rgb\` holds it linear and sRGB encoded, both cut off at white.
+@compute @workgroup_size(64, 1, 1)
+fn slice(@builtin(global_invocation_id) id: vec3u) {
+    let i = id.x;
+    if (i < ${SLICE}u) {
+        let altitude = f32(i) / f32(${SLICE - 1}u) * DK_PI / 2.0;
+        let azimuth = normalize(select(vec2f(0.0, 1.0), params.forward.xy, length(params.forward.xy) > 1e-6));
+        let direction = vec3f(azimuth * cos(altitude), sin(altitude));
+        samples[i] = stagesOf(lightAt(direction, 1e-4).sky);
+    } else if (i == ${SLICE}u) {
+        // The Sun's center, or once that has set, the highest point of its disc still showing, its w whether one does.
+        var light = lightAt(params.sun, 1e-4);
+        for (var k = 1; k <= 4 && all(light.disc == vec4f(0.0)); k++) {
+            light = lightAt(normalize(params.sun + vec3f(0.0, 0.0, params.sunRadius * f32(k) / 4.0)), 1e-4);
+        }
+        samples[i] = stagesOf(light.sky + light.disc);
+        samples[i].exposed.w = select(0.0, 1.0, any(light.disc > vec4f(0.0)));
+    } else if (i < ${SAMPLES}u) {
+        let stops = mix(${CURVE_STOPS[0]}.0, ${CURVE_STOPS[1]}.0, f32(i - ${SLICE + 1}u) / f32(${CURVE - 1}u));
+        let gray = vec3f(exp2(stops));
+        var sample: Sample;
+        sample.rgb = vec4f(min(gray.r, 1.0), dkEncodeSrgb(gray).r, 0.0, 0.0);
+        sample.exposed = vec4f(gray, 0.0);
+        sample.mapped = vec4f(toneMapped(gray), 0.0);
+        sample.pixel = vec4f(quantized(sample.mapped.rgb, 0.5), 0.0);
+        samples[i] = sample;
+    }
 }
 
 @compute @workgroup_size(8, 8, 1)
@@ -187,7 +252,12 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
             color = vec3f(1.0, 0.0, 1.0);
         }
     }
-    textureStore(output, id.xy, vec4f(color, 1.0));
+    // Each panel's corners rounded as the page's framed panels are, 6 CSS pixels, three quarters of the gap: premultiplied.
+    let half = vec2f(params.panel) * 0.5;
+    let radius = 0.75 * params.gap;
+    let corner = max(abs(local - half) - (half - radius), vec2f(0.0));
+    let inside = clamp(radius + 0.5 - length(corner), 0.0, 1.0);
+    textureStore(output, id.xy, vec4f(color * inside, inside));
 }
 `;
 
@@ -196,6 +266,41 @@ const canvas = find<HTMLCanvasElement>('[data-field="canvas"]', root);
 const evInput = find<HTMLInputElement>('[data-field="ev"]', root);
 const evValue = find<HTMLOutputElement>('[data-field="evValue"]', root);
 const PARAMS_SIZE = 96;
+const SAMPLES_SIZE = SAMPLES * SAMPLE_FLOATS * 4;
+
+offsetSliders();
+
+const plotSvg = find<SVGSVGElement>(".stages-transfer svg", root);
+let readout: Readout | null = null;
+const replot = onDemand(() => readout && plot(plotSvg, readout), plotSvg);
+
+/** One sample of the readback, as far as the plot reads it: linear RGB in gamut and the code values. */
+function stageAt(data: Float32Array, i: number): Stage {
+    const at = (field: number) => [...data.subarray(i * SAMPLE_FLOATS + field * 4, i * SAMPLE_FLOATS + field * 4 + 3)];
+    return { rgb: at(1), pixel: at(4) };
+}
+
+function readoutOf(data: Float32Array, ev: number, levels: number, curve: number): Readout {
+    const curvePoints = Array.from({ length: CURVE }, (_, k) => {
+        const s = stageAt(data, SLICE + 1 + k);
+        return {
+            stops: CURVE_STOPS[0] + (k * (CURVE_STOPS[1] - CURVE_STOPS[0])) / (CURVE - 1),
+            linear: s.rgb[0] ?? 0,
+            encoded: s.rgb[1] ?? 0,
+            pixel: s.pixel[0] ?? 0,
+        };
+    });
+    return {
+        slice: Array.from({ length: SLICE }, (_, i) => stageAt(data, i)),
+        sun: stageAt(data, SLICE),
+        sunShows: (data[SLICE * SAMPLE_FLOATS + 11] ?? 0) > 0,
+        curve: curvePoints,
+        white: 1.2 * 2 ** ev,
+        ev,
+        levels,
+        toneCurve: (["Neutral", "AgX", "ACES"] as const)[curve - 1] ?? "Neutral",
+    };
+}
 
 if (gpu.device) {
     const device = gpuDevice();
@@ -206,21 +311,37 @@ if (gpu.device) {
         usage: GPUTextureUsage.STORAGE_BINDING,
         alphaMode: "premultiplied",
     });
+    const module = device.createShaderModule({ label: "sternwarte:stages", code: source });
     const pipeline = device.createComputePipeline({
         label: "sternwarte:stages",
         layout: "auto",
-        compute: {
-            module: device.createShaderModule({ label: "sternwarte:stages", code: source }),
-            entryPoint: "main",
-        },
+        compute: { module, entryPoint: "main" },
+    });
+    const slicePipeline = device.createComputePipeline({
+        label: "sternwarte:stages slice",
+        layout: "auto",
+        compute: { module, entryPoint: "slice" },
     });
     const paramsBuffer = device.createBuffer({
         size: PARAMS_SIZE,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
+    const samplesBuffer = device.createBuffer({
+        label: "sternwarte:stages samples",
+        size: SAMPLES_SIZE,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    });
+    const readBuffer = device.createBuffer({
+        label: "sternwarte:stages readback",
+        size: SAMPLES_SIZE,
+        usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    });
     const choice = { matrix: 0, gamut: 0, curve: 1, levels: 256, dither: 1 };
     let sky: Sky | null = currentSky();
-    let metered = false;
+    let exposedByHand = false;
+    // One readback at a time: a draw while one is under way reads again once it is done.
+    let reading = false;
+    let again = false;
 
     const draw = onDemand(() => {
         const table = tables();
@@ -255,41 +376,73 @@ if (gpu.device) {
         u[23] = choice.matrix;
         device.queue.writeBuffer(paramsBuffer, 0, data);
 
+        const shared = [
+            { binding: 0, resource: { buffer: table.luts.atmosphereBuffer } },
+            { binding: 1, resource: { buffer: paramsBuffer } },
+            { binding: 2, resource: table.luts.transmittance.createView() },
+            { binding: 3, resource: sky.pass.skyViewTexture.createView() },
+            { binding: 4, resource: table.luts.sampler },
+        ];
         const texture = context.getCurrentTexture();
         const bindGroup = device.createBindGroup({
             layout: pipeline.getBindGroupLayout(0),
-            entries: [
-                { binding: 0, resource: { buffer: table.luts.atmosphereBuffer } },
-                { binding: 1, resource: { buffer: paramsBuffer } },
-                { binding: 2, resource: table.luts.transmittance.createView() },
-                { binding: 3, resource: sky.pass.skyViewTexture.createView() },
-                { binding: 4, resource: table.luts.sampler },
-                { binding: 5, resource: texture.createView() },
-            ],
+            entries: [...shared, { binding: 5, resource: texture.createView() }],
+        });
+        const sliceGroup = device.createBindGroup({
+            layout: slicePipeline.getBindGroupLayout(0),
+            entries: [...shared, { binding: 6, resource: { buffer: samplesBuffer } }],
         });
         const encoder = device.createCommandEncoder();
         const pass = encoder.beginComputePass();
         pass.setPipeline(pipeline);
         pass.setBindGroup(0, bindGroup);
         pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(panel / 8));
+        if (!reading) {
+            pass.setPipeline(slicePipeline);
+            pass.setBindGroup(0, sliceGroup);
+            pass.dispatchWorkgroups(Math.ceil(SAMPLES / 64));
+        }
         pass.end();
+        if (reading) {
+            again = true;
+            device.queue.submit([encoder.finish()]);
+            return;
+        }
+        encoder.copyBufferToBuffer(samplesBuffer, 0, readBuffer, 0, SAMPLES_SIZE);
         device.queue.submit([encoder.finish()]);
+        reading = true;
+        const from = { ev, levels: choice.levels, curve: choice.curve };
+        readBuffer.mapAsync(GPUMapMode.READ).then(() => {
+            const samples = new Float32Array(readBuffer.getMappedRange().slice(0));
+            readBuffer.unmap();
+            reading = false;
+            readout = readoutOf(samples, from.ev, from.levels, from.curve);
+            replot();
+            if (again) {
+                again = false;
+                draw();
+            }
+        });
     }, canvas);
 
     onSkyView((next) => {
         sky = next;
-        // The exposure starts at what the page's sky metered, and is the reader's after that.
-        if (!metered) {
-            metered = true;
+        // The exposure follows what the page's sky metered, moment by moment, until the reader sets one.
+        if (!exposedByHand) {
             next.pass.meteredEV100().then((ev) => {
+                if (exposedByHand || sky !== next) return;
                 evInput.value = String(Math.round(ev * 10) / 10);
+                paintRange(evInput);
                 draw();
             });
         }
         draw();
     });
     onTables(draw);
-    evInput.addEventListener("input", draw);
+    evInput.addEventListener("input", () => {
+        exposedByHand = true;
+        draw();
+    });
     // Each group of buttons is one choice: the pressed one is it.
     for (const [key, attribute] of [
         ["matrix", "data-matrix"],
@@ -319,6 +472,7 @@ if (gpu.device) {
         draw();
     });
     new ResizeObserver(draw).observe(canvas);
+    new ResizeObserver(replot).observe(plotSvg);
     draw();
 }
 

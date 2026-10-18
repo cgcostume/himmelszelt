@@ -1,0 +1,208 @@
+---
+import "../sternzeit/sternzeit.css";
+import "./dunstkreis.css";
+import "./generator.css";
+import { DEFAULT_ATMOSPHERE_MODEL, OSGHIMMEL_ATMOSPHERE_MODEL, RGB_ATMOSPHERE_MODEL } from "@himmelszelt/dunstkreis";
+import Try from "../Try.astro";
+import Choice from "./Choice.astro";
+
+const nm = (wavelengths: readonly number[]) => `${[...new Set(wavelengths)].join(", ")} nm`;
+const MODEL = {
+    name: "model",
+    label: "Atmosphere model",
+    heading: "wavelengths",
+    title: "The air and the wavelengths every table is computed at. Switches the whole page, recomputing every table",
+    options: [
+        ["fitted", "dunstkreis 4λ", `${nm(DEFAULT_ATMOSPHERE_MODEL.wavelengths)}, turned into RGB by a fitted matrix`],
+        ["rgb", "Bruneton’08 3λ", `${nm(RGB_ATMOSPHERE_MODEL.wavelengths)}, taken as R, G and B`],
+        ["osghimmel", "osgHimmel’12 3λ", `${nm(OSGHIMMEL_ATMOSPHERE_MODEL.wavelengths)}, osgHimmel's air as it was`],
+    ],
+    checked: "fitted",
+};
+
+const TABLES = [
+    { name: "transmittance", title: "transmittance", width: [8, 1024], height: [4, 256], samples: [1, 512] },
+    { name: "multiScattering", title: "multiple scattering", width: [4, 512], height: [4, 256], samples: [1, 64] },
+    { name: "skyView", title: "sky view", width: [8, 1024], height: [4, 1024], samples: [1, 128] },
+];
+const SIZES = { sky: [128, 256, 512, 1024, 2048, 4096], irradiance: [8, 16, 32, 64, 128] };
+const short = (n: number) => (n >= 1024 ? `${n / 1024}K` : String(n));
+
+const HDR = "The values themselves, linear, as Radiance HDR (RGBE)";
+const RAW = "Every channel as stored, four wavelengths, 32-bit floats, row after row from the first, without a header";
+/** Every file the generator hands out: what it is, and its formats with what each holds. */
+const FILES = [
+    {
+        name: "transmittance",
+        title: "Transmittance table",
+        formats: [
+            ["hdr", HDR],
+            ["f32", RAW],
+        ],
+    },
+    {
+        name: "multiScattering",
+        title: "Multiple scattering table",
+        formats: [
+            ["hdr", HDR],
+            ["f32", `${RAW}, decoded from their log2`],
+        ],
+    },
+    {
+        name: "skyView",
+        title: "Sky-view table",
+        formats: [
+            ["hdr", HDR],
+            ["f32", `${RAW}, in cd/m²`],
+        ],
+    },
+    {
+        name: "sky",
+        title: "Sky cube map",
+        formats: [
+            ["panorama", "Unrolled into an equirectangular panorama, north in the middle edge, as Radiance HDR"],
+            [
+                "faces",
+                "The six faces side by side in WebGPU's order +x, −x, +y, −y, +z, −z, ENU directions, as Radiance HDR",
+            ],
+        ],
+    },
+    {
+        name: "irradiance",
+        title: "Irradiance cube map",
+        formats: [
+            ["panorama", "Unrolled into an equirectangular panorama, in lux, as Radiance HDR"],
+            ["faces", "The six faces side by side in WebGPU's order +x, −x, +y, −y, +z, −z, ENU directions, in lux"],
+        ],
+    },
+    {
+        name: "coefficients",
+        title: "Nine coefficients",
+        formats: [
+            ["json", "The radiance's nine spherical harmonics coefficients, rgb each, in cd/m², over ENU directions"],
+            ["wgsl", "A WGSL function with the coefficients built in: the irradiance in lux for any normal"],
+        ],
+    },
+    {
+        name: "settings",
+        title: "Settings",
+        formats: [
+            [
+                "json",
+                "Everything the files are made with: moment, place, Sun, the model, the tables' and cube maps' settings",
+            ],
+        ],
+    },
+];
+const dev = import.meta.env.DEV;
+---
+
+<figure class="scene-frame generator" id="generator" data-variant="a">
+    {
+        dev && (
+            <p class="generator-variant">
+                <span class="steps" role="radiogroup" aria-label="Layout variant">
+                    <label><input type="radio" name="generator-variant" value="a" checked /><span>variant A</span></label>
+                    <label><input type="radio" name="generator-variant" value="b" /><span>variant B</span></label>
+                </span>
+            </p>
+        )
+    }
+    <div class="generator-preview">
+        <div class="lut-plot">
+            <span class="lut-axis lut-y">
+                <span>zenith</span>
+                <span>altitude</span>
+                <span>nadir</span>
+            </span>
+            <div class="lut-stage as-seen" style="aspect-ratio: 2 / 1">
+                <canvas data-field="panorama" aria-label="The sky cube map, unrolled"></canvas>
+            </div>
+            <span class="lut-axis lut-x">
+                <span>N</span>
+                <span>E · azimuth · S · W</span>
+                <span>N</span>
+            </span>
+        </div>
+    </div>
+    <div class="generator-recipe" data-field="recipe"></div>
+    <details class="fold generator-fold" open>
+        <summary><span class="moment-title">Settings</span> <span class="note" data-field="summary"></span></summary>
+        <div class="generator-settings">
+            <span class="lut-role">air</span>
+            <p class="lut-controls">
+                <Choice figure="generator" {...MODEL} />
+                <button type="button" class="view-toggle" data-refraction aria-pressed="true" title="Traced through the air, bending the light. Switches it for the whole page, recomputing every table and cube map">refracted</button>
+            </p>
+            <span class="lut-role">tables</span>
+            <div class="generator-tables">
+                <span class="note">texels</span>
+                <span class="note">samples</span>
+                {
+                    TABLES.map((table) => (
+                        <>
+                            <span class="generator-name">{table.title}</span>
+                            <span class="generator-size">
+                                <input type="number" data-config={`${table.name}.width`} min={table.width[0]} max={table.width[1]} step="1" aria-label={`${table.title} width`} />
+                                ×
+                                <input type="number" data-config={`${table.name}.height`} min={table.height[0]} max={table.height[1]} step="1" aria-label={`${table.title} height`} />
+                            </span>
+                            <input type="number" data-config={`integralSamples.${table.name}`} min={table.samples[0]} max={table.samples[1]} step="1" aria-label={`${table.title} samples per ray`} />
+                        </>
+                    ))
+                }
+            </div>
+            <span class="lut-role">cube map</span>
+            <p class="lut-controls">
+                <span class="steps" role="radiogroup" aria-label="Sky cube map face size">
+                    {SIZES.sky.map((n) => <label><input type="radio" name="generator-sky-size" value={n} data-size="sky" /><span>{short(n)}</span></label>)}
+                </span>
+                <button type="button" class="view-toggle" data-cubify aria-pressed="false" title="Texels spread evenly over the sphere, as osgHimmel's CubeMappedHimmel did. Whoever samples the sky cube follows">cubified</button>
+                <button type="button" class="view-toggle" data-scaled aria-pressed="false" title="The luminance times a power of two that follows the Sun rather than in cd/m². The files are in cd/m² either way">scaled</button>
+            </p>
+            <span class="lut-role">irradiance</span>
+            <p class="lut-controls">
+                <span class="steps" role="radiogroup" aria-label="Irradiance cube map face size">
+                    {SIZES.irradiance.map((n) => <label><input type="radio" name="generator-irradiance-size" value={n} data-size="irradiance" /><span>{n}</span></label>)}
+                </span>
+                <span class="note" data-field="timing"></span>
+            </p>
+        </div>
+    </details>
+    <ul class="generator-files">
+        {
+            FILES.map((file) => (
+                <li data-file={file.name}>
+                    {
+                        ["coefficients", "settings"].includes(file.name) ? (
+                            <span class="generator-thumb generator-glyph" aria-hidden="true">{"{ }"}</span>
+                        ) : (
+                            <span class="lut-stage as-seen generator-thumb"><canvas data-field="thumb" aria-hidden="true" /></span>
+                        )
+                    }
+                    <span class="generator-file">
+                        <span class="generator-name">{file.title}</span>
+                        <span class="note" data-field="detail"></span>
+                    </span>
+                    <span class="lut-downloads">
+                        {file.formats.map(([format, title]) => (
+                            <button type="button" class="view-toggle" data-download={format} title={title}>{format}</button>
+                        ))}
+                    </span>
+                </li>
+            ))
+        }
+    </ul>
+    <figcaption class="figure-caption">
+        The generator: the settings of every figure above in one panel, a preview of what they make, tone mapped by its
+        own scale, and the files a renderer takes the sky from. Tables, cube maps and coefficients are those of the
+        chosen moment and place, in cd/m² and lux whatever the encoding.
+        <Try label="Civil twilight" set="date=2026-04-06T18:15:00Z&lat=52.395&lon=13.085&h=1" fig="generator">
+            the Sun is 4° below the horizon, and the sky alone still lights the ground with some 44 lux.
+        </Try>
+    </figcaption>
+</figure>
+
+<script>
+    import "./generator";
+</script>

@@ -7,6 +7,20 @@
     touch-action: none;
     user-select: none;
 }
+/* Enclosed views rounded as sternzeit's framed panels are; full screen, square again. */
+.sky-view,
+.refraction-photo,
+.lut-stage,
+.lut-stage > canvas {
+    border-radius: var(--radius);
+}
+.sky-view,
+.refraction-photo {
+    overflow: hidden;
+}
+.sky-view:fullscreen {
+    border-radius: 0;
+}
 .sky-view canvas {
     display: block;
     width: 100%;
@@ -16,10 +30,12 @@
 .sky-view canvas:active {
     cursor: grabbing;
 }
-.sky-view .vis-credit,
+/* In the sky's own dark shades, as sternzeit's scenes credit theirs, and without a shadow. */
+.sky-view .vis-credit {
+    color: var(--muted);
+}
 .sky-overlay {
-    color: oklch(0.85 0 0);
-    text-shadow: 0 1px 3px oklch(0 0 0 / 0.8);
+    color: var(--text);
 }
 /* Along the bottom edge, lined up with the credit line at the top. */
 .sky-overlay {
@@ -70,11 +86,11 @@
     overflow: hidden;
     pointer-events: none;
 }
+/* Centered on where its direction meets the horizon, in the gap the grid leaves there. */
 .sky-compass span {
     position: absolute;
-    transform: translate(-50%, -100%);
-    padding-bottom: 0.2rem;
-    color: oklch(1 0 0 / 0.7);
+    transform: translate(-50%, -50%);
+    color: oklch(1 0 0 / 0.3);
     font-size: var(--text-small);
 }
 .sky-error {
@@ -554,7 +570,7 @@
 }
 .stages-row {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 8px;
     margin-top: 0.5rem;
 }
@@ -580,8 +596,4 @@
 }
 .stages-ev input {
     width: 6rem;
-}
-/* Distance in the air: a wide strip of horizon. */
-.distance-view {
-    aspect-ratio: 16 / 6;
 }

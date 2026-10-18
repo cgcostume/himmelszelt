@@ -14,6 +14,7 @@ import { paintRange } from "../range";
 import { state } from "../sternzeit/state";
 import {
     bindRefractionToggle,
+    currentSky,
     gpu,
     gpuDevice,
     onSkyView,
@@ -27,6 +28,7 @@ import { formatBytes, saveHdr, savePng } from "./download";
 import { geometry, multiScatteringAt, skyViewAt, type TableName, transmittanceAt } from "./lutmap";
 import { pick, type Ray, unpoint } from "./pick";
 import { createPreview, type PreviewOptions, renderPixels, TABLE_PREVIEW, texelOf } from "./preview";
+import { errorLine, keepShape, startStarving, starveSky, starving } from "./starve";
 
 const root = find("#tables");
 const field = (name: string) => find(`[data-field="${name}"]`, root);
@@ -127,6 +129,7 @@ function show(name: TableName, texture: GPUTexture, scale = 1) {
     const shape = DEFAULT_TEXTURE_CONFIG[name];
     const frame = part(name, "image").parentElement;
     if (frame) frame.style.aspectRatio = `${shownColumns(name, shape.width)} / ${shape.height}`;
+    keepShape(name);
     part(name, "size").textContent = `${width}×${height}`;
     part(name, "info").textContent = `${texture.format}, ${formatBytes(width * height * 8)}`;
     paint(name);
@@ -305,6 +308,12 @@ function mapped(name: TableName) {
 function hover(name: TableName, event: MouseEvent) {
     const table = mapped(name);
     if (!table) return;
+    const error = errorLine(name, event);
+    // Showing the sky's error, a table's panel reads no longer as its texels.
+    if (starving.on && starving.variant === "B" && name !== "skyView") {
+        if (error) tipAt(name, event, [error]);
+        return;
+    }
     const { column, row, x, y, leftOfSun } = texelAt(name, table, event);
     table.hover = { column, row };
     drawOverlay(name);
@@ -322,20 +331,25 @@ function hover(name: TableName, event: MouseEvent) {
         });
         return;
     }
-    const rect = part(name, "image").getBoundingClientRect();
     const readout = READOUTS[name](table, x, y, (y * table.width + x) * 4, leftOfSun, data);
     const center = (start: number[], i: number, n: number) =>
         ((start[i] ?? 0) + (start[i + 1] ?? 0)) / 2 / (start[n] ?? 1);
     mark(name, "x", center(table.columns.start, column, table.columns.start.length - 1), readout.x);
     mark(name, "y", center(table.rows.start, row, table.height), readout.y);
 
-    const tip = part(name, "tip");
-    tip.hidden = false;
-    tip.textContent = [
+    tipAt(name, event, [
+        ...(error ? [error] : []),
         `texel ${x}, ${y} · uv ${fixed((x + 0.5) / table.width, 4)}, ${fixed((y + 0.5) / table.height, 4)}`,
         ...readout.lines,
-    ].join("\n");
-    // Beside the pointer, on whichever side has the room.
+    ]);
+}
+
+// Beside the pointer, on whichever side has the room.
+function tipAt(name: TableName, event: MouseEvent, lines: string[]) {
+    const tip = part(name, "tip");
+    tip.hidden = false;
+    tip.textContent = lines.join("\n");
+    const rect = part(name, "image").getBoundingClientRect();
     const [left, top] = [event.clientX - rect.left, event.clientY - rect.top];
     const right = left > rect.width / 2;
     const below = top < rect.height / 2;
@@ -424,7 +438,11 @@ if (gpu.error) {
     onSkyView((sky) => {
         lastSky = sky;
         requestSkyView();
+        starveSky(sky);
     });
+    const sky = currentSky();
+    if (sky) starveSky(sky);
+    startStarving(field("starve-toggle"), root.querySelectorAll<HTMLElement>("[data-variant]"));
     showTables();
 
     for (const input of root.querySelectorAll<HTMLInputElement>("[data-config]")) {
@@ -459,7 +477,7 @@ if (gpu.error) {
         image.addEventListener("pointerleave", () => leave(name));
         image.addEventListener("click", (event) => {
             const table = mapped(name);
-            if (!table) return;
+            if (!table || (starving.on && starving.variant === "B" && name !== "skyView")) return;
             const { x, y, leftOfSun } = texelAt(name, table, event);
             pick(rayAt(name, table, x, y, leftOfSun), true);
         });

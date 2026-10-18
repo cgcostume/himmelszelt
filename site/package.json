@@ -11,7 +11,7 @@
         "preview": "astro preview",
         "typecheck": "astro check",
         "bluenoise": "node scripts/bluenoise.mjs",
-        "images": "magick src/data/corona-2023-04-20-exmouth-phil-hart.png -resize 1024x1024 -strip -quality 80 -define webp:method=6 public/images/corona-2023-04-20-exmouth.webp",
+        "images": "magick src/data/corona-2023-04-20-exmouth-phil-hart.png -resize 1024x1024 -strip -quality 80 -define webp:method=6 public/images/corona-2023-04-20-exmouth.webp && magick src/data/sunrise-2015-07-30-iss044e025484-scott-kelly.jpg -depth 16 -resize 1536x1536 -attenuate 0.1 +noise Gaussian -depth 8 -strip -quality 90 -define webp:method=6 -define webp:sns-strength=0 -define webp:filter-strength=0 public/images/sunrise-2015-07-30-iss.webp",
         "test:browser": "playwright test"
     },
     "dependencies": {

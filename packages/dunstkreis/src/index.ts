@@ -28,10 +28,12 @@ export {
 export {
     DEFAULT_WAVELENGTHS,
     fitSpectrumToRgb,
+    luminanceOf,
     ozoneAbsorptionAt,
     rayleighAt,
     reflectanceAt,
     rgbOfSpectrum,
+    skySpectrum,
     solarIrradianceAt,
 } from "./spectral.js";
 

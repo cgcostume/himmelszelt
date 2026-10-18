@@ -1,6 +1,6 @@
 /** Downloads for the tables and cube maps: PNG as shown, tone mapped, and Radiance HDR with the values themselves. */
 
-function save(blob: Blob | null, name: string) {
+export function save(blob: Blob | null, name: string) {
     if (!blob) return;
     const link = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: name });
     link.click();

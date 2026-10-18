@@ -219,6 +219,11 @@ if (gpu.error) {
         const set = radio.dataset.size === "sky" ? setEnvironmentSize : setIrradianceSize;
         radio.addEventListener("change", () => set(Number(radio.value)));
     }
+    // The sizes may be set elsewhere too, by the generator: the radios follow.
+    onEnvironment(({ size, irradianceSize }) => {
+        for (const radio of root.querySelectorAll<HTMLInputElement>("[data-size]"))
+            radio.checked = Number(radio.value) === (radio.dataset.size === "sky" ? size : irradianceSize);
+    });
     for (const button of root.querySelectorAll("[data-cubify]")) bindCubifyToggle(button);
     for (const button of root.querySelectorAll("[data-scaled]")) bindScaledToggle(button);
     for (const button of root.querySelectorAll<HTMLElement>("[data-download]")) {

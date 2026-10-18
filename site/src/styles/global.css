@@ -269,6 +269,10 @@ a.sky-sun:focus-visible::after {
     filter: none;
     box-shadow: 0 0 4px 1px color-mix(in srgb, currentColor 40%, transparent);
 }
+/* The glow squeezed and lifted with the Sun the air bends. */
+.sky-sun.current.squeezed::after {
+    transform: translateY(-27.5%) scaleY(0.6);
+}
 /* On the light page no glow at all, as --sun-glow: around the bare disc and around a scene's own Sun alike. */
 :root[data-theme="light"] .sky-sun.current.replaced::after {
     box-shadow: none;

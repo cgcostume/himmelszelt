@@ -1,7 +1,9 @@
 ---
 import "../sternzeit/sternzeit.css";
 import "./dunstkreis.css";
+import Try from "../Try.astro";
 import Shown from "./Shown.astro";
+import "./starve.css";
 
 /** Every table with the range of sizes and sample counts it can be set to; the defaults are dunstkreis' own. */
 const TABLES = [
@@ -54,12 +56,32 @@ const TABLES = [
         y: ["zenith", "angle from the horizon, which is in the middle", "nadir"],
     },
 ];
+// The sky view's axes, which the other tables' heat maps take on when they show their effect on the sky.
+const SKY = TABLES[2] ?? TABLES[0];
+const TICKS = [0.1, 1, 10, 100];
 ---
 
 <figure class="scene-frame" id="tables">
     <div class="lut-bar">
         <button type="button" class="view-toggle" data-field="reset" title="Back to dunstkreis' defaults">defaults</button>
         <span class="note" data-field="timing"></span>
+        <button type="button" class="view-toggle" data-field="starve-toggle" aria-pressed="false" title="Each table against a reference with many more texels and samples, as a heat map of the difference">vs. reference</button>
+        {
+            import.meta.env.DEV && (
+                <span class="starve-variants">
+                    <button type="button" class="view-toggle" data-variant="A" title="Each table against its reference, in its own texels">variant A</button>
+                    <button type="button" class="view-toggle" data-variant="B" title="What each table's difference makes of the sky view, everything else at the reference">variant B</button>
+                </span>
+            )
+        }
+    </div>
+    <div class="starve-legend" data-field="starve-legend" hidden>
+        <span class="starve-scale">
+            <span class="starve-ramp" aria-hidden="true"></span>
+            <span class="starve-ticks">{TICKS.map((t) => <span>{t}%</span>)}</span>
+        </span>
+        <span class="note" data-field="starve-total"></span>
+        <span class="note" data-field="starve-status"></span>
     </div>
     {
         TABLES.map((table) => (
@@ -70,22 +92,24 @@ const TABLES = [
                 <div class="lut-call" data-field="call" />
                 <div class="lut-plot">
                     <span class="lut-axis lut-y">
-                        <span>{table.y[0]}</span>
-                        <span>{table.y[1]}</span>
-                        <span>{table.y[2]}</span>
+                        {table.y.map((label, i) => (
+                            <span data-sky={table === SKY ? undefined : SKY.y[i]}>{label}</span>
+                        ))}
                     </span>
                     <div class="lut-stage">
                         <canvas data-field="image" aria-label={`The ${table.title.toLowerCase()} table`} />
+                        <canvas data-field="heat" class="starve-heat" aria-hidden="true" hidden />
                         <canvas data-field="overlay" aria-hidden="true" />
                         <span class="lut-size" data-field="size" />
                         <div class="lut-tip" data-field="tip" hidden />
                     </div>
                     <span class="lut-axis lut-x">
-                        <span>{table.x[0]}</span>
-                        <span>{table.x[1]}</span>
-                        <span>{table.x[2]}</span>
+                        {table.x.map((label, i) => (
+                            <span data-sky={table === SKY ? undefined : SKY.x[i]}>{label}</span>
+                        ))}
                     </span>
                 </div>
+                <p class="note starve-stats" data-field="starve" hidden />
                 <details class="fold lut-fold">
                     <summary>
                         <span class="moment-title">Settings</span> <span class="note" data-field="summary" />
@@ -148,7 +172,14 @@ const TABLES = [
     <figcaption class="figure-caption">
         The tables behind the sky above, as they are right now, and what they are computed with. Transmittance and
         multiple scattering change only with the air; the sky view with every move of the Sun or the observer. Shown
-        tone mapped, each by its own scale; point at a texel to read what it stands for.
+        tone mapped, each by its own scale; point at a texel to read what it stands for. Against the reference, each a
+        heat map of how far it lies from one with many more texels and samples, on a log scale from dark, 0.1% or less,
+        to light, 100%, black where too dark to measure; under it that difference, and the one it makes in the sky view
+        with every other table at the reference.
+        <Try label="Potsdam in twilight" set="date=2026-04-06T19:10Z&lat=52.395&lon=13.085&h=1" fig="tables">
+            against the reference, the multiple scattering moves the sky by almost 1% on average, more than the other two
+            tables together.
+        </Try>
     </figcaption>
 </figure>
 

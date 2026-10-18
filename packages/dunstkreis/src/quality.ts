@@ -56,6 +56,8 @@ export interface Features {
     autoExposure: boolean;
     debugGrid: boolean;
     sunDisc: boolean;
+    discAlpha: boolean;
+    supersample: boolean;
     cube: boolean;
     cubeScaled: boolean;
     cubify: boolean;
@@ -70,6 +72,8 @@ export const DEFAULT_FEATURES: Features = {
     autoExposure: false,
     debugGrid: false,
     sunDisc: true,
+    discAlpha: false,
+    supersample: true,
     cube: false,
     cubeScaled: false,
     cubify: false,
@@ -86,6 +90,8 @@ export function featureConstants(features: Partial<Features> = {}): Record<strin
         DK_AUTO_EXPOSURE: Number(f.autoExposure),
         DK_DEBUG_GRID: Number(f.debugGrid),
         DK_SUN_DISC: Number(f.sunDisc),
+        DK_DISC_ALPHA: Number(f.discAlpha),
+        DK_SUPERSAMPLE: Number(f.supersample),
         DK_CUBE: Number(f.cube),
         DK_CUBE_SCALED: Number(f.cubeScaled),
         DK_CUBIFY: Number(f.cubify),

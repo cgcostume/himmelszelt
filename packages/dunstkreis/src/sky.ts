@@ -55,6 +55,18 @@ export interface SkyPassOptions {
     /** Draw the sun disc. Default true. */
     sunDisc?: boolean;
     /**
+     * With `toneMap` off, write how much of each pixel the sun disc covers into alpha, 0 off the disc, rather than 1: a
+     * caller that tone maps can curve the sky and the disc apart and mix them after, so the disc's edge stays smooth.
+     * The disc's own light is the difference to a pass without it, divided by the share. Off by default.
+     */
+    discAlpha?: boolean;
+    /**
+     * Supersample the pixels the sun disc's edge or the horizon crosses, 16 rays each, every one bent by the air on its
+     * own: the disc squeezed near the horizon and the planet's rim seen from space stay smooth. On by default, at the
+     * cost of those few pixels; off, they are antialiased by the pixel's footprint alone.
+     */
+    supersample?: boolean;
+    /**
      * Light the ground below the horizon by the sky as well as the sun, true by default: the sky's irradiance on it,
      * integrated over the table texel by texel, exactly. Off, it is lit by the sun alone, a sky-view dispatch cheaper.
      */
@@ -72,7 +84,7 @@ export interface SkyPassOptions {
     aerialPerspective?: boolean | AerialPerspectiveOptions;
 }
 
-/** Byte size of DkSkyParams in frame.wgsl: a vec3 and a scalar, a mat4x4, four scalars, a vec2 and a scalar, padded. */
+/** Byte size of DkSkyParams in frame.wgsl: a vec3 and a scalar, a mat4x4, four scalars, a vec2 and two scalars. */
 const SKY_PARAMS_SIZE = 112;
 /** The light meter's directions per cap, `DK_METER_SAMPLES` in frame.wgsl, one per invocation of 128 per workgroup. */
 const METER_SAMPLES = 4096;
@@ -90,6 +102,7 @@ const DEFAULTS: SkyParams = {
     autoExposureRange: [4, 20],
     autoExposureKeys: DEFAULT_AUTO_EXPOSURE_KEYS,
     exposureCompensation: 0,
+    pixelRatio: 1,
     sunAngularDiameter: 0.533,
     projectionDistance: 0,
 };
@@ -150,6 +163,8 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         autoExposure = false,
         debugGrid = false,
         sunDisc = true,
+        discAlpha = false,
+        supersample = true,
         groundLight = true,
         headroom = 1,
     } = options;
@@ -279,7 +294,16 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             compute: {
                 module: device.createShaderModule({ code: skySource(wgsl.skyOutput(format)) }),
                 entryPoint: "dkSky",
-                constants: constants({ toneMap, headroom, dither, autoExposure, debugGrid, sunDisc }),
+                constants: constants({
+                    toneMap,
+                    headroom,
+                    dither,
+                    autoExposure,
+                    debugGrid,
+                    sunDisc,
+                    discAlpha,
+                    supersample,
+                }),
             },
         }),
         aerial &&
@@ -430,6 +454,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             const sunAltitude = (Math.atan2(sz, Math.hypot(sx, sy)) * 180) / Math.PI + dip;
             scale = skyViewScale(model.solarIlluminance, sunAltitude);
             sky[26] = scale;
+            sky[27] = params.pixelRatio;
             device.queue.writeBuffer(skyParams, 0, sky);
 
             // Rebuilding the sky-view table is the expensive part, and it is why the sky pass itself is one fetch

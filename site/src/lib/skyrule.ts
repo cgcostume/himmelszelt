@@ -12,4 +12,5 @@ export const SCENES: Record<string, string> = {
     eclipses: "eclipse",
     "a-month-of-moons": "phases",
     "precise-and-approximate": "approx",
+    "bent-light": "squeezed",
 };

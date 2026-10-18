@@ -93,6 +93,8 @@ const OVER: Record<string, string> = {
     astrolabe,
     rays: symbol,
     approx: `<circle cx="${SUN * 0.5}" cy="${-SUN * 0.4}" r="${SUN}" class="dashes"/>`,
+    // The Sun as the air shows it low over the horizon, squeezed and lifted, over its stippled outline where it truly is.
+    squeezed: `<circle cy="${SUN * 0.45}" r="${SUN}" class="cover"/><circle cy="${SUN * 0.45}" r="${SUN}" class="dashes"/><ellipse cy="${-SUN * 0.55}" rx="${SUN}" ry="${SUN * 0.6}" class="sun" style="filter: none"/>`,
 };
 const drawings: Record<string, string> = {
     eclipse: "",
@@ -103,6 +105,7 @@ const drawings: Record<string, string> = {
     moon: "",
     phases: "",
     approx: "",
+    squeezed: "",
 };
 // Close to the Sun the Moon is near new: thin crescents lit towards it, the nearest ones thinnest.
 const phase = (x: number) => moon(x, 0, 4.3, Math.abs(x) < 25 ? -3.4 : -2.1);
@@ -123,7 +126,7 @@ const ALONG: Record<string, { left?: string; right?: string }> = {
     {scene && <svg class="sky-scene" aria-hidden="true" viewBox="-24 -16 48 32" style={place} set:html={drawings[scene]} />}
     {ALONG[scene]?.left && <svg class="sky-scene along" aria-hidden="true" viewBox="-24 -16 48 32" style={along(before, here)} set:html={ALONG[scene].left} />}
     {ALONG[scene]?.right && <svg class="sky-scene along" aria-hidden="true" viewBox="-24 -16 48 32" style={along(here, after)} set:html={ALONG[scene].right} />}
-    <span class={`${sunClass(here.state, index)}${scene === "grid" || scene === "astrolabe" ? " replaced" : ""}`} style={sunStyle(here.x, here.y)} aria-current="location" />
+    <span class={`${sunClass(here.state, index)}${["grid", "astrolabe", "squeezed"].includes(scene ?? "") ? " replaced" : ""}${scene === "squeezed" ? " squeezed" : ""}`} style={sunStyle(here.x, here.y)} aria-current="location" />
     {
         scene === "earth" && (
             <span class="term sky-observer" tabindex="0" style={place}>

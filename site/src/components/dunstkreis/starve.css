@@ -1,0 +1,57 @@
+/* The tables against their reference: a heat map over each table, its legend and numbers. */
+.lut-stage canvas.starve-heat {
+    background: oklch(0 0 0);
+    pointer-events: none;
+}
+.lut-stage canvas.starve-heat[hidden] {
+    display: none;
+}
+.starve-variants {
+    display: flex;
+    gap: 0.4rem;
+}
+.starve-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    align-items: center;
+    margin: -0.5rem 0 1rem;
+}
+.starve-legend[hidden] {
+    display: none;
+}
+.starve-scale {
+    display: grid;
+    gap: 0.15rem;
+    width: 12rem;
+}
+/* Inferno from a tenth up, as starve.ts colors the texels: log scale, 0.1% to 100%. */
+.starve-ramp {
+    height: 0.6rem;
+    border-radius: var(--radius-small);
+    background: linear-gradient(
+        to right,
+        rgb(31 12 72),
+        rgb(87 16 110),
+        rgb(188 55 84),
+        rgb(249 142 9),
+        rgb(252 255 164)
+    );
+}
+.starve-ticks {
+    display: flex;
+    justify-content: space-between;
+    color: var(--muted);
+    font-size: var(--text-small);
+    font-variant-numeric: tabular-nums;
+}
+.starve-stats {
+    margin: 0.4rem 0 0;
+    font-size: var(--text-small);
+    white-space: pre-line;
+}
+/* A table's panel showing the sky instead takes the sky view's width. */
+.lut.starve-sky .lut-plot {
+    max-width: calc(28rem + var(--lut-axis) + 0.4rem);
+    margin-inline: auto;
+}

@@ -1,0 +1,73 @@
+/* From light to pixels: under the panels, one transfer plot from light to code values. Ink of the theme, the chosen
+   curve in the accent, the counts translucent behind everything. */
+.stages-plot {
+    display: block;
+    width: 100%;
+    overflow: visible;
+}
+.stages-transfer {
+    margin-top: 1rem;
+}
+.stages-grid {
+    stroke: var(--line);
+    stroke-width: 1;
+}
+.stages-axis {
+    stroke: var(--muted);
+    stroke-width: 1;
+}
+.stages-tick {
+    font-family: var(--font-mono);
+}
+.stages-white {
+    stroke: var(--muted);
+    stroke-width: 1;
+    stroke-dasharray: var(--line-dashes);
+}
+.stages-curve {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.2;
+}
+.stages-curve-tone {
+    stroke: var(--accent);
+    stroke-width: 2;
+}
+.stages-curve-encoded {
+    stroke-dasharray: var(--line-dashes);
+}
+.stages-curve-linear {
+    stroke-dasharray: var(--line-dots);
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+.stages-bar {
+    fill: var(--muted);
+    opacity: 0.18;
+}
+.stages-transfer text {
+    paint-order: stroke;
+    stroke: var(--bg);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
+/* Narrow, each stage's column keeps to its panel: its words wrap, and its buttons shrink. */
+.stages-row {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.stages-name,
+.stages-note {
+    overflow-wrap: anywhere;
+}
+.stages-ev input {
+    max-width: 100%;
+}
+@media (max-width: 520px) {
+    .stages-control .view-toggle {
+        padding-inline: 3px;
+        font-size: 11px;
+    }
+    .stages-wide {
+        display: none;
+    }
+}

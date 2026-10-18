@@ -1,0 +1,95 @@
+/* Exposure over a day: the daylight figure's bands under the hours, in the same colors. */
+#exposure-day {
+    --golden: oklch(0.82 0.098 84);
+    --golden-band: color-mix(in srgb, var(--golden) 80%, var(--night));
+    --blue-hour: oklch(0.534 0.192 264);
+    --night: var(--surface);
+    --day: var(--accent);
+}
+#exposure-day .strip-panel > svg {
+    height: clamp(15rem, 42vw, 18rem);
+    touch-action: pan-y;
+}
+#exposure-day[data-variant="b"] .strip-panel > svg {
+    height: clamp(17rem, 55vw, 24rem);
+    cursor: default;
+}
+.exposureday-variants {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+    margin-top: 0.4rem;
+}
+.exposureday-variants > .view-toggle {
+    position: static;
+}
+.exposureday-meter,
+.exposureday-compensated,
+.exposureday-exposure {
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+}
+.exposureday-meter {
+    stroke: var(--muted);
+}
+.exposureday-compensated {
+    stroke: var(--text);
+    stroke-dasharray: var(--line-dashes);
+    stroke-width: 1;
+}
+.exposureday-exposure {
+    stroke: var(--accent);
+    stroke-width: 2;
+}
+.exposureday-setting {
+    stroke-dasharray: var(--line-dashes);
+}
+.exposureday-floor {
+    fill: var(--surface);
+    opacity: 0.7;
+}
+.exposureday-anchor,
+.exposureday-value {
+    font-size: var(--text-small);
+    paint-order: stroke;
+    stroke: var(--bg);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
+/* Each variant's caption with its own plot; the second exists under pnpm dev only. */
+#exposure-day[data-variant="a"] [data-caption="b"],
+#exposure-day[data-variant="b"] [data-caption="a"] {
+    display: none;
+}
+.exposureday-ramp {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+}
+.exposureday-zero {
+    stroke: var(--line);
+    stroke-width: 1;
+}
+.exposureday-tick {
+    font-family: var(--font-mono);
+}
+.exposureday-horizon {
+    stroke: var(--muted);
+    stroke-width: 1;
+}
+.exposureday-dot {
+    fill: var(--accent);
+    stroke: var(--bg);
+    stroke-width: 1.5;
+}
+.exposureday-handle {
+    fill: var(--accent);
+    stroke: var(--bg);
+    stroke-width: 1.5;
+    cursor: ns-resize;
+}
+.exposureday-handle-setting {
+    fill: var(--bg);
+    stroke: var(--accent);
+}

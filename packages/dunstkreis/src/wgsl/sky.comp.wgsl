@@ -52,10 +52,12 @@ fn dkAzimuthStep(first: f32, second: f32) -> f32 {
     return abs(fract((second - first) / 360.0 + 0.5) - 0.5) * 360.0;
 }
 
-// sternwarte's sun symbol around the Sun's true direction, unbent by the air: a circle of 8.5 pixels and eight rays of two
-// round dots each, the same size on screen at any zoom. Where it is, rather than where it shows, so near the horizon the
-// disc stands above it, and below the horizon it is drawn over the ground. `pixel` is the angle of one pixel.
-fn dkSunSymbol(view: vec3f, sun: vec3f, pixel: f32) -> f32 {
+// sternwarte's sun symbol around the Sun's true direction, unbent by the air: a circle and eight rays of two round dots
+// each, the same size on screen at any zoom. The circle is the Sun's true disc, 8.5 pixels at the least, and the rays
+// fade as it grows past that, gone before it would reach their first dots at 13.5 pixels. Where it is, rather than
+// where it shows, so near the horizon the disc stands above it, and below the horizon it is drawn over the ground.
+// `pixel` is the angle of one CSS pixel, `disc` the disc's radius in CSS pixels, `ratio` device pixels per CSS pixel.
+fn dkSunSymbol(view: vec3f, sun: vec3f, pixel: f32, disc: f32, ratio: f32) -> f32 {
     if (dot(view, sun) <= 0.0) {
         return 0.0;
     }
@@ -65,25 +67,32 @@ fn dkSunSymbol(view: vec3f, sun: vec3f, pixel: f32) -> f32 {
     // In pixels from the Sun, in the plane facing it.
     let p = vec2f(dot(view - sun, across), dot(view - sun, up)) / pixel;
     let distance = length(p);
-    let circle = dkLine(abs(distance - 8.5), 1.0);
+    // As thin as the grid's lines, in device pixels.
+    let circle = dkLine(abs(distance - max(disc, 8.5)), 1.3 * DK_GRID_LINE / ratio);
     // The nearest of the eight rays, and the nearest of its two dots, at 13.5 and 18.8 pixels, 1.7 across.
     let step = DK_PI / 4.0;
     let angle = round(atan2(p.y, p.x) / step) * step;
     let ray = vec2f(cos(angle), sin(angle));
     let along = dot(p, ray);
     let center = select(18.8, 13.5, along < 16.15);
-    let bead = 1.0 - smoothstep(0.35, 1.35, length(p - ray * center));
+    let bead = (1.0 - smoothstep(0.35, 1.35, length(p - ray * center))) * (1.0 - smoothstep(8.5, 11.5, disc));
     return max(circle, bead);
 }
+
+// The grid's lines' width, as a share of the angle a pixel spans across and down.
+const DK_GRID_LINE: f32 = 0.65;
 
 // `right` and `below` are the rays of the neighboring pixels: a compute pass has no fwidth, so the lines' widths come
 // from how much the angles change from one pixel to the next.
 fn dkDebugOverlay(color: vec3f, view: vec3f, right: vec3f, below: vec3f) -> vec3f {
     let altitude = dkAltitudeDeg(view);
     let azimuth = dkAzimuthDeg(view);
-    let altitudeWidth = abs(dkAltitudeDeg(right) - altitude) + abs(dkAltitudeDeg(below) - altitude);
-    let azimuthWidth = dkAzimuthStep(azimuth, dkAzimuthDeg(right)) + dkAzimuthStep(azimuth, dkAzimuthDeg(below));
-    let pixel = length(abs(right - view) + abs(below - view));
+    // The lines about a device pixel thin, from the angle a pixel spans across and down; the symbol's size and the
+    // gaps for the compass labels in CSS pixels, so they look the same on a display with twice the pixels.
+    let ratio = max(dkParams.pixelRatio, 1.0);
+    let altitudeWidth = DK_GRID_LINE * (abs(dkAltitudeDeg(right) - altitude) + abs(dkAltitudeDeg(below) - altitude));
+    let azimuthWidth = DK_GRID_LINE
+        * (dkAzimuthStep(azimuth, dkAzimuthDeg(right)) + dkAzimuthStep(azimuth, dkAzimuthDeg(below)));
 
     let altitudeLine = dkLine(abs(fract(altitude / 10.0 + 0.5) - 0.5) * 10.0, altitudeWidth);
     let horizonLine = dkLine(abs(altitude), 1.5 * altitudeWidth);
@@ -91,17 +100,17 @@ fn dkDebugOverlay(color: vec3f, view: vec3f, right: vec3f, below: vec3f) -> vec3
     let compassDistance = abs(fract(azimuth / 45.0 + 0.5) - 0.5) * 45.0 * cos(altitude * DK_DEG_TO_RAD);
     let compassLine = dkLine(compassDistance, azimuthWidth * cos(altitude * DK_DEG_TO_RAD))
         * (1.0 - smoothstep(70.0, 80.0, abs(altitude)));
-    let sunPixel = length(right - view);
-    // Faded out as the disc itself grows past the symbol's circle, zoomed in, while the Sun is up and the disc shows;
-    // below the horizon the symbol stays, the only mark of where it is.
+    let sunPixel = length(right - view) * ratio;
     let discPixels = dkParams.sunAngularRadius / sunPixel;
-    let up = dkParams.sunDirection.z > dkMetering.horizon.x;
-    let fade = select(1.0, 1.0 - smoothstep(6.0, 8.5, discPixels), up);
-    let sun = dkSunSymbol(view, dkParams.sunDirection, sunPixel) * fade;
+    let sun = dkSunSymbol(view, dkParams.sunDirection, sunPixel, discPixels, ratio);
+    // Where a compass direction meets the horizon, its label stands: the lines leave it a gap 11 CSS pixels around.
+    let compass = round(azimuth / 45.0) * 45.0 * DK_DEG_TO_RAD;
+    let crossing = acos(clamp(dot(view, vec3f(sin(compass), cos(compass), 0.0)), -1.0, 1.0)) / sunPixel;
+    let gap = smoothstep(9.0, 12.0, crossing);
 
-    // The symbol stronger than the lines, so it finds the Sun in any sky.
-    let grid = max(max(0.1 * altitudeLine, 0.3 * horizonLine), max(0.15 * compassLine, 0.6 * sun));
-    return mix(color, vec3f(1.0), grid);
+    // Faint, the Sun as strong as the horizon.
+    let grid = max(max(0.1 * altitudeLine, 0.3 * horizonLine), 0.15 * compassLine) * gap;
+    return mix(color, vec3f(1.0), max(grid, 0.3 * sun) / 3.0);
 }
 
 // The exposure luminance in cd/m² is multiplied by. Metered, it is the light meter's EV100, log2(L * 100 / 12.5) for
@@ -222,6 +231,70 @@ fn dkSkySunCoverage(sky: DkSkySample, footprint: f32) -> f32 {
     return dkSunDiscCoverage(sky.direction, dkParams.sunDirection, dkParams.sunAngularRadius, footprint);
 }
 
+// Rays through a pixel the disc's edge or the horizon crosses, with DK_SUPERSAMPLE.
+const DK_SUPERSAMPLES: u32 = 16u;
+
+// How much of the pixel the disc covers. The air squeezes the disc near the horizon, from orbit to a fifth of its height,
+// so its upper and lower edges are sharper than the pixel's unbent footprint says: near an edge, the share is counted
+// over DK_SUPERSAMPLES rays through the pixel instead, each bent on its own way.
+fn dkSkySunCoverageOfPixel(sky: DkSkySample, pixel: vec2u, size: vec2u, footprint: f32) -> f32 {
+    let edge = abs(length(sky.direction - dkParams.sunDirection) - dkParams.sunAngularRadius);
+    if (!DK_SUPERSAMPLE || edge > 8.0 * footprint) {
+        return dkSkySunCoverage(sky, footprint);
+    }
+    var hits = 0.0;
+    for (var i = 0u; i < DK_SUPERSAMPLES; i = i + 1u) {
+        let ray = dkSkyAt(dkPixelRayAt(vec2f(pixel) + 0.5 + dkR2(i), size));
+        hits = hits + dkSkySunCoverage(ray, 0.0);
+    }
+    return hits / f32(DK_SUPERSAMPLES);
+}
+
+// Whether the horizon may cross a pixel looking along `view`: within two pixels of it, and from space up to two degrees
+// above the planet's rim, where the air bends grazing rays down onto it.
+fn dkNearHorizon(view: vec3f, footprint: f32) -> bool {
+    let horizon = dkMetering.horizon.x;
+    let above = select(2.0 * footprint, 2.0 * footprint + 0.035, dkInSpace());
+    return view.z > horizon - 2.0 * footprint && view.z < horizon + above;
+}
+
+// Whether the ground and the sky meet within the pixel: one of its corners on the other side from its center.
+fn dkHorizonCrosses(pixel: vec2u, size: vec2u, center: bool) -> bool {
+    var crosses = false;
+    for (var i = 0u; i < 4u; i = i + 1u) {
+        let corner = vec2f(pixel) + vec2f(f32(i & 1u), f32(i >> 1u));
+        crosses = crosses || dkSkyAt(dkPixelRayAt(corner, size)).hitsGround != center;
+    }
+    return crosses;
+}
+
+// A pixel the horizon crosses, as the mean of DK_SUPERSAMPLES rays through it: the sky's light, how much of it is
+// ground, how much is the disc, and the disc's light where it shows.
+struct DkPixel {
+    luminance: vec3f,
+    ground: f32,
+    sun: vec3f,
+    disc: f32,
+}
+
+fn dkSupersampledPixel(pixel: vec2u, size: vec2u) -> DkPixel {
+    var result = DkPixel(vec3f(0.0), 0.0, vec3f(0.0), 0.0);
+    for (var i = 0u; i < DK_SUPERSAMPLES; i = i + 1u) {
+        let ray = dkSkyAt(dkPixelRayAt(vec2f(pixel) + 0.5 + dkR2(i), size));
+        result.luminance = result.luminance + ray.luminance;
+        result.ground = result.ground + select(0.0, 1.0, ray.hitsGround);
+        if (DK_SUN_DISC && !ray.hitsGround && dkSkySunCoverage(ray, 0.0) > 0.0) {
+            result.disc = result.disc + 1.0;
+            result.sun = result.sun + dkSkySunLuminance(ray);
+        }
+    }
+    if (result.disc > 0.0) {
+        result.sun = result.sun / result.disc;
+    }
+    let n = f32(DK_SUPERSAMPLES);
+    return DkPixel(result.luminance / n, result.ground / n, result.sun, result.disc / n);
+}
+
 // `view` turned up or down within its vertical plane to the cosine `mu`.
 fn dkWithMu(view: vec3f, mu: f32) -> vec3f {
     let horizontal = length(view.xy);
@@ -265,7 +338,12 @@ fn dkProjectRay(inverseViewProjection: mat4x4f, ndc: vec2f, d: f32) -> vec3f {
 
 // The ray through the center of a pixel, top left first.
 fn dkPixelRay(pixel: vec2u, size: vec2u) -> vec3f {
-    let uv = (vec2f(pixel) + 0.5) / vec2f(size);
+    return dkPixelRayAt(vec2f(pixel) + 0.5, size);
+}
+
+// The ray through a point of the target, in pixels from its top left corner.
+fn dkPixelRayAt(position: vec2f, size: vec2u) -> vec3f {
+    let uv = position / vec2f(size);
     let ndc = vec2f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
     return dkProjectRay(dkParams.inverseViewProjection, ndc, clamp(dkParams.projectionDistance, 0.0, 1.0));
 }
@@ -300,13 +378,24 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
     let right = dkPixelRay(id.xy + vec2u(1u, 0u), size);
     let footprint = length(right - view);
 
-    // The horizon by how much of the pixel lies below it, like the disc's edge: a pixel it crosses mixes the sky just
-    // above it with the ground just below. Decided per pixel center, it would step a row at a time, and cut the disc
-    // resting on it with every step.
+    // The horizon by how much of the pixel lies below it, like the disc's edge: a pixel it crosses mixes the sky with
+    // the ground. Decided per pixel center, it would step a row at a time, and cut the disc resting on it with every
+    // step. Supersampled, by rays through the pixel, the disc's share among them; otherwise, inside the atmosphere,
+    // by the sky just above and the ground just below.
     var sky = dkSkyAt(view);
     var ground = select(0.0, 1.0, sky.hitsGround);
     var luminance = sky.luminance;
-    if (!dkInSpace()) {
+    var disc = -1.0;
+    var sunLuminance = vec3f(0.0);
+    if (DK_SUPERSAMPLE) {
+        if (dkNearHorizon(view, footprint) && dkHorizonCrosses(id.xy, size, sky.hitsGround)) {
+            let pixel = dkSupersampledPixel(id.xy, size);
+            luminance = pixel.luminance;
+            ground = pixel.ground;
+            disc = pixel.disc;
+            sunLuminance = pixel.sun;
+        }
+    } else if (!dkInSpace()) {
         let horizon = dkMetering.horizon.x;
         let below = clamp((horizon - view.z) / footprint + 0.5, 0.0, 1.0);
         if (below > 0.0 && below < 1.0) {
@@ -324,14 +413,15 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
     // The disc by how much of the pixel it covers, on the sky's part of it, looked up only there. Tone mapped, sky and
     // disc apart and mixed after, since the disc is far beyond white: mixed before, a pixel it barely touches would
     // turn white, and its edge would step.
-    var disc = 0.0;
-    var sun = vec3f(0.0);
-    if (DK_SUN_DISC) {
-        disc = dkSkySunCoverage(sky, footprint) * (1.0 - ground);
+    if (!DK_SUN_DISC) {
+        disc = 0.0;
+    } else if (disc < 0.0) {
+        disc = dkSkySunCoverageOfPixel(sky, id.xy, size, footprint) * (1.0 - ground);
         if (disc > 0.0) {
-            sun = dkSkySunLuminance(sky) * exposure;
+            sunLuminance = dkSkySunLuminance(sky);
         }
     }
+    let sun = sunLuminance * exposure;
     if (DK_TONE_MAP != 0u) {
         var mapped = dkToneMap(color);
         if (disc > 0.0) {
@@ -349,5 +439,5 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
     if (DK_TONE_MAP != 0u && DK_DITHER) {
         color = clamp(dkDither(color, id.xy), vec3f(0.0), dkEncodeSrgbExtended(vec3f(DK_HEADROOM), DK_HEADROOM));
     }
-    dkOutputStore(id.xy, 0u, vec4f(color, 1.0));
+    dkOutputStore(id.xy, 0u, vec4f(color, select(1.0, disc, DK_TONE_MAP == 0u && DK_DISC_ALPHA)));
 }

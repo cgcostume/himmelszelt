@@ -143,7 +143,11 @@ export function bindHdr(note: HTMLElement, choice: Element) {
 }
 
 /** Tone curve radios, `name="…"` inputs of the curves' values: choosing one switches every figure. */
-export function bindToneCurveChoice(inputs: Iterable<HTMLInputElement>) {
+export function bindToneCurveChoice(choices: Iterable<HTMLInputElement>) {
+    const inputs = [...choices];
+    onDisplay(() => {
+        for (const input of inputs) input.checked = input.value === display.toneCurve;
+    });
     for (const input of inputs) {
         input.checked = input.value === display.toneCurve;
         input.addEventListener("change", () => {
@@ -156,7 +160,11 @@ export function bindToneCurveChoice(inputs: Iterable<HTMLInputElement>) {
 const MODELS = { fitted: DEFAULT_ATMOSPHERE_MODEL, rgb: RGB_ATMOSPHERE_MODEL, osghimmel: OSGHIMMEL_ATMOSPHERE_MODEL };
 
 /** Model radios: four wavelengths, three as RGB or osgHimmel's; choosing one recomputes every table on the page. */
-export function bindModelChoice(inputs: Iterable<HTMLInputElement>) {
+export function bindModelChoice(choices: Iterable<HTMLInputElement>) {
+    const inputs = [...choices];
+    onTables(() => {
+        for (const input of inputs) input.checked = input.value === quality.model;
+    });
     for (const input of inputs) {
         input.checked = input.value === quality.model;
         input.addEventListener("change", () => {

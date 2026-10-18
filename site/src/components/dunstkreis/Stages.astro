@@ -2,10 +2,11 @@
 import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
 import "./dunstkreis.css";
+import "./stages.css";
 
 // The five stages from the tables' light to a pixel, each with its one control.
 const STAGES = [
-    { name: "Four wavelengths", note: "630, 580, 510 and 440 nm, clockwise from top left" },
+    { name: "Four wavelengths", note: "630, 580, 510 and 440 nm, clockwise from top left" },
     { name: "Linear RGB", note: "the brightest sky at white" },
     { name: "Exposed", note: "clipped at white" },
     { name: "Tone mapped", note: "folded into white" },
@@ -51,9 +52,9 @@ const STAGES = [
                     )}
                     {i === 4 && (
                         <span class="stages-control">
-                            <span class="stages-control" role="radiogroup" aria-label="Bits">
-                                <button type="button" class="view-toggle" data-bits="8" aria-pressed="true">8 bits</button>
-                                <button type="button" class="view-toggle" data-bits="4" aria-pressed="false" title="Four bits per channel: what eight do to a smooth gradient, sixteen times coarser so it shows">4</button>
+                            <span class="stages-control" role="radiogroup" aria-label="Bits per channel">
+                                <button type="button" class="view-toggle" data-bits="8" aria-pressed="true" title="Eight bits per channel, what a screen is sent">8 bits</button>
+                                <button type="button" class="view-toggle" data-bits="4" aria-pressed="false" title="Four bits per channel, never used for real: sixteen times coarser than eight, only so the bands eight bits leave in a smooth gradient show">4<span class="stages-wide">, exaggerated</span></button>
                             </span>
                             <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="A step of noise against the bands a smooth gradient falls into">dither</button>
                         </span>
@@ -62,9 +63,28 @@ const STAGES = [
             ))
         }
     </div>
+    <div class="stages-transfer">
+        <svg class="stages-plot" aria-label="The light along the slice mapped to code values: the curve from cd/m² to the pixel, with the slice's values as dots and histograms along both axes"></svg>
+    </div>
+    <label class="figure-slider" data-offset title="The moment, up to half a day either way from where it was set: drag, or turn the mouse wheel for ten minutes a notch">
+        <span class="note">Time</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="offset" min="-720" max="720" step="5" value="0" aria-label="Minutes from the moment" />
+            <span class="figure-slider-scale" aria-hidden="true">{["−12", "0", "+12"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 50}%`}>{mark}{i !== 1 && <span class="figure-slider-unit">{" h"}</span>}</span>)}</span>
+        </span>
+        <output data-field="offsetValue" />
+    </label>
     <figcaption class="figure-caption">
         One patch of the sky around the Sun, from the light in the tables to a pixel on the screen, each stage with its one
-        choice. Every choice is passed on: clip the gamut, and the exposed, tone mapped and encoded sky inherit it.
+        choice, and under it the sky straight below and above the Sun, from the horizon to the zenith, from light to code
+        value. Its luminance in cd/m² runs across on a logarithmic scale and the code value it is written as up, both
+        counted along the edges in bars of equal width. The curves are the chain for a gray light: the exposure moves it
+        sideways, the sRGB transfer curve lifts the darks, dashed, above the light written linearly, dotted, and the tone
+        curve rolls off the highlights. The dots are the slice every degree in its own colors, each at the code value of
+        a gray as bright as its pixel: a gray light lies on the curve, a colored one off it by what the tone curve does to
+        its color.
+        Every choice is passed on: clip the gamut, and the exposed, tone mapped and encoded sky inherit it. Four bits are
+        never used; they only magnify the bands that eight bits leave in a smooth gradient.
         <Try label="The setting Sun" set="date=2026-04-06T17:50:00Z&lat=52.395&lon=13.085&h=1" fig="stages">
             The sky around it lies outside sRGB, hatched. Take the wavelengths as RGB instead, and the sunset pales.
         </Try>

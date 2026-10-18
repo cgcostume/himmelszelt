@@ -1,0 +1,178 @@
+/* Spherical harmonics: the nine basis functions as a pyramid of spheres, the sky's coefficients under them, and the
+   irradiance they add up to, band by band. */
+.harmonics-panel {
+    display: grid;
+    gap: 1.25rem;
+    font-size: var(--text-small);
+}
+.harmonics-variants {
+    display: flex;
+    gap: 6px;
+    margin: 0;
+}
+.harmonics-variants .view-toggle {
+    position: static;
+}
+.harmonics-pyramid {
+    position: relative;
+    display: grid;
+    gap: 0.75rem;
+}
+.harmonics-band {
+    display: grid;
+    grid-template-columns: 3.5rem repeat(5, minmax(0, 1fr));
+    column-gap: 0.25rem;
+    align-items: start;
+}
+.harmonics-band-name,
+.harmonics-higher {
+    grid-column: 1;
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding-top: 0.75rem;
+    color: var(--muted);
+    line-height: 1.3;
+}
+.harmonics-higher {
+    flex-direction: row;
+    gap: 0.5rem;
+    padding-top: 0;
+}
+.harmonics-kept {
+    color: var(--text);
+    font-family: var(--font-mono);
+}
+.harmonics-cell,
+.harmonics-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+    text-align: center;
+    line-height: 1.25;
+}
+.harmonics-basis {
+    width: min(100%, 4.25rem);
+    aspect-ratio: 1;
+}
+.harmonics-sphere {
+    width: min(100%, 6rem);
+    aspect-ratio: 1;
+}
+.harmonics-bars {
+    width: min(100%, 2.75rem);
+    aspect-ratio: 36 / 28;
+    margin: 0.25rem 0;
+}
+.harmonics-bars line {
+    stroke: var(--muted);
+    stroke-width: 0.6;
+}
+.harmonics-red {
+    fill: oklch(0.63 0.19 27);
+}
+.harmonics-green {
+    fill: oklch(0.66 0.16 145);
+}
+.harmonics-blue {
+    fill: oklch(0.6 0.16 258);
+}
+.harmonics-word {
+    margin-top: 0.2rem;
+}
+.harmonics-poly {
+    color: var(--muted);
+    font-family: var(--font-mono);
+}
+.harmonics-key {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 4.5rem;
+    overflow: visible;
+}
+.harmonics-key line {
+    stroke: var(--muted);
+    stroke-width: 1;
+}
+.harmonics-key circle {
+    fill: var(--muted);
+}
+.harmonics-key text {
+    fill: var(--muted);
+    font-size: 11px;
+    text-anchor: middle;
+}
+.harmonics-build {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+    padding-left: 3.75rem;
+}
+.harmonics-sphere {
+    display: grid;
+    place-items: center;
+    padding: 0.35rem;
+    border-radius: var(--radius-small);
+    background: var(--bg);
+    box-sizing: border-box;
+}
+.harmonics-sphere canvas {
+    width: 100%;
+    aspect-ratio: 1;
+}
+.harmonics-plot {
+    width: 100%;
+    overflow: visible;
+}
+.harmonics-plot text {
+    fill: var(--muted);
+    font-size: 11px;
+}
+.harmonics-grid,
+.harmonics-zero {
+    stroke: var(--line);
+    stroke-width: 1;
+}
+.harmonics-curve {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.5;
+}
+.harmonics-curve[data-step="0"] {
+    stroke-dasharray: var(--line-dots);
+    stroke-linecap: round;
+    stroke-width: 2;
+}
+.harmonics-curve[data-step="1"] {
+    stroke-dasharray: var(--line-dashes);
+}
+.harmonics-curve[data-step="2"] {
+    stroke: var(--accent);
+    stroke-width: 2;
+}
+.harmonics-curve[data-step="3"] {
+    stroke: var(--text);
+}
+@media (max-width: 30rem) {
+    .harmonics-cell,
+    .harmonics-step {
+        font-size: 0.6875rem;
+    }
+    .harmonics-build {
+        padding-left: 0;
+    }
+}
+.harmonics-panel canvas {
+    cursor: grab;
+    touch-action: none;
+}
+.harmonics-panel canvas:active {
+    cursor: grabbing;
+}
+/* The dev-only variants: the basis alone, or the sky alone. */
+.harmonics-panel[data-variant="a"] :is(.harmonics-bars, .harmonics-build, .harmonics-plot),
+.harmonics-panel[data-variant="b"] .harmonics-basis {
+    display: none;
+}

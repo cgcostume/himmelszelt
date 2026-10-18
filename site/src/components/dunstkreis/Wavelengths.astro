@@ -1,0 +1,71 @@
+---
+import "../sternzeit/sternzeit.css";
+import Try from "../Try.astro";
+import Choice from "./Choice.astro";
+import "./dunstkreis.css";
+import "./wavelengths.css";
+---
+
+<figure class="strip-figure wide" id="wavelengths">
+    <div class="wavelengths-bar">
+        <Choice
+            figure="wavelengths"
+            name="preset"
+            label="Wavelengths"
+            title="Which wavelengths the sky is computed at, and how they become a color"
+            options={[
+                ["fitted", "dunstkreis’ four", "630, 580, 510 and 440 nm, turned into RGB by a fitted matrix"],
+                ["samples", "Bruneton’s three", "680, 550 and 440 nm, taken as red, green and blue"],
+            ]}
+            checked="fitted"
+        />
+        {
+            import.meta.env.DEV && (
+                <Choice
+                    figure="wavelengths"
+                    name="variant"
+                    label="Variant"
+                    title="Draft only: the figure without and with a live sky"
+                    options={[
+                        ["A", "variant A"],
+                        ["B", "variant B"],
+                    ]}
+                    checked="B"
+                />
+            )
+        }
+    </div>
+    <div class="strip-panel wavelengths-strip">
+        <svg aria-label="The visible spectrum, the eye's three weights over it, and the wavelengths, draggable"></svg>
+    </div>
+    <div class="wavelengths-skies" role="radiogroup" aria-label="Skies"></div>
+    <div class="wavelengths-numbers">
+        <p class="wavelengths-score"></p>
+        <table class="wavelengths-matrix" aria-label="The matrix from the samples to linear sRGB"></table>
+    </div>
+    <div class="wavelengths-live as-seen" hidden>
+        <div>
+            <canvas data-field="reference" aria-label="The whole sky at the chosen moment, at dunstkreis' four wavelengths"></canvas>
+            <span class="wavelengths-live-name">dunstkreis’ four</span>
+        </div>
+        <div>
+            <canvas data-field="chosen" aria-label="The whole sky at the chosen moment, at the chosen wavelengths"></canvas>
+            <span class="wavelengths-live-name" data-field="chosenName"></span>
+        </div>
+    </div>
+    <figcaption class="figure-caption">
+        The wavelengths a sky is computed at, on the visible spectrum under the eye's weights for linear red, green and
+        blue, each a sum over the whole spectrum; shaded, the spectrum of the sky chosen below. Under it, eight skies,
+        each as its true color, left, and the color from the samples alone, right, with how far apart they are: with
+        four, by a matrix fitted to sky spectra, refitted at once; with Bruneton's three, the samples taken as they are.
+        Underneath, the whole sky overhead at the chosen moment, the Sun at the bottom, at dunstkreis' four and at the
+        chosen wavelengths.
+        <Try label="Twilight over Potsdam" set="date=2026-04-06T18:20:00Z&lat=52.395&lon=13.085&h=1" fig="wavelengths">
+            With Bruneton's three, the whole sky turns pink and violet, the blue band low opposite the Sun included.
+        </Try>
+    </figcaption>
+</figure>
+
+<script>
+    import "./wavelengths";
+</script>

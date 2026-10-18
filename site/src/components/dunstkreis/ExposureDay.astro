@@ -1,0 +1,52 @@
+---
+import Term from "../Term.astro";
+import Try from "../Try.astro";
+import "../sternzeit/sternzeit.css";
+import "./dunstkreis.css";
+import "./exposureday.css";
+---
+
+<figure class="strip-figure exposureday" id="exposure-day" data-variant="a">
+    <div class="strip-panel exposureday-panel">
+        <svg aria-label="The exposure over the chosen day: the light meter's reading, the ramp's compensation and the exposure held in its range"></svg>
+        {
+            import.meta.env.DEV && (
+                <span class="exposureday-variants" role="radiogroup" aria-label="Variant">
+                    <button type="button" class="view-toggle" data-variant="a" aria-pressed="true">variant A</button>
+                    <button type="button" class="view-toggle" data-variant="b" aria-pressed="false">variant B</button>
+                    <button type="button" class="view-toggle" data-field="reset" hidden>reset keys</button>
+                </span>
+            )
+        }
+    </div>
+    <figcaption class="figure-caption">
+        <span data-caption="a">
+            The exposure over the chosen day at the chosen place, in EV<sub>100</sub>, midnight to midnight on the chosen
+            clock: what the light meter reads (gray), the reading with the ramp's compensation (dashed), and the exposure
+            the sky pass takes (the accent), held at its floor of EV 4. Below, the ramp's compensation itself, 0 as
+            metered and +1 twice as bright, and the Sun's altitude: day, the golden and the blue hour, then nautical and
+            astronomical <Term of="Twilight">twilight</Term>, each a shade darker, and night.
+            <Try label="Tromsø at midsummer" set="date=2026-06-21T22:00:00Z&lat=69.65&lon=18.96&h=1" fig="exposure-day">
+                the Sun never sets, and the exposure stays far above its floor, about EV 13 at midnight and 16 at noon.
+            </Try>
+        </span>
+        {
+            import.meta.env.DEV && (
+                <span data-caption="b">
+                    The exposure on the chosen day at the chosen place by the Sun's altitude above the horizon, in
+                    EV<sub>100</sub>: what the light meter reads (gray) and the exposure the sky pass takes (the accent),
+                    for the rising Sun (solid) and the setting one (dashed), held at its floor of EV 4. Below, the ramp's
+                    compensation, 0 as metered and +1 twice as bright, through its keys, hollow where the setting Sun has
+                    one of its own.
+                    <Try label="Tromsø in December" set="date=2026-12-21T11:00:00Z&lat=69.65&lon=18.96&h=1" fig="exposure-day">
+                        the Sun stays below the horizon all day, and the exposure climbs to about EV 10 at noon.
+                    </Try>
+                </span>
+            )
+        }
+    </figcaption>
+</figure>
+
+<script>
+    import "./exposureday";
+</script>

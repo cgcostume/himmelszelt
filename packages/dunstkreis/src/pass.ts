@@ -75,6 +75,8 @@ export interface SkyParams {
     autoExposureKeys: readonly AutoExposureKey[];
     /** Added to the metered exposure on top of the keys, in EV: +1 is twice as bright. */
     exposureCompensation: number;
+    /** Device pixels per CSS pixel, `devicePixelRatio`, so the debug overlay keeps its size on screen. Default 1. */
+    pixelRatio: number;
     /** The Sun's apparent angular diameter, in degrees, as `@himmelszelt/sternzeit`'s `sun.apparentAngularDiameter`
      *  returns it. About 0.53. */
     sunAngularDiameter: number;

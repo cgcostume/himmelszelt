@@ -1,0 +1,119 @@
+/* The generator: the settings in rows led by their role, then the files, each a row of its name and its downloads. */
+.generator-variant {
+    margin: 0 0 0.75rem;
+    font-size: var(--text-small);
+}
+.generator-preview {
+    margin-bottom: 0.75rem;
+}
+.generator-fold {
+    margin: 0 0 1rem;
+}
+.generator-settings {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.6rem 0.75rem;
+    align-items: baseline;
+    margin-top: 0.5rem;
+    font-size: var(--text-small);
+}
+.generator-settings .lut-role {
+    min-width: 0;
+}
+.generator-settings .lut-controls {
+    margin: 0;
+}
+.generator-settings .view-toggle {
+    position: static;
+}
+.generator-tables {
+    display: grid;
+    grid-template-columns: max-content max-content max-content;
+    gap: 0.3rem 1rem;
+    align-items: center;
+}
+.generator-tables > .note:first-child {
+    grid-column: 2;
+}
+.generator-tables input[type="number"] {
+    width: 7ch;
+    font-variant-numeric: tabular-nums;
+}
+.generator-size {
+    display: flex;
+    gap: 0.3rem;
+    align-items: center;
+}
+.generator-files {
+    display: grid;
+    gap: 0.4rem;
+    margin: 0 0 1rem;
+    padding: 0;
+    list-style: none;
+    font-size: var(--text-small);
+}
+.generator-files li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    align-items: center;
+    padding-block: 0.3rem;
+    border-bottom: var(--border);
+}
+.generator-file {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.5rem;
+    align-items: baseline;
+}
+.generator-name {
+    white-space: nowrap;
+}
+.generator-files .lut-downloads .view-toggle {
+    position: static;
+}
+.generator-thumb {
+    display: none;
+}
+
+/* Variant B: the code that makes the files over them, each file beside a thumbnail of itself, the settings folded. */
+.generator[data-variant="a"] .generator-recipe,
+.generator[data-variant="b"] .generator-preview {
+    display: none;
+}
+.generator[data-variant="b"] .generator-thumb {
+    display: grid;
+    place-items: center;
+    width: 8rem;
+    aspect-ratio: 2 / 1;
+    overflow: hidden;
+    border-radius: 2px;
+}
+.generator-thumb canvas {
+    width: 100%;
+    height: 100%;
+}
+.generator-glyph {
+    box-sizing: border-box;
+    border: var(--border);
+    color: var(--muted);
+    font-family: var(--font-mono);
+}
+.generator-recipe .code-block {
+    margin: 0 0 0.75rem;
+}
+
+@media (max-width: 40rem) {
+    .generator-settings {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .generator-tables {
+        gap: 0.3rem 0.5rem;
+    }
+    .generator-tables input[type="number"] {
+        width: 6ch;
+    }
+    .generator[data-variant="b"] .generator-thumb {
+        width: 6rem;
+    }
+}

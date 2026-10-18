@@ -23,6 +23,16 @@ override DK_DEBUG_GRID: bool = false;
 // 10^9 cd/m² in a few texels would outshine the whole sky in every filtered lookup.
 override DK_SUN_DISC: bool = true;
 
+// Without a tone curve, write how much of each pixel the disc covers into alpha, 0 off it: a caller that tone maps can
+// then curve the sky and the disc apart and mix them after, as the pass does, rather than whitening every pixel the disc
+// barely touches.
+override DK_DISC_ALPHA: bool = false;
+
+// Supersample the pixels the sun disc's edge or the horizon crosses, by rays bent each on its own way: the air squeezes
+// the disc near the horizon and bends the planet's rim seen from space, sharper than one ray per pixel resolves.
+// Off, they are antialiased by the pixel's footprint alone, which steps where the air squeezes.
+override DK_SUPERSAMPLE: bool = true;
+
 // Write the six faces of a cube map, in cd/m², rather than an image through the camera.
 override DK_CUBE: bool = false;
 
