@@ -1,0 +1,27 @@
+---
+import "../sternzeit/sternzeit.css";
+import Term from "../Term.astro";
+import "./dunstkreis.css";
+import "./bluesky.css";
+---
+
+<figure class="strip-figure" id="blue-sky">
+    <div class="blue-sky-panel" data-export="blue-sky" data-export-timeless>
+        <svg aria-label="A ray of sunlight entering the air towards an observer, reddening as the air scatters it, with dots where it does"></svg>
+    </div>
+    <figcaption class="figure-caption">
+        Sunlight on its way through the air to an observer at the chosen height, from the side; the
+        faint lines are the same sunlight everywhere else. The ray fades as the air scatters its light out, blue far sooner than red, and the lens on it shows the sunlight
+        coming in at the bars' seven wavelengths. The dots are the air scattering the sunlight that reaches it, in the color it scatters: blue
+        where that light is still white, golden where it has crossed much air. The bars beside the observer show, against
+        the Sun's light above the air, dashed, what arrives directly, what was scattered out of it on the way, and what the
+        sky adds, scattered towards the observer from everywhere else and drawn five times as tall; under each, the color
+        it adds up to. With the Sun high, the direct light stays white and the sky is blue; with it low, only red gets
+        through. The heights on the left are real, half and nine tenths of the air below the lower two. Not to scale: the
+        planet is half as wide, the air four times as thick and scattering three times as strongly, once only.
+    </figcaption>
+</figure>
+
+<script>
+    import "./bluesky";
+</script>

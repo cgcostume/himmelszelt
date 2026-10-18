@@ -1,11 +1,4 @@
-import {
-    DEFAULT_ATMOSPHERE_MODEL,
-    DEFAULT_WAVELENGTHS,
-    RGB_ATMOSPHERE_MODEL,
-    rayleighAt,
-    rgbOfSpectrum,
-    solarIrradianceAt,
-} from "@himmelszelt/dunstkreis";
+import { DEFAULT_ATMOSPHERE_MODEL, rayleighAt, rgbOfSpectrum, solarIrradianceAt } from "@himmelszelt/dunstkreis";
 import { find } from "../dom";
 import { onDemand } from "../frame";
 import { drawSvg, LABEL_GAP as GAP, STRIP_MARGIN as MARGIN, stripMoment, svgText } from "../sternzeit/figure";
@@ -16,20 +9,23 @@ const FIRST_NM = 360;
 const LAST_NM = 800;
 const VISIBLE = [400, 700];
 const TICKS = [400, 500, 600, 700];
-// The scattering per km at sea level, up to a little over Rayleigh's at 400 nm.
-const TOP = 8.6 * rayleighAt(680);
-// Red, 680 nm, the reference the rows count multiples of.
+// The scattering per km at sea level, up to a little over the top row; the curve leaves the plot past it.
+const TOP = 0.0445;
+// Blue and red, the two wavelengths marked on the curve; red is the one the second scale counts multiples of.
+const BLUE_NM = 440;
 const RED_NM = 680;
-const TIMES_RED = [2, 4, 6, 8];
-// The two spectra under the plot, sunlight and skylight: each a strip this thick, in a row this tall, in pixels.
-const STRIP = 4;
-const ROW = 14;
-// Room over the plot for the axis' name.
-const HEADER = 18;
-// Room under the plot's zero for the label under Mie's line, close above it.
-const BELOW_ZERO = 10;
+// The scattering per km on the left, the main scale; multiples of red's on the right, the second one.
+const PER_KM = [0.01, 0.02, 0.03, 0.04];
+const TIMES_RED = [2, 4, 6];
+// Where the haze line is named.
+const MIE_LABEL_NM = 405;
+// The sunlight as the plot's baseline, a strip of its colors this thick, in px.
+const BASELINE = 2;
+// Room over the plot for the top row's label, and the length of the second scale's ticks.
+const HEADER = 0;
+const TICK = 6;
 
-const svgEl = find<SVGSVGElement>(".scattering-panel > svg");
+const svgEl = find<SVGSVGElement>("#scattering .scattering-panel > svg");
 let hovered: number | null = null;
 const requestRender = onDemand(() => render(), svgEl);
 const f = (n: number) => n.toFixed(1);
@@ -44,20 +40,18 @@ const encode = (c: number) => Math.round(255 * (c <= 0.0031308 ? 12.92 * c : 1.0
 function css(rgb: readonly number[], brightness = 1) {
     const clipped = rgb.map((c) => Math.max(0, c));
     const top = Math.max(...clipped);
+    if (!(top > 0)) return "rgb(0 0 0)";
     return `rgb(${clipped.map((c) => encode((brightness * c) / top)).join(" ")})`;
 }
 
-const mie = DEFAULT_ATMOSPHERE_MODEL.mie.betaScattering[0] ?? 0;
-// Bruneton & Neyret's three wavelengths, taken as red, green and blue.
-const BRUNETON = [...new Set(RGB_ATMOSPHERE_MODEL.wavelengths)];
-const ours = (nm: number) => (DEFAULT_WAVELENGTHS as readonly number[]).includes(nm);
+const mieScattering = DEFAULT_ATMOSPHERE_MODEL.mie.betaScattering[0] ?? 0;
 
 /**
  * A spectrum as a strip of its colors, each as bright as the spectrum is there, to its peak; and the one color it adds
  * up to. The ends keep the hues of 400 and 650 nm: past 650 the color matching's fit drifts towards yellow.
  */
-function spectrum(name: string, power: (nm: number) => number) {
-    const peak = Math.max(...range(1).map(power));
+function spectrum(id: string, name: string, power: (nm: number) => number) {
+    const peak = Math.max(...range(1).map(power)) || 1;
     const stops = range(5)
         .map((nm) => {
             const offset = ((nm - FIRST_NM) / (LAST_NM - FIRST_NM)).toFixed(3);
@@ -66,112 +60,112 @@ function spectrum(name: string, power: (nm: number) => number) {
         })
         .join("");
     return {
+        id: `scattering-${id}`,
         name,
-        id: `scattering-${name}`,
         stops,
         color: css(rgbOfSpectrum((nm) => power(nm) / solarIrradianceAt(nm))),
     };
 }
-const skylight = (nm: number) => solarIrradianceAt(nm) * rayleighAt(nm);
-const SPECTRA = [
-    { ...spectrum("sunlight", solarIrradianceAt), curve: "scattering-sun" },
-    { ...spectrum("skylight", skylight), curve: "scattering-sky" },
-];
+type Spectrum = ReturnType<typeof spectrum>;
+// The sunlight above the air, the plot's baseline.
+const SUNLIGHT = spectrum("sunlight", "sunlight", solarIrradianceAt);
+/** Everything drawn over a spectrum fades out into the ultraviolet and the infrared, by a mask of this id. */
+function fade(id: string, left: number, right: number, height: number) {
+    const edge = (nm: number, opacity: number) =>
+        `<stop offset="${((nm - FIRST_NM) / (LAST_NM - FIRST_NM)).toFixed(3)}" stop-color="white" stop-opacity="${opacity}"/>`;
+    return (
+        `<linearGradient id="${id}-edges">${edge(FIRST_NM, 0)}${edge(VISIBLE[0] ?? 0, 1)}${edge(VISIBLE[1] ?? 0, 1)}${edge(LAST_NM, 0)}</linearGradient>` +
+        `<mask id="${id}"><rect x="${f(left)}" width="${f(right - left)}" height="${height}" fill="url(#${id}-edges)"/></mask>`
+    );
+}
 
+/** A spectrum named at its right end, where it has faded out, with the color it adds up to. */
+const SWATCH = 10;
+const named = (s: Spectrum, width: number, middle: number) =>
+    `<rect x="${f(width - SWATCH)}" y="${f(middle - SWATCH / 2)}" width="${SWATCH}" height="${SWATCH}" rx="2" fill="${s.color}" class="scattering-swatch"/>` +
+    svgText(width - SWATCH - GAP, middle, s.name, "figure-label figure-anchor-end");
+
+const perKm = (beta: number) => `${beta.toFixed(2)}\u202F/km`;
+// How wide the scale's labels on the left are, measured once on a label drawn and taken away again.
+// And how wide the spectra's names on the right, measured on the widest.
+const measured = new Map<string, number>();
+function measure(text: string, cls: string, fallback: number) {
+    const key = `${cls} ${text}`;
+    const known = measured.get(key);
+    if (known) return known;
+    const probe = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    probe.setAttribute("class", cls);
+    probe.textContent = text;
+    svgEl.append(probe);
+    const width = probe.getBBox().width;
+    probe.remove();
+    if (width > 0) measured.set(key, width);
+    return width || fallback;
+}
+
+/** The plot and its spectra between the scale's labels on the left, the ultraviolet starting at the zero, and their names. */
 function layout() {
     const [width, height] = [svgEl.clientWidth || 600, svgEl.clientHeight || 140];
-    const plot = { top: MARGIN.top + HEADER, bottom: height - MARGIN.bottom - GAP - SPECTRA.length * ROW - BELOW_ZERO };
-    const x = (nm: number) => ((nm - FIRST_NM) / (LAST_NM - FIRST_NM)) * width;
+    const left = measure(perKm(0.04), "figure-grid-label strip-tick", 60) + GAP;
+    const right = width - SWATCH - GAP - measure("sunlight", "figure-label", 50) - GAP;
+    const plot = { top: MARGIN.top + HEADER, bottom: height - MARGIN.bottom - GAP };
+    const x = (nm: number) => left + ((nm - FIRST_NM) / (LAST_NM - FIRST_NM)) * (right - left);
     const y = (beta: number) => plot.bottom - (beta / TOP) * (plot.bottom - plot.top);
-    const nmAt = (px: number) => FIRST_NM + (px / width) * (LAST_NM - FIRST_NM);
-    return { width, height, plot, x, y, nmAt };
+    const nmAt = (px: number) => FIRST_NM + ((px - left) / (right - left)) * (LAST_NM - FIRST_NM);
+    return { width, height, left, right, plot, x, y, nmAt };
 }
 
 function render() {
-    const { width, height, plot, x, y } = layout();
+    renderPlot();
+}
+
+function renderPlot() {
+    const { width, height, left, right, plot, x, y } = layout();
     svgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
     const line = (y0: number, cls: string) => `<line x1="0" y1="${f(y0)}" x2="${width}" y2="${f(y0)}" class="${cls}"/>`;
+    let svg = `<defs><linearGradient id="${SUNLIGHT.id}">${SUNLIGHT.stops}</linearGradient>${fade("scattering-fade", left, right, height)}</defs>`;
 
-    // Everything drawn over the spectrum fades out into the ultraviolet and the infrared.
-    const edge = (nm: number, opacity: number) =>
-        `<stop offset="${((nm - FIRST_NM) / (LAST_NM - FIRST_NM)).toFixed(3)}" stop-color="white" stop-opacity="${opacity}"/>`;
-    let svg = "<defs>";
-    for (const s of SPECTRA) svg += `<linearGradient id="${s.id}">${s.stops}</linearGradient>`;
-    svg += `<linearGradient id="scattering-edges">${edge(FIRST_NM, 0)}${edge(VISIBLE[0] ?? 0, 1)}${edge(VISIBLE[1] ?? 0, 1)}${edge(760, 0)}</linearGradient>`;
-    svg += `<mask id="scattering-fade"><rect width="${width}" height="${height}" fill="url(#scattering-edges)"/></mask></defs>`;
-
-    // The scattering as multiples of red's, labeled on the left.
+    // The scattering per km, labeled on the left; multiples of red's, ticked and labeled on the right.
     const red = rayleighAt(RED_NM);
-    for (const times of TIMES_RED) {
-        svg += line(y(times * red), "figure-grid scattering-row");
-        svg += svgText(0, y(times * red) - 4, `${times}\u00D7`, "figure-grid-label strip-tick");
+    for (const beta of PER_KM) {
+        svg += line(y(beta), "figure-grid scattering-row");
+        svg += svgText(0, y(beta), perKm(beta), "figure-grid-label strip-tick");
     }
-    svg += line(plot.bottom, "figure-grid");
-    // What the rows count, named over them.
-    svg += svgText(0, MARGIN.top, "\u00D7 red\u2019s, at 680\u202fnm", "figure-label figure-anchor-start");
+    svg += svgText(0, y(0), "0".padStart(perKm(0).length, "\u2007"), "figure-grid-label strip-tick");
+    for (const times of TIMES_RED) {
+        svg += line(y(times * red), "scattering-tick");
+        svg += svgText(width, y(times * red), `${times}×`, "figure-grid-label scattering-times");
+    }
 
-    // The curves stop at the plot's top, under the axis' name.
+    // The curves stop at the plot's top. The sunlight, a thin strip of its colors, is their baseline.
     svg += `<clipPath id="scattering-clip"><rect y="${f(plot.top - 4)}" width="${width}" height="${height}"/></clipPath>`;
     svg += `<g mask="url(#scattering-fade)" clip-path="url(#scattering-clip)">`;
-    svg += `<line x1="0" y1="${f(y(mie))}" x2="${width}" y2="${f(y(mie))}" class="scattering-mie"/>`;
+    svg += `<rect x="${f(left)}" y="${f(y(0) - BASELINE / 2)}" width="${f(right - left)}" height="${BASELINE}" fill="url(#${SUNLIGHT.id})" class="scattering-spectrum"/>`;
+    svg += `<line x1="0" y1="${f(y(mieScattering))}" x2="${width}" y2="${f(y(mieScattering))}" class="scattering-mie"/>`;
     const points = range(2)
         .map((nm) => `${f(x(nm))},${f(y(rayleighAt(nm)))}`)
         .join(" ");
     svg += `<polyline points="${points}" class="scattering-line"/>`;
-    // The sunlight and the skylight on the same scale, each as a multiple of its own red: the skylight is the sunlight
-    // times the air's scattering, so at every color its height is theirs multiplied.
-    for (const [cls, power] of [
-        ["scattering-sun", solarIrradianceAt],
-        ["scattering-sky", skylight],
-    ] as const) {
-        const atRed = power(RED_NM);
-        const curve = range(2)
-            .map((nm) => `${f(x(nm))},${f(y((power(nm) / atRed) * red))}`)
-            .join(" ");
-        svg += `<polyline points="${curve}" class="${cls}"/>`;
-    }
-    // The two spectra, each a strip on a row of its own.
-    SPECTRA.forEach((s, i) => {
-        const rowY = plot.bottom + BELOW_ZERO + GAP + i * ROW + (ROW - STRIP) / 2;
-        svg += `<rect x="0" y="${f(rowY)}" width="${width}" height="${STRIP}" rx="${STRIP / 2}" fill="url(#${s.id})" class="scattering-spectrum"/>`;
-    });
     svg += "</g>";
-    // Named at their right end, where they have faded out, each with the color it adds up to.
-    const [SWATCH, SAMPLE] = [10, 22];
-    SPECTRA.forEach((s, i) => {
-        const middle = plot.bottom + BELOW_ZERO + GAP + i * ROW + ROW / 2;
-        svg += `<rect x="${f(width - SWATCH)}" y="${f(middle - SWATCH / 2)}" width="${SWATCH}" height="${SWATCH}" rx="2" fill="${s.color}" class="scattering-swatch"/>`;
-        // Between name and swatch, a sample of the curve it is in the plot.
-        const [from, to] = [width - SWATCH - GAP - SAMPLE, width - SWATCH - GAP];
-        svg += `<line x1="${f(from)}" y1="${f(middle)}" x2="${f(to)}" y2="${f(middle)}" class="${s.curve}"/>`;
-        svg += svgText(from - GAP, middle, s.name, "figure-label figure-anchor-end");
-    });
+    svg += named(SUNLIGHT, width, y(0));
 
-    // dunstkreis' four wavelengths as dots on the line, Bruneton's three as rings the line breaks off in: 440, both.
-    for (const nm of [...new Set([...DEFAULT_WAVELENGTHS, ...BRUNETON])]) {
+    // Blue and red marked on the curve, each with how many times red's it is; the curve and the haze line named.
+    for (const nm of [BLUE_NM, RED_NM]) {
         const [px, py] = [x(nm), y(rayleighAt(nm))];
-        if (BRUNETON.includes(nm)) svg += `<circle cx="${f(px)}" cy="${f(py)}" r="5" class="scattering-bruneton"/>`;
-        if (ours(nm)) svg += `<circle cx="${f(px)}" cy="${f(py)}" r="2.5" class="scattering-sample"/>`;
-        const cls = `figure-label figure-anchor-start${ours(nm) ? "" : " scattering-bruneton-label"}`;
-        svg += svgText(px + GAP, py - GAP - 2, nm, cls);
+        const times = rayleighAt(nm) / red;
+        svg += `<circle cx="${f(px)}" cy="${f(py)}" r="3" class="scattering-bubble"/>`;
+        const label = `${nm} nm: ${times.toFixed(times < 1.05 ? 0 : 1)}×`;
+        svg += svgText(px + GAP, py - GAP - 2, label, "figure-label figure-anchor-start");
     }
-    // The legend, in the empty space over the red end: a sample of each, its name beside it.
-    const legend = [
-        ["Rayleigh: air", `<line x1="-10" y1="0" x2="10" y2="0" class="scattering-line"/>`, ""],
-        ["Mie: haze", `<line x1="-10" y1="0" x2="10" y2="0" class="scattering-mie"/>`, ""],
-        ["dunstkreis\u2019 wavelengths", `<circle r="2.5" class="scattering-sample"/>`, ""],
-        ["Bruneton\u2019s wavelengths", `<circle r="5" class="scattering-bruneton"/>`, " scattering-bruneton-label"],
-    ];
-    const [lx, ly] = [x(650), y(8 * red)];
-    legend.forEach(([name, sample, cls], i) => {
-        const rowY = ly + i * 18;
-        svg += `<g transform="translate(${f(lx)} ${f(rowY)})">${sample}</g>`;
-        svg += svgText(lx + 18, rowY, name ?? "", `figure-label figure-anchor-start scattering-legend${cls}`);
-    });
+    // Named halfway between the 0.02 and 0.03 rows, just right of where the curve crosses that height: λ⁻⁴ inverted.
+    const nameBeta = ((PER_KM[1] ?? 0) + (PER_KM[2] ?? 0)) / 2;
+    const [rx, ry] = [x(RED_NM * (red / nameBeta) ** 0.25) + 2 * GAP, y(nameBeta)];
+    svg += svgText(rx, ry, "air molecules: Rayleigh", "figure-label figure-anchor-start");
+    svg += svgText(x(MIE_LABEL_NM), y(mieScattering) - GAP - 2, "haze: Mie", "figure-label figure-anchor-start");
 
-    // The wavelengths under the spectra, the ultraviolet and the infrared at their ends.
+    // The wavelengths under the sunlight, the ultraviolet and the infrared at its faded ends.
     const labelY = height - MARGIN.bottom / 2;
-    for (const nm of TICKS) svg += svgText(x(nm), labelY, `${nm} nm`, "figure-label");
+    for (const nm of TICKS) svg += svgText(x(nm), labelY, `${nm} nm`, "figure-label");
     svg += svgText(x(FIRST_NM), labelY, "UV", "figure-label figure-anchor-start");
     svg += svgText(x(LAST_NM), labelY, "IR", "figure-label figure-anchor-end");
 
@@ -182,29 +176,38 @@ function render() {
         svg += stripMoment(x(nm), y(beta), plot.top, plot.bottom, "scattering-hover");
         svg += svgText(
             x(nm) + (left ? -GAP : GAP),
-            (plot.top + plot.bottom) / 2,
-            `${nm} nm: ${beta.toFixed(4)} /km, ${(beta / red).toFixed(1)}× red`,
+            (plot.top + y(PER_KM.at(-1) ?? 0)) / 2,
+            `${nm} nm: ${beta.toFixed(4)} /km, ${(beta / red).toFixed(1)}× red`,
             `figure-note figure-anchor-${left ? "end" : "start"}`,
         );
     }
     drawSvg(svgEl, svg, 1);
-    // The rows stop a gap short of their labels, measured once drawn.
-    const labels = [...svgEl.querySelectorAll<SVGTextElement>(".strip-tick")].map((text) => text.getBBox());
-    const start = Math.max(...labels.map((box) => box.x + box.width)) + GAP;
-    for (const row of svgEl.querySelectorAll(".scattering-row")) row.setAttribute("x1", f(start));
+    // The second scale's ticks a gap left of its labels, and the rows a gap short of the labels on either side, all
+    // measured once drawn.
+    const boxes = (selector: string) =>
+        [...svgEl.querySelectorAll<SVGTextElement>(selector)].map((text) => text.getBBox());
+    const start = Math.max(...boxes(".strip-tick").map((box) => box.x + box.width)) + GAP;
+    const tickEnd = Math.min(...boxes(".scattering-times").map((box) => box.x)) - GAP;
+    for (const tick of svgEl.querySelectorAll(".scattering-tick")) {
+        tick.setAttribute("x1", f(tickEnd - TICK));
+        tick.setAttribute("x2", f(tickEnd));
+    }
+    for (const row of svgEl.querySelectorAll(".scattering-row")) {
+        row.setAttribute("x1", f(start));
+        row.setAttribute("x2", f(tickEnd - TICK - GAP));
+    }
 }
 
-// Hovering reads the air's scattering off at a wavelength, per km and against red's.
+// Hovering reads the air's scattering off at a wavelength, per km and against red's, in the row over the top line.
 svgEl.addEventListener("pointermove", (event: PointerEvent) => {
-    const { width, nmAt } = layout();
+    const { left, right, nmAt } = layout();
     const px = event.clientX - svgEl.getBoundingClientRect().left;
-    hovered = px < 0 || px > width ? null : Math.min(LAST_NM, Math.max(FIRST_NM, nmAt(px)));
+    hovered = px < left || px > right ? null : Math.min(LAST_NM, Math.max(FIRST_NM, nmAt(px)));
     requestRender();
 });
 svgEl.addEventListener("pointerleave", () => {
     hovered = null;
     requestRender();
 });
-
 new ResizeObserver(requestRender).observe(svgEl);
 render();

@@ -459,43 +459,36 @@
     }
 }
 
-/* How strongly each color scatters: the two kinds of scattering in the accent, Rayleigh's solid and Mie's dashed, the
-   sunlight fainter, the skylight shaded in its own colors. */
+/* How strongly each wavelength scatters, styled as sternzeit's ΔT: the lines in the muted ink, Rayleigh's solid and
+   Mie's dashed, blue and red marked by bubbles, the second scale on the right fainter than the first. A little lower
+   than the other strips, the plot ending just over its top row. */
 .scattering-panel > svg {
+    height: calc(0.88 * max(9rem, 0.38 * min(80vh, min(var(--wide), 100vw - 3rem) * var(--scene-ratio, 3 / 4))));
     cursor: default;
 }
 .scattering-line,
 .scattering-mie {
     fill: none;
-    stroke: var(--accent);
+    stroke: var(--muted);
     stroke-width: 1.5;
+    stroke-linejoin: round;
 }
 .scattering-mie {
-    stroke-dasharray: var(--line-long-dashes);
+    stroke-dasharray: 4 4;
 }
-.scattering-sun,
-.scattering-sky {
-    fill: none;
+.scattering-bubble {
+    fill: var(--bg);
     stroke: var(--muted);
     stroke-width: 1.2;
-    stroke-dasharray: var(--line-dashes);
 }
-.scattering-sky {
-    stroke-dasharray: var(--line-dots);
-    stroke-width: 2;
-    stroke-linecap: round;
-}
-.scattering-sample {
-    fill: var(--accent);
-}
-/* Filled with the page, so the line breaks off inside the ring. */
-.scattering-bruneton {
-    fill: var(--bg);
-    stroke: var(--accent);
+.scattering-tick {
+    stroke: var(--line);
     stroke-width: 1;
 }
-.scattering-bruneton-label {
-    fill: var(--muted);
+.scattering-times {
+    font-family: var(--font-mono);
+    text-anchor: end;
+    opacity: 0.7;
 }
 .scattering-swatch {
     stroke: var(--line);
@@ -506,16 +499,6 @@
 /* On the light page the spectrum's yellow and cyan would wash out into the paper: deepened. */
 :root[data-theme="light"] .scattering-spectrum {
     filter: saturate(1.8) brightness(0.75);
-}
-/* Where a curve crosses a label, the label is ringed in the page's color, so it reads over it. */
-.scattering-panel text {
-    paint-order: stroke;
-    stroke: var(--bg);
-    stroke-width: 3px;
-    stroke-linejoin: round;
-}
-.scattering-legend {
-    dominant-baseline: middle;
 }
 /* The sky's parts as switches along the bottom left: the air's ingredients, then the orders of scattering. */
 .sky-parts {

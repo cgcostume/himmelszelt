@@ -30,11 +30,11 @@ import Cite from "../../components/Cite.astro";
 import Controls from "../../components/sternzeit/Controls.astro";
 import Planned from "../../components/Planned.astro";
 import Term from "../../components/Term.astro";
+import BlueSky from "../../components/dunstkreis/BlueSky.astro";
 import Scattering from "../../components/dunstkreis/Scattering.astro";
 import Sky from "../../components/dunstkreis/Sky.astro";
 import Stages from "../../components/dunstkreis/Stages.astro";
 import Tables from "../../components/dunstkreis/Tables.astro";
-import Distance from "../../components/dunstkreis/Distance.astro";
 import Environment from "../../components/dunstkreis/Environment.astro";
 import Lighting from "../../components/dunstkreis/Lighting.astro";
 import Lookup from "../../components/dunstkreis/Lookup.astro";
@@ -89,14 +89,16 @@ traces the refraction itself. How to hand it over is the code example in [What t
 ## Why the sky is blue
 
 Sunlight that reaches the ground has crossed some 8 km worth of sea-level air, and about a tenth of it never arrives
-as a beam: the molecules of the air scatter it aside, into every direction, and the sky is that sideways light. It is
-blue because the molecules are far smaller than the light's wavelength, and for such particles the scattering grows with
-the fourth power of the frequency, <Term of="Rayleigh scattering">Rayleigh scattering</Term>: the 440 nm of blue is
-scattered nearly six times as strongly as the 680 nm of red. Violet is scattered more still, and the sky is not violet
-only because the Sun sends less of it and the eye sees it poorly. The strength of it, the
-<Term of="Scattering coefficient">scattering coefficient</Term>, β, is one of the model's few numbers: at sea level
+as a beam: the molecules of the air scatter it aside, into every direction, and the sky is that sideways light. It
+is blue because the molecules are far smaller than the light's wavelength, and for such particles the scattering grows
+with the fourth power of the frequency, <Term of="Rayleigh scattering">Rayleigh scattering</Term>: the 440 nm of blue
+is scattered nearly six times as strongly as the 680 nm of red (<Fig id="scattering" />). Violet is scattered more
+still, and the sky is not violet only because the Sun sends less of it and the eye sees it poorly. The strength of it,
+the <Term of="Scattering coefficient">scattering coefficient</Term>, β, is one of the model's few numbers: at sea level
 3.3 × 10⁻² per kilometer for blue and 5.8 × 10⁻³ for red <Cite id="bruneton2008" />, falling off upward with the air's
 density, by a factor of e every 8 km, its <Term of="Scale height">scale height</Term>.
+
+<Scattering />
 
 Dust, haze and water droplets scatter too, by <Term of="Mie scattering">Mie scattering</Term>, which hardly depends
 on the wavelength and throws most of the light forward, within a few degrees of its direction. That is the white glow
@@ -104,14 +106,11 @@ around the Sun, the pale horizon of a hazy day, and the model's second layer, hu
 1.2 km. Its <Term of="Phase function">phase function</Term>, how much goes where, is set by one number, the
 <Term of="Henyey-Greenstein g">asymmetry</Term>, g, 0.8 by default. And a third layer only absorbs: the ozone in the
 stratosphere, a tent around 25 km, takes out the orange and yellow of the spectrum and leaves twilight its deep blue.
-Without it, as in osgHimmel, twilight goes gray.
+Without it, as in osgHimmel, twilight goes gray. What the air neither scatters nor absorbs reaches the ground as the
+Sun's own light: nearly white overhead, and red at the horizon, behind some 40 times as much air
+(<Fig id="blue-sky" />).
 
-<Scattering />
-
-<Planned what="revision" title="How strongly each wavelength scatters" plan="rework once the rest of the chapter stands.">
-    Not settled yet: is the figure easy to understand? Four curves on one scale of multiples of red's, two strips of
-    spectra under them and two legends may be too much for the first figure after the sky.
-</Planned>
+<BlueSky />
 
 
 Turn away from the Sun just after it has set, and the sky above the opposite horizon splits in two: a dark blue-gray
@@ -189,10 +188,6 @@ A mountain ridge behind another is paler, bluer and lower in contrast, and paint
 paint depth: the air between you and the ridge scatters sky light into the line of sight and takes some of the ridge's
 own light out. The same tables give it, the light scattered along a ray of a known length and what is left of what
 started at its end, and it is next on dunstkreis' list.
-
-<Distance />
-
-<Controls />
 
 ## Tables instead of raymarching
 
