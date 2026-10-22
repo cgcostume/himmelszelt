@@ -28,6 +28,7 @@ import irradiance from "./irradiance.comp.wgsl";
 import lut from "./lut.wgsl";
 import mipmap from "./mipmap.comp.wgsl";
 import multiscattering from "./multiscattering.comp.wgsl";
+import panorama from "./panorama.wgsl";
 import quality from "./quality.wgsl";
 import raymarch from "./raymarch.wgsl";
 import sampling from "./sampling.wgsl";
@@ -54,6 +55,7 @@ export {
     lut,
     mipmap,
     multiscattering,
+    panorama,
     quality,
     raymarch,
     sampling,

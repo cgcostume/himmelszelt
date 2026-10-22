@@ -63,7 +63,30 @@ const FILES = [
             ["panorama", "Unrolled into an equirectangular panorama, north in the middle edge, as Radiance HDR"],
             [
                 "faces",
-                "The six faces side by side in WebGPU's order +x, −x, +y, −y, +z, −z, ENU directions, as Radiance HDR",
+                "The six faces side by side in the order +X, −X, +Y, −Y, +Z, −Z of cube map images, y up and left-handed as in Direct3D and Unity: east +X, the zenith +Y, north +Z, each face upright and unmirrored as seen from inside, as Radiance HDR",
+            ],
+            [
+                "layers",
+                "The six layers exactly as WebGPU holds them, side by side in its order +x, −x, +y, −y, +z, −z, indexed by ENU directions: written into a cube texture as they come, sampled with ENU directions, as Radiance HDR",
+            ],
+        ],
+    },
+    {
+        name: "panoramas",
+        title: "Sky panoramas",
+        formats: [
+            [
+                "equirect.",
+                "Equirectangular, 2:1, north at the left edge, south in the middle, the zenith at the top, as Radiance HDR",
+            ],
+            ["upper", "The equirectangular's upper half, the horizon at the bottom, 4:1, as Radiance HDR"],
+            [
+                "octahedral",
+                "Octahedral, the whole sphere in a square, the zenith in the middle, north up, east left, as Radiance HDR",
+            ],
+            [
+                "fisheye",
+                "Fisheye, the upper hemisphere in the inscribed circle, north up, east left, the corners the ground, as Radiance HDR",
             ],
         ],
     },
@@ -72,7 +95,14 @@ const FILES = [
         title: "Irradiance cube map",
         formats: [
             ["panorama", "Unrolled into an equirectangular panorama, in lux, as Radiance HDR"],
-            ["faces", "The six faces side by side in WebGPU's order +x, −x, +y, −y, +z, −z, ENU directions, in lux"],
+            [
+                "faces",
+                "The six faces side by side in the order +X, −X, +Y, −Y, +Z, −Z of cube map images, y up and left-handed: east +X, the zenith +Y, north +Z, in lux",
+            ],
+            [
+                "layers",
+                "The six layers exactly as WebGPU holds them, side by side in its order +x, −x, +y, −y, +z, −z, indexed by ENU directions, in lux",
+            ],
         ],
     },
     {

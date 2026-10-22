@@ -1,12 +1,12 @@
 // The sky pass: a compute pass that turns the precomputed tables into pixels, one invocation per pixel of the target,
 // with no rasterization. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`, `sampling.wgsl`, `raymarch.wgsl`,
-// `cube.wgsl`, `sun.wgsl`, `tonemap.wgsl`, `frame.wgsl`, `quality.wgsl` and `features.wgsl`, plus the output at group 1,
-// `dkOutputSize` and `dkOutputStore`, declared by whoever builds the pipeline since its format has to be spelled out:
-// `skyOutput(format)` for an image, `skyCubeOutput(format)` for the six faces of a cube map.
+// `cube.wgsl`, `panorama.wgsl`, `sun.wgsl`, `tonemap.wgsl`, `frame.wgsl`, `quality.wgsl` and `features.wgsl`, plus the
+// output at group 1, `dkOutputSize` and `dkOutputStore`, declared by whoever builds the pipeline since its format has to
+// be spelled out: `skyOutput(format)` for an image or a panorama, `skyCubeOutput(format)` for a cube map's six faces.
 //
 // For an image, it writes every pixel, so the sky goes first, as the background the rest of the frame is drawn over.
-// For a cube map, with DK_CUBE, it writes the luminance itself, in cd/m², neither exposed nor tone mapped, or times
-// skyViewScale with DK_CUBE_SCALED.
+// For a cube map, with DK_CUBE, or a panorama, with DK_PANORAMA, it writes the luminance itself, in cd/m², neither
+// exposed nor tone mapped, or times skyViewScale with DK_CUBE_SCALED.
 
 @group(0) @binding(0) var<uniform> dkAtmosphere: DkAtmosphere;
 @group(0) @binding(1) var<uniform> dkParams: DkSkyParams;
@@ -363,6 +363,35 @@ fn dkCubeTexel(face: u32, texel: vec2u, size: u32) -> vec3f {
     return luminance / f32(DK_SAMPLES_CUBE) * select(1.0, dkParams.skyViewScale, DK_CUBE_SCALED);
 }
 
+// The ground, as the sky pass shows it straight down, the nadir of a cube map: one color for the panorama's texels no
+// direction falls into.
+fn dkPanoramaFill() -> vec3f {
+    return dkSkyAt(vec3f(0.0, 0.0, -1.0)).luminance;
+}
+
+// A texel of a panorama, as a cube map's: the mean of its rays within the projection, and in alpha their share, 1 but
+// around the fisheye's circle. Beyond the circle, where none is, the texel takes dkPanoramaFill, the same everywhere,
+// so that lookups clamped or filtered there blend into the ground, neither black nor streaked by the azimuth.
+fn dkPanoramaTexel(texel: vec2u, size: vec2u) -> vec4f {
+    var luminance = vec3f(0.0);
+    var inside = 0u;
+    for (var i = 0u; i < DK_SAMPLES_CUBE; i = i + 1u) {
+        let uv = (vec2f(texel) + 0.5 + dkR2(i)) / vec2f(size);
+        if (DK_PANORAMA == DK_FISHEYE && length(uv * 2.0 - 1.0) > 1.0) {
+            continue;
+        }
+        let sky = dkSkyAt(dkPanoramaDirection(DK_PANORAMA, uv, DK_PANORAMA_AZIMUTH_OFFSET, DK_PANORAMA_UPPER_HALF));
+        luminance = luminance + sky.luminance;
+        if (DK_SUN_DISC && dkSkySunCoverage(sky, 0.0) > 0.0) {
+            luminance = luminance + dkSkySunLuminance(sky);
+        }
+        inside = inside + 1u;
+    }
+    let mean = select(dkPanoramaFill(), luminance / f32(max(inside, 1u)), inside > 0u);
+    let scale = select(1.0, dkParams.skyViewScale, DK_CUBE_SCALED);
+    return vec4f(mean * scale, f32(inside) / f32(DK_SAMPLES_CUBE));
+}
+
 @compute @workgroup_size(8, 8, 1)
 fn dkSky(@builtin(global_invocation_id) id: vec3u) {
     let size = dkOutputSize();
@@ -371,6 +400,10 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
     }
     if (DK_CUBE) {
         dkOutputStore(id.xy, id.z, vec4f(dkCubeTexel(id.z, id.xy, size.x), 1.0));
+        return;
+    }
+    if (DK_PANORAMA != 0u) {
+        dkOutputStore(id.xy, 0u, dkPanoramaTexel(id.xy, size));
         return;
     }
 

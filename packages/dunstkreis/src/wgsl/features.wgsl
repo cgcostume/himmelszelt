@@ -36,12 +36,18 @@ override DK_SUPERSAMPLE: bool = true;
 // Write the six faces of a cube map, in cd/m², rather than an image through the camera.
 override DK_CUBE: bool = false;
 
-// Write the cube map's luminance times skyViewScale, like the sky-view table: half floats then hold the sky from noon
-// into the night, where cd/m² would fall below their normal values in deep twilight.
+// Write the cube map's or the panorama's luminance times skyViewScale, like the sky-view table: half floats then hold the
+// sky from noon into the night, where cd/m² would fall below their normal values in deep twilight.
 override DK_CUBE_SCALED: bool = false;
 
 // Spread the cube map's texels evenly over the sphere: see cube.wgsl.
 override DK_CUBIFY: bool = false;
+
+// Write a panorama, in cd/m² like the cube map, rather than an image through the camera: 0 none, or one of the
+// projections of panorama.wgsl. The equirectangular's upper half only, and the azimuth turned in radians, as there.
+override DK_PANORAMA: u32 = 0u;
+override DK_PANORAMA_UPPER_HALF: bool = false;
+override DK_PANORAMA_AZIMUTH_OFFSET: f32 = 0.0;
 
 // Which rows of the sky-view table a dispatch writes: 0 all, 1 the sky above the horizon, 2 the ground below it, lit
 // by the sky as well as the sun.

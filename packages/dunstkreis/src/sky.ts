@@ -8,6 +8,8 @@ import {
     MIN_OBSERVER_HEIGHT_M,
     type SkyCubeOptions,
     type SkyCubePass,
+    type SkyPanoramaOptions,
+    type SkyPanoramaPass,
     type SkyParams,
     type SkyPass,
 } from "./pass.js";
@@ -193,7 +195,18 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         wgsl.frame,
     ];
     // Everything but the output, which differs between an image and a cube map.
-    const skySource = (output: string) => [...prelude, wgsl.cube, wgsl.sun, wgsl.tonemap, output, wgsl.sky].join("\n");
+    const skySource = (output: string) =>
+        [...prelude, wgsl.cube, wgsl.panorama, wgsl.sun, wgsl.tonemap, output, wgsl.sky].join("\n");
+    // A cube map's or a panorama's format and settings, checked alike.
+    const checkEnvironment = (format: GPUTextureFormat, sunDisc: boolean, samples: number) => {
+        if (format !== "rgba16float" && format !== "rgba32float") {
+            throw new Error(`dunstkreis: the sky's cube map or panorama is rgba16float or rgba32float, not ${format}`);
+        }
+        if (sunDisc && format !== "rgba32float") {
+            throw new Error("dunstkreis: the sun disc needs rgba32float, being far brighter than rgba16float holds");
+        }
+        if (!Number.isInteger(samples) || samples < 1) throw new Error("dunstkreis: at least 1 sample per texel");
+    };
 
     const skyView = createLut(device, "dunstkreis:skyView", config.skyView.width, config.skyView.height);
     const aerial = options.aerialPerspective && {
@@ -516,15 +529,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
 
         async createCubePass(cubeOptions: SkyCubeOptions) {
             const { format: cubeFormat, samples = 1, cubify = false, sunDisc = false, scaled = false } = cubeOptions;
-            if (cubeFormat !== "rgba16float" && cubeFormat !== "rgba32float") {
-                throw new Error(`dunstkreis: the sky's cube map is rgba16float or rgba32float, not ${cubeFormat}`);
-            }
-            if (sunDisc && cubeFormat !== "rgba32float") {
-                throw new Error(
-                    "dunstkreis: the sun disc needs rgba32float, being far brighter than rgba16float holds",
-                );
-            }
-            if (!Number.isInteger(samples) || samples < 1) throw new Error("dunstkreis: at least 1 sample per texel");
+            checkEnvironment(cubeFormat, sunDisc, samples);
             const output = (viewDimension: GPUTextureViewDimension) =>
                 device.createBindGroupLayout({
                     entries: [
@@ -624,6 +629,72 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                 },
             };
             return cubePass;
+        },
+
+        async createPanoramaPass(panoramaOptions: SkyPanoramaOptions) {
+            const {
+                projection,
+                format: panoramaFormat,
+                samples = 1,
+                sunDisc = false,
+                scaled = false,
+            } = panoramaOptions;
+            const { upperHalf = false, azimuthOffset = 0 } = panoramaOptions;
+            checkEnvironment(panoramaFormat, sunDisc, samples);
+            const panorama = ({ equirectangular: 1, octahedral: 2, fisheye: 3 } as const)[projection];
+            if (!panorama) throw new Error(`dunstkreis: no panorama projection ${projection}`);
+            if (upperHalf && projection !== "equirectangular") {
+                throw new Error("dunstkreis: only the equirectangular panorama comes as its upper half");
+            }
+            const pipeline = await device.createComputePipelineAsync({
+                label: "dunstkreis:skyPanorama",
+                layout: "auto",
+                compute: {
+                    module: device.createShaderModule({ code: skySource(wgsl.skyOutput(panoramaFormat)) }),
+                    entryPoint: "dkSky",
+                    constants: constants(
+                        {
+                            toneMap: false,
+                            dither: false,
+                            cubeScaled: scaled,
+                            sunDisc,
+                            panorama,
+                            panoramaUpperHalf: upperHalf,
+                            panoramaAzimuthOffset: (azimuthOffset * Math.PI) / 180,
+                        },
+                        { cube: samples },
+                    ),
+                },
+            });
+            const panoramaBindGroup = skyBindGroupFor(pipeline);
+            const panoramaPass: SkyPanoramaPass = {
+                encode(encoder, target) {
+                    if (target.dimension !== "2d" || target.depthOrArrayLayers !== 1) {
+                        throw new Error("dunstkreis: a panorama is a 2D texture of one layer");
+                    }
+                    if (target.format !== panoramaFormat) {
+                        throw new Error(
+                            `dunstkreis: this panorama pass writes ${panoramaFormat}, not ${target.format}`,
+                        );
+                    }
+                    if (!(target.usage & GPUTextureUsage.STORAGE_BINDING)) {
+                        throw new Error("dunstkreis: the panorama needs STORAGE_BINDING usage");
+                    }
+                    const pass = encoder.beginComputePass({ label: "dunstkreis:skyPanorama" });
+                    pass.setPipeline(pipeline);
+                    pass.setBindGroup(0, panoramaBindGroup);
+                    pass.setBindGroup(
+                        1,
+                        device.createBindGroup({
+                            layout: pipeline.getBindGroupLayout(1),
+                            entries: [{ binding: 0, resource: target.createView({ mipLevelCount: 1 }) }],
+                        }),
+                    );
+                    pass.dispatchWorkgroups(dispatch(target.width), dispatch(target.height));
+                    pass.end();
+                },
+            };
+            return panoramaPass;
         },
 
         encode(encoder, target) {

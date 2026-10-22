@@ -4,21 +4,46 @@ import "./dunstkreis.css";
 import "./clocks.css";
 import Fig from "../Fig.astro";
 
-const SCENARIOS = [
-    ["skybox", "Skybox", "Everything computed once, kept as a cube map and nine numbers"],
-    ["live", "Live sky", "The sky pass every frame, the sky view whenever the Sun moves"],
-    ["lit", "Lighting a scene", "A live sky that also lights a scene by its cube map and coefficients"],
-    ["aerial", "Aerial perspective", "Lighting a scene, and the air in front of it by the aerial perspective volume"],
+const SKY = [
+    ["live", "Live sky", "The sky pass every frame and the sky view whenever the Sun moves"],
+    ["static", "Static sky", "A cube map written once, drawn by your frame"],
+];
+const ASKED = [
+    [
+        "indirect",
+        "Indirect light",
+        "The sky's light on the scene: the cube map and its coefficients, read by your shading",
+    ],
+    [
+        "direct",
+        "Direct light",
+        "The Sun's light on the scene, as the meter reads it with the sky view: no pass of its own",
+    ],
+    [
+        "aerial",
+        "Aerial perspective",
+        "The air in front of the scene, as a volume rebuilt whenever the camera or the Sun moves",
+    ],
 ];
 ---
 
-<figure class="strip-figure wide" id="clocks">
+<figure class="strip-figure" id="clocks">
     <div class="clocks-bar">
-        <span class="steps" role="radiogroup" aria-label="Scenario">
+        <span class="steps" role="radiogroup" aria-label="The sky">
             {
-                SCENARIOS.map(([value, text, title]) => (
+                SKY.map(([value, text, title]) => (
                     <label title={title}>
-                        <input type="radio" name="clocks-scenario" value={value} checked={value === "lit"} />
+                        <input type="radio" name="clocks-sky" value={value} checked={value === "live"} />
+                        <span>{text}</span>
+                    </label>
+                ))
+            }
+        </span>
+        <span class="steps" role="group" aria-label="What the renderer asks for">
+            {
+                ASKED.map(([value, text, title]) => (
+                    <label title={title}>
+                        <input type="checkbox" name="clocks-asked" value={value} checked={value !== "aerial"} />
                         <span>{text}</span>
                     </label>
                 ))
@@ -32,12 +57,13 @@ const SCENARIOS = [
     <figcaption class="figure-caption">
         Four pieces, four clocks: every texture and buffer dunstkreis computes, each in the lane of what makes it run
         again. A box shows what it holds, read from this page's own textures and shown as in the figures that explain
-        them, the aerial perspective by its middle and its last slice, then its size in texels and its memory, textures
-        at four half floats per texel. An arrow leads to what reads it, and every pass below the tables reads both, but
-        the one computing the coefficients. Dashed, what is yours. A scenario lights up what it runs, and a skybox runs
-        it all once. The timings are measured on this GPU as the page loaded, at the sizes the tables
-        (<Fig id="tables" />) and the cube map (<Fig id="environment" />) are set to, the sky pass into a full HD frame;
-        under the figure, their sums for each occasion.
+        them, the aerial perspective by its last slice, 32 km out, then its size in texels and its memory, textures at
+        four half floats per texel. An arrow leads to what reads it, and every pass below the tables reads both, but
+        the one computing the coefficients. Dashed, what is yours. The choices light up what runs: a live sky runs the
+        sky pass, a static sky is a cube map written once and drawn by your frame; indirect light adds the coefficients;
+        direct light costs nothing more, the meter reads it with the sky view. The timings are measured on this GPU as the page loaded, at the sizes the
+        tables (<Fig id="tables" />) and the cube map (<Fig id="environment" />) are set to, the sky pass into a full HD
+        frame; under the figure, their sums for each occasion.
     </figcaption>
 </figure>
 

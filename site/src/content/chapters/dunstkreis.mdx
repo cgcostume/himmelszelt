@@ -10,6 +10,7 @@ references:
     - bruneton2008
     - bruneton2017
     - edlen1966
+    - engelhardt2008
     - fritsch1980
     - hillaire2020
     - kelly2019
@@ -20,7 +21,9 @@ references:
     - narkowicz2016
     - nishita1993
     - nowell2005
+    - polyhaven
     - ramamoorthi2001
+    - snyder1987
     - sobotka2023
     - wrensch2023
     - wyman2013
@@ -45,6 +48,7 @@ import ExposureDay from "../../components/dunstkreis/ExposureDay.astro";
 import Harmonics from "../../components/dunstkreis/Harmonics.astro";
 import Refraction from "../../components/dunstkreis/Refraction.astro";
 import Wavelengths from "../../components/dunstkreis/Wavelengths.astro";
+import Projections from "../../components/dunstkreis/Projections.astro";
 
 This chapter is being written. The sky below is live, and it grows with the chapter; the dashed boxes are the figures
 still to come.
@@ -459,10 +463,10 @@ face's corner covers only a fifth of the solid angle of one at its center. So th
 towards the corners as in the middle of a face, and where two faces meet, the texel grid turns abruptly, which can show
 in gradients as smooth as the sky's. Cubified, as osgHimmel's `CubeMappedHimmel` did it <Cite id="mueller2012thesis" />,
 the texels are placed by Nowell's mapping of a cube onto a sphere <Cite id="nowell2005" /> instead. The largest then
-covers 1.31 times the solid angle of the smallest, a little more even than the equi-angular cube map YouTube streams
-video in, at 1.41 <Cite id="brown2017" />. It costs a few instructions per lookup, and whoever samples the cube map has
-to know: it looks up the point on the cube that maps to its direction, not the direction itself. Filtering across the
-faces' edges and the mip levels work as before. The two figures below switch it together.
+covers a third more solid angle than the smallest, a little more even than the equi-angular cube map YouTube streams
+video in, at 41% more <Cite id="brown2017" />. It costs a few instructions per lookup, and whoever samples the cube map
+has to know: it looks up the point on the cube that maps to its direction, not the direction itself. Filtering across
+the faces' edges and the mip levels work as before. The two figures below switch it together.
 
 The cube map comes with its mip levels, each texel the mean of four in the level above, down to a single texel a face.
 They cost a third more memory and a few cheap passes, and they are optional: the cube pass fills as many levels as the
@@ -487,6 +491,40 @@ from the same nine for shaders that prefer a lookup.
 <Environment />
 
 <Lighting />
+
+<Controls />
+
+## Flattening the sky
+
+A texture is flat and the sky is not. Storing one in the other is the mapmaker's old problem, and every answer to it is
+a map projection that pays somewhere: where texels crowd, they are wasted, and where they thin out, the sky blurs. The
+cube map pays at its faces' corners. The panorama HDRIs are shared in, on sites like
+[Poly Haven](https://polyhaven.com/hdris) <Cite id="polyhaven" />, is the
+<Term of="Equirectangular projection">equirectangular projection</Term>, and it is nearly two thousand years old:
+Marinus of Tyre is credited with it, around 100 CE <Cite id="snyder1987" />. The azimuth runs across it and the zenith
+angle down, so a single direction, the zenith, is stretched over the whole top row.
+
+An HDRI has no north, only wherever its camera happened to point. dunstkreis sets one: north at the left edge, east a
+quarter in, south in the middle and west three quarters in, as seen from inside, so the Sun's arc over a northern sky
+stays clear of the seam. `azimuthOffset` turns it about the zenith, 180 for a southern sky with north in the middle.
+A sky that is never seen below the horizon can keep only its upper half, at 4:1, and spend every texel above it. At
+about 400 texels, the equirectangular's largest texel covers some nine times the solid angle of its smallest.
+
+The <Term of="Octahedral map">octahedral map</Term> folds the sphere onto an octahedron and unfolds that into a square
+<Cite id="engelhardt2008" />: the zenith in the middle, the upper hemisphere a diamond without a seam, and the texels
+within a factor of about five. The fisheye stores what an all-sky camera sees, the upper hemisphere in a circle, its
+distance from the middle in proportion to the zenith angle. It spreads its texels within a factor of about 1.6, but
+leaves the corners of its square to no direction, a fifth of it; dunstkreis fills them with the ground's color, as a
+cube map holds it straight down, and looks up every direction below the horizon there, so the lower half is ground, as
+in a cube map, and a filtered lookup blends into it instead of black. Octahedral and fisheye are laid out as a sky chart
+held overhead: north up and east left, since the sky is seen from below.
+
+The cube map lights a scene best, filtered and mipmapped by the hardware; the equirectangular goes to every other tool;
+the octahedral packs into a 2D atlas of many, as light probes are; the fisheye compares with photographs of the whole
+sky. `createPanoramaPass` writes any of the three, as `createCubePass` writes the cube map (<Fig id="projections" />).
+Like the cube pass, it spreads `samples` rays over every texel, which smooth the horizon and the fisheye's rim within it.
+
+<Projections />
 
 <Controls />
 

@@ -1,3 +1,4 @@
+import type { SkyPanoramaPass, SkyPass } from "@himmelszelt/dunstkreis";
 import { clampObserverHeight, MULTI_SCATTERING_LOG2_OFFSET, readTexture } from "@himmelszelt/dunstkreis";
 import { showCode } from "../code";
 import { find } from "../dom";
@@ -89,6 +90,54 @@ async function downloadTable(name: TableName, format: string) {
 // The faces read back level by level down to one at most 1024 texels wide, which a 4096 cube map's 400 MB would not.
 const FACES_MAX = 1024;
 
+type Vec3 = [number, number, number];
+/** The point on the cube at s and t in [-1, 1] across a face, faces in WebGPU's order, as dkCubePointAt has it. */
+const facePoint = (face: number, s: number, t: number) =>
+    (
+        [
+            [1, -t, -s],
+            [-1, -t, s],
+            [s, 1, t],
+            [s, -1, -t],
+            [s, -t, 1],
+            [-s, -t, -1],
+        ] as Vec3[]
+    )[face] as Vec3;
+/** The face a point on the cube lies on, and its s and t there: facePoint's inverse. */
+function faceOf([x, y, z]: Vec3): [number, number, number] {
+    const [ax, ay, az] = [Math.abs(x), Math.abs(y), Math.abs(z)];
+    if (ax >= ay && ax >= az) return x > 0 ? [0, -z / ax, -y / ax] : [1, z / ax, -y / ax];
+    if (ay >= az) return y > 0 ? [2, x / ay, z / ay] : [3, x / ay, -z / ay];
+    return z > 0 ? [4, x / az, -y / az] : [5, -x / az, -y / az];
+}
+
+/**
+ * The six faces of an ENU cube map as cube map images are made, side by side in the order +X, −X, +Y, −Y, +Z, −Z: y up
+ * and left-handed, as Direct3D and Unity have it and as the cube map's own face table is, east +X, the zenith +Y, north
+ * +Z, the ENU direction (x, y, z) being (x, z, y) there. So each face reads as seen from inside, upright and unmirrored;
+ * with north at −Z, right-handed, every face would come out mirrored. The cube only turns and mirrors by its own
+ * symmetries, so every texel lands on a texel, cubified or not, and nothing is resampled. rgba32float texels.
+ */
+function yUpStrip(faces: Float32Array[], size: number) {
+    const strip = new Float32Array(6 * size * size * 4);
+    for (let face = 0; face < 6; ++face) {
+        for (let j = 0; j < size; ++j) {
+            for (let i = 0; i < size; ++i) {
+                const [vx, vy, vz] = facePoint(face, (2 * i + 1) / size - 1, (2 * j + 1) / size - 1);
+                const [from, s, t] = faceOf([vx, vz, vy]);
+                const x = Math.min(Math.floor(((s + 1) / 2) * size), size - 1);
+                const y = Math.min(Math.floor(((t + 1) / 2) * size), size - 1);
+                const source = (y * size + x) * 4;
+                strip.set(
+                    (faces[from] as Float32Array).subarray(source, source + 4),
+                    (j * 6 * size + face * size + i) * 4,
+                );
+            }
+        }
+    }
+    return strip;
+}
+
 async function downloadCube(name: CubeName, format: string) {
     const { texture, cubified } = cube(name, environment);
     if (!texture) return;
@@ -109,12 +158,66 @@ async function downloadCube(name: CubeName, format: string) {
     while (texture.width >> level > FACES_MAX) ++level;
     const face = Math.max(1, texture.width >> level);
     const faces = await Promise.all([0, 1, 2, 3, 4, 5].map((layer) => readTexture(gpuDevice(), texture, layer, level)));
-    const strip = new Float32Array(6 * face * face * 4);
-    faces.forEach(({ data }, f) => {
-        for (let y = 0; y < face; ++y)
-            strip.set(data.subarray(y * face * 4, (y + 1) * face * 4), (y * 6 + f) * face * 4);
+    if (format === "layers") {
+        // The layers as WebGPU holds them, side by side: written into a cube texture as they come, ENU directions.
+        const strip = new Float32Array(6 * face * face * 4);
+        faces.forEach(({ data }, layer) => {
+            for (let y = 0; y < face; ++y)
+                strip.set(data.subarray(y * face * 4, (y + 1) * face * 4), (y * 6 + layer) * face * 4);
+        });
+        saveHdr(divide(strip, scale), 6 * face, face, fileName(`${name}-layers-enu-${face}${suffix}`));
+        return;
+    }
+    const strip = yUpStrip(
+        faces.map(({ data }) => data),
+        face,
+    );
+    saveHdr(divide(strip, scale), 6 * face, face, fileName(`${name}-faces-y-up-${face}${suffix}`));
+}
+
+// The panoramas, each written by a pass of its own, kept for the sky pass it was made for.
+const PANORAMAS = {
+    "equirect.": { projection: "equirectangular", upperHalf: false, aspect: 2 },
+    upper: { projection: "equirectangular", upperHalf: true, aspect: 4 },
+    octahedral: { projection: "octahedral", upperHalf: false, aspect: 1 },
+    fisheye: { projection: "fisheye", upperHalf: false, aspect: 1 },
+} as const;
+type PanoramaName = keyof typeof PANORAMAS;
+const panoramaPasses = new WeakMap<SkyPass, Map<PanoramaName, Promise<SkyPanoramaPass>>>();
+
+/**
+ * A panorama of the sky, written by the sky pass itself rather than resampled from the cube map: as many texels as the
+ * cube map, up to faces of FACES_MAX, without the Sun's disc like it, in cd/m², rgba32float for the file.
+ */
+async function downloadPanorama(name: PanoramaName) {
+    const sky = currentSky();
+    if (!sky) return;
+    const { projection, upperHalf, aspect } = PANORAMAS[name];
+    let made = panoramaPasses.get(sky.pass);
+    if (!made) {
+        made = new Map();
+        panoramaPasses.set(sky.pass, made);
+    }
+    let pass = made.get(name);
+    if (!pass) {
+        pass = sky.pass.createPanoramaPass({ projection, upperHalf, format: "rgba32float", samples: 8 });
+        made.set(name, pass);
+    }
+    const face = Math.min(environment.size, FACES_MAX);
+    const height = Math.round(Math.sqrt((6 * face * face) / aspect));
+    const width = aspect * height;
+    const device = gpuDevice();
+    const texture = device.createTexture({
+        size: [width, height],
+        format: "rgba32float",
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC,
     });
-    saveHdr(divide(strip, scale), 6 * face, face, fileName(`${name}-faces-${face}${suffix}`));
+    const encoder = device.createCommandEncoder({ label: "sternwarte:panoramaExport" });
+    (await pass).encode(encoder, texture);
+    device.queue.submit([encoder.finish()]);
+    const { data } = await readTexture(device, texture, 0, 0);
+    texture.destroy();
+    saveHdr(data, width, height, fileName(`sky-${projection}${upperHalf ? "-upper" : ""}-${width}x${height}`));
 }
 
 const LM = ["0,0", "1,-1", "1,0", "1,1", "2,-2", "2,-1", "2,0", "2,1", "2,2"];
@@ -287,6 +390,8 @@ function details() {
             "sky",
             `faces ${sky.width}${cubified ? ", cubified" : ""}${scaledWith ? `, stored times 2^${Math.log2(scale)}` : ""}, cd/m²`,
         );
+    const face = Math.min(environment.size, FACES_MAX);
+    detail("panoramas", `${(6 * face * face).toLocaleString("en")} texels each, cd/m², without the Sun's disc`);
     const sh = coefficients();
     if (ibl && sh) {
         // On the ground, a surface facing up: the order 0 term and the two zonal ones, which depend on z alone.
@@ -358,6 +463,9 @@ function draw() {
             const { texture, cubified } = cube(name, environment);
             if (texture) drawInto(thumb(name), texture, cubeOptions(cubified));
         }
+        // The panoramas show the sky they are written from.
+        const { texture, cubified } = cube("sky", environment);
+        if (texture) drawInto(thumb("panoramas"), texture, cubeOptions(cubified));
     }
     field("timing").textContent = environment.buildMs ? `built in ${environment.buildMs.toFixed(1)} ms` : "";
 }
@@ -402,6 +510,7 @@ if (gpu.error) {
             button.addEventListener("click", () => {
                 if ((TABLES as string[]).includes(name)) downloadTable(name as TableName, format);
                 else if ((CUBES as readonly string[]).includes(name)) downloadCube(name as CubeName, format);
+                else if (name === "panoramas") downloadPanorama(format as PanoramaName);
                 else if (name === "coefficients") downloadCoefficients(format);
                 else downloadSettings();
             });

@@ -30,15 +30,19 @@ import { type PreviewOptions, renderPixels, SCALE, TABLE_PREVIEW } from "./previ
 // size, its memory, a thumbnail of what it holds, and its cost measured on this GPU.
 
 type Piece = "tables" | "skyView" | "aerial" | "cube" | "ibl" | "sky";
-type Scenario = "skybox" | "live" | "lit" | "aerial";
+/** What the renderer asks for: a live sky rather than a static one, a cube map written once; the sky's indirect light,
+ *  the Sun's direct light, and aerial perspective. */
+type Asked = "live" | "indirect" | "direct" | "aerial";
 
-/** What each scenario runs: once at startup, or again on each occasion. */
-const RUNS: Record<Scenario, Piece[]> = {
-    skybox: ["tables", "skyView", "cube", "ibl"],
-    live: ["tables", "skyView", "sky"],
-    lit: ["tables", "skyView", "cube", "ibl", "sky"],
-    aerial: ["tables", "skyView", "cube", "ibl", "aerial", "sky"],
-};
+/** What runs for what is asked: once at startup, or again on each occasion. The direct light comes with the sky view. */
+function runs(): Piece[] {
+    const pieces: Piece[] = ["tables", "skyView"];
+    if (asked.live) pieces.push("sky");
+    if (asked.indirect || !asked.live) pieces.push("cube");
+    if (asked.indirect) pieces.push("ibl");
+    if (asked.aerial) pieces.push("aerial");
+    return pieces;
+}
 
 // What the chapter states for a desktop GPU, shown only where this page cannot measure.
 const TYPICAL: Record<Piece, number> = {
@@ -60,7 +64,7 @@ const svgEl = find<SVGSVGElement>(".clocks-panel > svg", root);
 const measuredEl = find('[data-field="measured"]', root);
 const requestRender = onDemand(render, svgEl);
 
-let scenario: Scenario = "lit";
+const asked: Record<Asked, boolean> = { live: true, indirect: true, direct: true, aerial: false };
 let costs: Partial<Record<Piece, number>> = {};
 let measuring = false;
 let measuredFor = "";
@@ -94,7 +98,7 @@ interface Box {
     yours?: boolean;
 }
 
-function boxes(narrow: boolean): Box[] {
+function boxes(): Box[] {
     const { transmittance: t, multiScattering: m, skyView: v } = quality.config;
     const [cube, irradiance] = [environment.size, environment.irradianceSize];
     return [
@@ -126,12 +130,7 @@ function boxes(narrow: boolean): Box[] {
             lane: 1,
             column: 0,
             name: ["Sky view", "+ light meter"],
-            lines: [
-                `${v.width}×${v.height}`,
-                narrow
-                    ? memory(v.width * v.height * 8 + meterBytes(v.height))
-                    : `${Math.round((v.width * v.height * 8) / KiB)} + ${memory(meterBytes(v.height))}`,
-            ],
+            lines: [`${v.width}×${v.height}`, memory(v.width * v.height * 8 + meterBytes(v.height))],
             title:
                 "The whole sky from where the observer stands, and the meter's reading of it: the exposure, the " +
                 "sunlight, the horizon. Computed from both tables, the Sun and the height, read by the sky pass and the cube map.",
@@ -142,7 +141,7 @@ function boxes(narrow: boolean): Box[] {
             lane: 1,
             column: 1,
             name: ["Cube map"],
-            lines: [narrow ? `6×${cube}²` : `6×${cube}², mips`, memory(cubeBytes(cube))],
+            lines: [`6×${cube}², mips`, memory(cubeBytes(cube))],
             title:
                 "The sky in every direction, with mip levels, to light a scene and reflect in it. Computed like the " +
                 "sky pass, from the sky view and the tables, read by your shading and by the coefficients.",
@@ -162,7 +161,7 @@ function boxes(narrow: boolean): Box[] {
             id: "aerial",
             piece: "aerial",
             lane: 2,
-            column: 0,
+            column: 2,
             name: ["Aerial", "perspective"],
             lines: [`2×${FROXELS}³`, memory(2 * FROXELS ** 3 * 8)],
             title:
@@ -172,8 +171,8 @@ function boxes(narrow: boolean): Box[] {
         {
             id: "sky",
             piece: "sky",
-            lane: 3,
-            column: 1,
+            lane: 2,
+            column: 0,
             name: ["Sky pass"],
             lines: ["one lookup", "per pixel"],
             title:
@@ -182,10 +181,10 @@ function boxes(narrow: boolean): Box[] {
         },
         {
             id: "frame",
-            lane: 3,
-            column: 2,
+            lane: 2,
+            column: 1,
             name: ["Your frame"],
-            lines: narrow ? [] : ["target, shading"],
+            lines: ["target, shading"],
             title: "Yours: the target the sky pass writes into, and the shading that reads the cube map, the coefficients and the volume.",
             yours: true,
         },
@@ -195,24 +194,24 @@ function boxes(narrow: boolean): Box[] {
 const LANES = [
     { clock: "Per atmosphere", trigger: "or its sizes" },
     { clock: "Per Sun move", trigger: "or height move" },
-    { clock: "Per camera move", trigger: "and Sun move" },
-    { clock: "Per frame", trigger: "" },
+    { clock: "Per frame", trigger: "and per camera move" },
 ];
-const LANE_PIECES: Piece[][] = [["tables"], ["skyView", "cube", "ibl"], ["aerial"], ["sky"]];
+/** The pieces a lane's clock sums: the volume has its own clock, and shows its cost by itself. */
+const LANE_PIECES: Piece[][] = [["tables"], ["skyView", "cube", "ibl"], ["sky"]];
 
 /**
- * What each occasion costs in a scenario, at startup, when the Sun moves, when the camera does, every frame; null where
- * nothing runs on it.
+ * What each occasion costs for what is asked, at startup, when the Sun moves, when the camera does, every frame; null
+ * where nothing runs on it.
  */
-function sums(which: Scenario) {
-    const runs = RUNS[which];
+function sums() {
+    const running = runs();
     const sum = (pieces: Piece[]) => {
-        const running = pieces.filter((piece) => runs.includes(piece));
-        return running.length ? running.reduce((total, piece) => total + (costs[piece] ?? Number.NaN), 0) : null;
+        const some = pieces.filter((piece) => running.includes(piece));
+        return some.length ? some.reduce((total, piece) => total + (costs[piece] ?? Number.NaN), 0) : null;
     };
-    const startup = sum(runs) ?? 0;
-    if (which === "skybox") return { startup, sun: null, camera: null, frame: null };
-    return { startup, sun: sum(["skyView", "cube", "ibl", "aerial"]), camera: sum(["aerial"]), frame: sum(["sky"]) };
+    const startup = sum(running) ?? 0;
+    const sun = asked.live ? sum(["skyView", "cube", "ibl", "aerial"]) : sum(["aerial"]);
+    return { startup, sun, camera: sum(["aerial"]), frame: sum(["sky"]) };
 }
 
 const f = (n: number) => n.toFixed(1);
@@ -223,66 +222,58 @@ function arrow(points: [number, number][], active: boolean) {
 }
 
 function renderDataflow(width: number) {
-    const narrow = width < 560;
-    const labelWidth = narrow ? 0 : 150;
-    const gap = narrow ? 14 : 28;
-    const header = narrow ? 22 : 0;
-    const columnWidth = (width - labelWidth - 2 * gap) / 3;
-    // The thumbnail beside the text where the boxes are wide enough, above it where not.
-    const beside = columnWidth >= 250;
-    const thumbWidth = beside ? 112 : Math.min(columnWidth - 12, 96);
-    const thumbHeight = thumbWidth / 2;
-    const textHeight = 84;
-    const boxHeight = beside ? textHeight : textHeight + thumbHeight + 6;
-    const laneHeight = header + boxHeight + (narrow ? 26 : 34);
-    const height = LANES.length * laneHeight;
-    const runs = RUNS[scenario];
-    const x = (column: number) => labelWidth + column * (columnWidth + gap);
-    const top = (lane: number) => lane * laneHeight + header + (laneHeight - header - boxHeight) / 2;
-    const all = boxes(narrow);
+    // Each lane's clock heads it, so three columns fit the reading column, and roughly a phone.
+    const gap = 14;
+    const columnWidth = (width - 2 * gap) / 3;
+    // A square thumbnail over the text; a pass without a texture is an empty square of the same size.
+    const inset = 6;
+    const thumbWidth = Math.min(columnWidth - 2 * inset, 96);
+    // A name and its sizes on one line each where the column is wide enough, on two where not.
+    const joined = columnWidth >= 160;
+    const textHeight = joined ? 52 : 80;
+    const fullHeight = textHeight + thumbWidth + inset;
+    // The second lane's head leaves room for the rule's arrows into it; every lane, for the routes under its boxes.
+    const headers = [22, 38, 22];
+    const laneHeights = headers.map((header) => header + fullHeight + 42);
+    const laneTop = (lane: number) => laneHeights.slice(0, lane).reduce((sum, h) => sum + h, 0);
+    const height = laneTop(LANES.length);
+    const running = runs();
+    const x = (column: number) => column * (columnWidth + gap);
+    const all = boxes();
     const at = (id: Box["id"]) => all.find((box) => box.id === id) as Box;
-    const on = (box: Box) => (box.piece ? runs.includes(box.piece) : true);
+    const on = (box: Box) => (box.piece ? running.includes(box.piece) : true);
+    const hasThumb = (box: Box) => THUMBS.includes(box.id as Thumb);
+    // What an arrow starts from or ends at: the thumbnail, or the text's extent where there is none.
+    const body = (box: Box) => ({
+        x: x(box.column) + (columnWidth - thumbWidth) / 2,
+        y: laneTop(box.lane) + (headers[box.lane] ?? 0) + 14 + inset,
+        w: thumbWidth,
+        h: thumbWidth,
+    });
 
-    let svg = `<defs>${["", "-active"].map((suffix) => `<marker id="clocks-head${suffix}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L10 5L0 9z" class="clocks-head${suffix}"/></marker>`).join("")}</defs>`;
+    let svg = `<defs><pattern id="clocks-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="4" class="clocks-hatch-line"/></pattern>${["", "-active"].map((suffix) => `<marker id="clocks-head${suffix}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L10 5L0 9z" class="clocks-head${suffix}"/></marker>`).join("")}</defs>`;
     let labels = "";
     LANES.forEach((lane, i) => {
-        const y0 = i * laneHeight;
-        if (i % 2 === 0) svg += `<rect x="0" y="${y0}" width="${width}" height="${laneHeight}" class="clocks-lane"/>`;
+        const y0 = laneTop(i);
+        if (i % 2 === 0)
+            svg += `<rect x="0" y="${y0}" width="${width}" height="${laneHeights[i]}" class="clocks-lane"/>`;
         const pieces = LANE_PIECES[i] as Piece[];
-        const running = pieces.filter((piece) => runs.includes(piece));
-        const cost = running.length ? running.reduce((sum, piece) => sum + (costs[piece] ?? Number.NaN), 0) : null;
-        const once = scenario === "skybox" && i === 1 && running.length;
+        const some = pieces.filter((piece) => running.includes(piece));
+        const cost = some.length ? some.reduce((sum, piece) => sum + (costs[piece] ?? Number.NaN), 0) : null;
+        const once = !asked.live && i === 1 && some.length;
         const clock = once ? "Once" : lane.clock;
         const timing = cost === null ? "" : ms(cost);
         // Drawn over the arrows, each on a halo of its lane's color, which the arrows pass under.
         const halo = ` clocks-halo${i % 2 === 0 ? " on-surface" : ""}`;
-        if (narrow) {
-            const text = `${clock}${lane.trigger && !once ? ` ${lane.trigger}` : ""}`;
-            const cost = timing && ` <tspan class="figure-label clocks-cost">${timing}</tspan>`;
-            labels += `<text x="6" y="${y0 + 13}" class="figure-note figure-anchor-start${halo}">${escapeText(text)}${cost}</text>`;
-        } else {
-            const middle = y0 + laneHeight / 2;
-            const lines = [[clock, "figure-note"]];
-            if (lane.trigger && !once) lines.push([lane.trigger, "figure-label"]);
-            if (timing) lines.push([timing, "figure-label clocks-cost"]);
-            lines.forEach(([text, cls], j) => {
-                svg += svgText(
-                    10,
-                    middle + (j - (lines.length - 1) / 2) * 16,
-                    text ?? "",
-                    `${cls} figure-anchor-start`,
-                );
-            });
-        }
+        const text = `${clock}${lane.trigger && !once ? ` ${lane.trigger}` : ""}`;
+        const costSpan = timing && ` <tspan class="figure-label clocks-cost">${timing}</tspan>`;
+        labels += `<text x="6" y="${y0 + (headers[i] ?? 0) - 7}" class="figure-note figure-anchor-start${halo}">${escapeText(text)}${costSpan}</text>`;
     });
 
-    // The routes between the boxes, in the gaps: the sky view down to the sky pass through the empty middle of the
-    // camera's lane, the volume and the coefficients down into your frame.
-    const right = (box: Box) => x(box.column) + columnWidth;
-    const middle = (box: Box) => top(box.lane) + boxHeight / 2;
-    const center = (box: Box) => x(box.column) + columnWidth / 2;
-    const bottom = (box: Box) => top(box.lane) + boxHeight;
-    const [transmittance, multi, skyView, cube, coefficients, aerial, sky, frame] = [
+    // The routes: across the gaps between thumbnails, and straight down from the sky view to the sky pass and from the
+    // cube map to your frame. The meter's sunlight branches off the sky view's route, the coefficients come down and
+    // over, the volume comes in from the right.
+    const [tb, mb, sb, cb, kb, ab, yb, fb] = [
         "tables",
         "multi",
         "skyView",
@@ -291,112 +282,120 @@ function renderDataflow(width: number) {
         "aerial",
         "sky",
         "frame",
-    ].map((id) => at(id as Box["id"])) as Box[];
-    const [tb, mb, sb, cb, kb, ab, yb, fb] = [
-        transmittance,
-        multi,
-        skyView,
-        cube,
-        coefficients,
-        aerial,
-        sky,
-        frame,
-    ] as Box[];
+    ].map((id) => body(at(id as Box["id"]))) as ReturnType<typeof body>[];
     const pad = 3;
-    svg += arrow(
-        [
-            [right(tb) + pad, middle(tb)],
-            [x(mb.column) - pad, middle(mb)],
-        ],
-        on(mb),
-    );
-    svg += arrow(
-        [
-            [right(sb) + pad, middle(sb)],
-            [x(cb.column) - pad, middle(cb)],
-        ],
-        on(cb),
-    );
-    svg += arrow(
-        [
-            [right(cb) + pad, middle(cb)],
-            [x(kb.column) - pad, middle(kb)],
-        ],
-        on(kb),
-    );
-    const below = bottom(sb) + (narrow ? 7 : (laneHeight - boxHeight - header) / 2 + header / 2);
-    svg += arrow(
-        [
-            [center(sb), bottom(sb) + pad],
-            [center(sb), below],
-            [center(yb), below],
-            [center(yb), top(yb.lane) - pad],
-        ],
-        on(yb),
-    );
-    svg += arrow(
-        [
-            [right(yb) + pad, middle(yb)],
-            [x(fb.column) - pad, middle(fb)],
-        ],
-        on(yb),
-    );
-    svg += arrow(
-        [
-            [right(ab) + pad, middle(ab)],
-            [center(fb) - 10, middle(ab)],
-            [center(fb) - 10, top(fb.lane) - pad],
-        ],
-        on(ab),
-    );
-    svg += arrow(
-        [
-            [center(kb) + 10, bottom(kb) + pad],
-            [center(kb) + 10, top(fb.lane) - pad],
-        ],
-        on(kb),
-    );
-    // Both tables feed every piece below them: a rule under their lane says so once.
-    const ruleY = laneHeight - 1;
-    svg += `<line x1="${labelWidth}" y1="${ruleY}" x2="${width}" y2="${ruleY}" class="clocks-rule"/>`;
-    if (!narrow)
-        svg += svgText(
-            width - 6,
-            ruleY - 9,
-            "both tables, read by all below but the coefficients",
-            "figure-label figure-anchor-end",
+    const centerX = (b: typeof tb) => b.x + b.w / 2;
+    const centerY = (b: typeof tb) => b.y + b.h / 2;
+    // A route leaves downward under the text, not through it.
+    const under = (b: typeof tb) => b.y + b.h + textHeight + pad;
+    const across = (from: typeof tb, to: typeof tb, active: boolean) =>
+        arrow(
+            [
+                [from.x + from.w + pad, centerY(from)],
+                [to.x - pad, centerY(to)],
+            ],
+            active,
         );
+    const line = (points: [number, number][], active: boolean) =>
+        `<path d="${points.map(([px, py], i) => `${i ? "L" : "M"}${f(px)} ${f(py)}`).join(" ")}" class="clocks-arrow${active ? " active" : ""}"/>`;
+    svg += across(tb, mb, on(at("multi")));
+    svg += across(sb, cb, on(at("cube")));
+    svg += across(cb, kb, on(at("coefficients")));
+    // The row under the second lane's boxes, where the sunlight and the coefficients turn toward your frame.
+    const below = laneTop(2) - 14;
+    svg += line(
+        [
+            [centerX(sb), under(sb)],
+            [centerX(sb), below],
+        ],
+        on(at("sky")) || asked.direct,
+    );
+    svg += arrow(
+        [
+            [centerX(sb), below],
+            [centerX(sb), yb.y - pad],
+        ],
+        on(at("sky")),
+    );
+    svg += arrow(
+        [
+            [centerX(sb), below],
+            [centerX(fb) - 20, below],
+            [centerX(fb) - 20, fb.y - pad],
+        ],
+        asked.direct,
+    );
+    svg += arrow(
+        [
+            [centerX(cb), under(cb)],
+            [centerX(cb), fb.y - pad],
+        ],
+        on(at("cube")) && (asked.indirect || !asked.live),
+    );
+    svg += arrow(
+        [
+            [centerX(kb), under(kb)],
+            [centerX(kb), below],
+            [centerX(fb) + 20, below],
+            [centerX(fb) + 20, fb.y - pad],
+        ],
+        on(at("coefficients")),
+    );
+    svg += across(yb, fb, on(at("sky")));
+    svg += arrow(
+        [
+            [ab.x - pad, centerY(ab)],
+            [fb.x + fb.w + pad, centerY(ab)],
+        ],
+        on(at("aerial")),
+    );
+    // Both tables feed every piece below them: a rule under their lane says so once, with an arrow into each column.
+    const ruleY = laneTop(1) - 1;
+    svg += `<line x1="0" y1="${ruleY}" x2="${width}" y2="${ruleY}" class="clocks-rule"/>`;
+    for (const column of [0, 1, 2])
+        svg += arrow(
+            [
+                [x(column) + columnWidth / 2, ruleY],
+                [x(column) + columnWidth / 2, ruleY + 14],
+            ],
+            true,
+        );
+    svg += svgText(
+        width - 6,
+        ruleY - 9,
+        "both tables, read by every pass below but the coefficients",
+        "figure-label figure-anchor-end",
+    );
 
     svg += labels;
     for (const box of all) {
-        const [bx, by] = [x(box.column), top(box.lane)];
+        const b = body(box);
         const cls = `clocks-box${on(box) ? " active" : ""}${box.yours ? " yours" : ""}`;
         svg += `<g class="${cls}"><title>${escapeText(box.title)}</title>`;
-        svg += `<rect x="${f(bx)}" y="${f(by)}" width="${f(columnWidth)}" height="${boxHeight}" rx="4"/>`;
-        const lines = [
-            ...box.name.map((text) => [text, "clocks-name"]),
-            ...box.lines.map((text) => [text, "clocks-size"]),
-        ];
-        // Where a lane holds pieces timed apart, each box shows its own.
-        if (box.piece && (LANE_PIECES[box.lane] ?? []).length > 1) lines.push([ms(costs[box.piece]), "clocks-cost"]);
-        const thumb = THUMBS.includes(box.id as Thumb) ? (box.id as Thumb) : null;
-        let [textX, textY] = [bx + columnWidth / 2, by + boxHeight / 2];
-        if (thumb) {
-            const [tx, ty] = beside
-                ? [bx + 8, by + (boxHeight - thumbHeight) / 2]
-                : [bx + (columnWidth - thumbWidth) / 2, by + 6];
-            const size = `x="${f(tx)}" y="${f(ty)}" width="${f(thumbWidth)}" height="${f(thumbHeight)}"`;
-            // Rounded as the box around it, the image clipped to the same corners.
-            svg += `<clipPath id="clocks-clip-${thumb}"><rect ${size} rx="4"/></clipPath>`;
+        if (!hasThumb(box))
+            svg += `<rect x="${f(b.x)}" y="${f(b.y)}" width="${f(b.w)}" height="${f(b.h)}" rx="4" class="clocks-frame"/>`;
+        const lines = joined
+            ? [
+                  [box.name.join(" "), "clocks-name"],
+                  [box.lines.join(box.id === "sky" ? " " : ", "), "clocks-size"],
+              ]
+            : [...box.name.map((text) => [text, "clocks-name"]), ...box.lines.map((text) => [text, "clocks-size"])];
+        // The pieces with a clock of their own among others show their cost themselves.
+        if (box.piece && box.piece !== "tables" && box.piece !== "sky")
+            lines.push([ms(costs[box.piece]), "clocks-cost"]);
+        const textX = x(box.column) + columnWidth / 2;
+        const textY = b.y + b.h + textHeight / 2;
+        if (hasThumb(box)) {
+            const size = `x="${f(b.x)}" y="${f(b.y)}" width="${f(b.w)}" height="${f(b.h)}"`;
+            svg += `<clipPath id="clocks-clip-${box.id}"><rect ${size} rx="4"/></clipPath>`;
             svg += `<rect ${size} rx="4" class="clocks-thumb"/>`;
-            const url = thumbs[thumb];
-            const pixelated = thumb === "aerial" ? " pixelated" : "";
+            const url = thumbs[box.id as Thumb];
+            const pixelated = box.id === "aerial" ? " pixelated" : "";
             if (url)
-                svg += `<image ${size} href="${url}" preserveAspectRatio="none" clip-path="url(#clocks-clip-${thumb})" class="clocks-image${pixelated}"/>`;
-            if (beside) textX = tx + thumbWidth + (bx + columnWidth - tx - thumbWidth) / 2;
-            else textY = ty + thumbHeight + (by + boxHeight - ty - thumbHeight) / 2;
+                svg += `<image ${size} href="${url}" preserveAspectRatio="none" clip-path="url(#clocks-clip-${box.id})" class="clocks-image${pixelated}"/>`;
+            if (!on(box)) svg += `<rect ${size} rx="4" class="clocks-hatched"/>`;
         }
-        const step = 15;
+        const step = 14;
         const first = textY - ((lines.length - 1) * step) / 2;
         lines.forEach(([text, cls], i) => {
             svg += svgText(textX, first + i * step, text ?? "", `figure-note ${cls}`);
@@ -442,11 +441,11 @@ function showEnvironment() {
 }
 
 // The page draws no aerial perspective of its own sky: a pass of the figure's own builds the volume from the page's
-// tables, Sun and height, for a camera looking at the horizon under the Sun with a field of view of 90 degrees.
+// tables, Sun and height, for a camera looking at the horizon under the Sun, 90 degrees high and twice as wide.
 let aerialPass: SkyPass | null = null;
 let aerialFor: AtmosphereLUTs | null = null;
-// Two of its slices, side by side: the middle one and the last, 32 km out.
-const SLICES = [FROXELS / 2 - 1, FROXELS - 1];
+// Its last slice, 32 km out.
+const SLICES = [FROXELS - 1];
 
 /** A half float's value from its 16 bits. */
 function half(bits: number) {
@@ -474,7 +473,7 @@ async function showAerial(sky: Sky) {
     const yaw = Math.atan2(sx, sy);
     const [forward, right] = [
         [Math.sin(yaw), Math.cos(yaw), 0],
-        [Math.cos(yaw), -Math.sin(yaw), 0],
+        [2 * Math.cos(yaw), -2 * Math.sin(yaw), 0],
     ];
     const camera = new Float32Array([...right, 0, 0, 0, 1, 0, 0, 0, 0, 1, ...forward, 0]);
     const encoder = device.createCommandEncoder({ label: "sternwarte:clocksAerial" });
@@ -548,7 +547,7 @@ function render() {
 }
 
 function showSums() {
-    const { startup, sun, camera, frame } = sums(scenario);
+    const { startup, sun, camera, frame } = sums();
     const parts = [`at the start ${ms(startup)}`];
     if (sun !== null) parts.push(`when the Sun moves ${ms(sun)}`);
     if (camera !== null) parts.push(`when the camera moves ${ms(camera)}`);
@@ -754,9 +753,15 @@ onEnvironment(() => {
 });
 needEnvironment(root);
 
-for (const input of root.querySelectorAll<HTMLInputElement>('input[name="clocks-scenario"]')) {
+for (const input of root.querySelectorAll<HTMLInputElement>('input[name="clocks-asked"]')) {
     input.addEventListener("change", () => {
-        scenario = input.value as Scenario;
+        asked[input.value as Asked] = input.checked;
+        requestRender();
+    });
+}
+for (const input of root.querySelectorAll<HTMLInputElement>('input[name="clocks-sky"]')) {
+    input.addEventListener("change", () => {
+        asked.live = input.value === "live";
         requestRender();
     });
 }

@@ -3,7 +3,7 @@
 // Binding-free.
 //
 // A cubified cube map, osgHimmel's `cubify` after petrocket's sphere-to-cube mapping, lays its texels out over the
-// sphere far more evenly: the largest texel spans 1.31 times the smallest one's solid angle, not 5.1 times, so the
+// sphere far more evenly: the largest texel spans 4/3 of the smallest one's solid angle, not some 5.2 times, so the
 // corners are no longer sharper than the face centers. Write it through `dkSphereFromCube` and sample it with
 // `dkCubeFromSphere(d)` instead of d; hardware filtering, seamless across the edges, and the mip levels work as before.
 

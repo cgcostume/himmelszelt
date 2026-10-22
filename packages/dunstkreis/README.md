@@ -137,6 +137,16 @@ The Sun and the sky light a scene apart, the usual split for image-based lightin
   twilight cd/m² fall below what rgba16float holds finely; with `scaled: true` the cube map holds them times
   `sky.skyViewScale`, a power of two that follows the Sun, as the sky-view table does: divide by it, as read when
   encoding, for cd/m², and the irradiance from it too.
+- The sky as a panorama, from `await sky.createPanoramaPass({ projection, format })`, then `encode(encoder, texture)`
+  into mip level 0 of a 2D texture, in cd/m² like the cube map and with the same `samples`, `sunDisc` and `scaled`.
+  `equirectangular`, as HDRIs are shared, 2:1: north at the left edge, east a quarter in, south in the middle, seen
+  from inside, the zenith at the top; `upperHalf: true` keeps the half above the horizon, 4:1. `octahedral`, the
+  whole sphere in a square, and `fisheye`, the upper hemisphere azimuthal equidistant in the inscribed circle: both with the zenith in the
+  middle, north up and east left, as a sky chart held overhead. The fisheye's corners all hold one color, the
+  ground's at the nadir, alpha 0, and `dkFisheyeUv` sends every direction below the horizon there, so the lower half
+  looks up uniform ground; the equirectangular's upper half takes such a direction to the horizon at its azimuth.
+  `azimuthOffset` turns each about the zenith, in degrees, 180 for north in the equirectangular's middle. The
+  mappings both ways are in `wgsl.panorama`, `dkPanoramaUv` and `dkPanoramaDirection`.
 - The sky's diffuse light from `await createIrradiancePass(device, { cubified, sourceFormat })`: `encode(encoder, cube)` projects any cube map onto the
   nine real spherical harmonics up to order 2 (Ramamoorthi & Hanrahan), in a storage buffer to shade with directly,
   and writes an irradiance cube map from them, 32x32 per face, in lux. It takes any cube map, the sky's or an HDR
@@ -209,7 +219,8 @@ Implemented so far:
 - `src/wgsl/common.wgsl`: ray-sphere geometry, rays bent by the air, density profiles and phase functions.
 - `src/pass.ts`: the `SkyPass`/`AtmosphereLUTs` interfaces.
 - `src/luts.ts`: the transmittance and multiple-scattering tables, `precomputeAtmosphere()`.
-- `src/sky.ts`: the sky-view table, the light meter, the sky pass and its cube pass, `createSkyPass()`.
+- `src/sky.ts`: the sky-view table, the light meter, the sky pass and its cube and panorama passes, `createSkyPass()`.
+- `src/wgsl/cube.wgsl` and `src/wgsl/panorama.wgsl`: how cube maps and panoramas lay out the directions.
 - `src/exposure.ts`: EV100 and the automatic exposure's ramp.
 - `src/ibl.ts`: spherical harmonics and irradiance from a cube map, `createIrradiancePass()`.
 - `src/wgsl/aerial.wgsl` and `src/wgsl/aerialvolume.comp.wgsl`: the aerial perspective volume, its lookup and how it

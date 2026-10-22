@@ -1,0 +1,98 @@
+---
+import "../sternzeit/sternzeit.css";
+import Try from "../Try.astro";
+import Choice from "./Choice.astro";
+import "./dunstkreis.css";
+import "./projections.css";
+
+const PROJECTION = {
+    figure: "projections",
+    name: "projection",
+    label: "Projection",
+    title: "How the sphere of directions is laid out on the texture",
+    options: [
+        ["cube", "cube map", "Six perspective views, the sides of a cube, as createCubePass writes them"],
+        ["cubified", "cubified", "Texels spread evenly over the sphere, as osgHimmel's CubeMappedHimmel did"],
+        ["equirectangular", "equirectangular", "Azimuth across, zenith angle down, 2:1, as HDRIs are shared"],
+        ["upper", "upper equirect.", "The equirectangular's upper half, from the zenith to the horizon, 4:1"],
+        ["octahedral", "octahedral", "The sphere onto an octahedron, unfolded into a square, the zenith in the middle"],
+        ["fisheye", "fisheye", "The upper hemisphere as an all-sky camera sees it, azimuthal equidistant"],
+    ],
+    checked: "cube",
+};
+const BUDGET = {
+    figure: "projections",
+    name: "budget",
+    label: "Texels",
+    heading: "texels",
+    title: "About as many texels in each projection",
+    options: [
+        ["0", "400"],
+        ["1", "1,600"],
+        ["2", "6,400"],
+        ["3", "full", "As many texels as the environment figure's sky cube map, faces of 512 by default"],
+    ],
+    checked: "0",
+};
+const FILTER = {
+    figure: "projections",
+    name: "filter",
+    label: "Filter",
+    title: "Texel by texel, bilinear by the hardware's sampler as a renderer reads it, or bicubic",
+    options: [
+        ["nearest", "nearest"],
+        ["linear", "bilinear"],
+        [
+            "cubic",
+            "bicubic",
+            "Catmull-Rom over 4 by 4 texels, by hand in the shader: smooth where texels meet and across the cube's edges, where bilinear bends",
+        ],
+    ],
+    checked: "nearest",
+};
+---
+
+<figure class="scene-frame" id="projections">
+    <p class="lut-controls projections-controls">
+        <Choice {...PROJECTION} />
+        <Choice {...BUDGET} />
+        <Choice {...FILTER} />
+        <button type="button" class="view-toggle" data-field="edges" aria-pressed="true" title="Outline every texel">texel edges</button>
+        <button type="button" class="view-toggle" data-field="density" aria-pressed="false" title="Color every direction by how densely the projection packs its texels there, against the same texels spread evenly over what it covers">density</button>
+    </p>
+    <div class="sky-view as-seen projections-view" data-panel="inside">
+        <canvas aria-label="The sky's texels seen from inside, looking around"></canvas>
+        <div class="projections-marks" aria-hidden="true"></div>
+        <div class="sky-corner sky-corner-end">
+            <button type="button" class="view-toggle sky-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="sky-enter" d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" /><path class="sky-exit" d="M6 2.5V6H2.5M13.5 6H10V2.5M10 13.5V10h3.5M2.5 10H6v3.5" /></svg></button>
+        </div>
+        <p class="vis-credit footnote">Drag to look around, scroll to zoom. Rendered with WebGPU.</p>
+        <div class="projections-inset" data-panel="flat">
+            <canvas aria-label="The same texture as stored"></canvas>
+            <div class="projections-marks" aria-hidden="true"></div>
+        </div>
+    </div>
+    <p class="projections-legend note" hidden>
+        <span>4 times sparser</span><span class="projections-ramp" aria-hidden="true"></span><span>4 times denser</span>
+    </p>
+    <p class="view-status" data-field="info"></p>
+    <div class="lut-call" data-field="call"></div>
+    <figcaption class="figure-caption">
+        One sky in six projections, each in a texture of about as many texels, shown texel by texel, filtered bilinearly
+        by the hardware or bicubically by hand: seen from inside, as from the ground, in perspective, and in the corner
+        the texture as stored, a cube map as its six faces in a row, north, east, south and west upright as seen from
+        inside, then the zenith and the nadir, with what the view shows outlined and the rest dimmed. Below the horizon,
+        the fisheye shows the ground it stores beyond its circle, and the equirectangular's upper half its horizon, as a
+        lookup clamped there returns it. With the density on, every direction is colored by how many texels the
+        projection packs there against the same texels spread evenly over what it covers, in ColorBrewer's RdBu: blue
+        where they are sparse, red where dense.
+        <Try label="Midnight sun" set="date=2026-06-21T22:46:00Z&lat=69.65&lon=18.96&h=1" fig="projections">
+            In Tromsø the Sun stands low in the north, its glow split between the equirectangular's two edges and whole
+            at the top of the fisheye.
+        </Try>
+    </figcaption>
+</figure>
+
+<script>
+    import "./projections";
+</script>

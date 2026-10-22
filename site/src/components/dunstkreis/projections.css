@@ -1,0 +1,79 @@
+/* The projections figure: the sky seen from inside, as wide as the text and as the sky figure, and the texture as
+   stored in its bottom right corner, both texel by texel. */
+.projections-controls {
+    margin-bottom: 0.75rem;
+}
+.projections-view {
+    container-type: size;
+}
+/* In the projection's own shape, at most a third of the view high and seven tenths of it wide. */
+.projections-inset {
+    --aspect: 1;
+    position: absolute;
+    right: 0.6rem;
+    bottom: 0.6rem;
+    width: min(70cqw, 36cqh * var(--aspect));
+    aspect-ratio: var(--aspect);
+    overflow: hidden;
+    border-radius: var(--radius-small);
+    box-shadow: 0 0 0 1px oklch(1 0 0 / 0.25);
+    background: oklch(0 0 0);
+}
+.sky-view .projections-inset canvas {
+    cursor: default;
+    image-rendering: pixelated;
+}
+.projections-marks {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+.projections-marks span {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    color: oklch(0.95 0 0);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    line-height: 1;
+    text-shadow:
+        0 0 3px oklch(0 0 0),
+        0 0 6px oklch(0 0 0);
+}
+.projections-inset .projections-marks span {
+    font-size: 0.7rem;
+}
+.projections-legend {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    justify-content: center;
+    margin: 0.75rem 0 0;
+}
+.projections-legend[hidden] {
+    display: none;
+}
+/* The density's colors, as the shader interpolates them: ColorBrewer's RdBu, blue where sparse, white where even, red
+   where dense. */
+.projections-ramp {
+    width: 10rem;
+    height: 0.6rem;
+    border-radius: var(--radius-small);
+    background: linear-gradient(
+        to right,
+        #053061,
+        #2166ac,
+        #4393c3,
+        #92c5de,
+        #d1e5f0,
+        #f7f7f7,
+        #fddbc7,
+        #f4a582,
+        #d6604d,
+        #b2182b,
+        #67001f
+    );
+}
+/* Inset as the corner's buttons are: the figure is as wide as the text, where the wide figures' inset is 0. */
+.projections-view .vis-credit {
+    left: 0.6rem;
+}

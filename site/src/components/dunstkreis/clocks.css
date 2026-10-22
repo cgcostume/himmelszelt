@@ -30,18 +30,10 @@
     stroke-width: 1;
     stroke-dasharray: var(--line-dashes);
 }
-.clocks-box rect {
-    fill: var(--bg);
-    stroke: var(--line);
-    stroke-width: 1;
-}
 .clocks-box text {
     fill: var(--muted);
     opacity: 0.6;
-}
-.clocks-box.active rect {
-    stroke: var(--accent);
-    stroke-width: 1.5;
+    font-size: 0.75rem;
 }
 .clocks-box.active text {
     opacity: 1;
@@ -49,9 +41,26 @@
 .clocks-box.active .clocks-name {
     fill: var(--text);
 }
-.clocks-box.yours rect {
+/* A pass without a texture is a square like the thumbnails, outlined; dashed, what is yours. */
+.clocks-frame {
+    fill: var(--bg);
+    stroke: var(--line);
+    stroke-width: 1;
+}
+.clocks-box.active .clocks-frame {
+    stroke: var(--accent);
+}
+.clocks-box.yours .clocks-frame {
     stroke: var(--text);
     stroke-dasharray: var(--line-dashes);
+}
+/* What does not run: its thumbnail grey, dim and hatched. */
+.clocks-hatched {
+    fill: url(#clocks-hatch);
+}
+.clocks-hatch-line {
+    stroke: var(--muted);
+    stroke-width: 0.6;
 }
 .clocks-size,
 .clocks-cost {
@@ -86,11 +95,13 @@
 }
 .clocks-thumb {
     fill: oklch(0.159 0.011 268);
-    stroke: var(--line);
-    stroke-width: 1;
+}
+.clocks-box:not(.active) .clocks-thumb {
+    fill: var(--surface);
 }
 .clocks-box:not(.active) .clocks-image {
-    opacity: 0.35;
+    filter: grayscale(1);
+    opacity: 0.3;
 }
 .clocks-image.pixelated {
     image-rendering: pixelated;

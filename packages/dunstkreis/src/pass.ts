@@ -119,6 +119,48 @@ export interface SkyCubePass {
     encode(encoder: GPUCommandEncoder, target: GPUTexture): void;
 }
 
+/** How a panorama lays the sphere out on one 2D texture, see `wgsl.panorama`. */
+export type PanoramaProjection = "equirectangular" | "octahedral" | "fisheye";
+
+/** A sky panorama's settings, fixed when its pass is made. */
+export interface SkyPanoramaOptions {
+    /**
+     * Equirectangular, as HDRIs are shared: 2:1, the azimuth across, north at the left edge and south in the middle,
+     * the zenith at the top and the nadir at the bottom. Octahedral: the whole sphere in a square, the zenith in the
+     * middle. Fisheye: the upper hemisphere in the square's inscribed circle, as an all-sky camera sees it, the zenith
+     * in the middle. Octahedral and fisheye are laid out as a sky chart held overhead: north up, east left.
+     */
+    projection: PanoramaProjection;
+    /** rgba16float, or rgba32float, which the sun disc needs, being far brighter than rgba16float holds. */
+    format: "rgba16float" | "rgba32float";
+    /** Rays per texel, spread over it by the R2 sequence, 1 by default, as the cube pass' `samples`. */
+    samples?: number;
+    /** Draw the sun disc into it, for exporting it as one image; off by default, to light a scene with. */
+    sunDisc?: boolean;
+    /** Write the luminance times `SkyPass.skyViewScale`, as the cube pass' `scaled`. Off by default. */
+    scaled?: boolean;
+    /** Equirectangular only: the upper half, the horizon at the bottom, 4:1. Off by default. */
+    upperHalf?: boolean;
+    /**
+     * Turns the panorama about the zenith, in degrees: the azimuth at the equirectangular's left edge and at the top of
+     * the others, 0 by default, north. 180 puts north in the equirectangular's middle and at the bottom of the others.
+     */
+    azimuthOffset?: number;
+}
+
+/**
+ * A pass that writes the sky of its sky pass into a panorama, as the cube pass does into a cube map: the luminance in
+ * cd/m², or times `skyViewScale` with `scaled`, linear, neither exposed nor tone mapped. Alpha is the share of a texel
+ * the projection covers: 1, but around the fisheye's circle and 0 beyond it, where every texel holds the ground's
+ * color, as a cube map holds it at the nadir, so that lookups clamped or filtered there blend into it, not into black;
+ * `dkFisheyeUv` sends every direction below the horizon there. It follows the sky pass' `update()`.
+ */
+export interface SkyPanoramaPass {
+    /** Records the sky into mip level 0 of `target`, a 2D texture of any size, of the pass' format, with
+     *  `STORAGE_BINDING` usage. */
+    encode(encoder: GPUCommandEncoder, target: GPUTexture): void;
+}
+
 /** The aerial perspective volume's shape, fixed when its sky pass is made. */
 export interface AerialPerspectiveOptions {
     /** Froxels across and down the screen, 32 each by default, as Hillaire's. */
@@ -184,6 +226,8 @@ export interface SkyPass {
      * a cube map lights a scene, and shows behind it with the disc drawn over it by `dkSunDisc` from `wgsl.sun`.
      */
     createCubePass(options: SkyCubeOptions): Promise<SkyCubePass>;
+    /** Makes a pass that writes this sky into a panorama, its pipeline compiled without blocking. */
+    createPanoramaPass(options: SkyPanoramaOptions): Promise<SkyPanoramaPass>;
     /** Records the pass into `encoder`, writing all of `target`, which needs `STORAGE_BINDING` usage and the format
      *  the pass was created for. */
     encode(encoder: GPUCommandEncoder, target: GPUTexture): void;

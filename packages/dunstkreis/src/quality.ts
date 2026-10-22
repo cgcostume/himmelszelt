@@ -61,6 +61,11 @@ export interface Features {
     cube: boolean;
     cubeScaled: boolean;
     cubify: boolean;
+    /** A panorama's projection, 0 for none, 1 equirectangular, 2 octahedral, 3 fisheye, see `panorama.wgsl`. */
+    panorama: 0 | 1 | 2 | 3;
+    panoramaUpperHalf: boolean;
+    /** In radians. */
+    panoramaAzimuthOffset: number;
     /** Which rows of the sky-view table a dispatch writes: 0 all, 1 the sky, 2 the ground lit by the sky too. */
     skyViewRows: 0 | 1 | 2;
 }
@@ -77,6 +82,9 @@ export const DEFAULT_FEATURES: Features = {
     cube: false,
     cubeScaled: false,
     cubify: false,
+    panorama: 0,
+    panoramaUpperHalf: false,
+    panoramaAzimuthOffset: 0,
     skyViewRows: 0,
 };
 
@@ -95,6 +103,9 @@ export function featureConstants(features: Partial<Features> = {}): Record<strin
         DK_CUBE: Number(f.cube),
         DK_CUBE_SCALED: Number(f.cubeScaled),
         DK_CUBIFY: Number(f.cubify),
+        DK_PANORAMA: f.panorama,
+        DK_PANORAMA_UPPER_HALF: Number(f.panoramaUpperHalf),
+        DK_PANORAMA_AZIMUTH_OFFSET: f.panoramaAzimuthOffset,
         DK_SKY_VIEW_ROWS: f.skyViewRows,
     };
 }

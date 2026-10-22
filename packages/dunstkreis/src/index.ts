@@ -73,8 +73,11 @@ export type {
     AerialPerspectiveOptions,
     AerialPerspectiveVolume,
     AtmosphereLUTs,
+    PanoramaProjection,
     SkyCubeOptions,
     SkyCubePass,
+    SkyPanoramaOptions,
+    SkyPanoramaPass,
     SkyParams,
     SkyPass,
 } from "./pass.js";

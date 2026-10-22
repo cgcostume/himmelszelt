@@ -30,6 +30,7 @@ import {
     skyViewChanged,
     tables,
 } from "./atmosphere";
+import { type Basis, bindFullscreen, cameraBasis, lookAround, project } from "./skycamera";
 
 // The parts of the sky a figure with `data-parts` switches: the air's three ingredients, which take tables of their own
 // without them, and the two orders of scattering, which the sky pass adds up or leaves out.
@@ -137,29 +138,6 @@ export function skyFigure(root: HTMLElement) {
         return { device: gpuDevice(), context, format: SDR, adapterName: shared.adapterName };
     }
 
-    // Zooming out past 100 degrees bends the perspective into a stereographic fisheye, complete at the widest view of
-    // 200 degrees: the projection's d (see dunstkreis' projectionDistance). Looking up, the whole sky then shows as a disc,
-    // with ten degrees below the horizon to spare at the top and bottom edges.
-    const MAX_FOV = 200 * DEG;
-    const projectionDistance = (fov: number) => Math.min(1, Math.max(0, (fov - 100 * DEG) / (MAX_FOV - 100 * DEG)));
-
-    /** The image plane radius at `theta` from the axis, for the projection's d: (d + 1) sin(theta) / (d + cos(theta)). */
-    const imageRadius = (theta: number, d: number) => ((d + 1) * Math.sin(theta)) / (d + Math.cos(theta));
-
-    /** The camera's forward, right and up vectors, the image plane's half extents and the projection's d. */
-    type Vec3 = [number, number, number];
-    type Basis = ReturnType<typeof cameraBasis>;
-
-    function cameraBasis(aspect: number) {
-        const { yaw, pitch, fov } = camera;
-        const f: Vec3 = [Math.cos(pitch) * Math.sin(yaw), Math.cos(pitch) * Math.cos(yaw), Math.sin(pitch)];
-        const r: Vec3 = [Math.cos(yaw), -Math.sin(yaw), 0];
-        const u: Vec3 = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
-        const d = projectionDistance(fov);
-        const ty = imageRadius(fov / 2, d);
-        return { f, r, u, tx: ty * aspect, ty, d };
-    }
-
     /**
      * The inverse view-projection the pass turns pixels back into rays with, built directly: of a reversed-z projection with
      * an infinite far plane, the near plane at 1, without translation. A clip-space point (x, y) maps to the direction
@@ -169,25 +147,10 @@ export function skyFigure(root: HTMLElement) {
         return new Float32Array([...r.map((c) => c * tx), 0, ...u.map((c) => c * ty), 0, 0, 0, 0, 1, ...f, 0]);
     }
 
-    const dot = (a: readonly number[], b: readonly number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-
     // The eight compass directions as labels standing on the horizon, placed by the same projection the sky uses.
     const labels = COMPASS.map((name) =>
         compass.appendChild(Object.assign(document.createElement("span"), { textContent: name })),
     );
-
-    /** Where `direction` shows in the view, in pixels from the top left, by the same projection the shader inverts: the
-     *  angle from the axis to the image plane radius. Null behind the camera. */
-    function project(direction: Vec3, basis: Basis, width: number, height: number) {
-        const cosTheta = dot(direction, basis.f);
-        if (basis.d + cosTheta <= 1e-3 || (basis.d === 0 && cosTheta <= 0)) return null;
-        const inPlane = direction.map((c, i) => c - basis.f[i] * cosTheta);
-        const sinTheta = Math.hypot(...inPlane);
-        const scale = sinTheta > 1e-9 ? imageRadius(Math.atan2(sinTheta, cosTheta), basis.d) / sinTheta : 1;
-        const x = (dot(inPlane, basis.r) * scale) / basis.tx;
-        const y = (dot(inPlane, basis.u) * scale) / basis.ty;
-        return { x: ((x + 1) / 2) * width, y: ((1 - y) / 2) * height };
-    }
 
     function placeCompass(basis: Basis, width: number, height: number) {
         compass.hidden = !pressed("grid");
@@ -298,7 +261,7 @@ export function skyFigure(root: HTMLElement) {
             return;
         }
 
-        const basis = cameraBasis(width / height);
+        const basis = cameraBasis(camera, width / height);
         pass.update({
             sunDirection,
             sunAngularDiameter,
@@ -448,37 +411,13 @@ export function skyFigure(root: HTMLElement) {
                 setTimeout(() => URL.revokeObjectURL(link.href), 1000);
             });
         });
-        const view = canvas.parentElement as HTMLElement;
-        maybe("fullscreen")?.addEventListener("click", () =>
-            document.fullscreenElement ? document.exitFullscreen() : view.requestFullscreen(),
-        );
-        document.addEventListener("fullscreenchange", () =>
-            maybe("fullscreen")?.setAttribute("aria-pressed", String(document.fullscreenElement === view)),
-        );
+        const fullscreen = maybe("fullscreen");
+        if (fullscreen) bindFullscreen(fullscreen, canvas.parentElement as HTMLElement);
 
-        canvas.addEventListener("pointerdown", (event) => {
-            canvas.setPointerCapture(event.pointerId);
-            const start = { x: event.clientX, y: event.clientY, yaw: camera.yaw, pitch: camera.pitch };
-            const move = (e: PointerEvent) => {
-                field("lock").setAttribute("aria-pressed", "false");
-                // A pixel of drag turns the view by a pixel's worth of the field of view, so the sky follows the pointer.
-                const perPixel = Math.min(camera.fov, Math.PI) / canvas.clientHeight;
-                camera.yaw = start.yaw - (e.clientX - start.x) * perPixel;
-                camera.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, start.pitch + (e.clientY - start.y) * perPixel));
-                requestRender();
-            };
-            canvas.addEventListener("pointermove", move);
-            canvas.addEventListener("pointerup", () => canvas.removeEventListener("pointermove", move), { once: true });
+        lookAround(canvas, camera, {
+            onChange: requestRender,
+            onDrag: () => field("lock").setAttribute("aria-pressed", "false"),
         });
-        canvas.addEventListener(
-            "wheel",
-            (event) => {
-                event.preventDefault();
-                camera.fov = Math.max(0.5 * DEG, Math.min(MAX_FOV, camera.fov * Math.exp(event.deltaY * 0.001)));
-                requestRender();
-            },
-            { passive: false },
-        );
         requestRender();
     }
 }
