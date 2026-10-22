@@ -140,11 +140,13 @@ The Sun and the sky light a scene apart, the usual split for image-based lightin
 - The sky as a panorama, from `await sky.createPanoramaPass({ projection, format })`, then `encode(encoder, texture)`
   into mip level 0 of a 2D texture, in cd/m² like the cube map and with the same `samples`, `sunDisc` and `scaled`.
   `equirectangular`, as HDRIs are shared, 2:1: north at the left edge, east a quarter in, south in the middle, seen
-  from inside, the zenith at the top; `upperHalf: true` keeps the half above the horizon, 4:1. `octahedral`, the
-  whole sphere in a square, and `fisheye`, the upper hemisphere azimuthal equidistant in the inscribed circle: both with the zenith in the
-  middle, north up and east left, as a sky chart held overhead. The fisheye's corners all hold one color, the
-  ground's at the nadir, alpha 0, and `dkFisheyeUv` sends every direction below the horizon there, so the lower half
-  looks up uniform ground; the equirectangular's upper half takes such a direction to the horizon at its azimuth.
+  from inside, the zenith at the top. `octahedral`, the whole sphere in a square; `fisheye`, the upper hemisphere
+  azimuthal equidistant in the inscribed circle; and `sphere`, the sphere map, the whole sphere in the inscribed circle
+  as a mirror ball shows it, equal in area, the nadir all round the rim. All three with the zenith in the middle, north
+  up and east left, as a sky chart held overhead. Beyond the circle, alpha 0, the fisheye's texels hold the horizon at
+  their azimuth and the sphere map's the nadir, so a filtered lookup at the rim blends into what lies there; the
+  fisheye's top left corner texel alone holds the ground's color at the nadir, where `dkFisheyeUv` sends every
+  direction below the horizon.
   `azimuthOffset` turns each about the zenith, in degrees, 180 for north in the equirectangular's middle. The
   mappings both ways are in `wgsl.panorama`, `dkPanoramaUv` and `dkPanoramaDirection`.
 - The sky's diffuse light from `await createIrradiancePass(device, { cubified, sourceFormat })`: `encode(encoder, cube)` projects any cube map onto the

@@ -506,22 +506,25 @@ angle down, so a single direction, the zenith, is stretched over the whole top r
 
 An HDRI has no north, only wherever its camera happened to point. dunstkreis sets one: north at the left edge, east a
 quarter in, south in the middle and west three quarters in, as seen from inside, so the Sun's arc over a northern sky
-stays clear of the seam. `azimuthOffset` turns it about the zenith, 180 for a southern sky with north in the middle.
-A sky that is never seen below the horizon can keep only its upper half, at 4:1, and spend every texel above it. At
+stays clear of the seam. `azimuthOffset` turns it about the zenith, 180 for a southern sky with north in the middle. At
 about 400 texels, the equirectangular's largest texel covers some nine times the solid angle of its smallest.
 
 The <Term of="Octahedral map">octahedral map</Term> folds the sphere onto an octahedron and unfolds that into a square
 <Cite id="engelhardt2008" />: the zenith in the middle, the upper hemisphere a diamond without a seam, and the texels
 within a factor of about five. The fisheye stores what an all-sky camera sees, the upper hemisphere in a circle, its
 distance from the middle in proportion to the zenith angle. It spreads its texels within a factor of about 1.6, but
-leaves the corners of its square to no direction, a fifth of it; dunstkreis fills them with the ground's color, as a
-cube map holds it straight down, and looks up every direction below the horizon there, so the lower half is ground, as
-in a cube map, and a filtered lookup blends into it instead of black. Octahedral and fisheye are laid out as a sky chart
+leaves the corners of its square to no direction, a fifth of it. dunstkreis fills them with the horizon at their
+azimuth, so a filtered lookup at the rim blends into the sky rather than into black. Only the top left corner texel
+holds the ground's color, as a cube map holds it straight down, and every direction below the horizon looks it up
+there. The sphere map is the mirror ball's: the whole sphere in the circle, the zenith in the middle and the nadir all
+round the rim, the distance from the middle the sine of half the zenith angle. That keeps every texel's solid angle
+the same, and the horizon at seven tenths of the radius. Octahedral, fisheye and sphere map are laid out as a sky chart
 held overhead: north up and east left, since the sky is seen from below.
 
 The cube map lights a scene best, filtered and mipmapped by the hardware; the equirectangular goes to every other tool;
 the octahedral packs into a 2D atlas of many, as light probes are; the fisheye compares with photographs of the whole
-sky. `createPanoramaPass` writes any of the three, as `createCubePass` writes the cube map (<Fig id="projections" />).
+sky, and the sphere map holds all of it in one disc. `createPanoramaPass` writes any of the four, as `createCubePass`
+writes the cube map (<Fig id="projections" />).
 Like the cube pass, it spreads `samples` rays over every texel, which smooth the horizon and the fisheye's rim within it.
 
 <Projections />

@@ -33,10 +33,6 @@
     right: 0.5rem;
     text-align: right;
 }
-.refraction-render .sky-overlay {
-    left: 0.5rem;
-    right: 0.5rem;
-}
 .refraction-overlay {
     position: absolute;
     inset: 0;

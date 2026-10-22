@@ -81,13 +81,3 @@ export function lookAround(
         { passive: false },
     );
 }
-
-/** The full screen button of a view: it fills the screen with `view`, and shows whether it does. */
-export function bindFullscreen(button: HTMLElement, view: HTMLElement) {
-    button.addEventListener("click", () =>
-        document.fullscreenElement ? document.exitFullscreen() : view.requestFullscreen(),
-    );
-    document.addEventListener("fullscreenchange", () =>
-        button.setAttribute("aria-pressed", String(document.fullscreenElement === view)),
-    );
-}

@@ -135,5 +135,6 @@ confirmed yet.
 | Equirectangular credited to Marinus of Tyre, around 100 CE | Flattening the sky | web | Esri's projection pages, citing snyder1987; the book's own text not seen | open | 2026-10-22 |
 | At about 400 texels the largest texel over the smallest: equirectangular 8.9, fisheye 1.5 (cube 3.8, cubified 1.1, octahedral 4.2); at 1.6 million, octahedral 5.18 = (√3)³, cube 5.18, fisheye 1.57 = π/2 | Flattening the sky | lib, derived | projections figure, Jacobian over 6 by 6 points a texel; equirectangular exact 8.88 | fixed | 2026-10-22 |
 | Fisheye texels within a factor of about 1.6 (π/2 in the limit); it leaves a fifth of its square empty | Flattening the sky | derived | 1 - π/4 = 21%; 84 of 400 texels | ok | 2026-10-22 |
+| Sphere map: the horizon at sin 45° = 0.71 of the radius, every texel the same solid angle (largest over smallest 1.00 at 1,600 and 6,400 texels) | Flattening the sky | lib, derived | r = sin(zenith angle / 2), Lambert's azimuthal equal-area halved; projections figure | ok | 2026-10-22 |
 | Midnight sun in Tromsø, June 21 22:46 UTC: glow due north, on the equirectangular's seam, at the fisheye's top | Projections caption | lib | screenshot of the figure | ok | 2026-10-22 |
 

@@ -23,6 +23,51 @@ fn dkSunDiscLuminance(illuminance: vec3f, angularRadius: f32) -> vec3f {
     return illuminance / (3.141592653589793 * angularRadius * angularRadius);
 }
 
+// Rays a pixel by the disc's rim is supersampled with, spread over it by Roberts' R2 sequence, the first at its center.
+const DK_SUN_DISC_RAYS: u32 = 16u;
+
+fn dkSunDiscOffset(i: u32) -> vec2f {
+    return fract(vec2f(0.5) + f32(i) * vec2f(0.7548776662466927, 0.5698402909980532)) - 0.5;
+}
+
+// How much of a pixel the disc covers, supersampled where its rim crosses the pixel: DK_SUN_DISC_RAYS rays spread over
+// it, from its own ray `view` and those of the pixels right of and below it, each hitting the disc or not, as the sky
+// pass takes the disc's edge. Off the rim, 0 or 1 from the one ray. Exact at any zoom, from a disc a fraction of a
+// pixel to one filling the view, where a coverage from the distance to the rim alone would blur or step.
+fn dkSunDiscPixelCoverage(view: vec3f, right: vec3f, below: vec3f, sunDirection: vec3f, angularRadius: f32) -> f32 {
+    let across = right - view;
+    let down = below - view;
+    let reach = length(across) + length(down);
+    let distance = length(view - sunDirection);
+    if (distance > angularRadius + reach) {
+        return 0.0;
+    }
+    if (distance < angularRadius - reach) {
+        return 1.0;
+    }
+    var hits = 0u;
+    for (var i = 0u; i < DK_SUN_DISC_RAYS; i = i + 1u) {
+        let offset = dkSunDiscOffset(i);
+        let ray = normalize(view + offset.x * across + offset.y * down);
+        hits = hits + select(0u, 1u, length(ray - sunDirection) < angularRadius);
+    }
+    return f32(hits) / f32(DK_SUN_DISC_RAYS);
+}
+
+// The disc's luminance over a pixel, supersampled as dkSunDiscPixelCoverage covers it: add it to what a sky cube map
+// gives for the pixel's ray.
+fn dkSunDiscPixel(
+    view: vec3f,
+    right: vec3f,
+    below: vec3f,
+    sunDirection: vec3f,
+    angularRadius: f32,
+    illuminance: vec3f,
+) -> vec3f {
+    let coverage = dkSunDiscPixelCoverage(view, right, below, sunDirection, angularRadius);
+    return dkSunDiscLuminance(illuminance, angularRadius) * coverage;
+}
+
 // The disc's luminance along a ray, by how much of its pixel it covers: add it to what a sky cube map gives for the ray.
 // `illuminance` is `SkyPass.sunIlluminance()`, zero once the planet hides the sun.
 fn dkSunDisc(direction: vec3f, sunDirection: vec3f, angularRadius: f32, illuminance: vec3f, footprint: f32) -> vec3f {

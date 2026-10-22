@@ -1,8 +1,4 @@
-/* The projections figure: the sky seen from inside, as wide as the text and as the sky figure, and the texture as
-   stored in its bottom right corner, both texel by texel. */
-.projections-controls {
-    margin-bottom: 0.75rem;
-}
+/* The projections figure: the sky seen from inside, the texture as stored in its bottom right corner, texel by texel. */
 .projections-view {
     container-type: size;
 }
@@ -11,7 +7,7 @@
     --aspect: 1;
     position: absolute;
     right: 0.6rem;
-    bottom: 0.6rem;
+    bottom: calc(0.6rem + var(--sky-foot, 0px));
     width: min(70cqw, 36cqh * var(--aspect));
     aspect-ratio: var(--aspect);
     overflow: hidden;
@@ -42,12 +38,26 @@
 .projections-inset .projections-marks span {
     font-size: 0.7rem;
 }
+/* Full screen, a little smaller: the sky has the room. */
+.sky-stage:fullscreen .projections-inset {
+    width: min(50cqw, 26cqh * var(--aspect));
+}
+/* Over the view's foot, in the middle, clear of the height on the left and the texture on the right. */
 .projections-legend {
+    position: absolute;
+    bottom: calc(0.6rem + var(--sky-foot, 0px));
+    left: 50%;
+    z-index: 4;
+    transform: translateX(-50%);
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-small);
+    background: color-mix(in srgb, var(--bg) 75%, transparent);
+    white-space: nowrap;
     display: flex;
     gap: 0.6rem;
     align-items: center;
     justify-content: center;
-    margin: 0.75rem 0 0;
+    margin: 0;
 }
 .projections-legend[hidden] {
     display: none;
@@ -72,8 +82,4 @@
         #b2182b,
         #67001f
     );
-}
-/* Inset as the corner's buttons are: the figure is as wide as the text, where the wide figures' inset is 0. */
-.projections-view .vis-credit {
-    left: 0.6rem;
 }

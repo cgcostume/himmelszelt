@@ -24,6 +24,7 @@ import cube from "./cube.wgsl";
 import exposure from "./exposure.comp.wgsl";
 import features from "./features.wgsl";
 import frame from "./frame.wgsl";
+import grid from "./grid.wgsl";
 import irradiance from "./irradiance.comp.wgsl";
 import lut from "./lut.wgsl";
 import mipmap from "./mipmap.comp.wgsl";
@@ -51,6 +52,7 @@ export {
     exposure,
     features,
     frame,
+    grid,
     irradiance,
     lut,
     mipmap,

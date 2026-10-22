@@ -18,9 +18,6 @@
 .refraction-photo {
     overflow: hidden;
 }
-.sky-view:fullscreen {
-    border-radius: 0;
-}
 .sky-view canvas {
     display: block;
     width: 100%;
@@ -33,51 +30,6 @@
 /* In the sky's own dark shades, as sternzeit's scenes credit theirs, and without a shadow. */
 .sky-view .vis-credit {
     color: var(--muted);
-}
-.sky-overlay {
-    color: var(--text);
-}
-/* Along the bottom edge, lined up with the credit line at the top. */
-.sky-overlay {
-    position: absolute;
-    right: var(--content-inset);
-    bottom: 0.5rem;
-    left: var(--content-inset);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1rem;
-    align-items: center;
-}
-.sky-overlay label {
-    display: flex;
-    gap: 0.4rem;
-    align-items: center;
-}
-.sky-toggles {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    margin-left: auto;
-}
-/* A named group wraps as a whole, onto the next line, where there is room for it on one. */
-@media (min-width: 40rem) {
-    .sky-toggles .steps:has(.steps-heading) {
-        flex: none;
-    }
-}
-.sky-overlay .view-toggle,
-.sky-corner .view-toggle {
-    position: static;
-}
-/* The first figure's two switches, top left, where sternzeit's figures keep theirs. */
-.sky-corner {
-    position: absolute;
-    top: 6px;
-    left: 6px;
-    z-index: 5;
-    display: flex;
-    gap: 6px;
 }
 /* The compass directions, standing on the horizon: each label's bottom center sits on its point of the horizon. */
 .sky-compass {
@@ -277,30 +229,6 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* The lighting figure's choices in rows: what it shows, and how finely it samples. A little wider than the text, so
-   each row fits on one line. */
-.lighting-overlay {
-    right: max(1rem, calc(var(--content-inset) - 3rem));
-    left: max(1rem, calc(var(--content-inset) - 3rem));
-    flex-direction: column;
-    align-items: stretch;
-}
-.lighting-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1rem;
-    align-items: center;
-}
-.toggle-separator {
-    align-self: stretch;
-    width: 1px;
-    margin: 0.2rem 0.25rem;
-    background: currentColor;
-    opacity: 0.4;
-}
-.lighting-toggles {
-    margin-left: 0;
-}
 /* A figure's readout, right under its view, as the Moon's in sternzeit. */
 .view-status {
     margin: 0.5rem 0 0;
@@ -500,27 +428,6 @@
 :root[data-theme="light"] .scattering-spectrum {
     filter: saturate(1.8) brightness(0.75);
 }
-/* The sky's parts as switches along the bottom left: the air's ingredients, then the orders of scattering. */
-.sky-parts {
-    position: absolute;
-    bottom: 6px;
-    left: 6px;
-    z-index: 5;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-.sky-parts .view-toggle {
-    position: static;
-}
-.sky-parts-gap {
-    width: 6px;
-}
-/* The download and full screen buttons, top right. */
-.sky-corner-end {
-    right: 6px;
-    left: auto;
-}
 /* An icon in place of a switch's word, as tall as the words beside it. */
 .sky-icon {
     display: grid;
@@ -540,10 +447,192 @@
 .sky-icon[aria-pressed="true"] .sky-enter {
     display: none;
 }
-/* Full screen, the view fills it, whatever its aspect. */
-.sky-view:fullscreen {
-    aspect-ratio: auto;
+/* The frame every view into the sky shares (see SkyFrame.astro). Its controls are in the view, so they go full screen
+   with it; --sky-foot is the room the time slider takes at the view's foot there. */
+.sky-stage {
+    position: relative;
+}
+.sky-stage .view-toggle {
+    position: static;
+}
+/* Play's triangle, split in two, folds into pause's two bars and back (see skyframe.ts). */
+.sky-icon .sky-play path {
+    fill: currentColor;
+    stroke: none;
+}
+.sky-bar {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    left: 6px;
+    z-index: 5;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: space-between;
+    pointer-events: none;
+}
+.sky-bar-start,
+.sky-bar-end {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+    min-width: 0;
+    pointer-events: auto;
+}
+.sky-hint {
+    align-self: center;
+    margin: 0 0 0 0.35rem;
+    overflow: hidden;
+    color: var(--muted);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    pointer-events: none;
+}
+/* The observer's height up the left edge, as a y axis: a decade a mark beside the rail, its value beside the thumb. The slider is
+   a horizontal one turned upright, as long as its rail is high. */
+.sky-height {
+    position: absolute;
+    top: 40px;
+    bottom: calc(1rem + var(--sky-foot, 0px));
+    left: 6px;
+    z-index: 4;
+    display: flex;
+    font-size: var(--text-small);
+}
+/* The height itself beside the thumb, over the marks it passes. */
+.sky-height output {
+    position: absolute;
+    bottom: calc(9px + var(--at, 0) * (100% - 18px));
+    left: calc(100% + 0.2rem);
+    z-index: 1;
+    transform: translateY(50%);
+    padding: 0.05rem 0.3rem;
+    border-radius: var(--radius-small);
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.sky-height-rail {
+    position: relative;
+    flex: 1;
+    width: 18px;
+    container-type: size;
+}
+.sky-height input {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100cqh;
+    margin: 0;
+    transform: translate(-50%, -50%) rotate(-90deg);
+}
+.sky-height-scale {
+    position: absolute;
+    inset: 9px auto 9px 100%;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    line-height: 1;
+    pointer-events: none;
+}
+.sky-height-mark {
+    position: absolute;
+    bottom: calc(var(--at) * 100%);
+    left: 0.3rem;
+    transform: translateY(50%);
+    white-space: nowrap;
+    text-shadow: 0 0 4px oklch(0 0 0);
+}
+.sky-height-tick {
+    width: 4px;
+    height: 1px;
+    background: currentColor;
+}
+/* The view's further options, in named groups, over its right side under the buttons; folded away by one of them. */
+.sky-options {
+    position: absolute;
+    top: 40px;
+    right: 6px;
+    z-index: 5;
+    display: grid;
+    gap: 0.5rem;
+    max-width: min(24rem, calc(100% - 6rem));
+    max-height: calc(100% - 46px - var(--sky-foot, 0px));
+    overflow: auto;
+    padding: 0.5rem 0.6rem;
+    border-radius: var(--radius-small);
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+    backdrop-filter: blur(6px);
+    font-size: var(--text-small);
+}
+.sky-options[hidden] {
+    display: none;
+}
+.sky-group {
+    display: grid;
+    gap: 0.25rem;
+}
+.sky-group-name {
+    color: var(--accent);
+}
+.sky-group-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+.sky-group-items label {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+.sky-ev input {
+    width: 7rem;
+}
+.sky-ev output {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+/* The time slider under the view, as wide as the text. */
+.sky-stage > .figure-slider {
+    width: calc(var(--measure) - 3rem);
+    max-width: 100%;
+    margin-inline: auto;
+}
+/* Full screen, the view fills the screen, whatever its aspect, and the time slider floats over its foot. */
+.sky-stage:fullscreen {
+    --sky-foot: 3.5rem;
+    background: oklch(0 0 0);
+}
+.sky-stage:fullscreen > .sky-view {
+    height: 100%;
     max-height: none;
+    aspect-ratio: auto;
+    border-radius: 0;
+}
+.sky-stage:fullscreen > .figure-slider {
+    position: absolute;
+    right: 1.5rem;
+    bottom: 0.5rem;
+    left: 1.5rem;
+    z-index: 6;
+    width: auto;
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 0.45rem 0.75rem 0.2rem;
+    border-radius: var(--radius-small);
+    background: color-mix(in srgb, var(--bg) 75%, transparent);
+    backdrop-filter: blur(6px);
+}
+/* The figure's readouts and code under a wide view keep to the text's width. */
+.scene-frame.wide > .lut-call {
+    width: calc(var(--measure) - 3rem);
+    max-width: 100%;
+    margin-inline: auto;
 }
 /* From light to pixels: the five panels in one canvas, each stage's name, note and control in a row under it. */
 .stages-view canvas {

@@ -35,7 +35,9 @@ export function offsetSliders() {
             update({ jd: slid, live: false, animate: false }, input);
         });
         const render = () => {
-            if (state.jd !== slid) anchor = state.jd;
+            // Animated, the thumb runs along from where it was, and starts over in the middle at either end.
+            const away = (state.jd - anchor) / step;
+            if (state.jd !== slid && (!state.animate || Math.abs(away) > Number(input.max))) anchor = state.jd;
             const steps = Math.round((state.jd - anchor) / step);
             input.value = String(steps);
             paintRange(input);

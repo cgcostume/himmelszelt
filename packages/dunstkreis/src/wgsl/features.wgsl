@@ -44,9 +44,8 @@ override DK_CUBE_SCALED: bool = false;
 override DK_CUBIFY: bool = false;
 
 // Write a panorama, in cd/m² like the cube map, rather than an image through the camera: 0 none, or one of the
-// projections of panorama.wgsl. The equirectangular's upper half only, and the azimuth turned in radians, as there.
+// projections of panorama.wgsl, the azimuth turned in radians, as there.
 override DK_PANORAMA: u32 = 0u;
-override DK_PANORAMA_UPPER_HALF: bool = false;
 override DK_PANORAMA_AZIMUTH_OFFSET: f32 = 0.0;
 
 // Which rows of the sky-view table a dispatch writes: 0 all, 1 the sky above the horizon, 2 the ground below it, lit

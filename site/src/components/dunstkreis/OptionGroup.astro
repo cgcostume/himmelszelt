@@ -1,0 +1,12 @@
+---
+/** A named group of a view's options, its name in a column of its own, its switches wrapping beside it. */
+interface Props {
+    name: string;
+}
+const { name } = Astro.props;
+---
+
+<div class="sky-group">
+    <span class="sky-group-name">{name}</span>
+    <span class="sky-group-items"><slot /></span>
+</div>

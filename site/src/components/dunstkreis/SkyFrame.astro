@@ -1,0 +1,82 @@
+---
+/**
+ * The frame every view into the sky shares, full screen with all of it: along the top the Sun lock, the grid and how to
+ * navigate, then play, the options, the download and full screen; the observer's height up the left edge, as a y axis;
+ * the moment, half a day either way, under it as an x axis. The view's own canvas and overlays go in the default slot,
+ * its further switches, in named groups, in the `options` slot, which folds away behind a button.
+ */
+interface Props {
+    /** How to navigate the view, after the switches. */
+    hint?: string;
+    /** Whether the view offers a PNG of itself. */
+    png?: boolean;
+    /** Classes and a panel name of the view itself, for the figure's own styles and script. */
+    viewClass?: string;
+    panel?: string;
+    /** The grid's title: what it shows in this view. */
+    gridTitle?: string;
+    /** The Sun lock's title: where it keeps the view. */
+    lockTitle?: string;
+    /** Whether the view starts on the Sun. */
+    locked?: boolean;
+}
+const {
+    hint = "Drag to look around, scroll to zoom. Rendered with WebGPU.",
+    png = false,
+    viewClass = "",
+    panel,
+    gridTitle = "Grid: lines of altitude every 10°, the compass directions, and the Sun's symbol where it truly is",
+    lockTitle = "Keep the view on the Sun's true direction; dragging lets go",
+    locked = true,
+} = Astro.props;
+// A figure may hand over an options slot that renders to nothing: no panel then, and no button for it.
+const optionsHtml = Astro.slots.has("options") ? (await Astro.slots.render("options")).trim() : "";
+const options = optionsHtml !== "";
+// The height's scale, a decade a mark, from eye level to the International Space Station's orbit.
+const LOG_TOP = Math.log10(408_000);
+const decades = [0, 1, 2, 3, 4, 5].map((decade) => ({ decade, at: `--at: ${decade / LOG_TOP}` }));
+const named: Record<number, string> = { 0: "1 m", 3: "1 km", 5: "100 km" };
+---
+
+<div class="sky-stage" data-sky-frame>
+    <div class={`sky-view as-seen ${viewClass}`} data-panel={panel}>
+        <slot />
+        <div class="sky-bar">
+            <span class="sky-bar-start">
+                <button type="button" class="view-toggle sky-icon" data-field="lock" aria-pressed={locked ? "true" : "false"} title={lockTitle} aria-label="Sun lock"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.6" /><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" /></svg></button>
+                <button type="button" class="view-toggle sky-icon" data-field="grid" aria-pressed="true" title={gridTitle} aria-label="Grid"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" /><circle cx="8" cy="8" r="2.75" /><path d="M8 2v12M2 8h12" /></svg></button>
+                <span class="sky-hint footnote">{hint}</span>
+            </span>
+            <span class="sky-bar-end">
+                <button type="button" class="view-toggle sky-icon" data-field="play" aria-pressed="false" title="Play: the moment runs on, an hour in 10 seconds, half a day in 2 minutes" aria-label="Play"><svg class="sky-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5L8.5 5.25L8.5 10.75L4 13.5Z" /><path d="M8.5 5.25L13 8L13 8L8.5 10.75Z" /></svg></button>
+                {options && <button type="button" class="view-toggle sky-icon" data-field="options" aria-pressed="true" title="Show or hide this figure's options" aria-label="Options"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" /><circle cx="5.5" cy="4.5" r="1.4" /><circle cx="10.5" cy="8" r="1.4" /><circle cx="6.5" cy="11.5" r="1.4" /></svg></button>}
+                {png && <button type="button" class="view-toggle sky-icon" data-field="png" title="Download the view as PNG" aria-label="Download the view as PNG"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v7.5M4.75 6.75 8 10l3.25-3.25M2.5 10v3.5h11V10" /></svg></button>}
+                <button type="button" class="view-toggle sky-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="sky-enter" d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" /><path class="sky-exit" d="M6 2.5V6H2.5M13.5 6H10V2.5M10 13.5V10h3.5M2.5 10H6v3.5" /></svg></button>
+            </span>
+        </div>
+        <label class="sky-height" data-height title="The observer's height, from eye level to the space station's orbit: drag, or turn the mouse wheel">
+            <span class="sky-height-rail">
+                <input type="range" data-field="height" min="0" max="1000" step="10" aria-label="The observer's height" />
+                <span class="sky-height-scale" aria-hidden="true">
+                    {decades.map(({ decade, at }) => <span class:list={["sky-height-mark", { "sky-height-tick": !named[decade] }]} style={at}>{named[decade]}</span>)}
+                </span>
+                <output data-field="heightValue"></output>
+            </span>
+        </label>
+        {options && <div class="sky-options" data-field="optionsPanel"><Fragment set:html={optionsHtml} /></div>}
+    </div>
+    <label class="figure-slider sky-time" data-offset title="The moment, up to half a day either way from where it was set: drag, or turn the mouse wheel for ten minutes a notch">
+        <span class="note">Time</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="offset" min="-720" max="720" step="5" value="0" aria-label="Minutes from the moment" />
+            <span class="figure-slider-scale" aria-hidden="true">{["−12", "0", "+12"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 50}%`}>{mark}{i !== 1 && <span class="figure-slider-unit">{" h"}</span>}</span>)}</span>
+        </span>
+        <output data-field="offsetValue" />
+    </label>
+</div>
+
+<script>
+    import { skyFrames } from "./skyframe";
+
+    skyFrames();
+</script>

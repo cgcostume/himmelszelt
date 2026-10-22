@@ -4,6 +4,7 @@ import type { Direction } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
 import { onDemand } from "../frame";
 import { cameraFrame, createScene } from "../scene/scene";
+import { COMPASS } from "../sternzeit/figure";
 import {
     bindCubifyToggle,
     bindHdr,
@@ -148,6 +149,52 @@ function renderBackground(encoder: GPUCommandEncoder, pass: SkyPass, sky: Sky, w
     return background;
 }
 
+// The field of view the camera keeps, and the pitch it had before the Sun lock tilted it.
+const FOV = 50 * DEG;
+let unlockedPitch: number | null = null;
+
+/**
+ * Locked, the camera looks towards the Sun from the solids' far side, the Sun in view above them: tilted up as far as it
+ * needs, and as far as the ground allows, then, for a Sun higher still, with a wider view.
+ */
+function lockOnSun(sun: ArrayLike<number>) {
+    unlockedPitch ??= camera.pitch;
+    camera.yaw = Math.atan2(sun[0] ?? 0, sun[1] ?? 1) + Math.PI;
+    const altitude = Math.asin(Math.min(1, Math.max(-1, sun[2] ?? 0)));
+    // The Sun a tenth of the view below its top edge; the camera's pitch looks down, so its view rises by minus it.
+    const margin = 0.1 * FOV;
+    setPitch(Math.min(unlockedPitch, FOV / 2 - margin - altitude));
+    camera.fov = Math.min(140 * DEG, Math.max(FOV, 2 * (altitude + camera.pitch + margin)));
+}
+
+/** Lets go of the Sun: the pitch from before it, and the camera's own field of view. */
+function unlock() {
+    if (unlockedPitch !== null) setPitch(unlockedPitch);
+    unlockedPitch = null;
+    camera.fov = FOV;
+}
+
+// The compass directions on the horizon, where the camera sees them, with the grid.
+const compass = field("compass");
+const labels = COMPASS.map((name) =>
+    compass.appendChild(Object.assign(document.createElement("span"), { textContent: name })),
+);
+function placeCompass() {
+    compass.hidden = !pressed("grid");
+    const { forward, right, up } = cameraFrame(camera);
+    const ty = Math.tan(camera.fov / 2);
+    const tx = ty * (canvas.clientWidth / Math.max(canvas.clientHeight, 1));
+    labels.forEach((label, i) => {
+        const d = [Math.sin(i * 45 * DEG), Math.cos(i * 45 * DEG), 0];
+        const along = (axis: number[]) => d.reduce((sum, c, k) => sum + c * (axis[k] ?? 0), 0);
+        const depth = along(forward);
+        label.hidden = depth <= 0.05;
+        if (label.hidden) return;
+        label.style.left = `${(1 + along(right) / depth / tx) * 50}%`;
+        label.style.top = `${(1 - along(up) / depth / ty) * 50}%`;
+    });
+}
+
 function render() {
     const table = tables();
     const { cube, ibl, sun, ev100, sky } = environment;
@@ -156,6 +203,9 @@ function render() {
     const width = Math.max(1, Math.round(canvas.clientWidth * dpr));
     const height = Math.max(1, Math.round(canvas.clientHeight * dpr));
     if (canvas.width !== width || canvas.height !== height) Object.assign(canvas, { width, height });
+
+    if (pressed("lock")) lockOnSun(sky.apparentSun);
+    placeCompass();
 
     const now = performance.now();
     if (pressed("rotate") && last !== null) seconds += (now - last) / 1000;
@@ -233,9 +283,10 @@ if (gpu.error) {
         'input[name="lighting-shadows"], input[name="lighting-background"], input[name="lighting-ground"], input[name="lighting-occlusion"], input[name="lighting-godrays"], input[name="lighting-bloom"]',
     ))
         radio.addEventListener("change", requestRender);
-    for (const name of ["rotate", "sunDisc", "sunLight", "skyLight", "dither"]) {
+    for (const name of ["rotate", "sunDisc", "sunLight", "skyLight", "dither", "lock", "grid"]) {
         field(name).addEventListener("click", () => {
             field(name).setAttribute("aria-pressed", String(!pressed(name)));
+            if (name === "lock" && !pressed("lock")) unlock();
             requestRender();
         });
     }
@@ -243,6 +294,11 @@ if (gpu.error) {
         canvas.setPointerCapture(event.pointerId);
         const start = { x: event.clientX, y: event.clientY, yaw: camera.yaw, pitch: camera.pitch };
         const move = (e: PointerEvent) => {
+            if (pressed("lock")) {
+                field("lock").setAttribute("aria-pressed", "false");
+                camera.fov = FOV;
+                unlockedPitch = null;
+            }
             const perPixel = camera.fov / canvas.clientHeight;
             camera.yaw = start.yaw + (e.clientX - start.x) * perPixel;
             setPitch(start.pitch + (e.clientY - start.y) * perPixel);

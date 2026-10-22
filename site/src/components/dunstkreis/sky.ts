@@ -11,7 +11,6 @@ import { find } from "../dom";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { COMPASS } from "../sternzeit/figure";
-import { offsetSliders } from "../sternzeit/offset";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
 import {
     bindHdr,
@@ -30,7 +29,7 @@ import {
     skyViewChanged,
     tables,
 } from "./atmosphere";
-import { type Basis, bindFullscreen, cameraBasis, lookAround, project } from "./skycamera";
+import { type Basis, cameraBasis, lookAround, project } from "./skycamera";
 
 // The parts of the sky a figure with `data-parts` switches: the air's three ingredients, which take tables of their own
 // without them, and the two orders of scattering, which the sky pass adds up or leaves out.
@@ -63,7 +62,8 @@ const DEG = Math.PI / 180;
  * One sky figure on `root`, a `figure[data-sky]`. With `data-full` it carries every option, tone curve, HDR, model,
  * exposure, dither and refraction, bound to the page's shared display and tables; without, it shows the sky as a
  * reader meets it first, with the grid, metered and refracted, and only the Sun lock to press. With `data-primary` it
- * tells the other figures of its sky, which take their tables, cube map and lighting from it: one figure per page.
+ * tells the other figures of its sky, which take their tables, cube map and lighting from it: one figure per page. The
+ * frame around it, height, play and full screen, is SkyFrame's.
  */
 export function skyFigure(root: HTMLElement) {
     const full = root.hasAttribute("data-full");
@@ -341,7 +341,6 @@ export function skyFigure(root: HTMLElement) {
             requestRender();
         });
         new ResizeObserver(requestRender).observe(canvas);
-        offsetSliders();
         maybe("exposure")?.addEventListener("input", requestRender);
         for (const name of [
             "auto",
@@ -411,9 +410,6 @@ export function skyFigure(root: HTMLElement) {
                 setTimeout(() => URL.revokeObjectURL(link.href), 1000);
             });
         });
-        const fullscreen = maybe("fullscreen");
-        if (fullscreen) bindFullscreen(fullscreen, canvas.parentElement as HTMLElement);
-
         lookAround(canvas, camera, {
             onChange: requestRender,
             onDrag: () => field("lock").setAttribute("aria-pressed", "false"),

@@ -27,8 +27,7 @@ async function evaluate(expression: string, inputs: Vec4[]) {
 const MARKS = [direction(0, 0), direction(90, 0), direction(180, 0), direction(270, 0), direction(0, 90)];
 
 test("the equirectangular puts north at the left edge, south in the middle and the zenith at the top", async () => {
-    const full = await evaluate("vec4f(dkEquirectangularUv(input.xyz, 0.0, false), 0.0, 0.0)", MARKS);
-    const upper = await evaluate("vec4f(dkEquirectangularUv(input.xyz, 0.0, true), 0.0, 0.0)", MARKS);
+    const full = await evaluate("vec4f(dkEquirectangularUv(input.xyz, 0.0), 0.0, 0.0)", MARKS);
     if (full.length === 0) return;
     const expected = [
         [0, 0.5],
@@ -39,7 +38,6 @@ test("the equirectangular puts north at the left edge, south in the middle and t
     expected.forEach(([u, v], i) => {
         expect(wrapped(full[i]?.[0], u)).toBeCloseTo(0, 5);
         expect(full[i]?.[1]).toBeCloseTo(v as number, 5);
-        expect(upper[i]?.[1]).toBeCloseTo(1, 5);
     });
     expect(full[4]?.[1]).toBeCloseTo(0, 5);
 });
@@ -66,7 +64,7 @@ test("the azimuth offset turns each panorama about the zenith", async () => {
     // Offset by 90°, east takes north's place.
     const offset = (90 * DEG).toFixed(9);
     const uv = await evaluate(
-        `vec4f(dkEquirectangularUv(input.xyz, ${offset}, false), dkOctahedralUv(input.xyz, ${offset}))`,
+        `vec4f(dkEquirectangularUv(input.xyz, ${offset}), dkOctahedralUv(input.xyz, ${offset}))`,
         [direction(90, 0), direction(0, 0)],
     );
     if (uv.length === 0) return;
@@ -85,10 +83,10 @@ test("every projection maps a direction back onto itself", async () => {
     }
     const upper = inputs.filter(([, , z]) => z > 0);
     const cases: [string, Vec4[]][] = [
-        ["dkPanoramaDirection(1u, dkPanoramaUv(1u, input.xyz, 0.7, false), 0.7, false)", inputs],
-        ["dkPanoramaDirection(1u, dkPanoramaUv(1u, input.xyz, 0.7, true), 0.7, true)", upper],
-        ["dkPanoramaDirection(2u, dkPanoramaUv(2u, input.xyz, 0.7, false), 0.7, false)", inputs],
-        ["dkPanoramaDirection(3u, dkPanoramaUv(3u, input.xyz, 0.7, false), 0.7, false)", upper],
+        ["dkPanoramaDirection(1u, dkPanoramaUv(1u, input.xyz, 0.7), 0.7)", inputs],
+        ["dkPanoramaDirection(2u, dkPanoramaUv(2u, input.xyz, 0.7), 0.7)", inputs],
+        ["dkPanoramaDirection(3u, dkPanoramaUv(3u, input.xyz, 0.7), 0.7)", upper],
+        ["dkPanoramaDirection(4u, dkPanoramaUv(4u, input.xyz, 0.7), 0.7)", inputs],
     ];
     for (const [expression, directions] of cases) {
         const back = await evaluate(`vec4f(${expression}, 0.0)`, directions);
@@ -102,15 +100,22 @@ test("every projection maps a direction back onto itself", async () => {
     }
 });
 
-test("the equirectangular's upper half takes a direction below the horizon to the horizon at its azimuth", async () => {
-    const uv = "dkEquirectangularUv(input.xyz, 0.0, true)";
-    const below = await evaluate(`vec4f(${uv}, 0.0, 0.0)`, [direction(30, -20), direction(200, -60)]);
-    const horizon = await evaluate(`vec4f(${uv}, 0.0, 0.0)`, [direction(30, 0), direction(200, 0)]);
-    if (below.length === 0) return;
-    below.forEach((p, i) => {
-        expect(p[0], `${i}`).toBeCloseTo(horizon[i]?.[0] ?? 0, 4);
-        expect(p[1], `${i}`).toBeCloseTo(horizon[i]?.[1] ?? 0, 4);
-    });
+test("the sphere map puts the horizon at sin 45° of the radius and the nadir on the rim, equal in area", async () => {
+    const uv = await evaluate("vec4f(dkSphereMapUv(input.xyz, 0.0), 0.0, 0.0)", [
+        ...MARKS,
+        direction(0, -89.99),
+        direction(90, -30),
+    ]);
+    if (uv.length === 0) return;
+    const r = (p: number[]) => Math.hypot((p[0] ?? 0) * 2 - 1, (p[1] ?? 0) * 2 - 1);
+    // North at the top, east on the left, as the fisheye.
+    expect(uv[0]?.[0]).toBeCloseTo(0.5, 5);
+    expect(uv[0]?.[1]).toBeCloseTo(0.5 - 0.5 * Math.SQRT1_2, 5);
+    expect(uv[1]?.[0]).toBeCloseTo(0.5 - 0.5 * Math.SQRT1_2, 5);
+    expect(r(uv[4] ?? [])).toBeCloseTo(0, 5);
+    expect(r(uv[5] ?? [])).toBeCloseTo(1, 5);
+    // sin(zenith angle / 2): 120° from the zenith at sin 60°.
+    expect(r(uv[6] ?? [])).toBeCloseTo(Math.sin(60 * DEG), 5);
 });
 
 test("the fisheye takes a direction below the horizon to its corner, beyond the circle", async () => {

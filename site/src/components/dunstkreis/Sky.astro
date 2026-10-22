@@ -9,53 +9,52 @@ import {
 import Try from "../Try.astro";
 import Choice from "./Choice.astro";
 import Hdr from "./Hdr.astro";
+import OptionGroup from "./OptionGroup.astro";
+import SkyFrame from "./SkyFrame.astro";
 import "./dunstkreis.css";
 
 // The wavelengths a model computes, once each: the three-wavelength models repeat their third as a fourth.
 const nm = (model: AtmosphereModel) => `${[...new Set(model.wavelengths)].join(", ")}\u202fnm`;
-const CHOICES = [
-    {
-        name: "model",
-        label: "Atmosphere model",
-        heading: "wavelengths",
-        title: "Four wavelengths (λ) turned into RGB by a fitted matrix; Bruneton's three taken as R, G and B, as skies were colored before; or osgHimmel's air as it was, its three as R, G and B too. Switches the whole page, recomputing every table",
-        options: [
-            [
-                "fitted",
-                "dunstkreis 4λ",
-                `${nm(DEFAULT_ATMOSPHERE_MODEL)}, turned into RGB by a matrix fitted to sky spectra`,
-            ],
-            [
-                "rgb",
-                "Bruneton’08 3λ",
-                `${nm(RGB_ATMOSPHERE_MODEL)}, taken as R, G and B, as Bruneton and Neyret did; the same air`,
-            ],
-            [
-                "osghimmel",
-                "osgHimmel’12 3λ",
-                `${nm(OSGHIMMEL_ATMOSPHERE_MODEL)}, taken as R, G and B, with osgHimmel's air as it was: no ozone, far more haze`,
-            ],
+const MODEL = {
+    name: "model",
+    label: "Atmosphere model",
+    title: "Four wavelengths (λ) turned into RGB by a fitted matrix; Bruneton's three taken as R, G and B, as skies were colored before; or osgHimmel's air as it was, its three as R, G and B too. Switches the whole page, recomputing every table",
+    options: [
+        [
+            "fitted",
+            "dunstkreis 4λ",
+            `${nm(DEFAULT_ATMOSPHERE_MODEL)}, turned into RGB by a matrix fitted to sky spectra`,
         ],
-        checked: "fitted",
-    },
-    {
-        name: "tone",
-        label: "Tone curve",
-        title: "Khronos PBR Neutral keeps colors as they are and compresses only the brightest, AgX fades bright colors towards white as film does, ACES is the saturated filmic curve used before, none cuts the light off where it saturates. Switches every figure",
-        options: [
-            ["clip", "no tone mapping", "No curve: the exposed light cut off at 1, where it saturates, sRGB encoded"],
-            ["neutral", "neutral"],
-            ["agx", "AgX"],
-            ["aces", "ACES"],
+        [
+            "rgb",
+            "Bruneton’08 3λ",
+            `${nm(RGB_ATMOSPHERE_MODEL)}, taken as R, G and B, as Bruneton and Neyret did; the same air`,
         ],
-        checked: "neutral",
-    },
-];
+        [
+            "osghimmel",
+            "osgHimmel’12 3λ",
+            `${nm(OSGHIMMEL_ATMOSPHERE_MODEL)}, taken as R, G and B, with osgHimmel's air as it was: no ozone, far more haze`,
+        ],
+    ],
+    checked: "fitted",
+};
+const TONE = {
+    name: "tone",
+    label: "Tone curve",
+    title: "Khronos PBR Neutral keeps colors as they are and compresses only the brightest, AgX fades bright colors towards white as film does, ACES is the saturated filmic curve used before, none cuts the light off where it saturates. Switches every figure",
+    options: [
+        ["clip", "no tone mapping", "No curve: the exposed light cut off at 1, where it saturates, sRGB encoded"],
+        ["neutral", "neutral"],
+        ["agx", "AgX"],
+        ["aces", "ACES"],
+    ],
+    checked: "neutral",
+};
 
 /**
  * The sky figure, once per page as the primary, which the other figures take their sky from, shown as a reader meets it:
- * the grid, metered, refracted, and only the Sun lock to press. With `full`, every option over it: exposure, the tone
- * curve, HDR, the model, dither and refraction, bound to the page's shared choices.
+ * the grid, metered, refracted, in the shared frame (see SkyFrame.astro). With `full`, every option in its panel: exposure,
+ * the tone curve, HDR, dither, the model and refraction, bound to the page's shared choices.
  */
 interface Props {
     id?: string;
@@ -79,68 +78,46 @@ const {
 ---
 
 <figure class="scene-frame wide" id={id} data-sky data-full={full ? "" : undefined} data-primary={primary ? "" : undefined} data-parts={parts ? "" : undefined}>
-    <div class="sky-view as-seen">
+    <SkyFrame png>
         <canvas data-field="canvas" aria-label="The sky at the chosen moment and place"></canvas>
         <div class="sky-compass" data-field="compass"></div>
         {
-            !full && (
-                <>
-                <div class="sky-corner">
-                    <button type="button" class="view-toggle" data-field="lock" aria-pressed="true" title="Keep the view on the Sun's true direction; dragging lets go">sun-locked</button>
-                    <button type="button" class="view-toggle sky-icon" data-field="grid" aria-pressed="true" title="Grid: lines of altitude every 10°, the compass directions, and the Sun's symbol where it truly is" aria-label="Grid"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" /><circle cx="8" cy="8" r="2.75" /><path d="M8 2v12M2 8h12" /></svg></button>
-                </div>
-                <div class="sky-corner sky-corner-end">
-                    <button type="button" class="view-toggle sky-icon" data-field="png" title="Download the view as PNG" aria-label="Download the view as PNG"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v7.5M4.75 6.75 8 10l3.25-3.25M2.5 10v3.5h11V10" /></svg></button>
-                    <button type="button" class="view-toggle sky-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="sky-enter" d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" /><path class="sky-exit" d="M6 2.5V6H2.5M13.5 6H10V2.5M10 13.5V10h3.5M2.5 10H6v3.5" /></svg></button>
-                </div>
-                {parts && (
-                    <div class="sky-parts">
+            parts && (
+                <Fragment slot="options">
+                    <OptionGroup name="air">
                         <button type="button" class="view-toggle" data-field="rayleigh" aria-pressed="true" title="Scattering by the air's molecules, Rayleigh's: the blue">Rayleigh</button>
                         <button type="button" class="view-toggle" data-field="mie" aria-pressed="true" title="Scattering by haze, Mie's: the glow around the Sun and the pale horizon">Mie</button>
                         <button type="button" class="view-toggle" data-field="ozone" aria-pressed="true" title="Absorption by ozone: the deep blue of twilight">ozone</button>
-                        <span class="sky-parts-gap" />
+                    </OptionGroup>
+                    <OptionGroup name="scattered">
                         <button type="button" class="view-toggle" data-field="single" aria-pressed="true" title="Light scattered once, straight from the Sun">single</button>
                         <button type="button" class="view-toggle" data-field="multiple" aria-pressed="true" title="Light scattered more than once: the shadow side of the sky, twilight">multiple</button>
-                    </div>
-                )}
-                </>
+                    </OptionGroup>
+                </Fragment>
             )
         }
         {
             full && (
-                <div class="sky-overlay">
-                    <span class="note" data-field="sun" />
-                    <label class="note">EV<sub>100</sub> <input data-field="exposure" type="range" min="-20" max="8" step="0.1" value="-14" title="Brighter to the right: a lower EV lets in more light" /> <output data-field="ev" /></label>
-                    <span class="note" data-field="timing" />
-                    <span class="sky-toggles">
+                <Fragment slot="options">
+                    <OptionGroup name="exposure">
+                        <label class="sky-ev">EV<sub>100</sub> <input data-field="exposure" type="range" min="-20" max="8" step="0.1" value="-14" title="Brighter to the right: a lower EV lets in more light" /> <output data-field="ev" /></label>
                         <button type="button" class="view-toggle" data-field="auto" aria-pressed="true" title="Expose by a light meter reading the whole sky">auto</button>
                         <button type="button" class="view-toggle" data-field="ramp" aria-pressed="true" title="Shape the metered exposure over the day by the Sun's altitude: night and the minutes around sunrise and sunset darker, the blue hour lifted. Off, the light meter's reading as it is, for the tone curve alone">ramp</button>
-                        <button type="button" class="view-toggle" data-field="lock" aria-pressed="true" title="Keep the view on the Sun; dragging lets go">sun-locked</button>
-                        <button type="button" class="view-toggle" data-field="grid" aria-pressed="true" title="Lines of altitude every 10°, the compass directions, a ring around the Sun's disc and timings">grid</button>
-                        <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="Dither the 8-bit output by a step of noise, against banding in the sky's smooth gradients">dither</button>
-                        <button type="button" class="view-toggle" data-field="refraction" aria-pressed="true" title="Traced through the air, bending the light. Switches it for the whole page, recomputing every table and cube map">refracted</button>
-                    </span>
-                    <span class="sky-toggles">
+                    </OptionGroup>
+                    <OptionGroup name="display">
+                        <Choice figure={id} {...TONE} />
                         <Hdr figure={id} />
-                        {CHOICES.map((choice) => <Choice figure={id} {...choice} />)}
-                    </span>
-                </div>
+                        <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="Dither the 8-bit output by a step of noise, against banding in the sky's smooth gradients">dither</button>
+                    </OptionGroup>
+                    <OptionGroup name="air">
+                        <Choice figure={id} {...MODEL} />
+                        <button type="button" class="view-toggle" data-field="refraction" aria-pressed="true" title="Traced through the air, bending the light. Switches it for the whole page, recomputing every table and cube map">refracted</button>
+                    </OptionGroup>
+                </Fragment>
             )
         }
-        <p class="vis-credit footnote">Drag to look around, scroll to zoom. Rendered with WebGPU.</p>
-    </div>
-    {
-        !full && (
-            <label class="figure-slider" data-offset title="The moment, up to half a day either way from where it was set: drag, or turn the mouse wheel for ten minutes a notch">
-                <span class="note">Time</span>
-                <span class="figure-slider-rail">
-                    <input type="range" data-field="offset" min="-720" max="720" step="5" value="0" aria-label="Minutes from the moment" />
-                    <span class="figure-slider-scale" aria-hidden="true">{["−12", "0", "+12"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 50}%`}>{mark}{i !== 1 && <span class="figure-slider-unit">{"\u202fh"}</span>}</span>)}</span>
-                </span>
-                <output data-field="offsetValue" />
-            </label>
-        )
-    }
+    </SkyFrame>
+    {full && <p class="view-status"><span data-field="sun" /> <span class="sky-timing" data-field="timing" /></p>}
     <figcaption class="figure-caption">
         {caption}
         {experiment && <Try label={experiment.label} set={experiment.set} fig={id}>{experiment.text}</Try>}

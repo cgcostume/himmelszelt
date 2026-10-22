@@ -286,12 +286,9 @@ const half = (bits: number) => {
 function cubifyFace([x, y]: Vec3, z: number): Vec3 {
     const xx2 = 2 * x * x;
     const yy2 = 2 * y * y;
-    const root3 = 3 - Math.sqrt(Math.max((yy2 - xx2 - 3) ** 2 - 12 * xx2, 0));
-    return [
-        Math.sign(x) * Math.sqrt(Math.max(xx2 - yy2 + root3, 0)) * Math.SQRT1_2,
-        Math.sign(y) * Math.sqrt(Math.max(yy2 - xx2 + root3, 0)) * Math.SQRT1_2,
-        Math.sign(z),
-    ];
+    const [bx, by] = [3 + xx2 - yy2, 3 + yy2 - xx2];
+    const root = Math.sqrt(Math.max(bx * bx - 12 * xx2, 0));
+    return [x * Math.sqrt(12 / (bx + root)), y * Math.sqrt(12 / (by + root)), Math.sign(z)];
 }
 function cubeFromSphere([x, y, z]: Vec3): Vec3 {
     const [ax, ay, az] = [Math.abs(x), Math.abs(y), Math.abs(z)];

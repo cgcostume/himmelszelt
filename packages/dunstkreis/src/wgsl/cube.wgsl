@@ -39,15 +39,16 @@ fn dkSphereFromCube(p: vec3f) -> vec3f {
     return p * sqrt(max(vec3f(1.0) - 0.5 * (q.yzx + q.zxy) + q.yzx * q.zxy / 3.0, vec3f(0.0)));
 }
 
-// The inverse on the face whose axis is z: the point on it, x and y, that stands for the unit direction d.
+// The inverse on the face whose axis is z: the point on it, x and y, that stands for the unit direction d. Nowell's
+// x² = (b - sqrt(b² - 24 x²)) / 2, with b = 3 + 2x² - 2y², rationalized to 12 x² / (b + sqrt(b² - 24 x²)): the
+// difference of two nearly equal numbers would lose a small component to rounding, and with it the side of a face's
+// middle it lies on, such as the horizon's.
 fn dkCubifyFace(d: vec3f) -> vec3f {
     let xx2 = d.x * d.x * 2.0;
     let yy2 = d.y * d.y * 2.0;
-    let difference = vec2f(xx2 - yy2, yy2 - xx2);
-    let ii = (difference.y - 3.0) * (difference.y - 3.0);
-    let root = 3.0 - sqrt(max(ii - 12.0 * xx2, 0.0));
-    let v = sqrt(max(difference + root, vec2f(0.0))) * 0.7071067811865476;
-    return sign(d) * vec3f(v, 1.0);
+    let b = vec2f(3.0 + xx2 - yy2, 3.0 + yy2 - xx2);
+    let root = sqrt(max(b.x * b.x - 12.0 * xx2, 0.0));
+    return vec3f(d.xy * sqrt(12.0 / (b + root)), sign(d.z));
 }
 
 // What a cubified cube map is sampled with for the unit direction d, the inverse of dkSphereFromCube: the point on the

@@ -340,11 +340,12 @@ fn backdrop(pixel: vec2u, direction: vec3f) -> vec3f {
     return textureSampleLevel(sky, skySampler, lookup, level).rgb / params.skyScale;
 }
 
-// How much of the sun disc a camera ray covers, as the share of its part of a pixel inside the disc's rim: the four rays
-// of a pixel each stand for a quarter of it, about half a pixel across.
-fn discCoverage(direction: vec3f, size: vec2u) -> f32 {
-    let halfPixel = params.tanHalfFov / f32(size.y);
-    return dkSunDiscCoverage(direction, params.discDirection, params.sunAngularRadius, halfPixel);
+// How much of the sun disc a camera ray's part of a pixel covers, supersampled by sun.wgsl: the four rays of a pixel
+// each stand for a quarter of it, half a pixel across.
+fn discCoverage(pixel: vec2u, size: vec2u, subsample: vec2f, direction: vec3f) -> f32 {
+    let right = cameraRay(pixel, size, subsample + vec2f(0.5, 0.0));
+    let below = cameraRay(pixel, size, subsample + vec2f(0.0, 0.5));
+    return dkSunDiscPixelCoverage(direction, right, below, params.discDirection, params.sunAngularRadius);
 }
 
 // The backdrop's own ground where a camera ray meets the plane z = 0, `t` along it, with what the solids keep from it
@@ -481,7 +482,7 @@ fn render(@builtin(global_invocation_id) id: vec3u) {
         let surface = shade(id.xy, direction);
         luminance = luminance + surface.rgb / 4.0;
         if (surface.w > 0.0 && params.sunDisc != 0u) {
-            disc = disc + discCoverage(direction, size) / 4.0;
+            disc = disc + discCoverage(id.xy, size, subsamples[i], direction) / 4.0;
         }
     }
     subsample = 0u;

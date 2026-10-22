@@ -177,10 +177,10 @@ async function downloadCube(name: CubeName, format: string) {
 
 // The panoramas, each written by a pass of its own, kept for the sky pass it was made for.
 const PANORAMAS = {
-    "equirect.": { projection: "equirectangular", upperHalf: false, aspect: 2 },
-    upper: { projection: "equirectangular", upperHalf: true, aspect: 4 },
-    octahedral: { projection: "octahedral", upperHalf: false, aspect: 1 },
-    fisheye: { projection: "fisheye", upperHalf: false, aspect: 1 },
+    "equirect.": { projection: "equirectangular", aspect: 2 },
+    octahedral: { projection: "octahedral", aspect: 1 },
+    fisheye: { projection: "fisheye", aspect: 1 },
+    "sphere map": { projection: "sphere", aspect: 1 },
 } as const;
 type PanoramaName = keyof typeof PANORAMAS;
 const panoramaPasses = new WeakMap<SkyPass, Map<PanoramaName, Promise<SkyPanoramaPass>>>();
@@ -192,7 +192,7 @@ const panoramaPasses = new WeakMap<SkyPass, Map<PanoramaName, Promise<SkyPanoram
 async function downloadPanorama(name: PanoramaName) {
     const sky = currentSky();
     if (!sky) return;
-    const { projection, upperHalf, aspect } = PANORAMAS[name];
+    const { projection, aspect } = PANORAMAS[name];
     let made = panoramaPasses.get(sky.pass);
     if (!made) {
         made = new Map();
@@ -200,7 +200,7 @@ async function downloadPanorama(name: PanoramaName) {
     }
     let pass = made.get(name);
     if (!pass) {
-        pass = sky.pass.createPanoramaPass({ projection, upperHalf, format: "rgba32float", samples: 8 });
+        pass = sky.pass.createPanoramaPass({ projection, format: "rgba32float", samples: 8 });
         made.set(name, pass);
     }
     const face = Math.min(environment.size, FACES_MAX);
@@ -217,7 +217,7 @@ async function downloadPanorama(name: PanoramaName) {
     device.queue.submit([encoder.finish()]);
     const { data } = await readTexture(device, texture, 0, 0);
     texture.destroy();
-    saveHdr(data, width, height, fileName(`sky-${projection}${upperHalf ? "-upper" : ""}-${width}x${height}`));
+    saveHdr(data, width, height, fileName(`sky-${projection}-${width}x${height}`));
 }
 
 const LM = ["0,0", "1,-1", "1,0", "1,1", "2,-2", "2,-1", "2,0", "2,1", "2,2"];

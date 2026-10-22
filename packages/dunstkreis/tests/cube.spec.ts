@@ -45,6 +45,24 @@ test("a cubified cube map looks up the point on the face of the direction's larg
     });
 });
 
+test("a cubified cube map keeps a component near zero on its side of the face's middle", async () => {
+    // Just above and below the horizon, on the side faces: the point's z as small as the direction's, never zero.
+    const inputs: Vec4[] = [1e-6, -1e-6, 1e-4, -1e-4].flatMap((z) =>
+        [0.3, 1.1, 2].map((azimuth): Vec4 => {
+            const r = Math.sqrt(1 - z * z);
+            return [r * Math.sin(azimuth), r * Math.cos(azimuth), z, 0];
+        }),
+    );
+    const points = await evaluate("vec4f(dkCubeFromSphere(input.xyz), 0.0)", inputs);
+    if (points.length === 0) return;
+    points.forEach((p, i) => {
+        const z = (inputs[i] as Vec4)[2];
+        expect(Math.sign(p[2] as number), `${inputs[i]}`).toBe(Math.sign(z));
+        expect(Math.abs(p[2] as number) / Math.abs(z), `${inputs[i]}`).toBeGreaterThan(1);
+        expect(Math.abs(p[2] as number) / Math.abs(z), `${inputs[i]}`).toBeLessThan(2);
+    });
+});
+
 test("dkCubeFromSphere inverts dkSphereFromCube, both ways", async () => {
     const inputs = directions();
     const back = await evaluate("vec4f(dkSphereFromCube(dkCubeFromSphere(input.xyz)), 0.0)", inputs);

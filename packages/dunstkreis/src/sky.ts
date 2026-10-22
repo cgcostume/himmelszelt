@@ -196,7 +196,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     ];
     // Everything but the output, which differs between an image and a cube map.
     const skySource = (output: string) =>
-        [...prelude, wgsl.cube, wgsl.panorama, wgsl.sun, wgsl.tonemap, output, wgsl.sky].join("\n");
+        [...prelude, wgsl.cube, wgsl.panorama, wgsl.sun, wgsl.tonemap, wgsl.grid, output, wgsl.sky].join("\n");
     // A cube map's or a panorama's format and settings, checked alike.
     const checkEnvironment = (format: GPUTextureFormat, sunDisc: boolean, samples: number) => {
         if (format !== "rgba16float" && format !== "rgba32float") {
@@ -639,13 +639,10 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                 sunDisc = false,
                 scaled = false,
             } = panoramaOptions;
-            const { upperHalf = false, azimuthOffset = 0 } = panoramaOptions;
+            const { azimuthOffset = 0 } = panoramaOptions;
             checkEnvironment(panoramaFormat, sunDisc, samples);
-            const panorama = ({ equirectangular: 1, octahedral: 2, fisheye: 3 } as const)[projection];
+            const panorama = ({ equirectangular: 1, octahedral: 2, fisheye: 3, sphere: 4 } as const)[projection];
             if (!panorama) throw new Error(`dunstkreis: no panorama projection ${projection}`);
-            if (upperHalf && projection !== "equirectangular") {
-                throw new Error("dunstkreis: only the equirectangular panorama comes as its upper half");
-            }
             const pipeline = await device.createComputePipelineAsync({
                 label: "dunstkreis:skyPanorama",
                 layout: "auto",
@@ -659,7 +656,6 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                             cubeScaled: scaled,
                             sunDisc,
                             panorama,
-                            panoramaUpperHalf: upperHalf,
                             panoramaAzimuthOffset: (azimuthOffset * Math.PI) / 180,
                         },
                         { cube: samples },

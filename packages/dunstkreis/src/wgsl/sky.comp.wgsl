@@ -1,8 +1,9 @@
 // The sky pass: a compute pass that turns the precomputed tables into pixels, one invocation per pixel of the target,
 // with no rasterization. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`, `sampling.wgsl`, `raymarch.wgsl`,
-// `cube.wgsl`, `panorama.wgsl`, `sun.wgsl`, `tonemap.wgsl`, `frame.wgsl`, `quality.wgsl` and `features.wgsl`, plus the
-// output at group 1, `dkOutputSize` and `dkOutputStore`, declared by whoever builds the pipeline since its format has to
-// be spelled out: `skyOutput(format)` for an image or a panorama, `skyCubeOutput(format)` for a cube map's six faces.
+// `cube.wgsl`, `panorama.wgsl`, `sun.wgsl`, `tonemap.wgsl`, `grid.wgsl`, `frame.wgsl`, `quality.wgsl` and
+// `features.wgsl`, plus the output at group 1, `dkOutputSize` and `dkOutputStore`, declared by whoever builds the
+// pipeline since its format has to be spelled out: `skyOutput(format)` for an image or a panorama,
+// `skyCubeOutput(format)` for a cube map's six faces.
 //
 // For an image, it writes every pixel, so the sky goes first, as the background the rest of the frame is drawn over.
 // For a cube map, with DK_CUBE, or a panorama, with DK_PANORAMA, it writes the luminance itself, in cd/m², neither
@@ -31,86 +32,10 @@ fn dkR2(i: u32) -> vec2f {
     return fract(vec2f(0.5) + f32(i) * vec2f(0.7548776662466927, 0.5698402909980532)) - 0.5;
 }
 
-const DK_DEG_TO_RAD: f32 = 0.01745329251994330;
-
-// Debug overlay, in the observer's frame, unbent: lines of altitude every 10 degrees with the horizon stronger, the
-// eight compass directions up to 80 degrees, and the sun symbol where the Sun truly is, at any exposure.
-fn dkLine(distance: f32, width: f32) -> f32 {
-    return 1.0 - smoothstep(0.5 * width, 1.5 * width, distance);
-}
-
-fn dkAltitudeDeg(v: vec3f) -> f32 {
-    return asin(clamp(v.z, -1.0, 1.0)) / DK_DEG_TO_RAD;
-}
-
-fn dkAzimuthDeg(v: vec3f) -> f32 {
-    return atan2(v.x, v.y) / DK_DEG_TO_RAD;
-}
-
-// An azimuth difference, wrapped into [-180, 180]: the azimuth jumps by 360 degrees due south.
-fn dkAzimuthStep(first: f32, second: f32) -> f32 {
-    return abs(fract((second - first) / 360.0 + 0.5) - 0.5) * 360.0;
-}
-
-// sternwarte's sun symbol around the Sun's true direction, unbent by the air: a circle and eight rays of two round dots
-// each, the same size on screen at any zoom. The circle is the Sun's true disc, 8.5 pixels at the least, and the rays
-// fade as it grows past that, gone before it would reach their first dots at 13.5 pixels. Where it is, rather than
-// where it shows, so near the horizon the disc stands above it, and below the horizon it is drawn over the ground.
-// `pixel` is the angle of one CSS pixel, `disc` the disc's radius in CSS pixels, `ratio` device pixels per CSS pixel.
-fn dkSunSymbol(view: vec3f, sun: vec3f, pixel: f32, disc: f32, ratio: f32) -> f32 {
-    if (dot(view, sun) <= 0.0) {
-        return 0.0;
-    }
-    let level = cross(vec3f(0.0, 0.0, 1.0), sun);
-    let across = select(vec3f(1.0, 0.0, 0.0), normalize(level), length(level) > 1e-6);
-    let up = cross(sun, across);
-    // In pixels from the Sun, in the plane facing it.
-    let p = vec2f(dot(view - sun, across), dot(view - sun, up)) / pixel;
-    let distance = length(p);
-    // As thin as the grid's lines, in device pixels.
-    let circle = dkLine(abs(distance - max(disc, 8.5)), 1.3 * DK_GRID_LINE / ratio);
-    // The nearest of the eight rays, and the nearest of its two dots, at 13.5 and 18.8 pixels, 1.7 across.
-    let step = DK_PI / 4.0;
-    let angle = round(atan2(p.y, p.x) / step) * step;
-    let ray = vec2f(cos(angle), sin(angle));
-    let along = dot(p, ray);
-    let center = select(18.8, 13.5, along < 16.15);
-    let bead = (1.0 - smoothstep(0.35, 1.35, length(p - ray * center))) * (1.0 - smoothstep(8.5, 11.5, disc));
-    return max(circle, bead);
-}
-
-// The grid's lines' width, as a share of the angle a pixel spans across and down.
-const DK_GRID_LINE: f32 = 0.65;
-
-// `right` and `below` are the rays of the neighboring pixels: a compute pass has no fwidth, so the lines' widths come
-// from how much the angles change from one pixel to the next.
+// The grid in white, over the sky (see grid.wgsl).
 fn dkDebugOverlay(color: vec3f, view: vec3f, right: vec3f, below: vec3f) -> vec3f {
-    let altitude = dkAltitudeDeg(view);
-    let azimuth = dkAzimuthDeg(view);
-    // The lines about a device pixel thin, from the angle a pixel spans across and down; the symbol's size and the
-    // gaps for the compass labels in CSS pixels, so they look the same on a display with twice the pixels.
-    let ratio = max(dkParams.pixelRatio, 1.0);
-    let altitudeWidth = DK_GRID_LINE * (abs(dkAltitudeDeg(right) - altitude) + abs(dkAltitudeDeg(below) - altitude));
-    let azimuthWidth = DK_GRID_LINE
-        * (dkAzimuthStep(azimuth, dkAzimuthDeg(right)) + dkAzimuthStep(azimuth, dkAzimuthDeg(below)));
-
-    let altitudeLine = dkLine(abs(fract(altitude / 10.0 + 0.5) - 0.5) * 10.0, altitudeWidth);
-    let horizonLine = dkLine(abs(altitude), 1.5 * altitudeWidth);
-    // Measured along the circle of altitude, so the lines keep their width as they converge towards the zenith.
-    let compassDistance = abs(fract(azimuth / 45.0 + 0.5) - 0.5) * 45.0 * cos(altitude * DK_DEG_TO_RAD);
-    let compassLine = dkLine(compassDistance, azimuthWidth * cos(altitude * DK_DEG_TO_RAD))
-        * (1.0 - smoothstep(70.0, 80.0, abs(altitude)));
-    let sunPixel = length(right - view) * ratio;
-    let discPixels = dkParams.sunAngularRadius / sunPixel;
-    let sun = dkSunSymbol(view, dkParams.sunDirection, sunPixel, discPixels, ratio);
-    // Where a compass direction meets the horizon, its label stands: the lines leave it a gap 11 CSS pixels around.
-    let compass = round(azimuth / 45.0) * 45.0 * DK_DEG_TO_RAD;
-    let crossing = acos(clamp(dot(view, vec3f(sin(compass), cos(compass), 0.0)), -1.0, 1.0)) / sunPixel;
-    let gap = smoothstep(9.0, 12.0, crossing);
-
-    // Faint, the Sun as strong as the horizon.
-    let grid = max(max(0.1 * altitudeLine, 0.3 * horizonLine), 0.15 * compassLine) * gap;
-    return mix(color, vec3f(1.0), max(grid, 0.3 * sun) / 3.0);
+    let sun = dkParams.sunDirection;
+    return dkGridOverlay(color, view, right, below, vec3f(1.0), sun, dkParams.sunAngularRadius, dkParams.pixelRatio);
 }
 
 // The exposure luminance in cd/m² is multiplied by. Metered, it is the light meter's EV100, log2(L * 100 / 12.5) for
@@ -350,12 +275,66 @@ fn dkPixelRayAt(position: vec2f, size: vec2u) -> vec3f {
 
 // A texel of a cube map: the mean of DK_SAMPLES_CUBE rays through it, in cd/m², the disc included with DK_SUN_DISC; times
 // skyViewScale with DK_CUBE_SCALED.
+// One of a texel's rays, standing for its share of the texel: `cell` is how far the cosine of the zenith angle runs
+// across that share. Where the visible horizon crosses it, the sky just above and the ground just below, mixed by how
+// much of the share lies below, as the sky pass does a pixel. Alone, a ray would take all of one or the other, and the
+// few rays of a texel by the horizon would decide it by where they happen to fall: on the same sky, a cube map's faces,
+// whose rays fall differently, would disagree along its first row below the horizon by up to a factor of two.
+fn dkSkyRayLuminance(view: vec3f, sky: DkSkySample, cell: f32) -> vec3f {
+    if (dkInSpace()) {
+        return sky.luminance;
+    }
+    let horizon = dkMetering.horizon.x;
+    let footprint = max(cell, 1e-6);
+    let below = clamp((horizon - view.z) / footprint + 0.5, 0.0, 1.0);
+    if (below <= 0.0 || below >= 1.0) {
+        return sky.luminance;
+    }
+    let above = dkSkyAt(dkWithMu(view, horizon + 0.25 * footprint));
+    let under = dkSkyAt(dkWithMu(view, horizon - 0.25 * footprint));
+    return mix(above.luminance, under.luminance, below);
+}
+
+// The direction through a point of a cube face, through Nowell's mapping in a cubified one.
+fn dkCubeRay(face: u32, position: vec2f, size: u32) -> vec3f {
+    let point = dkCubePointAt(face, position, size);
+    return select(normalize(point), dkSphereFromCube(point), DK_CUBIFY);
+}
+
+// How far the cosine of the zenith angle runs across a ray's share of its texel, a square 1 / sqrt(rays) of a texel on a
+// side, from the rays through its corners.
+fn dkCellOf(view: vec3f, across: vec3f, down: vec3f) -> f32 {
+    return abs(across.z - view.z) + abs(down.z - view.z);
+}
+
+// Offsets within a cube map's or a panorama's texel for its rays, in [-0.5, 0.5): eight at a time, each a point of
+// Roberts' R2 sequence in its eight mirror images, so the rays fall alike however a face is turned or flipped, and
+// centered on the texel. A lean of the rays to one side, R2's eight lean 0.11 of a texel, would shift every texel of a
+// face along the steep gradient by the horizon, and the faces would disagree by a few percent on a sky the same all
+// round. One ray alone takes the center.
+fn dkTexelOffset(i: u32) -> vec2f {
+    if (DK_SAMPLES_CUBE == 1u) {
+        return vec2f(0.0);
+    }
+    let p = dkR2(i / 8u + 1u);
+    let k = i % 8u;
+    let q = select(p, p.yx, (k & 4u) != 0u);
+    return q * vec2f(select(1.0, -1.0, (k & 1u) != 0u), select(1.0, -1.0, (k & 2u) != 0u));
+}
+
 fn dkCubeTexel(face: u32, texel: vec2u, size: u32) -> vec3f {
     var luminance = vec3f(0.0);
+    let side = inverseSqrt(f32(DK_SAMPLES_CUBE));
     for (var i = 0u; i < DK_SAMPLES_CUBE; i = i + 1u) {
-        let point = dkCubePointAt(face, vec2f(texel) + 0.5 + dkR2(i), size);
-        let sky = dkSkyAt(select(normalize(point), dkSphereFromCube(point), DK_CUBIFY));
-        luminance = luminance + sky.luminance;
+        let position = vec2f(texel) + 0.5 + dkTexelOffset(i);
+        let view = dkCubeRay(face, position, size);
+        let sky = dkSkyAt(view);
+        let cell = dkCellOf(
+            view,
+            dkCubeRay(face, position + vec2f(side, 0.0), size),
+            dkCubeRay(face, position + vec2f(0.0, side), size),
+        );
+        luminance = luminance + dkSkyRayLuminance(view, sky, cell);
         if (DK_SUN_DISC && dkSkySunCoverage(sky, 0.0) > 0.0) {
             luminance = luminance + dkSkySunLuminance(sky);
         }
@@ -363,33 +342,42 @@ fn dkCubeTexel(face: u32, texel: vec2u, size: u32) -> vec3f {
     return luminance / f32(DK_SAMPLES_CUBE) * select(1.0, dkParams.skyViewScale, DK_CUBE_SCALED);
 }
 
-// The ground, as the sky pass shows it straight down, the nadir of a cube map: one color for the panorama's texels no
-// direction falls into.
+// The ground, as the sky pass shows it straight down, the nadir of a cube map: the fisheye's corner, where it sends
+// every direction below the horizon.
 fn dkPanoramaFill() -> vec3f {
     return dkSkyAt(vec3f(0.0, 0.0, -1.0)).luminance;
 }
 
-// A texel of a panorama, as a cube map's: the mean of its rays within the projection, and in alpha their share, 1 but
-// around the fisheye's circle. Beyond the circle, where none is, the texel takes dkPanoramaFill, the same everywhere,
-// so that lookups clamped or filtered there blend into the ground, neither black nor streaked by the azimuth.
+// A texel of a panorama, as a cube map's: the mean of its rays, and in alpha the share of them within the projection,
+// 1 but around the fisheye's and the sphere map's circle. Beyond the circle, the rays are those of its rim, as
+// dkPanoramaDirection takes them: the horizon at their azimuth for the fisheye, the nadir for the sphere map, so a
+// lookup filtered across the rim blends into what lies there rather than into the ground or black. The fisheye's top
+// left corner texel alone holds dkPanoramaFill.
 fn dkPanoramaTexel(texel: vec2u, size: vec2u) -> vec4f {
+    let scale = select(1.0, dkParams.skyViewScale, DK_CUBE_SCALED);
+    if (DK_PANORAMA == DK_FISHEYE && all(texel == vec2u(0u))) {
+        return vec4f(dkPanoramaFill() * scale, 0.0);
+    }
+    let round = DK_PANORAMA == DK_FISHEYE || DK_PANORAMA == DK_SPHERE_MAP;
     var luminance = vec3f(0.0);
     var inside = 0u;
+    let side = inverseSqrt(f32(DK_SAMPLES_CUBE)) / vec2f(size);
     for (var i = 0u; i < DK_SAMPLES_CUBE; i = i + 1u) {
-        let uv = (vec2f(texel) + 0.5 + dkR2(i)) / vec2f(size);
-        if (DK_PANORAMA == DK_FISHEYE && length(uv * 2.0 - 1.0) > 1.0) {
-            continue;
-        }
-        let sky = dkSkyAt(dkPanoramaDirection(DK_PANORAMA, uv, DK_PANORAMA_AZIMUTH_OFFSET, DK_PANORAMA_UPPER_HALF));
-        luminance = luminance + sky.luminance;
+        let uv = (vec2f(texel) + 0.5 + dkTexelOffset(i)) / vec2f(size);
+        let view = dkPanoramaDirection(DK_PANORAMA, uv, DK_PANORAMA_AZIMUTH_OFFSET);
+        let sky = dkSkyAt(view);
+        let cell = dkCellOf(
+            view,
+            dkPanoramaDirection(DK_PANORAMA, uv + vec2f(side.x, 0.0), DK_PANORAMA_AZIMUTH_OFFSET),
+            dkPanoramaDirection(DK_PANORAMA, uv + vec2f(0.0, side.y), DK_PANORAMA_AZIMUTH_OFFSET),
+        );
+        luminance = luminance + dkSkyRayLuminance(view, sky, cell);
         if (DK_SUN_DISC && dkSkySunCoverage(sky, 0.0) > 0.0) {
             luminance = luminance + dkSkySunLuminance(sky);
         }
-        inside = inside + 1u;
+        inside = inside + select(1u, 0u, round && length(uv * 2.0 - 1.0) > 1.0);
     }
-    let mean = select(dkPanoramaFill(), luminance / f32(max(inside, 1u)), inside > 0u);
-    let scale = select(1.0, dkParams.skyViewScale, DK_CUBE_SCALED);
-    return vec4f(mean * scale, f32(inside) / f32(DK_SAMPLES_CUBE));
+    return vec4f(luminance / f32(DK_SAMPLES_CUBE) * scale, f32(inside) / f32(DK_SAMPLES_CUBE));
 }
 
 @compute @workgroup_size(8, 8, 1)

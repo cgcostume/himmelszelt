@@ -3,51 +3,45 @@ import { wgsl } from "@himmelszelt/dunstkreis";
 import { showCode } from "../code";
 import { find } from "../dom";
 import { onDemand } from "../frame";
-import {
-    currentSky,
-    display,
-    environment,
-    gpu,
-    gpuDevice,
-    onDisplay,
-    onEnvironment,
-    onSkyView,
-    type Sky,
-} from "./atmosphere";
-import { bindFullscreen, cameraBasis, lookAround, project, type SkyCamera, type Vec3 } from "./skycamera";
+import { currentSky, display, gpu, gpuDevice, onDisplay, onSkyView, type Sky } from "./atmosphere";
+import { cameraBasis, lookAround, project, type SkyCamera, type Vec3 } from "./skycamera";
 
 /**
- * The sky in six ways of storing it, each in a texture of some 400, 1,600 or 6,400 texels, or as many as the
- * environment figure's sky cube map, shown texel by texel, bilinearly or bicubically: as stored, and from inside, looking around.
+ * The sky in six ways of storing it, in textures of the sizes below, shown texel by texel, bilinearly or bicubically:
+ * as stored, and from inside, looking around.
  * Over both, the texels' edges, and how densely each projection packs its texels against an even spread of the same
  * texels over what it covers.
  */
 
-type Projection = "cube" | "cubified" | "equirectangular" | "upper" | "octahedral" | "fisheye";
+type Projection = "cube" | "cubified" | "equirectangular" | "octahedral" | "fisheye" | "sphere";
 // In the shader's numbering.
-const PROJECTIONS: Projection[] = ["cube", "cubified", "equirectangular", "upper", "octahedral", "fisheye"];
+const PROJECTIONS: Projection[] = ["cube", "cubified", "equirectangular", "octahedral", "fisheye", "sphere"];
 
-/** The budget that stands for as many texels as the environment figure's sky cube map, faces of 512 by default. */
-const FULL = 3;
+/**
+ * The sizes, in two tiers. XS to L compare the projections: about as many texels in each, 400, 1,600, 6,400 and
+ * 25,600. HD and UHD are what maps commonly come in: faces of 1024 and 2048 for a cube map, 2048 and 4096 across for
+ * the others.
+ */
+type Size = "xs" | "s" | "m" | "l" | "hd" | "uhd";
+const LEVEL: Record<Size, number> = { xs: 0, s: 1, m: 2, l: 3, hd: 0, uhd: 0 };
+const large = (size: Size) => size === "hd" || size === "uhd";
 
-/** Each projection's texture at a budget: width and height, six layers for a cube map. */
-function sizeOf(projection: Projection, level: number): [number, number] {
-    if (level === FULL) {
-        const face = environment.size;
-        const texels = 6 * face * face;
-        const side = (aspect: number) => Math.round(Math.sqrt(texels / aspect));
-        if (projection === "cube" || projection === "cubified") return [face, face];
-        if (projection === "equirectangular") return [2 * side(2), side(2)];
-        if (projection === "upper") return [4 * side(4), side(4)];
-        return [side(1), side(1)];
+/** Each projection's texture at a size: width and height, six layers for a cube map. */
+function sizeOf(projection: Projection, size: Size): [number, number] {
+    if (large(size)) {
+        const across = size === "uhd" ? 4096 : 2048;
+        if (projection === "cube" || projection === "cubified") return [across / 2, across / 2];
+        if (projection === "equirectangular") return [across, across / 2];
+        return [across, across];
     }
+    const level = LEVEL[size];
     const base: Record<Projection, [number, number]> = {
         cube: [8, 8],
         cubified: [8, 8],
         equirectangular: [28, 14],
-        upper: [40, 10],
         octahedral: [20, 20],
         fisheye: [20, 20],
+        sphere: [20, 20],
     };
     const [width, height] = base[projection];
     return [width << level, height << level];
@@ -58,9 +52,9 @@ const ASPECT: Record<Projection, number> = {
     cube: 6,
     cubified: 6,
     equirectangular: 2,
-    upper: 4,
     octahedral: 1,
     fisheye: 1,
+    sphere: 1,
 };
 
 // The display: the chart a direction falls into, its texel, the texel's edges by the chart's screen-space derivatives,
@@ -69,11 +63,13 @@ const SOURCE = /* wgsl */ `
 ${wgsl.cube}
 ${wgsl.panorama}
 ${wgsl.tonemap}
+${wgsl.sun}
+${wgsl.grid}
 struct Params {
     // The view's right, up and forward.
     rotation: mat3x3f,
     size: vec2u,
-    // 0 cube, 1 cubified, 2 equirectangular, 3 its upper half, 4 octahedral, 5 fisheye.
+    // 0 cube, 1 cubified, 2 equirectangular, 3 octahedral, 4 fisheye, 5 sphere map.
     projection: u32,
     // 0 as stored, 1 the view from inside.
     inside: u32,
@@ -90,6 +86,17 @@ struct Params {
     curve: u32,
     ty: f32,
     d: f32,
+    // The sky figure's grid over both views, the Sun's disc's radius in radians and its true direction for its symbol.
+    grid: u32,
+    pixelRatio: f32,
+    sunAngularRadius: f32,
+    sunDirection: vec3f,
+    dither: u32,
+    // The Sun's disc, drawn over the view from inside pixel by pixel, never stored: where it shows, bent by the air,
+    // and its illuminance in the texture's units, times the sky's scale.
+    apparentSun: vec3f,
+    sunDisc: u32,
+    sunIlluminance: vec3f,
 }
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -151,10 +158,10 @@ fn chartOn(d: vec3f, axis: u32) -> Chart {
         return cubeFaceChart(p, axis);
     }
     switch params.projection {
-        case 2u: { return Chart(dkEquirectangularUv(d, 0.0, false) * size, 0u, true); }
-        case 3u: { return Chart(dkEquirectangularUv(d, 0.0, true) * size, 0u, d.z >= 0.0); }
-        case 4u: { return Chart(dkOctahedralUv(d, 0.0) * size, 0u, true); }
-        default: { return Chart(dkFisheyeUv(d, 0.0) * size, 0u, d.z >= 0.0); }
+        case 2u: { return Chart(dkEquirectangularUv(d, 0.0) * size, 0u, true); }
+        case 3u: { return Chart(dkOctahedralUv(d, 0.0) * size, 0u, true); }
+        case 4u: { return Chart(dkFisheyeUv(d, 0.0) * size, 0u, d.z >= 0.0); }
+        default: { return Chart(dkSphereMapUv(d, 0.0) * size, 0u, true); }
     }
 }
 
@@ -163,7 +170,7 @@ fn chartOn(d: vec3f, axis: u32) -> Chart {
 fn chartAt(position: vec2f, axis: u32) -> Chart {
     if (params.inside == 0u && !isCube()) {
         let uv = position / vec2f(textureDimensions(output));
-        return Chart(uv * vec2f(params.size), 0u, params.projection != 5u || length(uv * 2.0 - 1.0) <= 1.0);
+        return Chart(uv * vec2f(params.size), 0u, params.projection < 4u || length(uv * 2.0 - 1.0) <= 1.0);
     }
     return chartOn(directionAt(position).xyz, axis);
 }
@@ -175,7 +182,7 @@ fn chart(d: vec3f) -> Chart {
 // The step from one chart position to another, across the equirectangular's seam the short way.
 fn chartStep(a: Chart, b: Chart) -> vec2f {
     var delta = b.texel - a.texel;
-    if (params.projection == 2u || params.projection == 3u) {
+    if (params.projection == 2u) {
         delta.x = delta.x - round(delta.x / f32(params.size.x)) * f32(params.size.x);
     }
     return delta;
@@ -185,7 +192,7 @@ fn chartStep(a: Chart, b: Chart) -> vec2f {
 // half is its upper half folded over, its texels as dense as at the mirrored direction.
 fn texelsPerSr(direction: vec3f) -> f32 {
     var d = direction;
-    if (params.projection == 4u) {
+    if (params.projection == 3u) {
         d.z = abs(d.z);
     }
     let axis = majorAxis(d);
@@ -263,9 +270,8 @@ fn directionAt(position: vec2f) -> vec4f {
         }
         return onCube(-up + st.x * east - st.y * north);
     }
-    var projections = array<u32, 6>(0u, 0u, 1u, 1u, 2u, 3u);
-    let projection = projections[params.projection];
-    return vec4f(dkPanoramaDirection(projection, uv, 0.0, params.projection == 3u), 1.0);
+    // In panorama.wgsl's numbering, one less.
+    return vec4f(dkPanoramaDirection(params.projection - 1u, uv, 0.0), 1.0);
 }
 
 // Catmull-Rom's weights for the four texels around a point a fraction f past the second one's center: through every
@@ -300,16 +306,47 @@ fn cubeTap(face: u32, position: vec2f) -> vec4f {
     return textureLoad(source, texel, tap.layer, 0);
 }
 
-// Bicubic by hand, 4 by 4 texels: across the equirectangular's seam it wraps, at the other edges it clamps, as the
-// hardware's sampler does, and on a cube map it reads on across the faces. Never below zero, where Catmull-Rom's
-// negative lobes overshoot a sharp edge such as the horizon.
+// A flat panorama's texel, which may lie past the texture's edge: the equirectangular wraps across, as round the
+// azimuth; the octahedral folds, as its triangles meet across each edge, the texel mirrored along it; the others clamp.
+fn flatTap(position: vec2i) -> vec4f {
+    let size = vec2i(params.size);
+    var texel = position;
+    if (params.projection == 2u) {
+        texel.x = ((texel.x % size.x) + size.x) % size.x;
+    } else if (params.projection == 3u) {
+        if (texel.x < 0 || texel.x >= size.x) {
+            texel = vec2i(select(2 * size.x - 1 - texel.x, -1 - texel.x, texel.x < 0), size.y - 1 - texel.y);
+        }
+        if (texel.y < 0 || texel.y >= size.y) {
+            texel = vec2i(size.x - 1 - texel.x, select(2 * size.y - 1 - texel.y, -1 - texel.y, texel.y < 0));
+        }
+    }
+    return textureLoad(source, clamp(texel, vec2i(0), size - 1), 0, 0);
+}
+
+// Bilinear by hand over flatTap, for the octahedral, whose folds the hardware's sampler would clamp instead: at the
+// texture's edge it blends with the texel across the fold, so the sky runs on there as it does on the sphere.
+fn bilinearFlat(here: Chart) -> vec4f {
+    let t = here.texel - 0.5;
+    let base = vec2i(floor(t));
+    let f = t - floor(t);
+    let top = mix(flatTap(base), flatTap(base + vec2i(1, 0)), f.x);
+    let bottom = mix(flatTap(base + vec2i(0, 1)), flatTap(base + vec2i(1, 1)), f.x);
+    return mix(top, bottom, f.y);
+}
+
+// Bicubic by hand, 4 by 4 texels: past the texture's edge as flatTap reads, and on a cube map on across the faces. Interpolated in log2 of the luminance, as
+// the eye sees it: Catmull-Rom's negative lobes overshoot a sharp edge such as the horizon or the Sun's glow, in HDR by
+// far more than either side, but in the log by a share of the step. Held within the 16 texels, which a smooth sky never
+// reaches, so the curve stays smooth where texels meet.
 fn bicubic(here: Chart) -> vec4f {
     let t = here.texel - 0.5;
     let base = floor(t);
     let wx = catmullRom(t.x - base.x);
     let wy = catmullRom(t.y - base.y);
-    let size = vec2i(params.size);
-    var sum = vec4f(0.0);
+    var sum = vec3f(0.0);
+    var low = vec3f(3.4e38);
+    var high = vec3f(-3.4e38);
     for (var j = 0; j < 4; j = j + 1) {
         for (var i = 0; i < 4; i = i + 1) {
             let center = base + vec2f(f32(i - 1), f32(j - 1)) + 0.5;
@@ -317,16 +354,15 @@ fn bicubic(here: Chart) -> vec4f {
             if (isCube()) {
                 value = cubeTap(here.layer, center);
             } else {
-                var texel = vec2i(floor(center));
-                if (params.projection == 2u || params.projection == 3u) {
-                    texel.x = ((texel.x % size.x) + size.x) % size.x;
-                }
-                value = textureLoad(source, clamp(texel, vec2i(0), size - 1), 0, 0);
+                value = flatTap(vec2i(floor(center)));
             }
-            sum = sum + wx[i] * wy[j] * value;
+            let level = log2(max(value.rgb, vec3f(1e-30)));
+            sum = sum + wx[i] * wy[j] * level;
+            low = min(low, level);
+            high = max(high, level);
         }
     }
-    return max(sum, vec4f(0.0));
+    return vec4f(exp2(clamp(sum, low, high)), 1.0);
 }
 
 // Whether the view from inside shows d: its general perspective, as skycamera.ts projects, within the image plane.
@@ -359,6 +395,27 @@ fn framed(color: vec3f, position: vec2f, d: vec3f, covered: bool) -> vec3f {
         return vec3f(1.0);
     }
     return select(color * 0.4, color, seen);
+}
+
+// How strongly the sky figure's grid covers a pixel, by the directions the neighboring pixels show; in the view from
+// inside only.
+fn gridCoverage(position: vec2f, d: vec3f) -> f32 {
+    if (params.grid == 0u || params.inside == 0u) {
+        return 0.0;
+    }
+    let right = directionAt(position + vec2f(1.0, 0.0)).xyz;
+    let below = directionAt(position + vec2f(0.0, 1.0)).xyz;
+    return dkGridCoverage(d, right, below, params.sunDirection, params.sunAngularRadius, params.pixelRatio);
+}
+
+// Written out, with dither as the sky pass has it: Jimenez's interleaved gradient noise, an 8-bit step, triangular.
+fn put(p: vec2u, color: vec3f) {
+    var c = color;
+    if (params.dither != 0u) {
+        let noise = fract(52.9829189 * fract(dot(vec2f(p), vec2f(0.06711056, 0.00583715)))) * 2.0 - 1.0;
+        c = c + sign(noise) * (1.0 - sqrt(1.0 - abs(noise))) / 255.0;
+    }
+    textureStore(output, vec2i(p), vec4f(clamp(c, vec3f(0.0), vec3f(1.0)), 1.0));
 }
 
 const THREADS: u32 = 256u;
@@ -420,11 +477,13 @@ fn display(@builtin(global_invocation_id) id: vec3u) {
     }
     let d = at.xyz;
     let axis = majorAxis(d);
-    // Outside what the projection covers: below the horizon, a half sky's lookup clamped to its horizon, and the
-    // fisheye's corners as stored, the sky at the horizon too; shown without edges or density.
+    // Outside what the projection covers: below the fisheye's horizon its corner texel, the ground, whichever filter,
+    // and beyond the circles as stored, what their rims hold; shown without edges or density.
     let here = chartAt(position, axis);
     var stored: vec4f;
-    if (params.sampling == 2u) {
+    if (params.projection == 4u && params.inside != 0u && !here.covered) {
+        stored = textureLoad(source, vec2i(0), 0, 0);
+    } else if (params.sampling == 2u) {
         stored = bicubic(here);
     } else if (params.sampling == 0u) {
         let texel = clamp(vec2i(floor(here.texel)), vec2i(0), vec2i(params.size) - 1);
@@ -432,38 +491,51 @@ fn display(@builtin(global_invocation_id) id: vec3u) {
     } else if (isCube()) {
         let lookup = select(d, dkCubeFromSphere(d), params.projection == 1u);
         stored = textureSampleLevel(cubeSource, linearSampler, lookup, 0.0);
+    } else if (params.projection == 3u) {
+        stored = bilinearFlat(here);
     } else {
         stored = textureSampleLevel(flatSource, linearSampler, here.texel / vec2f(params.size), 0.0);
     }
-    var color = toneMap(stored.rgb);
+    var luminance = stored.rgb;
+    if (params.sunDisc != 0u && params.inside != 0u) {
+        let right = directionAt(position + vec2f(1.0, 0.0)).xyz;
+        let below = directionAt(position + vec2f(0.0, 1.0)).xyz;
+        let sun = params.apparentSun;
+        luminance += dkSunDiscPixel(d, right, below, sun, params.sunAngularRadius, params.sunIlluminance);
+    }
+    var color = toneMap(luminance);
+    // The grid over everything, the texel edges under it, so its lines run on unbroken across them.
+    let grid = gridCoverage(position, d);
     if (!here.covered) {
-        textureStore(output, vec2i(id.xy), vec4f(framed(color, position, d, false), 1.0));
+        put(id.xy, framed(mix(color, vec3f(1.0), grid / DK_GRID_FAINT), position, d, false));
         return;
     }
     if (params.density != 0u) {
         let q = texelsPerSr(d) / params.texelsPerSr;
         color = densityColor(q) * (0.35 + 0.65 * dot(color, LUMINANCE));
     }
-    if (params.edges != 0u) {
-        // A texel's edge where the chart crosses a whole texel within half a pixel, by its steps to the neighboring
-        // pixels; a step across a quarter of the texture is a seam, where the chart jumps, and an edge too. Faded out
-        // where texels shrink below a few pixels, where edges would cover them.
+    // The texture as stored stays as it is: edges in the view from inside only.
+    if (params.edges != 0u && params.inside != 0u) {
+        // A texel's edge where the chart crosses a whole texel, a pixel wide, antialiased by the distance to it in
+        // pixels: along the chart's gradient, from its steps to the neighboring pixels, so it is as wide whichever way
+        // it runs. Dark, a third of the way to black. A step across a quarter of the texture is a seam, where the
+        // chart jumps, and an edge too. Faded out from 8 pixels a texel down to 4, before the lines crowd into a moiré.
         let besideX = directionAt(position + vec2f(1.0, 0.0));
         let besideY = directionAt(position + vec2f(0.0, 1.0));
         let dx = chartStep(here, chartAt(position + vec2f(1.0, 0.0), axis));
         let dy = chartStep(here, chartAt(position + vec2f(0.0, 1.0), axis));
-        let footprint = max(abs(dx) + abs(dy), vec2f(1e-6));
+        let footprint = max(vec2f(length(vec2f(dx.x, dy.x)), length(vec2f(dx.y, dy.y))), vec2f(1e-6));
         let f = fract(here.texel);
         let pixels = min(f, 1.0 - f) / footprint;
-        var edge = 1.0 - smoothstep(0.35, 0.85, min(pixels.x, pixels.y));
+        var edge = clamp(1.0 - min(pixels.x, pixels.y), 0.0, 1.0);
         let seam = 0.25 * f32(min(params.size.x, params.size.y));
         if (besideX.w == 0.0 || besideY.w == 0.0 || ((params.inside == 0u || !isCube()) && max(length(dx), length(dy)) > seam)) {
             edge = 1.0;
         }
-        edge = edge * (1.0 - smoothstep(0.25, 0.6, max(footprint.x, footprint.y)));
-        color = mix(color, color * 0.35, edge);
+        edge = edge * (1.0 - smoothstep(0.125, 0.25, max(footprint.x, footprint.y))) * (1.0 - min(grid * 10.0, 1.0));
+        color = mix(color, vec3f(0.0), edge / 3.0);
     }
-    textureStore(output, vec2i(id.xy), vec4f(framed(color, position, d, true), 1.0));
+    put(id.xy, framed(mix(color, vec3f(1.0), grid / DK_GRID_FAINT), position, d, true));
 }
 `;
 
@@ -473,6 +545,7 @@ const stage = (name: string) => find(`[data-panel="${name}"]`, root);
 const canvasOf = (name: string) => find<HTMLCanvasElement>("canvas", stage(name));
 const chosen = (name: string, fallback: string) =>
     root.querySelector<HTMLInputElement>(`input[name="projections-${name}"]:checked`)?.value ?? fallback;
+const chosenSize = () => chosen("budget", "xs") as Size;
 const pressed = (name: string) => field(name).getAttribute("aria-pressed") === "true";
 
 const DEG = Math.PI / 180;
@@ -517,10 +590,9 @@ function directionOf(projection: Projection, layer: number, u: number, v: number
             return normalize(cubePoint(layer, 2 * u - 1, 2 * v - 1));
         case "cubified":
             return sphereFromCube(cubePoint(layer, 2 * u - 1, 2 * v - 1));
-        case "equirectangular":
-        case "upper": {
+        case "equirectangular": {
             const azimuth = u * 2 * Math.PI;
-            const zenith = v * (projection === "upper" ? 0.5 : 1) * Math.PI;
+            const zenith = v * Math.PI;
             return [Math.sin(zenith) * Math.sin(azimuth), Math.sin(zenith) * Math.cos(azimuth), Math.cos(zenith)];
         }
         case "octahedral": {
@@ -529,6 +601,13 @@ function directionOf(projection: Projection, layer: number, u: number, v: number
             if (z >= 0) return normalize([qx, qy, z]);
             const sign = (a: number) => (a >= 0 ? 1 : -1);
             return normalize([(1 - Math.abs(qy)) * sign(qx), (1 - Math.abs(qx)) * sign(qy), z]);
+        }
+        case "sphere": {
+            const [qx, qy] = [1 - 2 * u, 1 - 2 * v];
+            const rr = qx * qx + qy * qy;
+            if (rr > 1) return null;
+            const s = 2 * Math.sqrt(1 - rr);
+            return [qx * s, qy * s, 1 - 2 * rr];
         }
         case "fisheye": {
             const [qx, qy] = [1 - 2 * u, 1 - 2 * v];
@@ -544,20 +623,25 @@ type Stats = { texels: number; above: number; ratio: number };
 const statsCache = new Map<string, Stats>();
 
 /** Texels in all, above the horizon, and the largest's solid angle over the smallest's, of the texels wholly inside. */
-function statsOf(projection: Projection, level: number): Stats {
-    const key = `${projection},${sizeOf(projection, level)}`;
+function statsOf(projection: Projection, size: Size): Stats {
+    const key = `${projection},${sizeOf(projection, size)}`;
     const cached = statsCache.get(key);
     if (cached) return cached;
-    const [width, height] = sizeOf(projection, level);
-    // Fewer points at the full budget, millions of texels, where a texel hardly varies across. All are moved off the
-    // texel's symmetric grid, unequally across and down: on it, some fall onto the octahedral's edges, where the map
-    // has a kink.
-    const k = level === FULL ? 2 : 6;
+    const [width, height] = sizeOf(projection, size);
+    // HD and UHD, millions of texels, every stride-th row and column, the edges always, where the extremes lie, and
+    // from L on fewer points a texel, which hardly varies across. All points are moved off the texel's symmetric grid, unequally
+    // across and down: on it, some fall onto the octahedral's edges, where the map has a kink.
+    const stride = large(size) ? Math.ceil(Math.sqrt((width * height * layers(projection)) / 250_000)) : 1;
+    const k = large(size) ? 2 : size === "l" ? 3 : 6;
     const h = 1e-4;
-    let [above, smallest, largest] = [0, Number.POSITIVE_INFINITY, 0];
+    const visit = (n: number) => [
+        ...new Set([...Array(Math.ceil(n / stride)).keys()].map((i) => i * stride).concat(n - 1)),
+    ];
+    let [above, counted, smallest, largest] = [0, 0, Number.POSITIVE_INFINITY, 0];
     for (let layer = 0; layer < layers(projection); ++layer) {
-        for (let y = 0; y < height; ++y) {
-            for (let x = 0; x < width; ++x) {
+        for (const y of visit(height)) {
+            for (const x of visit(width)) {
+                ++counted;
                 const center = directionOf(projection, layer, (x + 0.5) / width, (y + 0.5) / height);
                 if (center && center[2] > 0) ++above;
                 // The solid angle by the map's Jacobian at k by k points of the texel, in texels.
@@ -584,17 +668,23 @@ function statsOf(projection: Projection, level: number): Stats {
             }
         }
     }
-    const stats = { texels: width * height * layers(projection), above, ratio: largest / smallest };
+    const texels = width * height * layers(projection);
+    const stats = {
+        texels,
+        above: Math.round((above / counted) * texels),
+        sampled: stride > 1,
+        ratio: largest / smallest,
+    };
     statsCache.set(key, stats);
     return stats;
 }
 
 /** An even spread's texels per steradian: the texels covering what the projection covers, over its solid angle. */
-function evenTexelsPerSr(projection: Projection, level: number) {
-    const [width, height] = sizeOf(projection, level);
+function evenTexelsPerSr(projection: Projection, size: Size) {
+    const [width, height] = sizeOf(projection, size);
     const texels = width * height * layers(projection);
-    if (projection === "upper") return texels / (2 * Math.PI);
     if (projection === "fisheye") return ((Math.PI / 4) * texels) / (2 * Math.PI);
+    if (projection === "sphere") return ((Math.PI / 4) * texels) / (4 * Math.PI);
     return texels / (4 * Math.PI);
 }
 
@@ -613,14 +703,6 @@ const FLAT_MARKS: Record<Projection, Mark[]> = {
         ["zenith", 0.5, 0],
         ["nadir", 0.5, 1],
     ],
-    upper: [
-        ["N", 0, 1],
-        ["E", 0.25, 1],
-        ["S", 0.5, 1],
-        ["W", 0.75, 1],
-        ["N", 1, 1],
-        ["zenith", 0.5, 0],
-    ],
     octahedral: [
         ["N", 0.5, 0],
         ["E", 0, 0.5],
@@ -633,6 +715,14 @@ const FLAT_MARKS: Record<Projection, Mark[]> = {
         ["E", 0, 0.5],
         ["S", 0.5, 1],
         ["W", 1, 0.5],
+        ["zenith", 0.5, 0.5],
+    ],
+    // The horizon at sin 45° of the radius, the nadir all round the rim.
+    sphere: [
+        ["N", 0.5, 0.1464],
+        ["E", 0.1464, 0.5],
+        ["S", 0.5, 0.8536],
+        ["W", 0.8536, 0.5],
         ["zenith", 0.5, 0.5],
     ],
 };
@@ -667,7 +757,7 @@ function showMarks(projection: Projection) {
     const [width, height] = [canvas.clientWidth || 1, canvas.clientHeight || 1];
     const basis = cameraBasis(camera, width / height);
     const marks: Mark[] = [];
-    for (const [text, d] of VIEW_MARKS) {
+    for (const [text, d] of pressed("grid") ? VIEW_MARKS : []) {
         const at = project(d, basis, width, height);
         if (at && at.x > 0 && at.x < width && at.y > 0 && at.y < height)
             marks.push([text, at.x / width, at.y / height]);
@@ -678,23 +768,24 @@ function showMarks(projection: Projection) {
 // The calls that compute the shown texture, at most 80 columns.
 function call(projection: Projection, [width, height]: [number, number]) {
     const cube = layers(projection) === 6;
+    const format = '    format: "rgba16float",';
     const options = {
         cube: [],
         cubified: ["cubify: true,"],
         equirectangular: ['projection: "equirectangular",'],
-        upper: ['projection: "equirectangular",', "upperHalf: true,"],
         octahedral: ['projection: "octahedral",'],
         fisheye: ['projection: "fisheye",'],
+        sphere: ['projection: "sphere",'],
     }[projection];
     return [
         "const texture = device.createTexture({",
         `    size: [${width}, ${height}${cube ? ", 6" : ""}],`,
-        '    format: "rgba16float",',
+        format,
         "    usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,",
         "});",
         `const pass = await sky.${cube ? "createCubePass" : "createPanoramaPass"}({`,
         ...options.map((line) => `    ${line}`),
-        '    format: "rgba16float",',
+        format,
         "    samples: 8,",
         "    scaled: true, // half floats hold the night as finely as the day",
         "});",
@@ -709,8 +800,8 @@ let pipelines: { meter: GPUComputePipeline; display: GPUComputePipeline; layout:
 let metering: GPUBuffer | null = null;
 let sampler: GPUSampler | null = null;
 let noCube: GPUTexture | null = null;
-// Params: a mat3x3f, then nine scalars, padded to 16 bytes.
-const PARAMS_SIZE = 96;
+// Params: a mat3x3f, twelve scalars, then three vec3f with a scalar after each, padded to 16 bytes.
+const PARAMS_SIZE = 160;
 
 function setUp() {
     const device = gpuDevice();
@@ -787,23 +878,22 @@ function passFor(sky: SkyPass, projection: Projection) {
         pass =
             projection === "cube" || projection === "cubified"
                 ? sky.createCubePass({ ...options, cubify: projection === "cubified" })
-                : sky.createPanoramaPass({
-                      ...options,
-                      projection: projection === "upper" ? "equirectangular" : projection,
-                      upperHalf: projection === "upper",
-                  });
+                : sky.createPanoramaPass({ ...options, projection });
         made.set(projection, pass);
     }
     return pass;
 }
 
-let built: { texture: GPUTexture; projection: Projection; sky: Sky } | null = null;
+let built: { texture: GPUTexture; projection: Projection; sky: Sky; scale: number } | null = null;
 let building = false;
+// The sunlight where the observer is, in lux, for the disc, read back once per sky.
+let sunIlluminance: number[] = [0, 0, 0];
+let litBy: Sky | null = null;
 
-async function build(sky: Sky, projection: Projection, level: number) {
+async function build(sky: Sky, projection: Projection, size: Size) {
     building = true;
     const pass = await passFor(sky.pass, projection);
-    const [width, height] = sizeOf(projection, level);
+    const [width, height] = sizeOf(projection, size);
     const device = gpuDevice();
     const texture = device.createTexture({
         label: `sternwarte:projections:${projection}`,
@@ -814,8 +904,16 @@ async function build(sky: Sky, projection: Projection, level: number) {
     const encoder = device.createCommandEncoder({ label: "sternwarte:projections" });
     pass.encode(encoder, texture);
     device.queue.submit([encoder.finish()]);
+    // Only the chosen map at the chosen size is computed, again whenever the sky moves: how long it takes, as the sky
+    // figure tells its own, from the submit until the GPU is done.
+    const submitted = performance.now();
+    device.queue.onSubmittedWorkDone().then(() => {
+        const ms = performance.now() - submitted;
+        field("timing").textContent = `· computed in ${ms < 10 ? ms.toFixed(1) : Math.round(ms)}\u202fms`;
+    });
     built?.texture.destroy();
-    built = { texture, projection, sky };
+    // The scale it was written with, read now, before the sky moves on.
+    built = { texture, projection, sky, scale: sky.pass.skyViewScale };
     building = false;
     requestDraw();
 }
@@ -824,16 +922,29 @@ function draw() {
     const sky = currentSky();
     if (!sky) return;
     const projection = chosen("projection", "cube") as Projection;
-    const level = Number(chosen("budget", "0"));
-    const [wanted] = sizeOf(projection, level);
+    const size = chosenSize();
+    const [wanted] = sizeOf(projection, size);
     if (!built || built.sky !== sky || built.projection !== projection || built.texture.width !== wanted) {
-        if (!building) build(sky, projection, level);
+        if (!building) build(sky, projection, size);
         return;
+    }
+    if (litBy !== sky) {
+        litBy = sky;
+        sky.pass.sunIlluminance().then((lux) => {
+            sunIlluminance = [...lux];
+            requestDraw();
+        });
+    }
+    // Locked, the view looks where the Sun truly is.
+    if (pressed("lock")) {
+        const [x, y, z] = sky.sunDirection;
+        camera.yaw = Math.atan2(x, y);
+        camera.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, Math.asin(z)));
     }
     if (!pipelines || !panels || !sampler || !noCube || !metering) setUp();
     if (!pipelines || !panels || !sampler || !noCube || !metering) return;
     const device = gpuDevice();
-    const { texture } = built;
+    const { texture, scale } = built;
     const encoder = device.createCommandEncoder({ label: "sternwarte:projections" });
     let first = true;
     for (const name of ["flat", "inside"] as const) {
@@ -852,12 +963,23 @@ function draw() {
         floats.set([...r, 0, ...u, 0, ...f, 0]);
         uints.set([texture.width, texture.height, PROJECTIONS.indexOf(projection), name === "inside" ? 1 : 0], 12);
         uints.set([pressed("edges") ? 1 : 0, pressed("density") ? 1 : 0], 16);
-        floats[18] = evenTexelsPerSr(projection, level);
+        floats[18] = evenTexelsPerSr(projection, size);
         floats[19] = tx;
         floats[22] = ty;
         floats[23] = d;
         uints[20] = ["nearest", "linear", "cubic"].indexOf(chosen("filter", "nearest"));
         uints[21] = ["neutral", "agx", "aces", "clip"].indexOf(display.toneCurve);
+        uints[24] = pressed("grid") ? 1 : 0;
+        floats[25] = dpr;
+        floats[26] = (sky.sunAngularDiameter / 2) * DEG;
+        floats.set(sky.sunDirection, 28);
+        uints[31] = pressed("dither") ? 1 : 0;
+        floats.set(sky.apparentSun, 32);
+        uints[35] = pressed("sunDisc") ? 1 : 0;
+        floats.set(
+            sunIlluminance.map((lux) => lux * scale),
+            36,
+        );
         device.queue.writeBuffer(params, 0, data);
         const bindGroup = device.createBindGroup({
             layout: pipelines.layout,
@@ -893,16 +1015,16 @@ function draw() {
 
 function describe() {
     const projection = chosen("projection", "cube") as Projection;
-    const level = Number(chosen("budget", "0"));
-    const size = sizeOf(projection, level);
+    const dimensions = sizeOf(projection, chosenSize());
     stage("flat").style.setProperty("--aspect", String(ASPECT[projection]));
     find(".projections-legend", root).hidden = !pressed("density");
-    const { texels, above, ratio } = statsOf(projection, level);
-    const shape = layers(projection) === 6 ? `6 faces of ${size[0]}²` : `${size[0]} × ${size[1]}`;
+    const { texels, above, sampled, ratio } = statsOf(projection, chosenSize());
+    const shape = layers(projection) === 6 ? `6 faces of ${dimensions[0]}²` : `${dimensions[0]} × ${dimensions[1]}`;
+    const count = (n: number) => (n < 1e6 ? n.toLocaleString("en") : `${(n / 1e6).toFixed(1)} million`);
     field("info").textContent =
-        `${shape}, ${texels.toLocaleString("en")} texels, ${above.toLocaleString("en")} of them above the horizon; ` +
+        `${shape}, ${count(texels)} texels, ${sampled ? "about " : ""}${count(above)} of them above the horizon; ` +
         `the largest covers ${ratio.toFixed(2)} times the solid angle of the smallest`;
-    showCode(field("call"), call(projection, size));
+    showCode(field("call"), call(projection, dimensions));
 }
 
 const requestDraw = onDemand(draw, root);
@@ -912,19 +1034,13 @@ if (gpu.error) {
 } else {
     onSkyView(requestDraw);
     onDisplay(requestDraw);
-    // The full budget follows the environment figure's face size.
-    onEnvironment(() => {
-        if (Number(chosen("budget", "0")) !== FULL) return;
-        describe();
-        requestDraw();
-    });
     for (const input of root.querySelectorAll<HTMLInputElement>("input[type=radio]")) {
         input.addEventListener("change", () => {
             describe();
             requestDraw();
         });
     }
-    for (const name of ["edges", "density"]) {
+    for (const name of ["edges", "density", "lock", "grid", "dither", "sunDisc"]) {
         field(name).addEventListener("click", () => {
             field(name).setAttribute("aria-pressed", String(!pressed(name)));
             describe();
@@ -932,8 +1048,10 @@ if (gpu.error) {
         });
     }
     for (const name of ["flat", "inside"]) new ResizeObserver(requestDraw).observe(canvasOf(name));
-    lookAround(canvasOf("inside"), camera, { onChange: requestDraw });
-    bindFullscreen(field("fullscreen"), stage("inside"));
+    lookAround(canvasOf("inside"), camera, {
+        onChange: requestDraw,
+        onDrag: () => field("lock").setAttribute("aria-pressed", "false"),
+    });
     describe();
     requestDraw();
 }
