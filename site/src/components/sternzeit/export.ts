@@ -3,6 +3,7 @@
 // Nested panels (the locked views over the armillary sphere, the analemma over the sun path) are exported on their
 // own, not twice. Each file is signed with the moment and place it shows, unless marked `data-export-timeless`.
 
+import { icon } from "../icons";
 import { momentAndPlace, momentStamp } from "./state";
 
 // The properties the figures' CSS and Zdog set; inlined from the computed style, since the file carries no stylesheet.
@@ -217,8 +218,7 @@ for (const root of document.querySelectorAll<HTMLElement>("[data-export]")) {
     button.className = dark ? "svg-download as-seen" : "svg-download";
     button.title = "Download this panel as SVG";
     button.setAttribute("aria-label", button.title);
-    // A tray with an arrow down into it.
-    button.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v7.5M4.75 6.75 8 10l3.25-3.25M2.5 10v3.5h11V10"/></svg>`;
+    button.innerHTML = icon("download");
     button.addEventListener("click", (event) => {
         event.stopPropagation();
         download(root);

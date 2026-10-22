@@ -1,5 +1,6 @@
 ---
 import glossary from "../../data/glossary.json";
+import Icon from "../Icon.astro";
 import "./sternzeit.css";
 
 interface Props {
@@ -41,11 +42,7 @@ const heightSteps = [
         <span class="moment-title">Moment and place</span> <span class="note" data-field="summary"></span>
         {/* Inside the summary, so it is there while the set is folded away too; the click does not toggle it. */}
         <button type="button" data-field="copy" class="icon-button" title="Copy this moment and place as JSON" aria-label="Copy this moment and place as JSON">
-            <svg viewBox="0 0 16 16" aria-hidden="true"
-                ><rect x="5.5" y="5.5" width="8" height="8" rx="1.5" /><path
-                    d="M10.5 3.5v-1a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h1"
-                /></svg
-            >
+            <Icon name="copy" />
         </button>
     </summary>
     <div class="input-grid">
@@ -101,10 +98,7 @@ const heightSteps = [
             <input id={`${uid}-latitude`} data-field="latitude" class="latlong" type="number" />
             <button type="button" data-step="1" aria-label="Latitude, one step forward">+</button>
             <button type="button" data-field="geolocate" title="Use browser location" aria-label="Use browser location">
-                <svg viewBox="0 0 16 16" aria-hidden="true"
-                    ><path d="M8 14.5s5-4.6 5-8.2A5 5 0 0 0 3 6.3c0 3.6 5 8.2 5 8.2z" /><circle cx="8" cy="6.2" r="1.8"
-                    /></svg
-                >
+                <Icon name="locate" />
             </button>
         </span>
 

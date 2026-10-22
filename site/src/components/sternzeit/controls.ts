@@ -180,13 +180,16 @@ for (const root of roots) {
     latitude.addEventListener("input", commitLatLong);
     longitude.addEventListener("input", commitLatLong);
 
-    field("copy").addEventListener("click", async (event) => {
+    const copy = field("copy");
+    copy.addEventListener("click", async (event) => {
         // It sits inside the summary line, where a click would otherwise fold the set open or shut.
         event.preventDefault();
         const status = field("location");
         try {
             await navigator.clipboard.writeText(momentAndPlaceJson());
             status.textContent = "copied as JSON";
+            copy.toggleAttribute("data-copied", true);
+            setTimeout(() => copy.removeAttribute("data-copied"), 1500);
         } catch {
             status.textContent = "copying failed, this browser did not allow it";
         }

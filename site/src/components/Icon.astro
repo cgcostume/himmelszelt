@@ -1,0 +1,12 @@
+---
+/** One of the site's icons (see icons.ts), inline. */
+import { type IconName, icon } from "./icons";
+
+interface Props {
+    name: IconName;
+    class?: string;
+}
+const { name, class: extra } = Astro.props;
+---
+
+<Fragment set:html={icon(name, extra)} />

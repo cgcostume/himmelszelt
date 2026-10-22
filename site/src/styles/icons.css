@@ -1,0 +1,179 @@
+/* The site's icons (see icons.ts): a stroke of 1.4 on the 16 unit grid, 16 pixels, in the text's color. Their parts move
+   when what holds them is hovered, switched on (aria-pressed), opened (aria-expanded) or done (data-copied); each turns
+   or slides about its own middle. */
+.icon {
+    width: 16px;
+    height: 16px;
+    overflow: visible;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.icon * {
+    transform-box: fill-box;
+    transform-origin: center;
+}
+.icon :is(.solid, .morph) {
+    fill: currentColor;
+    stroke: none;
+}
+.icon :is(.spin, .spin22) {
+    transition: transform 0.6s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+:hover > .icon .spin {
+    transform: rotate(45deg);
+}
+:hover > .icon .spin22 {
+    transform: rotate(22.5deg);
+}
+.icon .close-in {
+    transition: transform 0.35s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+:hover > .icon .close-in,
+[aria-pressed="true"] > .icon .close-in {
+    transform: scale(0.84);
+}
+.icon .fill-on {
+    transition: fill 0.2s;
+}
+[aria-pressed="true"] > .icon .fill-on {
+    fill: currentColor;
+}
+/* Options: the knobs slide, the rails either side of each grow and shrink with them. */
+.icon :is(.l, .r) {
+    transition: transform 0.35s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+:hover > .icon .l {
+    transform: translateX(-3px);
+}
+:hover > .icon .r {
+    transform: translateX(3px);
+}
+.icon :is(.grow-a, .grow-b, .shrink-a, .shrink-b) {
+    transition: stroke-dasharray 0.35s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.icon :is(.grow-a, .grow-b) {
+    stroke-dasharray: 0.8 30;
+}
+.icon :is(.shrink-a, .shrink-b) {
+    stroke-dasharray: 5.8 30;
+}
+:hover > .icon :is(.grow-a, .grow-b) {
+    stroke-dasharray: 3.8 30;
+}
+:hover > .icon :is(.shrink-a, .shrink-b) {
+    stroke-dasharray: 2.8 30;
+}
+@keyframes icon-drop {
+    0%,
+    100% {
+        transform: none;
+    }
+    45% {
+        transform: translateY(2px);
+    }
+    70% {
+        transform: translateY(-0.5px);
+    }
+}
+:hover > .icon .drop {
+    animation: icon-drop 0.55s ease-out;
+}
+/* Full screen: the corners reach out, and turn inward once it is on. */
+.icon :is(.tl, .tr, .bl, .br) {
+    transition: transform 0.3s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+:hover > .icon .tl {
+    transform: translate(-1px, -1px);
+}
+:hover > .icon .tr {
+    transform: translate(1px, -1px);
+}
+:hover > .icon .bl {
+    transform: translate(-1px, 1px);
+}
+:hover > .icon .br {
+    transform: translate(1px, 1px);
+}
+[aria-pressed="true"] > .icon :is(.tl, .tr, .bl, .br) {
+    transform: rotate(180deg);
+}
+.icon .nudge {
+    transition: transform 0.3s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+:hover > .icon .nudge {
+    transform: translate(1px, -1px);
+}
+.icon :is(.body, .check) {
+    transition: opacity 0.2s;
+}
+.icon .check,
+[data-copied] > .icon .body {
+    opacity: 0;
+}
+[data-copied] > .icon .check {
+    opacity: 1;
+}
+@keyframes icon-pulse {
+    0% {
+        transform: scale(0.6);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1.5);
+        opacity: 0;
+    }
+}
+.icon .pulse {
+    opacity: 0;
+}
+:hover > .icon .pulse {
+    animation: icon-pulse 0.9s ease-out;
+}
+/* The padlock's shackle swings open while off. */
+.icon .shackle {
+    transition: transform 0.35s cubic-bezier(0.3, 1.5, 0.5, 1);
+    transform-origin: 100% 100%;
+}
+[aria-pressed="false"] > .icon .shackle {
+    transform: translateY(-1.5px) rotate(20deg);
+}
+[aria-pressed="false"]:hover > .icon .shackle {
+    transform: translateY(-0.5px) rotate(6deg);
+}
+@keyframes icon-flash {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    30% {
+        opacity: 0.1;
+    }
+    60% {
+        opacity: 1;
+    }
+}
+:hover > .icon .flash {
+    animation: icon-flash 0.6s;
+}
+/* The menu's two lines fold into a cross while it is open. */
+.icon :is(.fold-a, .fold-b) {
+    transition: transform 0.3s;
+}
+[aria-expanded="true"] > .icon .fold-a {
+    transform: translateY(2px) rotate(45deg);
+}
+[aria-expanded="true"] > .icon .fold-b {
+    transform: translateY(-2px) rotate(-45deg) scaleX(1.6);
+}
+@media (prefers-reduced-motion: reduce) {
+    /* No motion at all, whatever started it. */
+    .icon * {
+        /* biome-ignore lint/complexity/noImportantStyles: over every animation above */
+        animation: none !important;
+        /* biome-ignore lint/complexity/noImportantStyles: over every transition above */
+        transition: none !important;
+    }
+}

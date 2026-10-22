@@ -428,43 +428,30 @@
 :root[data-theme="light"] .scattering-spectrum {
     filter: saturate(1.8) brightness(0.75);
 }
-/* An icon in place of a switch's word, as tall as the words beside it. */
-.sky-icon {
-    display: grid;
-    place-items: center;
-    align-self: stretch;
-}
-.sky-icon svg {
-    width: 14px;
-    height: 14px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.4;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-.sky-icon:not([aria-pressed="true"]) .sky-exit,
-.sky-icon[aria-pressed="true"] .sky-enter {
-    display: none;
-}
 /* The frame every view into the sky shares (see SkyFrame.astro). Its controls are in the view, so they go full screen
-   with it; --sky-foot is the room the time slider takes at the view's foot there. */
+   with it; --sky-foot is the room the time slider takes at the view's foot there. They sit on frosted glass in the page's
+   own theme, also over a view that stays dark, so they take the page's colors back from the overlay tokens. */
 .sky-stage {
     position: relative;
 }
-.sky-stage .view-toggle {
-    position: static;
-}
-/* Play's triangle, split in two, folds into pause's two bars and back (see skyframe.ts). */
-.sky-icon .sky-play path {
-    fill: currentColor;
-    stroke: none;
+.sky-bar,
+.sky-options,
+.sky-height,
+.sky-stage:fullscreen > .sky-time {
+    --bg: var(--overlay-solid);
+    --surface: var(--overlay-surface);
+    --line: var(--overlay-line);
+    --text: var(--overlay-ink);
+    --muted: var(--overlay-quiet);
+    --accent: var(--overlay-accent);
+    --border: 1px solid var(--line);
+    color: var(--text);
 }
 .sky-bar {
     position: absolute;
-    top: 6px;
-    right: 6px;
-    left: 6px;
+    top: 8px;
+    right: 8px;
+    left: 8px;
     z-index: 5;
     display: flex;
     gap: 6px;
@@ -472,49 +459,88 @@
     justify-content: space-between;
     pointer-events: none;
 }
-.sky-bar-start,
-.sky-bar-end {
+.sky-bar-start {
     display: flex;
     gap: 6px;
-    align-items: stretch;
+    align-items: center;
     min-width: 0;
+}
+/* The buttons, a capsule of glass for each end of the bar, round buttons inside it. */
+.sky-group-buttons {
+    display: flex;
+    flex: none;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 999px;
+    background: var(--overlay-glass);
+    backdrop-filter: var(--overlay-filter);
     pointer-events: auto;
 }
 .sky-hint {
-    align-self: center;
-    margin: 0 0 0 0.35rem;
+    min-width: 0;
+    margin: 0;
+    padding: 0.45rem 0.85rem;
     overflow: hidden;
-    color: var(--muted);
+    border-radius: 999px;
+    background: var(--overlay-glass);
+    backdrop-filter: var(--overlay-filter);
+    color: var(--text);
     white-space: nowrap;
     text-overflow: ellipsis;
-    pointer-events: none;
 }
-/* The observer's height up the left edge, as a y axis: a decade a mark beside the rail, its value beside the thumb. The slider is
-   a horizontal one turned upright, as long as its rail is high. */
+/* A disc behind the icon shows hover and on; a press shrinks the disc alone, the icon stays where it is. */
+.sky-icon {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--text);
+    transition: color 0.15s;
+}
+.sky-icon::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--disc, transparent);
+    transition:
+        background 0.15s,
+        transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.sky-icon:hover {
+    --disc: var(--overlay-hover);
+}
+.sky-icon:active::before {
+    transform: scale(0.82);
+    transition-duration: 0.08s;
+}
+.sky-icon[aria-pressed="true"] {
+    --disc: var(--overlay-tint);
+    color: var(--accent);
+}
+.sky-icon .icon {
+    width: 18px;
+    height: 18px;
+    stroke-width: 1.1;
+}
+/* The observer's height up the left edge, as a y axis: a bare rail filled in the accent below the value, frosted above
+   it, the value itself the thumb, a decade a mark beside it. The slider is a horizontal one turned upright, its own thumb
+   hidden under the value. */
 .sky-height {
     position: absolute;
-    top: 40px;
+    top: 60px;
     bottom: calc(1rem + var(--sky-foot, 0px));
-    left: 6px;
+    left: 26px;
     z-index: 4;
     display: flex;
     font-size: var(--text-small);
-}
-/* The height itself beside the thumb, over the marks it passes. */
-.sky-height output {
-    position: absolute;
-    bottom: calc(9px + var(--at, 0) * (100% - 18px));
-    left: calc(100% + 0.2rem);
-    z-index: 1;
-    transform: translateY(50%);
-    padding: 0.05rem 0.3rem;
-    border-radius: var(--radius-small);
-    background: color-mix(in srgb, var(--bg) 85%, transparent);
-    color: var(--accent);
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    line-height: 1.2;
-    white-space: nowrap;
 }
 .sky-height-rail {
     position: relative;
@@ -530,12 +556,54 @@
     margin: 0;
     transform: translate(-50%, -50%) rotate(-90deg);
 }
+.sky-stage :is(.sky-height, .sky-time) input::-webkit-slider-runnable-track {
+    height: 3px;
+    border-radius: 2px;
+    background:
+        linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) 3px no-repeat,
+        var(--overlay-glass);
+}
+.sky-stage :is(.sky-height, .sky-time) input::-moz-range-track {
+    height: 3px;
+    border-radius: 2px;
+    background:
+        linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) 3px no-repeat,
+        var(--overlay-glass);
+}
+.sky-stage :is(.sky-height, .sky-time) input::-webkit-slider-thumb {
+    opacity: 0;
+}
+.sky-stage :is(.sky-height, .sky-time) input::-moz-range-thumb {
+    opacity: 0;
+}
+/* The value, a capsule in the accent as the rail's filled part, centred on the rail at the thumb; clicks go through it. */
+.sky-height output,
+.sky-time:where(.sky-stage:fullscreen > *) output {
+    position: absolute;
+    z-index: 1;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--bg);
+    font: 500 var(--text-small) / 1.2 var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    pointer-events: none;
+}
+.sky-height output {
+    bottom: calc(9px + var(--at, 0) * (100% - 18px));
+    left: 50%;
+    transform: translate(-50%, 50%);
+}
 .sky-height-scale {
     position: absolute;
-    inset: 9px auto 9px 100%;
-    color: var(--muted);
+    inset: 9px auto 9px calc(100% + 4px);
+    color: var(--render-ink);
     font-family: var(--font-mono);
     line-height: 1;
+    text-shadow:
+        0 0 3px var(--render-shade),
+        0 0 6px var(--render-shade);
     pointer-events: none;
 }
 .sky-height-mark {
@@ -544,28 +612,30 @@
     left: 0.3rem;
     transform: translateY(50%);
     white-space: nowrap;
-    text-shadow: 0 0 4px oklch(0 0 0);
 }
 .sky-height-tick {
     width: 4px;
     height: 1px;
     background: currentColor;
+    box-shadow: 0 0 2px var(--render-shade);
 }
-/* The view's further options, in named groups, over its right side under the buttons; folded away by one of them. */
+/* The view's further options, in named groups, over its right side under the buttons, on the same glass; folded away by
+   one of them, kept narrow. A group's items are indented under its name. A switch has a ring before it, a dot in it while
+   on; a choice of several is a row of tabs, the chosen one underlined in the accent. */
 .sky-options {
     position: absolute;
-    top: 40px;
-    right: 6px;
+    top: 54px;
+    right: 8px;
     z-index: 5;
     display: grid;
-    gap: 0.5rem;
-    max-width: min(24rem, calc(100% - 6rem));
-    max-height: calc(100% - 46px - var(--sky-foot, 0px));
+    gap: 0.6rem;
+    max-width: min(19rem, calc(100% - 6rem));
+    max-height: calc(100% - 62px - var(--sky-foot, 0px));
     overflow: auto;
-    padding: 0.5rem 0.6rem;
-    border-radius: var(--radius-small);
-    background: color-mix(in srgb, var(--bg) 78%, transparent);
-    backdrop-filter: blur(6px);
+    padding: 0.6rem 0.75rem 0.75rem;
+    border-radius: 14px;
+    background: var(--overlay-glass);
+    backdrop-filter: var(--overlay-filter);
     font-size: var(--text-small);
 }
 .sky-options[hidden] {
@@ -573,21 +643,97 @@
 }
 .sky-group {
     display: grid;
-    gap: 0.25rem;
+    gap: 0.3rem;
 }
-.sky-group-name {
-    color: var(--accent);
+.sky-group-name,
+.sky-options .steps-heading {
+    color: var(--muted);
+    font-family: inherit;
+    font-weight: 500;
 }
+/* A group's switches, or the options of its choice, side by side, wrapping in the narrow panel. */
 .sky-group-items {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 2px 4px;
     align-items: center;
+    padding-left: 0.75rem;
+}
+/* Switches, though, one a row. */
+.sky-group-items:has(> .view-toggle) {
+    flex-direction: column;
+    align-items: flex-start;
 }
 .sky-group-items label {
     display: flex;
     gap: 0.4rem;
     align-items: center;
+}
+.sky-options .view-toggle {
+    position: static;
+    display: inline-flex;
+    gap: 5px;
+    align-items: center;
+    height: auto;
+    padding: 3px 9px 3px 5px;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--muted);
+    transition:
+        background 0.15s,
+        color 0.15s;
+}
+.sky-options .view-toggle::before {
+    content: "";
+    flex: none;
+    width: 12px;
+    height: 12px;
+    box-sizing: border-box;
+    border: 1.2px solid currentColor;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--accent) 2.4px, transparent 2.9px) center / 0 0 no-repeat;
+    transition: background-size 0.2s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.sky-options .view-toggle:hover {
+    background: var(--overlay-hover);
+    color: var(--text);
+}
+.sky-options .view-toggle[aria-pressed="true"] {
+    color: var(--text);
+}
+.sky-options .view-toggle[aria-pressed="true"]::before {
+    border-color: var(--accent);
+    background-size: 100% 100%;
+}
+.sky-options .steps {
+    align-items: center;
+}
+.sky-options .steps-heading {
+    margin: 0 0.2rem 0 0.4rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    opacity: 1;
+}
+.sky-options .steps label span {
+    margin: 0;
+    padding: 3px 7px;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--muted);
+    box-shadow: inset 0 -1px 0 color-mix(in oklab, var(--text) 18%, transparent);
+    transition:
+        color 0.15s,
+        box-shadow 0.15s;
+}
+.sky-options .steps label:hover span {
+    color: var(--text);
+}
+.sky-options .steps label:has(:checked) span {
+    color: var(--accent);
+    box-shadow: inset 0 -2px 0 var(--accent);
 }
 .sky-ev input {
     width: 7rem;
@@ -603,7 +749,8 @@
     max-width: 100%;
     margin-inline: auto;
 }
-/* Full screen, the view fills the screen, whatever its aspect, and the time slider floats over its foot. */
+/* Full screen, the view fills the screen, whatever its aspect, and the time slider lies bare over its foot as the height
+   does up its side: the value the thumb, the marks on a halo. */
 .sky-stage:fullscreen {
     --sky-foot: 3.5rem;
     background: oklch(0 0 0);
@@ -614,19 +761,30 @@
     aspect-ratio: auto;
     border-radius: 0;
 }
-.sky-stage:fullscreen > .figure-slider {
+.sky-stage:fullscreen > .sky-time {
     position: absolute;
     right: 1.5rem;
-    bottom: 0.5rem;
+    bottom: 0.75rem;
     left: 1.5rem;
     z-index: 6;
     width: auto;
     max-width: 50rem;
     margin: 0 auto;
-    padding: 0.45rem 0.75rem 0.2rem;
-    border-radius: var(--radius-small);
-    background: color-mix(in srgb, var(--bg) 75%, transparent);
-    backdrop-filter: blur(6px);
+}
+.sky-stage:fullscreen > .sky-time > .note {
+    display: none;
+}
+.sky-stage:fullscreen > .sky-time .figure-slider-scale {
+    color: var(--render-ink);
+    text-shadow:
+        0 0 3px var(--render-shade),
+        0 0 6px var(--render-shade);
+}
+.sky-time:where(.sky-stage:fullscreen > *) output {
+    top: 9px;
+    left: calc(9px + var(--at, 0.5) * (100% - 18px));
+    min-width: 0;
+    transform: translate(-50%, -50%);
 }
 /* The figure's readouts and code under a wide view keep to the text's width. */
 .scene-frame.wide > .lut-call {

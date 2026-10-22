@@ -845,6 +845,24 @@ g.eclipse-corona {
 .icon-button:hover {
     color: var(--accent);
 }
+/* Over a figure, the download is a disc of the frame's glass in the page's own theme (see SkyFrame.astro). */
+.svg-download {
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--overlay-glass);
+    backdrop-filter: var(--overlay-filter);
+    color: var(--overlay-ink);
+}
+.svg-download:hover {
+    color: var(--overlay-accent);
+}
+.svg-download .icon {
+    width: 16px;
+    height: 16px;
+    stroke-width: 1.2;
+}
 .svg-download svg,
 .icon-button svg,
 .calendar-lock svg {

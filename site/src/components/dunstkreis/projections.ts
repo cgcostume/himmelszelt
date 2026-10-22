@@ -619,7 +619,7 @@ function directionOf(projection: Projection, layer: number, u: number, v: number
     }
 }
 
-type Stats = { texels: number; above: number; ratio: number };
+type Stats = { texels: number; above: number; ratio: number; sampled: boolean };
 const statsCache = new Map<string, Stats>();
 
 /** Texels in all, above the horizon, and the largest's solid angle over the smallest's, of the texels wholly inside. */

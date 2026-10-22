@@ -30,7 +30,6 @@ const SIZE = {
     figure: "projections",
     name: "budget",
     label: "Size",
-    heading: "size",
     title: "XS to L about as many texels in each projection, to compare them; HD and UHD the sizes maps commonly come in",
     options: [
         ["xs", "XS", "About 400 texels"],
@@ -46,7 +45,6 @@ const FILTER = {
     figure: "projections",
     name: "filter",
     label: "Filter",
-    heading: "filter",
     title: "Texel by texel, bilinear by the hardware's sampler as a renderer reads it, or bicubic",
     options: [
         ["nearest", "nearest"],
@@ -73,12 +71,16 @@ const FILTER = {
             <span>4 times sparser</span><span class="projections-ramp" aria-hidden="true"></span><span>4 times denser</span>
         </p>
         <Fragment slot="options">
-            <OptionGroup name="texture">
+            <OptionGroup name="projection">
                 <Choice {...PROJECTION} />
+            </OptionGroup>
+            <OptionGroup name="size">
                 <Choice {...SIZE} />
             </OptionGroup>
-            <OptionGroup name="shown">
+            <OptionGroup name="filtering">
                 <Choice {...FILTER} />
+            </OptionGroup>
+            <OptionGroup name="shown">
                 <button type="button" class="view-toggle" data-field="sunDisc" aria-pressed="true" title="Draw the Sun's disc over the view from inside, pixel by pixel, as the sky figure does: never stored in the texture, where it would be one bright texel">sun disc</button>
                 <button type="button" class="view-toggle" data-field="edges" aria-pressed="true" title="Outline every texel in the view from inside">texel edges</button>
                 <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="Dither the 8-bit output by a step of noise, against banding in the sky's smooth gradients">dither</button>

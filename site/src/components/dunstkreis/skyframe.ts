@@ -28,7 +28,7 @@ onChange(() => {
 // Play's two halves of the triangle and pause's two bars, four corners each in the same order, so one folds into the
 // other corner by corner, as YouTube's button does.
 const PLAY = [
-    [4, 2.5, 8.5, 5.25, 8.5, 10.75, 4, 13.5],
+    [4, 2.5, 9, 5.556, 9, 10.444, 4, 13.5],
     [8.5, 5.25, 13, 8, 13, 8, 8.5, 10.75],
 ];
 const PAUSE = [
@@ -50,6 +50,8 @@ function morph(button: Element) {
             const points = (PLAY[i] ?? []).map((p, k) => p + ((PAUSE[i]?.[k] ?? p) - p) * ease);
             const corners = [0, 2, 4, 6].map((k) => `${points[k]?.toFixed(3)} ${points[k + 1]?.toFixed(3)}`);
             path.setAttribute("d", `M${corners.join("L")}Z`);
+            // Paused, the bars snap to whole pixels, so both come out equally wide.
+            path.setAttribute("shape-rendering", t === 1 ? "crispEdges" : "auto");
         });
     };
     const step = (now: number) => {
@@ -79,6 +81,8 @@ export function skyFrames() {
         const field = <T extends HTMLElement = HTMLElement>(name: string) => find<T>(`[data-field="${name}"]`, frame);
 
         const height = field<HTMLInputElement>("height");
+        const offset = field<HTMLInputElement>("offset");
+        const time = offset.closest<HTMLElement>("[data-offset]");
         const heightValue = field("heightValue");
         height.addEventListener("input", () => update({ heightM: heightOf(Number(height.value)) }, height));
         const playButton = field("play");
@@ -89,6 +93,9 @@ export function skyFrames() {
             paintRange(height);
             heightValue.textContent = meters(Math.round(state.heightM));
             heightValue.style.setProperty("--at", String(Number(height.value) / 1000));
+            // How far along the time slider is, for its value riding the rail in full screen.
+            const span = Number(offset.max) - Number(offset.min);
+            time?.style.setProperty("--at", String((Number(offset.value) - Number(offset.min)) / span));
             playButton.setAttribute("aria-pressed", String(state.animate));
             playButton.setAttribute("aria-label", state.animate ? "Pause" : "Play");
             fold(state.animate);

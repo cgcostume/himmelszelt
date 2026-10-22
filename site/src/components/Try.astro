@@ -1,4 +1,6 @@
 ---
+import Icon from "./Icon.astro";
+
 /**
  * One experiment at the end of a figure's caption: a link that sets the moment and the place (see state.ts), named by
  * `label`, and what the figure then shows, in the slot. `set` is the link's query without the "?", `fig` the figure's
@@ -13,10 +15,7 @@ const { label, set, fig } = Astro.props;
 ---
 
 <span class="figure-try"
-    ><svg viewBox="0 0 16 16" aria-hidden="true"
-        ><path d="M8 1.75a4.25 4.25 0 0 0-2.5 7.7c.45.33.75.8.75 1.35v.7h3.5v-.7c0-.55.3-1.02.75-1.35A4.25 4.25 0 0 0 8 1.75ZM6.5 13.75h3"
-        ></path></svg
-    ><a href={`?${set}#${fig}`}>{label}</a>: <slot /></span
+    ><Icon name="bulb" /><a href={`?${set}#${fig}`}>{label}</a>: <slot /></span
 >
 
 <style>
@@ -27,7 +26,7 @@ const { label, set, fig } = Astro.props;
         margin-top: 0.4em;
         color: var(--text);
     }
-    svg {
+    .figure-try > :global(.icon) {
         width: 1.1em;
         height: 1.1em;
         margin-right: 0.3em;

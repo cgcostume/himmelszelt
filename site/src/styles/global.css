@@ -88,6 +88,25 @@
 :root[data-theme="light"] .as-seen {
     --accent: color-mix(in oklab, var(--cyanometer), white 45%);
 }
+/* Controls over a figure (see SkyFrame.astro): frosted glass in the page's own theme, over a figure that stays dark
+   (.as-seen) too, so declared on the root alone and inherited from there. */
+:root {
+    --overlay-glass: color-mix(in oklab, var(--bg) 68%, transparent);
+    --overlay-filter: blur(20px) saturate(1.2) brightness(1.05);
+    --overlay-ink: var(--text);
+    --overlay-quiet: color-mix(in oklab, var(--text) 70%, transparent);
+    --overlay-accent: var(--accent);
+    --overlay-on-accent: var(--bg);
+    --overlay-solid: var(--bg);
+    --overlay-surface: var(--surface);
+    --overlay-line: var(--line);
+    --overlay-hover: color-mix(in oklab, var(--text) 9%, transparent);
+    --overlay-tint: color-mix(in oklab, var(--accent) 16%, color-mix(in oklab, var(--bg) 70%, transparent));
+    --overlay-shade: var(--shadow);
+    /* Marks drawn straight onto a render: white, lifted off it by a dark halo, on either page. */
+    --render-ink: oklch(1 0 0 / 0.92);
+    --render-shade: oklch(0.2 0.02 266 / 0.55);
+}
 /* Without specificity, so whatever colors an element inside, or the element itself, still does. */
 :where(:root[data-theme="light"] .as-seen) {
     color: var(--text);
