@@ -536,7 +536,7 @@
 .sky-icon .icon {
     width: 18px;
     height: 18px;
-    stroke-width: 0.95;
+    stroke-width: 0.85;
 }
 /* The observer's height up the left edge, as a y axis: a bare rail filled in the accent below the value, frosted above
    it, the value itself the thumb, a decade a mark beside it. The slider is a horizontal one turned upright, its own thumb
