@@ -6,7 +6,7 @@ import OptionGroup from "./OptionGroup.astro";
 import SkyFrame from "./SkyFrame.astro";
 import "./dunstkreis.css";
 
-// The choices over the scene, in its options' groups: what it shows, how it is lit, and how finely it is sampled.
+// The choices over the scene, in its options' groups: what lies behind it, how it is lit, and how finely it is sampled.
 const GROUPS = {
     background: {
         label: "Background",
@@ -16,15 +16,6 @@ const GROUPS = {
             ["sky map", "sky map"],
         ],
         checked: "atmosphere",
-    },
-    ground: {
-        label: "Ground",
-        title: "Under the solids: a round floor of their own, lit like them and fading out, or the backdrop's own ground with their shadows taken out of it",
-        options: [
-            ["floor", "floor"],
-            ["backdrop", "backdrop"],
-        ],
-        checked: "backdrop",
     },
     bloom: {
         label: "Bloom",
@@ -77,30 +68,33 @@ const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
 ---
 
 <figure class="scene-frame wide" id="lighting">
-    <SkyFrame locked={false} hint="Drag to turn around, scroll to move closer or far out. Raytraced with WebGPU." lockTitle="Look towards the Sun, the solids against its light; dragging lets go" gridTitle="The compass directions on the horizon">
+    <SkyFrame locked={false} hint="Drag to turn around, scroll to move closer or far out. Raytraced with WebGPU." lockTitle="Look towards the Sun, the solids against its light; dragging lets go" grid={false}>
         <canvas data-field="canvas" aria-label="The five Platonic solids and a sphere, lit by the sky and the Sun at the chosen moment and place"></canvas>
-        <div class="sky-compass" data-field="compass"></div>
+        <div class="sky-compass" data-field="compassLabels"></div>
         <Fragment slot="options">
-            <OptionGroup name="scene">
+            <OptionGroup name="background">
                 <Choice {...group("background")} />
-                <Choice {...group("ground")} />
-                <button type="button" class="view-toggle" data-field="rotate" aria-pressed="false" title="Turn the solids slowly, and send them round the sphere on slightly tilted orbits">rotate</button>
+                <button type="button" class="view-toggle" data-field="sunDisc" aria-pressed="true" title="Draw the Sun's disc in the background">sun disc</button>
             </OptionGroup>
             <OptionGroup name="light">
                 <button type="button" class="view-toggle" data-field="sunLight" aria-pressed="true" title="Light the solids by the Sun directly, with its shadows">sunlight</button>
                 <button type="button" class="view-toggle" data-field="skyLight" aria-pressed="true" title="Light the solids by the sky, image-based, from the nine coefficients of the sky map">sky light</button>
-                <button type="button" class="view-toggle" data-field="sunDisc" aria-pressed="true" title="Draw the Sun's disc in the background">sun disc</button>
                 <Choice {...group("bloom")} />
             </OptionGroup>
-            <OptionGroup name="rays">
+            <OptionGroup name="samples per pixel">
                 {SAMPLING.map((choice) => <Choice {...choice} />)}
             </OptionGroup>
             <OptionGroup name="sky map">
                 <button type="button" class="view-toggle" data-cubify aria-pressed="false" title="The sky map as the environment figure builds it: cubified, its texels spread evenly over the sphere, sampled through the inverse mapping. The same switch as there">cubified</button>
                 <button type="button" class="view-toggle" data-scaled aria-pressed="false" title="The sky map as the environment figure builds it: scaled, times a power of two that follows the Sun, divided by it again here. The same switch as there">scaled</button>
             </OptionGroup>
-            <OptionGroup name="display">
+            <OptionGroup name="solids">
+                <button type="button" class="view-toggle" data-field="rotate" aria-pressed="false" title="Turn the solids slowly, and send them round the sphere on slightly tilted orbits">rotate</button>
+            </OptionGroup>
+            <OptionGroup name="HDR (× SDR white)">
                 <Hdr figure="lighting" />
+            </OptionGroup>
+            <OptionGroup name="display">
                 <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="Dither the 8-bit output by a step of blue noise, against banding in smooth gradients">dither</button>
             </OptionGroup>
         </Fragment>
@@ -110,8 +104,8 @@ const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
         The five Platonic solids, on a pentagon around a sphere, lit by the sky above: the Sun as a light of its own, with its
         shadows, soft from rays spread over its disc, and the sky's light from its nine coefficients, dimmed where the
         solids hide the sky. Raytraced, not a triangle in it, four rays per pixel. Every surface is white but the
-        ground, a darker gray; the colors are the light's. The ground is either a round floor of their own or
-        the backdrop's own ground below the horizon with their shadows taken out of it.
+        ground, a darker gray; the colors are the light's. The ground is the backdrop's own below the horizon, with
+        their shadows taken out of it.
         Exposed like the sky.
     </figcaption>
 </figure>

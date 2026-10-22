@@ -104,10 +104,8 @@ export type SceneOptions = {
     seconds?: number;
     shadowRays?: number;
     background?: GPUTexture | null;
-    groundRadius?: number;
     sunLight?: boolean;
     skyLight?: boolean;
-    ground?: "floor" | "backdrop";
     bloom?: number;
     godRaySamples?: number;
     airDensity?: number;
@@ -163,10 +161,9 @@ export function createScene(device: GPUDevice) {
          * Records the scene into `target` (rgba8unorm, or rgba16float for an HDR canvas, storage). `camera` orbits the scene's center: yaw from north
          * through east, pitch, distance, vertical field of view, all angles in radians. `seconds` turns the solids and
          * moves them along their orbits. `shadowRays` over the sun disc, 8 or 64 for soft shadows, 0 for none, anything else for hard ones. `background`, a texture of the target's size
-         * holding the sky in cd/m² through the same camera, replaces the sky map behind the solids. `cubified` for a sky map written cubified, `skyScale` for one written scaled, which its light and coefficients are divided by. `groundRadius`, in
-         * scene units, sizes the round ground, which fades out over its outer half. `sunLight` and `skyLight`, both on
-         * by default, switch the direct sunlight and the sky's light from the coefficients. `ground` is "floor" by
-         * default, a round floor of the scene's own; "backdrop" shows the backdrop's ground with the solids' shadows.
+         * holding the sky in cd/m² through the same camera, replaces the sky map behind the solids. `cubified` for a sky map written cubified, `skyScale` for one written scaled, which its light and coefficients are divided by. The ground is
+         * the backdrop's own, with the solids' shadows taken out of it. `sunLight` and `skyLight`, both on
+         * by default, switch the direct sunlight and the sky's light from the coefficients.
          * `bloom`, 0 to 1, how strong the sun's veil is, `godRaySamples`, 8 or 64, haze lit by the sun
          * with the solids' shadows through it, 0 for none. `airDensity` and `hazeDensity`, around the camera relative to
          * the ground's, 1 by default, thin the veil and the haze. `discDirection` and `discIlluminance`, the sun as the
@@ -198,9 +195,7 @@ export function createScene(device: GPUDevice) {
             data.set(centers(seconds), 84);
             flags[108] = rest.shadowRays ?? 0;
             flags[109] = rest.background ? 1 : 0;
-            data[110] = rest.groundRadius ?? 36;
             flags[111] = (rest.sunLight === false ? 0 : 1) | (rest.skyLight === false ? 0 : 2);
-            flags[112] = rest.ground === "backdrop" ? 1 : 0;
             data[113] = rest.bloom ?? 0;
             flags[114] = rest.godRaySamples ?? 0;
             data[115] = rest.airDensity ?? 1;

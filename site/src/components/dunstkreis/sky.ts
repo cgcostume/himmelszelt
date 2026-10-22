@@ -73,7 +73,10 @@ export function skyFigure(root: HTMLElement) {
     const maybe = <T extends HTMLElement = HTMLElement>(name: string) =>
         root.querySelector<T>(`[data-field="${name}"]`);
     const canvas = field<HTMLCanvasElement>("canvas");
-    const compass = field("compass");
+    const compass = field("compassLabels");
+    // Off, the compass, or the compass with the grid (see skyframe.ts).
+    const marks = () => Number(field("marks").dataset.level);
+    field("marks").addEventListener("click", () => requestRender());
     // A switch's state, or what the figure without it is fixed to: everything on, the refraction the page's.
     const PRESET: Record<string, () => boolean> = { refraction: () => quality.refraction };
     const pressed = (name: string) =>
@@ -153,7 +156,7 @@ export function skyFigure(root: HTMLElement) {
     );
 
     function placeCompass(basis: Basis, width: number, height: number) {
-        compass.hidden = !pressed("grid");
+        compass.hidden = marks() < 1;
         labels.forEach((label, i) => {
             const at = project([Math.sin(i * 45 * DEG), Math.cos(i * 45 * DEG), 0], basis, width, height);
             label.hidden = at === null;
@@ -203,7 +206,7 @@ export function skyFigure(root: HTMLElement) {
             `sky ${skyMs.toFixed(2)} ms · GPU done after ${doneMs.toFixed(2)} ms`;
         gpu.device.queue.onSubmittedWorkDone().then(() => {
             const timing = maybe("timing");
-            if (timing) timing.textContent = pressed("grid") ? text(performance.now() - submitted) : "";
+            if (timing) timing.textContent = marks() === 2 ? text(performance.now() - submitted) : "";
         });
     }
 
@@ -222,7 +225,7 @@ export function skyFigure(root: HTMLElement) {
         const sunAngularDiameter = sun.apparentAngularDiameter(julianEphemerisDay(time));
         const astronomyMs = performance.now() - started;
 
-        const debugGrid = pressed("grid");
+        const debugGrid = marks() === 2;
         // The figure with every option follows the page's display choices; the other shows SDR, Neutral, as a reader meets it.
         const { format, headroom } = full ? displayOutput() : { format: SDR, headroom: 1 };
         // Half floats need no dither: their steps are far finer than 8 bits'.
@@ -324,7 +327,7 @@ export function skyFigure(root: HTMLElement) {
                 slider.value = String(-ev100);
                 paintRange(slider);
             }
-            ev.textContent = `EV\u202f${ev100.toFixed(1)} metered`;
+            ev.textContent = ev100.toFixed(1);
         });
     }
 
@@ -342,16 +345,7 @@ export function skyFigure(root: HTMLElement) {
         });
         new ResizeObserver(requestRender).observe(canvas);
         maybe("exposure")?.addEventListener("input", requestRender);
-        for (const name of [
-            "auto",
-            "ramp",
-            "lock",
-            "grid",
-            "refraction",
-            "dither",
-            ...INGREDIENTS,
-            ...Object.keys(ORDERS),
-        ]) {
+        for (const name of ["auto", "ramp", "lock", "refraction", "dither", ...INGREDIENTS, ...Object.keys(ORDERS)]) {
             maybe(name)?.addEventListener("click", async () => {
                 field(name).setAttribute("aria-pressed", String(!pressed(name)));
                 // The environment and the lighting figure take their exposure from this meter: rebuilt with it.

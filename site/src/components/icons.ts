@@ -6,11 +6,14 @@ const CHECK = '<path class="check" d="M3 8.5l3 3 7-7"/>';
 
 export const ICONS = {
     /** The view kept on the Sun: brackets that close in round a Sun, filled while on. */
-    sunLock: `${BRACKETS}<circle class="fill-on" cx="8" cy="8" r="1.9"/><path class="spin" d="M8 3.6v1M8 11.4v1M3.6 8h1M11.4 8h1M4.9 4.9l.7.7M10.4 10.4l.7.7M4.9 11.1l.7-.7M10.4 5.6l.7-.7"/>`,
+    sunLock: `${BRACKETS}<circle class="fill-on" cx="8" cy="8" r="2.4"/><path class="spin" d="M8 2.9v1.2M8 11.9v1.2M2.9 8h1.2M11.9 8h1.2M4.4 4.4l.85.85M10.75 10.75l.85.85M4.4 11.6l.85-.85M10.75 5.25l.85-.85"/>`,
     /** The view kept on the Moon: the same brackets round a crescent. */
-    moonLock: `${BRACKETS}<path class="fill-on" d="M9.3 5.5A2.7 2.7 0 1 0 9.3 10.5 2.2 2.2 0 0 1 9.3 5.5z"/>`,
-    /** The sky's grid: the horizon, a dotted circle of altitude and the four compass points. */
-    grid: '<circle cx="8" cy="8" r="6"/><circle class="spin22" cx="8" cy="8" r="3.2" stroke-dasharray="0.1 1.9"/><path d="M8 2v2.2M8 11.8V14M2 8h2.2M11.8 8H14"/>',
+    moonLock: `${BRACKETS}<path class="fill-on" d="M9.6 4.8A3.4 3.4 0 1 0 9.6 11.2 2.8 2.8 0 0 1 9.6 4.8z"/>`,
+    /** Refraction: the Sun where it truly is, dashed, and a little above it, a little squeezed, where the air shows it. */
+    refraction:
+        '<circle cx="8" cy="9.4" r="5.2" stroke-dasharray="1.3 1.4"/><ellipse class="fill-on lift" cx="8" cy="7" rx="5.2" ry="4.1"/>',
+    /** A compass with a small north arrow; with the grid on, a dotted circle of altitude joins it (see .sky-marks). */
+    marks: '<circle cx="8" cy="8" r="6"/><path d="M8 2v1.8M8 12.2V14M2 8h1.8M12.2 8H14"/><circle class="grid-part spin22" cx="8" cy="8" r="4.2" stroke-dasharray="0.1 1.75"/><path class="solid swing" d="M8 5.3 9.15 8.6H6.85z"/>',
     /** A figure's options: two knobs, each between two rails that grow and shrink as it slides, so it stays hollow. */
     options:
         '<path class="grow-a" d="M2.5 5.5h11"/><path class="shrink-a" d="M13.5 5.5H2.5"/><path class="shrink-b" d="M2.5 10.5h11"/><path class="grow-b" d="M13.5 10.5H2.5"/><circle class="r" cx="5.5" cy="5.5" r="1.7"/><circle class="l" cx="10.5" cy="10.5" r="1.7"/>',
@@ -30,8 +33,8 @@ export const ICONS = {
     /** A padlock, its shackle swung open while off. */
     padlock:
         '<rect x="3.5" y="7.5" width="9" height="6.5" rx="1.2"/><path class="shackle" d="M5.5 7.5V5.5a2.5 2.5 0 0 1 5 0v2"/>',
-    /** A bulb whose rays flash on hover. */
-    bulb: '<path d="M8 3.5a3.5 3.5 0 0 0-2 6.4c.35.25.5.6.5 1v.6h3v-.6c0-.4.15-.75.5-1A3.5 3.5 0 0 0 8 3.5ZM6.75 13.75h2.5"/><path class="flash" d="M8 .5v1.2M2.5 6h1.2M12.3 6h1.2M3.9 2l.8.8M12.1 2l-.8.8"/>',
+    /** A bulb, still: at the size of a caption's text any motion is too small to read. */
+    bulb: '<path d="M8 1.75a4.25 4.25 0 0 0-2.5 7.7c.45.33.75.8.75 1.35v.7h3.5v-.7c0-.55.3-1.02.75-1.35A4.25 4.25 0 0 0 8 1.75ZM6.5 13.75h3"/>',
     /** Two lines that fold into a cross while open. */
     menu: '<path class="fold-a" d="M2.5 6h11"/><path class="fold-b" d="M5 10h6"/>',
 } as const;

@@ -525,10 +525,18 @@
     --disc: var(--overlay-tint);
     color: var(--accent);
 }
+/* The marks' compass gains its circle of altitude once the grid is on. */
+.sky-marks .grid-part {
+    opacity: 0;
+    transition: opacity 0.25s;
+}
+.sky-marks[data-level="2"] .grid-part {
+    opacity: 1;
+}
 .sky-icon .icon {
     width: 18px;
     height: 18px;
-    stroke-width: 1.1;
+    stroke-width: 0.95;
 }
 /* The observer's height up the left edge, as a y axis: a bare rail filled in the accent below the value, frosted above
    it, the value itself the thumb, a decade a mark beside it. The slider is a horizontal one turned upright, its own thumb
@@ -556,24 +564,28 @@
     margin: 0;
     transform: translate(-50%, -50%) rotate(-90deg);
 }
-.sky-stage :is(.sky-height, .sky-time) input::-webkit-slider-runnable-track {
+.sky-height input::-webkit-slider-runnable-track,
+.sky-time:where(.sky-stage:fullscreen > *) input::-webkit-slider-runnable-track {
     height: 3px;
     border-radius: 2px;
     background:
         linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) 3px no-repeat,
         var(--overlay-glass);
 }
-.sky-stage :is(.sky-height, .sky-time) input::-moz-range-track {
+.sky-height input::-moz-range-track,
+.sky-time:where(.sky-stage:fullscreen > *) input::-moz-range-track {
     height: 3px;
     border-radius: 2px;
     background:
         linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) 3px no-repeat,
         var(--overlay-glass);
 }
-.sky-stage :is(.sky-height, .sky-time) input::-webkit-slider-thumb {
+.sky-height input::-webkit-slider-thumb,
+.sky-time:where(.sky-stage:fullscreen > *) input::-webkit-slider-thumb {
     opacity: 0;
 }
-.sky-stage :is(.sky-height, .sky-time) input::-moz-range-thumb {
+.sky-height input::-moz-range-thumb,
+.sky-time:where(.sky-stage:fullscreen > *) input::-moz-range-thumb {
     opacity: 0;
 }
 /* The value, a capsule in the accent as the rail's filled part, centred on the rail at the thumb; clicks go through it. */

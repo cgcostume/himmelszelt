@@ -53,7 +53,6 @@ const chosen = (name: string, fallback: string | number) =>
 const shadowRays = () => Number(chosen("lighting-shadows", 8));
 const occlusionRays = () => Number(chosen("lighting-occlusion", 8));
 const liveSky = () => chosen("lighting-background", "atmosphere") === "atmosphere";
-const ground = () => chosen("lighting-ground", "backdrop") as "floor" | "backdrop";
 
 // The atmosphere behind the solids, rendered live through the scene's camera by a sky pass of the scene's own, linear
 // and unexposed: the sky map's texels blur the horizon with the unlit planet below it.
@@ -174,13 +173,13 @@ function unlock() {
     camera.fov = FOV;
 }
 
-// The compass directions on the horizon, where the camera sees them, with the grid.
-const compass = field("compass");
+// The compass directions on the horizon, where the camera sees them.
+const compass = field("compassLabels");
 const labels = COMPASS.map((name) =>
     compass.appendChild(Object.assign(document.createElement("span"), { textContent: name })),
 );
 function placeCompass() {
-    compass.hidden = !pressed("grid");
+    compass.hidden = field("marks").dataset.level === "0";
     const { forward, right, up } = cameraFrame(camera);
     const ty = Math.tan(camera.fov / 2);
     const tx = ty * (canvas.clientWidth / Math.max(canvas.clientHeight, 1));
@@ -245,7 +244,6 @@ function render() {
         dither: pressed("dither") && format === SDR,
         toneCurve: display.toneCurve,
         headroom,
-        ground: ground(),
         seconds,
     });
     gpuDevice().queue.submit([encoder.finish()]);
@@ -278,12 +276,13 @@ if (gpu.error) {
     bindScaledToggle(find("[data-scaled]", root));
     onTables(requestRender);
     onDisplay(requestRender);
+    field("marks").addEventListener("click", requestRender);
     new ResizeObserver(requestRender).observe(canvas);
     for (const radio of root.querySelectorAll(
-        'input[name="lighting-shadows"], input[name="lighting-background"], input[name="lighting-ground"], input[name="lighting-occlusion"], input[name="lighting-godrays"], input[name="lighting-bloom"]',
+        'input[name="lighting-shadows"], input[name="lighting-background"], input[name="lighting-occlusion"], input[name="lighting-godrays"], input[name="lighting-bloom"]',
     ))
         radio.addEventListener("change", requestRender);
-    for (const name of ["rotate", "sunDisc", "sunLight", "skyLight", "dither", "lock", "grid"]) {
+    for (const name of ["rotate", "sunDisc", "sunLight", "skyLight", "dither", "lock"]) {
         field(name).addEventListener("click", () => {
             field(name).setAttribute("aria-pressed", String(!pressed(name)));
             if (name === "lock" && !pressed("lock")) unlock();

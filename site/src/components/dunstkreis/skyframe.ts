@@ -103,6 +103,20 @@ export function skyFrames() {
         onChange(sync);
         sync();
 
+        // The marks step through their states, off, the compass, the compass with the grid, before the figure hears the click.
+        const marks = field("marks");
+        const titles: string[] = JSON.parse(marks.dataset.titles ?? "[]");
+        marks.addEventListener(
+            "click",
+            () => {
+                const level = (Number(marks.dataset.level) + 1) % Number(marks.dataset.levels);
+                marks.dataset.level = String(level);
+                marks.setAttribute("aria-pressed", String(level > 0));
+                marks.title = titles[level] ?? "";
+            },
+            { capture: true },
+        );
+
         const options = frame.querySelector('[data-field="options"]');
         const panel = frame.querySelector<HTMLElement>('[data-field="optionsPanel"]');
         if (options && panel) {

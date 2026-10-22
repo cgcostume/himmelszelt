@@ -15,22 +15,36 @@ interface Props {
     /** Classes and a panel name of the view itself, for the figure's own styles and script. */
     viewClass?: string;
     panel?: string;
-    /** The grid's title: what it shows in this view. */
+    /** What the compass labels in this view. */
+    compassTitle?: string;
+    /** Whether the view has a grid of lines of its own, and what it shows; then the marks switch through three states. */
+    grid?: boolean;
     gridTitle?: string;
     /** The Sun lock's title: where it keeps the view. */
     lockTitle?: string;
     /** Whether the view starts on the Sun. */
     locked?: boolean;
+    /** Whether the view offers refraction to switch, for the whole page (see sky.ts). */
+    refraction?: boolean;
 }
 const {
     hint = "Drag to look around, scroll to zoom. Rendered with WebGPU.",
     png = false,
     viewClass = "",
     panel,
-    gridTitle = "Grid: lines of altitude every 10°, the compass directions, and the Sun's symbol where it truly is",
+    compassTitle = "The compass directions on the horizon",
+    grid = true,
+    gridTitle = "Grid: lines of altitude every 10° and of azimuth, and the Sun's symbol where it truly is",
     lockTitle = "Keep the view on the Sun's true direction; dragging lets go",
     locked = true,
+    refraction = false,
 } = Astro.props;
+// The marks' button steps through off, the compass, and the compass with the grid where the view has one (see skyframe.ts).
+const marksTitles = [
+    "No marks; click for the compass directions",
+    `${compassTitle}${grid ? "; click for the grid too" : "; click to hide them"}`,
+    `${compassTitle}, and ${gridTitle.replace(/^Grid: /, "")}; click to hide them`,
+];
 // A figure may hand over an options slot that renders to nothing: no panel then, and no button for it.
 const optionsHtml = Astro.slots.has("options") ? (await Astro.slots.render("options")).trim() : "";
 const options = optionsHtml !== "";
@@ -47,7 +61,8 @@ const named: Record<number, string> = { 0: "1 m", 3: "1 km", 5: "100 km" }
             <span class="sky-bar-start">
                 <span class="sky-group-buttons">
                     <button type="button" class="sky-icon" data-field="lock" aria-pressed={locked ? "true" : "false"} title={lockTitle} aria-label="Sun lock"><Icon name="sunLock" /></button>
-                    <button type="button" class="sky-icon" data-field="grid" aria-pressed="true" title={gridTitle} aria-label="Grid"><Icon name="grid" /></button>
+                    {refraction && <button type="button" class="sky-icon" data-field="refraction" aria-pressed="true" title="Refraction: the light traced through the air, bending, the Sun lifted and squeezed low over the horizon. Switches it for the whole page, recomputing every table and cube map" aria-label="Refraction"><Icon name="refraction" /></button>}
+                    <button type="button" class="sky-icon sky-marks" data-field="marks" data-levels={grid ? 3 : 2} data-level={grid ? 2 : 1} data-titles={JSON.stringify(marksTitles)} aria-pressed="true" title={marksTitles[grid ? 2 : 1]} aria-label="Compass and grid"><Icon name="marks" /></button>
                 </span>
                 <span class="sky-hint footnote">{hint}</span>
             </span>

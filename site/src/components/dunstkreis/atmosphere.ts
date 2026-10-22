@@ -107,7 +107,7 @@ export function displayOutput() {
 }
 
 /**
- * The headroom radios of a figure and its note (Hdr.astro): "HDR off" chosen and the headrooms disabled where the
+ * The headroom radios of a figure and its note (Hdr.astro): "off" chosen and the headrooms disabled where the
  * display or the canvas cannot show HDR, the note on an HDR display only; choosing a headroom switches every figure.
  */
 export function bindHdr(note: HTMLElement, choice: Element) {

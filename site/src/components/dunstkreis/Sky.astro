@@ -43,7 +43,7 @@ const TONE = {
     label: "Tone curve",
     title: "Khronos PBR Neutral keeps colors as they are and compresses only the brightest, AgX fades bright colors towards white as film does, ACES is the saturated filmic curve used before, none cuts the light off where it saturates. Switches every figure",
     options: [
-        ["clip", "no tone mapping", "No curve: the exposed light cut off at 1, where it saturates, sRGB encoded"],
+        ["clip", "none", "No curve: the exposed light cut off at 1, where it saturates, sRGB encoded"],
         ["neutral", "neutral"],
         ["agx", "AgX"],
         ["aces", "ACES"],
@@ -78,9 +78,9 @@ const {
 ---
 
 <figure class="scene-frame wide" id={id} data-sky data-full={full ? "" : undefined} data-primary={primary ? "" : undefined} data-parts={parts ? "" : undefined}>
-    <SkyFrame png>
+    <SkyFrame png refraction>
         <canvas data-field="canvas" aria-label="The sky at the chosen moment and place"></canvas>
-        <div class="sky-compass" data-field="compass"></div>
+        <div class="sky-compass" data-field="compassLabels"></div>
         {
             parts && (
                 <Fragment slot="options">
@@ -104,14 +104,17 @@ const {
                         <button type="button" class="view-toggle" data-field="auto" aria-pressed="true" title="Expose by a light meter reading the whole sky">auto</button>
                         <button type="button" class="view-toggle" data-field="ramp" aria-pressed="true" title="Shape the metered exposure over the day by the Sun's altitude: night and the minutes around sunrise and sunset darker, the blue hour lifted. Off, the light meter's reading as it is, for the tone curve alone">ramp</button>
                     </OptionGroup>
-                    <OptionGroup name="display">
+                    <OptionGroup name="tone mapping">
                         <Choice figure={id} {...TONE} />
+                    </OptionGroup>
+                    <OptionGroup name="HDR (× SDR white)">
                         <Hdr figure={id} />
+                    </OptionGroup>
+                    <OptionGroup name="display">
                         <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="Dither the 8-bit output by a step of noise, against banding in the sky's smooth gradients">dither</button>
                     </OptionGroup>
                     <OptionGroup name="air">
                         <Choice figure={id} {...MODEL} />
-                        <button type="button" class="view-toggle" data-field="refraction" aria-pressed="true" title="Traced through the air, bending the light. Switches it for the whole page, recomputing every table and cube map">refracted</button>
                     </OptionGroup>
                 </Fragment>
             )

@@ -547,6 +547,8 @@ const chosen = (name: string, fallback: string) =>
     root.querySelector<HTMLInputElement>(`input[name="projections-${name}"]:checked`)?.value ?? fallback;
 const chosenSize = () => chosen("budget", "xs") as Size;
 const pressed = (name: string) => field(name).getAttribute("aria-pressed") === "true";
+// Off, the compass, or the compass with the grid (see skyframe.ts).
+const markLevel = () => Number(field("marks").dataset.level);
 
 const DEG = Math.PI / 180;
 // Looking south, a little above the horizon, 100° across the view's height, as the sky figure's camera measures it.
@@ -757,7 +759,7 @@ function showMarks(projection: Projection) {
     const [width, height] = [canvas.clientWidth || 1, canvas.clientHeight || 1];
     const basis = cameraBasis(camera, width / height);
     const marks: Mark[] = [];
-    for (const [text, d] of pressed("grid") ? VIEW_MARKS : []) {
+    for (const [text, d] of markLevel() >= 1 ? VIEW_MARKS : []) {
         const at = project(d, basis, width, height);
         if (at && at.x > 0 && at.x < width && at.y > 0 && at.y < height)
             marks.push([text, at.x / width, at.y / height]);
@@ -969,7 +971,7 @@ function draw() {
         floats[23] = d;
         uints[20] = ["nearest", "linear", "cubic"].indexOf(chosen("filter", "nearest"));
         uints[21] = ["neutral", "agx", "aces", "clip"].indexOf(display.toneCurve);
-        uints[24] = pressed("grid") ? 1 : 0;
+        uints[24] = markLevel() === 2 ? 1 : 0;
         floats[25] = dpr;
         floats[26] = (sky.sunAngularDiameter / 2) * DEG;
         floats.set(sky.sunDirection, 28);
@@ -1040,13 +1042,14 @@ if (gpu.error) {
             requestDraw();
         });
     }
-    for (const name of ["edges", "density", "lock", "grid", "dither", "sunDisc"]) {
+    for (const name of ["edges", "density", "lock", "dither", "sunDisc"]) {
         field(name).addEventListener("click", () => {
             field(name).setAttribute("aria-pressed", String(!pressed(name)));
             describe();
             requestDraw();
         });
     }
+    field("marks").addEventListener("click", requestDraw);
     for (const name of ["flat", "inside"]) new ResizeObserver(requestDraw).observe(canvasOf(name));
     lookAround(canvasOf("inside"), camera, {
         onChange: requestDraw,

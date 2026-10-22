@@ -1,7 +1,7 @@
 // A small scene lit by an environment, to see how a sky lights things: a cube map in cd/m² for the background, nine
 // spherical harmonics coefficients of it for the light from every direction, and the sun as a light of its own.
-// Raytraced in a compute pass: the five Platonic solids on a pentagon around a sphere, over a round ground or over the
-// backdrop's own ground, exact rather than triangulated. Each polyhedron is the intersection of the half-spaces behind
+// Raytraced in a compute pass: the five Platonic solids on a pentagon around a sphere, over the backdrop's own ground
+// with their shadows taken out of it, exact rather than triangulated. Each polyhedron is the intersection of the half-spaces behind
 // its faces, the sphere is a sphere. The sun casts shadows, soft when its disc is sampled; the sky's light is dimmed by ambient occlusion from a few rays.
 //
 // Four camera rays per pixel, on the rotated grid of 4x multisampling, each with its shadow and occlusion rays turned
@@ -36,12 +36,12 @@ struct Params {
     shadowRays: u32,
     // Nonzero to show `background` behind the solids rather than the sky map.
     background: u32,
-    // Radius of the round ground, in scene units: it fades out over its outer half into what lies behind it.
-    groundRadius: f32,
+    // Free, where the round floor's radius was.
+    free0: f32,
     // Which lights shine on the scene: 1 the sun directly, 2 the sky by its coefficients.
     lights: u32,
-    // The ground: 0 a round floor of the scene's own, 1 the backdrop's ground with the solids' shadows taken out of it.
-    ground: u32,
+    // Free, where the choice of ground was: it is always the backdrop's, with the solids' shadows taken out of it.
+    free1: u32,
     // How strong the sun's veil is, 0 for none to 1 for full: light ones are fainter and narrower.
     bloom: f32,
     // Samples along each camera ray through the haze for god rays, 0 for none.
@@ -204,15 +204,7 @@ fn intersectSolids(origin: vec3f, direction: vec3f, tMax: f32) -> Hit {
 }
 
 fn intersectScene(origin: vec3f, direction: vec3f) -> Hit {
-    var closest = intersectSolids(origin, direction, FAR);
-    // The round ground, z = 0.
-    if (params.ground == 0u && direction.z < 0.0) {
-        let t = -origin.z / direction.z;
-        if (t > 0.0 && t < closest.t && length((origin + direction * t).xy) < params.groundRadius) {
-            closest = Hit(t, vec3f(0.0, 0.0, 1.0), GROUND_ALBEDO);
-        }
-    }
-    return closest;
+    return intersectSolids(origin, direction, FAR);
 }
 
 // Irradiance in lux for a surface facing `n`, from the coefficients convolved with the cosine lobe.
@@ -440,7 +432,7 @@ fn shade(pixel: vec2u, direction: vec3f) -> vec4f {
         let t = -params.eye.z / direction.z;
         // The backdrop's ground plane is flat, the planet is not: from high up, the sky reaches below z = 0.
         let sky = select(0.0, 1.0, direction.z > params.horizonZ);
-        if (params.ground != 0u && direction.z < 0.0 && t > 0.0) {
+        if (direction.z < 0.0 && t > 0.0) {
             return vec4f(backdropGround(pixel, direction, t), sky);
         }
         return vec4f(backdrop(pixel, direction), sky);
@@ -458,13 +450,7 @@ fn shade(pixel: vec2u, direction: vec3f) -> vec4f {
         skylight = skyIrradiance(hit.normal) * openness(p, hit.normal, pixel);
     }
     // A Lambertian surface: albedo over pi of the irradiance, in cd/m².
-    var luminance = hit.albedo / PI * (sunlight + skylight);
-    // The round ground fades out over its outer half into what lies behind it, the planet's own ground, colored and
-    // lit in the sky map and the live atmosphere alike: no edge where it ends.
-    if (p.z < 1e-2) {
-        let r = length(p.xy) / params.groundRadius;
-        luminance = mix(luminance, backdrop(pixel, direction), smoothstep(0.5, 1.0, r));
-    }
+    let luminance = hit.albedo / PI * (sunlight + skylight);
     return vec4f(luminance, 0.0);
 }
 
