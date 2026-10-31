@@ -86,3 +86,29 @@ fn hdToneMapAgx(exposed: vec3f) -> vec3f {
     let curve = 15.5 * x4 * x2 - 40.14 * x4 * x + 31.96 * x4 - 6.868 * x2 * x + 0.4298 * x2 + 0.1191 * x - 0.00232;
     return clamp(outset * curve, vec3f(0.0), vec3f(1.0));
 }
+
+// A step of noise, added before a color is quantized to `levels` steps per channel, 255 for 8 bits: it trades a smooth
+// gradient's bands for grain too fine to see. Jimenez's interleaved gradient noise, which spreads neighboring values apart
+// like blue noise, from the pixel alone, so it is stable from frame to frame and needs no texture; remapped to a
+// triangular distribution, whose error does not depend on the signal. For encoded values, the last thing before writing.
+fn hdDither(color: vec3f, pixel: vec2u, levels: f32) -> vec3f {
+    return hdDitherBy(color, fract(52.9829189 * fract(dot(vec2f(pixel), vec2f(0.06711056, 0.00583715)))), levels);
+}
+
+// Bayer's ordered dither: a fixed threshold per pixel, 8x8 tiled, in [0, 1). No noise, a pattern: each pixel's rank, its
+// bits taken in turn from x xor y and from y. Cheap, and stable, and the cross hatch shows. Added as it is, a step wide:
+// color + (hdBayer(pixel) - 0.5) / levels.
+fn hdBayer(pixel: vec2u) -> f32 {
+    let a = pixel.x ^ pixel.y;
+    var rank = 0u;
+    for (var i = 0u; i < 3u; i = i + 1u) {
+        rank = rank | (((a >> i) & 1u) << (5u - 2u * i)) | (((pixel.y >> i) & 1u) << (4u - 2u * i));
+    }
+    return (f32(rank) + 0.5) / 64.0;
+}
+
+// The same with noise of your own, in [0, 1), such as a tiled blue noise texture's.
+fn hdDitherBy(color: vec3f, uniform: f32, levels: f32) -> vec3f {
+    let noise = uniform * 2.0 - 1.0;
+    return color + sign(noise) * (1.0 - sqrt(1.0 - abs(noise))) / levels;
+}

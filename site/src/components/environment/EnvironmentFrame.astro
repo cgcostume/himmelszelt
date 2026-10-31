@@ -1,0 +1,78 @@
+---
+import Icon from "../Icon.astro";
+import "../sternzeit/sternzeit.css";
+import "../dunstkreis/dunstkreis.css";
+import "./environments.css";
+
+/**
+ * The frame every figure showing the HDRI shares, its bar the same on all and their switches one for the page: the map as
+ * stored or the view from inside, what clips, and the file's resolution.
+ */
+interface Props {
+    /** Whether the figure offers full screen. */
+    fullscreen?: boolean;
+    /** Whether the image's author goes in the frame's corner: not if the figure holds more than the image. */
+    author?: boolean;
+    /** What the figure says over itself instead of the map's or the view's hint, for one with a camera of its own. */
+    ownView?: string;
+}
+const { fullscreen = false, author = true, ownView } = Astro.props;
+// As a view into the sky has them (see SkyFrame.astro): a figure's own options, folded away behind a button.
+const optionsHtml = Astro.slots.has("options") ? (await Astro.slots.render("options")).trim() : "";
+const options = optionsHtml !== "";
+const RESOLUTIONS = [
+    ["1k", "res1k", "1K: 1024 × 512, a megabyte or two"],
+    ["2k", "res2k", "2K: 2048 × 1024, about 5 MB"],
+    ["4k", "res4k", "4K: 4096 × 2048, some 20 MB"],
+    ["8k", "res8k", "8K: 8192 × 4096, some 70 MB, and half a gigabyte while it is read"],
+] as const;
+---
+
+<div class="env-frame" data-env-frame data-mode="map" data-own-view={ownView}>
+    <div class="env-stage">
+    <slot />
+    {author && <span class="env-author" data-env="author"></span>}
+    <div class="env-bar">
+        {!ownView && (<Fragment>
+        <span class="view-buttons">
+            <button type="button" class="view-icon" data-env="map" aria-pressed="true" title="The whole map, as it is stored" aria-label="Map"><Icon name="envMap" /></button>
+            <button type="button" class="view-icon" data-env="view" aria-pressed="false" title="Projected: the view from inside, in perspective. Drag to look around, scroll to zoom" aria-label="View"><Icon name="envView" /></button>
+        </span>
+        <span class="view-buttons">
+            <button type="button" class="view-icon" data-env="clipped" aria-pressed="false" title="Stripe what clips: red to white, blue to black" aria-label="Clipped"><Icon name="clipped" /></button>
+        </span>
+        </Fragment>)}
+        <span class="view-buttons env-resolutions">
+            {RESOLUTIONS.map(([value, name, title]) => (
+                <button type="button" class="view-icon env-resolution" data-env-resolution={value} aria-pressed={value === "1k" ? "true" : "false"} title={title} aria-label={title}>
+                    <Icon name={name} />
+                    <Icon name="loading" />
+                </button>
+            ))}
+            <span class="env-progress" aria-hidden="true"><span></span></span>
+        </span>
+        <span class="sky-hint footnote" data-env="hint"></span>
+        {(fullscreen || options) && (
+            <span class="view-buttons env-end">
+                {options && <button type="button" class="view-icon" data-env="options" aria-pressed="true" title="Show or hide this figure's options" aria-label="Options"><Icon name="options" /></button>}
+                {fullscreen && <button type="button" class="view-icon" data-env="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>}
+            </span>
+        )}
+    </div>
+    {options && <div class="sky-options" data-env="optionsPanel"><Fragment set:html={optionsHtml} /></div>}
+    </div>
+    <div class="env-exposure">
+        <label class="figure-slider" title="The exposure, in EV: drag, or turn the mouse wheel">
+            <span class="note">EV</span>
+            <span class="figure-slider-rail">
+                <input type="range" data-env="ev" min="-8" max="8" step="any" data-wheel-step="0.1" value="0" aria-label="Exposure in EV" />
+                <span class="figure-slider-scale" aria-hidden="true">{["−8", "0", "+8"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 50}%`} data-env={["low", "zero", "high"][i]}>{mark}</span>)}<span class="figure-slider-mark env-metered" data-env="meteredMark" title="What the light meter read for this image. The slider snaps to it, and the padlock closes while the exposure follows the reading; drag away to let go" aria-pressed="true" hidden><Icon name="padlock" />metered</span></span>
+            </span>
+            <output data-env="reading"></output>
+        </label>
+    </div>
+</div>
+
+<script>
+    import "./frame";
+</script>

@@ -1,0 +1,32 @@
+---
+import "../sternzeit/sternzeit.css";
+import "./helldunkel.css";
+---
+
+<figure class="scene-frame" id="ramps">
+    <div class="chromaticity-ramp">
+        <p class="note">Equal steps of light</p>
+        <canvas data-ramp="light" aria-label="A gray ramp, equal steps of light"></canvas>
+        <p class="note">Equal steps of the sRGB encoded number</p>
+        <canvas data-ramp="encoded" aria-label="A gray ramp, equal steps of the sRGB encoded number"></canvas>
+    </div>
+    <figcaption class="figure-caption">
+        Two gray ramps of 16 steps, from black to white. Above, the eye sees most of the steps bunched at the bright end. Below,
+        they look even, and that is where eight bits are best spent.
+    </figcaption>
+</figure>
+
+<script>
+    const encode = (c: number) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+    for (const canvas of document.querySelectorAll<HTMLCanvasElement>("#ramps canvas")) {
+        Object.assign(canvas, { width: 16, height: 1 });
+        const context = canvas.getContext("2d");
+        if (!context) continue;
+        const image = context.createImageData(16, 1);
+        for (let i = 0; i < 16; ++i) {
+            const c = (canvas.dataset.ramp === "light" ? encode(i / 15) : i / 15) * 255;
+            image.data.set([c, c, c, 255], i * 4);
+        }
+        context.putImageData(image, 0, 0);
+    }
+</script>

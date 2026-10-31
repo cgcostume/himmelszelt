@@ -1,0 +1,312 @@
+.environments-gallery {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+    margin: 0.75rem 0 0.5rem;
+}
+.environments-thumb {
+    display: flex;
+    height: auto;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: 2px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-small);
+    background: none;
+    color: inherit;
+    font-size: var(--text-small);
+    line-height: 1.2;
+    text-align: left;
+    cursor: pointer;
+}
+.environments-thumb[aria-pressed="true"] {
+    border-color: var(--accent);
+}
+.environments-thumb img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 2px;
+}
+@media (max-width: 40rem) {
+    .environments-gallery {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+.environments-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin: 0.5rem 0;
+}
+.environments-controls label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+}
+.environments-button {
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 0.6rem;
+    border: 1px solid color-mix(in oklab, var(--text), transparent 70%);
+    border-radius: var(--radius-small);
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: var(--text-small);
+    cursor: pointer;
+}
+.environments-button[aria-pressed="true"] {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.environments-thanks {
+    margin: 0.75rem 0 0.25rem;
+}
+.environments-controls input[type="search"] {
+    flex: 1 1 10rem;
+    min-width: 0;
+    height: 28px;
+    padding: 0 0.5rem;
+    border: 1px solid color-mix(in oklab, var(--text), transparent 70%);
+    border-radius: var(--radius-small);
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: var(--text-small);
+}
+/* The bar over every figure showing the HDRI. */
+.env-stage {
+    position: relative;
+}
+.env-exposure {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+.env-exposure .figure-slider {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+}
+[data-dropping] {
+    outline: 2px dashed var(--accent);
+    outline-offset: 2px;
+}
+.grounded-controls {
+    flex-wrap: wrap;
+}
+.grounded-controls .figure-slider {
+    flex-basis: 12rem;
+}
+/* What the meter read: a tick under the rail, its name beside it. */
+.env-metered {
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+    transform: translateX(-0.5px);
+    padding-left: 7px;
+    border-left: 1px solid currentColor;
+    color: var(--text);
+}
+.env-metered[data-left] {
+    transform: translateX(calc(0.5px - 100%));
+    padding: 0 7px 0 0;
+    border-left: 0;
+    border-right: 1px solid currentColor;
+}
+.env-metered > svg {
+    width: 13px;
+    height: 13px;
+    margin: 0;
+    fill: none;
+}
+/* Locked on the reading, in the accent: the exposure follows it. */
+.env-metered[aria-pressed="true"] {
+    color: var(--accent);
+}
+/* A resolution's digits, or while it comes, a spinner in their place. */
+@keyframes environments-spin {
+    to {
+        transform: rotate(1turn);
+    }
+}
+.env-resolution > svg:last-child,
+.env-resolution[data-busy] > svg:first-child {
+    display: none;
+}
+/* The whole icon turns, about its middle, on the compositor: it keeps turning while the file is decoded on the main
+   thread. It says something is happening, so it turns even for reduced motion, which only slows it. */
+.env-resolution[data-busy] > svg:last-child {
+    display: block;
+    transform-origin: center;
+    will-change: transform;
+    animation: environments-spin 0.9s linear infinite !important;
+}
+@media (prefers-reduced-motion: reduce) {
+    .env-resolution[data-busy] > svg:last-child {
+        animation-duration: 3s !important;
+    }
+}
+.env-frame[data-mode="view"] canvas,
+.env-frame[data-own-view] canvas {
+    cursor: grab;
+    touch-action: none;
+}
+.env-bar {
+    position: absolute;
+    z-index: 1;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    /* Each as high as it is: the resolutions' group grows alone. */
+    align-items: flex-start;
+    gap: 4px 8px;
+    pointer-events: none;
+}
+.env-bar .view-buttons {
+    pointer-events: auto;
+}
+.env-bar .env-end {
+    margin-left: auto;
+}
+/* Who made the image, in its corner. */
+.env-author {
+    position: absolute;
+    z-index: 1;
+    right: 8px;
+    bottom: 8px;
+    max-width: calc(100% - 16px);
+    padding: 2px 6px;
+    overflow: hidden;
+    border-radius: var(--radius-group);
+    background: var(--overlay-surface);
+    color: var(--overlay-ink);
+    font-size: var(--text-small);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.env-author:empty {
+    display: none;
+}
+.env-author a {
+    color: inherit;
+}
+.env-frame:fullscreen {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0.5rem;
+    background: black;
+}
+.env-frame:fullscreen .env-stage {
+    flex: 1;
+    min-height: 0;
+}
+.env-frame:fullscreen .env-exposure {
+    padding: 0 1rem;
+    color: white;
+    --text: white;
+    --muted: #aaa;
+    /* The gap around the slider's thumb, in what lies behind it. */
+    --bg: black;
+}
+.env-frame:fullscreen .hdri-view {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.env-frame:fullscreen[data-mode="map"] canvas {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    aspect-ratio: 2 / 1;
+}
+.env-frame:fullscreen[data-mode="view"] canvas {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+}
+.env-bar .sky-hint {
+    pointer-events: auto;
+    /* The page's ink on its frosted glass, full screen as well, whose dark would otherwise take it light on light. */
+    color: var(--overlay-ink);
+}
+/* While an HDRI comes over the network, not from the cache, the resolutions' group grows a line at its foot, and a thumbnail one over its image: the
+   track empty and muted, what has come in the ink. No border, and nothing runs along it while the size is unknown; that
+   the file is coming, the spinner in the chosen resolution says. */
+.env-resolutions {
+    display: inline-grid;
+    grid-template-columns: repeat(4, auto);
+    row-gap: 0;
+}
+.env-progress,
+.env-loading {
+    display: none;
+    height: 2px;
+    overflow: hidden;
+    border-radius: 1px;
+    background: color-mix(in oklab, var(--overlay-ink), transparent 80%);
+}
+/* Always there, without height until a file comes: the group grows and shrinks to it. */
+.env-progress {
+    display: block;
+    grid-column: 1 / -1;
+    height: 0;
+    margin: 0 4px;
+    transition:
+        height 0.18s ease-out,
+        margin 0.18s ease-out;
+}
+[data-needs-hdri][data-progress] .env-progress {
+    height: 2px;
+    margin: 6px 4px 1px;
+}
+.env-progress > span,
+.env-loading > span {
+    display: block;
+    height: 100%;
+    width: calc(var(--progress, 0) * 100%);
+    background: var(--overlay-ink);
+}
+.environments-thumb[data-progress] .env-loading {
+    display: block;
+}
+.environments-thumb .env-loading {
+    position: absolute;
+    z-index: 1;
+    background: color-mix(in oklab, white, transparent 65%);
+}
+.environments-thumb .env-loading > span {
+    background: white;
+}
+/* On a thumbnail, within its square. */
+.environments-thumb .env-loading {
+    /* From the padding box, the image 2 px into it. */
+    left: 8px;
+    top: calc(100cqw - 6px);
+    width: calc(100cqw - 12px);
+}
+.environments-thumb {
+    position: relative;
+    container-type: inline-size;
+}
+.env-frame .hdri-view,
+.env-frame .tone-tiles {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-canvas);
+}
+.env-frame:fullscreen .hdri-view,
+.env-frame:fullscreen .tone-tiles {
+    border-radius: 0;
+}

@@ -118,6 +118,7 @@ export type SceneOptions = {
     discIlluminance?: Iterable<number>;
     skyScale?: number;
     headroom?: number;
+    linearOutput?: boolean;
 };
 
 export function createScene(device: GPUDevice) {
@@ -208,6 +209,7 @@ export function createScene(device: GPUDevice) {
             data.set([...(rest.discIlluminance ?? sunIlluminance)], 124);
             data[127] = rest.skyScale ?? 1;
             data[128] = rest.headroom ?? 1;
+            flags[129] = rest.linearOutput ? 1 : 0;
             device.queue.writeBuffer(params, 0, data);
 
             const pipeline = pipelineFor(target.format);

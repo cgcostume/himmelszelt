@@ -1,0 +1,52 @@
+---
+import "../sternzeit/sternzeit.css";
+import EnvironmentFrame from "../environment/EnvironmentFrame.astro";
+import "./helldunkel.css";
+
+const STRENGTHS = [
+    ["0", "off"],
+    ["0.04", "4%"],
+    ["0.15", "15%"],
+];
+---
+
+<figure class="scene-frame wide" id="glow" data-needs-hdri data-loading>
+    <EnvironmentFrame fullscreen>
+        <div class="hdri-view as-seen"><canvas data-field="canvas" aria-label="The chosen HDRI with bloom"></canvas></div>
+    </EnvironmentFrame>
+    <p class="hdri-controls">
+        <span class="steps" role="radiogroup" aria-label="Bloom strength">
+            <span class="steps-heading" aria-hidden="true">bloom</span>
+            {STRENGTHS.map(([value, name]) => (
+                <label>
+                    <input type="radio" name="bloom-strength" value={value} checked={value === "0.04"} />
+                    <span>{name}</span>
+                </label>
+            ))}
+        </span>
+    </p>
+    <figcaption class="figure-caption">
+        The image through the neutral curve, with this share of its blurred self mixed in before the curve. Raise the exposure
+        and look at the edges of what is brightest.
+    </figcaption>
+</figure>
+
+<script>
+    import { find } from "../dom";
+    import { gpu } from "../dunstkreis/atmosphere";
+    import { context, draw, onHdri } from "../environment/hdri";
+    import { onDemand } from "../frame";
+
+    const root = find("#glow");
+    const canvas = find<HTMLCanvasElement>('[data-field="canvas"]', root);
+    if (!gpu.error) {
+        const target = context(canvas);
+        const request = onDemand(() => {
+            const bloom = Number(root.querySelector<HTMLInputElement>('input[name="bloom-strength"]:checked')?.value);
+            if (target) draw(canvas, target, { curve: "neutral", bloom });
+        }, root);
+        onHdri(request);
+        new ResizeObserver(request).observe(canvas);
+        for (const radio of root.querySelectorAll('input[name="bloom-strength"]')) radio.addEventListener("change", request);
+    }
+</script>

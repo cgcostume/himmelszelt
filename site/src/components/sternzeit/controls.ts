@@ -5,7 +5,7 @@ import { clock } from "./zone";
 
 // Every set of controls on the page (see Controls.astro) is wired the same way: user input writes to the shared
 // state, and every state change is written back to all of them, so they always show the one moment and place.
-const roots = [...document.querySelectorAll<HTMLElement>(".moment")];
+const roots = [...document.querySelectorAll<HTMLElement>(".moment:not([data-environments])")];
 const LATLONG_DECIMALS = 7;
 
 // jd is UT; shown in the viewer's own time zone or in the place's, as the clock toggle says.

@@ -27,6 +27,13 @@ equirectangular's middle. The mappings both ways are in `wgsl.panorama`, `rbPano
 
 ## Cube maps
 
+`await createCubeFromPanoramaPass(device, { projection, cubify, samples })`, then `encode(encoder, panorama, cube)`, an
+rgba16float panorama into a cube map, with its mip levels if it has them. For a cube map to hold what an equirectangular
+of width W holds, its faces need W/π texels.
+
+`await createEnvironmentBlendPass(device)`, then `encode(encoder, a, b, target, t, { a, b })`, fades two cube maps by
+their light, each scaled first. `mixCoefficients(a, b, t)` does the same for their spherical harmonics coefficients.
+
 `wgsl.cube` holds the layout: `rbCubeDirection` for writing a texel, and, for a cubified cube map, osgHimmel's `cubify`
 after Nowell's mapping, `rbSphereFromCube` and `rbCubeFromSphere`. Its largest texel spans 4/3 of the smallest one's solid
 angle, not some 5.2 times.
@@ -40,11 +47,13 @@ unless the device has "float32-filterable".
 
 ## Files
 
-`encodeRgbe(pixels, width, height)` gives the bytes of a Radiance HDR file.
+`encodeRgbe(pixels, width, height)` gives the bytes of a Radiance HDR file, `decodeRgbe(bytes)` the pixels of one.
 
 ## Status
 
-Reading HDR files, the horizon band of the original thesis and specular image-based lighting follow. Exposure and tone
+`wgsl.ground` puts an image's ground on a plane, so objects stand on it and a camera moves over it, and lifts its horizon.
+
+The horizon band of the original thesis and specular image-based lighting follow. Exposure and tone
 curves are `@himmelszelt/helldunkel`'s.
 
 The WGSL is tested by executing it via Dawn in-process: `pnpm test:gpu`, since a CI runner has no GPU. Every identifier

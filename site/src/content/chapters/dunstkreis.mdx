@@ -60,6 +60,7 @@ under it, which every figure of the chapter follows.
 
 <Sky
     primary
+    full
     try={{
         label: "Sunset over Potsdam",
         set: "date=2026-04-06T18:05:00Z&lat=52.395&lon=13.085&h=8000",
@@ -248,7 +249,7 @@ every ten seconds, when the Sun has moved a tenth of its diameter. Refraction li
 the per-pixel pass, so bent rays cost the same per frame as straight ones.
 
 The sky pass runs every frame, one lookup per pixel into the sky view, 0.05 ms for a full HD frame, and it is where the
-camera comes in. It is also where the [exposure and the tone curve](#from-light-to-pixels) are applied, or not: a
+camera comes in. It is also where the [exposure and the tone curve](../helldunkel/) are applied, or not: a
 renderer with a pipeline of its own takes the exposed luminance, linear and unclamped, and tone maps the whole frame
 with the sky in it. Lighting a scene adds a fourth piece behind the sky view: the cube map and its nine coefficients,
 rebuilt when the sky view is, at the cost of a few sky passes, and sampled every frame after that.
@@ -337,11 +338,6 @@ cd/m², deep twilight would coarsen into steps that an exposure for the night ma
 holds the luminance times a power of two that follows the Sun, which keeps its brightest value near 2¹⁰ at any hour,
 and whatever reads it divides by the same.
 
-Between those numbers and a pixel lie five steps, and every one of them is a choice a renderer makes: which three
-numbers stand for the light, how bright it is shown, how its range is squeezed into the screen's, what becomes of a
-color the screen cannot show, and how the result is written into eight bits. dunstkreis takes all five by default and
-hands each one back on request, so the rest of this section walks them in order.
-
 The light leaves the tables at four wavelengths, and a screen wants red, green and blue. The matrix from
 [Four wavelengths](#four-wavelengths) does that, into linear sRGB, where a number is proportional to light and adding
 two skies adds their light. Linear is the keyword: the physics works here and nowhere else, which is why neither the
@@ -354,21 +350,22 @@ such a color back into the gamut by mixing in the gray of its own brightness unt
 what it can of the hue. Left to a tone curve, that negative blue would be cut off at zero per channel, and the setting
 Sun's disc split into a white upper and a yellow lower half at a hard line.
 
-Then the exposure scales the light to the screen's white, the tone curve folds what is
-brighter than white into it, and the last step writes the result for the display: through the sRGB transfer curve, the
-"gamma" that spends more of the eight bits on dark values, where the eye tells them apart, and with a step of noise
-against the bands a smooth twilight would otherwise fall into. Two displays want more, and both are the last step's
-business alone: a float canvas with extended tone mapping shows values above white, up to its headroom, and a canvas in
-Display P3 shows the saturated reds an sRGB screen gives up; what either does with a color still outside its range is
-the gamut mapping at the end of the section.
+
+Between those numbers and a pixel lie five steps, and every one of them is a choice a renderer makes: which three
+numbers stand for the light, how bright it is shown, how its range is squeezed into the screen's, what becomes of a
+color the screen cannot show, and how the result is written into eight bits. dunstkreis takes all five by default and
+hands each one back on request (<Fig id="stages" />).
 
 <Stages />
 
 <Controls />
 
+From there on the sky is light like any other: how it is exposed and folded into a screen's range is
+[helldunkel](../helldunkel/)'s, whose curves dunstkreis bundles, so the sky pass needs no other package. A renderer with
+its own HDR pipeline turns the tone map off and gets the exposed luminance itself, linear and unclamped, for a float
+target.
 
-Exposure is set in EV100, as on a camera, which [helldunkel](../helldunkel/#exposure) explains. A sunny day is about
-EV 15, an overcast one 10, twilight 0, moonlight −6.
+### Exposure over a day
 
 Automatic exposure is an option, for a renderer without an exposure of its own, or to follow day into night. A light
 meter on the GPU reads the sky-view table in directions spread evenly over the sky above the horizon, and takes the
@@ -400,14 +397,6 @@ of EV100 values at sun altitudes, joined by the same curve: a default exposure f
 numbers in code. The default atmosphere's is to ship with dunstkreis. It knows only the Sun, not the observer's height,
 and nothing of clouds or a Moon.
 
-
-For a display, the pass then tone maps: exposed, compressed into the display's range, and encoded for sRGB, dithered
-against banding. The curves, the HDR headroom and what becomes of a color outside the display's range are
-[helldunkel](../helldunkel/#tone-curves)'s; dunstkreis bundles them, so the sky pass needs no other package. The tone
-curve choice in <Fig id="sky-full" /> switches every figure between them. A renderer with its own HDR pipeline turns
-that off and gets the exposed luminance itself, linear and unclamped, for a float target.
-
-
 ## Lighting a scene
 
 The same sky can light a scene. The sky pass writes it into the six faces of a cube map, in cd/m² and without the sun's
@@ -431,14 +420,6 @@ Everything this chapter changed along the way, the atmosphere's numbers, the tab
 wavelengths and the encoding, comes together here, previewed, and leaves as files: the tables, the sky cube map and
 its irradiance as RGBE images that any engine reads, and the nine coefficients as numbers. A renderer that never runs
 dunstkreis gets its sky from them (<Fig id="generator" />).
-
-<Sky
-    id="sky-full"
-    full
-    caption="The sky with every option over it, the same pass as the first figure's: exposure by hand or metered, with or without the ramp over the day, the tone curve, the HDR headroom, the atmosphere model, dither and refraction. The model, the tone curve, HDR and refraction switch every figure of the page."
-/>
-
-<Controls />
 
 <Generator />
 

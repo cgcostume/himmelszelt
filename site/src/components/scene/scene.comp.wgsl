@@ -66,6 +66,8 @@ struct Params {
     skyScale: f32,
     // How many times SDR white the display shows, for an HDR canvas; 1 for SDR.
     headroom: f32,
+    // Nonzero to write the exposed light, linear, rather than tone mapped, for bloom to go over.
+    linearOutput: u32,
 }
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -480,6 +482,14 @@ fn render(@builtin(global_invocation_id) id: vec3u) {
     }
     if (params.bloom > 0.0 && params.discIlluminance.g > 0.0) {
         luminance = luminance + bloom(center);
+    }
+    if (params.linearOutput != 0u) {
+        var light = luminance;
+        if (disc > 0.0) {
+            light = light + disc * dkSunDiscLuminance(params.discIlluminance, params.sunAngularRadius);
+        }
+        textureStore(output, vec2i(id.xy), vec4f(min(light * params.exposure, vec3f(1e4)), 1.0));
+        return;
     }
     var color = toneMap(luminance * params.exposure);
     // The sun disc, far beyond white in most exposures: added to what lies behind it, tone mapped apart and mixed in by

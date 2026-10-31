@@ -1,0 +1,57 @@
+---
+import "../sternzeit/sternzeit.css";
+import "./environments.css";
+
+/**
+ * The HDRI, as the moment and place are: one choice for the whole page, set from any of its boxes,
+ * under every figure that shows it.
+ */
+interface Props {
+    /** Starts unfolded; folded shows a one-line summary of the current choice. */
+    open?: boolean;
+}
+const { open = false } = Astro.props;
+// Poly Haven's own categories, the ones a sky is found by, with how many they hold left to the list.
+const CATEGORIES = [
+    "skies",
+    "pure skies",
+    "partly cloudy",
+    "clear",
+    "overcast",
+    "sunrise-sunset",
+    "midday",
+    "night",
+    "all",
+];
+const uid = `environment-${Math.random().toString(36).slice(2, 8)}`;
+---
+
+<details class="moment environments" data-environments open={open}>
+    <summary>
+        <span class="moment-title">Environment</span> <span class="note" data-field="summary">Loading…</span>
+    </summary>
+    <p class="environments-controls">
+        <span class="steps" role="radiogroup" aria-label="Poly Haven category">
+            {CATEGORIES.map((category) => (
+                <label>
+                    <input type="radio" name={uid} value={category} data-category checked={category === "skies"} />
+                    <span>{category}</span>
+                </label>
+            ))}
+        </span>
+        <input type="search" data-field="search" placeholder="Search by name or tag" aria-label="Search Poly Haven's HDRIs by name or tag" />
+    </p>
+    <div class="environments-gallery" data-field="gallery" role="group" aria-label="HDRIs"></div>
+    <p class="environments-controls">
+        <label class="environments-button">your own .hdr <input type="file" accept=".hdr" data-field="file" hidden /></label>
+        <span class="footnote">or drop one on this box or on a figure showing the image.</span>
+        <span class="note" data-field="status"></span>
+    </p>
+    <p class="footnote environments-thanks">
+        These skies are from <a href="https://polyhaven.com/hdris"><strong>Poly Haven</strong></a>, thank you. They give away some thousand HDRIs, textures and models for anyone to use under <a href="https://polyhaven.com/license">CC0</a>: <a href="https://polyhaven.com/">go and have a look</a>, and if they help you, <a href="https://www.patreon.com/polyhaven">support them on Patreon</a>. Fetched live through <a href="https://polyhaven.com/our-api">their API</a>: this site is powered by it, not made, owned or endorsed by Poly Haven, and hosts none of the files.
+    </p>
+</details>
+
+<script>
+    import "./environments";
+</script>

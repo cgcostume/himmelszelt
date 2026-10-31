@@ -6,6 +6,8 @@ import OptionGroup from "../dunstkreis/OptionGroup.astro";
 import SkyFrame from "../dunstkreis/SkyFrame.astro";
 import "../dunstkreis/dunstkreis.css";
 
+const { bloom = "0" } = Astro.props as { bloom?: "0" | "0.04" | "0.15" };
+
 // The choices over the scene, in its options' groups: what lies behind it, how it is lit, and how finely it is sampled.
 const GROUPS = {
     background: {
@@ -20,6 +22,17 @@ const GROUPS = {
     bloom: {
         label: "Bloom",
         heading: "bloom",
+        title: "The image's bright places bled into what lies around them, as a lens does, by the blurred image's share: none, 4% or 15%",
+        options: [
+            ["0", "off"],
+            ["0.04", "4%"],
+            ["0.15", "15%"],
+        ],
+        checked: bloom,
+    },
+    veil: {
+        label: "Veil",
+        heading: "veil",
         title: "The air's wide, soft veil around the Sun, thinning with height, gone in space: none, light or strong",
         options: [
             ["off", "off"],
@@ -79,6 +92,7 @@ const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
             <OptionGroup name="light">
                 <button type="button" class="view-toggle" data-field="sunLight" aria-pressed="true" title="Light the solids by the Sun directly, with its shadows">sunlight</button>
                 <button type="button" class="view-toggle" data-field="skyLight" aria-pressed="true" title="Light the solids by the sky, image-based, from the nine coefficients of the sky map">sky light</button>
+                <Choice {...group("veil")} />
                 <Choice {...group("bloom")} />
             </OptionGroup>
             <OptionGroup name="samples per pixel">

@@ -1,8 +1,8 @@
 # @himmelszelt/helldunkel
 
 From light to pixels: how bright a scene in cd/m² is shown, how its range is folded into the display's, and how the
-result is written. A few plain functions and binding-free WGSL, with no dependency on any other package and no device
-or pass of its own.
+result is written. Plain functions, binding-free WGSL and two small WebGPU passes, with no dependency on any other
+package.
 
 *Helldunkel* is the German word for *clair-obscur* and *chiaroscuro*, the interplay of light and shadow.
 
@@ -12,7 +12,9 @@ or pass of its own.
 - `wgsl.tonemap`, also as `@himmelszelt/helldunkel/wgsl`: exposed, scene-linear Rec. 709 to sRGB-encoded values, by
   `hdToneMapNeutral` (Khronos PBR Neutral), `hdToneMapAgx` (Sobotka's AgX in Wrensch's fit), `hdToneMapAces` (Narkowicz's
   ACES fit) or `hdToneMapClip`, none. `hdToneMapNeutralHdr` and `hdToneMapClipHdr` compress into a display's headroom,
-  for a float canvas with extended tone mapping. Every identifier is prefixed `hd`/`HD_`.
+  for a float canvas with extended tone mapping. `hdDither(color, pixel, levels)` adds a step of
+  interleaved gradient noise (Jimenez 2014) before an 8-bit target rounds, `hdDitherBy(color, noise, levels)` a step of
+  noise of your own, such as a blue noise texture's, and `hdBayer(pixel)` Bayer's 8x8 thresholds. Every identifier is prefixed `hd`/`HD_`.
 
 ```js
 import { exposureFromEV100, wgsl } from "@himmelszelt/helldunkel";
@@ -23,6 +25,15 @@ fn show(luminance: vec3f, exposure: f32) -> vec3f {
     return hdToneMapNeutral(luminance * exposure);
 }`;
 ```
+
+- `createMeterPass(device, { source })`: a light meter over a cube map, an equirectangular panorama or an image. On the
+  GPU it counts every texel, by the solid angle it covers, into histograms of red, green, blue, luminance and the
+  brightest channel, and averages them. `encode` takes where it looks (`focus`, center-weighted or spot), a `mask`, how it
+  averages (a floor of `rangeStops`, or `percentiles`) how fast it follows (`adapt`) and how many texels it counts (`maxSize`). A renderer binds `result` in its
+  own shader, with no round trip; `readHistogram()`, `readLuminance()` and `readEV100()` read it back.
+- `adaptEV100(current, target, seconds, { toBrighter, toDarker })`: the same following on the CPU.
+- `createBloomPass(device)`: `encode(encoder, source, target, strength)` over a linear, exposed rgba16float image, after
+  Jimenez 2014, before the tone curve. It moves light rather than adding it.
 
 Gamut mapping and Display P3 are planned. `@himmelszelt/dunstkreis` bundles this package's curves for its sky pass, so
 installing it needs nothing else. Part of the [himmelszelt monorepo](https://github.com/cgcostume/himmelszelt).

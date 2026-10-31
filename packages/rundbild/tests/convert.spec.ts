@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createPanoramaPass, wgsl } from "../dist/index.js";
+import { createCubeFromPanoramaPass, createEnvironmentBlendPass, createPanoramaPass, wgsl } from "../dist/index.js";
 import { gpuDevice } from "./gpu.js";
 
 const FACE = 64;
@@ -127,3 +127,39 @@ for (const cubified of [false, true]) {
         });
     }
 }
+
+test("a panorama of directions comes back from a cube map where it was, and a fade lies between its ends", async () => {
+    const device = await gpuDevice();
+    test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
+    if (!device) return;
+    const flags = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING;
+    const start = directionCube(device, false);
+    const panorama = device.createTexture({ size: [SIZE, SIZE], format: "rgba16float", usage: flags });
+    const cube = device.createTexture({
+        size: [FACE, FACE, 6],
+        mipLevelCount: 3,
+        format: "rgba16float",
+        usage: flags,
+        textureBindingViewDimension: "cube",
+    });
+    const blended = device.createTexture({
+        size: [FACE, FACE, 6],
+        format: "rgba16float",
+        usage: flags,
+        textureBindingViewDimension: "cube",
+    });
+    const back = device.createTexture({ size: [SIZE, SIZE], format: "rgba16float", usage: flags });
+    const out = await createPanoramaPass(device, { projection: "equirectangular", format: "rgba16float" });
+    const into = await createCubeFromPanoramaPass(device);
+    const blend = await createEnvironmentBlendPass(device);
+    const encoder = device.createCommandEncoder();
+    out.encode(encoder, start, panorama);
+    into.encode(encoder, panorama, cube);
+    // A fade of a cube map with itself: the same, whatever t is.
+    blend.encode(encoder, cube, cube, blended, 0.5);
+    out.encode(encoder, blended, back);
+    device.queue.submit([encoder.finish()]);
+    expect(await worstError(device, back, 1)).toBeLessThan(0.08);
+    for (const texture of [start, panorama, cube, blended, back]) texture.destroy();
+    blend.destroy();
+});

@@ -1,5 +1,6 @@
 import type { AtmosphereLUTs, SkyPass, SkyPassOptions } from "@himmelszelt/dunstkreis";
 import { apparentDirection, clampObserverHeight, createSkyPass } from "@himmelszelt/dunstkreis";
+import { type BloomPass, createBloomPass } from "@himmelszelt/helldunkel";
 import type { Direction } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
 import {
@@ -23,6 +24,7 @@ import {
 } from "../dunstkreis/atmosphere";
 import { geometry } from "../dunstkreis/lutmap";
 import { onDemand } from "../frame";
+import { createDisplay } from "../scene/display";
 import { cameraFrame, createScene } from "../scene/scene";
 import { COMPASS } from "../sternzeit/figure";
 
@@ -44,6 +46,24 @@ function setPitch(pitch: number) {
 }
 
 let context: GPUCanvasContext | null = null;
+// With bloom: the scene written linear, the bloom over it, and the tone curve last.
+let toneMapper: ReturnType<typeof createDisplay> | null = null;
+let bloomPass: BloomPass | null = null;
+let bloomMaking = false;
+let linear: [GPUTexture, GPUTexture] | null = null;
+function linearTargets(width: number, height: number) {
+    if (linear?.[0].width === width && linear[0].height === height) return linear;
+    for (const texture of linear ?? []) texture.destroy();
+    const target = () =>
+        gpuDevice().createTexture({
+            label: "sternwarte:lightingLinear",
+            size: [width, height],
+            format: "rgba16float",
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+        });
+    linear = [target(), target()];
+    return linear;
+}
 let scene: ReturnType<typeof createScene> | null = null;
 // The turning solids' clock, running only while they turn.
 let seconds = 0;
@@ -84,10 +104,14 @@ function sunSeen(live: boolean, luts: AtmosphereLUTs, sky: Sky) {
     return { discDirection: apparentFor.direction, discIlluminance: environment.sun, horizonZ };
 }
 
+// With bloom the scene draws the disc itself, as behind the sky map: the sky pass writes the luminance unexposed into half
+// floats, which the disc overflows, and bloom needs to know how bright it is.
+const bloomChosen = () => Number(chosen("lighting-bloom", 0)) > 0;
+
 /** Whether the sky pass is ready for the current settings; if not, it is compiled, and renders once it is in. */
 function readySkyPass(luts: AtmosphereLUTs) {
     // With the sun disc, drawn along every bent ray, as the sky figure draws it.
-    const settings = { luts, groundLight: quality.groundLight, sunDisc: pressed("sunDisc") };
+    const settings = { luts, groundLight: quality.groundLight, sunDisc: pressed("sunDisc") && !bloomChosen() };
     const same = (other: object | null) =>
         other !== null &&
         Object.entries(settings).every(([key, value]) => (other as Record<string, unknown>)[key] === value);
@@ -217,7 +241,18 @@ function render() {
     const encoder = gpuDevice().createCommandEncoder({ label: "sternwarte:lighting" });
     const live = liveSky() && skyPass ? renderBackground(encoder, skyPass, sky, width, height) : null;
     const seen = sunSeen(live !== null, table.luts, sky);
-    scene.encode(encoder, context.getCurrentTexture(), {
+    const strength = Number(chosen("lighting-bloom", 0));
+    if (strength > 0 && !bloomPass && !bloomMaking) {
+        bloomMaking = true;
+        createBloomPass(gpuDevice()).then((pass) => {
+            bloomPass = pass;
+            requestRender();
+        });
+    }
+    const blooming = strength > 0 && bloomPass !== null;
+    const targets = blooming ? linearTargets(width, height) : null;
+    scene.encode(encoder, targets ? targets[0] : context.getCurrentTexture(), {
+        linearOutput: blooming,
         background: live,
         cube,
         cubified: environment.cubified,
@@ -230,8 +265,8 @@ function render() {
         ...seen,
         ev100,
         // Behind the live atmosphere, the sky pass has drawn the disc already.
-        sunDisc: pressed("sunDisc") && live === null,
-        bloom: ({ off: 0, light: 0.35, strong: 1 } as Record<string, number>)[chosen("lighting-bloom", "strong")],
+        sunDisc: pressed("sunDisc") && (live === null || bloomChosen()),
+        bloom: ({ off: 0, light: 0.35, strong: 1 } as Record<string, number>)[chosen("lighting-veil", "strong")],
         godRaySamples: Number(chosen("lighting-godrays", 8)),
         // The air thins with a scale height of 8 km, the haze in it with 1.2 km.
         airDensity: Math.exp(-cameraFrame(camera).eye[2] / 8000),
@@ -246,6 +281,15 @@ function render() {
         headroom,
         seconds,
     });
+    if (targets && bloomPass) {
+        bloomPass.encode(encoder, targets[0], targets[1], strength);
+        toneMapper ??= createDisplay(gpuDevice());
+        toneMapper.encode(encoder, targets[1], context.getCurrentTexture(), {
+            toneCurve: display.toneCurve,
+            headroom,
+            dither: pressed("dither") && format === SDR,
+        });
+    }
     gpuDevice().queue.submit([encoder.finish()]);
     const lux = 0.2126 * sun[0] + 0.7152 * sun[1] + 0.0722 * sun[2];
     const meters = (m: number) => (m < 1000 ? `${m.toFixed(1)}\u202fm` : `${(m / 1000).toFixed(2)}\u202fkm`);
@@ -279,7 +323,7 @@ if (gpu.error) {
     field("marks").addEventListener("click", requestRender);
     new ResizeObserver(requestRender).observe(canvas);
     for (const radio of root.querySelectorAll(
-        'input[name="lighting-shadows"], input[name="lighting-background"], input[name="lighting-occlusion"], input[name="lighting-godrays"], input[name="lighting-bloom"]',
+        'input[name="lighting-shadows"], input[name="lighting-background"], input[name="lighting-occlusion"], input[name="lighting-godrays"], input[name="lighting-bloom"], input[name="lighting-veil"]',
     ))
         radio.addEventListener("change", requestRender);
     for (const name of ["rotate", "sunDisc", "sunLight", "skyLight", "dither", "lock"]) {

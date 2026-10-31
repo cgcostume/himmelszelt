@@ -44,7 +44,7 @@ document.addEventListener(
         const input = sliderFor(event.target);
         if (!input || event.defaultPrevented || event.deltaY === 0) return;
         event.preventDefault();
-        const step = Number(input.step) || 1;
+        const step = Number(input.dataset.wheelStep || input.step) || 1;
         const [min, max] = [Number(input.min || 0), Number(input.max || 100)];
         const value = Math.min(Math.max(Number(input.value) - Math.sign(event.deltaY) * step, min), max);
         if (value === Number(input.value)) return;

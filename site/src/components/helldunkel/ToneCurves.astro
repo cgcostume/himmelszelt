@@ -1,0 +1,34 @@
+---
+import "../sternzeit/sternzeit.css";
+import EnvironmentFrame from "../environment/EnvironmentFrame.astro";
+import "./helldunkel.css";
+
+const CURVES = [
+    ["clip", "none"],
+    ["neutral", "neutral"],
+    ["agx", "AgX"],
+    ["aces", "ACES"],
+];
+---
+
+<figure class="scene-frame wide" id="tones" data-needs-hdri data-loading>
+    <EnvironmentFrame fullscreen author={false}>
+        <div class="tone-tiles as-seen">
+            {CURVES.map(([curve, name]) => (
+                <figure class="tone-tile">
+                    <canvas data-curve={curve} aria-label={`The chosen HDRI through ${name}`}></canvas>
+                    <figcaption class="note">{name}</figcaption>
+                </figure>
+            ))}
+            <span class="env-author" data-env="author"></span>
+        </div>
+    </EnvironmentFrame>
+    <figcaption class="figure-caption">
+        One image through each tone curve at the chosen exposure. Raise the exposure until the sky clips in the first, and
+        watch what the others make of the same light.
+    </figcaption>
+</figure>
+
+<script>
+    import "./tonecurves";
+</script>

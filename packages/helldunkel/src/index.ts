@@ -14,5 +14,28 @@ export { ev100FromLuminance, exposureFromEV100 } from "./exposure.js";
  */
 export type ToneCurve = "neutral" | "agx" | "aces" | "clip";
 
-// The raw WGSL, binding-free, for inlining into a consumer's own shaders.
+// A light meter for what changes rarely, and the histogram it counts.
+export type {
+    MeterAdaptation,
+    MeterAverage,
+    MeterFocus,
+    MeterHistogram,
+    MeterPass,
+    MeterPassOptions,
+    MeterReading,
+} from "./meter.js";
+export {
+    adaptEV100,
+    createMeterPass,
+    METER_BINS,
+    METER_BINS_PER_STOP,
+    METER_LOWEST_STOP,
+    meteredLuminance,
+} from "./meter.js";
+
+// Bloom, over a linear, exposed image.
+export type { BloomPass, BloomPassOptions } from "./bloom.js";
+export { createBloomPass } from "./bloom.js";
+
+// The raw WGSL, for inlining into a consumer's own shaders.
 export * as wgsl from "./wgsl/index.js";

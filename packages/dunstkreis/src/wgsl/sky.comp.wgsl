@@ -16,15 +16,6 @@
 @group(0) @binding(5) var dkMultiScatteringLut: texture_2d<f32>;
 @group(0) @binding(6) var<storage, read> dkMetering: DkMetering;
 
-// Noise of one 8-bit step, added before the output is quantized: it trades the sky's smooth gradients' bands for grain
-// too fine to see. Jimenez's interleaved gradient noise, which spreads neighboring values apart like blue noise, from
-// the pixel alone, so it is stable from frame to frame and needs no texture; remapped to a triangular distribution,
-// whose error does not depend on the signal.
-fn dkDither(color: vec3f, p: vec2u) -> vec3f {
-    let noise = fract(52.9829189 * fract(dot(vec2f(p), vec2f(0.06711056, 0.00583715)))) * 2.0 - 1.0;
-    return color + sign(noise) * (1.0 - sqrt(1.0 - abs(noise))) / 255.0;
-}
-
 // Offsets within a texel, in [-0.5, 0.5), from Roberts' R2 sequence: evenly spread for any count, the first at the
 // center.
 fn dkR2(i: u32) -> vec2f {
@@ -415,7 +406,7 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
         color = dkDebugOverlay(color, view, right, below);
     }
     if (DK_TONE_MAP != 0u && DK_DITHER) {
-        color = clamp(dkDither(color, id.xy), vec3f(0.0), hdEncodeSrgbExtended(vec3f(DK_HEADROOM), DK_HEADROOM));
+        color = clamp(hdDither(color, id.xy, 255.0), vec3f(0.0), hdEncodeSrgbExtended(vec3f(DK_HEADROOM), DK_HEADROOM));
     }
     dkOutputStore(id.xy, 0u, vec4f(color, select(1.0, disc, DK_TONE_MAP == 0u && DK_DISC_ALPHA)));
 }

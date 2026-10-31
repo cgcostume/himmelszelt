@@ -1,0 +1,76 @@
+---
+import "../sternzeit/sternzeit.css";
+import Choice from "../dunstkreis/Choice.astro";
+import OptionGroup from "../dunstkreis/OptionGroup.astro";
+import EnvironmentFrame from "../environment/EnvironmentFrame.astro";
+import "./helldunkel.css";
+
+const METERINGS = [
+    ["average", "average", "The whole sphere, each place by the solid angle it covers"],
+    ["center", "center", "The middle of the view counts most, fading out towards the frame's corners"],
+    ["spot", "spot", "Only a small circle at the center of the view: drag what you want metered into it"],
+    ["sky", "sky", "A mask: only what lies above the panorama's horizon"],
+    ["ground", "ground", "A mask: only what lies below the panorama's horizon"],
+];
+const AVERAGES = [
+    ["floor", "camera", "Everything, each place at most 10 stops below the brightest percent"],
+    ["middle", "10 to 90%", "The mean of what is left without the darkest and the brightest tenth"],
+    ["bright", "50 to 95%", "The mean of the brighter half, without the brightest 5%: dark places no longer count"],
+];
+const SIZES = [
+    ["256", "¼K", "At most 256 texels across, the rest skipped"],
+    ["512", "½K", "At most 512 texels across, the rest skipped"],
+    ["1024", "1K", "At most 1024 texels across, the rest skipped"],
+    ["2048", "2K", "At most 2048 texels across, the rest skipped"],
+    ["0", "all", "Every texel of the file"],
+];
+const OUTPUTS = [
+    ["linear", "linear", "Eight bits stored proportional to light: 8 stops"],
+    ["srgb", "sRGB", "Eight bits through the sRGB curve: 11.7 stops"],
+    ["hdr", "HDR 4×", "The same, on a display that shows four times SDR white: 2 stops more at the top"],
+];
+---
+
+<figure class="scene-frame wide" id="range" data-needs-hdri data-loading>
+    <EnvironmentFrame fullscreen>
+        <div class="hdri-view as-seen range-view">
+            <canvas data-field="canvas" aria-label="The chosen HDRI at the chosen exposure"></canvas>
+            <span class="range-ring" data-field="ring" hidden></span>
+            <div class="range-plot">
+                <canvas data-field="histogram" aria-label="Histogram of the image's red, green and blue, and over them its luminance, in stops"></canvas>
+                <div class="range-labels" data-field="labels" aria-hidden="true"></div>
+            </div>
+        </div>
+        <Fragment slot="options">
+            <OptionGroup name="metering">
+                <Choice figure="range" name="metering" label="How the meter weighs the image" title="What the meter counts" options={METERINGS} checked="average" />
+            </OptionGroup>
+            <OptionGroup name="counted">
+                <Choice figure="range" name="size" label="How many texels the meter counts" title="How many texels across the meter counts" options={SIZES} checked="2048" />
+            </OptionGroup>
+            <OptionGroup name="average">
+                <Choice figure="range" name="average" label="How the meter averages" title="How it averages what it counts" options={AVERAGES} checked="floor" />
+            </OptionGroup>
+            <OptionGroup name="adaptation">
+                <label class="sky-ev" title="The time constant towards a darker scene; towards a brighter one, a third of it. 0 takes each reading at once"><input data-field="adaptation" type="range" min="0" max="2" step="0.1" value="0" aria-label="How fast the exposure follows the reading, in seconds" /> <output data-field="adaptationValue">off</output></label>
+            </OptionGroup>
+            <OptionGroup name="output">
+                <Choice figure="range" name="output" label="What the output holds" title="What the band in the histogram holds" options={OUTPUTS} checked="srgb" />
+            </OptionGroup>
+        </Fragment>
+    </EnvironmentFrame>
+    <p class="note" data-field="info"></p>
+    <figcaption class="figure-caption">
+        How much of the image lies at each brightness: across in stops squeezed towards the ends of the axis, up by the root of its share of the whole sphere, every texel counted on the GPU by the solid angle it covers:
+        red, green and blue as light adding up, densest towards each curve, the white line their luminance, and the gray behind them the whole image, of which the curves show what the meter weighs. The percentages are of what it weighs. The lit band is what the output holds at the chosen
+        exposure, from its first step above black to white, and dashed is the meter's reading. What lies in the stripes clips, a
+        place to white once its brightest channel passes the band and to black once that channel is below it. The clip button
+        marks the same places in the image. The circle over the view is the meter's: center-weighted counts it fully and
+        fades out by the frame's corners, spot counts nothing else, and sky and ground are masks. With some adaptation, the band
+        slides after the dashed reading: choose spot and drag from the ground to the Sun.
+    </figcaption>
+</figure>
+
+<script>
+    import "./range";
+</script>

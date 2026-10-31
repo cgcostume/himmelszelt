@@ -34,7 +34,7 @@ const ANCHORS: [ev: number, label: string][] = [
     [15, "sunny day"],
     [0, "twilight"],
 ];
-// Variant B's sun altitudes and its ramp's compensations.
+// The ramp's own plot: sun altitudes and compensations.
 const ALTITUDE_AXIS = [-18, 90] as const;
 const ALTITUDE_TICKS = [-18, -6, 0, 30, 60, 90];
 const COMPENSATION_AXIS = [-2.5, 1] as const;
@@ -48,10 +48,12 @@ const BANDS: [threshold: number, cls: string][] = [
 ];
 const BAND_HEIGHT = 6;
 const MARGIN = { top: 10, right: 8, bottom: 26 };
-// The space between the meter's plot and the ramp's, and the ramp's share of the height in each variant.
+// The space between the meter's plot and the compensation under it, the latter's share, and the ramp's own plot below
+// them, with the room for the hours between.
 const GAP = 12;
-const RAMP_SHARE_A = 0.18;
-const RAMP_SHARE_B = 0.34;
+const RAMP_SHARE = 0.18;
+const EDITOR_HEIGHT = 96;
+const EDITOR_GAP = 38;
 const HANDLE_RADIUS = 5;
 
 const root = find("#exposure-day");
@@ -70,9 +72,8 @@ type Day = {
 let metered: Day | null = null;
 let metering = "";
 
-// The ramp, local to the figure: dragged in variant B, it changes this plot only.
+// The ramp, local to the figure: dragged, it changes this plot only.
 let keys: AutoExposureKey[] = structuredClone([...DEFAULT_AUTO_EXPOSURE_KEYS]);
-let variant: "a" | "b" = "a";
 
 let pass: SkyPass | null = null;
 let passFor: unknown = null;
@@ -161,21 +162,24 @@ function path(points: [number, number][], cls: string) {
 
 type Box = { left: number; right: number; top: number; bottom: number };
 
-function layout(rampShare: number) {
-    const [width, height] = [svgEl.clientWidth || 600, svgEl.clientHeight || 220];
+function layout() {
+    const [width, height] = [svgEl.clientWidth || 600, svgEl.clientHeight || 340];
     // The EV100s flush with the text's left edge, the plot after them: a sign and two monospace digits.
     const left = 1.8 * parseFloat(getComputedStyle(svgEl).fontSize) + LABEL_GAP;
-    const [top, bottom] = [MARGIN.top, height - MARGIN.bottom];
-    // The meter above, the ramp's compensation below, on one axis of time or of sun altitudes.
-    const split = bottom - (bottom - top) * rampShare;
-    const upper = { left, right: width - MARGIN.right, top, bottom: split - GAP / 2 };
+    const right = width - MARGIN.right;
+    const editorBottom = height - 16;
+    const editor = { left, right, top: editorBottom - EDITOR_HEIGHT, bottom: editorBottom };
+    const [top, bottom] = [MARGIN.top, editor.top - EDITOR_GAP];
+    // The meter above, the ramp's compensation over the day below it, on one axis of time.
+    const split = bottom - (bottom - top) * RAMP_SHARE;
+    const upper = { left, right, top, bottom: split - GAP / 2 };
     const lower = { ...upper, top: split + GAP / 2, bottom };
-    return { width, height, upper, lower };
+    return { width, height, upper, lower, editor };
 }
 
 // The plots as last laid out, for the pointer.
 let upperBox: Box = { left: 0, right: 1, top: 0, bottom: 1 };
-let lowerBox: Box = { left: 0, right: 1, top: 0, bottom: 1 };
+let editorBox: Box = { left: 0, right: 1, top: 0, bottom: 1 };
 let handles: { key: number; phase: "rising" | "setting" | null; x: number; y: number }[] = [];
 
 const minus = (n: number | string) => String(n).replace("-", "−");
@@ -233,8 +237,8 @@ function labels(x: number, box: Box, y: (ev: number) => number, text: string) {
 }
 
 function renderByTime(day: Day | null) {
-    const { upper, lower } = layout(RAMP_SHARE_A);
-    [upperBox, lowerBox] = [upper, lower];
+    const { upper, lower } = layout();
+    upperBox = upper;
     const x = (minutes: number) => upper.left + (minutes / (24 * 60)) * (upper.right - upper.left);
     const ev = evAxis(upper, EV_AXIS);
     const ramp = rampAxis(lower, [-2, 0]);
@@ -278,23 +282,20 @@ function renderByTime(day: Day | null) {
     return svg + labels(mx, upper, ev.y, `EV ${minus(value.toFixed(1))}`);
 }
 
-function renderByAltitude(day: Day | null) {
-    const { upper, lower } = layout(RAMP_SHARE_B);
-    [upperBox, lowerBox] = [upper, lower];
+/** The ramp itself over the Sun's altitude, solid rising and dashed setting, its keys to drag up and down. */
+function renderRamp(day: Day | null) {
+    const { editor } = layout();
+    editorBox = editor;
     const [a0, a1] = ALTITUDE_AXIS;
-    const x = (altitude: number) => upper.left + ((altitude - a0) / (a1 - a0)) * (upper.right - upper.left);
-    const ev = evAxis(upper, EV_AXIS);
-    const ramp = rampAxis(lower, [-2, -1, 0]);
-    let svg = ev.svg + ramp.svg;
+    const x = (altitude: number) => editor.left + ((altitude - a0) / (a1 - a0)) * (editor.right - editor.left);
+    const ramp = rampAxis(editor, [-2, -1, 0]);
+    let svg = ramp.svg;
     for (const altitude of ALTITUDE_TICKS) {
         const ax = x(altitude);
-        const cls = altitude === 0 ? "exposureday-horizon" : "figure-grid";
-        svg += vline(ax, upper.top, upper.bottom, cls) + vline(ax, lower.top, lower.bottom, cls);
+        svg += vline(ax, editor.top, editor.bottom, altitude === 0 ? "exposureday-horizon" : "figure-grid");
         const anchor = altitude === a0 ? "figure-anchor-start" : altitude === a1 ? "figure-anchor-end" : "";
-        svg += svgText(ax, lower.bottom + 12, `${minus(altitude)}°`, `figure-label exposureday-tick ${anchor}`);
+        svg += svgText(ax, editor.bottom + 12, `${minus(altitude)}°`, `figure-label exposureday-tick ${anchor}`);
     }
-
-    // The ramp for the rising and the setting Sun, and its keys as handles.
     const rampCurve = (east: number) =>
         Array.from({ length: 217 }, (_, i): [number, number] => {
             const altitude = a0 + (i / 216) * (a1 - a0);
@@ -314,52 +315,34 @@ function renderByAltitude(day: Day | null) {
             svg += `<circle cx="${f(hx)}" cy="${f(hy)}" r="${HANDLE_RADIUS}" class="${cls}"/>`;
         }
     });
-    if (!day) return svg + labels(Number.NaN, upper, ev.y, "");
-
-    const { exposure } = curves(day);
-    // Each half of the day by its own Sun, as the ramp tells them: east of the meridian rising, west of it setting.
-    const series = (values: number[], east: boolean) =>
-        day.altitudes
-            .map((altitude, i): [number, number, boolean] => [
-                altitude + day.dip,
-                values[i] ?? 0,
-                (day.directions[i]?.[0] ?? 0) >= 0,
-            ])
-            .filter(([, , e]) => e === east)
-            .sort(([p], [q]) => p - q)
-            .map(([altitude, value]): [number, number] => [x(altitude), ev.y(value)]);
-    svg += `${clip("exposureday-clip", upper)}<g clip-path="url(#exposureday-clip)">`;
-    for (const east of [true, false]) {
-        const setting = east ? "" : " exposureday-setting";
-        svg += path(series(day.meter, east), `exposureday-meter${setting}`);
-        svg += path(series(exposure, east), `exposureday-exposure${setting}`);
-    }
-    svg += "</g>";
+    svg += svgText(
+        editor.right - 2,
+        editor.top + 8,
+        "drag the keys",
+        "figure-label figure-anchor-end exposureday-anchor",
+    );
+    if (!day) return svg;
     // The Sun now, by its altitude above the observer's horizon, as the ramp reads it.
     const direction = sun.direction(fromJulianDay(state.jd), state);
     const altitude = Math.asin(direction[2]) / DEG + day.dip;
-    if (altitude < a0 || altitude > a1) return svg + labels(Number.NaN, upper, ev.y, "");
+    if (altitude < a0 || altitude > a1) return svg;
     const mx = x(altitude);
-    const value = at(exposure, momentOnClock().timeOfDay / MINUTE_MS);
-    svg += vline(mx, upper.top, lower.bottom, "strip-moment");
-    svg += `<circle cx="${f(mx)}" cy="${f(ev.y(value))}" r="3.5" class="exposureday-dot"/>`;
-    svg += `<circle cx="${f(mx)}" cy="${f(ramp.y(autoExposureCompensation(keys, direction, day.dip)))}" r="3" class="exposureday-dot"/>`;
-    return svg + labels(mx, upper, ev.y, `EV ${minus(value.toFixed(1))}`);
+    svg += vline(mx, editor.top, editor.bottom, "strip-moment");
+    return `${svg}<circle cx="${f(mx)}" cy="${f(ramp.y(autoExposureCompensation(keys, direction, day.dip)))}" r="3" class="exposureday-dot"/>`;
 }
 
 function render() {
     ensureMetered();
-    root.dataset.variant = variant;
     // The day metered last, until the next one is in.
-    const svg = variant === "a" ? renderByTime(metered) : renderByAltitude(metered);
-    const { width, height } = layout(0);
+    const svg = renderByTime(metered) + renderRamp(metered);
+    const { width, height } = layout();
     svgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
     drawSvg(svgEl, svg, 1);
 }
 
 const requestRender = onDemand(render, svgEl);
 
-// Variant A: a press or a drag on the plot sets the time of day. Variant B: a drag moves a key of the ramp up or down.
+// A press or a drag on the day sets the time of day; on the ramp, a drag moves a key up or down.
 let dragging: { kind: "time" } | { kind: "key"; key: number; phase: "rising" | "setting" | null } | null = null;
 
 function pointer(event: PointerEvent) {
@@ -376,7 +359,7 @@ function setTime(px: number) {
 function setKey(py: number) {
     if (dragging?.kind !== "key") return;
     const [c0, c1] = COMPENSATION_AXIS;
-    const t = (lowerBox.bottom - py) / (lowerBox.bottom - lowerBox.top);
+    const t = (editorBox.bottom - py) / (editorBox.bottom - editorBox.top);
     const value = Math.round(clamp(c0 + t * (c1 - c0), c0, c1) * 10) / 10;
     const key = keys[dragging.key];
     if (!key) return;
@@ -388,14 +371,14 @@ function setKey(py: number) {
 
 svgEl.addEventListener("pointerdown", (event) => {
     const [px, py] = pointer(event);
-    if (variant === "a") {
-        if (px < upperBox.left - 4 || px > upperBox.right + 4) return;
-        dragging = { kind: "time" };
-        setTime(px);
-    } else {
+    if (py >= editorBox.top - HANDLE_RADIUS) {
         const near = handles.map((h) => ({ ...h, d: Math.hypot(h.x - px, h.y - py) })).sort((a, b) => a.d - b.d)[0];
         if (!near || near.d > 3 * HANDLE_RADIUS) return;
         dragging = { kind: "key", key: near.key, phase: near.phase };
+    } else {
+        if (px < upperBox.left - 4 || px > upperBox.right + 4) return;
+        dragging = { kind: "time" };
+        setTime(px);
     }
     svgEl.setPointerCapture(event.pointerId);
     event.preventDefault();
@@ -408,15 +391,7 @@ svgEl.addEventListener("pointermove", (event) => {
 });
 for (const type of ["pointerup", "pointercancel"]) svgEl.addEventListener(type, () => (dragging = null));
 
-const variantButtons = root.querySelectorAll<HTMLButtonElement>("button[data-variant]");
 const resetButton = root.querySelector<HTMLButtonElement>('[data-field="reset"]');
-for (const button of variantButtons) {
-    button.addEventListener("click", () => {
-        variant = button.dataset.variant === "b" ? "b" : "a";
-        for (const other of variantButtons) other.setAttribute("aria-pressed", String(other === button));
-        requestRender();
-    });
-}
 resetButton?.addEventListener("click", () => {
     keys = structuredClone([...DEFAULT_AUTO_EXPOSURE_KEYS]);
     resetButton.setAttribute("hidden", "");

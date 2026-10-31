@@ -121,6 +121,16 @@ confirmed yet.
 | Caravaggio and Rembrandt are chiaroscuro painters; clair-obscur and chiaroscuro are the same term | opening | web | de.wikipedia.org/wiki/Chiaroscuro | ok | 2026-10-31 |
 | Clair Obscur: Expedition 33 is a game of 2025 | opening | web | en.wikipedia.org | ok | 2026-10-31 |
 
+| sRGB primaries, D65 (0.3127, 0.329), reference white 80 cd/m²; BT.2408 203 cd/m²; Rec. 2020 and P3 primaries; D50 and A coordinates | Color spaces, High dynamic range, figure | web | from memory of the standards, not yet checked against them | open | 2026-10-31 |
+| 8-bit sRGB holds 11.7 stops above its first step: log2(255 × 12.92) | High dynamic range, range figure | derived | 11.69 | ok | 2026-10-31 |
+| Bloom chain: 13 taps, tent, no threshold | Bloom | src | jimenez2014, from memory, slides not reread | open | 2026-10-31 |
+
+| Eight bits, 256 steps; a dither of one step keeps the mean right; dither after the sRGB curve, not before | Banding and dither | derived | standard practice, not cited beyond jimenez2014 | open | 2026-10-31 |
+
+| White noise clumps; blue noise holds back low frequencies; gradient noise shows a diagonal order | Banding and dither | src, web | ulichney1988 by secondary sources, its text not read; the order seen in the figure | open | 2026-10-31 |
+
+| Bayer 1973 and Jarzynski & Olano 2020: titles and venues | references | web | from memory, not looked up | open | 2026-10-31 |
+
 ## rundbild
 
 ### Text
@@ -133,6 +143,7 @@ confirmed yet.
 | At about 400 texels the largest texel over the smallest: equirectangular 8.9, fisheye 1.5 (cube 3.8, cubified 1.1, octahedral 4.2); at 1.6 million, octahedral 5.18 = (√3)³, cube 5.18, fisheye 1.57 = π/2 | Flattening the sky | lib, derived | projections figure, Jacobian over 6 by 6 points a texel; equirectangular exact 8.88 | fixed | 2026-10-22 |
 | Fisheye texels within a factor of about 1.6 (π/2 in the limit); it leaves a fifth of its square empty | Flattening the sky | derived | 1 - π/4 = 21%; 84 of 400 texels | ok | 2026-10-22 |
 | Sphere map: the horizon at sin 45° = 0.71 of the radius, every texel the same solid angle (largest over smallest 1.00 at 1,600 and 6,400 texels) | Flattening the sky | lib, derived | r = sin(zenith angle / 2), Lambert's azimuthal equal-area halved; projections figure | ok | 2026-10-22 |
+| Cube face needs W/π to hold an equirectangular of width W: 2π/W against 2/N at the middle of a face | From one to the other | derived | | ok | 2026-10-31 |
 | Midnight sun in Tromsø, June 21 22:46 UTC: glow due north, on the equirectangular's seam, at the fisheye's top | Projections caption | lib | screenshot of the figure | ok | 2026-10-22 |
 
 ## dunstkreis

@@ -413,8 +413,7 @@ fn gridCoverage(position: vec2f, d: vec3f) -> f32 {
 fn put(p: vec2u, color: vec3f) {
     var c = color;
     if (params.dither != 0u) {
-        let noise = fract(52.9829189 * fract(dot(vec2f(p), vec2f(0.06711056, 0.00583715)))) * 2.0 - 1.0;
-        c = c + sign(noise) * (1.0 - sqrt(1.0 - abs(noise))) / 255.0;
+        c = hdDither(c, p, 255.0);
     }
     textureStore(output, vec2i(p), vec4f(clamp(c, vec3f(0.0), vec3f(1.0)), 1.0));
 }

@@ -1,0 +1,48 @@
+---
+import "../sternzeit/sternzeit.css";
+import "./helldunkel.css";
+
+const WHITES = [
+    ["D65", "D65, noon daylight, about 6500 K: the white of sRGB, Display P3 and Rec. 2020"],
+    ["D50", "D50, warmer daylight, about 5000 K: the white of print"],
+    ["A", "Illuminant A, an incandescent lamp, about 2856 K"],
+];
+---
+
+<figure class="scene-frame" id="chromaticity">
+    <div class="chromaticity" data-field="plot">
+        <canvas data-field="canvas" aria-label="The colors a screen shows within the CIE 1931 chromaticity diagram"></canvas>
+        <div data-field="overlay"></div>
+    </div>
+    <p class="hdri-controls">
+        <span class="steps" role="radiogroup" aria-label="White point">
+            <span class="steps-heading" aria-hidden="true">white point</span>
+            {WHITES.map(([value, title]) => (
+                <label title={title}>
+                    <input type="radio" name="chromaticity-white" value={value} checked={value === "D65"} />
+                    <span>{value}</span>
+                </label>
+            ))}
+        </span>
+        <span class="steps" role="radiogroup" aria-label="Which colors are filled in">
+            <span class="steps-heading" aria-hidden="true">colors</span>
+            {["sRGB", "P3"].map((value) => (
+                <label>
+                    <input type="radio" name="chromaticity-fill" value={value} checked={value === "sRGB"} />
+                    <span>{value}</span>
+                </label>
+            ))}
+        </span>
+        <span class="chromaticity-swatch" data-field="swatch" title="This white as sRGB shows it"></span>
+        <span class="note" data-field="info"></span>
+    </p>
+    <figcaption class="figure-caption">
+        Every color the eye can tell apart, by chromaticity, the spectrum's pure colors along the curved edge, computed by
+        Wyman's fit. The triangles are what three primaries can mix: sRGB, Display P3 and Rec. 2020, and the mark is the
+        white point. The colors fill the triangle chosen, P3 only on a screen that shows it, and outside it there is nothing a screen could show right.
+    </figcaption>
+</figure>
+
+<script>
+    import "./chromaticity";
+</script>

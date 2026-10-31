@@ -1,0 +1,25 @@
+---
+import "../sternzeit/sternzeit.css";
+import "../environment/environments.css";
+import Hdr from "../dunstkreis/Hdr.astro";
+import EnvironmentFrame from "../environment/EnvironmentFrame.astro";
+import "../dunstkreis/dunstkreis.css";
+import "./helldunkel.css";
+---
+
+<figure class="scene-frame wide" id="hdri" data-needs-hdri data-loading>
+    <EnvironmentFrame fullscreen>
+        <div class="hdri-view as-seen"><canvas data-field="canvas" aria-label="The chosen HDRI"></canvas></div>
+    </EnvironmentFrame>
+    <p class="hdri-controls"><Hdr figure="hdri" /></p>
+    <p class="note" data-field="info"></p>
+    <figcaption class="figure-caption">
+        A photograph of the whole sphere, seen from inside, or as the equirectangular panorama it is stored as: north, or wherever
+        its camera pointed, at the edges, the zenith at the top. Shown without a curve, each channel cut off at white, at the
+        chosen exposure.
+    </figcaption>
+</figure>
+
+<script>
+    import "./hdrifigure";
+</script>

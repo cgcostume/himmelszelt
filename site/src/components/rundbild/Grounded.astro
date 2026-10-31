@@ -1,0 +1,66 @@
+---
+import "../sternzeit/sternzeit.css";
+import EnvironmentFrame from "../environment/EnvironmentFrame.astro";
+import "../environment/environments.css";
+import "../helldunkel/helldunkel.css";
+
+const SLIDERS = [
+    {
+        name: "height",
+        label: "height",
+        title: "How far above the ground the image was taken, in the units the solids stand in",
+        min: 0.2,
+        max: 8,
+        step: 0.1,
+        value: 2,
+        marks: ["0.2", "8"],
+    },
+    {
+        name: "lift",
+        label: "horizon",
+        title: "How far the image's horizon is lifted, or lowered, in degrees",
+        min: -20,
+        max: 20,
+        step: 0.5,
+        value: 0,
+        marks: ["−20°", "+20°"],
+    },
+    {
+        name: "blend",
+        label: "blend",
+        title: "Over how many degrees around the horizon the ground goes over into the plain lookup",
+        min: 0,
+        max: 30,
+        step: 1,
+        value: 8,
+        marks: ["0°", "30°"],
+    },
+];
+---
+
+<figure class="scene-frame wide" id="grounded" data-needs-hdri data-loading>
+    <EnvironmentFrame fullscreen ownView="Drag to turn around, scroll to move closer. Raytraced with WebGPU.">
+        <div class="hdri-view as-seen"><canvas data-field="canvas" aria-label="The five Platonic solids and a sphere, standing on the chosen HDRI's ground"></canvas></div>
+    </EnvironmentFrame>
+    <div class="env-exposure grounded-controls">
+        <button type="button" class="environments-button" data-field="flat" aria-pressed="true" title="Lay what lies below the horizon on a plane; off, it lies at infinity">flat ground</button>
+        {SLIDERS.map(({ name, label, title, min, max, step, value, marks }) => (
+            <label class="figure-slider" title={title}>
+                <span class="note">{label}</span>
+                <span class="figure-slider-rail">
+                    <input type="range" data-field={name} min={min} max={max} step={step} value={value} aria-label={title} />
+                    <span class="figure-slider-scale" aria-hidden="true">{marks.map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 100}%`}>{mark}</span>)}</span>
+                </span>
+                <output data-field={`${name}Reading`}></output>
+            </label>
+        ))}
+    </div>
+    <figcaption class="figure-caption">
+        The solids on the chosen image's own ground, lit by its nine coefficients and dimmed where they hide its sky. The image
+        holds no separate Sun, so there is no sharp shadow, only this soft one. Turn the flat ground off, and they float.
+    </figcaption>
+</figure>
+
+<script>
+    import "./grounded";
+</script>

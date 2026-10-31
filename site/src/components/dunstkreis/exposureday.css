@@ -7,21 +7,15 @@
     --day: var(--accent);
 }
 #exposure-day .strip-panel > svg {
-    height: clamp(15rem, 42vw, 18rem);
+    height: clamp(22rem, 60vw, 26rem);
     touch-action: pan-y;
 }
-#exposure-day[data-variant="b"] .strip-panel > svg {
-    height: clamp(17rem, 55vw, 24rem);
-    cursor: default;
-}
-.exposureday-variants {
-    display: flex;
-    gap: 0.4rem;
-    justify-content: flex-end;
-    margin-top: 0.4rem;
-}
-.exposureday-variants > .view-toggle {
-    position: static;
+.exposureday-reset {
+    position: absolute;
+    top: auto;
+    left: auto;
+    bottom: 22px;
+    right: 8px;
 }
 .exposureday-meter,
 .exposureday-compensated,
@@ -56,11 +50,6 @@
     stroke: var(--bg);
     stroke-width: 3px;
     stroke-linejoin: round;
-}
-/* Each variant's caption with its own plot; the second exists under pnpm dev only. */
-#exposure-day[data-variant="a"] [data-caption="b"],
-#exposure-day[data-variant="b"] [data-caption="a"] {
-    display: none;
 }
 .exposureday-ramp {
     fill: none;

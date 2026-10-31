@@ -1,0 +1,59 @@
+---
+import "../sternzeit/sternzeit.css";
+import "./helldunkel.css";
+
+const CURVES = [
+    ["clip", "none"],
+    ["neutral", "neutral"],
+    ["agx", "AgX"],
+    ["aces", "ACES"],
+];
+const COLORS = [
+    ["sunset", "sunset"],
+    ["sky", "sky"],
+    ["leaf", "leaf"],
+    ["gray", "gray"],
+];
+---
+
+<figure class="scene-frame" id="curves">
+    <p class="hdri-controls">
+        <span class="steps" role="radiogroup" aria-label="The light's color">
+            <span class="steps-heading" aria-hidden="true">light</span>
+            {COLORS.map(([value, name]) => (
+                <label>
+                    <input type="radio" name="curves-color" value={value} checked={value === "sunset"} />
+                    <span>{name}</span>
+                </label>
+            ))}
+        </span>
+        <span class="steps" role="radiogroup" aria-label="The tone curve in the plot">
+            <span class="steps-heading" aria-hidden="true">curve</span>
+            {CURVES.map(([value, name]) => (
+                <label>
+                    <input type="radio" name="curves-curve" value={value} checked={value === "neutral"} />
+                    <span>{name}</span>
+                </label>
+            ))}
+        </span>
+    </p>
+    <div class="curves-plot"><svg data-field="plot" aria-label="What the chosen tone curve makes of each channel of the chosen light"></svg></div>
+    <div class="curves-strips">
+        {CURVES.map(([value, name]) => (
+            <Fragment>
+                <span class="note">{name}</span>
+                <canvas data-strip={value} aria-label={`The chosen light from dark to bright through ${name}`}></canvas>
+            </Fragment>
+        ))}
+    </div>
+    <figcaption class="figure-caption">
+        One color of light growing brighter from left to right, in stops from white. The plot shows what the chosen curve writes
+        for each channel, computed by the shaders themselves, and the strips show that color through every curve. Where a
+        channel's line flattens at 1 it has clipped, and the others go on without it, which is what shifts a hue. On gray the
+        three lines lie on one another, and only the shape of the curve is left.
+    </figcaption>
+</figure>
+
+<script>
+    import "./tonegraph";
+</script>

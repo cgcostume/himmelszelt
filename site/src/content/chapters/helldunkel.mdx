@@ -5,22 +5,37 @@ summary: "From light to pixels: how bright a scene is shown, and what becomes of
 order: 1
 draft: true
 references:
+    - bayer1973
+    - bt2408
     - goethe1810
+    - iec1999
+    - jimenez2014
+    - jarzynski2020
     - khronos2024
     - lagarde2014
     - narkowicz2016
+    - polyhaven
     - sobotka2023
+    - ulichney1988
     - wrensch2023
+    - wyman2013
 ---
 
 import Cite from "../../components/Cite.astro";
 import Controls from "../../components/sternzeit/Controls.astro";
 import Fig from "../../components/Fig.astro";
-import Planned from "../../components/Planned.astro";
 import Sky from "../../components/dunstkreis/Sky.astro";
+import Environments from "../../components/environment/Environments.astro";
+import Banding from "../../components/helldunkel/Banding.astro";
+import Bloom from "../../components/helldunkel/Bloom.astro";
+import Chromaticity from "../../components/helldunkel/Chromaticity.astro";
+import Hdri from "../../components/helldunkel/Hdri.astro";
+import Ramps from "../../components/helldunkel/Ramps.astro";
+import Range from "../../components/helldunkel/Range.astro";
+import ToneCurves from "../../components/helldunkel/ToneCurves.astro";
+import ToneGraph from "../../components/helldunkel/ToneGraph.astro";
 
-This chapter is being written. Most of it comes from dunstkreis, where it began, and it still needs an opening of its
-own, and figures that show a photograph rather than only the computed sky.
+This chapter is being written. Its order and its figures stand; the text between them is still a first draft.
 
 > "What matters here is the highest light, the middle tint, the shadow." Goethe <Cite id="goethe1810" />
 
@@ -32,17 +47,19 @@ more than a canvas or a screen can show, so something has to decide what becomes
 and the shadow. helldunkel makes that decision: how much light is let in, how its range is folded into the screen's, and
 how the result is written out.
 
-For a developer: a few plain functions and binding-free WGSL, no dependency on any other package, and no device or pass
-of its own. It takes light in cd/m², from a photograph or from [dunstkreis](../dunstkreis/), which bundles the same
-curves for its sky pass.
+For a developer: plain functions, binding-free WGSL and two small WebGPU passes, a light meter and bloom, with no
+dependency on any other package. It takes light in cd/m², or in the relative values of a photograph.
 
-<Sky
-    primary
-    full
-    caption="The sky of dunstkreis, here to have something to expose: the exposure by hand or metered, the tone curve and the HDR headroom, each of which switches every figure of the page."
-/>
+## A photograph of the whole sky
 
-<Controls open />
+Stand on a hill and turn once around: an HDRI holds all of that, every direction, in one image of numbers that can go far
+beyond white (<Fig id="hdri" />). Choose another and it comes straight from [Poly Haven](https://polyhaven.com/hdris) <Cite id="polyhaven" />; push the exposure up and the
+ground appears as the sky burns out, down and the clouds appear as the ground goes black. No single setting shows it all. The bar over each figure shows the map as
+it is stored or the view from inside it, which [rundbild](../rundbild/#flattening-the-sky) explains.
+
+<Hdri />
+
+<Environments open />
 
 ```ts
 import { exposureFromEV100, wgsl } from "@himmelszelt/helldunkel";
@@ -56,53 +73,185 @@ fn show(luminance: vec3f, exposure: f32) -> vec3f {
 }`;
 ```
 
-<Planned what="section" title="The range of a scene" plan="the opening section, from what anyone can see: a window seen from inside a room.">
-    What a day spans in stops against what a screen shows, on a photograph.
-</Planned>
+## Numbers for light, numbers for the eye
 
-## Exposure
+A pixel's numbers can mean two things: an amount of light, or how bright it looks. Light adds in linear numbers and
+nowhere else, so every computation here works in them. Eight bits, though, are spent where the eye tells values apart, in
+the dark, which is what the sRGB transfer curve does (<Fig id="ramps" />). Mixing encoded values is the classic mistake: a
+blur between white and black comes out too dark.
+
+<Ramps />
+
+## High dynamic range
+
+An image's numbers span far more than a screen does. Eight bits of sRGB hold 11.7 stops, each twice the light of the last,
+and a sunny HDRI holds many more from its darkest place to the Sun. That number is no choice but the transfer curve's: the
+first step above black is 1/255 on its linear toe of slope 12.92, so log₂(255 × 12.92). Eight bits stored linearly would
+hold 8 stops. How many of them a screen really shows is up to the screen and the room, as the darkest steps drown in its
+black. Exposure slides that window along the stops, and whatever falls out at either end is gone.
+
+Nothing fixes how bright the top of the window shows, as a display decides that: sRGB's reference white is 80 cd/m²
+<Cite id="iec1999" />, and HDR video settled on 203 for the same white <Cite id="bt2408" />.
+
+## Exposing an image
 
 Exposure is set in EV100, as on a camera and in engines like Frostbite and Unreal <Cite id="lagarde2014" />: the
 luminance that just saturates is 1.2 × 2^EV100 cd/m². A sunny day is about EV 15, an overcast one 10, twilight 0,
 moonlight −6. A sky in cd/m² takes the same exposure as any other scene built on this convention, and looks the same
 under it.
 
-<Planned title="Exposure on a photograph" plan="needs rundbild's HDRI loader.">
-    One HDRI under an EV100 slider, with the stops it clips marked.
-</Planned>
+The image needs an exposure before anything else, and a light meter gives a good start: the geometric mean of its
+luminance, so that a few bright places do not outvote the rest, with each place counted at most ten stops below the
+brightest percent of them. `createMeterPass` counts every texel on the GPU, by the solid angle it covers, into histograms
+of red, green, blue and luminance, and takes the mean from those. An equirectangular panorama read as a plain image would
+count its stretched zenith and nadir far too often. An HDRI's values are usually relative, so the reading is relative
+too: it says how to show this image, not how bright the day was.
+
+Cameras weigh the frame in different ways, and <Fig id="range" /> offers the common ones. A center-weighted meter counts
+the middle of the view most, a spot meter nothing but a small circle, and a mask whatever you paint into it, here the sky
+or the ground. Turn the view and the reading follows, and the slider under the image marks it and snaps to it. The red,
+green and blue curves do not end at one place, which is why a bright color clips one channel at a time.
+
+Real-time renderers usually average differently. A camera's floor keeps every place in the mean, while a game engine
+tends to filter the histogram by percentiles: it leaves out the darkest and brightest shares, so a window or a lamp stops
+moving the exposure. Nor does a game jump to the reading. The exposure follows it over time, faster towards a brighter
+scene than towards a darker one, as an eye does. Give it some seconds to adapt, choose spot, and drag from the ground to the Sun: the
+reading jumps at once, and the band of what the output holds slides after it. The same runs without a round trip:
+`meter.result` holds the reading and the adapted exposure on the GPU, for a tone curve to bind directly.
+
+<Range />
+
+<Environments />
+
+```ts
+import { createMeterPass } from "@himmelszelt/helldunkel";
+
+const meter = await createMeterPass(device, { source: "equirectangular" });
+// Each frame: the middle 80% of a spot to the north, following over the seconds since the last.
+meter.encode(encoder, panorama, {
+    focus: { direction: [0, 1, 0], innerAngle: 0.1, outerAngle: 0.12 },
+    percentiles: [0.1, 0.9],
+    adapt: { seconds, toBrighter: 0.4, toDarker: 1.5 },
+});
+// Three f32 on the GPU, luminance, EV100 and adapted EV100: bind it in your own shader.
+const { result } = meter;
+```
+
+## A sky that moves
+
+A photograph needs one reading. A sky computed by [dunstkreis](../dunstkreis/) changes with the Sun, so its meter runs
+again each time, as [its chapter](../dunstkreis/#exposure-over-a-day) follows through a day (<Fig id="sky" />).
+
+<Sky
+    primary
+    full
+    caption="A computed sky, here to be exposed: the exposure by hand or metered, the tone curve and the HDR headroom, each of which switches every figure of the page."
+/>
+
+<Controls open />
 
 ## Tone curves
 
 A tone curve folds what is brighter than white into what the display shows, and the last step encodes the result for
-sRGB, dithered against banding. Khronos PBR Neutral <Cite id="khronos2024" /> keeps colors exactly as they are up to three quarters of
-white and compresses only the brightest, so the sky's blue stays the blue the model computes. AgX
-<Cite id="sobotka2023" />, in Wrensch's fit <Cite id="wrensch2023" />, fades bright colors towards white as film does:
-the glow around the Sun and a sunset's brightest band turn white instead of clipping to a flat hue, but the daytime sky
-comes out flatter and grayer. Narkowicz's fit of the ACES filmic curve <Cite id="narkowicz2016" />, which dunstkreis
-used first, is the third: saturated, and it pushes bright hues towards yellow. The exposure follows a camera's
-convention, which puts a metered average at about a tenth of white, where ACES expects it; Neutral and AgX expect the
-scene's middle gray at 0.18, and are lifted by the difference. The tone curve choice in <Fig id="sky" /> switches every
-figure between them. A renderer with its own HDR pipeline turns that off and gets the exposed luminance itself, linear
-and unclamped, for a float target.
+sRGB, dithered against banding. The curves differ most in what they do to a color, so take the orange of a low Sun and
+raise it (<Fig id="curves" />). Without a curve, red clips first, green goes on alone, and orange turns yellow on its way
+to white. Khronos PBR Neutral <Cite id="khronos2024" /> keeps colors exactly as they are up to three quarters of white and
+compresses only the brightest, so the sky's blue stays the blue the model computes. AgX <Cite id="sobotka2023" />, in
+Wrensch's fit <Cite id="wrensch2023" />, fades bright colors towards white as film does, but the daytime sky comes out
+flatter and grayer. Narkowicz's fit of the ACES filmic curve <Cite id="narkowicz2016" />, which dunstkreis used first, is
+saturated, and pushes bright hues towards yellow.
 
-<Planned title="The curves compared" plan="on one HDRI and on the sky, side by side; maybe a plot of each curve.">
-    The same image through none, Neutral, AgX and ACES.
-</Planned>
+<ToneGraph />
+
+The exposure follows a camera's convention, which puts a metered average at about a tenth of white, where ACES expects it;
+Neutral and AgX expect the scene's middle gray at 0.18, and are lifted by the difference. The same curves over a whole
+image are in <Fig id="tones" />, and the tone curve choice in <Fig id="sky" /> switches every other figure between them. A
+renderer with its own HDR pipeline turns that off and gets the exposed luminance itself, linear and unclamped, for a float
+target.
+
+<ToneCurves />
+
+<Environments />
+
+## Banding and dither
+
+A tone curve's last step writes each channel into eight bits, 256 steps from black to white. Where a gradient is as slow
+as a clear sky at dusk, many pixels in a row fall on one step and the next row on another, and the eye, very good at
+edges, sees bands that lie nowhere in the light (<Fig id="banding" />). More bits would end them, and so does less
+order: one step of noise added before the rounding lets each pixel fall to either side of a step as often as its value
+says, and the bands dissolve into a grain too fine to see, for an image that is on average right. The classic mistake is
+dithering before the sRGB curve or in linear light, where the same step is another size in the dark than the bright.
+A float target needs none: its steps are far finer than eight bits'.
+
+Which pattern matters less than that there is one, and more the closer you look. Bayer's, from 1973, is the classic and
+no noise at all: a fixed threshold per pixel, tiled every eight, cheap and steady, whose cross hatch stays visible
+<Cite id="bayer1973" />. White noise, here from a PCG hash <Cite id="jarzynski2020" />, has no pattern, but every
+frequency alike, so some neighbors happen to agree and the grain clumps. Blue noise holds back its low frequencies, what
+the eye sees most, so its grain stays even <Cite id="ulichney1988" />, at the price of a texture to carry and tile.
+Jimenez's interleaved gradient noise lies between: one line of shader from the pixel's position alone, so it stands still
+from frame to frame and needs no texture <Cite id="jimenez2014" />, though it shows a diagonal order up close. `hdDither`
+takes that one, `hdBayer` gives Bayer's thresholds, and `hdDitherBy` takes any noise of your own. Set four bits and
+enlarge the pixels to compare, and turn the noise down: anything less than the full amount leaves some of the steps.
+
+<Banding />
+
+```ts
+import { wgsl } from "@himmelszelt/helldunkel";
+
+const code = `${wgsl.tonemap}
+fn show(exposed: vec3f, pixel: vec2u) -> vec3f {
+    // Encoded by the curve, then a step of noise for 255 steps.
+    return hdDither(hdToneMapNeutral(exposed), pixel, 255.0);
+}`;
+```
+
+## Bloom
+
+A lens is not perfect, and neither is an eye: a little of all the light that passes through scatters, so a bright place
+bleeds into what lies around it, and that glow is how a screen says brighter than white (<Fig id="glow" />). The classic
+mistake is a threshold, which keeps only what is bright, and makes a hard edge of where it stops. Jimenez's chain needs
+none <Cite id="jimenez2014" />: the image is halved level by level and added back up, each level a wider blur, and a few
+percent of the result mixed in. It moves light rather than adding it, so an even image stays as it is. `createBloomPass`
+runs on the exposed image, before the tone curve.
+
+<Bloom />
+
+```ts
+import { createBloomPass } from "@himmelszelt/helldunkel";
+
+const bloom = await createBloomPass(device);
+// Exposed and linear in, the same out, both rgba16float.
+bloom.encode(encoder, exposed, bloomed, 0.04);
+```
 
 ## Beyond white
 
 A display that shows more gets more, and only the last step changes. An rgba16float canvas with extended tone mapping
 shows values above white up to the display's headroom, a few times SDR white on today's screens, and the Neutral
 curve takes that headroom as its ceiling, so the Sun's glow and a bright horizon stay bright instead of compressed to
-white. The HDR choice in <Fig id="sky" /> switches to it where the browser and the screen offer it. A canvas in
-Display P3 would show the saturated reds an sRGB screen gives up, with the matrix fitted for P3 instead; whether enough
-of a sunset leaves sRGB to be worth it is being measured. Either way a color still outside the display's range is cut
-off per channel today, which shifts its hue; reducing its chroma at the same lightness and hue, as CSS does since
-Color 4, keeps it, and is the next option of the tone map.
+white. The HDR choice in <Fig id="hdri" /> and <Fig id="sky" /> switches to it, for every figure of the page, where the browser and the screen offer it.
+
+A display can also show more colors. Three numbers say nothing until a color space says what they mean: three primaries,
+the corners of a triangle of all the colors the eye can tell apart, and a white point, the color all three at full make
+together (<Fig id="chromaticity" />). sRGB's white point is D65, the color of noon daylight at about 6500 K
+<Cite id="iec1999" />, and Display P3 and Rec. 2020 share it while reaching further out. The spectrum's edge comes from
+Wyman's fit of the color matching functions <Cite id="wyman2013" />. A canvas in Display P3 would show the saturated reds
+an sRGB screen gives up, with the matrix fitted for P3 instead; whether enough of a sunset leaves sRGB to be worth it is
+being measured. Either way a color still outside the display's range is cut off per channel today, which shifts its hue;
+reducing its chroma at the same lightness and hue, as CSS does since Color 4, keeps it, and is the next option of the tone
+map.
+
+<Chromaticity />
 
 ## The people behind the numbers
 
 Goethe wrote the section this library is named after, in his theory of colors of 1810 <Cite id="goethe1810" />. Sébastien
 Lagarde and Charles de Rousiers wrote down for Frostbite the exposure convention <Cite id="lagarde2014" />. The tone
 curves are Khronos' <Cite id="khronos2024" />, Troy Sobotka's AgX <Cite id="sobotka2023" /> in Benjamin Wrensch's fit
-<Cite id="wrensch2023" />, and Krzysztof Narkowicz's fit of the ACES curve <Cite id="narkowicz2016" />.
+<Cite id="wrensch2023" />, and Krzysztof Narkowicz's fit of the ACES curve <Cite id="narkowicz2016" />. Jorge Jimenez
+showed the bloom chain and the gradient noise at SIGGRAPH 2014 <Cite id="jimenez2014" />, and Robert Ulichney the blue
+of noise, in 1988 <Cite id="ulichney1988" />.
+
+The panoramas of this chapter are [Poly Haven](https://polyhaven.com/)'s, who give some thousand HDRIs away, under CC0,
+to anyone <Cite id="polyhaven" />. Without such a shelf of
+skies, there would be little to expose here. Thank you.

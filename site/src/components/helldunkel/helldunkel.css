@@ -1,0 +1,254 @@
+.hdri-view canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 2 / 1;
+}
+.hdri-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin: 0.5rem 0;
+}
+.hdri-controls label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+}
+/* In the view's bottom right corner, drags passing through it to the view. Dark on either theme: red, green and blue add up to white only on the dark. */
+.range-plot {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    z-index: 1;
+    width: min(46%, 36rem);
+    height: min(24%, 10.5rem);
+    overflow: hidden;
+    border-radius: var(--radius-button);
+    box-shadow: 0 0 0 1px oklch(1 0 0 / 0.25);
+    background: #1c1c1c;
+    pointer-events: none;
+}
+/* The panorama is lower than the view, and the options should clear the plot there too. */
+.env-frame:not(:fullscreen)[data-mode="map"] .range-plot {
+    height: 20%;
+}
+#range .sky-ev {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+#range .sky-ev input {
+    width: 12rem;
+}
+#range .sky-options {
+    gap: 0.35rem;
+    max-width: min(22rem, calc(100% - 6rem));
+}
+/* The room the plot leaves the credit, and a view higher than the panorama. */
+#range .env-author {
+    right: auto;
+    left: 8px;
+    max-width: calc(54% - 24px);
+}
+.env-frame:not(:fullscreen)[data-mode="view"] .range-view canvas[data-field="canvas"] {
+    aspect-ratio: 16 / 9;
+}
+@media (max-width: 720px) {
+    .range-plot {
+        position: relative;
+        right: auto;
+        bottom: auto;
+        width: 100%;
+        height: 7.5rem;
+        margin-top: 4px;
+    }
+    #range .env-author {
+        display: none;
+    }
+}
+.range-plot canvas,
+.range-labels,
+.range-labels svg {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.range-labels svg {
+    /* As sternzeit's plots write theirs, with an edge of the plot's gray where they cross a curve. */
+    fill: oklch(0.8 0.015 265);
+    stroke: #1c1c1c;
+    stroke-width: 3px;
+    paint-order: stroke;
+    font-size: 13px;
+    font-weight: 350;
+    pointer-events: none;
+}
+/* The meter's circle, its size a share of the view's height. */
+.range-view {
+    position: relative;
+    overflow: hidden;
+}
+.range-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    height: calc(var(--radius, 25%) * 2);
+    aspect-ratio: 1;
+    border: 1px solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.5);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+.range-ring[hidden] {
+    display: none;
+}
+.chromaticity {
+    position: relative;
+    max-width: 520px;
+    margin: auto;
+    aspect-ratio: 1;
+}
+.chromaticity canvas,
+.chromaticity svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+.chromaticity-swatch {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: var(--radius-small);
+    border: 1px solid var(--text);
+}
+.chromaticity-ramp canvas {
+    display: block;
+    border-radius: var(--radius-small);
+    width: 100%;
+    height: 1.5rem;
+    image-rendering: pixelated;
+}
+.chromaticity-ramp p {
+    margin: 0.4rem 0 0.1rem;
+}
+.tone-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+    margin-top: 0.5rem;
+}
+.tone-tile {
+    margin: 0;
+}
+.tone-tile canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 2 / 1;
+}
+.banding-view {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-canvas);
+}
+.banding-view canvas {
+    display: block;
+    width: 100%;
+    height: 25rem;
+    image-rendering: pixelated;
+}
+/* One name per strip, over its left end. */
+.banding-names {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-rows: repeat(5, 1fr);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    pointer-events: none;
+}
+.banding-names li {
+    display: flex;
+    align-items: flex-end;
+    margin: 0;
+    padding: 0 0 6px 6px;
+}
+.banding-names span {
+    padding: 0 0.4rem;
+    border-radius: var(--radius-small);
+    background: var(--overlay-solid);
+    color: var(--overlay-ink);
+    font-size: var(--text-small);
+}
+.curves-plot {
+    position: relative;
+    height: 20rem;
+}
+.curves-plot svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+.curves-line {
+    fill: none;
+    stroke-width: 1.5;
+}
+.curves-red {
+    stroke: #e5484d;
+}
+.curves-green {
+    stroke: #30a46c;
+}
+.curves-blue {
+    stroke: #3e8ce0;
+}
+.curves-mark {
+    stroke: var(--accent);
+    stroke-width: 1;
+}
+.curves-quiet {
+    stroke-dasharray: 3 3;
+}
+/* The strips under the plot, their stops at the same places: the names as wide as its inset. */
+.curves-strips {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    gap: 2px 0;
+    align-items: center;
+    margin-top: 0.25rem;
+}
+.curves-strips .note {
+    margin: 0;
+}
+.curves-strips canvas {
+    display: block;
+    border-radius: var(--radius-small);
+    width: 100%;
+    height: 1.5rem;
+}
+/* A tile's name on the tile itself, so the tiles lie as tight full screen as on the page. */
+.tone-tile {
+    position: relative;
+}
+.tone-tile figcaption {
+    position: absolute;
+    left: 6px;
+    bottom: 6px;
+    margin: 0;
+    padding: 0 0.4rem;
+    border-radius: var(--radius-small);
+    background: var(--overlay-solid);
+    color: var(--overlay-ink);
+    font-size: var(--text-small);
+}
+/* The lower tiles' names above the image's credit, which runs across them. */
+.tone-tile:nth-of-type(n + 3) figcaption {
+    bottom: 34px;
+}

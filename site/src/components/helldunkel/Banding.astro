@@ -1,0 +1,59 @@
+---
+import "../sternzeit/sternzeit.css";
+import "../environment/environments.css";
+import "./helldunkel.css";
+
+const BITS = ["8", "6", "5", "4"];
+const STRIPS = [
+    "No noise",
+    "Bayer, ordered",
+    "Interleaved gradient noise",
+    "White noise, a PCG hash of the pixel",
+    "Blue noise, from a texture",
+];
+const GRADIENTS = ["dark", "dusk"];
+---
+
+<figure class="scene-frame" id="banding">
+    <div class="banding-view as-seen">
+        <canvas data-field="canvas" aria-label="One gradient in five strips, from no noise to blue noise"></canvas>
+        <ol class="banding-names">{STRIPS.map((name) => <li><span class="note">{name}</span></li>)}</ol>
+    </div>
+    <p class="hdri-controls">
+        <span class="steps" role="radiogroup" aria-label="Gradient">
+            <span class="steps-heading" aria-hidden="true">gradient</span>
+            {GRADIENTS.map((gradient) => (
+                <label>
+                    <input type="radio" name="banding-gradient" value={gradient} checked={gradient === "dark"} />
+                    <span>{gradient}</span>
+                </label>
+            ))}
+        </span>
+        <span class="steps" role="radiogroup" aria-label="Bits per channel">
+            <span class="steps-heading" aria-hidden="true">bits</span>
+            {BITS.map((bits) => (
+                <label>
+                    <input type="radio" name="banding-bits" value={bits} checked={bits === "8"} />
+                    <span>{bits}</span>
+                </label>
+            ))}
+        </span>
+        <button type="button" class="environments-button" data-field="magnify" aria-pressed="true" title="The result eight times as bright, so the steps of a dark gradient can be seen">8 × as bright</button>
+        <button type="button" class="environments-button" data-field="zoom" aria-pressed="false" title="Every pixel four times as wide, to see the noise's pattern">4 × as large</button>
+    </p>
+    <label class="figure-slider" title="How strong the noise is, up to the amount that hides the steps: 1, any less leaves some of them">
+        <span class="note">noise</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="intensity" min="0" max="1" step="0.05" value="1" aria-label="Noise intensity" />
+            <span class="figure-slider-scale" aria-hidden="true">{["0", "0.5", "1"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 50}%`}>{mark}</span>)}</span>
+        </span>
+        <output data-field="reading"></output>
+    </label>
+    <figcaption class="figure-caption">
+        One smooth gradient from edge to edge, sRGB encoded, written with as many bits per channel as chosen. On top it is rounded to the nearest step. Below, Bayer's fixed pattern or noise from one of three sources is added first, the three of the same triangular distribution, at the chosen strength. The dark gradient is magnified by default, as 8 bits hide their steps from most screens until a gradient is this slow.
+    </figcaption>
+</figure>
+
+<script>
+    import "./banding";
+</script>

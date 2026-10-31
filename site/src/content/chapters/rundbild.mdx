@@ -21,11 +21,13 @@ import Planned from "../../components/Planned.astro";
 import Term from "../../components/Term.astro";
 import Sky from "../../components/dunstkreis/Sky.astro";
 import Environment from "../../components/rundbild/Environment.astro";
+import Grounded from "../../components/rundbild/Grounded.astro";
+import Environments from "../../components/environment/Environments.astro";
 import Harmonics from "../../components/rundbild/Harmonics.astro";
 import Lighting from "../../components/rundbild/Lighting.astro";
 import Projections from "../../components/rundbild/Projections.astro";
 
-This chapter is being written. Its figures still show only the computed sky of dunstkreis; HDRIs follow with the loader.
+This chapter is being written. Its figures still show only the computed sky of dunstkreis.
 
 Not every sky has to be computed. A photographed or pre-rendered one arrives as an image, and this library is about
 turning such an image into something a renderer can sample and light with: cube maps, spherical, paraboloid, and
@@ -48,10 +50,6 @@ a plain `GPUTexture`, and exposure and tone curves are [helldunkel](../helldunke
 />
 
 <Controls open />
-
-<Planned what="section" title="Loading an image" plan="the Radiance HDR reader, and EXR after it. File drop, and one small CC0 HDRI from Poly Haven in the repository.">
-    Any HDRI as the source of every figure of this chapter, the computed sky as the option beside it.
-</Planned>
 
 ## Lighting a scene
 
@@ -88,6 +86,20 @@ from the same nine for shaders that prefer a lookup.
 <Environment />
 
 <Lighting />
+
+An image has no depth: all of it lies at infinity, its ground as well. So a solid put into it floats, and the ground slides
+along with the camera. Laying everything below the horizon on a plane fixes both for the cost of one intersection per
+pixel. The camera's ray meets the plane, and the image is looked up from where it was taken, some way above that plane, towards
+that point (<Fig id="grounded" />). A ray close to the horizon meets the plane far off and looks up nearly the same
+direction as before, so the ground joins the sky without a seam. What truly rises from the ground, a tree or a house, lies flat on
+the plane and smears the further the camera moves from where the photograph was taken. Lifting the horizon is simpler still:
+the image is stretched between its poles, for a horizon that is not where the image has it. Both fade in over a few degrees
+around the horizon, so neither sets in at a line. Both are `wgsl.ground`, two functions from a direction to a direction,
+for any map.
+
+<Grounded />
+
+<Environments open />
 
 <Planned title="Specular image-based lighting" plan="the pre-filtered levels are not built yet.">
     The same solids in polished metal, the levels of the map by roughness.
@@ -128,6 +140,25 @@ It spreads `samples` lookups over every texel, which smooth the horizon and the 
 <Projections />
 
 <Controls />
+
+## From one to the other
+
+A map turned into another is resampled, and resampling loses what falls between texels unless the target is the finer of
+the two. An equirectangular of W texels across spends 2π/W radians on a texel at the horizon, a cube map of N texels a
+face 2/N at the middle of a face: N has to reach W/π, about a third of the width, not the quarter the faces' count
+suggests. A turn into a cube map and back then keeps the sky, up to the filter's softness. The octahedral map needs care
+of its own: its lower half folds outward, so a filtered lookup across its edge reads a neighbor that is not one on the
+sphere. `createCubeFromPanoramaPass` and `createPanoramaPass` go each way.
+
+Mip levels pay the same way. Each texel of a level is the mean of four above it, which treats them alike: nearly right on
+a cubified cube map, a little off towards a plain one's corners, and far off on an equirectangular, whose top rows are
+one direction many times over. So the mip levels live on the cube map. A cubified map keeps its evenness only for whoever
+knows: another tool reads it as a plain one, bent, so a file for others goes through `createPanoramaPass` first.
+
+Two environments fade by their light, not by their pictures, so a mix of a noon and a night stays physically a mix of
+the two. `createEnvironmentBlendPass` writes it into a cube map, and the nine coefficients of the result are those of the
+two mixed by the same share, `mixCoefficients`, without a pass at all. A sky in cd/m² and an HDRI of relative values take
+a scale each first.
 
 <Planned what="section" title="The horizon band" plan="from the thesis, with the horizon band of osgHimmel.">
     The hard edge of a hemisphere's map, and the band that hides it.

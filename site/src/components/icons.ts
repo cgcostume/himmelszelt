@@ -4,7 +4,26 @@
 const BRACKETS = '<path class="close-in" d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3"/>';
 const CHECK = '<path class="check" d="M3 8.5l3 3 7-7"/>';
 
+// The resolutions' K, beside a digit of each.
+const K = '<path d="M9.5 3.5v9M14 3.5 9.5 8.5l4.5 4"/>';
+
 export const ICONS = {
+    /** An environment map's resolution, by its width in texels. */
+    res1k: `<path d="M3.5 5.5l2-2v9"/>${K}`,
+    res2k: `<path d="M2 5.5a2 2 0 0 1 4 0c0 1.8-4 3.8-4 7h4.2"/>${K}`,
+    res4k: `<path d="M5.5 12.5v-9L2 9.5h5.2"/>${K}`,
+    res8k: `<circle cx="4.5" cy="5.4" r="1.9"/><circle cx="4.5" cy="10.2" r="2.4"/>${K}`,
+    /** An environment map as stored: a sheet, its horizon across and meridians down. */
+    envMap: '<rect x="1.5" y="3.5" width="13" height="9" rx="1"/><path d="M1.5 8h13M6 3.5v9M10 3.5v9"/>',
+    /** The view from inside: a globe with its equator and a meridian, the eye in its middle. */
+    envView:
+        '<circle cx="8" cy="8" r="6"/><ellipse cx="8" cy="8" rx="6" ry="2.2"/><path d="M8 2a2.4 6 0 0 0 0 12"/><circle class="fill-on" cx="8" cy="8" r="1.1"/>',
+    /** What clips past white: a frame with a highlight's warning stripes across it. */
+    clipped: '<rect x="2" y="2" width="12" height="12" rx="1"/><path d="M2 8.5 8.5 2M2 13.5 13.5 2M7 14l7-7"/>',
+    /** Bloom: a small bright place and the glow bleeding out of it. */
+    bloom: '<circle class="solid" cx="8" cy="8" r="1.8"/><circle cx="8" cy="8" r="4" stroke-dasharray="1.4 1.5"/><circle cx="8" cy="8" r="6.3" stroke-dasharray="0.8 2.2"/>',
+    /** Something on its way: three quarters of a circle, turned by whoever shows it. */
+    loading: '<path d="M8 2.5a5.5 5.5 0 1 1-5.5 5.5"/>',
     /** The view kept on the Sun: brackets that close in round a Sun, filled while on. */
     sunLock: `${BRACKETS}<circle class="fill-on" cx="8" cy="8" r="2.4"/><path class="spin" d="M8 2.9v1.2M8 11.9v1.2M2.9 8h1.2M11.9 8h1.2M4.4 4.4l.85.85M10.75 10.75l.85.85M4.4 11.6l.85-.85M10.75 5.25l.85-.85"/>`,
     /** The view kept on the Moon: the same brackets round the theme toggle's crescent (see Base.astro). */
