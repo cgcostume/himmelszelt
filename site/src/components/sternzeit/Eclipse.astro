@@ -2,6 +2,7 @@
 import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "./sternzeit.css";
+import Icon from "../Icon.astro";
 ---
 
 <figure class="eclipse-figure" id="eclipse-views">
@@ -9,10 +10,9 @@ import "./sternzeit.css";
     <figure class="eclipse-view" data-kind="solar" data-export="solar-eclipse">
         <div class="eclipse-panel as-seen">
         <svg viewBox="-100 -100 200 200" aria-hidden="true"></svg>
-        <span class="eclipse-jump">
-            <button type="button" data-jump="solar" data-step="-1" title="The eclipse before this moment" aria-label="The eclipse before this moment">earlier</button>
-            eclipse
-            <button type="button" data-jump="solar" data-step="1" title="The eclipse after this moment" aria-label="The eclipse after this moment">later</button>
+        <span class="eclipse-jump view-buttons">
+            <button type="button" class="button-xs" data-jump="solar" data-step="-1" title="The eclipse before this moment" aria-label="The eclipse before this moment"><Icon name="earlier" />earlier</button>
+            <button type="button" class="button-xs" data-jump="solar" data-step="1" title="The eclipse after this moment" aria-label="The eclipse after this moment">later<Icon name="later" /></button>
         </span>
         </div>
         <label class="figure-slider" data-offset title="The moment, up to 2 hours either way from where it was set: drag, or turn the mouse wheel for a minute a notch">
@@ -29,10 +29,9 @@ import "./sternzeit.css";
     <figure class="eclipse-view" data-kind="lunar" data-export="lunar-eclipse">
         <div class="eclipse-panel as-seen">
         <svg viewBox="-100 -100 200 200" aria-hidden="true"></svg>
-        <span class="eclipse-jump">
-            <button type="button" data-jump="lunar" data-step="-1" title="The eclipse before this moment" aria-label="The eclipse before this moment">earlier</button>
-            eclipse
-            <button type="button" data-jump="lunar" data-step="1" title="The eclipse after this moment" aria-label="The eclipse after this moment">later</button>
+        <span class="eclipse-jump view-buttons">
+            <button type="button" class="button-xs" data-jump="lunar" data-step="-1" title="The eclipse before this moment" aria-label="The eclipse before this moment"><Icon name="earlier" />earlier</button>
+            <button type="button" class="button-xs" data-jump="lunar" data-step="1" title="The eclipse after this moment" aria-label="The eclipse after this moment">later<Icon name="later" /></button>
         </span>
         </div>
         <label class="figure-slider" data-offset title="The moment, up to 3 hours either way from where it was set: drag, or turn the mouse wheel for a minute a notch">

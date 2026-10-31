@@ -1,4 +1,5 @@
 ---
+import Icon from "../Icon.astro";
 import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "./sternzeit.css";
@@ -7,10 +8,12 @@ import LunationSlider from "./LunationSlider.astro";
 
 <figure class="moon-figure" id="moon-view">
     <div class="moon-view as-seen" data-export="moon">
-        <button type="button" class="view-toggle" data-field="lockMoon" aria-pressed="true" title="Lock the view to the Moon itself: north up, no horizon">moon frame</button>
+        <span class="view-buttons">
+            <button type="button" class="view-icon" data-field="lockMoon" aria-pressed="true" title="Lock the view to the Moon itself: north up, no horizon" aria-label="Moon frame"><Icon name="moonLock" /></button>
+            <button type="button" class="view-icon" data-field="opticalLibration" aria-pressed="true" title="The tilt of the Moon's axis against its orbit and its uneven speed along it let us see a little around its edges" aria-label="Optical libration"><Icon name="libration" /></button>
+        </span>
         <div class="moon-panel">
             <svg viewBox="-100 -100 200 200" aria-hidden="true"></svg>
-            <button type="button" class="view-toggle libration-toggle" data-field="opticalLibration" aria-pressed="true" title="The tilt of the Moon's axis against its orbit and its uneven speed along it let us see a little around its edges">optical libration</button>
         </div>
     </div>
     <LunationSlider />

@@ -7,17 +7,17 @@ import TimeSlider from "./TimeSlider.astro";
 
 <figure class="moon-calendar" id="moon-calendar">
     {/* The container the month buttons size by; not the figure, as a container scopes the counter that numbers it. */}
-    <div class="calendar">
+    <div class="calendar" data-export="moon-calendar" data-download-in=".calendar-head">
     <div class="calendar-head">
-        <button type="button" class="view-toggle calendar-lock" data-field="lock" aria-pressed="false" title="Lock the calendar to the moment and place: it shows the moment's month, and neither the months nor the days can be picked" aria-label="Lock to the moment and place">
+        <button type="button" class="button-xs calendar-lock" data-field="lock" aria-pressed="false" title="Lock the calendar to the moment and place: it shows the moment's month, and neither the months nor the days can be picked" aria-label="Lock to the moment and place">
             <Icon name="padlock" />
             <span class="calendar-lock-word">moment</span>
         </button>
         <div class="calendar-months">
             {/* Up to five months either side, as many as the width has room for. */}
-            {[-5, -4, -3, -2, -1].map((offset) => <button type="button" data-month={offset} class={`calendar-month-${-offset}`}></button>)}
-            <button type="button" class="calendar-title" data-field="title" aria-pressed="true"></button>
-            {[1, 2, 3, 4, 5].map((offset) => <button type="button" data-month={offset} class={`calendar-month-${offset}`}></button>)}
+            {[-5, -4, -3, -2, -1].map((offset) => <button type="button" data-month={offset} class={`button-xs calendar-month-${-offset}`}></button>)}
+            <button type="button" class="button-xs calendar-title" data-field="title" data-export-text aria-pressed="true"></button>
+            {[1, 2, 3, 4, 5].map((offset) => <button type="button" data-month={offset} class={`button-xs calendar-month-${offset}`}></button>)}
         </div>
     </div>
     <div class="calendar-weekdays" aria-hidden="true"></div>

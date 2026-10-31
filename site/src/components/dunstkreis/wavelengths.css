@@ -120,7 +120,7 @@
     width: 100%;
     aspect-ratio: 1;
     border: 2px solid transparent;
-    border-radius: var(--radius-small);
+    border-radius: var(--radius-button);
     overflow: hidden;
 }
 .wavelengths-swatch > span {
@@ -181,7 +181,7 @@
 .wavelengths-live > div {
     position: relative;
     overflow: hidden;
-    border-radius: var(--radius);
+    border-radius: var(--radius-canvas);
     background: oklch(0 0 0);
 }
 .wavelengths-live canvas {

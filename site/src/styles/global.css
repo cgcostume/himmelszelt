@@ -11,7 +11,10 @@
     --text-small: 0.8125rem;
     --text-meta: var(--text-small);
     --wide: 1140px;
-    --radius: 6px;
+    /* Corners: a canvas or panel, a group of controls, one control; and the smallest, for marks at the size of text. */
+    --radius-canvas: 16px;
+    --radius-group: 10px;
+    --radius-button: 8px;
     --radius-small: 4px;
     --font-mono: "Roboto Mono", ui-monospace, monospace;
     /* The figures' line styles, in screen pixels at any zoom: dots for fixed references, dashes for construction
@@ -88,21 +91,17 @@
 :root[data-theme="light"] .as-seen {
     --accent: color-mix(in oklab, var(--cyanometer), white 45%);
 }
-/* Controls over a figure (see SkyFrame.astro): frosted glass in the page's own theme, over a figure that stays dark
-   (.as-seen) too, so declared on the root alone and inherited from there. */
+/* Controls over a figure (see SkyFrame.astro): opaque, in the page's own theme, over a figure that stays dark (.as-seen)
+   too, so declared on the root alone and inherited from there. */
 :root {
-    --overlay-glass: color-mix(in oklab, var(--bg) 68%, transparent);
-    --overlay-filter: blur(20px) saturate(1.2) brightness(1.05);
-    --overlay-ink: var(--text);
-    --overlay-quiet: color-mix(in oklab, var(--text) 70%, transparent);
-    --overlay-accent: var(--accent);
-    --overlay-on-accent: var(--bg);
     --overlay-solid: var(--bg);
     --overlay-surface: var(--surface);
     --overlay-line: var(--line);
-    --overlay-hover: color-mix(in oklab, var(--text) 9%, transparent);
-    --overlay-tint: color-mix(in oklab, var(--accent) 16%, color-mix(in oklab, var(--bg) 70%, transparent));
-    --overlay-shade: var(--shadow);
+    --overlay-ink: var(--text);
+    --overlay-quiet: var(--muted);
+    --overlay-accent: var(--accent);
+    --overlay-hover: var(--line);
+    --overlay-tint: color-mix(in oklab, var(--accent) 22%, var(--surface));
     /* Marks drawn straight onto a render: white, lifted off it by a dark halo, on either page. */
     --render-ink: oklch(1 0 0 / 0.92);
     --render-shade: oklch(0.2 0.02 266 / 0.55);
@@ -642,7 +641,7 @@ main {
     padding: 1rem 1.25rem;
     background: var(--surface);
     border: var(--border);
-    border-radius: var(--radius);
+    border-radius: var(--radius-canvas);
     color: var(--text);
 }
 .chapter-list a.planned {
@@ -747,11 +746,11 @@ select {
     font-family: var(--font-mono);
     font-size: var(--text-meta);
     line-height: 1.4;
-    height: 1.65rem;
+    height: 1.75rem;
     background: var(--surface);
     color: var(--text);
     border: var(--border);
-    border-radius: var(--radius-small);
+    border-radius: var(--radius-button);
     padding: 0.15rem 0.4rem;
 }
 input[type="checkbox"] {
@@ -853,7 +852,7 @@ input[type="range"]::-moz-range-thumb {
         box-shadow: 0 0 0 0 var(--accent);
     }
     100% {
-        box-shadow: 0 0 0 10px transparent;
+        box-shadow: 0 0 0 6px transparent;
     }
 }
 input[type="range"].slider-hint::-webkit-slider-thumb {
@@ -938,7 +937,7 @@ input[type="range"]:focus-visible::-moz-range-thumb {
     padding: 0.6rem 0.8rem;
     background: var(--surface);
     border: var(--border);
-    border-radius: var(--radius);
+    border-radius: var(--radius-group);
     box-shadow: 0 8px 24px var(--shadow);
     color: var(--text);
     font-size: var(--text-meta);
@@ -1192,7 +1191,7 @@ dialog.cyanometer {
     background: var(--surface);
     color: var(--text);
     border: var(--border);
-    border-radius: var(--radius);
+    border-radius: var(--radius-group);
     box-shadow: 0 8px 24px var(--shadow);
     font-size: var(--text-meta);
     text-align: left;

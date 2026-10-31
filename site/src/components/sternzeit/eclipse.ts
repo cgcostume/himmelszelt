@@ -329,7 +329,7 @@ const views = document.querySelectorAll<HTMLElement>(".eclipse-view[data-kind]")
 offsetSliders();
 
 // The status line's height above the panel's foot, clear of the buttons there.
-const STATUS_BOTTOM_PX = 48;
+const STATUS_BOTTOM_PX = 64;
 const searchMessages = new WeakMap<Element, string>();
 
 function render() {

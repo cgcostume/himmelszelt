@@ -12,7 +12,7 @@
 .refraction-photo,
 .lut-stage,
 .lut-stage > canvas {
-    border-radius: var(--radius);
+    border-radius: var(--radius-canvas);
 }
 .sky-view,
 .refraction-photo {
@@ -183,7 +183,7 @@
     right: 0.3rem;
     padding: 0.05rem 0.35rem;
     border-radius: var(--radius-small);
-    background: color-mix(in srgb, var(--bg) 70%, transparent);
+    background: var(--surface);
     color: var(--text);
     font-family: var(--font-mono);
     font-size: var(--text-small);
@@ -196,7 +196,7 @@
     padding: 0.35rem 0.55rem;
     border: var(--border);
     border-radius: var(--radius-small);
-    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    background: var(--surface);
     color: var(--text);
     font-family: var(--font-mono);
     font-size: var(--text-small);
@@ -318,7 +318,7 @@
 .lookup-table {
     aspect-ratio: 2 / 1;
     border: var(--border);
-    border-radius: var(--radius-small);
+    border-radius: var(--radius-button);
     overflow: hidden;
 }
 /* The observer's place and height, left of its dot. */
@@ -465,65 +465,16 @@
     align-items: center;
     min-width: 0;
 }
-/* The buttons, a capsule of glass for each end of the bar, round buttons inside it. */
-.sky-group-buttons {
-    display: flex;
-    flex: none;
-    gap: 2px;
-    padding: 3px;
-    border-radius: 999px;
-    background: var(--overlay-glass);
-    backdrop-filter: var(--overlay-filter);
-    pointer-events: auto;
-}
 .sky-hint {
     min-width: 0;
     margin: 0;
     padding: 0.45rem 0.85rem;
     overflow: hidden;
-    border-radius: 999px;
-    background: var(--overlay-glass);
-    backdrop-filter: var(--overlay-filter);
+    border-radius: var(--radius-group);
+    background: var(--overlay-surface);
     color: var(--text);
     white-space: nowrap;
     text-overflow: ellipsis;
-}
-/* A disc behind the icon shows hover and on; a press shrinks the disc alone, the icon stays where it is. */
-.sky-icon {
-    position: relative;
-    isolation: isolate;
-    display: grid;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border: 0;
-    border-radius: 999px;
-    background: none;
-    color: var(--text);
-    transition: color 0.15s;
-}
-.sky-icon::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: inherit;
-    background: var(--disc, transparent);
-    transition:
-        background 0.15s,
-        transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
-}
-.sky-icon:hover {
-    --disc: var(--overlay-hover);
-}
-.sky-icon:active::before {
-    transform: scale(0.82);
-    transition-duration: 0.08s;
-}
-.sky-icon[aria-pressed="true"] {
-    --disc: var(--overlay-tint);
-    color: var(--accent);
 }
 /* The marks' compass gains its circle of altitude once the grid is on. */
 .sky-marks .grid-part {
@@ -533,12 +484,7 @@
 .sky-marks[data-level="2"] .grid-part {
     opacity: 1;
 }
-.sky-icon .icon {
-    width: 18px;
-    height: 18px;
-    stroke-width: 0.85;
-}
-/* The observer's height up the left edge, as a y axis: a bare rail filled in the accent below the value, frosted above
+/* The observer's height up the left edge, as a y axis: a bare rail filled in the accent below the value, plain above
    it, the value itself the thumb, a decade a mark beside it. The slider is a horizontal one turned upright, its own thumb
    hidden under the value. */
 .sky-height {
@@ -570,7 +516,7 @@
     border-radius: 2px;
     background:
         linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) 3px no-repeat,
-        var(--overlay-glass);
+        var(--overlay-surface);
 }
 .sky-height input::-moz-range-track,
 .sky-time:where(.sky-stage:fullscreen > *) input::-moz-range-track {
@@ -578,7 +524,7 @@
     border-radius: 2px;
     background:
         linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) 3px no-repeat,
-        var(--overlay-glass);
+        var(--overlay-surface);
 }
 .sky-height input::-webkit-slider-thumb,
 .sky-time:where(.sky-stage:fullscreen > *) input::-webkit-slider-thumb {
@@ -594,7 +540,7 @@
     position: absolute;
     z-index: 1;
     padding: 2px 8px;
-    border-radius: 999px;
+    border-radius: var(--radius-button);
     background: var(--accent);
     color: var(--bg);
     font: 500 var(--text-small) / 1.2 var(--font-mono);
@@ -645,9 +591,8 @@
     max-height: calc(100% - 62px - var(--sky-foot, 0px));
     overflow: auto;
     padding: 0.6rem 0.75rem 0.75rem;
-    border-radius: 14px;
-    background: var(--overlay-glass);
-    backdrop-filter: var(--overlay-filter);
+    border-radius: var(--radius-group);
+    background: var(--overlay-surface);
     font-size: var(--text-small);
 }
 .sky-options[hidden] {
@@ -689,7 +634,7 @@
     height: auto;
     padding: 3px 9px 3px 5px;
     border: 0;
-    border-radius: 999px;
+    border-radius: var(--radius-button);
     background: none;
     color: var(--muted);
     transition:

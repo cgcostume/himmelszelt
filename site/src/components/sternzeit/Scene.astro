@@ -1,4 +1,5 @@
 ---
+import Icon from "../Icon.astro";
 import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "./sternzeit.css";
@@ -8,7 +9,7 @@ import TimeSlider from "./TimeSlider.astro";
 <figure class="scene-frame wide" id="armillary-sphere">
     <div id="scene" data-export="armillary-sphere">
         <div class="scene-bar">
-            <button type="button" class="view-toggle" data-field="labels" aria-pressed="true" title="Show or hide the labels">show labels</button>
+            <span class="view-buttons"><button type="button" class="view-icon" data-field="labels" aria-pressed="true" title="Show or hide the labels" aria-label="Labels"><Icon name="labels" /></button></span>
             <p class="vis-credit footnote">
                 Drag to rotate. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
             </p>

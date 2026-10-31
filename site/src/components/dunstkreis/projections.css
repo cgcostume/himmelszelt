@@ -11,7 +11,7 @@
     width: min(70cqw, 36cqh * var(--aspect));
     aspect-ratio: var(--aspect);
     overflow: hidden;
-    border-radius: var(--radius-small);
+    border-radius: var(--radius-button);
     box-shadow: 0 0 0 1px oklch(1 0 0 / 0.25);
     background: oklch(0 0 0);
 }
@@ -51,7 +51,7 @@
     transform: translateX(-50%);
     padding: 0.25rem 0.5rem;
     border-radius: var(--radius-small);
-    background: color-mix(in srgb, var(--bg) 75%, transparent);
+    background: var(--surface);
     white-space: nowrap;
     display: flex;
     gap: 0.6rem;

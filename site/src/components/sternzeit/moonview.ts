@@ -151,7 +151,7 @@ function render() {
         ["perigee", perigee + 2.2 * unitsPerPx + 2],
     ] as const) {
         const [x, y] = [lx * r, ly * r];
-        svg += `<text x="${f(x)}" y="${f(y)}" transform="rotate(${180 - REFERENCE_LABEL_ANGLE} ${f(x)} ${f(y)})" class="figure-label moon-reference-label">${name}</text>`;
+        svg += `<text x="${f(x)}" y="${f(y)}" transform="rotate(${180 - REFERENCE_LABEL_ANGLE} ${f(x)} ${f(y)})" class="figure-label">${name}</text>`;
     }
 
     // The lunar north pole and the axis' tilt against the zenith, outside the perigee circle so they never overlap it: a
@@ -224,9 +224,10 @@ function render() {
     } else {
         const corner = halfHeight - cornerRowPx() * unitsPerPx;
         const right = halfWidth - CORNER_PX * unitsPerPx;
-        // The size stops short of the download in the corner.
-        svg += readout(right - 36 * unitsPerPx, -corner, "size", size, "end");
-        if (!locked) svg += readout(right, -corner + line * 1.25, "tilt", tiltText, "end");
+        // Both stop short of the download in the corner.
+        const beforeDownload = right - 48 * unitsPerPx;
+        svg += readout(beforeDownload, -corner, "size", size, "end");
+        if (!locked) svg += readout(beforeDownload, -corner + line * 1.25, "tilt", tiltText, "end");
         svg += readout(right, corner - line * 1.25, "libration", libration, "end");
         svg += readout(right, corner, "earthshine", shine, "end");
     }

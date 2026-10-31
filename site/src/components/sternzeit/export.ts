@@ -130,14 +130,18 @@ type Box = { x: number; y: number; width: number; height: number };
 
 async function compose(root: HTMLElement) {
     const svgs = [...root.querySelectorAll("svg")].filter(
-        (svg) => ownedBy(root, svg) && !svg.closest("button") && getComputedStyle(svg).visibility !== "hidden",
+        (svg) =>
+            ownedBy(root, svg) &&
+            !svg.closest("button:not(.calendar-day)") &&
+            getComputedStyle(svg).visibility !== "hidden",
     );
     const labels = [...root.querySelectorAll("[data-export-text]")].filter(
         (label) => ownedBy(root, label) && getComputedStyle(label).visibility !== "hidden",
     );
     const rects: DOMRect[] = svgs.map((svg) => svg.getBoundingClientRect());
     const left = Math.min(...rects.map((r) => r.left));
-    const top = Math.min(...rects.map((r) => r.top));
+    // Labels may stand above the first SVG, as the calendar's weekdays do.
+    const top = Math.min(...rects.map((r) => r.top), ...labels.map((label) => label.getBoundingClientRect().top));
     const width = Math.max(...rects.map((r) => r.right)) - left;
     // The moment and place the figure shows, in a row of its own under it, unless it shows none.
     const stamp = root.hasAttribute("data-export-timeless") ? null : momentAndPlace();
@@ -195,6 +199,16 @@ async function compose(root: HTMLElement) {
         text.setAttribute("style", `fill:${getComputedStyle(root).getPropertyValue("--muted")};font-size:12px`);
         out.append(text);
     }
+    // What the SVGs reference from elsewhere on the page, as the calendar's days do its hatching.
+    for (const [, id] of out.outerHTML.matchAll(/url\(["']?[^"')#]*#([^"')]+)/g)) {
+        const source = id && !out.querySelector(`[id="${id}"]`) ? document.getElementById(id) : null;
+        if (!source) continue;
+        const clone = source.cloneNode(true) as Element;
+        inlineStyles(source, clone);
+        const defs = document.createElementNS(SVG_NS, "defs");
+        defs.append(clone);
+        out.prepend(defs);
+    }
     await embedImages(out);
     return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(out)}`;
 }
@@ -211,11 +225,13 @@ async function download(root: HTMLElement) {
 
 for (const root of document.querySelectorAll<HTMLElement>("[data-export]")) {
     if (root.querySelector(":scope > .svg-download")) continue;
+    // In a row of the figure's own, a small button there; otherwise a group of its own over the figure.
+    const row = root.dataset.downloadIn ? root.querySelector(root.dataset.downloadIn) : null;
+    const group = document.createElement("span");
+    group.className = "view-buttons svg-download";
     const button = document.createElement("button");
     button.type = "button";
-    // Dark over a panel that stays dark on the light page (see .as-seen in global.css).
-    const dark = root.matches(".as-seen") || root.querySelector(":scope > .as-seen") !== null;
-    button.className = dark ? "svg-download as-seen" : "svg-download";
+    button.className = row ? "button-xs button-square" : "view-icon";
     button.title = "Download this panel as SVG";
     button.setAttribute("aria-label", button.title);
     button.innerHTML = icon("download");
@@ -224,5 +240,9 @@ for (const root of document.querySelectorAll<HTMLElement>("[data-export]")) {
         download(root);
     });
     button.addEventListener("pointerdown", (event) => event.stopPropagation());
-    root.append(button);
+    if (row) row.append(button);
+    else {
+        group.append(button);
+        root.append(group);
+    }
 }

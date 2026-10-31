@@ -1,4 +1,5 @@
 ---
+import Icon from "../Icon.astro";
 import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "./sternzeit.css";
@@ -13,7 +14,7 @@ import TimeSlider from "./TimeSlider.astro";
         <svg class="dome-layer zdog" data-layer="above" aria-hidden="true"></svg>
         <div class="frame-labels" aria-hidden="true"></div>
         <div class="scene-bar">
-            <button type="button" class="view-toggle" data-field="labels" aria-pressed="true" title="Show or hide the annotations, all but the axes and the compass">show labels</button>
+            <span class="view-buttons"><button type="button" class="view-icon" data-field="labels" aria-pressed="true" title="Show or hide the annotations, all but the axes and the compass" aria-label="Annotations"><Icon name="labels" /></button></span>
             <p class="vis-credit footnote">
                 Drag to rotate. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
             </p>

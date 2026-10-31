@@ -59,18 +59,18 @@ const named: Record<number, string> = { 0: "1 m", 3: "1 km", 5: "100 km" }
         <slot />
         <div class="sky-bar">
             <span class="sky-bar-start">
-                <span class="sky-group-buttons">
-                    <button type="button" class="sky-icon" data-field="lock" aria-pressed={locked ? "true" : "false"} title={lockTitle} aria-label="Sun lock"><Icon name="sunLock" /></button>
-                    {refraction && <button type="button" class="sky-icon" data-field="refraction" aria-pressed="true" title="Refraction: the light traced through the air, bending, the Sun lifted and squeezed low over the horizon. Switches it for the whole page, recomputing every table and cube map" aria-label="Refraction"><Icon name="refraction" /></button>}
-                    <button type="button" class="sky-icon sky-marks" data-field="marks" data-levels={grid ? 3 : 2} data-level={grid ? 2 : 1} data-titles={JSON.stringify(marksTitles)} aria-pressed="true" title={marksTitles[grid ? 2 : 1]} aria-label="Compass and grid"><Icon name="marks" /></button>
+                <span class="view-buttons">
+                    <button type="button" class="view-icon" data-field="lock" aria-pressed={locked ? "true" : "false"} title={lockTitle} aria-label="Sun lock"><Icon name="sunLock" /></button>
+                    {refraction && <button type="button" class="view-icon" data-field="refraction" aria-pressed="true" title="Refraction: the light traced through the air, bending, the Sun lifted and squeezed low over the horizon. Switches it for the whole page, recomputing every table and cube map" aria-label="Refraction"><Icon name="refraction" /></button>}
+                    <button type="button" class="view-icon sky-marks" data-field="marks" data-levels={grid ? 3 : 2} data-level={grid ? 2 : 1} data-titles={JSON.stringify(marksTitles)} aria-pressed="true" title={marksTitles[grid ? 2 : 1]} aria-label="Compass and grid"><Icon name="marks" /></button>
                 </span>
                 <span class="sky-hint footnote">{hint}</span>
             </span>
-            <span class="sky-group-buttons">
-                <button type="button" class="sky-icon" data-field="play" aria-pressed="false" title="Play: the moment runs on, an hour in 10 seconds, half a day in 2 minutes" aria-label="Play"><Icon name="play" /></button>
-                {options && <button type="button" class="sky-icon" data-field="options" aria-pressed="true" title="Show or hide this figure's options" aria-label="Options"><Icon name="options" /></button>}
-                {png && <button type="button" class="sky-icon" data-field="png" title="Download the view as PNG" aria-label="Download the view as PNG"><Icon name="download" /></button>}
-                <button type="button" class="sky-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
+            <span class="view-buttons">
+                <button type="button" class="view-icon" data-field="play" aria-pressed="false" title="Play: the moment runs on, an hour in 10 seconds, half a day in 2 minutes" aria-label="Play"><Icon name="play" /></button>
+                {options && <button type="button" class="view-icon" data-field="options" aria-pressed="true" title="Show or hide this figure's options" aria-label="Options"><Icon name="options" /></button>}
+                {png && <button type="button" class="view-icon" data-field="png" title="Download the view as PNG" aria-label="Download the view as PNG"><Icon name="download" /></button>}
+                <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
             </span>
         </div>
         <label class="sky-height" data-height title="The observer's height, from eye level to the space station's orbit: drag, or turn the mouse wheel">

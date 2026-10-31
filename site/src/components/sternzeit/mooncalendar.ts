@@ -5,6 +5,7 @@ import { moonSymbol, sunInViewFrame } from "./figure";
 import { onChange, state, update } from "./state";
 import { momentOnClock } from "./timeofday";
 import { clock, DAY_MS, instantOf, wallDayOf } from "./zone";
+import "./export";
 
 // Ten-minute steps: rise and set are then found to the minute by bisection, and the lanes are smooth enough.
 const SAMPLES_PER_DAY = 144;
@@ -241,7 +242,7 @@ function render() {
             const classes = `calendar-day term${other ? " calendar-other" : ""}`;
             const current = day === pageDay ? ' aria-current="date"' : "";
             cells += `<button type="button" class="${classes}" data-day="${day}" data-at="${at}" aria-label="${tip.label}"${current}>
-                <span class="calendar-date">${String(date.getUTCDate()).padStart(2, "0")}<span class="calendar-where">${moon.below ? "" : `<span>${moon.direction}</span><span>\u2191${moon.altitude.toFixed(0)}°</span>`}</span></span>
+                <span class="calendar-date"><span data-export-text>${String(date.getUTCDate()).padStart(2, "0")}</span><span class="calendar-where">${moon.below ? "" : `<span>${moon.direction}</span><span>\u2191${moon.altitude.toFixed(0)}°</span>`}</span></span>
                 <svg class="as-seen" viewBox="-20 -20 40 40" aria-hidden="true">${moon.svg}</svg>
                 <span class="term-tip" aria-hidden="true">${tip.html}</span></button>`;
 
@@ -319,7 +320,7 @@ weeksEl.addEventListener("click", (event) => {
     update({ jd: Number(jd.toFixed(7)), live: false, animate: false });
 });
 
-find(".calendar-weekdays", figure).innerHTML = WEEKDAYS.map((day) => `<span>${day}</span>`).join("");
+find(".calendar-weekdays", figure).innerHTML = WEEKDAYS.map((day) => `<span data-export-text>${day}</span>`).join("");
 
 // A link that sets the moment (an experiment in a caption, see state.ts) takes the calendar to its month too.
 onChange((source) => {

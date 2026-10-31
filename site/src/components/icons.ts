@@ -7,11 +7,19 @@ const CHECK = '<path class="check" d="M3 8.5l3 3 7-7"/>';
 export const ICONS = {
     /** The view kept on the Sun: brackets that close in round a Sun, filled while on. */
     sunLock: `${BRACKETS}<circle class="fill-on" cx="8" cy="8" r="2.4"/><path class="spin" d="M8 2.9v1.2M8 11.9v1.2M2.9 8h1.2M11.9 8h1.2M4.4 4.4l.85.85M10.75 10.75l.85.85M4.4 11.6l.85-.85M10.75 5.25l.85-.85"/>`,
-    /** The view kept on the Moon: the same brackets round a crescent. */
-    moonLock: `${BRACKETS}<path class="fill-on" d="M9.6 4.8A3.4 3.4 0 1 0 9.6 11.2 2.8 2.8 0 0 1 9.6 4.8z"/>`,
+    /** The view kept on the Moon: the same brackets round the theme toggle's crescent (see Base.astro). */
+    moonLock: `${BRACKETS}<path class="solid" d="M7.115 3.943A4 4 0 1 0 11.485 10.257 4 4 0 0 1 7.115 3.943z"/>`,
+    /** Back and on in time, each stepping its way on hover. */
+    earlier: '<path class="step-back" d="M10 3.5 5.5 8l4.5 4.5"/>',
+    later: '<path class="step-on" d="M6 3.5 10.5 8 6 12.5"/>',
     /** Refraction: the Sun where it truly is, dashed, and a little above it, a little squeezed, where the air shows it. */
     refraction:
         '<circle cx="8" cy="9.4" r="5.2" stroke-dasharray="1.3 1.4"/><ellipse class="fill-on lift" cx="8" cy="7" rx="5.2" ry="4.1"/>',
+    /** Labels on a figure: a tag, its eyelet filled while on. */
+    labels: '<path d="M2.5 2.5h5.2l5.8 5.8-5.2 5.2-5.8-5.8z"/><circle class="fill-on" cx="5.6" cy="5.6" r="1"/>',
+    /** The Moon's libration: a disc rocking between two arcs, its center filled while on. */
+    libration:
+        '<circle cx="8" cy="8" r="3.8"/><path d="M2.3 5a7 7 0 0 0 0 6M13.7 5a7 7 0 0 1 0 6"/><circle class="fill-on" cx="8" cy="8" r="1"/>',
     /** A compass with a small north arrow; with the grid on, a dotted circle of altitude joins it (see .sky-marks). */
     marks: '<circle cx="8" cy="8" r="6"/><path d="M8 2v1.8M8 12.2V14M2 8h1.8M12.2 8H14"/><circle class="grid-part spin22" cx="8" cy="8" r="4.2" stroke-dasharray="0.1 1.75"/><path class="solid swing" d="M8 5.3 9.15 8.6H6.85z"/>',
     /** A figure's options: two knobs, each between two rails that grow and shrink as it slides, so it stays hollow. */

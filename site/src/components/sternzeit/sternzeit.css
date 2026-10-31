@@ -82,10 +82,10 @@
     margin: 0 -1px;
 }
 .stepper > button[data-step="-1"] {
-    border-radius: var(--radius-small) 0 0 var(--radius-small);
+    border-radius: var(--radius-button) 0 0 var(--radius-button);
 }
 .stepper > button[data-step="1"] {
-    border-radius: 0 var(--radius-small) var(--radius-small) 0;
+    border-radius: 0 var(--radius-button) var(--radius-button) 0;
 }
 /* "now" and the location pin act on their own, so they stand apart from the stepping group. */
 .stepper > button[data-field] {
@@ -149,16 +149,16 @@
 }
 .steps label:first-child span {
     margin-left: 0;
-    border-radius: var(--radius-small) 0 0 var(--radius-small);
+    border-radius: var(--radius-button) 0 0 var(--radius-button);
 }
 .steps label:last-child span {
-    border-radius: 0 var(--radius-small) var(--radius-small) 0;
+    border-radius: 0 var(--radius-button) var(--radius-button) 0;
 }
 /* A group's name, first and plain: text, not a button. */
 .steps-heading {
     padding: 0.15rem 0.45rem;
     border: var(--border);
-    border-radius: var(--radius-small) 0 0 var(--radius-small);
+    border-radius: var(--radius-button) 0 0 var(--radius-button);
     background: var(--surface);
     color: var(--muted);
     font-family: var(--font-mono);
@@ -360,7 +360,7 @@ tbody tr:hover {
     width: 100%;
     aspect-ratio: 1 / 1;
     border: var(--border);
-    border-radius: var(--radius);
+    border-radius: var(--radius-canvas);
     background: var(--bg);
 }
 /* The one panel sized by its box rather than by its own shape: it fills the height its scene gives it. */
@@ -537,15 +537,6 @@ figure[id] {
     left: 50%;
     transform: translateX(-50%);
     z-index: 5;
-    display: flex;
-    gap: 0.4rem;
-    align-items: center;
-    color: var(--muted);
-    font-size: var(--text-small);
-    white-space: nowrap;
-}
-.eclipse-jump button:hover {
-    color: var(--accent);
 }
 .eclipse-sun {
     fill: var(--text);
@@ -737,19 +728,18 @@ g.eclipse-corona {
     margin: 1.5rem 0;
 }
 .moon-view {
-    margin: 0 0 0.75rem;
+    margin: 0;
 }
 /* As wide as the column, its height set by the script (see moonview.js) so the disc keeps its size. */
 .moon-panel > svg {
     aspect-ratio: auto;
 }
-/* The libration switch: in the panel's bottom left corner, as the lock is in its top left one. */
-.moon-panel {
-    position: relative;
-}
-.moon-panel > .libration-toggle {
-    top: auto;
-    bottom: 6px;
+/* The Moon's switches in the top left corner, opposite the download. */
+.moon-view > .view-buttons:not(.svg-download) {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    z-index: 5;
 }
 .moon-reference {
     fill: none;
@@ -757,13 +747,6 @@ g.eclipse-corona {
     stroke-width: 1;
     stroke-dasharray: 3 3;
     vector-effect: non-scaling-stroke;
-}
-/* The circles' names cross the disc's edge and grid, so a halo in the panel's background keeps them legible. */
-.moon-reference-label {
-    paint-order: stroke;
-    stroke: var(--bg);
-    stroke-width: 3px;
-    stroke-linejoin: round;
 }
 .moon-night {
     fill: color-mix(in srgb, var(--accent) calc(var(--earthshine, 0) * 45%), var(--surface));
@@ -836,29 +819,72 @@ g.eclipse-corona {
     opacity: 0;
     transition: opacity 0.15s;
 }
-.svg-download:hover,
 .icon-button:hover {
     color: var(--accent);
 }
-/* Over a figure, the download is a disc of the frame's glass in the page's own theme (see SkyFrame.astro). */
-.svg-download {
-    width: 30px;
-    height: 30px;
+/* A group of icon buttons over a figure (see SkyFrame.astro), in the page's own theme even over one that stays dark. */
+.view-buttons {
+    --bg: var(--overlay-solid);
+    --surface: var(--overlay-surface);
+    --line: var(--overlay-line);
+    --text: var(--overlay-ink);
+    --muted: var(--overlay-quiet);
+    --accent: var(--overlay-accent);
+    display: flex;
+    flex: none;
+    gap: 4px;
+    padding: 4px;
+    border-radius: var(--radius-group);
+    background: var(--overlay-surface);
+    pointer-events: auto;
+}
+/* A plate behind the icon shows hover and on; a press shrinks the plate alone, the icon stays where it is. */
+.view-icon {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
     border: 0;
-    border-radius: 999px;
-    background: var(--overlay-glass);
-    backdrop-filter: var(--overlay-filter);
-    color: var(--overlay-ink);
+    border-radius: var(--radius-button);
+    background: none;
+    color: var(--text);
+    transition: color 0.15s;
 }
-.svg-download:hover {
-    color: var(--overlay-accent);
+.view-icon::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--plate, transparent);
+    transition:
+        background 0.15s,
+        transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
-.svg-download .icon {
+.view-icon:hover {
+    --plate: var(--overlay-hover);
+}
+.view-icon:active::before {
+    transform: scale(0.82);
+    transition-duration: 0.08s;
+}
+.view-icon[aria-pressed="true"] {
+    --plate: var(--overlay-tint);
+    color: var(--accent);
+}
+.view-icon .icon {
     width: 16px;
     height: 16px;
-    stroke-width: 0.95;
+    stroke-width: 0.85;
 }
-.svg-download svg,
+.svg-download {
+    width: auto;
+    padding: 4px;
+    display: flex;
+}
 .icon-button svg,
 .calendar-lock svg {
     width: 14px;
@@ -869,26 +895,54 @@ g.eclipse-corona {
     stroke-linecap: round;
     stroke-linejoin: round;
 }
-/* Controls that sit over a figure rather than under it: the view switch and the steps to the nearest eclipse. */
-.view-toggle,
-.eclipse-jump button {
-    padding: 0.1rem 0.4rem;
+/* Text buttons, with or without an icon before or after the word, at the small text's size. A view switch is one, over
+   the figure unless it says otherwise; within a group the group is its ground. */
+.button-xs,
+.view-toggle {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    height: 28px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: var(--radius-button);
+    background: var(--surface);
     color: var(--muted);
     font-size: var(--text-small);
+    transition:
+        background 0.15s,
+        color 0.15s;
 }
-/* Opposite the download button, always visible, since nothing else hints at the second view. */
+.button-xs:hover:enabled,
+.view-toggle:hover {
+    background: var(--line);
+    color: var(--text);
+}
+.button-xs[aria-pressed="true"],
+.view-toggle[aria-pressed="true"] {
+    background: color-mix(in oklab, var(--accent) 22%, var(--surface));
+    color: var(--accent);
+}
+.button-xs .icon,
+.view-toggle .icon {
+    width: 14px;
+    height: 14px;
+    stroke-width: 1;
+}
+/* Nothing but an icon: square. */
+.button-square {
+    justify-content: center;
+    width: 28px;
+    padding: 0;
+}
+.view-buttons > .button-xs:not(:hover, [aria-pressed="true"]) {
+    background: none;
+}
 .view-toggle {
     position: absolute;
     top: 6px;
     left: 6px;
     z-index: 5;
-}
-.view-toggle:hover {
-    color: var(--accent);
-}
-.view-toggle[aria-pressed="true"] {
-    color: var(--accent);
-    border-color: var(--accent);
 }
 /* A scene's switches in the top left corner, the credit line after them. The bar lets a drag through to the scene. */
 .scene-bar {
@@ -900,10 +954,6 @@ g.eclipse-corona {
     gap: 0.5rem;
     align-items: center;
     pointer-events: none;
-}
-.scene-bar > .view-toggle {
-    position: static;
-    pointer-events: auto;
 }
 .scene-bar > .vis-credit {
     position: static;
@@ -943,7 +993,7 @@ g.eclipse-corona {
     text-align: right;
 }
 [data-export]:hover > .svg-download,
-.svg-download:focus-visible,
+.svg-download:focus-within,
 .moment:hover .icon-button,
 .icon-button:focus-visible {
     opacity: 1;
@@ -968,7 +1018,7 @@ g.eclipse-corona {
     display: flex;
     gap: 0.3rem;
     align-items: center;
-    margin-bottom: 0.75rem;
+    margin-bottom: 1.25rem;
 }
 .calendar-months {
     flex: 1;
@@ -977,21 +1027,7 @@ g.eclipse-corona {
     justify-content: center;
     gap: 0.3rem;
 }
-/* A view toggle like the moon view's, but in the row rather than over the figure, with a padlock before its word. */
-.calendar-head > .calendar-lock {
-    position: static;
-    display: flex;
-    gap: 0.3rem;
-    align-items: center;
-}
-/* The months to pick muted like steps not chosen, brightening on hover; those of another year fainter still, like a
-   variant not shown. */
-.calendar-months > button {
-    color: var(--muted);
-}
-.calendar-months > button:hover:enabled {
-    color: var(--text);
-}
+/* The months of another year fainter, like a variant not shown. */
 .calendar-other-year {
     opacity: 0.55;
 }
@@ -1001,18 +1037,18 @@ g.eclipse-corona {
 }
 /* The farther months only where there is room for them, measured around a turn of the year, the widest case: five a
    side with the lock's word at the page's width, then fewer, and on a narrow screen in the controls' small text. */
-@container (max-width: 38.5rem) {
+@container (max-width: 40.5rem) {
     .calendar-month-5 {
         display: none;
     }
 }
-@container (max-width: 36.5rem) {
+@container (max-width: 38.5rem) {
     /* No room for where the Moon stands beside the day; the tooltip still says it. */
     .calendar .calendar-where {
         display: none;
     }
 }
-@container (max-width: 33rem) {
+@container (max-width: 35rem) {
     .calendar-lock-word {
         display: none;
     }
@@ -1020,17 +1056,17 @@ g.eclipse-corona {
         font-size: var(--text-small);
     }
 }
-@container (max-width: 27.75rem) {
+@container (max-width: 29.75rem) {
     .calendar-month-4 {
         display: none;
     }
 }
-@container (max-width: 22.5rem) {
+@container (max-width: 24.5rem) {
     .calendar-month-3 {
         display: none;
     }
 }
-@container (max-width: 17.5rem) {
+@container (max-width: 19.5rem) {
     .calendar-month-2 {
         display: none;
     }
@@ -1054,9 +1090,17 @@ g.eclipse-corona {
     display: flex;
     gap: 0.75rem;
     align-items: flex-start;
-    margin-top: 1.25rem;
+    margin-top: 0.5rem;
     font-size: var(--text-meta);
     line-height: 18px;
+}
+/* The calendar's rows run close, so its slider stands further off them. */
+.calendar > .figure-slider {
+    margin-top: 1.25rem;
+}
+/* A second slider stands off the first and its scale. */
+.figure-slider + .figure-slider {
+    margin-top: 1.25rem;
 }
 .figure-slider-rail {
     flex: 1;
@@ -1127,10 +1171,6 @@ g.eclipse-corona {
 .figure-slider[data-lunation] output {
     min-width: 6ch;
     text-align: right;
-}
-/* Under the half-width eclipse panels, closer to them than under a full figure. */
-.eclipse-view > .figure-slider {
-    margin-top: 0.5rem;
 }
 .figure-slider output {
     min-width: 5ch;
@@ -1513,6 +1553,15 @@ g.eclipse-corona {
 }
 .strip-panel {
     position: relative;
+}
+/* Inside the plot, under its top margin (STRIP_MARGIN), not half over its edge. */
+.strip-panel > .svg-download {
+    top: 20px;
+    right: 8px;
+}
+/* Clear of the scale along its right edge. */
+.scattering-panel > .svg-download {
+    right: 36px;
 }
 /* Broken out of the column, inset as far as the panels floating over the scenes, the analemma's among them. */
 @media (min-width: 48rem) {
