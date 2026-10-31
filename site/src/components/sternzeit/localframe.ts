@@ -332,7 +332,7 @@ let dragFrom: { x: number; y: number } | null = null;
 let pressedAt: { x: number; y: number } | null = null;
 frameEl.addEventListener("pointerdown", (event) => {
     // Not on the switch, whose clicks the captured pointer would take away.
-    if (event.target instanceof Element && event.target.closest(".frame-options")) return;
+    if (event.target instanceof Element && event.target.closest(".scene-bar")) return;
     dragFrom = { x: event.clientX, y: event.clientY };
     pressedAt = dragFrom;
     frameEl.setPointerCapture(event.pointerId);

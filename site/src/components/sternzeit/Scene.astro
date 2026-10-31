@@ -6,8 +6,13 @@ import TimeSlider from "./TimeSlider.astro";
 ---
 
 <figure class="scene-frame wide" id="armillary-sphere">
-    <div id="scene" data-export="armillary-sphere" data-download-beside=":scope > .view-toggle">
-        <button type="button" class="view-toggle" data-field="labels" aria-pressed="true" title="Show or hide the labels">show labels</button>
+    <div id="scene" data-export="armillary-sphere">
+        <div class="scene-bar">
+            <button type="button" class="view-toggle" data-field="labels" aria-pressed="true" title="Show or hide the labels">show labels</button>
+            <p class="vis-credit footnote">
+                Drag to rotate. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
+            </p>
+        </div>
         <svg id="stage" class="zdog" aria-hidden="true"></svg>
         <svg class="scene-annotations" aria-hidden="true">
             <path class="annotation-arrow" data-annotation="observer"></path>
@@ -34,9 +39,6 @@ import TimeSlider from "./TimeSlider.astro";
                 <span class="altaz-caption"><span class="subfigure-title">moon-locked</span>: the observer's sky</span>
             </div>
         </div>
-        <p class="vis-credit footnote">
-            Drag to rotate. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
-        </p>
     </div>
     <TimeSlider />
     <figcaption class="figure-caption">

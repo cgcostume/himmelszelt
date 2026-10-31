@@ -280,7 +280,7 @@ tbody tr:hover {
 .orbit-scene:active {
     cursor: grabbing;
 }
-/* The orbits: the scene fills the frame, nothing floats over it but the credit line in the top right corner. */
+/* The orbits: the scene fills the frame, nothing floats over it but the credit line and the download. */
 .orbit-scene > svg {
     display: block;
     width: 100%;
@@ -290,11 +290,6 @@ tbody tr:hover {
     position: absolute;
     inset: 0;
     pointer-events: none;
-}
-.orbit-scene > .vis-credit {
-    left: auto;
-    right: var(--content-inset);
-    text-align: right;
 }
 #stage {
     display: block;
@@ -895,8 +890,8 @@ g.eclipse-corona {
     color: var(--accent);
     border-color: var(--accent);
 }
-/* The observer's frame's labels switch in the top left corner, as the armillary sphere has its own. */
-.frame-options {
+/* A scene's switches in the top left corner, the credit line after them. The bar lets a drag through to the scene. */
+.scene-bar {
     position: absolute;
     top: 0.5rem;
     left: var(--content-inset);
@@ -904,8 +899,13 @@ g.eclipse-corona {
     display: flex;
     gap: 0.5rem;
     align-items: center;
+    pointer-events: none;
 }
-.frame-options > .view-toggle {
+.scene-bar > .view-toggle {
+    position: static;
+    pointer-events: auto;
+}
+.scene-bar > .vis-credit {
     position: static;
 }
 .frame-scene.over-body {
@@ -920,38 +920,26 @@ g.eclipse-corona {
     top: 0;
     right: 0;
 }
-/* The big scenes have no panel frame to hang the button off, so it lines up with the figure's own content instead:
-   the same gutter the credit line and the caption use, in the top left corner. Their right side is taken by the panels
-   floating over it. */
-[data-export="sun-path-diagram"] > .svg-download {
+/* The big scenes have no panel frame to hang the button off, so it lines up with the figure's own content instead: top
+   right in the gutter the credit line and the caption use, or just short of the panels floating there. Always shown. */
+:where(#scene, .dome-scene, .orbit-scene, .frame-scene) > .svg-download {
     top: 0.5rem;
-    right: auto;
-    left: var(--content-inset);
+    right: var(--content-inset);
+    opacity: 1;
 }
-/* The download placed beside a switch of the figure's own instead (see export.ts). */
-[data-download-beside] > .svg-download {
-    right: auto;
+#scene {
+    container-type: size;
 }
-/* The labels switch in the top left corner, lined up with the text, the download beside it (see export.ts); the credit
-   line then moves to the bottom, or to the top right corner where no panels float (see the narrow media query). */
-#scene > .view-toggle {
-    top: 0.5rem;
-    left: var(--content-inset);
+#scene > .svg-download {
+    right: calc(1.5rem + 38cqh + 1rem);
 }
-#scene > .vis-credit {
-    top: auto;
-    bottom: 0.5rem;
+.dome-scene > .svg-download {
+    right: calc(1.5rem + var(--analemma-width, 38cqh) + 1rem);
 }
-/* The sun path's credit line in the top right corner, right-aligned up to the analemma floating there. */
-.dome-scene > .vis-credit {
+/* Lookup's credit line, right-aligned up to its tables. */
+.lookup-scene > .vis-credit {
     left: auto;
     right: calc(1.5rem + var(--analemma-width, 38cqh) + 1rem);
-    text-align: right;
-}
-/* Nothing floats over the observer's frame: its credit line goes to the top right corner at any width. */
-.frame-scene > .vis-credit {
-    left: auto;
-    right: var(--content-inset);
     text-align: right;
 }
 [data-export]:hover > .svg-download,
@@ -1277,6 +1265,9 @@ g.eclipse-corona {
     #scene .altaz-panel {
         height: 42.75%;
     }
+    #scene > .svg-download {
+        right: calc(1.5rem + 42.75cqh + 1rem);
+    }
     #scene .altaz-panel-sun {
         top: 0;
     }
@@ -1309,15 +1300,25 @@ g.eclipse-corona {
         margin-left: 0;
     }
     .vis-credit,
-    #scene > .view-toggle,
-    .frame-options {
+    .scene-bar {
         left: 0;
     }
-    #scene > .vis-credit,
-    .dome-scene > .vis-credit,
-    .frame-scene > .vis-credit {
+    #scene {
+        container-type: normal;
+    }
+    /* The panels have moved below, and the bar wraps short of the download. */
+    :is(#scene, .dome-scene, .orbit-scene, .frame-scene) > .svg-download {
+        right: 0;
+    }
+    .scene-bar {
+        right: 2.5rem;
+        flex-wrap: wrap;
+    }
+    .dome-scene > .vis-credit {
+        right: 2.5rem;
+    }
+    .lookup-scene > .vis-credit {
         top: 0.5rem;
-        bottom: auto;
         left: auto;
         right: 0;
         text-align: right;

@@ -34,6 +34,7 @@ const MOON_SPAN_HOURS = 24;
 const MOON_FADE_HOURS = 24;
 // Faint beneath it, the Moon's path over a whole lunation, half a synodic month either way, sampled every half hour.
 const LUNATION_SAMPLES_PER_HOUR = 2;
+const LUNATION_PIECE = 6;
 const LUNATION_ALPHA = { above: 11, below: 5 };
 // The Sun's: half a day either way, its last hour at either end fading out, so the two ends meet without overlapping.
 const SUN_SPAN_HOURS = 12;
@@ -163,7 +164,7 @@ const compassLabels = COMPASS.map((text, i) => {
 });
 
 // The observer's ENU axes, small, at the dome's center, where the observer stands: the same frame as the observer's
-// frame figure, x east, y north and z up. Each arrowhead two crossed triangles, so it reads from any side.
+// frame figure, x east, y north and z up. Each arrowhead a flat triangle, turned to face the viewer (see turnEnuHeads).
 const ENU_AXIS = 0.2 * R;
 const ENU_HEAD = { length: 4, halfWidth: 1.6 };
 const enuTips: [string, Zdog.VectorOptions][] = [
@@ -171,21 +172,31 @@ const enuTips: [string, Zdog.VectorOptions][] = [
     ["y", { x: 0, y: 0, z: -ENU_AXIS }],
     ["z", { x: 0, y: -ENU_AXIS, z: 0 }],
 ];
-for (const [, tip] of enuTips) {
+const enuHeads = enuTips.map(([, tip]) => {
     const d = new Vector(tip);
     d.multiply(1 / ENU_AXIS);
     const base = new Vector(d).multiply(ENU_AXIS - ENU_HEAD.length);
     styled(new Shape({ addTo: above, path: [{ x: 0, y: 0, z: 0 }, base], color: INK }), 1);
-    // Two directions square to the axis: the other two axes.
-    const sides = [
-        { x: 1, y: 0, z: 0 },
-        { x: 0, y: 1, z: 0 },
-        { x: 0, y: 0, z: 1 },
-    ].filter((axis) => axis.x * d.x + axis.y * d.y + axis.z * d.z === 0);
-    for (const side of sides) {
-        const offset = new Vector(side).multiply(ENU_HEAD.halfWidth);
-        const path = [tip, new Vector(base).add(offset), new Vector(base).subtract(offset)];
-        styled(new Shape({ addTo: above, path, fill: true, color: INK }), 1);
+    const shape = styled(new Shape({ addTo: above, path: [tip, tip, tip], fill: true, color: INK }), 1);
+    return { shape, tip, base, d };
+});
+
+/** Turns every arrowhead's wings square to both its axis and the line of sight. */
+function turnEnuHeads() {
+    // The line of sight in scene coordinates: the screen's z, with the scene's rotation undone in reverse order.
+    const view = new Vector({ x: 0, y: 0, z: 1 }).rotate({ x: -rotation.x }).rotate({ y: -rotation.y });
+    for (const { shape, tip, base, d } of enuHeads) {
+        const side = new Vector({
+            x: d.y * view.z - d.z * view.y,
+            y: d.z * view.x - d.x * view.z,
+            z: d.x * view.y - d.y * view.x,
+        });
+        const length = side.magnitude();
+        // Seen along the axis, any direction across it will do.
+        if (length < 1e-3) side.set({ x: d.y, y: d.z, z: d.x });
+        else side.multiply(ENU_HEAD.halfWidth / length);
+        shape.path = [tip, new Vector(base).add(side), new Vector(base).subtract(side)];
+        shape.updatePath();
     }
 }
 const ENU_LABEL_GAP_PX = 8;
@@ -247,16 +258,25 @@ function addFadingPath(path: ReturnType<typeof fadingPath>, color: string, strok
     }
 }
 
-function addPath(samples: HorizontalCoords[], color: string, strokePx: number, dashBelow: string, colorBelow = color) {
+/** A path in short pieces of `piece` samples, since Zdog sorts by depth shape by shape: each passes in front or behind on its own. */
+function addPath(
+    samples: HorizontalCoords[],
+    color: string,
+    strokePx: number,
+    dashBelow: string,
+    colorBelow = color,
+    piece = SAMPLES_PER_HOUR,
+) {
     for (const run of runsByHorizon(samples)) {
-        const path = run.samples.map((s) => skyPoint(s));
-        const shape = new Shape({
-            addTo: dynamic[run.up ? 1 : 0],
-            path,
-            closed: false,
-            color: run.up ? color : colorBelow,
-        });
-        styled(shape, strokePx, run.up ? null : dashBelow);
+        for (let i = 0; i < run.samples.length - 1; i += piece) {
+            const shape = new Shape({
+                addTo: dynamic[run.up ? 1 : 0],
+                path: run.samples.slice(i, i + piece + 1).map((s) => skyPoint(s)),
+                closed: false,
+                color: run.up ? color : colorBelow,
+            });
+            styled(shape, strokePx, run.up ? null : dashBelow);
+        }
     }
 }
 
@@ -317,6 +337,33 @@ function addSunRays(horizontal: HorizontalCoords) {
     for (const path of sunRays()) styled(new Shape({ addTo: face, path, color: INK }), 1, "figure-sun-ray");
 }
 
+const shapeCounts = () => dynamic.map((anchor) => anchor.children.length);
+
+// How far along its path, in scene units, a body hides what passes through it; the rest of the path keeps its true depth.
+const BODY_REACH = 0.2 * R;
+
+/** Sorts what was added since `counts` and lies at the body at `point` behind it, so a body stands in front of its own path there. */
+function keepBehindBody(counts: number[], point: Zdog.VectorOptions, altitude: number) {
+    const { x: bx = 0, y: by = 0, z: bz = 0 } = point;
+    const body = new Anchor({ addTo: anchorFor(altitude), translate: point });
+    dynamic.forEach((anchor, i) => {
+        for (const child of anchor.children.slice(counts[i])) {
+            if (child === body) continue;
+            const shape = child as Zdog.Shape;
+            const { x, y, z } = shape.translate;
+            const near = (shape.path as Zdog.VectorOptions[]).some(
+                (p) => Math.hypot(x + (p.x ?? 0) - bx, y + (p.y ?? 0) - by, z + (p.z ?? 0) - bz) < BODY_REACH,
+            );
+            if (!near) continue;
+            const updateSortValue = shape.updateSortValue;
+            shape.updateSortValue = () => {
+                updateSortValue.call(shape);
+                shape.sortValue = Math.min(shape.sortValue, body.renderOrigin.z - 1);
+            };
+        }
+    });
+}
+
 function rebuildPaths() {
     const { jd, latitude, longitude } = state;
     billboards.length = 0;
@@ -330,17 +377,11 @@ function rebuildPaths() {
     // Moon's does not close: it moves on by some 13 degrees a day and winds on as a spiral, a day either
     // way, fading from the Moon itself. The Sun's nearly closes after a day: half a day either way, the last hour
     // at either end fading, so its two ends meet without overlapping.
-    const band = (alpha: number) => `color-mix(in srgb, ${MUTED} ${alpha}%, transparent)`;
-    const lunation = lunationPath(jd, latitude, longitude);
-    addPath(lunation, band(LUNATION_ALPHA.above), 0.75, DASHED, band(LUNATION_ALPHA.below));
-    const moon = fadingPath(precise.moon, jd, latitude, longitude, MOON_SPAN_HOURS, MOON_FADE_HOURS);
-    addFadingPath(moon, MUTED, 1, DASHED);
-    const sun = fadingPath(precise.sun, jd, latitude, longitude, SUN_SPAN_HOURS, SUN_FADE_HOURS);
-    addFadingPath(sun, INK, 1.5, DOTTED);
-    for (const [path, color] of [
-        [moon, MUTED],
-        [sun, INK],
-    ] as const) {
+    const time = precise.fromJulianDay(jd);
+    const moonNow = seen(precise.moon, time, latitude, longitude);
+    const sunNow = seen(precise.sun, time, latitude, longitude);
+    bodyPoints = { sun: skyPoint(sunNow), moon: skyPoint(moonNow) };
+    const addArrows = (path: ReturnType<typeof fadingPath>, color: string) => {
         for (let i = 0; i < path.samples.length - 1; i++) {
             const alpha = path.alpha(i);
             if (!path.arrow(i) || alpha < 0.2) continue;
@@ -350,15 +391,24 @@ function rebuildPaths() {
                 alpha >= 1 ? color : `color-mix(in srgb, ${color} ${Math.round(alpha * 100)}%, transparent)`,
             );
         }
-    }
+    };
+    const band = (alpha: number) => `color-mix(in srgb, ${MUTED} ${alpha}%, transparent)`;
+    const beforeMoon = shapeCounts();
+    const lunation = lunationPath(jd, latitude, longitude);
+    addPath(lunation, band(LUNATION_ALPHA.above), 0.75, DASHED, band(LUNATION_ALPHA.below), LUNATION_PIECE);
+    const moon = fadingPath(precise.moon, jd, latitude, longitude, MOON_SPAN_HOURS, MOON_FADE_HOURS);
+    addFadingPath(moon, MUTED, 1, DASHED);
+    addArrows(moon, MUTED);
+    keepBehindBody(beforeMoon, bodyPoints.moon, moonNow.altitude);
+    const beforeSun = shapeCounts();
+    const sun = fadingPath(precise.sun, jd, latitude, longitude, SUN_SPAN_HOURS, SUN_FADE_HOURS);
+    addFadingPath(sun, INK, 1.5, DOTTED);
+    addArrows(sun, INK);
     // The Sun's hour dots on whole hours of the day it is drawn for, where it is up.
     sun.samples.forEach((sample, i) => {
         if (sun.hour(i) && sun.alpha(i) >= 1 && sample.altitude >= 0) addDot(sample, INK, 4);
     });
-    const time = precise.fromJulianDay(jd);
-    const moonNow = seen(precise.moon, time, latitude, longitude);
-    const sunNow = seen(precise.sun, time, latitude, longitude);
-    bodyPoints = { sun: skyPoint(sunNow), moon: skyPoint(moonNow) };
+    keepBehindBody(beforeSun, bodyPoints.sun, sunNow.altitude);
     moonPhase = zdogMoon(anchorFor(moonNow.altitude), bodyPoints.moon);
     styled(
         zdogSun(anchorFor(sunNow.altitude), skyPoint(sunNow)),
@@ -487,6 +537,7 @@ frameEl.addEventListener("pointerup", () => {
 });
 
 function frame() {
+    turnEnuHeads();
     moonPhase?.update(bodyPoints.sun, bodyPoints.moon, rotation, zoom);
     // Undoing the scene's rotation, outermost turn first, leaves these anchors facing the viewer; the scale makes
     // their own units screen pixels.

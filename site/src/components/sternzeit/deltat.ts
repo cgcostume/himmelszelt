@@ -33,6 +33,7 @@ const LINEAR_SINCE = 1800;
 const LINEAR_SHARE = 0.5;
 const LOG_SCALE_YEARS = 71;
 const LOG_SPAN = Math.log1p((LINEAR_SINCE - FIRST_YEAR) / LOG_SCALE_YEARS);
+const LABEL_LINE = 16;
 
 const svgEl = find<SVGSVGElement>(".deltat-panel > svg");
 // The year under the pointer, while it hovers the plot.
@@ -152,16 +153,15 @@ function render() {
         svg += svgText(x(today) + GAP, row, "extrapolated \u203A", "figure-label figure-anchor-start");
     }
 
-    // A year marked on the curve. The moment's label keeps to the row between the 1 h and 10 h lines, the same height
-    // wherever it is; the hovered year's sits by its dot, on the side with more room, below it in the upper half and
-    // above it in the lower one.
-    const mark = (year: number, name: string, cls: string, labelY: number | null = null) => {
+    // A year marked on the curve, its label on a row of its own, the same height wherever it is: the moment's between
+    // the 1 h and 10 h lines, the hovered year's on the line below it.
+    const labelRow = (y(3600) + y(36_000)) / 2;
+    const mark = (year: number, name: string, cls: string, ly: number) => {
         if (year < FIRST_YEAR || year > LAST_YEAR) return "";
         const seconds = deltaT(year);
         const [mx, my] = [x(year), y(seconds)];
         const left = mx > width / 2;
         const label = `${name} ${duration(seconds)}`;
-        const ly = labelY ?? (my < (plot.top + plot.bottom) / 2 ? my + 12 : my - 10);
         return (
             stripMoment(mx, my, plot.top, plot.bottom, cls) +
             svgText(mx + (left ? -GAP : GAP), ly, label, `figure-note figure-anchor-${left ? "end" : "start"} ${cls}`)
@@ -169,8 +169,8 @@ function render() {
     };
     // The page's moment always, the hovered year besides while there is one.
     const year = yearOf(state.jd);
-    svg += mark(year, yearText(Math.floor(year)), "", (y(3600) + y(36_000)) / 2);
-    if (hovered !== null) svg += mark(hovered, yearText(Math.round(hovered)), "deltat-hover");
+    svg += mark(year, yearText(Math.floor(year)), "", labelRow);
+    if (hovered !== null) svg += mark(hovered, yearText(Math.round(hovered)), "deltat-hover", labelRow + LABEL_LINE);
     drawSvg(svgEl, svg, 1);
     // The rows stop a gap short of their labels, measured once drawn.
     const labels = [...svgEl.querySelectorAll<SVGTextElement>(".strip-tick")].map((text) => text.getBBox());

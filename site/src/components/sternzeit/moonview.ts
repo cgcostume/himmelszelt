@@ -224,7 +224,8 @@ function render() {
     } else {
         const corner = halfHeight - cornerRowPx() * unitsPerPx;
         const right = halfWidth - CORNER_PX * unitsPerPx;
-        svg += readout(right, -corner, "size", size, "end");
+        // The size stops short of the download in the corner.
+        svg += readout(right - 36 * unitsPerPx, -corner, "size", size, "end");
         if (!locked) svg += readout(right, -corner + line * 1.25, "tilt", tiltText, "end");
         svg += readout(right, corner - line * 1.25, "libration", libration, "end");
         svg += readout(right, corner, "earthshine", shine, "end");
