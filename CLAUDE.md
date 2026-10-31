@@ -27,12 +27,13 @@ osghimmel/         read-only reference clone, gitignored
 | npm package | Directory | Status |
 |---|---|---|
 | `@himmelszelt/sternzeit` (astronomy/sidereal time math) | `packages/sternzeit` | Julian Day, sidereal time, sun/moon/earth positions, moon phase, sun direction from the moon, earthshine and librations done (precise + approx), ΔT from IERS observations and Espenak & Meeus; cross-checked against astronomia; stars stubbed |
-| `@himmelszelt/dunstkreis` (WebGPU atmosphere after Hillaire, on Bruneton's model) | `packages/dunstkreis` | tables, sky pass, traced refraction, exposure, sky cube map and diffuse IBL (SH9, irradiance cube) working, live in its chapter under `pnpm dev` (a draft, withheld from the published site); aerial perspective, specular IBL, Bruneton as another sky-view filler pending |
-| `@himmelszelt/sternwarte` (the website, `private: true`) | `site/` | sternzeit chapter done (figures, glossary tooltips, references, TOC); dunstkreis chapter started (live sky, section skeleton), and `planned: true` placeholders for nachtgestirn, sternenheer, gewoelk, rundbild; deployed to GitHub Pages by CI from main |
+| `@himmelszelt/helldunkel` (from light to pixels: EV100, tone curves, display encoding) | `packages/helldunkel` | moved out of dunstkreis, chapter drafted (withheld from the published site); gamut mapping, Display P3 and figures on photographs pending |
+| `@himmelszelt/rundbild` (skies as images: cube map and panorama layouts, cube map to panorama, diffuse IBL, Radiance HDR writing) | `packages/rundbild` | moved out of dunstkreis, chapter drafted (withheld); HDR reading, HDRIs in its figures, horizon band and specular IBL pending. Named after the Rundgemaelde, the 19th century panorama |
+| `@himmelszelt/dunstkreis` (WebGPU atmosphere after Hillaire, on Bruneton's model) | `packages/dunstkreis` | tables, sky pass, traced refraction, metering and day ramp, sky cube map working, live in its chapter under `pnpm dev` (a draft, withheld from the published site); Bruneton as another sky-view filler pending |
+| `@himmelszelt/sternwarte` (the website, `private: true`) | `site/` | chapter order helldunkel, rundbild, sternzeit, dunstkreis, then the planned ones; sternzeit done (figures, glossary tooltips, references, TOC); helldunkel, rundbild and dunstkreis drafts, and `planned: true` placeholders for nachtgestirn, sternenheer, gewoelk; deployed to GitHub Pages by CI from main |
 | `@himmelszelt/gewoelk` (clouds, contrails, flocks of birds, rainbows, halos; weather as plain inputs) | not created yet | later |
 | `@himmelszelt/sternenheer` (star rendering and constellations) | not created yet | later; the old poetic word for the host of stars, and clear of himmelszelt |
 | `@himmelszelt/nachtgestirn` (moon rendering) | not created yet | later |
-| `@himmelszelt/rundbild` (texture mapped skies) | not created yet | later; sky projections, HDR environment maps, IBL computed from them, and the horizon band from the thesis. Named after the Rundgemaelde, the 19th century panorama: a 360 degree image of the surroundings, which is what an environment map is |
 
 **sternwarte** is one site for all libraries, structured like a blog with one chapter per library:
 explains the techniques, showcases them, makes them explorable (WebGPU canvases, zdog
@@ -49,13 +50,15 @@ combining sun, moon, atmosphere, stars, clouds. Audience: developers who want to
 libraries; should be a joy to read, educational, and nerdy. Hard requirements, non-negotiable:
 runs locally with a single command, deploys as static files to GitHub Pages, no other hosting.
 No per-package dev pages: a library is developed and debugged in its chapter, which imports its source directly.
-`pnpm dev` and the published site differ on purpose: a chapter with `draft: true` in its frontmatter (dunstkreis for
-now) is shown in full under `pnpm dev` and published as a placeholder like a planned one, and `<Planned>` figure notes
+`pnpm dev` and the published site differ on purpose: a chapter with `draft: true` in its frontmatter (all but sternzeit
+for now) is shown in full under `pnpm dev` and published as a placeholder like a planned one, and `<Planned>` figure notes
 render under `pnpm dev` only. Both switch on `import.meta.env.DEV` (see `site/src/lib/chapters.ts`).
 
 **No cross-module hard dependencies.** `dunstkreis` doesn't depend on `sternzeit`, it takes a
 sun/moon direction vector + time as plain inputs. Whoever embeds it computes that vector however
-they like. Keep this decoupling for every future module too.
+they like. Keep this decoupling for every future module too. One exception, at build time only: a package may bundle a small
+piece another owns, as a dev dependency inlined into its `dist` (dunstkreis: helldunkel's tone curves and EV100 math,
+rundbild's cube map layout, through their `/wgsl` entries). One source, and npm users still install one package.
 
 **Directions are ENU** (x east, y north, z up, right-handed) in every package: sternzeit's
 `horizontalToDirection` and `moon.sunDirection`, dunstkreis' `sunDirection` input and view rays. Azimuths are

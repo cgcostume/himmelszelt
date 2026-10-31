@@ -1,0 +1,53 @@
+{
+    "name": "@himmelszelt/rundbild",
+    "version": "0.1.0",
+    "description": "Skies as images: cube maps and panoramas, converted into each other, and the diffuse image-based lighting from them, on WebGPU.",
+    "type": "module",
+    "license": "MIT",
+    "sideEffects": false,
+    "author": "Daniel Limberger <cgdaniel@outlook.com> (https://github.com/cgcostume)",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/cgcostume/himmelszelt.git",
+        "directory": "packages/rundbild"
+    },
+    "homepage": "https://github.com/cgcostume/himmelszelt/tree/main/packages/rundbild#readme",
+    "keywords": [
+        "environment-map",
+        "cube-map",
+        "equirectangular",
+        "image-based-lighting",
+        "spherical-harmonics",
+        "webgpu"
+    ],
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./wgsl": {
+            "types": "./dist/wgsl.d.ts",
+            "import": "./dist/wgsl.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "rolldown -c rolldown.config.ts",
+        "typecheck": "tsc --noEmit",
+        "test": "pnpm build && playwright test",
+        "test:gpu": "pnpm build && RUNDBILD_GPU=1 playwright test"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.62.1",
+        "@types/node": "^26.6.2",
+        "@webgpu/types": "^0.1.71",
+        "rolldown": "^1.2.2",
+        "rolldown-plugin-dts": "^0.28.0",
+        "typescript": "^7.0.2",
+        "webgpu": "^0.6.1"
+    }
+}

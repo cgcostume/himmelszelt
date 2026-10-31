@@ -27,7 +27,7 @@ async function evaluate(expression: string, inputs: Vec4[]) {
 const MARKS = [direction(0, 0), direction(90, 0), direction(180, 0), direction(270, 0), direction(0, 90)];
 
 test("the equirectangular puts north at the left edge, south in the middle and the zenith at the top", async () => {
-    const full = await evaluate("vec4f(dkEquirectangularUv(input.xyz, 0.0), 0.0, 0.0)", MARKS);
+    const full = await evaluate("vec4f(rbEquirectangularUv(input.xyz, 0.0), 0.0, 0.0)", MARKS);
     if (full.length === 0) return;
     const expected = [
         [0, 0.5],
@@ -43,7 +43,7 @@ test("the equirectangular puts north at the left edge, south in the middle and t
 });
 
 test("octahedral and fisheye put the zenith in the middle, north at the top and east on the left", async () => {
-    for (const fn of ["dkOctahedralUv(input.xyz, 0.0)", "dkFisheyeUv(input.xyz, 0.0)"]) {
+    for (const fn of ["rbOctahedralUv(input.xyz, 0.0)", "rbFisheyeUv(input.xyz, 0.0)"]) {
         const uv = await evaluate(`vec4f(${fn}, 0.0, 0.0)`, MARKS);
         if (uv.length === 0) return;
         const expected = [
@@ -64,7 +64,7 @@ test("the azimuth offset turns each panorama about the zenith", async () => {
     // Offset by 90°, east takes north's place.
     const offset = (90 * DEG).toFixed(9);
     const uv = await evaluate(
-        `vec4f(dkEquirectangularUv(input.xyz, ${offset}), dkOctahedralUv(input.xyz, ${offset}))`,
+        `vec4f(rbEquirectangularUv(input.xyz, ${offset}), rbOctahedralUv(input.xyz, ${offset}))`,
         [direction(90, 0), direction(0, 0)],
     );
     if (uv.length === 0) return;
@@ -83,10 +83,10 @@ test("every projection maps a direction back onto itself", async () => {
     }
     const upper = inputs.filter(([, , z]) => z > 0);
     const cases: [string, Vec4[]][] = [
-        ["dkPanoramaDirection(1u, dkPanoramaUv(1u, input.xyz, 0.7), 0.7)", inputs],
-        ["dkPanoramaDirection(2u, dkPanoramaUv(2u, input.xyz, 0.7), 0.7)", inputs],
-        ["dkPanoramaDirection(3u, dkPanoramaUv(3u, input.xyz, 0.7), 0.7)", upper],
-        ["dkPanoramaDirection(4u, dkPanoramaUv(4u, input.xyz, 0.7), 0.7)", inputs],
+        ["rbPanoramaDirection(1u, rbPanoramaUv(1u, input.xyz, 0.7), 0.7)", inputs],
+        ["rbPanoramaDirection(2u, rbPanoramaUv(2u, input.xyz, 0.7), 0.7)", inputs],
+        ["rbPanoramaDirection(3u, rbPanoramaUv(3u, input.xyz, 0.7), 0.7)", upper],
+        ["rbPanoramaDirection(4u, rbPanoramaUv(4u, input.xyz, 0.7), 0.7)", inputs],
     ];
     for (const [expression, directions] of cases) {
         const back = await evaluate(`vec4f(${expression}, 0.0)`, directions);
@@ -101,7 +101,7 @@ test("every projection maps a direction back onto itself", async () => {
 });
 
 test("the sphere map puts the horizon at sin 45° of the radius and the nadir on the rim, equal in area", async () => {
-    const uv = await evaluate("vec4f(dkSphereMapUv(input.xyz, 0.0), 0.0, 0.0)", [
+    const uv = await evaluate("vec4f(rbSphereMapUv(input.xyz, 0.0), 0.0, 0.0)", [
         ...MARKS,
         direction(0, -89.99),
         direction(90, -30),
@@ -119,7 +119,7 @@ test("the sphere map puts the horizon at sin 45° of the radius and the nadir on
 });
 
 test("the fisheye takes a direction below the horizon to its corner, beyond the circle", async () => {
-    const uv = await evaluate("vec4f(dkFisheyeUv(input.xyz, 0.0), 0.0, 0.0)", [
+    const uv = await evaluate("vec4f(rbFisheyeUv(input.xyz, 0.0), 0.0, 0.0)", [
         direction(30, -0.5),
         direction(200, -89),
     ]);

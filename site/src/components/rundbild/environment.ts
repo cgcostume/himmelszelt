@@ -1,7 +1,5 @@
 import { showCode } from "../code";
 import { find } from "../dom";
-import { onDemand } from "../frame";
-import { paintRange } from "../range";
 import {
     bindCubifyToggle,
     bindRefractionToggle,
@@ -13,9 +11,11 @@ import {
     quality,
     setEnvironmentSize,
     setIrradianceSize,
-} from "./atmosphere";
-import { formatBytes, saveHdr, savePng } from "./download";
-import { createPreview, type PreviewOptions, renderPixels, SCALE } from "./preview";
+} from "../dunstkreis/atmosphere";
+import { formatBytes, saveHdr, savePng } from "../dunstkreis/download";
+import { createPreview, type PreviewOptions, renderPixels, SCALE } from "../dunstkreis/preview";
+import { onDemand } from "../frame";
+import { paintRange } from "../range";
 
 type PanelName = "sky" | "irradiance";
 const PANELS: PanelName[] = ["sky", "irradiance"];

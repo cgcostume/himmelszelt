@@ -110,6 +110,31 @@ confirmed yet.
 | L1 and L2 about 1.5 million km from Earth | Lagrange points | derived | (μ/3)^(1/3) AU with μ = 1/328,900: 1.50 million km | ok | 2026-10-15 |
 | Sternzeit: sidereal time, kept by the stars; German for Star Trek's stardate. "Since 1799" and "one culmination of a star to the next" (the stellar day, not the sidereal) removed | sternzeit | web | German dub: "Sternzeit" | fixed | 2026-10-11 |
 
+## helldunkel
+
+### Text
+
+| Claim | Where | Against | Result | Status | Checked |
+|---|---|---|---|---|---|
+| Goethe, § 849 defines Helldunkel, clair-obscur; § 851 separates it from color; § 853 names highest light, middle tint, shadow | opening | web | textlog.de transcription, sense confirmed by merke.ch; wording not checked against a scholarly edition; the English is our translation | open | 2026-10-31 |
+| Helldunkel: "das Zusammenspiel von Licht und Schatten", Malerei | glossary | web | Duden | ok | 2026-10-31 |
+| Caravaggio and Rembrandt are chiaroscuro painters; clair-obscur and chiaroscuro are the same term | opening | web | de.wikipedia.org/wiki/Chiaroscuro | ok | 2026-10-31 |
+| Clair Obscur: Expedition 33 is a game of 2025 | opening | web | en.wikipedia.org | ok | 2026-10-31 |
+
+## rundbild
+
+### Text
+
+| Claim | Where | Against | Result | Status | Checked |
+|---|---|---|---|---|---|
+| Nine SH terms keep more than 99% of the irradiance for any environment | Lighting a scene | src | Ramamoorthi & Hanrahan 2001: error under 1% for the Lambertian kernel; "any sky" is their bound, not a measurement here | ok | 2026-10-17 |
+| Cube map texels within 3√3, about 5.2 (a corner texel a fifth of a center one); cubified within exactly 4/3, a third more; equi-angular within √2, 41% more. At 128 a face: 5.11, 1.31, 1.41 | Lighting a scene, cube.wgsl | derived | Jacobian of each map over a face, pointwise and per texel at 8, 128 and 512 | fixed | 2026-10-22 |
+| Equirectangular credited to Marinus of Tyre, around 100 CE | Flattening the sky | web | Esri's projection pages, citing snyder1987; the book's own text not seen | open | 2026-10-22 |
+| At about 400 texels the largest texel over the smallest: equirectangular 8.9, fisheye 1.5 (cube 3.8, cubified 1.1, octahedral 4.2); at 1.6 million, octahedral 5.18 = (√3)³, cube 5.18, fisheye 1.57 = π/2 | Flattening the sky | lib, derived | projections figure, Jacobian over 6 by 6 points a texel; equirectangular exact 8.88 | fixed | 2026-10-22 |
+| Fisheye texels within a factor of about 1.6 (π/2 in the limit); it leaves a fifth of its square empty | Flattening the sky | derived | 1 - π/4 = 21%; 84 of 400 texels | ok | 2026-10-22 |
+| Sphere map: the horizon at sin 45° = 0.71 of the radius, every texel the same solid angle (largest over smallest 1.00 at 1,600 and 6,400 texels) | Flattening the sky | lib, derived | r = sin(zenith angle / 2), Lambert's azimuthal equal-area halved; projections figure | ok | 2026-10-22 |
+| Midnight sun in Tromsø, June 21 22:46 UTC: glow due north, on the equirectangular's seam, at the fisheye's top | Projections caption | lib | screenshot of the figure | ok | 2026-10-22 |
+
 ## dunstkreis
 
 ### Text
@@ -126,15 +151,8 @@ confirmed yet.
 | Rebuild in a quarter of a millisecond, tables in 0.6 ms, sky pass 0.05 ms at 1080p | opening, What to compute when | lib | research/README.md, review of 2026-10 | ok | 2026-10-17 |
 | Bruneton's table 32 by 128 by 32 by 8; Hillaire's tables fit in half a megabyte | Precise and approximate | derived | 57k texels at 8 bytes = 460 kB | ok | 2026-10-17 |
 | Hillaire's and Bruneton's skies differ by a few percent, mostly in twilight | Precise and approximate, Taking the sky apart | lib | not measured yet: Bruneton's table is not built | open | 2026-10-17 |
-| Nine SH terms keep more than 99% of the irradiance for any environment | Lighting a scene | src | Ramamoorthi & Hanrahan 2001: error under 1% for the Lambertian kernel; "any sky" is their bound, not a measurement here | ok | 2026-10-17 |
 | Bruneton and Neyret at INRIA Grenoble; Hillaire at Epic Games in 2020; Nishita 1993 the first computed Earth through its atmosphere; Edlén at Lund; Ramamoorthi and Hanrahan at Stanford; Kopp and Lean 2011 | The people behind the numbers | src | affiliations on the papers; "first" for Nishita unverified | open | 2026-10-17 |
 | Sunlight has crossed some 8 km worth of sea-level air; about a tenth scattered aside overhead | Why the sky is blue | derived | scale height 8 km; Rayleigh depth at 550 nm 0.11 plus Mie 0.004: 11% at the zenith | fixed | 2026-10-17 |
 | Potsdam, 1 km, 2026-04-06: sunset 17:57 UTC, so 17:37 is 20 minutes before; at +30 minutes, looking east, Earth's shadow and the Belt of Venus show | Fig. sky, Try | lib | sternzeit sun.direction and apparentDirection at 1 km; rendered in the figure | ok | 2026-10-17 |
 | Sun 408 km up over Potsdam, 2026-04-06 02:04 UTC: on the planet's rim, lower limb lifted by about a degree, the disc a sixth as tall as wide | planned refraction figure | lib | refractionAngle at 408 km; rendered | ok | 2026-10-17 |
-| Cube map texels within 3√3, about 5.2 (a corner texel a fifth of a center one); cubified within exactly 4/3, a third more; equi-angular within √2, 41% more. At 128 a face: 5.11, 1.31, 1.41 | Lighting a scene, cube.wgsl | derived | Jacobian of each map over a face, pointwise and per texel at 8, 128 and 512 | fixed | 2026-10-22 |
-| Equirectangular credited to Marinus of Tyre, around 100 CE | Flattening the sky | web | Esri's projection pages, citing snyder1987; the book's own text not seen | open | 2026-10-22 |
-| At about 400 texels the largest texel over the smallest: equirectangular 8.9, fisheye 1.5 (cube 3.8, cubified 1.1, octahedral 4.2); at 1.6 million, octahedral 5.18 = (√3)³, cube 5.18, fisheye 1.57 = π/2 | Flattening the sky | lib, derived | projections figure, Jacobian over 6 by 6 points a texel; equirectangular exact 8.88 | fixed | 2026-10-22 |
-| Fisheye texels within a factor of about 1.6 (π/2 in the limit); it leaves a fifth of its square empty | Flattening the sky | derived | 1 - π/4 = 21%; 84 of 400 texels | ok | 2026-10-22 |
-| Sphere map: the horizon at sin 45° = 0.71 of the radius, every texel the same solid angle (largest over smallest 1.00 at 1,600 and 6,400 texels) | Flattening the sky | lib, derived | r = sin(zenith angle / 2), Lambert's azimuthal equal-area halved; projections figure | ok | 2026-10-22 |
-| Midnight sun in Tromsø, June 21 22:46 UTC: glow due north, on the equirectangular's seam, at the fisheye's top | Projections caption | lib | screenshot of the figure | ok | 2026-10-22 |
 

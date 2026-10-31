@@ -4,12 +4,12 @@
 //
 // A cubified cube map, osgHimmel's `cubify` after petrocket's sphere-to-cube mapping, lays its texels out over the
 // sphere far more evenly: the largest texel spans 4/3 of the smallest one's solid angle, not some 5.2 times, so the
-// corners are no longer sharper than the face centers. Write it through `dkSphereFromCube` and sample it with
-// `dkCubeFromSphere(d)` instead of d; hardware filtering, seamless across the edges, and the mip levels work as before.
+// corners are no longer sharper than the face centers. Write it through `rbSphereFromCube` and sample it with
+// `rbCubeFromSphere(d)` instead of d; hardware filtering, seamless across the edges, and the mip levels work as before.
 
 // The point on the cube through any point of a face, in texels from its corner, faces in WebGPU's order +x, -x, +y, -y,
 // +z, -z. One coordinate is ±1, the others within [-1, 1].
-fn dkCubePointAt(face: u32, position: vec2f, size: u32) -> vec3f {
+fn rbCubePointAt(face: u32, position: vec2f, size: u32) -> vec3f {
     let st = position / f32(size) * 2.0 - 1.0;
     let s = st.x;
     let t = st.y;
@@ -24,17 +24,17 @@ fn dkCubePointAt(face: u32, position: vec2f, size: u32) -> vec3f {
 }
 
 // The direction through the center of a texel of a cube face.
-fn dkCubeDirection(face: u32, pixel: vec2u, size: u32) -> vec3f {
-    return dkCubeDirectionAt(face, vec2f(pixel) + 0.5, size);
+fn rbCubeDirection(face: u32, pixel: vec2u, size: u32) -> vec3f {
+    return rbCubeDirectionAt(face, vec2f(pixel) + 0.5, size);
 }
 
 // The same through any point of a face.
-fn dkCubeDirectionAt(face: u32, position: vec2f, size: u32) -> vec3f {
-    return normalize(dkCubePointAt(face, position, size));
+fn rbCubeDirectionAt(face: u32, position: vec2f, size: u32) -> vec3f {
+    return normalize(rbCubePointAt(face, position, size));
 }
 
 // The unit direction a point on the cube stands for in a cubified cube map.
-fn dkSphereFromCube(p: vec3f) -> vec3f {
+fn rbSphereFromCube(p: vec3f) -> vec3f {
     let q = p * p;
     return p * sqrt(max(vec3f(1.0) - 0.5 * (q.yzx + q.zxy) + q.yzx * q.zxy / 3.0, vec3f(0.0)));
 }
@@ -43,7 +43,7 @@ fn dkSphereFromCube(p: vec3f) -> vec3f {
 // x² = (b - sqrt(b² - 24 x²)) / 2, with b = 3 + 2x² - 2y², rationalized to 12 x² / (b + sqrt(b² - 24 x²)): the
 // difference of two nearly equal numbers would lose a small component to rounding, and with it the side of a face's
 // middle it lies on, such as the horizon's.
-fn dkCubifyFace(d: vec3f) -> vec3f {
+fn rbCubifyFace(d: vec3f) -> vec3f {
     let xx2 = d.x * d.x * 2.0;
     let yy2 = d.y * d.y * 2.0;
     let b = vec2f(3.0 + xx2 - yy2, 3.0 + yy2 - xx2);
@@ -51,15 +51,15 @@ fn dkCubifyFace(d: vec3f) -> vec3f {
     return vec3f(d.xy * sqrt(12.0 / (b + root)), sign(d.z));
 }
 
-// What a cubified cube map is sampled with for the unit direction d, the inverse of dkSphereFromCube: the point on the
+// What a cubified cube map is sampled with for the unit direction d, the inverse of rbSphereFromCube: the point on the
 // cube, on the face of d's largest component.
-fn dkCubeFromSphere(d: vec3f) -> vec3f {
+fn rbCubeFromSphere(d: vec3f) -> vec3f {
     let f = abs(d);
     if (f.y >= f.x && f.y >= f.z) {
-        return dkCubifyFace(d.xzy).xzy;
+        return rbCubifyFace(d.xzy).xzy;
     }
     if (f.x >= f.z) {
-        return dkCubifyFace(d.yzx).zxy;
+        return rbCubifyFace(d.yzx).zxy;
     }
-    return dkCubifyFace(d);
+    return rbCubifyFace(d);
 }

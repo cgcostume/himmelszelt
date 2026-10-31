@@ -20,16 +20,13 @@ import aerial from "./aerial.wgsl";
 import aerialvolume from "./aerialvolume.comp.wgsl";
 import atmosphere from "./atmosphere.wgsl";
 import common from "./common.wgsl";
-import cube from "./cube.wgsl";
 import exposure from "./exposure.comp.wgsl";
 import features from "./features.wgsl";
 import frame from "./frame.wgsl";
 import grid from "./grid.wgsl";
-import irradiance from "./irradiance.comp.wgsl";
 import lut from "./lut.wgsl";
 import mipmap from "./mipmap.comp.wgsl";
 import multiscattering from "./multiscattering.comp.wgsl";
-import panorama from "./panorama.wgsl";
 import quality from "./quality.wgsl";
 import raymarch from "./raymarch.wgsl";
 import sampling from "./sampling.wgsl";
@@ -37,8 +34,12 @@ import sky from "./sky.comp.wgsl";
 import skyview from "./skyview.comp.wgsl";
 import spiral from "./spiral.wgsl";
 import sun from "./sun.wgsl";
-import tonemap from "./tonemap.wgsl";
 import transmittance from "./transmittance.comp.wgsl";
+
+// One source with the packages that own them, bundled here so the sky pass needs no other package: how a cube map lays
+// out directions, for whoever samples the sky's, and the tone curves.
+export { tonemap } from "@himmelszelt/helldunkel/wgsl";
+export { cube } from "@himmelszelt/rundbild/wgsl";
 
 export { skyCubeOutput, skyOutput } from "./output.js";
 export { workgroupSum } from "./reduce.js";
@@ -48,16 +49,13 @@ export {
     aerialvolume,
     atmosphere,
     common,
-    cube,
     exposure,
     features,
     frame,
     grid,
-    irradiance,
     lut,
     mipmap,
     multiscattering,
-    panorama,
     quality,
     raymarch,
     sampling,
@@ -65,7 +63,6 @@ export {
     skyview,
     spiral,
     sun,
-    tonemap,
     transmittance,
 };
 

@@ -81,7 +81,7 @@ const THREADS: u32 = 256u;
 var<workgroup> sums: array<vec2f, THREADS>;
 
 fn sampleDirection(d: vec3f, s: sampler) -> vec3f {
-    ${cube ? "return textureSampleLevel(source, s, select(d, dkCubeFromSphere(d), params.cubified != 0u), params.level).rgb;" : "return vec3f(0.0);"}
+    ${cube ? "return textureSampleLevel(source, s, select(d, rbCubeFromSphere(d), params.cubified != 0u), params.level).rgb;" : "return vec3f(0.0);"}
 }
 
 fn gather(c: vec3f, sum: vec2f) -> vec2f {

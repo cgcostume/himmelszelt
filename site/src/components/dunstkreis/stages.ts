@@ -126,12 +126,12 @@ fn inGamut(rgb: vec3f) -> vec3f {
 
 fn toneMapped(exposed: vec3f) -> vec3f {
     if (params.curve == 2u) {
-        return dkToneMapAgx(exposed);
+        return hdToneMapAgx(exposed);
     }
     if (params.curve == 3u) {
-        return dkToneMapAces(exposed);
+        return hdToneMapAces(exposed);
     }
-    return dkToneMapNeutral(exposed);
+    return hdToneMapNeutral(exposed);
 }
 
 fn quantized(mapped: vec3f, offset: f32) -> vec3f {
@@ -151,16 +151,16 @@ fn shown(spectral: vec4f, panel: u32, band: u32, pixel: vec2u) -> vec3f {
     if (panel == 0u) {
         // Each wavelength as gray, as bright as a spectrum flat at its value would be.
         let flat = dot(atmosphere.toRgb * vec4f(1.0), LUMINANCE);
-        return dkEncodeSrgb(vec3f(spectral[band] * flat * params.exposure));
+        return hdEncodeSrgb(vec3f(spectral[band] * flat * params.exposure));
     }
     let rgb = inGamut(matrixed(spectral));
     if (panel == 1u) {
         // Linear, before any exposure: the table's brightest sky, near 2^10 times its scale, at white.
-        return dkEncodeSrgb(rgb * params.skyViewScale / 1024.0);
+        return hdEncodeSrgb(rgb * params.skyViewScale / 1024.0);
     }
     let exposed = rgb * params.exposure;
     if (panel == 2u) {
-        return dkEncodeSrgb(exposed);
+        return hdEncodeSrgb(exposed);
     }
     let mapped = toneMapped(exposed);
     if (panel == 3u) {
@@ -202,7 +202,7 @@ fn slice(@builtin(global_invocation_id) id: vec3u) {
         let stops = mix(${CURVE_STOPS[0]}.0, ${CURVE_STOPS[1]}.0, f32(i - ${SLICE + 1}u) / f32(${CURVE - 1}u));
         let gray = vec3f(exp2(stops));
         var sample: Sample;
-        sample.rgb = vec4f(min(gray.r, 1.0), dkEncodeSrgb(gray).r, 0.0, 0.0);
+        sample.rgb = vec4f(min(gray.r, 1.0), hdEncodeSrgb(gray).r, 0.0, 0.0);
         sample.exposed = vec4f(gray, 0.0);
         sample.mapped = vec4f(toneMapped(gray), 0.0);
         sample.pixel = vec4f(quantized(sample.mapped.rgb, 0.5), 0.0);

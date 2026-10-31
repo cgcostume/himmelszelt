@@ -1,0 +1,108 @@
+---
+title: helldunkel
+package: "@himmelszelt/helldunkel"
+summary: "From light to pixels: how bright a scene is shown, and what becomes of the rest."
+order: 1
+draft: true
+references:
+    - goethe1810
+    - khronos2024
+    - lagarde2014
+    - narkowicz2016
+    - sobotka2023
+    - wrensch2023
+---
+
+import Cite from "../../components/Cite.astro";
+import Controls from "../../components/sternzeit/Controls.astro";
+import Fig from "../../components/Fig.astro";
+import Planned from "../../components/Planned.astro";
+import Sky from "../../components/dunstkreis/Sky.astro";
+
+This chapter is being written. Most of it comes from dunstkreis, where it began, and it still needs an opening of its
+own, and figures that show a photograph rather than only the computed sky.
+
+> "What matters here is the highest light, the middle tint, the shadow." Goethe <Cite id="goethe1810" />
+
+*Helldunkel* is the German word for what the French call *clair-obscur* and the Italians *chiaroscuro*: the interplay of
+light and shadow, as Caravaggio and Rembrandt painted it, and lately the name of
+[a game's expedition](https://en.wikipedia.org/wiki/Clair_Obscur:_Expedition_33) into it. Goethe gave it a section of its
+own and insisted it could be thought apart from color. A display faces the same problem as a painter: a sky spans far
+more than a canvas or a screen can show, so something has to decide what becomes of the highest light, the middle tint
+and the shadow. helldunkel makes that decision: how much light is let in, how its range is folded into the screen's, and
+how the result is written out.
+
+For a developer: a few plain functions and binding-free WGSL, no dependency on any other package, and no device or pass
+of its own. It takes light in cd/m², from a photograph or from [dunstkreis](../dunstkreis/), which bundles the same
+curves for its sky pass.
+
+<Sky
+    primary
+    full
+    caption="The sky of dunstkreis, here to have something to expose: the exposure by hand or metered, the tone curve and the HDR headroom, each of which switches every figure of the page."
+/>
+
+<Controls open />
+
+```ts
+import { exposureFromEV100, wgsl } from "@himmelszelt/helldunkel";
+
+// A sunny day: what luminance in cd/m² is multiplied by.
+const exposure = exposureFromEV100(15);
+// Binding-free, so it goes into your own shader as it is.
+const code = `${wgsl.tonemap}
+fn show(luminance: vec3f, exposure: f32) -> vec3f {
+    return hdToneMapNeutral(luminance * exposure);
+}`;
+```
+
+<Planned what="section" title="The range of a scene" plan="the opening section, from what anyone can see: a window seen from inside a room.">
+    What a day spans in stops against what a screen shows, on a photograph.
+</Planned>
+
+## Exposure
+
+Exposure is set in EV100, as on a camera and in engines like Frostbite and Unreal <Cite id="lagarde2014" />: the
+luminance that just saturates is 1.2 × 2^EV100 cd/m². A sunny day is about EV 15, an overcast one 10, twilight 0,
+moonlight −6. A sky in cd/m² takes the same exposure as any other scene built on this convention, and looks the same
+under it.
+
+<Planned title="Exposure on a photograph" plan="needs rundbild's HDRI loader.">
+    One HDRI under an EV100 slider, with the stops it clips marked.
+</Planned>
+
+## Tone curves
+
+A tone curve folds what is brighter than white into what the display shows, and the last step encodes the result for
+sRGB, dithered against banding. Khronos PBR Neutral <Cite id="khronos2024" /> keeps colors exactly as they are up to three quarters of
+white and compresses only the brightest, so the sky's blue stays the blue the model computes. AgX
+<Cite id="sobotka2023" />, in Wrensch's fit <Cite id="wrensch2023" />, fades bright colors towards white as film does:
+the glow around the Sun and a sunset's brightest band turn white instead of clipping to a flat hue, but the daytime sky
+comes out flatter and grayer. Narkowicz's fit of the ACES filmic curve <Cite id="narkowicz2016" />, which dunstkreis
+used first, is the third: saturated, and it pushes bright hues towards yellow. The exposure follows a camera's
+convention, which puts a metered average at about a tenth of white, where ACES expects it; Neutral and AgX expect the
+scene's middle gray at 0.18, and are lifted by the difference. The tone curve choice in <Fig id="sky" /> switches every
+figure between them. A renderer with its own HDR pipeline turns that off and gets the exposed luminance itself, linear
+and unclamped, for a float target.
+
+<Planned title="The curves compared" plan="on one HDRI and on the sky, side by side; maybe a plot of each curve.">
+    The same image through none, Neutral, AgX and ACES.
+</Planned>
+
+## Beyond white
+
+A display that shows more gets more, and only the last step changes. An rgba16float canvas with extended tone mapping
+shows values above white up to the display's headroom, a few times SDR white on today's screens, and the Neutral
+curve takes that headroom as its ceiling, so the Sun's glow and a bright horizon stay bright instead of compressed to
+white. The HDR choice in <Fig id="sky" /> switches to it where the browser and the screen offer it. A canvas in
+Display P3 would show the saturated reds an sRGB screen gives up, with the matrix fitted for P3 instead; whether enough
+of a sunset leaves sRGB to be worth it is being measured. Either way a color still outside the display's range is cut
+off per channel today, which shifts its hue; reducing its chroma at the same lightness and hue, as CSS does since
+Color 4, keeps it, and is the next option of the tone map.
+
+## The people behind the numbers
+
+Goethe wrote the section this library is named after, in his theory of colors of 1810 <Cite id="goethe1810" />. Sébastien
+Lagarde and Charles de Rousiers wrote down for Frostbite the exposure convention <Cite id="lagarde2014" />. The tone
+curves are Khronos' <Cite id="khronos2024" />, Troy Sobotka's AgX <Cite id="sobotka2023" /> in Benjamin Wrensch's fit
+<Cite id="wrensch2023" />, and Krzysztof Narkowicz's fit of the ACES curve <Cite id="narkowicz2016" />.

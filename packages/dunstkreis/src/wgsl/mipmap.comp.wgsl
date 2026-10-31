@@ -16,7 +16,7 @@ fn dkDownsample(@builtin(global_invocation_id) id: vec3u) {
     var sum = vec4f(0.0);
     for (var k = 0u; k < 4u; k = k + 1u) {
         let texel = min(id.xy * 2u + vec2u(k & 1u, k >> 1u), vec2u(sourceSize - 1u));
-        sum = sum + textureSampleLevel(dkMipSource, dkMipSampler, dkCubeDirection(id.z, texel, sourceSize), 0.0);
+        sum = sum + textureSampleLevel(dkMipSource, dkMipSampler, rbCubeDirection(id.z, texel, sourceSize), 0.0);
     }
     dkOutputStore(id.xy, id.z, sum / 4.0);
 }

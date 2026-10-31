@@ -39,18 +39,15 @@ export {
 
 // Exposure in EV100, for the sky in cd/m².
 export type { AutoExposureKey } from "./exposure.js";
-export {
-    autoExposureCompensation,
-    DEFAULT_AUTO_EXPOSURE_KEYS,
-    ev100FromLuminance,
-    exposureFromEV100,
-} from "./exposure.js";
+export { autoExposureCompensation, DEFAULT_AUTO_EXPOSURE_KEYS } from "./exposure.js";
+export { ev100FromLuminance, exposureFromEV100 } from "@himmelszelt/helldunkel";
 
 // Packing the model into the DkAtmosphere uniform block the shaders take.
 export { ATMOSPHERE_UNIFORM_SIZE, atmosphereUniformData } from "./uniforms.js";
 
 // Pipeline-overridable sample counts, for specializing a shader at pipeline creation.
-export type { QualityConstants, ToneCurve } from "./quality.js";
+export type { ToneCurve } from "@himmelszelt/helldunkel";
+export type { QualityConstants } from "./quality.js";
 export { DEFAULT_QUALITY, pipelineConstants } from "./quality.js";
 
 // What a device needs: the features and limits to request it with, and what one lacks.
@@ -63,21 +60,14 @@ export { MULTI_SCATTERING_LOG2_OFFSET, precomputeAtmosphere } from "./luts.js";
 export type { SkyPassOptions } from "./sky.js";
 export { createSkyPass } from "./sky.js";
 
-// Diffuse image-based lighting from a cube map: spherical harmonics and an irradiance cube map.
-export type { IrradiancePass, IrradiancePassOptions } from "./ibl.js";
-export { createIrradiancePass } from "./ibl.js";
-
 // Pass and LUT interfaces. This package records into passes the caller owns; it creates no device, canvas,
 // context or render pass of its own.
 export type {
     AerialPerspectiveOptions,
     AerialPerspectiveVolume,
     AtmosphereLUTs,
-    PanoramaProjection,
     SkyCubeOptions,
     SkyCubePass,
-    SkyPanoramaOptions,
-    SkyPanoramaPass,
     SkyParams,
     SkyPass,
 } from "./pass.js";

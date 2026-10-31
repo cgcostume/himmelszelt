@@ -15,7 +15,9 @@ import { readFileSync } from "node:fs";
  * test runner has no equivalent. Same bytes either way, so this still tests the shipped shader.
  */
 export function wgslSource(name: string): string {
-    const read = (file: string) => readFileSync(new URL(`../src/wgsl/${file}`, import.meta.url), "utf8");
+    // Fragments shared with the packages that own them.
+    const owner = { tonemap: "../../helldunkel/src/wgsl", cube: "../../rundbild/src/wgsl" }[name] ?? "../src/wgsl";
+    const read = (file: string) => readFileSync(new URL(`${owner}/${file}`, import.meta.url), "utf8");
     try {
         return read(`${name}.wgsl`);
     } catch {

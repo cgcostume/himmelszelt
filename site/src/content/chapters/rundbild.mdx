@@ -2,9 +2,30 @@
 title: rundbild
 package: "@himmelszelt/rundbild"
 summary: "Environment maps in any projection, as sky and as light."
-order: 6
-planned: true
+order: 2
+draft: true
+references:
+    - brown2017
+    - engelhardt2008
+    - mueller2012thesis
+    - nowell2005
+    - polyhaven
+    - ramamoorthi2001
+    - snyder1987
 ---
+
+import Cite from "../../components/Cite.astro";
+import Controls from "../../components/sternzeit/Controls.astro";
+import Fig from "../../components/Fig.astro";
+import Planned from "../../components/Planned.astro";
+import Term from "../../components/Term.astro";
+import Sky from "../../components/dunstkreis/Sky.astro";
+import Environment from "../../components/rundbild/Environment.astro";
+import Harmonics from "../../components/rundbild/Harmonics.astro";
+import Lighting from "../../components/rundbild/Lighting.astro";
+import Projections from "../../components/rundbild/Projections.astro";
+
+This chapter is being written. Its figures still show only the computed sky of dunstkreis; HDRIs follow with the loader.
 
 Not every sky has to be computed. A photographed or pre-rendered one arrives as an image, and this library is about
 turning such an image into something a renderer can sample and light with: cube maps, spherical, paraboloid, and
@@ -15,19 +36,107 @@ the sky and a scene showing the sky agree with each other.
 It also carries the horizon band from the original thesis. Several projections cover only the upper hemisphere and end
 in a hard edge at the horizon, which a band of ground color, faded into the lowest rows of the map, hides. The
 computed skies of [dunstkreis](../dunstkreis/) and [sternenheer](../sternenheer/) can be baked into the same maps, so a
-renderer can trade a live sky for a captured one without changing anything else.
+renderer can trade a live sky for a captured one without changing anything else. The original's texture mapped skies are
+shown in [this video](https://www.youtube.com/watch?v=y8UMaM_Wj-o).
 
-This chapter is a placeholder: the library does not exist yet. The original's texture mapped skies are shown in
-[this video](https://www.youtube.com/watch?v=y8UMaM_Wj-o).
+For a developer: TypeScript and WGSL, WebGPU compute passes, no dependency on any other package. It takes any cube map as
+a plain `GPUTexture`, and exposure and tone curves are [helldunkel](../helldunkel/)'s.
 
-## Projections
+<Sky
+    primary
+    caption="The sky of dunstkreis, baked by the figures below into every map they show. Altitude lines every 10°, the compass directions on the horizon, and the Sun's symbol where it truly is."
+/>
 
-How a whole sky fits into a flat image, and back. Not written yet.
+<Controls open />
 
-## Image-based lighting
+<Planned what="section" title="Loading an image" plan="the Radiance HDR reader, and EXR after it. File drop, and one small CC0 HDRI from Poly Haven in the repository.">
+    Any HDRI as the source of every figure of this chapter, the computed sky as the option beside it.
+</Planned>
 
-How the same image lights a scene. Not written yet.
+## Lighting a scene
 
-## Code examples
+A cube map's faces are six perspective views, and a perspective crowds the most directions into its middle: a texel at a
+face's corner covers only a fifth of the solid angle of one at its center. So the sky is resolved five times as finely
+towards the corners as in the middle of a face, and where two faces meet, the texel grid turns abruptly, which can show
+in gradients as smooth as the sky's. Cubified, as osgHimmel's `CubeMappedHimmel` did it <Cite id="mueller2012thesis" />,
+the texels are placed by Nowell's mapping of a cube onto a sphere <Cite id="nowell2005" /> instead. The largest then
+covers a third more solid angle than the smallest, a little more even than the equi-angular cube map YouTube streams
+video in, at 41% more <Cite id="brown2017" />. It costs a few instructions per lookup, and whoever samples the cube map
+has to know: it looks up the point on the cube that maps to its direction, not the direction itself. Filtering across
+the faces' edges and the mip levels work as before. The two figures below switch it together.
 
-Not written yet.
+The cube map comes with its mip levels, each texel the mean of four in the level above, down to a single texel a face.
+They cost a third more memory and a few cheap passes, and they are optional: the cube pass fills as many levels as the
+texture was created with, so a `mipLevelCount` of 1 leaves them out. Two readers need them here. The projection onto the
+coefficients takes 4,096 directions; from a face of 1,024 texels it would see only one texel in some 1,500 and miss
+whatever lies between, so it reads the level whose texels are about as many as its directions. And a background showing
+the cube map through a wide lens spans several texels with each pixel, so it reads the level where a texel is about a
+pixel wide, instead of picking one texel of many and flickering as the view turns.
+
+Nine numbers per color channel hold the sky's diffuse light, as a sound is held by a few of its lowest tones (<Fig id="harmonics" />): the first is the
+sky's average brightness, the next three say how much brighter it is above than below and towards the Sun than away
+from it, and the last five bend that into the shape of a lit horizon over a dark ground. A diffuse surface sees the
+sky blurred over the whole hemisphere it faces, and nine terms of that blur keep more than 99% of the light it receives,
+for any sky <Cite id="ramamoorthi2001" />. A shader turns them into the light on any surface with nine multiplies and
+no texture lookup, which is what `createIrradiancePass` writes into a buffer, next to an irradiance cube map computed
+from the same nine for shaders that prefer a lookup.
+
+<Harmonics />
+
+<Controls />
+
+<Environment />
+
+<Lighting />
+
+<Planned title="Specular image-based lighting" plan="the pre-filtered levels are not built yet.">
+    The same solids in polished metal, the levels of the map by roughness.
+</Planned>
+
+## Flattening the sky
+
+A texture is flat and the sky is not. Storing one in the other is the mapmaker's old problem, and every answer to it is
+a map projection that pays somewhere: where texels crowd, they are wasted, and where they thin out, the sky blurs. The
+cube map pays at its faces' corners. The panorama HDRIs are shared in, on sites like
+[Poly Haven](https://polyhaven.com/hdris) <Cite id="polyhaven" />, is the
+<Term of="Equirectangular projection">equirectangular projection</Term>, and it is nearly two thousand years old:
+Marinus of Tyre is credited with it, around 100 CE <Cite id="snyder1987" />. The azimuth runs across it and the zenith
+angle down, so a single direction, the zenith, is stretched over the whole top row.
+
+An HDRI has no north, only wherever its camera happened to point. rundbild sets one: north at the left edge, east a
+quarter in, south in the middle and west three quarters in, as seen from inside, so the Sun's arc over a northern sky
+stays clear of the seam. `azimuthOffset` turns it about the zenith, 180 for a southern sky with north in the middle. At
+about 400 texels, the equirectangular's largest texel covers some nine times the solid angle of its smallest.
+
+The <Term of="Octahedral map">octahedral map</Term> folds the sphere onto an octahedron and unfolds that into a square
+<Cite id="engelhardt2008" />: the zenith in the middle, the upper hemisphere a diamond without a seam, and the texels
+within a factor of about five. The fisheye stores what an all-sky camera sees, the upper hemisphere in a circle, its
+distance from the middle in proportion to the zenith angle. It spreads its texels within a factor of about 1.6, but
+leaves the corners of its square to no direction, a fifth of it. rundbild fills them with the horizon at their
+azimuth, so a filtered lookup at the rim blends into the sky rather than into black. Only the top left corner texel
+holds the ground's color, as a cube map holds it straight down, and every direction below the horizon looks it up
+there. The sphere map is the mirror ball's: the whole sphere in the circle, the zenith in the middle and the nadir all
+round the rim, the distance from the middle the sine of half the zenith angle. That keeps every texel's solid angle
+the same, and the horizon at seven tenths of the radius. Octahedral, fisheye and sphere map are laid out as a sky chart
+held overhead: north up and east left, since the sky is seen from below.
+
+The cube map lights a scene best, filtered and mipmapped by the hardware; the equirectangular goes to every other tool;
+the octahedral packs into a 2D atlas of many, as light probes are; the fisheye compares with photographs of the whole
+sky, and the sphere map holds all of it in one disc. `createPanoramaPass` lays any cube map out as one of the four (<Fig id="projections" />).
+It spreads `samples` lookups over every texel, which smooth the horizon and the fisheye's rim within it.
+
+<Projections />
+
+<Controls />
+
+<Planned what="section" title="The horizon band" plan="from the thesis, with the horizon band of osgHimmel.">
+    The hard edge of a hemisphere's map, and the band that hides it.
+</Planned>
+
+## The people behind the numbers
+
+Ravi Ramamoorthi and Pat Hanrahan, at Stanford, showed in 2001 that nine numbers hold the diffuse light of any
+environment <Cite id="ramamoorthi2001" />.
+
+An image stands still, with its Sun where the camera found it. For a sky that moves, [sternzeit](../sternzeit/) says where
+the Sun is, and [dunstkreis](../dunstkreis/) computes what the air makes of its light, as live as the baked sky above.

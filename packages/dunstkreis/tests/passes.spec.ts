@@ -28,7 +28,6 @@ const PASSES: Record<string, readonly string[]> = {
         "sampling",
         "raymarch",
         "cube",
-        "panorama",
         "sun",
         "tonemap",
         "grid",
@@ -44,23 +43,6 @@ const PASSES: Record<string, readonly string[]> = {
         "sampling",
         "raymarch",
         "cube",
-        "panorama",
-        "sun",
-        "tonemap",
-        "grid",
-        "frame",
-        "quality",
-        "features",
-        "sky",
-    ],
-    skyPanorama: [
-        "atmosphere",
-        "common",
-        "lut",
-        "sampling",
-        "raymarch",
-        "cube",
-        "panorama",
         "sun",
         "tonemap",
         "grid",
@@ -71,7 +53,6 @@ const PASSES: Record<string, readonly string[]> = {
     ],
     exposure: ["atmosphere", "common", "lut", "sampling", "raymarch", "spiral", "frame", "exposure"],
     aerialvolume: ["atmosphere", "common", "lut", "sampling", "raymarch", "frame", "aerial", "aerialvolume"],
-    irradiance: ["cube", "spiral", "irradiance"],
     mipmap: ["cube", "mipmap"],
 };
 // What the passes leave to whoever builds their pipelines: the sky pass' output, and the sums over a workgroup, here
@@ -79,12 +60,10 @@ const PASSES: Record<string, readonly string[]> = {
 const OUTPUTS: Record<string, string> = {
     sky: skyOutput("rgba8unorm"),
     skyCube: skyCubeOutput("rgba16float"),
-    skyPanorama: skyOutput("rgba16float"),
     mipmap: skyCubeOutput("rgba16float"),
     multiscattering: workgroupSum(64, false),
     skyview: workgroupSum(64, false),
     exposure: workgroupSum(128, false),
-    irradiance: workgroupSum(64, false),
 };
 
 for (const [name, fragments] of Object.entries(PASSES)) {
@@ -106,7 +85,7 @@ test("the composable fragments compile without any pass, binding or override", a
 
     // The property that makes them droppable into someone else's shader: no bindings, no entry points, and
     // no dependency on the quality overrides.
-    const composable = ["atmosphere", "common", "lut", "sampling", "raymarch", "aerial", "cube", "panorama", "grid"]
+    const composable = ["atmosphere", "common", "lut", "sampling", "raymarch", "aerial", "cube", "grid"]
         .map(wgslSource)
         .join("\n");
     expect(await compileWgsl(device, composable)).toEqual([]);

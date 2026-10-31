@@ -1,10 +1,11 @@
-import type { SkyCubePass, SkyPanoramaPass, SkyPass } from "@himmelszelt/dunstkreis";
+import type { SkyCubePass, SkyPass } from "@himmelszelt/dunstkreis";
 import { wgsl } from "@himmelszelt/dunstkreis";
+import { createPanoramaPass, type PanoramaPass, wgsl as rundbild } from "@himmelszelt/rundbild";
 import { showCode } from "../code";
 import { find } from "../dom";
+import { currentSky, display, gpu, gpuDevice, onDisplay, onSkyView, type Sky } from "../dunstkreis/atmosphere";
+import { cameraBasis, lookAround, project, type SkyCamera, type Vec3 } from "../dunstkreis/skycamera";
 import { onDemand } from "../frame";
-import { currentSky, display, gpu, gpuDevice, onDisplay, onSkyView, type Sky } from "./atmosphere";
-import { cameraBasis, lookAround, project, type SkyCamera, type Vec3 } from "./skycamera";
 
 /**
  * The sky in six ways of storing it, in textures of the sizes below, shown texel by texel, bilinearly or bicubically:
@@ -61,7 +62,7 @@ const ASPECT: Record<Projection, number> = {
 // and the texels per steradian by the chart's derivatives on the sphere, against those of an even spread.
 const SOURCE = /* wgsl */ `
 ${wgsl.cube}
-${wgsl.panorama}
+${rundbild.panorama}
 ${wgsl.tonemap}
 ${wgsl.sun}
 ${wgsl.grid}
@@ -132,7 +133,7 @@ struct Chart {
 }
 
 // d in the chart it falls into; a cube map's on the face of \`axis\`, so that its neighbors stay on that face.
-// The face a point on the cube lies on, the one of the axis given, and its texel there, as dkCubePointAt lays the faces out.
+// The face a point on the cube lies on, the one of the axis given, and its texel there, as rbCubePointAt lays the faces out.
 fn cubeFaceChart(p: vec3f, axis: u32) -> Chart {
     var st: vec2f;
     var face: u32;
@@ -150,18 +151,18 @@ fn chartOn(d: vec3f, axis: u32) -> Chart {
         var p = d / abs(d[axis]);
         if (params.projection == 1u) {
             switch axis {
-                case 0u: { p = dkCubifyFace(d.yzx).zxy; }
-                case 1u: { p = dkCubifyFace(d.xzy).xzy; }
-                default: { p = dkCubifyFace(d); }
+                case 0u: { p = rbCubifyFace(d.yzx).zxy; }
+                case 1u: { p = rbCubifyFace(d.xzy).xzy; }
+                default: { p = rbCubifyFace(d); }
             }
         }
         return cubeFaceChart(p, axis);
     }
     switch params.projection {
-        case 2u: { return Chart(dkEquirectangularUv(d, 0.0) * size, 0u, true); }
-        case 3u: { return Chart(dkOctahedralUv(d, 0.0) * size, 0u, true); }
-        case 4u: { return Chart(dkFisheyeUv(d, 0.0) * size, 0u, d.z >= 0.0); }
-        default: { return Chart(dkSphereMapUv(d, 0.0) * size, 0u, true); }
+        case 2u: { return Chart(rbEquirectangularUv(d, 0.0) * size, 0u, true); }
+        case 3u: { return Chart(rbOctahedralUv(d, 0.0) * size, 0u, true); }
+        case 4u: { return Chart(rbFisheyeUv(d, 0.0) * size, 0u, d.z >= 0.0); }
+        default: { return Chart(rbSphereMapUv(d, 0.0) * size, 0u, true); }
     }
 }
 
@@ -231,7 +232,7 @@ fn densityColor(q: f32) -> vec3f {
 // The direction a point on the cube stands for, as stored: through Nowell's mapping in a cubified cube map, so that its
 // faces show their texels on a straight grid.
 fn onCube(p: vec3f) -> vec4f {
-    return vec4f(select(normalize(p), dkSphereFromCube(p), params.projection == 1u), 1.0);
+    return vec4f(select(normalize(p), rbSphereFromCube(p), params.projection == 1u), 1.0);
 }
 
 // The direction a point of the output shows.
@@ -271,7 +272,7 @@ fn directionAt(position: vec2f) -> vec4f {
         return onCube(-up + st.x * east - st.y * north);
     }
     // In panorama.wgsl's numbering, one less.
-    return vec4f(dkPanoramaDirection(params.projection - 1u, uv, 0.0), 1.0);
+    return vec4f(rbPanoramaDirection(params.projection - 1u, uv, 0.0), 1.0);
 }
 
 // Catmull-Rom's weights for the four texels around a point a fraction f past the second one's center: through every
@@ -290,7 +291,7 @@ fn catmullRom(f: f32) -> vec4f {
 // cubified cube map's texels are as evenly spaced as a plain one's. Past a corner, the larger excess is folded and the
 // other held at the edge.
 fn cubeTap(face: u32, position: vec2f) -> vec4f {
-    var p = dkCubePointAt(face, position, params.size.x);
+    var p = rbCubePointAt(face, position, params.size.x);
     let axis = face / 2u;
     let b = (axis + 1u) % 3u;
     let c = (axis + 2u) % 3u;
@@ -454,10 +455,10 @@ fn meter(@builtin(local_invocation_index) index: u32) {
 fn toneMap(c: vec3f) -> vec3f {
     let exposed = c / (9.6 * exp2(metered));
     switch params.curve {
-        case 1u: { return dkToneMapAgx(exposed); }
-        case 2u: { return dkToneMapAces(exposed); }
-        case 3u: { return dkToneMapClip(exposed); }
-        default: { return dkToneMapNeutral(exposed); }
+        case 1u: { return hdToneMapAgx(exposed); }
+        case 2u: { return hdToneMapAces(exposed); }
+        case 3u: { return hdToneMapClip(exposed); }
+        default: { return hdToneMapNeutral(exposed); }
     }
 }
 
@@ -489,7 +490,7 @@ fn display(@builtin(global_invocation_id) id: vec3u) {
         let texel = clamp(vec2i(floor(here.texel)), vec2i(0), vec2i(params.size) - 1);
         stored = textureLoad(source, texel, here.layer, 0);
     } else if (isCube()) {
-        let lookup = select(d, dkCubeFromSphere(d), params.projection == 1u);
+        let lookup = select(d, rbCubeFromSphere(d), params.projection == 1u);
         stored = textureSampleLevel(cubeSource, linearSampler, lookup, 0.0);
     } else if (params.projection == 3u) {
         stored = bilinearFlat(here);
@@ -767,32 +768,54 @@ function showMarks(projection: Projection) {
     placeMarks("inside", marks);
 }
 
+/** The cube map a panorama of this width is laid out from: finer than its texels, up to faces of 2048. */
+const sourceFace = (width: number) => Math.min(2048, Math.max(256, width / 2));
+
 // The calls that compute the shown texture, at most 80 columns.
 function call(projection: Projection, [width, height]: [number, number]) {
-    const cube = layers(projection) === 6;
+    const usage = "    usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,";
     const format = '    format: "rgba16float",';
-    const options = {
-        cube: [],
-        cubified: ["cubify: true,"],
-        equirectangular: ['projection: "equirectangular",'],
-        octahedral: ['projection: "octahedral",'],
-        fisheye: ['projection: "fisheye",'],
-        sphere: ['projection: "sphere",'],
-    }[projection];
+    if (layers(projection) === 6) {
+        return [
+            "const texture = device.createTexture({",
+            `    size: [${width}, ${height}, 6],`,
+            format,
+            usage,
+            "});",
+            "const pass = await sky.createCubePass({",
+            ...(projection === "cubified" ? ["    cubify: true,"] : []),
+            format,
+            "    samples: 8,",
+            "    scaled: true, // half floats hold the night as finely as the day",
+            "});",
+            "pass.encode(encoder, texture);",
+            "const scale = sky.skyViewScale; // read now: cd/m² = texel / scale",
+        ].join("\n");
+    }
+    const face = sourceFace(width);
     return [
-        "const texture = device.createTexture({",
-        `    size: [${width}, ${height}${cube ? ", 6" : ""}],`,
+        "const cube = device.createTexture({",
+        `    size: [${face}, ${face}, 6],`,
         format,
-        "    usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,",
+        usage,
         "});",
-        `const pass = await sky.${cube ? "createCubePass" : "createPanoramaPass"}({`,
-        ...options.map((line) => `    ${line}`),
+        "const texture = device.createTexture({",
+        `    size: [${width}, ${height}],`,
         format,
-        "    samples: 8,",
+        usage,
+        "});",
+        `const cubePass = await sky.createCubePass({`,
+        format,
         "    scaled: true, // half floats hold the night as finely as the day",
         "});",
-        "pass.encode(encoder, texture);",
+        "const pass = await createPanoramaPass(device, {",
+        `    projection: "${projection}",`,
+        format,
+        "    samples: 8,",
+        "});",
+        "cubePass.encode(encoder, cube);",
         "const scale = sky.skyViewScale; // read now: cd/m² = texel / scale",
+        "pass.encode(encoder, cube, texture);",
     ].join("\n");
 }
 
@@ -865,23 +888,29 @@ function setUp() {
     });
 }
 
-// The passes made for a sky pass, one per projection, and the texture built last.
-const passes = new WeakMap<SkyPass, Map<Projection, Promise<SkyCubePass | SkyPanoramaPass>>>();
-function passFor(sky: SkyPass, projection: Projection) {
-    let made = passes.get(sky);
+// The cube passes made for a sky pass, and the panorama passes, one per projection.
+const cubePasses = new WeakMap<SkyPass, Map<string, Promise<SkyCubePass>>>();
+function cubePassFor(sky: SkyPass, cubify: boolean, samples: number) {
+    let made = cubePasses.get(sky);
     if (!made) {
         made = new Map();
-        passes.set(sky, made);
+        cubePasses.set(sky, made);
     }
-    let pass = made.get(projection);
+    const key = `${cubify},${samples}`;
+    let pass = made.get(key);
     if (!pass) {
         // Scaled by the sky's power of two, so that half floats hold the night as finely as the day.
-        const options = { format: "rgba16float", samples: 8, scaled: true } as const;
-        pass =
-            projection === "cube" || projection === "cubified"
-                ? sky.createCubePass({ ...options, cubify: projection === "cubified" })
-                : sky.createPanoramaPass({ ...options, projection });
-        made.set(projection, pass);
+        pass = sky.createCubePass({ format: "rgba16float", samples, cubify, scaled: true });
+        made.set(key, pass);
+    }
+    return pass;
+}
+const panoramaPasses = new Map<string, Promise<PanoramaPass>>();
+function panoramaPassFor(projection: Exclude<Projection, "cube" | "cubified">) {
+    let pass = panoramaPasses.get(projection);
+    if (!pass) {
+        pass = createPanoramaPass(gpuDevice(), { projection, format: "rgba16float", samples: 8 });
+        panoramaPasses.set(projection, pass);
     }
     return pass;
 }
@@ -894,9 +923,11 @@ let litBy: Sky | null = null;
 
 async function build(sky: Sky, projection: Projection, size: Size) {
     building = true;
-    const pass = await passFor(sky.pass, projection);
     const [width, height] = sizeOf(projection, size);
     const device = gpuDevice();
+    const isCube = projection === "cube" || projection === "cubified";
+    const cubePass = await cubePassFor(sky.pass, projection === "cubified", isCube ? 8 : 1);
+    const panoramaPass = isCube ? null : await panoramaPassFor(projection);
     const texture = device.createTexture({
         label: `sternwarte:projections:${projection}`,
         size: [width, height, layers(projection)],
@@ -904,8 +935,19 @@ async function build(sky: Sky, projection: Projection, size: Size) {
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
     });
     const encoder = device.createCommandEncoder({ label: "sternwarte:projections" });
-    pass.encode(encoder, texture);
+    const source =
+        panoramaPass &&
+        device.createTexture({
+            label: "sternwarte:projections:source",
+            size: [sourceFace(width), sourceFace(width), 6],
+            format: "rgba16float",
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+            textureBindingViewDimension: "cube",
+        });
+    cubePass.encode(encoder, source ?? texture);
+    if (panoramaPass && source) panoramaPass.encode(encoder, source, texture);
     device.queue.submit([encoder.finish()]);
+    source?.destroy();
     // Only the chosen map at the chosen size is computed, again whenever the sky moves: how long it takes, as the sky
     // figure tells its own, from the submit until the GPU is done.
     const submitted = performance.now();

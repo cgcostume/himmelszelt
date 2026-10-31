@@ -1,0 +1,48 @@
+{
+    "name": "@himmelszelt/helldunkel",
+    "version": "0.1.0",
+    "description": "From light to pixels: exposure in EV100, tone curves and the encoding for a display, as plain functions and WGSL.",
+    "type": "module",
+    "license": "MIT",
+    "sideEffects": false,
+    "author": "Daniel Limberger <cgdaniel@outlook.com> (https://github.com/cgcostume)",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/cgcostume/himmelszelt.git",
+        "directory": "packages/helldunkel"
+    },
+    "homepage": "https://github.com/cgcostume/himmelszelt/tree/main/packages/helldunkel#readme",
+    "keywords": [
+        "exposure",
+        "tone-mapping",
+        "hdr",
+        "wgsl",
+        "webgpu"
+    ],
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./wgsl": {
+            "types": "./dist/wgsl.d.ts",
+            "import": "./dist/wgsl.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "rolldown -c rolldown.config.ts",
+        "typecheck": "tsc --noEmit",
+        "test": "playwright test"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.62.1",
+        "rolldown": "^1.2.2",
+        "rolldown-plugin-dts": "^0.28.0",
+        "typescript": "^7.0.2"
+    }
+}

@@ -1,13 +1,12 @@
 import {
     type AtmosphereLUTs,
-    createIrradiancePass,
     createSkyPass,
-    type IrradiancePass,
     precomputeAtmosphere,
     type SkyCubePass,
     type SkyPass,
     spectrumToRgb,
 } from "@himmelszelt/dunstkreis";
+import { createIrradiancePass, type IrradiancePass } from "@himmelszelt/rundbild";
 import { find } from "../dom";
 import { onDemand } from "../frame";
 import { drawSvg, escapeText, svgText } from "../sternzeit/figure";

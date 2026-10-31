@@ -1,6 +1,5 @@
-import type { AtmosphereLUTs, IrradiancePass, SkyCubePass, SkyPass } from "@himmelszelt/dunstkreis";
+import type { AtmosphereLUTs, SkyCubePass, SkyPass } from "@himmelszelt/dunstkreis";
 import {
-    createIrradiancePass,
     DEFAULT_ATMOSPHERE_MODEL,
     DEFAULT_TEXTURE_CONFIG,
     OSGHIMMEL_ATMOSPHERE_MODEL,
@@ -8,6 +7,8 @@ import {
     RGB_ATMOSPHERE_MODEL,
     skyRequirements,
 } from "@himmelszelt/dunstkreis";
+import type { IrradiancePass } from "@himmelszelt/rundbild";
+import { createIrradiancePass } from "@himmelszelt/rundbild";
 import type { Direction } from "@himmelszelt/sternzeit";
 import type { ToneCurve } from "../scene/scene";
 

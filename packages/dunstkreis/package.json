@@ -38,6 +38,8 @@
         "test:gpu": "pnpm build && DUNSTKREIS_GPU=1 playwright test"
     },
     "devDependencies": {
+        "@himmelszelt/helldunkel": "workspace:*",
+        "@himmelszelt/rundbild": "workspace:*",
         "@himmelszelt/sternzeit": "workspace:*",
         "@playwright/test": "^1.62.1",
         "@types/node": "^26.6.2",

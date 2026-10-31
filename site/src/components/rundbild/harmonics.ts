@@ -1,7 +1,14 @@
 import { find } from "../dom";
+import {
+    type Environment,
+    environment,
+    gpu,
+    gpuDevice,
+    needEnvironment,
+    onEnvironment,
+} from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { offsetSliders } from "../sternzeit/offset";
-import { type Environment, environment, gpu, gpuDevice, needEnvironment, onEnvironment } from "./atmosphere";
 
 type Vec3 = [number, number, number];
 
@@ -282,7 +289,7 @@ const half = (bits: number) => {
     return sign * 2 ** (exponent - 15) * (1 + fraction / 1024);
 };
 
-// Nowell's mapping inverted, as dkCubeFromSphere in cube.wgsl does it: the point on the cube a cubified map keeps d at.
+// Nowell's mapping inverted, as rbCubeFromSphere in cube.wgsl does it: the point on the cube a cubified map keeps d at.
 function cubifyFace([x, y]: Vec3, z: number): Vec3 {
     const xx2 = 2 * x * x;
     const yy2 = 2 * y * y;

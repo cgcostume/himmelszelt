@@ -8,7 +8,7 @@ import { gpuDevice } from "./gpu.js";
 // how the horizon within them is taken, which every face must agree on.
 
 const SIZE = 16;
-// dkCubePointAt: the point on the cube a face's s and t stand for, in ENU.
+// rbCubePointAt: the point on the cube a face's s and t stand for, in ENU.
 const point = (face: number, s: number, t: number) =>
     [
         [1, -t, -s],

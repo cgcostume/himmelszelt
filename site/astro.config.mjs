@@ -4,7 +4,7 @@ import { defineConfig } from "astro/config";
 
 const source = (path) => fileURLToPath(new URL(`../packages/${path}`, import.meta.url));
 
-// dunstkreis' shaders are .wgsl files its own build inlines as strings; the site reads its source, so it does the same.
+// The libraries' shaders are .wgsl files their own builds inline as strings; the site reads its source, so it does the same.
 const wgsl = {
     name: "wgsl",
     transform: (code, id) =>
@@ -42,6 +42,10 @@ export default defineConfig({
                 { find: /^@himmelszelt\/sternzeit$/, replacement: source("sternzeit/src/index.ts") },
                 { find: /^@himmelszelt\/sternzeit\/approx$/, replacement: source("sternzeit/src/approx.ts") },
                 { find: /^@himmelszelt\/dunstkreis$/, replacement: source("dunstkreis/src/index.ts") },
+                { find: /^@himmelszelt\/helldunkel$/, replacement: source("helldunkel/src/index.ts") },
+                { find: /^@himmelszelt\/helldunkel\/wgsl$/, replacement: source("helldunkel/src/wgsl/index.ts") },
+                { find: /^@himmelszelt\/rundbild$/, replacement: source("rundbild/src/index.ts") },
+                { find: /^@himmelszelt\/rundbild\/wgsl$/, replacement: source("rundbild/src/wgsl/index.ts") },
             ],
         },
     },

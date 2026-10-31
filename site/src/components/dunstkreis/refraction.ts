@@ -199,7 +199,7 @@ fn composite(@builtin(global_invocation_id) id: vec3u) {
         sky = mix(sky, glow, params.glow);
         disc = disc * (1.0 - params.glow);
     }
-    let mapped = mix(dkToneMapNeutral(sky), dkToneMapNeutral(sky + disc), share);
+    let mapped = mix(hdToneMapNeutral(sky), hdToneMapNeutral(sky + disc), share);
     let encoded = mapped + (noise(id.xy) - 0.5) / 255.0;
     textureStore(output, id.xy, vec4f(clamp(encoded, vec3f(0.0), vec3f(1.0)), 1.0));
 }

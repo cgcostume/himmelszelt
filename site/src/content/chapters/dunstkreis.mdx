@@ -2,30 +2,19 @@
 title: dunstkreis
 package: "@himmelszelt/dunstkreis"
 summary: "Why the sky is blue and the sunset red, computed on the GPU."
-order: 2
+order: 4
 draft: true
 references:
     - bennett1982
-    - brown2017
     - bruneton2008
     - bruneton2017
     - edlen1966
-    - engelhardt2008
     - fritsch1980
     - hillaire2020
     - kelly2019
-    - khronos2024
     - kopp2011
-    - lagarde2014
     - mueller2012thesis
-    - narkowicz2016
     - nishita1993
-    - nowell2005
-    - polyhaven
-    - ramamoorthi2001
-    - snyder1987
-    - sobotka2023
-    - wrensch2023
     - wyman2013
 ---
 
@@ -38,17 +27,13 @@ import Scattering from "../../components/dunstkreis/Scattering.astro";
 import Sky from "../../components/dunstkreis/Sky.astro";
 import Stages from "../../components/dunstkreis/Stages.astro";
 import Tables from "../../components/dunstkreis/Tables.astro";
-import Environment from "../../components/dunstkreis/Environment.astro";
-import Lighting from "../../components/dunstkreis/Lighting.astro";
 import Lookup from "../../components/dunstkreis/Lookup.astro";
 import Fig from "../../components/Fig.astro";
 import Generator from "../../components/dunstkreis/Generator.astro";
 import Clocks from "../../components/dunstkreis/Clocks.astro";
 import ExposureDay from "../../components/dunstkreis/ExposureDay.astro";
-import Harmonics from "../../components/dunstkreis/Harmonics.astro";
 import Refraction from "../../components/dunstkreis/Refraction.astro";
 import Wavelengths from "../../components/dunstkreis/Wavelengths.astro";
-import Projections from "../../components/dunstkreis/Projections.astro";
 
 This chapter is being written. The sky below is live, and it grows with the chapter; the dashed boxes are the figures
 still to come.
@@ -67,7 +52,7 @@ For a developer: TypeScript and WGSL, WebGPU compute passes, no dependency on an
 a direction vector. Two small tables are computed once per atmosphere, one of the whole sky whenever the Sun or the
 observer moves, in a quarter of a millisecond on a desktop GPU, and every frame after that costs one texture lookup per
 pixel. It writes into a texture you own and records into a command encoder you own; the code example in [What to compute when](#what-to-compute-when) is
-the whole setup. The same sky lights a scene, as a cube map and nine numbers, and
+the whole setup. The same sky lights a scene, as a cube map [rundbild](../rundbild/) takes, and
 can be exported as files for a renderer that never runs dunstkreis at all.
 
 The sky below is that pass, drawn into a canvas: drag to look around, scroll to zoom, and set the moment and the place
@@ -382,10 +367,8 @@ the gamut mapping at the end of the section.
 <Controls />
 
 
-Exposure is set in EV100, as on a camera and in engines like Frostbite and Unreal <Cite id="lagarde2014" />: the
-luminance that just saturates is 1.2 × 2^EV100 cd/m². A sunny day is about EV 15, an overcast one 10, twilight 0,
-moonlight −6. Since the sky is in cd/m², it takes the same exposure as any other scene built on this convention, and
-looks the same under it.
+Exposure is set in EV100, as on a camera, which [helldunkel](../helldunkel/#exposure) explains. A sunny day is about
+EV 15, an overcast one 10, twilight 0, moonlight −6.
 
 Automatic exposure is an option, for a renderer without an exposure of its own, or to follow day into night. A light
 meter on the GPU reads the sky-view table in directions spread evenly over the sky above the horizon, and takes the
@@ -419,34 +402,18 @@ and nothing of clouds or a Moon.
 
 
 For a display, the pass then tone maps: exposed, compressed into the display's range, and encoded for sRGB, dithered
-against banding. Khronos PBR Neutral <Cite id="khronos2024" /> keeps colors exactly as they are up to three quarters of
-white and compresses only the brightest, so the sky's blue stays the blue the model computes. AgX
-<Cite id="sobotka2023" />, in Wrensch's fit <Cite id="wrensch2023" />, fades bright colors towards white as film does:
-the glow around the Sun and a sunset's brightest band turn white instead of clipping to a flat hue, but the daytime sky
-comes out flatter and grayer. Narkowicz's fit of the ACES filmic curve <Cite id="narkowicz2016" />, which dunstkreis
-used first, is the third: saturated, and it pushes bright hues towards yellow. The exposure follows a camera's
-convention, which puts a metered average at about a tenth of white, where ACES expects it; Neutral and AgX expect the
-scene's middle gray at 0.18, and are lifted by the difference. The tone curve choice in <Fig id="sky" /> switches every
-figure between them. A renderer with its own HDR pipeline turns that off and gets the exposed luminance itself, linear
-and unclamped, for a float target.
+against banding. The curves, the HDR headroom and what becomes of a color outside the display's range are
+[helldunkel](../helldunkel/#tone-curves)'s; dunstkreis bundles them, so the sky pass needs no other package. The tone
+curve choice in <Fig id="sky-full" /> switches every figure between them. A renderer with its own HDR pipeline turns
+that off and gets the exposed luminance itself, linear and unclamped, for a float target.
 
-
-A display that shows more gets more, and only the last step changes. An rgba16float canvas with extended tone mapping
-shows values above white up to the display's headroom, a few times SDR white on today's screens, and the Neutral
-curve takes that headroom as its ceiling, so the Sun's glow and a bright horizon stay bright instead of compressed to
-white. The HDR choice in <Fig id="sky" /> switches to it where the browser and the screen offer it. A canvas in
-Display P3 would show the saturated reds an sRGB screen gives up, with the matrix fitted for P3 instead; whether enough
-of a sunset leaves sRGB to be worth it is being measured. Either way a color still outside the display's range is cut
-off per channel today, which shifts its hue; reducing its chroma at the same lightness and hue, as CSS does since
-Color 4, keeps it, and is the next option of the tone map.
 
 ## Lighting a scene
 
 The same sky can light a scene. The sky pass writes it into the six faces of a cube map, in cd/m² and without the sun's
-disc, and a second pass projects that onto nine spherical harmonics coefficients, which give the irradiance for any
-surface's orientation <Cite id="ramamoorthi2001" />. The disc stays out on purpose: at some two billion cd/m² it is far
+disc, and [rundbild](../rundbild/#lighting-a-scene) projects that onto the nine numbers of its diffuse light. The disc stays out on purpose: at some two billion cd/m² it is far
 brighter than a half float holds, and at half a degree smaller than a texel of all but the largest cube maps, so it
-would be one blocky texel, smeared by the mip levels, and the coefficients would ring with it. Wherever the cube map is
+would be one blocky texel, smeared by the mip levels, and the numbers would ring with it. Wherever the cube map is
 shown, the disc is drawn over it instead, sharp at any resolution. The Sun lights the scene apart, as a light of its
 own, with what the air leaves of it.
 
@@ -454,82 +421,9 @@ Why a cube map, rather than the atmosphere itself for every pixel and every surf
 one frame to the next. The Sun moves by a quarter of a degree a minute, its own diameter in about two, and at 60 frames
 per second that is thousands of frames each computing the same sky again. So the cube map is built once whenever the Sun
 or the observer has moved, and every frame after that only samples it: one filtered fetch per direction, for the
-background as for a reflection, and nine coefficients for all of the diffuse light. Lighting needs the whole sky anyway,
+background as for a reflection, and nine numbers for all of the diffuse light. Lighting needs the whole sky anyway,
 not only the part the camera sees. At 128 texels a face, a build computes 98,304 texels, a twentieth of the pixels of a
 full HD frame; how long it takes shows above the figure.
-
-A cube map's faces are six perspective views, and a perspective crowds the most directions into its middle: a texel at a
-face's corner covers only a fifth of the solid angle of one at its center. So the sky is resolved five times as finely
-towards the corners as in the middle of a face, and where two faces meet, the texel grid turns abruptly, which can show
-in gradients as smooth as the sky's. Cubified, as osgHimmel's `CubeMappedHimmel` did it <Cite id="mueller2012thesis" />,
-the texels are placed by Nowell's mapping of a cube onto a sphere <Cite id="nowell2005" /> instead. The largest then
-covers a third more solid angle than the smallest, a little more even than the equi-angular cube map YouTube streams
-video in, at 41% more <Cite id="brown2017" />. It costs a few instructions per lookup, and whoever samples the cube map
-has to know: it looks up the point on the cube that maps to its direction, not the direction itself. Filtering across
-the faces' edges and the mip levels work as before. The two figures below switch it together.
-
-The cube map comes with its mip levels, each texel the mean of four in the level above, down to a single texel a face.
-They cost a third more memory and a few cheap passes, and they are optional: the cube pass fills as many levels as the
-texture was created with, so a `mipLevelCount` of 1 leaves them out. Two readers need them here. The projection onto the
-coefficients takes 4,096 directions; from a face of 1,024 texels it would see only one texel in some 1,500 and miss
-whatever lies between, so it reads the level whose texels are about as many as its directions. And a background showing
-the cube map through a wide lens spans several texels with each pixel, so it reads the level where a texel is about a
-pixel wide, instead of picking one texel of many and flickering as the view turns.
-
-Nine numbers per color channel hold the sky's diffuse light, as a sound is held by a few of its lowest tones (<Fig id="harmonics" />): the first is the
-sky's average brightness, the next three say how much brighter it is above than below and towards the Sun than away
-from it, and the last five bend that into the shape of a lit horizon over a dark ground. A diffuse surface sees the
-sky blurred over the whole hemisphere it faces, and nine terms of that blur keep more than 99% of the light it receives,
-for any sky <Cite id="ramamoorthi2001" />. A shader turns them into the light on any surface with nine multiplies and
-no texture lookup, which is what `createIrradiancePass` writes into a buffer, next to an irradiance cube map computed
-from the same nine for shaders that prefer a lookup.
-
-<Harmonics />
-
-<Controls />
-
-<Environment />
-
-<Lighting />
-
-<Controls />
-
-## Flattening the sky
-
-A texture is flat and the sky is not. Storing one in the other is the mapmaker's old problem, and every answer to it is
-a map projection that pays somewhere: where texels crowd, they are wasted, and where they thin out, the sky blurs. The
-cube map pays at its faces' corners. The panorama HDRIs are shared in, on sites like
-[Poly Haven](https://polyhaven.com/hdris) <Cite id="polyhaven" />, is the
-<Term of="Equirectangular projection">equirectangular projection</Term>, and it is nearly two thousand years old:
-Marinus of Tyre is credited with it, around 100 CE <Cite id="snyder1987" />. The azimuth runs across it and the zenith
-angle down, so a single direction, the zenith, is stretched over the whole top row.
-
-An HDRI has no north, only wherever its camera happened to point. dunstkreis sets one: north at the left edge, east a
-quarter in, south in the middle and west three quarters in, as seen from inside, so the Sun's arc over a northern sky
-stays clear of the seam. `azimuthOffset` turns it about the zenith, 180 for a southern sky with north in the middle. At
-about 400 texels, the equirectangular's largest texel covers some nine times the solid angle of its smallest.
-
-The <Term of="Octahedral map">octahedral map</Term> folds the sphere onto an octahedron and unfolds that into a square
-<Cite id="engelhardt2008" />: the zenith in the middle, the upper hemisphere a diamond without a seam, and the texels
-within a factor of about five. The fisheye stores what an all-sky camera sees, the upper hemisphere in a circle, its
-distance from the middle in proportion to the zenith angle. It spreads its texels within a factor of about 1.6, but
-leaves the corners of its square to no direction, a fifth of it. dunstkreis fills them with the horizon at their
-azimuth, so a filtered lookup at the rim blends into the sky rather than into black. Only the top left corner texel
-holds the ground's color, as a cube map holds it straight down, and every direction below the horizon looks it up
-there. The sphere map is the mirror ball's: the whole sphere in the circle, the zenith in the middle and the nadir all
-round the rim, the distance from the middle the sine of half the zenith angle. That keeps every texel's solid angle
-the same, and the horizon at seven tenths of the radius. Octahedral, fisheye and sphere map are laid out as a sky chart
-held overhead: north up and east left, since the sky is seen from below.
-
-The cube map lights a scene best, filtered and mipmapped by the hardware; the equirectangular goes to every other tool;
-the octahedral packs into a 2D atlas of many, as light probes are; the fisheye compares with photographs of the whole
-sky, and the sphere map holds all of it in one disc. `createPanoramaPass` writes any of the four, as `createCubePass`
-writes the cube map (<Fig id="projections" />).
-Like the cube pass, it spreads `samples` rays over every texel, which smooth the horizon and the fisheye's rim within it.
-
-<Projections />
-
-<Controls />
 
 ## Make your own
 
@@ -576,10 +470,5 @@ through its atmosphere in 1993 <Cite id="nishita1993" />, and the thickness of t
 
 Bengt Edlén, a physicist at Lund, measured the refractive index of air that bends every ray here
 <Cite id="edlen1966" />, and George G. Bennett's fit for navigators <Cite id="bennett1982" /> is what the traced
-refraction is tested against. Ravi Ramamoorthi and Pat Hanrahan, at Stanford, showed in 2001 that nine numbers hold
-the diffuse light of any environment <Cite id="ramamoorthi2001" />. Greg Kopp and Judith Lean measured the Sun's
-constant anew in 2011, lower than before, 1361 W/m² <Cite id="kopp2011" />, which sets the sky's brightness, and
-Sébastien Lagarde and Charles de Rousiers wrote down for Frostbite the exposure convention the sky is shown with
-<Cite id="lagarde2014" />. The tone curves are Khronos' <Cite id="khronos2024" />, Troy Sobotka's AgX
-<Cite id="sobotka2023" /> in Benjamin Wrensch's fit <Cite id="wrensch2023" />, and Krzysztof Narkowicz's fit of the
-ACES curve <Cite id="narkowicz2016" />.
+refraction is tested against. Greg Kopp and Judith Lean measured the Sun's
+constant anew in 2011, lower than before, 1361 W/m² <Cite id="kopp2011" />, which sets the sky's brightness.

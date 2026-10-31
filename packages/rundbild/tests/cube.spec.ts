@@ -29,7 +29,7 @@ async function evaluate(expression: string, inputs: Vec4[]) {
 
 test("a cubified cube map looks up the point on the face of the direction's largest component", async () => {
     const inputs = directions();
-    const points = await evaluate("vec4f(dkCubeFromSphere(input.xyz), 0.0)", inputs);
+    const points = await evaluate("vec4f(rbCubeFromSphere(input.xyz), 0.0)", inputs);
     if (points.length === 0) return;
     points.forEach((p, i) => {
         const d = inputs[i] as Vec4;
@@ -53,7 +53,7 @@ test("a cubified cube map keeps a component near zero on its side of the face's 
             return [r * Math.sin(azimuth), r * Math.cos(azimuth), z, 0];
         }),
     );
-    const points = await evaluate("vec4f(dkCubeFromSphere(input.xyz), 0.0)", inputs);
+    const points = await evaluate("vec4f(rbCubeFromSphere(input.xyz), 0.0)", inputs);
     if (points.length === 0) return;
     points.forEach((p, i) => {
         const z = (inputs[i] as Vec4)[2];
@@ -63,9 +63,9 @@ test("a cubified cube map keeps a component near zero on its side of the face's 
     });
 });
 
-test("dkCubeFromSphere inverts dkSphereFromCube, both ways", async () => {
+test("rbCubeFromSphere inverts rbSphereFromCube, both ways", async () => {
     const inputs = directions();
-    const back = await evaluate("vec4f(dkSphereFromCube(dkCubeFromSphere(input.xyz)), 0.0)", inputs);
+    const back = await evaluate("vec4f(rbSphereFromCube(rbCubeFromSphere(input.xyz)), 0.0)", inputs);
     if (back.length === 0) return;
     let worst = 0;
     back.forEach((b, i) => {
@@ -79,10 +79,10 @@ test("dkCubeFromSphere inverts dkSphereFromCube, both ways", async () => {
     for (let face = 0; face < 6; ++face)
         for (let y = 0; y < 16; ++y) for (let x = 0; x < 16; ++x) faces.push([face, x + 0.5, y + 0.5, 0]);
     const roundTrip = await evaluate(
-        "vec4f(dkCubeFromSphere(dkSphereFromCube(dkCubePointAt(u32(input.x), input.yz, 16u))), 0.0)",
+        "vec4f(rbCubeFromSphere(rbSphereFromCube(rbCubePointAt(u32(input.x), input.yz, 16u))), 0.0)",
         faces,
     );
-    const direct = await evaluate("vec4f(dkCubePointAt(u32(input.x), input.yz, 16u), 0.0)", faces);
+    const direct = await evaluate("vec4f(rbCubePointAt(u32(input.x), input.yz, 16u), 0.0)", faces);
     let worstPoint = 0;
     roundTrip.forEach((p, i) => {
         const q = direct[i] as [number, number, number, number];
@@ -93,7 +93,7 @@ test("dkCubeFromSphere inverts dkSphereFromCube, both ways", async () => {
 
 test("the cube's texel directions run as WebGPU samples a cube map", async () => {
     // The center of each face looks along its axis, in WebGPU's order +x, -x, +y, -y, +z, -z.
-    const centers = await evaluate("vec4f(dkCubeDirection(u32(input.x), vec2u(8u, 8u), 16u), 0.0)", [
+    const centers = await evaluate("vec4f(rbCubeDirection(u32(input.x), vec2u(8u, 8u), 16u), 0.0)", [
         [0, 0, 0, 0],
         [1, 0, 0, 0],
         [2, 0, 0, 0],

@@ -12,7 +12,9 @@ background, no rasterization involved. Or take the WGSL and inline it yourself.
 Takes a sun/moon direction vector and time as plain inputs, no hard
 dependency on [`@himmelszelt/sternzeit`](https://github.com/cgcostume/himmelszelt/tree/main/packages/sternzeit)
 or any other `@himmelszelt/*` package, so it drops into any existing WebGPU
-renderer.
+renderer. The tone curves and EV100 math of `@himmelszelt/helldunkel` and the cube map layout of
+`@himmelszelt/rundbild` are bundled into `dist` at build time and exported from here as well: one source, nothing else
+to install.
 
 New to terms like inscatter, optical depth, or scale height? The [himmelszelt site](https://github.com/cgcostume/himmelszelt) explains every one of them, right where it is used.
 
@@ -137,23 +139,11 @@ The Sun and the sky light a scene apart, the usual split for image-based lightin
   twilight cd/m² fall below what rgba16float holds finely; with `scaled: true` the cube map holds them times
   `sky.skyViewScale`, a power of two that follows the Sun, as the sky-view table does: divide by it, as read when
   encoding, for cd/m², and the irradiance from it too.
-- The sky as a panorama, from `await sky.createPanoramaPass({ projection, format })`, then `encode(encoder, texture)`
-  into mip level 0 of a 2D texture, in cd/m² like the cube map and with the same `samples`, `sunDisc` and `scaled`.
-  `equirectangular`, as HDRIs are shared, 2:1: north at the left edge, east a quarter in, south in the middle, seen
-  from inside, the zenith at the top. `octahedral`, the whole sphere in a square; `fisheye`, the upper hemisphere
-  azimuthal equidistant in the inscribed circle; and `sphere`, the sphere map, the whole sphere in the inscribed circle
-  as a mirror ball shows it, equal in area, the nadir all round the rim. All three with the zenith in the middle, north
-  up and east left, as a sky chart held overhead. Beyond the circle, alpha 0, the fisheye's texels hold the horizon at
-  their azimuth and the sphere map's the nadir, so a filtered lookup at the rim blends into what lies there; the
-  fisheye's top left corner texel alone holds the ground's color at the nadir, where `dkFisheyeUv` sends every
-  direction below the horizon.
-  `azimuthOffset` turns each about the zenith, in degrees, 180 for north in the equirectangular's middle. The
-  mappings both ways are in `wgsl.panorama`, `dkPanoramaUv` and `dkPanoramaDirection`.
-- The sky's diffuse light from `await createIrradiancePass(device, { cubified, sourceFormat })`: `encode(encoder, cube)` projects any cube map onto the
-  nine real spherical harmonics up to order 2 (Ramamoorthi & Hanrahan), in a storage buffer to shade with directly,
-  and writes an irradiance cube map from them, 32x32 per face, in lux. It takes any cube map, the sky's or an HDR
-  environment's, and may move to `@himmelszelt/rundbild` once that exists. An rgba32float source is read through a
-  nearest sampler unless the device has "float32-filterable".
+
+What to do with that cube map is [`@himmelszelt/rundbild`](https://github.com/cgcostume/himmelszelt/tree/main/packages/rundbild)'s:
+it takes any cube map as a plain texture, for the sky's diffuse light as nine spherical harmonics coefficients and an
+irradiance cube map (`createIrradiancePass`), and to lay it out as a panorama (`createPanoramaPass`). The two packages
+do not depend on each other at runtime.
 
 ## Aerial perspective
 
@@ -202,7 +192,7 @@ const device = await adapter.requestDevice(skyRequirements(options, adapter));
 ```
 
 The limits fit WebGPU's compatibility mode too. The passes that sum over a workgroup, the multiple-scattering table
-(one workgroup of 64 per texel), the light meter and the spherical harmonics, use subgroup operations where the device
+(one workgroup of 64 per texel), and the light meter, use subgroup operations where the device
 has "subgroups", and a tree in workgroup memory where it has not (`wgsl.workgroupSum`). Pass creation is asynchronous throughout (`createComputePipelineAsync`), so compiling never blocks a frame.
 
 ## Status
@@ -221,14 +211,12 @@ Implemented so far:
 - `src/wgsl/common.wgsl`: ray-sphere geometry, rays bent by the air, density profiles and phase functions.
 - `src/pass.ts`: the `SkyPass`/`AtmosphereLUTs` interfaces.
 - `src/luts.ts`: the transmittance and multiple-scattering tables, `precomputeAtmosphere()`.
-- `src/sky.ts`: the sky-view table, the light meter, the sky pass and its cube and panorama passes, `createSkyPass()`.
-- `src/wgsl/cube.wgsl` and `src/wgsl/panorama.wgsl`: how cube maps and panoramas lay out the directions.
-- `src/exposure.ts`: EV100 and the automatic exposure's ramp.
-- `src/ibl.ts`: spherical harmonics and irradiance from a cube map, `createIrradiancePass()`.
+- `src/sky.ts`: the sky-view table, the light meter, the sky pass and its cube pass, `createSkyPass()`.
+- `src/exposure.ts`: the automatic exposure's ramp.
 - `src/wgsl/aerial.wgsl` and `src/wgsl/aerialvolume.comp.wgsl`: the aerial perspective volume, its lookup and how it
   applies to a color.
 
-Specular image-based lighting and Bruneton's table as another filler follow.
+Bruneton's table as another filler follows.
 
 ### Composing the shaders
 
@@ -301,8 +289,6 @@ Echtzeit"](https://daniellimberger.de/resources/2012%20%E2%80%93%20Mueller%20%28
 - B. Edlén, "The Refractive Index of Air" (Metrologia, 1966): the refractivity of air.
 - F. N. Fritsch, R. E. Carlson, "Monotone Piecewise Cubic Interpolation" (SIAM J. Numer. Anal., 1980): the curve
   through the exposure keys.
-- R. Ramamoorthi, P. Hanrahan, "An Efficient Representation for Irradiance Environment Maps" (SIGGRAPH 2001): the
-  nine spherical harmonics coefficients of diffuse image-based lighting.
 - G. Kopp, J. L. Lean, "A new, lower value of total solar irradiance" (Geophysical Research Letters, 2011): the
   solar constant.
 - S. Lagarde, C. de Rousiers, "Moving Frostbite to Physically Based Rendering" (SIGGRAPH course, 2014): EV100 and the

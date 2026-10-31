@@ -1,10 +1,11 @@
-import { dispatch } from "./luts.js";
 import * as wgsl from "./wgsl/index.js";
+
+const dispatch = (n: number) => Math.ceil(n / 8);
 
 export interface IrradiancePassOptions {
     /** Edge of each face of the irradiance cube map, in texels, 32 by default: irradiance is smooth. */
     size?: number;
-    /** Whether the source cube maps are cubified, written by a sky cube pass with `cubify`. */
+    /** Whether the source cube maps are cubified, see `wgsl.cube`. */
     cubified?: boolean;
     /**
      * The source cube maps' format, rgba16float by default. rgba32float is read through a nearest sampler unless the
@@ -14,7 +15,7 @@ export interface IrradiancePassOptions {
 }
 
 /**
- * Diffuse image-based lighting from a cube map in cd/m², the sky's from `SkyPass.encodeCube` or any other: its nine
+ * Diffuse image-based lighting from a cube map in cd/m², the sky's or any other: its nine
  * spherical harmonics coefficients and an irradiance cube map computed from them. Not tied to the atmosphere, so an HDR
  * environment map works as well.
  */
@@ -71,24 +72,24 @@ export async function createIrradiancePass(
     });
     const [project, convolve] = await Promise.all([
         device.createComputePipelineAsync({
-            label: "dunstkreis:projectSH",
+            label: "rundbild:projectSH",
             layout: device.createPipelineLayout({ bindGroupLayouts: [sourceLayout] }),
-            compute: { module, entryPoint: "dkProjectSH", constants: { DK_SOURCE_CUBIFIED: cubified ? 1 : 0 } },
+            compute: { module, entryPoint: "rbProjectSH", constants: { RB_SOURCE_CUBIFIED: cubified ? 1 : 0 } },
         }),
         device.createComputePipelineAsync({
-            label: "dunstkreis:irradianceCube",
+            label: "rundbild:irradianceCube",
             layout: "auto",
-            compute: { module, entryPoint: "dkIrradianceCube" },
+            compute: { module, entryPoint: "rbIrradianceCube" },
         }),
     ]);
 
     const sh = device.createBuffer({
-        label: "dunstkreis:sh",
+        label: "rundbild:sh",
         size: 9 * 16,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     });
     const irradiance = device.createTexture({
-        label: "dunstkreis:irradiance",
+        label: "rundbild:irradiance",
         size: { width: size, height: size, depthOrArrayLayers: 6 },
         mipLevelCount: Math.floor(Math.log2(size)) + 1,
         format: "rgba16float",
@@ -116,7 +117,7 @@ export async function createIrradiancePass(
 
         encode(encoder, source) {
             if (source.format !== sourceFormat) {
-                throw new Error(`dunstkreis: this irradiance pass reads ${sourceFormat}, not ${source.format}`);
+                throw new Error(`rundbild: this irradiance pass reads ${sourceFormat}, not ${source.format}`);
             }
             const projectBindGroup = device.createBindGroup({
                 layout: project.getBindGroupLayout(0),
@@ -126,7 +127,7 @@ export async function createIrradiancePass(
                     { binding: 2, resource: { buffer: sh } },
                 ],
             });
-            const pass = encoder.beginComputePass({ label: "dunstkreis:irradiance" });
+            const pass = encoder.beginComputePass({ label: "rundbild:irradiance" });
             pass.setPipeline(project);
             pass.setBindGroup(0, projectBindGroup);
             pass.dispatchWorkgroups(1);
@@ -143,7 +144,7 @@ export async function createIrradiancePass(
                 size: 9 * 16,
                 usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
             });
-            const encoder = device.createCommandEncoder({ label: "dunstkreis:shReadback" });
+            const encoder = device.createCommandEncoder({ label: "rundbild:shReadback" });
             encoder.copyBufferToBuffer(sh, 0, staging, 0, 9 * 16);
             device.queue.submit([encoder.finish()]);
             await staging.mapAsync(GPUMapMode.READ);

@@ -50,7 +50,7 @@ struct Params {
     // with height and are gone in space.
     airDensity: f32,
     hazeDensity: f32,
-    // Nonzero when the sky map is cubified, sampled through dkCubeFromSphere from dunstkreis' cube.wgsl.
+    // Nonzero when the sky map is cubified, sampled through rbCubeFromSphere from dunstkreis' cube.wgsl.
     cubified: u32,
     // Nonzero to dither the 8-bit output against banding.
     dither: u32,
@@ -302,15 +302,15 @@ fn sunVisibility(p: vec3f, pixel: vec2u) -> f32 {
 // The sky pass' tone curves, sRGB encoded, beyond 1 up to the headroom on an HDR display.
 fn toneMap(exposed: vec3f) -> vec3f {
     if (params.toneCurve == 2u) {
-        return dkToneMapAgx(exposed);
+        return hdToneMapAgx(exposed);
     }
     if (params.toneCurve == 3u) {
-        return dkToneMapAces(exposed);
+        return hdToneMapAces(exposed);
     }
     if (params.toneCurve == 4u) {
-        return dkToneMapClipHdr(exposed, params.headroom);
+        return hdToneMapClipHdr(exposed, params.headroom);
     }
-    return dkToneMapNeutralHdr(exposed, params.headroom);
+    return hdToneMapNeutralHdr(exposed, params.headroom);
 }
 
 // Four rays per pixel on a rotated grid, as 4x multisampling places its samples: edges come out smooth in one frame.
@@ -328,7 +328,7 @@ fn backdrop(pixel: vec2u, direction: vec3f) -> vec3f {
     let pixelAngle = 2.0 * params.tanHalfFov / f32(textureDimensions(output).y);
     let texelAngle = 0.5 * PI / f32(textureDimensions(sky).x);
     let level = clamp(log2(pixelAngle / texelAngle), 0.0, f32(textureNumLevels(sky) - 1u));
-    let lookup = select(direction, dkCubeFromSphere(normalize(direction)), params.cubified != 0u);
+    let lookup = select(direction, rbCubeFromSphere(normalize(direction)), params.cubified != 0u);
     return textureSampleLevel(sky, skySampler, lookup, level).rgb / params.skyScale;
 }
 
@@ -494,6 +494,6 @@ fn render(@builtin(global_invocation_id) id: vec3u) {
         let noise = dot(blueNoise(id.xy), vec2f(1.0, -1.0));
         color = color + noise / 255.0;
     }
-    color = clamp(color, vec3f(0.0), dkEncodeSrgbExtended(vec3f(params.headroom), params.headroom));
+    color = clamp(color, vec3f(0.0), hdEncodeSrgbExtended(vec3f(params.headroom), params.headroom));
     textureStore(output, vec2i(id.xy), vec4f(color, 1.0));
 }

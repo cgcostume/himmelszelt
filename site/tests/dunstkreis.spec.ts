@@ -1,28 +1,8 @@
-import { choose, expect, test } from "./fixtures.js";
-
-test.beforeEach(async ({ page }) => {
-    await page.goto("dunstkreis/");
-    // The lighting figure's readout shows sunlight once the environment is built from the sky at the chosen moment, which
-    // happens only while the figure is on screen.
-    await page.locator("#lighting").scrollIntoViewIfNeeded();
-    await expect(page.locator('#lighting [data-field="info"]')).toContainText(/sunlight [1-9]/, { timeout: 30_000 });
-});
+import { expect, test } from "./fixtures.js";
 
 test("the chapter's figures render without WebGPU errors", async ({ page, problems }) => {
-    await page.waitForTimeout(1000);
+    await page.goto("dunstkreis/");
+    await page.locator("#generator").scrollIntoViewIfNeeded();
+    await page.waitForTimeout(3000);
     expect(problems).toEqual([]);
 });
-
-for (const background of ["atmosphere", "sky map"]) {
-    test(`lighting: ${background}`, async ({ page, problems }, testInfo) => {
-        const figure = page.locator("#lighting");
-        await figure.scrollIntoViewIfNeeded();
-        await choose(page, "lighting-background", background);
-        // The running sum of 64 frames.
-        await page.waitForTimeout(1500);
-        const path = testInfo.outputPath(`lighting-${background.replace(" ", "-")}.png`);
-        await figure.locator("canvas").screenshot({ path });
-        await testInfo.attach("lighting", { path, contentType: "image/png" });
-        expect(problems).toEqual([]);
-    });
-}

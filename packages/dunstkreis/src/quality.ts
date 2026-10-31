@@ -1,3 +1,4 @@
+import type { ToneCurve } from "@himmelszelt/helldunkel";
 import type { AtmosphereModel, PrecomputedTextureConfig } from "./model.js";
 
 /**
@@ -39,14 +40,6 @@ export function pipelineConstants(config: PrecomputedTextureConfig, samples: { c
     };
 }
 
-/**
- * A tone curve for a display: "neutral", Khronos PBR Neutral, which keeps colors as they are up to 0.76 and compresses
- * only above; "agx", Sobotka's, whose bright colors fade towards white as film does, flatter and grayer by day; or
- * "aces", Narkowicz's fit of the ACES filmic curve, saturated, shifting bright hues towards yellow; or "clip", none at
- * all, the exposed light cut off at 1, where it saturates, to see what the curves make of it.
- */
-export type ToneCurve = "neutral" | "agx" | "aces" | "clip";
-
 /** The passes' switches, `wgsl/features.wgsl`, as their defaults there. */
 export interface Features {
     toneMap: ToneCurve | false;
@@ -61,10 +54,6 @@ export interface Features {
     cube: boolean;
     cubeScaled: boolean;
     cubify: boolean;
-    /** A panorama's projection, 0 for none, 1 equirectangular, 2 octahedral, 3 fisheye, see `panorama.wgsl`. */
-    panorama: 0 | 1 | 2 | 3 | 4;
-    /** In radians. */
-    panoramaAzimuthOffset: number;
     /** Which rows of the sky-view table a dispatch writes: 0 all, 1 the sky, 2 the ground lit by the sky too. */
     skyViewRows: 0 | 1 | 2;
 }
@@ -81,8 +70,6 @@ export const DEFAULT_FEATURES: Features = {
     cube: false,
     cubeScaled: false,
     cubify: false,
-    panorama: 0,
-    panoramaAzimuthOffset: 0,
     skyViewRows: 0,
 };
 
@@ -101,8 +88,6 @@ export function featureConstants(features: Partial<Features> = {}): Record<strin
         DK_CUBE: Number(f.cube),
         DK_CUBE_SCALED: Number(f.cubeScaled),
         DK_CUBIFY: Number(f.cubify),
-        DK_PANORAMA: f.panorama,
-        DK_PANORAMA_AZIMUTH_OFFSET: f.panoramaAzimuthOffset,
         DK_SKY_VIEW_ROWS: f.skyViewRows,
     };
 }

@@ -314,6 +314,14 @@ export const references: Record<string, Reference> = {
         url: "https://iolite-engine.com/blog_posts/minimal_agx_implementation",
         note: "The polynomial fit of AgX's curve dunstkreis uses.",
     },
+    goethe1810: {
+        authors: "Johann Wolfgang von Goethe",
+        title: "Zur Farbenlehre",
+        venue: "Didactic part, section Helldunkel, §§ 849 to 853 (German; translated here)",
+        year: 1810,
+        url: "https://www.textlog.de/6832.html",
+        note: "Helldunkel, thought apart from color: the highest light, the middle tint, the shadow.",
+    },
     khronos2024: {
         authors: "Khronos Group",
         title: "PBR Neutral Tone Mapping",

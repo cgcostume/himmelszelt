@@ -2,16 +2,16 @@
 // (github.com/cginternals/webgl-operate, source/data/goldenset08.json and goldenset64.json), points on a golden-angle
 // spiral. Binding-free.
 //
-// Parked here from dunstkreis, which now spreads its samples by R2 and Vogel's spiral, for rundbild's downsampling of
+// Parked here from dunstkreis, which now spreads its samples by R2 and Vogel's spiral, for downsampling
 // equirectangular HDR images into (cubified) cube maps. `var<private>` copies the table into every invocation; make it
 // `const` when it is used again.
 
-var<private> dkGoldenSet8: array<vec2f, 8> = array<vec2f, 8>(
+var<private> rbGoldenSet8: array<vec2f, 8> = array<vec2f, 8>(
     vec2f( 0.201114,  0.016597), vec2f(-0.090682, -0.219471), vec2f(-0.180852,  0.162495), vec2f( 0.055216,  0.398563),
     vec2f(-0.416920, -0.073573), vec2f( 0.291284, -0.365369), vec2f( 0.437182,  0.252665), vec2f(-0.326750, -0.455539),
 );
 
-var<private> dkGoldenSet64: array<vec2f, 64> = array<vec2f, 64>(
+var<private> rbGoldenSet64: array<vec2f, 64> = array<vec2f, 64>(
     vec2f(-0.058976,  0.021042), vec2f( 0.065636, -0.034686), vec2f( 0.023064,  0.111212), vec2f(-0.011378, -0.124856),
     vec2f(-0.122834, -0.069128), vec2f( 0.155806,  0.055484), vec2f(-0.170432,  0.076770), vec2f(-0.101548,  0.166940),
     vec2f( 0.190248, -0.090414), vec2f( 0.121364, -0.180584), vec2f( 0.100078,  0.201382), vec2f(-0.080262, -0.215026),

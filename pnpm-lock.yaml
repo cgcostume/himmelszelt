@@ -20,6 +20,12 @@ importers:
 
   packages/dunstkreis:
     devDependencies:
+      '@himmelszelt/helldunkel':
+        specifier: workspace:*
+        version: link:../helldunkel
+      '@himmelszelt/rundbild':
+        specifier: workspace:*
+        version: link:../rundbild
       '@himmelszelt/sternzeit':
         specifier: workspace:*
         version: link:../sternzeit
@@ -38,6 +44,45 @@ importers:
       rolldown-plugin-dts:
         specifier: ^0.28.0
         version: 0.28.6(@volar/typescript@2.4.28(typescript@7.0.2))(rolldown@1.2.9)(typescript@7.0.2)
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      webgpu:
+        specifier: ^0.6.1
+        version: 0.6.1
+
+  packages/helldunkel:
+    devDependencies:
+      '@playwright/test':
+        specifier: ^1.62.1
+        version: 1.63.0
+      rolldown:
+        specifier: ^1.2.2
+        version: 1.2.13
+      rolldown-plugin-dts:
+        specifier: ^0.28.0
+        version: 0.28.6(@volar/typescript@2.4.28(typescript@7.0.2))(rolldown@1.2.13)(typescript@7.0.2)
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/rundbild:
+    devDependencies:
+      '@playwright/test':
+        specifier: ^1.62.1
+        version: 1.63.0
+      '@types/node':
+        specifier: ^26.6.2
+        version: 26.6.2
+      '@webgpu/types':
+        specifier: ^0.1.71
+        version: 0.1.74
+      rolldown:
+        specifier: ^1.2.2
+        version: 1.2.13
+      rolldown-plugin-dts:
+        specifier: ^0.28.0
+        version: 0.28.6(@volar/typescript@2.4.28(typescript@7.0.2))(rolldown@1.2.13)(typescript@7.0.2)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -71,6 +116,12 @@ importers:
       '@himmelszelt/dunstkreis':
         specifier: workspace:*
         version: link:../packages/dunstkreis
+      '@himmelszelt/helldunkel':
+        specifier: workspace:*
+        version: link:../packages/helldunkel
+      '@himmelszelt/rundbild':
+        specifier: workspace:*
+        version: link:../packages/rundbild
       '@himmelszelt/sternzeit':
         specifier: workspace:*
         version: link:../packages/sternzeit
@@ -3826,6 +3877,21 @@ snapshots:
       '@types/nlcst': 2.0.3
       nlcst-to-string: 4.0.0
       unist-util-visit: 5.1.0
+
+  rolldown-plugin-dts@0.28.6(@volar/typescript@2.4.28(typescript@7.0.2))(rolldown@1.2.13)(typescript@7.0.2):
+    dependencies:
+      dts-resolver: 3.0.0
+      get-tsconfig: 5.0.0-beta.6
+      obug: 3.0.0
+      rolldown: 1.2.13
+      yuku-ast: 0.10.2
+      yuku-codegen: 0.10.2
+      yuku-parser: 0.10.2
+    optionalDependencies:
+      '@volar/typescript': 2.4.28(typescript@7.0.2)
+      typescript: 7.0.2
+    transitivePeerDependencies:
+      - oxc-resolver
 
   rolldown-plugin-dts@0.28.6(@volar/typescript@2.4.28(typescript@7.0.2))(rolldown@1.2.9)(typescript@7.0.2):
     dependencies:

@@ -1,5 +1,5 @@
-import type { SkyPanoramaPass, SkyPass } from "@himmelszelt/dunstkreis";
 import { clampObserverHeight, MULTI_SCATTERING_LOG2_OFFSET, readTexture } from "@himmelszelt/dunstkreis";
+import { createPanoramaPass, type PanoramaPass } from "@himmelszelt/rundbild";
 import { showCode } from "../code";
 import { find } from "../dom";
 import { onDemand } from "../frame";
@@ -91,7 +91,7 @@ async function downloadTable(name: TableName, format: string) {
 const FACES_MAX = 1024;
 
 type Vec3 = [number, number, number];
-/** The point on the cube at s and t in [-1, 1] across a face, faces in WebGPU's order, as dkCubePointAt has it. */
+/** The point on the cube at s and t in [-1, 1] across a face, faces in WebGPU's order, as rbCubePointAt has it. */
 const facePoint = (face: number, s: number, t: number) =>
     (
         [
@@ -183,25 +183,21 @@ const PANORAMAS = {
     "sphere map": { projection: "sphere", aspect: 1 },
 } as const;
 type PanoramaName = keyof typeof PANORAMAS;
-const panoramaPasses = new WeakMap<SkyPass, Map<PanoramaName, Promise<SkyPanoramaPass>>>();
+const panoramaPasses = new Map<string, Promise<PanoramaPass>>();
 
 /**
- * A panorama of the sky, written by the sky pass itself rather than resampled from the cube map: as many texels as the
- * cube map, up to faces of FACES_MAX, without the Sun's disc like it, in cd/m², rgba32float for the file.
+ * A panorama of the sky, laid out from its cube map: as many texels as the cube map, up to faces of FACES_MAX, without
+ * the Sun's disc like it, in cd/m², rgba32float for the file.
  */
 async function downloadPanorama(name: PanoramaName) {
-    const sky = currentSky();
-    if (!sky) return;
+    const { cube, cubified = false, scale } = environment;
+    if (!cube) return;
     const { projection, aspect } = PANORAMAS[name];
-    let made = panoramaPasses.get(sky.pass);
-    if (!made) {
-        made = new Map();
-        panoramaPasses.set(sky.pass, made);
-    }
-    let pass = made.get(name);
+    const key = `${name},${cubified}`;
+    let pass = panoramaPasses.get(key);
     if (!pass) {
-        pass = sky.pass.createPanoramaPass({ projection, format: "rgba32float", samples: 8 });
-        made.set(name, pass);
+        pass = createPanoramaPass(gpuDevice(), { projection, format: "rgba32float", samples: 8, cubified });
+        panoramaPasses.set(key, pass);
     }
     const face = Math.min(environment.size, FACES_MAX);
     const height = Math.round(Math.sqrt((6 * face * face) / aspect));
@@ -213,15 +209,15 @@ async function downloadPanorama(name: PanoramaName) {
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC,
     });
     const encoder = device.createCommandEncoder({ label: "sternwarte:panoramaExport" });
-    (await pass).encode(encoder, texture);
+    (await pass).encode(encoder, cube, texture);
     device.queue.submit([encoder.finish()]);
     const { data } = await readTexture(device, texture, 0, 0);
     texture.destroy();
-    saveHdr(data, width, height, fileName(`sky-${projection}-${width}x${height}`));
+    saveHdr(divide(data, scale), width, height, fileName(`sky-${projection}-${width}x${height}`));
 }
 
 const LM = ["0,0", "1,-1", "1,0", "1,1", "2,-2", "2,-1", "2,0", "2,1", "2,2"];
-// The cosine lobe's weights per order and the basis functions' constants, as dunstkreis' irradiance.comp.wgsl has them.
+// The cosine lobe's weights per order and the basis functions' constants, as rundbild's irradiance.comp.wgsl has them.
 const LOBE = [Math.PI, (2 * Math.PI) / 3, (2 * Math.PI) / 3, (2 * Math.PI) / 3, ...Array(5).fill(Math.PI / 4)];
 const BASIS = [
     "0.282095",
@@ -334,8 +330,8 @@ function recipe() {
     const faces = environment.cube?.width ?? environment.size;
     const cubeFlags = `${environment.cubified ? ", cubify: true" : ""}${environment.scaledWith ? ", scaled: true" : ""}`;
     return [
+        'import { createIrradiancePass } from "@himmelszelt/rundbild";',
         "import {",
-        "    createIrradiancePass,",
         "    createSkyPass,",
         `    ${model}_ATMOSPHERE_MODEL,`,
         "    precomputeAtmosphere,",

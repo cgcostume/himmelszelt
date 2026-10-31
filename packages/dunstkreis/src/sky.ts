@@ -1,4 +1,5 @@
-import { autoExposureCompensation, DEFAULT_AUTO_EXPOSURE_KEYS, exposureFromEV100 } from "./exposure.js";
+import { exposureFromEV100, type ToneCurve } from "@himmelszelt/helldunkel";
+import { autoExposureCompensation, DEFAULT_AUTO_EXPOSURE_KEYS } from "./exposure.js";
 import { createLut, dispatch } from "./luts.js";
 import {
     type AerialPerspectiveOptions,
@@ -8,8 +9,6 @@ import {
     MIN_OBSERVER_HEIGHT_M,
     type SkyCubeOptions,
     type SkyCubePass,
-    type SkyPanoramaOptions,
-    type SkyPanoramaPass,
     type SkyParams,
     type SkyPass,
 } from "./pass.js";
@@ -19,7 +18,6 @@ import {
     pipelineConstants,
     refractionConstants,
     scatteringConstants,
-    type ToneCurve,
 } from "./quality.js";
 import * as wgsl from "./wgsl/index.js";
 
@@ -196,11 +194,11 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     ];
     // Everything but the output, which differs between an image and a cube map.
     const skySource = (output: string) =>
-        [...prelude, wgsl.cube, wgsl.panorama, wgsl.sun, wgsl.tonemap, wgsl.grid, output, wgsl.sky].join("\n");
-    // A cube map's or a panorama's format and settings, checked alike.
+        [...prelude, wgsl.cube, wgsl.sun, wgsl.tonemap, wgsl.grid, output, wgsl.sky].join("\n");
+    // A cube map's format and settings.
     const checkEnvironment = (format: GPUTextureFormat, sunDisc: boolean, samples: number) => {
         if (format !== "rgba16float" && format !== "rgba32float") {
-            throw new Error(`dunstkreis: the sky's cube map or panorama is rgba16float or rgba32float, not ${format}`);
+            throw new Error(`dunstkreis: the sky's cube map is rgba16float or rgba32float, not ${format}`);
         }
         if (sunDisc && format !== "rgba32float") {
             throw new Error("dunstkreis: the sun disc needs rgba32float, being far brighter than rgba16float holds");
@@ -629,68 +627,6 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                 },
             };
             return cubePass;
-        },
-
-        async createPanoramaPass(panoramaOptions: SkyPanoramaOptions) {
-            const {
-                projection,
-                format: panoramaFormat,
-                samples = 1,
-                sunDisc = false,
-                scaled = false,
-            } = panoramaOptions;
-            const { azimuthOffset = 0 } = panoramaOptions;
-            checkEnvironment(panoramaFormat, sunDisc, samples);
-            const panorama = ({ equirectangular: 1, octahedral: 2, fisheye: 3, sphere: 4 } as const)[projection];
-            if (!panorama) throw new Error(`dunstkreis: no panorama projection ${projection}`);
-            const pipeline = await device.createComputePipelineAsync({
-                label: "dunstkreis:skyPanorama",
-                layout: "auto",
-                compute: {
-                    module: device.createShaderModule({ code: skySource(wgsl.skyOutput(panoramaFormat)) }),
-                    entryPoint: "dkSky",
-                    constants: constants(
-                        {
-                            toneMap: false,
-                            dither: false,
-                            cubeScaled: scaled,
-                            sunDisc,
-                            panorama,
-                            panoramaAzimuthOffset: (azimuthOffset * Math.PI) / 180,
-                        },
-                        { cube: samples },
-                    ),
-                },
-            });
-            const panoramaBindGroup = skyBindGroupFor(pipeline);
-            const panoramaPass: SkyPanoramaPass = {
-                encode(encoder, target) {
-                    if (target.dimension !== "2d" || target.depthOrArrayLayers !== 1) {
-                        throw new Error("dunstkreis: a panorama is a 2D texture of one layer");
-                    }
-                    if (target.format !== panoramaFormat) {
-                        throw new Error(
-                            `dunstkreis: this panorama pass writes ${panoramaFormat}, not ${target.format}`,
-                        );
-                    }
-                    if (!(target.usage & GPUTextureUsage.STORAGE_BINDING)) {
-                        throw new Error("dunstkreis: the panorama needs STORAGE_BINDING usage");
-                    }
-                    const pass = encoder.beginComputePass({ label: "dunstkreis:skyPanorama" });
-                    pass.setPipeline(pipeline);
-                    pass.setBindGroup(0, panoramaBindGroup);
-                    pass.setBindGroup(
-                        1,
-                        device.createBindGroup({
-                            layout: pipeline.getBindGroupLayout(1),
-                            entries: [{ binding: 0, resource: target.createView({ mipLevelCount: 1 }) }],
-                        }),
-                    );
-                    pass.dispatchWorkgroups(dispatch(target.width), dispatch(target.height));
-                    pass.end();
-                },
-            };
-            return panoramaPass;
         },
 
         encode(encoder, target) {

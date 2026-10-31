@@ -2,9 +2,6 @@ import type { AtmosphereLUTs, SkyPass, SkyPassOptions } from "@himmelszelt/dunst
 import { apparentDirection, clampObserverHeight, createSkyPass } from "@himmelszelt/dunstkreis";
 import type { Direction } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
-import { onDemand } from "../frame";
-import { cameraFrame, createScene } from "../scene/scene";
-import { COMPASS } from "../sternzeit/figure";
 import {
     bindCubifyToggle,
     bindHdr,
@@ -23,8 +20,11 @@ import {
     SDR,
     type Sky,
     tables,
-} from "./atmosphere";
-import { geometry } from "./lutmap";
+} from "../dunstkreis/atmosphere";
+import { geometry } from "../dunstkreis/lutmap";
+import { onDemand } from "../frame";
+import { cameraFrame, createScene } from "../scene/scene";
+import { COMPASS } from "../sternzeit/figure";
 
 const DEG = Math.PI / 180;
 const root = find("#lighting");
