@@ -1,5 +1,5 @@
 import { find } from "../dom";
-import { bindHdr, gpu } from "../dunstkreis/atmosphere";
+import { bindHdr, display, gpu } from "../dunstkreis/atmosphere";
 import { context, draw, hdri, onHdri } from "../environment/hdri";
 import { onDemand } from "../frame";
 
@@ -13,7 +13,7 @@ if (gpu.error) {
     bindHdr(find('[data-hdr="note"]', root), find('[data-hdr="choice"]', root));
     const target = context(canvas);
     const request = onDemand(() => {
-        if (target) draw(canvas, target);
+        if (target) draw(canvas, target, { curve: display.toneCurve });
         field("info").textContent = hdri.name
             ? `${hdri.width} × ${hdri.height}; the meter reads EV ${hdri.metered.toFixed(1)}, in the file's own relative units`
             : "Loading…";

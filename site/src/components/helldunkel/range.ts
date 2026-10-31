@@ -5,7 +5,7 @@ import {
     type MeterHistogram,
 } from "@himmelszelt/helldunkel";
 import { find } from "../dom";
-import { gpu, gpuDevice } from "../dunstkreis/atmosphere";
+import { display, gpu, gpuDevice } from "../dunstkreis/atmosphere";
 import {
     changed,
     context,
@@ -344,7 +344,7 @@ if (gpu.error) {
 } else {
     const target = context(canvas);
     const request = onDemand(() => {
-        if (target) draw(canvas, target);
+        if (target) draw(canvas, target, { curve: display.toneCurve });
         ring();
         plot();
     }, root);
