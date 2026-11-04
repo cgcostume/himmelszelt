@@ -80,6 +80,14 @@ export interface SkyParams {
     /** The Sun's apparent angular diameter, in degrees, as `@himmelszelt/sternzeit`'s `sun.apparentAngularDiameter`
      *  returns it. About 0.53. */
     sunAngularDiameter: number;
+    /** Towards the Moon, its true direction like `sunDirection`, for a sky pass made with `moonlight`. */
+    moonDirection: readonly [number, number, number];
+    /**
+     * The Moon's illuminance above the air, in lux, for a sky pass made with `moonlight`: some 0.3 at full Moon, as
+     * `@himmelszelt/nachtgestirn`'s `moonIlluminance` gives it. The sky by moonlight is the sky by day at that share
+     * of the Sun's light, from the Moon's direction. 0 by default, none.
+     */
+    moonIlluminance: number;
 }
 
 /** A sky cube map's settings, fixed when its pass is made. */

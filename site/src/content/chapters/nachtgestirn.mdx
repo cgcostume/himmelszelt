@@ -22,6 +22,7 @@ import Planned from "../../components/Planned.astro";
 import Term from "../../components/Term.astro";
 import Fig from "../../components/Fig.astro";
 import Moon from "../../components/nachtgestirn/Moon.astro";
+import MoonFace from "../../components/nachtgestirn/MoonFace.astro";
 
 This chapter is being written. The Moon below is live, and it grows with the chapter; the dashed boxes are the figures
 still to come.
@@ -72,7 +73,7 @@ const maps = await loadMoonMaps(
 );
 const pass = await createMoonPass(device, { format: "rgba8unorm", maps });
 // Per frame: where it is, how large, where the Sun is from it, how it is turned.
-pass.update({ direction, angularDiameter, sunDirection, orientation, ev100: 15 });
+pass.update({ direction, angularDiameter, sunDirection, orientation, ev100: 14 });
 pass.encode(encoder, target, { background: skyInCandelaPerSquareMeter });
 ```
 
@@ -123,13 +124,25 @@ on the Moon is the side where the Sun rises on it, the side of Mare Crisium, the
 right of the disc with north up as seen from Earth's northern hemisphere, and which sternzeit's own Moon, drawn with a
 grid rather than a map, puts in the same place.
 
+<Fig id="moon-face" /> lays the two over each other: sternzeit's view of the Moon with its grid, axis and arrow to the
+Sun, and behind it the Moon from the maps, turned by the same three angles. The grid's center is the point of the
+Moon's face that looks at you, its meridian of 0° the one the map is centered on, and both move together as the
+libration nods the face. Lock it to the Moon frame and the air goes: seen from Earth's center, with its north up, the
+disc is the one the overlay has always drawn.
+
+<MoonFace />
+<Controls height={false} />
+
 The maps are NASA's, from the CGI Moon Kit of its Scientific Visualization Studio <Cite id="svs4720" />: the color
 from the Lunar Reconnaissance Orbiter's wide angle camera, over 100,000 images into one mosaic, remade in December 2025
 with more of the source's color and range, and the relief from its laser altimeter. Both are laid out with 0° longitude
 in the middle and east to the right, so a point's longitude and latitude read straight off them, with no mirroring, which
 osgHimmel's cube map needed. The color map is balanced to look right, not to measure, so the package scales it to
 normal albedo by the near side's mean: a rerunnable script makes both maps from the kit, 4096 texels around for the
-color and 2048 for the relief, which it turns from heights into normals along east and north. The normals matter
+color and 2048 for the relief, which it turns from heights into normals along east and north, and pairs a quarter
+and an eighth that size, all shipped with the package. A disc shows a map π times its width in pixels at one texel
+per pixel, so the 80 KB pair does for a disc up to some 160 pixels across, the 270 KB one to some 330, and the figure
+loads the 3.6 MB one only once you zoom in further, or when you ask for it. The normals matter
 along the <Term of="Terminator">terminator</Term>, where the Sun stands low over the surface and every crater rim
 catches the light; elsewhere the disc is a sphere, and the color does the rest.
 
@@ -161,10 +174,9 @@ earthshine as what it is, an illuminance at the Moon in lux: Earth as a Lambert 
 0.367 <Cite id="nssdc" />, at its phase as the Moon sees it, which is the Moon's own phase turned around
 <Cite id="vandehulst1980" />. A full Earth lights the Moon with some 13 lux, a ten thousandth of the Sun's 128,000, and
 about fifty times what a full Moon gives Earth back: Earth is four times wider and three times brighter. The night
-side then shines at half a candela per square meter, a thirteenth of a stop short of nothing next to the crescent's
-sunlit part, which is why a photograph exposed for the crescent shows it faintly and the eye, which adapts across
-the disc, sees it plainly. The light comes from where we look from, so the night side is lit face on, flat like the
-day side at full Moon.
+side then shines at half a candela per square meter, thirteen stops below the crescent's sunlit part, which is why a photograph exposed for the crescent shows it faintly and the eye, which adapts across
+the disc, sees it plainly. The light comes from Earth's center, which the Moon sees at most a degree from where we
+look from, so the night side is lit almost face on, flat like the day side at full Moon.
 
 Set <Fig id="moon" /> to March 21, 2026 at 19:30 local time in Berlin, a crescent of a tenth 21° up in the west at the
 end of twilight: the night side shows the maria faintly in the earthshine, and lowering the exposure by a few stops
@@ -204,6 +216,19 @@ dunstkreis' transmittance table, so the rising Moon comes out dim and orange; th
 the sky drawn behind it in cd/m², whose light it adds on top of the disc. That is the whole secret of the Moon by day:
 it is as bright as at night, the sky in front of it is simply brighter still, and a renderer that draws the Moon over
 the daytime sky in physical units gets the pale daytime Moon for free.
+
+The air also bends the Moon's light, and more the lower it comes in: on the horizon it lifts the lower limb some 6′
+more than the upper, and the rising Moon shows squeezed to four fifths of its height. The pass bends every ray as
+dunstkreis bends them for the sun disc: `refractionTable` asks any refraction you hand it, the figure dunstkreis'
+own, how far the air bends a ray at 32 apparent altitudes over where the disc shows, and the pass turns each ray down
+by it before it meets the sphere. Seen from orbit, where a ray grazing the planet crosses the air twice and dips deep
+into it, the same table squeezes the setting Moon to a quarter of its height, as astronauts photograph it.
+
+The Moon lights the air as the Sun does, at a four hundred thousandth of the light: some 0.3 lux above the air at full
+Moon, which `moonIlluminance` gives. The sky by moonlight is the day's sky at that share, blue, with the aureole of the
+haze around the disc, and dunstkreis draws it from a second sky-view table built from the Moon's direction when its
+sky pass is made with `moonlight`. In <Fig id="moon" />, turn the exposure off auto, take it down to −3 and zoom out:
+the night around the full Moon is blue.
 
 The exposure is the renderer's: the pass takes an EV100 like dunstkreis' sky pass, and the two agree, since both
 start from the same 128,000 lux. A full Moon exposes around 14 like a sunny day, the photographer's "looney 11" of

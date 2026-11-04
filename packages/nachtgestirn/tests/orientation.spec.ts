@@ -2,13 +2,20 @@ import { expect, test } from "@playwright/test";
 import {
     earthshineIlluminance,
     horizonZ,
+    liftedDirection,
     meanLuminance,
+    moonEV100,
+    moonIlluminance,
     moonOrientation,
     phaseLaw,
+    REFRACTION_SAMPLES,
+    refractionTable,
     selenographic,
     toSelenographic,
     viewFrame,
 } from "../src/orientation.js";
+
+const DEG = Math.PI / 180;
 
 // The Moon due south, halfway up, as seen from the northern hemisphere.
 const SOUTH_UP: [number, number, number] = [0, -Math.SQRT1_2, Math.SQRT1_2];
@@ -102,4 +109,54 @@ test("the phase law gives a tenth at the quarters and the full Moon some 4,900 c
 test("the horizon dips with height", () => {
     expect(horizonZ(1)).toBeCloseTo(-0.00056, 4);
     expect(horizonZ(10_000)).toBeLessThan(-0.05);
+});
+
+test("the meter exposes a full Moon by looney 11, f/11 at 1/100 s, and a crescent's lit part alike", () => {
+    expect(moonEV100(0, 1, 0.8)).toBeCloseTo(Math.log2(121 * 100), 0);
+    // Half lit at the quarter: a tenth of the full Moon's light over half the disc, 2.3 stops less.
+    expect(moonEV100(0, 1) - moonEV100(90, 0.5)).toBeGreaterThan(2);
+    expect(moonEV100(0, 1) - moonEV100(90, 0.5)).toBeLessThan(2.6);
+});
+
+test("a full Moon lights the top of the air with some 0.3 lux, four hundred thousandths of the Sun's", () => {
+    expect(moonIlluminance(0)).toBeGreaterThan(0.28);
+    expect(moonIlluminance(0)).toBeLessThan(0.34);
+    expect(moonIlluminance(90)).toBeCloseTo(moonIlluminance(0) * phaseLaw(90), 6);
+});
+
+test("the refraction table spans the disc and what the air lifts it by, and finds the horizon", () => {
+    // Bennett's refraction, in degrees at an apparent altitude in degrees; below -1° the ray ends on the ground.
+    const bennett = (h: number) => (h < -1 ? null : 1 / Math.tan((h + 7.31 / (h + 4.4)) * (Math.PI / 180)) / 60);
+    // The true center a third of a degree down, the disc just risen.
+    const table = refractionTable([0, Math.cos(-0.3 * DEG), Math.sin(-0.3 * DEG)], 0.52, bennett);
+    expect(table.bends.length).toBe(REFRACTION_SAMPLES);
+    // Every entry on or just around the disc, which shows lifted, squeezed to some 0.8 of its 0.52°.
+    const top = table.from + (REFRACTION_SAMPLES - 1) * table.step;
+    expect(top - table.from).toBeGreaterThan(0.4 * DEG);
+    expect(top - table.from).toBeLessThan(0.6 * DEG);
+    const [, uy, uz] = liftedDirection([0, Math.cos(-0.04 * DEG), Math.sin(-0.04 * DEG)], bennett);
+    const at = (Math.atan2(uz, uy) - table.from) / table.step;
+    expect(at).toBeGreaterThan(REFRACTION_SAMPLES / 2);
+    expect(at).toBeLessThan(REFRACTION_SAMPLES);
+    const i = 10;
+    expect((table.bends[i] ?? 0) / DEG).toBeCloseTo(bennett((table.from + i * table.step) / DEG) ?? 0, 5);
+    // Sunk to -2°, the band's lower part on the ground: its horizon at -1° exactly, and no jump in the bends below it.
+    const sunk = refractionTable([0, Math.cos(-2 * DEG), Math.sin(-2 * DEG)], 0.52, bennett);
+    expect(sunk.horizon / DEG).toBeCloseTo(-1, 5);
+    expect(sunk.bends[0]).toBe(sunk.bends[sunk.bends.findIndex((_, k) => sunk.from + k * sunk.step >= -DEG)]);
+});
+
+test("the lifted direction follows the bend and runs on smoothly below the horizon", () => {
+    const bennett = (h: number) => (h < -0.5 ? null : 1 / Math.tan((h + 7.31 / (h + 4.4)) * DEG) / 60);
+    const altitude = (t: number) => {
+        const [, y, z] = liftedDirection([0, Math.cos(t * DEG), Math.sin(t * DEG)], bennett);
+        return Math.atan2(z, y) / DEG;
+    };
+    expect(altitude(10)).toBeCloseTo(10 + (bennett(altitude(10)) ?? 0), 4);
+    // Lifted some 0.6° near the horizon; below the last ray it keeps its lift and sinks at the true rate.
+    const steps = Array.from({ length: 21 }, (_, i) => altitude(-1.5 + i * 0.1));
+    for (let i = 1; i < steps.length; i++) {
+        expect((steps[i] ?? 0) - (steps[i - 1] ?? 0)).toBeGreaterThan(0.04);
+        expect((steps[i] ?? 0) - (steps[i - 1] ?? 0)).toBeLessThan(0.11);
+    }
 });

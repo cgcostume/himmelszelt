@@ -30,14 +30,15 @@
         }
     },
     "files": [
-        "dist"
+        "dist",
+        "maps"
     ],
     "scripts": {
         "build": "rolldown -c rolldown.config.ts",
         "typecheck": "tsc --noEmit",
         "test": "pnpm build && playwright test",
         "test:gpu": "pnpm build && NACHTGESTIRN_GPU=1 playwright test",
-        "maps": "node scripts/maps.mjs"
+        "maps": "node scripts/maps.mjs maps"
     },
     "devDependencies": {
         "@himmelszelt/dunstkreis": "workspace:*",

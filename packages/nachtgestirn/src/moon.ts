@@ -1,6 +1,13 @@
 import type { ToneCurve } from "@himmelszelt/helldunkel";
 import type { MoonMaps } from "./maps.js";
-import { EARTH_RADIUS_KM, MOON_RADIUS_KM, SUN_ILLUMINANCE, type Vec3 } from "./orientation.js";
+import {
+    EARTH_RADIUS_KM,
+    MOON_RADIUS_KM,
+    REFRACTION_SAMPLES,
+    type RefractionTable,
+    SUN_ILLUMINANCE,
+    type Vec3,
+} from "./orientation.js";
 import * as wgsl from "./wgsl/index.js";
 
 export interface MoonPassOptions {
@@ -19,6 +26,9 @@ export interface MoonPassOptions {
     background?: boolean;
     /** The Moon's maps, from `createMoonMaps`; without, a uniform disc of the geometric albedo. */
     maps?: MoonMaps | null;
+    /** Rays per pixel on and around the disc, 8 by default: the terminator and the relief's shading are sharper than
+     *  a pixel. 1 for one through each pixel's center. */
+    samples?: number;
 }
 
 /** Earth's shadow, for a lunar eclipse: as `eclipse.lunar` of `@himmelszelt/sternzeit` gives its radii. */
@@ -38,7 +48,8 @@ export interface EarthShadow {
 
 /** Everything that can change per frame. Directions ENU (x east, y north, z up), unit length. */
 export interface MoonParams {
-    /** Towards the Moon's center as it shows, topocentric and, for a sky with refraction, refracted. */
+    /** Towards the Moon's center, topocentric: the true direction with `refraction`, which bends the rays back to it,
+     *  else where it shows. */
     direction: Vec3;
     /** The Moon's apparent angular diameter, in degrees: `moon.topocentricAngularDiameter`. About 0.5. */
     angularDiameter: number;
@@ -57,7 +68,7 @@ export interface MoonParams {
     /** Inverse view-projection, column major, and the projection's bend, as `@himmelszelt/dunstkreis`' sky pass. */
     inverseViewProjection: Float32Array;
     projectionDistance: number;
-    /** Exposure in EV100: the Moon is a sunlit rock, a full Moon exposes around 15, like a sunny day. */
+    /** Exposure in EV100: the Moon is a sunlit rock, a full Moon exposes around 14 like a sunny day, `moonEV100`. */
     ev100: number;
     /** The z below which a ray hits the ground and the Moon is hidden, `horizonZ`; -1 by default, drawn everywhere. */
     horizonZ: number;
@@ -70,6 +81,12 @@ export interface MoonParams {
     eclipse: EarthShadow | null;
     /** The Sun's angular diameter in degrees, for the penumbra's width. About 0.53. */
     sunAngularDiameter: number;
+    /** How far the air bends the rays over the disc, `refractionTable`: each pixel's ray is turned down by it before it
+     *  meets the Moon, which lifts and squeezes the disc near the horizon as the air does. Null by default, none. */
+    refraction: RefractionTable | null;
+    /** The Moon's distance from the observer, in km, `moon.topocentricDistance` or about it: where Earth's center lies
+     *  from the Moon, which earthshine comes from. 384,400 by default. */
+    distanceKm: number;
 }
 
 export interface EncodeOptions {
@@ -92,8 +109,9 @@ export interface MoonPass {
 const DEG = Math.PI / 180;
 const EIGHT_BIT = ["rgba8unorm", "bgra8unorm"];
 const TONE_CURVES: Record<string, number> = { neutral: 1, agx: 2, aces: 3, clip: 4 };
-/** Byte size of NbParams in params.wgsl: a mat4x4, a mat3x3 of three padded columns, and eleven vec4-sized rows. */
-export const PARAMS_SIZE = 240;
+/** Byte size of NbParams in params.wgsl: a mat4x4, a mat3x3 of three padded columns, twelve vec4-sized rows and the
+ *  refraction table's eight. */
+export const PARAMS_SIZE = 384;
 
 const DEFAULTS: MoonParams = {
     direction: [0, 0, 1],
@@ -106,13 +124,15 @@ const DEFAULTS: MoonParams = {
     // A camera looking north with a 90° field of view, until the caller sets its own.
     inverseViewProjection: new Float32Array([1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0]),
     projectionDistance: 0,
-    ev100: 15,
+    ev100: 14,
     horizonZ: -1,
     albedoMap: true,
     relief: true,
     law: "hapke",
     eclipse: null,
     sunAngularDiameter: 0.533,
+    refraction: null,
+    distanceKm: 384_400,
 };
 
 /** Packs `params` as NbParams, for a consumer's own pipeline as much as for the pass. */
@@ -138,17 +158,32 @@ export function paramsData(params: MoonParams, maps: MoonMaps | null): ArrayBuff
     f[50] = EARTH_RADIUS_KM;
     f[51] = MOON_RADIUS_KM;
     f[52] = 1 / (1.2 * 2 ** params.ev100);
-    f[53] = params.horizonZ;
+    // The table's horizon, where the air's rays end on the ground, if it is higher than the one given.
+    f[53] = Math.max(params.horizonZ, params.refraction ? Math.sin(params.refraction.horizon) : -1);
     f[54] = maps?.albedoScale ?? 1;
     f[55] = 0.12;
     u[56] = (params.albedoMap && maps ? 1 : 0) | (params.relief && maps?.normals ? 2 : 0) | (eclipse ? 4 : 0);
     u[57] = params.law === "lambert" ? 1 : 0;
     f[58] = eclipse?.umbraLight ?? 1;
+    const { refraction } = params;
+    f[59] = refraction?.step ?? 0;
+    f[63] = refraction?.from ?? 0;
+    if (refraction) f.set(refraction.bends.subarray(0, REFRACTION_SAMPLES), 64);
+    // Earth's center from the Moon's, the observer on Earth's surface straight above it.
+    const [dx, dy, dz] = params.direction;
+    const d = params.distanceKm;
+    const earth = [-dx * d, -dy * d, -dz * d - EARTH_RADIUS_KM];
+    const length = Math.hypot(earth[0] ?? 0, earth[1] ?? 0, earth[2] ?? 0);
+    f.set(
+        earth.map((c) => c / length),
+        60,
+    );
     return data;
 }
 
 export async function createMoonPass(device: GPUDevice, options: MoonPassOptions): Promise<MoonPass> {
-    const { format, toneMap = "neutral", headroom = 1, background = true, maps = null } = options;
+    const { format, toneMap = "neutral", headroom = 1, background = true, maps = null, samples = 8 } = options;
+    if (!(Number.isInteger(samples) && samples >= 1)) throw new Error(`nachtgestirn: ${samples} rays per pixel`);
     const dither = options.dither ?? (toneMap !== false && EIGHT_BIT.includes(format));
     const storable = ["rgba8unorm", "rgba16float", "rgba32float"].includes(format);
     if (!storable && !(format === "bgra8unorm" && device.features.has("bgra8unorm-storage"))) {
@@ -167,6 +202,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
                 NB_HEADROOM: headroom,
                 NB_DITHER: dither ? 1 : 0,
                 NB_BACKGROUND: background ? 1 : 0,
+                NB_SAMPLES: samples,
             },
         },
     });

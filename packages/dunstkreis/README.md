@@ -136,6 +136,16 @@ light in the air, the veil and bloom what the eye or the lens spreads of all tha
 binding-free, `wgsl.raymarch` the aureole's march, `dkRaymarchAerosol`, and `wgsl.common` its lobe, for a renderer's
 own sky.
 
+## Moonlight
+
+`createSkyPass(device, { ..., moonlight: true })` lights the sky by the Moon too: `update({ moonDirection,
+moonIlluminance })` takes the Moon's true direction and its illuminance above the air in lux, some 0.3 at full Moon, as
+`@himmelszelt/nachtgestirn`'s `moonIlluminance` gives it. A second sky-view table, the same march from the Moon's
+direction at its share of the Sun's light, is rebuilt when the Moon moves and read beside the Sun's, and the aureole
+glows around the Moon as well, centered on where it shows. The sky by full moon comes out blue at around EV100 −3, as a
+camera sees it. The disc itself is not drawn: that is nachtgestirn's. The light meter, the ground's light from the sky
+and the aerial perspective volume stay the Sun's.
+
 ## The ground
 
 Below the horizon the sky-view table shows the ground, in its albedo `groundAlbedo` (linear RGB, 0.3 by default, the

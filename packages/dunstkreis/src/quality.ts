@@ -58,6 +58,10 @@ export interface Features {
     cubify: boolean;
     /** Which rows of the sky-view table a dispatch writes: 0 all, 1 the sky, 2 the ground lit by the sky too. */
     skyViewRows: 0 | 1 | 2;
+    /** The Moon as a second light of the sky, from a sky-view table of its own. */
+    moonlight: boolean;
+    /** Build the Moon's sky-view table rather than the Sun's. */
+    moonView: boolean;
 }
 
 export const DEFAULT_FEATURES: Features = {
@@ -74,6 +78,8 @@ export const DEFAULT_FEATURES: Features = {
     cubeScaled: false,
     cubify: false,
     skyViewRows: 0,
+    moonlight: false,
+    moonView: false,
 };
 
 /** The `constants` record for `features.wgsl`; a test pins its keys to the overrides declared there. */
@@ -93,6 +99,8 @@ export function featureConstants(features: Partial<Features> = {}): Record<strin
         DK_CUBE_SCALED: Number(f.cubeScaled),
         DK_CUBIFY: Number(f.cubify),
         DK_SKY_VIEW_ROWS: f.skyViewRows,
+        DK_MOONLIGHT: Number(f.moonlight),
+        DK_MOON_VIEW: Number(f.moonView),
     };
 }
 

@@ -154,6 +154,132 @@ export function ev100ForLuminance(luminance: number): number {
     return Math.log2(Math.max(luminance, 1e-6) * 8);
 }
 
+/**
+ * The EV100 that exposes the Moon's lit part a stop brighter than mid gray, as a photographer's "looney 11" does, f/11
+ * at a shutter of one over the film's speed, EV100 13.6: its mean luminance at a phase angle in degrees spread over the
+ * illuminated fraction only, times what the air lets through. `compensation` in EV, +1 twice as bright.
+ */
+export function moonEV100(
+    phaseAngle: number,
+    illuminatedFraction: number,
+    transmittance = 1,
+    compensation = 1,
+): number {
+    const lit = meanLuminance(phaseAngle, SUN_ILLUMINANCE, transmittance) / Math.max(illuminatedFraction, 0.01);
+    return ev100ForLuminance(lit) - compensation;
+}
+
+/**
+ * The Moon's illuminance above Earth's air, in lux, at a phase angle in degrees and a distance in km: its mean luminance
+ * times the solid angle of its disc, some 0.3 lux at full Moon, a four hundred thousandth of the Sun. For lighting a sky
+ * by moonlight, as `@himmelszelt/dunstkreis`' `moonIlluminance`.
+ */
+export function moonIlluminance(phaseAngle: number, distanceKm = 384_400, sunIlluminance = SUN_ILLUMINANCE): number {
+    const sin = Math.min(MOON_RADIUS_KM / distanceKm, 1);
+    return meanLuminance(phaseAngle, sunIlluminance) * 2 * Math.PI * (1 - Math.sqrt(1 - sin * sin));
+}
+
+/** How far the air bends rays down over the band of apparent altitudes the Moon's disc lies in, for the pass. */
+export interface RefractionTable {
+    /** The apparent altitude of the first entry and the spacing, in radians. */
+    from: number;
+    step: number;
+    /** The bend at each, in radians: what the true altitude lies below the apparent one. `REFRACTION_SAMPLES` of them;
+     *  below the horizon, where the rays end on the ground, the first one above it. */
+    bends: Float32Array;
+    /** The apparent altitude below which the rays end on the ground, in radians, found to a hundredth of an arc second:
+     *  the pass hides the Moon there. -π/2 where the whole band reaches space. */
+    horizon: number;
+}
+
+/** The entries of a `RefractionTable`, `NB_REFRACTION_SAMPLES` in params.wgsl. */
+export const REFRACTION_SAMPLES = 32;
+
+/**
+ * The refraction over the band of apparent altitudes the Moon's disc shows in, for the pass' `refraction`: from
+ * `bend`, how far the air bends a ray seen at an apparent altitude in degrees down, in degrees, null for one that ends
+ * on the ground, such as `@himmelszelt/dunstkreis`' `refractionAngle` for a model and height. Built around the true
+ * direction, which the pass then takes as `direction`, and over where its limbs show, found by bisection: all its
+ * entries lie on the disc, however hard the air squeezes it, from space to a fifth of its height. The disc stays whole
+ * and smooth as it sinks, even with its center below the horizon.
+ */
+export function refractionTable(
+    trueDirection: Vec3,
+    angularDiameter: number,
+    bend: (apparentAltitude: number) => number | null,
+): RefractionTable {
+    const [x, y, z] = trueDirection;
+    const altitude = Math.atan2(z, Math.hypot(x, y)) / DEG;
+    const r = angularDiameter / 2;
+    // The apparent altitude a ray leaving at `trueAltitude` is seen at, or the horizon's where it is hidden.
+    const shown = (trueAltitude: number) => {
+        let [low, high] = [trueAltitude, trueAltitude + 5];
+        for (let i = 0; i < 40; i++) {
+            const middle = (low + high) / 2;
+            const b = bend(middle);
+            if (b === null || middle - b < trueAltitude) low = middle;
+            else high = middle;
+        }
+        return high;
+    };
+    const [lower, upper] = [shown(altitude - 1.05 * r), shown(altitude + 1.05 * r)];
+    const span = Math.max(upper - lower, 0.02);
+    const from = (lower - 0.1 * span) * DEG;
+    const step = (1.2 * span * DEG) / (REFRACTION_SAMPLES - 1);
+    const values = Array.from({ length: REFRACTION_SAMPLES }, (_, i) => bend((from + i * step) / DEG));
+    const first = values.findIndex((value) => value !== null);
+    if (first < 0) return { from, step, bends: new Float32Array(REFRACTION_SAMPLES), horizon: from + 32 * step };
+    // The horizon between the last ray on the ground and the first one out, by bisection: interpolated towards a ray
+    // that has no bend, the disc would be cut off a step above it.
+    let horizon = -Math.PI / 2;
+    if (first > 0) {
+        let [low, high] = [from + (first - 1) * step, from + first * step];
+        for (let i = 0; i < 30; i++) {
+            const middle = (low + high) / 2;
+            if (bend(middle / DEG) === null) low = middle;
+            else high = middle;
+        }
+        horizon = high;
+    }
+    const bends = new Float32Array(values.map((value, i) => (i < first ? (values[first] ?? 0) : (value ?? 0)) * DEG));
+    return { from, step, bends, horizon };
+}
+
+/**
+ * Where a true direction shows, lifted by `bend` as `refractionTable` takes it: for aiming a camera at the Moon or
+ * measuring the air along its line of sight. Solved by bisection on the apparent altitude, since the true one only
+ * grows with it. Below the lowest ray that still reaches space it runs on down at the same rate, so a sinking Moon's
+ * center moves smoothly behind the horizon instead of dropping back to its true place.
+ */
+export function liftedDirection(trueDirection: Vec3, bend: (apparentAltitude: number) => number | null): Vec3 {
+    const [x, y, z] = trueDirection;
+    const horizontal = Math.hypot(x, y);
+    if (horizontal < 1e-9) return trueDirection;
+    const altitude = Math.atan2(z, horizontal) / DEG;
+    const lowered = (a: number) => {
+        const b = bend(a);
+        return b === null ? Number.NEGATIVE_INFINITY : a - b;
+    };
+    let [low, high] = [altitude, Math.min(altitude + 3, 90)];
+    for (let i = 0; i < 40; i++) {
+        const middle = (low + high) / 2;
+        if (lowered(middle) < altitude) low = middle;
+        else high = middle;
+    }
+    // Hidden: the lowest ray that reaches space, `high`, lowered less than the body is.
+    const shown = high - Math.max(lowered(high) - altitude, 0);
+    const a = shown * DEG;
+    return [(x / horizontal) * Math.cos(a), (y / horizontal) * Math.cos(a), Math.sin(a)];
+}
+
+/**
+ * The width of a color map that gives the disc about one texel per pixel at its center, for a disc `discPixels` across:
+ * π times that. A smaller map loads faster and looks the same while the Moon is small in the view.
+ */
+export function mapWidthFor(discPixels: number): number {
+    return Math.PI * discPixels;
+}
+
 /** The z, in the observer's ENU frame, of the horizon as seen from `heightM` over a planet of `radiusKm`: rays below it
  *  hit the ground. -1 for none. */
 export function horizonZ(heightM: number, radiusKm = EARTH_RADIUS_KM): number {

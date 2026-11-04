@@ -32,6 +32,18 @@ const LAW = {
     ],
     checked: "hapke",
 };
+const MAPS = {
+    name: "maps",
+    label: "Map size",
+    title: "Which of nachtgestirn's maps the disc is drawn from, the color map's width: auto takes the smallest that gives a texel per pixel, 512 (80 KB) is sharp up to a disc of some 160 pixels, 1K (270 KB) to some 330, 4K (3.6 MB) when zoomed in",
+    options: [
+        ["auto", "auto"],
+        ["small", "512"],
+        ["medium", "1K"],
+        ["large", "4K"],
+    ],
+    checked: "auto",
+};
 const TONE = {
     name: "tone",
     label: "Tone curve",
@@ -60,6 +72,7 @@ const TONE = {
                 <button type="button" class="view-toggle" data-field="relief" aria-pressed="true" title="The relief from the Lunar Orbiter Laser Altimeter's elevation map: craters and mountains catch the light along the terminator">relief</button>
                 <button type="button" class="view-toggle" data-field="earthshine" aria-pressed="true" title="Earthshine, sunlight reflected by Earth onto the Moon's night side: a full Earth lights it with some 13 lux">earthshine</button>
                 <button type="button" class="view-toggle" data-field="eclipse" aria-pressed="true" title="Earth's shadow on the Moon during a lunar eclipse: the penumbra's dimming, the umbra's copper, and the turquoise rim ozone leaves">eclipse</button>
+                <Choice figure={id} {...MAPS} />
             </OptionGroup>
             <OptionGroup name="reflectance">
                 <Choice figure={id} {...LAW} />

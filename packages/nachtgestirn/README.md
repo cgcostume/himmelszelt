@@ -27,26 +27,42 @@ other package at runtime: the astronomy comes in as directions and angles, from
   where ozone takes the orange out. The radii come from `eclipse.lunar` of sternzeit, the geometry is yours to hand
   over.
 - **The air**: a transmittance per channel along the line of sight dims and reddens the disc, and the sky you compose
-  it over adds its light in front.
+  it over adds its light in front. The air's bending, a `refractionTable` from any refraction function such as
+  dunstkreis' `refractionAngle`, turns every ray down before it meets the Moon, as dunstkreis does for the sun disc:
+  the disc shows lifted and squeezed near the horizon, to some four fifths of its height from the ground and to a
+  quarter from orbit, and sinks smoothly behind the horizon. `liftedDirection` says where its center shows.
+- **Supersampled**: 8 rays per pixel on and around the disc by default (`samples`), and the maps read by a cubic
+  B-spline when magnified, so the terminator and the relief along it stay smooth.
+- **The exposure**: `moonEV100` meters the lit part a stop over mid gray, the photographer's "looney 11", EV100 13.6 at
+  full Moon; `moonIlluminance` gives the Moon's light above the air, some 0.3 lux at full Moon, for lighting a sky by
+  it, as dunstkreis' `moonlight` does.
 
 ## The maps
 
 `pnpm maps <outDir>` makes them from NASA's [CGI Moon Kit](https://svs.gsfc.nasa.gov/4720): the color map of
 December 2025, from the LROC wide angle camera's Hapke-normalized mosaic, as a 4096 x 2048 WebP, and a 2048 x 1024
-normal map from the LOLA elevation map. Both equirectangular, centered on 0° longitude, east to the right, north up;
-the pass reads them that way. The color map is balanced to look right, not to measure: `createMoonMaps` takes the
-near side's mean reflectance the script prints and scales the map to normal albedo, so the drawn disc averages the
-geometric albedo. The package ships no maps; load them with `loadMoonMaps` from wherever you host them, or hand
-`createMoonMaps` any images laid out the same way.
+normal map from the LOLA elevation map, and the same pair at a quarter and an eighth of the size. The package ships
+all three in `maps/`, as `MOON_MAPS.large` (3.6 MB), `medium` (270 KB) and `small` (80 KB), resolved by
+`new URL(..., import.meta.url)`, which bundlers copy along: a disc shows a map `mapWidthFor(pixels)`, π times its width,
+at one texel per pixel, so `small` does up to a disc of some 160 pixels, `medium` to some 330. All equirectangular,
+centered on 0° longitude, east to the right, north up; the pass reads them that way. The color map is balanced to look
+right, not to measure: `createMoonMaps` takes the near side's mean reflectance the script prints and scales the map
+to normal albedo, so the drawn disc averages the geometric albedo; `MOON_MAPS` carries it along. `loadMoonMaps` loads
+`MOON_MAPS.large` by default, or any pair laid out the same way.
 
 ## Use
 
 ```ts
-import { createMoonPass, earthshineIlluminance, loadMoonMaps, moonOrientation } from "@himmelszelt/nachtgestirn";
+import {
+    createMoonPass,
+    earthshineIlluminance,
+    loadMoonMaps,
+    MOON_MAPS,
+    moonEV100,
+    moonOrientation,
+} from "@himmelszelt/nachtgestirn";
 
-const maps = await loadMoonMaps(device, { color: "moon-color-4k.webp", normals: "moon-normals-2k.webp" }, {
-    meanReflectance: 0.396,
-});
+const maps = await loadMoonMaps(device, MOON_MAPS.medium);
 const pass = await createMoonPass(device, { format: "rgba8unorm", maps });
 
 // Per frame, from your astronomy (here sternzeit's, time and observer as its functions take them):
@@ -62,7 +78,7 @@ pass.update({
     }),
     earthshine: earthshineIlluminance(180 - moon.phaseAngle(jde), moon.distance(jde)),
     inverseViewProjection, // as dunstkreis' sky pass takes it
-    ev100: 15, // the Moon is a sunlit rock
+    ev100: moonEV100(moon.phaseAngle(jde), moon.illuminatedFraction(jde)), // a sunlit rock, some 14 at full Moon
 });
 pass.encode(encoder, target, { background: skyInCdPerM2 });
 ```

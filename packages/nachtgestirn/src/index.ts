@@ -5,7 +5,7 @@
 
 // biome-ignore-all assist/source/organizeImports: exports are hand-grouped by domain, not alphabetical
 
-export type { MoonOrientationInput, Vec3 } from "./orientation.js";
+export type { MoonOrientationInput, RefractionTable, Vec3 } from "./orientation.js";
 export {
     EARTH_GEOMETRIC_ALBEDO,
     EARTH_RADIUS_KM,
@@ -15,16 +15,22 @@ export {
     earthshineIlluminance,
     ev100ForLuminance,
     horizonZ,
+    liftedDirection,
+    mapWidthFor,
     meanLuminance,
+    moonEV100,
+    moonIlluminance,
     moonOrientation,
     phaseLaw,
     selenographic,
     toSelenographic,
+    refractionTable,
+    REFRACTION_SAMPLES,
     viewFrame,
 } from "./orientation.js";
 
-export type { MoonMaps, MoonMapsOptions } from "./maps.js";
-export { createMoonMaps, loadMoonMaps } from "./maps.js";
+export type { MoonMapFiles, MoonMaps, MoonMapsOptions } from "./maps.js";
+export { createMoonMaps, loadMoonMaps, MOON_MAPS } from "./maps.js";
 
 export type { EarthShadow, EncodeOptions, MoonParams, MoonPass, MoonPassOptions } from "./moon.js";
 export { createMoonPass, PARAMS_SIZE, paramsData } from "./moon.js";

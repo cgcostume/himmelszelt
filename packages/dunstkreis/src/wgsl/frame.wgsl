@@ -27,6 +27,14 @@ struct DkSkyParams {
     // Where the sun shows, lifted by the air as seen from the observer, `apparentDirection`: what the aureole and the
     // veil are centered on, in the view's own directions, whether a ray ends in the sky or on the ground.
     apparentSunDirection: vec3f,
+    // The Moon's illuminance above the air as a share of the Sun's, which its light in the sky is scaled by; 0 for none.
+    moonlight: f32,
+    // Unit vector towards the Moon, the true direction, like sunDirection.
+    moonDirection: vec3f,
+    // What the Moon's sky-view table holds luminance multiplied by, like skyViewScale.
+    moonViewScale: f32,
+    // Where the Moon shows, lifted by the air, like apparentSunDirection: what its aureole is centered on.
+    apparentMoonDirection: vec3f,
 }
 
 // Directions the light meter reads per cap, above and below the horizon: 32 workgroups of 128 sample one each.

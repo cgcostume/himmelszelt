@@ -48,8 +48,8 @@ fn dkPrecomputeSkyView(@builtin(global_invocation_id) id: vec3u) {
     let sinAzimuth = sqrt(max(1.0 - cosAzimuth * cosAzimuth, 0.0));
     let direction = vec3f(sinView * cosAzimuth, sinView * sinAzimuth, mu);
 
-    // The sun placed in that same frame, at azimuth zero by construction.
-    let muS = clamp(dkParams.sunDirection.z, -1.0, 1.0);
+    // The sun placed in that same frame, at azimuth zero by construction; or the Moon, for its own table.
+    let muS = clamp(select(dkParams.sunDirection.z, dkParams.moonDirection.z, DK_MOON_VIEW), -1.0, 1.0);
     let sunDirection = vec3f(sqrt(max(1.0 - muS * muS, 0.0)), 0.0, muS);
 
     let ray = dkRaymarchSky(
@@ -58,7 +58,7 @@ fn dkPrecomputeSkyView(@builtin(global_invocation_id) id: vec3u) {
     );
     // How far the ray bent on its way out, as the sine of the angle, the same for every azimuth: one per row. Nothing
     // for a ray ending on the ground.
-    if (id.x == 0u) {
+    if (id.x == 0u && !DK_MOON_VIEW) {
         dkMetering.bend[row] = select(length(cross(direction, ray.direction)), 0.0, ray.hitsGround);
     }
     var luminance = ray.luminance;
@@ -67,8 +67,10 @@ fn dkPrecomputeSkyView(@builtin(global_invocation_id) id: vec3u) {
         luminance = luminance + ray.transmittance * a.groundAlbedo / DK_PI * dkMetering.groundLight;
     }
     // At the four wavelengths, in units `toRgb` turns into cd/m², times skyViewScale: its brightest texel near 2^10, with
-    // 16 stops above it to 65504 and 24 below it to half floats' smallest normal value, 6e-5.
-    textureStore(dkSkyViewOut, vec2i(i32(id.x), i32(row)), min(luminance * dkParams.skyViewScale, vec4f(65504.0)));
+    // 16 stops above it to 65504 and 24 below it to half floats' smallest normal value, 6e-5. The Moon's table times its
+    // share of the Sun's light and its own scale.
+    let scale = select(dkParams.skyViewScale, dkParams.moonlight * dkParams.moonViewScale, DK_MOON_VIEW);
+    textureStore(dkSkyViewOut, vec2i(i32(id.x), i32(row)), min(luminance * scale, vec4f(65504.0)));
 }
 
 // The sky's irradiance on the ground, ∫ L μ dω over the hemisphere above: the table's upper half summed texel by

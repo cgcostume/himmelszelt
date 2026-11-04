@@ -33,5 +33,8 @@ import LunationSlider from "./LunationSlider.astro";
 </figure>
 
 <script>
-    import "./moonview";
+    import { find } from "../dom";
+    import { moonView } from "./moonview";
+
+    moonView(find("#moon-view .moon-view"));
 </script>

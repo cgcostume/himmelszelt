@@ -70,16 +70,61 @@ export function createMoonMaps(device: GPUDevice, options: MoonMapsOptions): Moo
     };
 }
 
-/** Fetches and decodes the maps' files, as a browser does, and uploads them: `createMoonMaps` with the images. */
+/** Where a pair of maps lies, and the color map's mean reflectance over the near side, `MoonMapsOptions`'. */
+export interface MoonMapFiles {
+    color: string | URL;
+    normals?: string | URL;
+    /** The color map's width in texels, to choose a pair by `mapWidthFor`. */
+    width?: number;
+    meanReflectance?: number;
+}
+
+/**
+ * The maps the package ships, made by `pnpm maps` from NASA's CGI Moon Kit, the color map 512, 1024 or 4096 texels
+ * around and the relief half that: `small` 80 KB, for a disc up to some 160 pixels across, `medium` 270 KB, up to
+ * some 330, `large` 3.6 MB, for zooming in (see `mapWidthFor`). Resolved next to the package's own files, which
+ * bundlers that know `new URL(..., import.meta.url)` copy along.
+ */
+export const MOON_MAPS: { small: MoonMapFiles; medium: MoonMapFiles; large: MoonMapFiles } = {
+    small: {
+        color: new URL("../maps/moon-color-512.webp", import.meta.url),
+        normals: new URL("../maps/moon-normals-256.webp", import.meta.url),
+        width: 512,
+        meanReflectance: 0.396,
+    },
+    medium: {
+        color: new URL("../maps/moon-color-1k.webp", import.meta.url),
+        normals: new URL("../maps/moon-normals-512.webp", import.meta.url),
+        width: 1024,
+        meanReflectance: 0.396,
+    },
+    large: {
+        color: new URL("../maps/moon-color-4k.webp", import.meta.url),
+        normals: new URL("../maps/moon-normals-2k.webp", import.meta.url),
+        width: 4096,
+        meanReflectance: 0.396,
+    },
+};
+
+/**
+ * Fetches and decodes a pair of maps, as a browser does, and uploads them: `createMoonMaps` with the images. The
+ * package's own large pair by default.
+ */
 export async function loadMoonMaps(
     device: GPUDevice,
-    urls: { color: string; normals?: string },
+    files: MoonMapFiles = MOON_MAPS.large,
     options: Omit<MoonMapsOptions, "color" | "normals"> = {},
 ): Promise<MoonMaps> {
-    const decode = async (url: string) =>
+    const decode = async (url: string | URL) =>
         createImageBitmap(await (await fetch(url)).blob(), { colorSpaceConversion: "none", premultiplyAlpha: "none" });
-    const [color, normals] = await Promise.all([decode(urls.color), urls.normals ? decode(urls.normals) : null]);
-    return createMoonMaps(device, { color, ...(normals ? { normals } : {}), ...options });
+    const [color, normals] = await Promise.all([decode(files.color), files.normals ? decode(files.normals) : null]);
+    const meanReflectance = options.meanReflectance ?? files.meanReflectance;
+    return createMoonMaps(device, {
+        color,
+        ...(normals ? { normals } : {}),
+        ...options,
+        ...(meanReflectance === undefined ? {} : { meanReflectance }),
+    });
 }
 
 const pipelines = new WeakMap<GPUDevice, Map<string, GPUComputePipeline>>();

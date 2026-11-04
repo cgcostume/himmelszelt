@@ -38,8 +38,18 @@ struct NbParams {
     law: u32,
     // How strong the umbra's refracted light is, 1 for a typical eclipse.
     umbraLight: f32,
-    pad: f32,
+    // The refraction table's spacing in apparent altitude, in radians: 0 for no table, the rays taken as they are.
+    refractionStep: f32,
+    // From the Moon's center towards Earth's, where earthshine comes from: a degree off the view at most.
+    earthDirection: vec3f,
+    // The apparent altitude of the table's first entry, in radians.
+    refractionFrom: f32,
+    // How far the air bends a ray down, in radians, at NB_REFRACTION_SAMPLES apparent altitudes over the disc's band,
+    // from `refractionFrom` on by `refractionStep`.
+    refraction: array<vec4f, 8>,
 }
+
+const NB_REFRACTION_SAMPLES: u32 = 32u;
 
 const NB_FLAG_COLOR: u32 = 1u;
 const NB_FLAG_NORMALS: u32 = 2u;

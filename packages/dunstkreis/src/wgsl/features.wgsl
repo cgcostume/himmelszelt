@@ -48,6 +48,13 @@ override DK_CUBE_SCALED: bool = false;
 // Spread the cube map's texels evenly over the sphere: see cube.wgsl.
 override DK_CUBIFY: bool = false;
 
+// The Moon as a second light of the sky, from a sky-view table of its own: its direction and its share of the Sun's
+// illuminance come in the uniforms, `moonDirection` and `moonlight`.
+override DK_MOONLIGHT: bool = false;
+
+// Build the Moon's sky-view table rather than the Sun's: the same march from the Moon's direction, times its light.
+override DK_MOON_VIEW: bool = false;
+
 // Which rows of the sky-view table a dispatch writes: 0 all, 1 the sky above the horizon, 2 the ground below it, lit
 // by the sky as well as the sun.
 override DK_SKY_VIEW_ROWS: u32 = 0u;

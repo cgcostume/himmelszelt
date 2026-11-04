@@ -2,6 +2,7 @@
 // Makes the Moon's maps for a renderer from NASA's CGI Moon Kit (svs.gsfc.nasa.gov/4720): the color map of December
 // 2025, from the LROC WAC Hapke-normalized mosaic, at 4096 x 2048, and a normal map at 2048 x 1024 from the LOLA
 // elevation map at 16 pixels per degree. Both equirectangular, centered on 0° longitude, east to the right, north up.
+// Two smaller pairs beside them, a quarter and an eighth of the size, for a Moon small in the view: see `mapWidthFor`.
 // Rerunnable: `node scripts/maps.mjs <outDir> [--cache <dir>]`. Needs ImageMagick 7 (`magick`) with TIFF and WebP.
 // Downloads some 95 MB once into the cache. Prints the near side's mean reflectance, which `createMoonMaps` takes as
 // `meanReflectance`, so that the drawn disc averages the Moon's geometric albedo.
@@ -113,13 +114,50 @@ magick(
     Buffer.from(normals.buffer),
 );
 console.log("wrote moon-normals-2k.webp");
+
+// The smaller pairs, averaged down from the full one: the color in linear light, the normals as they are, which the
+// shader normalizes, like a mip level.
+for (const [color, normals, width] of [
+    ["moon-color-1k.webp", "moon-normals-512.webp", 1024],
+    ["moon-color-512.webp", "moon-normals-256.webp", 512],
+]) {
+    const size = (w) => `${w}x${w / 2}!`;
+    magick([
+        join(out, "moon-color-4k.webp"),
+        "-colorspace",
+        "RGB",
+        "-filter",
+        "Box",
+        "-resize",
+        size(width),
+        "-colorspace",
+        "sRGB",
+        "-quality",
+        "88",
+        "-define",
+        "webp:method=6",
+        join(out, color),
+    ]);
+    magick([
+        normalsFile,
+        "-filter",
+        "Box",
+        "-resize",
+        size(width / 2),
+        "-define",
+        "webp:lossless=true",
+        join(out, normals),
+    ]);
+    console.log(`wrote ${color} and ${normals}`);
+}
 writeFileSync(
     join(out, "README.md"),
     `# The Moon's maps
 
 Made by \`pnpm --filter @himmelszelt/nachtgestirn maps\` from NASA's CGI Moon Kit (https://svs.gsfc.nasa.gov/4720),
 credit NASA's Scientific Visualization Studio: the color map of December 2025, from the LROC WAC Hapke-normalized
-mosaic, and a normal map from the LOLA elevation map. Equirectangular, centered on 0° longitude, east to the right,
-north up. Near side mean reflectance ${mean.toFixed(4)}.
+mosaic, and a normal map from the LOLA elevation map, each also at a quarter and an eighth of the size for a Moon
+small in the view. Equirectangular, centered on 0° longitude, east to the right, north up. Near side mean
+reflectance ${mean.toFixed(4)}.
 `,
 );

@@ -16,6 +16,8 @@
 @group(0) @binding(4) var dkLutSampler: sampler;
 @group(0) @binding(5) var dkMultiScatteringLut: texture_2d<f32>;
 @group(0) @binding(6) var<storage, read> dkMetering: DkMetering;
+// The Moon's sky-view table, read with DK_MOONLIGHT; the Sun's is bound in its place without.
+@group(0) @binding(7) var dkMoonViewLut: texture_2d<f32>;
 
 // Offsets within a texel, in [-0.5, 0.5), from Roberts' R2 sequence: evenly spread for any count, the first at the
 // center.
@@ -69,28 +71,36 @@ fn dkInSpace() -> bool {
     return dkParams.observerAltitude > dkAtmosphere.Rt - dkAtmosphere.Rg;
 }
 
-// For an observer inside the atmosphere, from the sky-view table, at the altitude it was built for.
+// Where a view ray reads a sky-view table built for a light towards `light`, by the azimuth from the light's. Degenerate
+// when either vector points straight up, where azimuth is meaningless and any value gives the same lookup. The table's
+// upper half is sky, the lower half ground, split exactly at the horizon: kept to its own half, so the linear filter
+// does not blend the last row of sky with the first of ground.
+fn dkSkyViewUvToward(horizon: vec3f, view: vec3f, light: vec3f, hitsGround: bool, size: vec2f) -> vec2f {
+    var cosAzimuth = 1.0;
+    if (length(view.xy) > 1e-6 && length(light.xy) > 1e-6) {
+        cosAzimuth = clamp(dot(normalize(view.xy), normalize(light.xy)), -1.0, 1.0);
+    }
+    var uv = dkSkyViewUvAt(horizon, view.z, cosAzimuth, size);
+    let half = 0.5 / size.y;
+    uv.y = select(min(uv.y, 0.5 - half), max(uv.y, 0.5 + half), hitsGround);
+    return uv;
+}
+
+// For an observer inside the atmosphere, from the sky-view table, at the altitude it was built for, and the Moon's.
 fn dkSkyFromInside(a: DkAtmosphere, view: vec3f) -> DkSkySample {
     var result: DkSkySample;
     // The observer's horizon, written by the light meter whenever the table is rebuilt: of the altitude alone.
     let horizon = dkMetering.horizon.xyz;
     result.hitsGround = dkBelowHorizon(horizon, view.z);
 
-    // Azimuth measured from the sun, the frame the sky-view table is indexed in. Degenerate when either vector points
-    // straight up, where azimuth is meaningless and any value gives the same lookup.
-    let sunH = dkParams.sunDirection.xy;
-    var cosAzimuth = 1.0;
-    if (length(view.xy) > 1e-6 && length(sunH) > 1e-6) {
-        cosAzimuth = clamp(dot(normalize(view.xy), normalize(sunH)), -1.0, 1.0);
-    }
-
     let size = vec2f(textureDimensions(dkSkyViewLut));
-    var uv = dkSkyViewUvAt(horizon, view.z, cosAzimuth, size);
-    // The table's upper half is sky, the lower half ground, split exactly at the horizon. Kept to its own half, so the
-    // linear filter does not blend the last row of sky with the first of ground.
-    let half = 0.5 / size.y;
-    uv.y = select(min(uv.y, 0.5 - half), max(uv.y, 0.5 + half), result.hitsGround);
+    let uv = dkSkyViewUvToward(horizon, view, dkParams.sunDirection, result.hitsGround, size);
     result.luminance = dkToRgb(a, textureSampleLevel(dkSkyViewLut, dkLutSampler, uv, 0.0)) / dkParams.skyViewScale;
+    if (DK_MOONLIGHT && dkParams.moonlight > 0.0) {
+        let moonUv = dkSkyViewUvToward(horizon, view, dkParams.moonDirection, result.hitsGround, size);
+        let moon = textureSampleLevel(dkMoonViewLut, dkLutSampler, moonUv, 0.0);
+        result.luminance = result.luminance + dkToRgb(a, moon) / dkParams.moonViewScale;
+    }
 
     // Turned down within its vertical plane by the bending the table traced, stored per row as its sine, and read
     // between rows as the filter would.
@@ -113,7 +123,15 @@ fn dkSkyFromSpace(a: DkAtmosphere, view: vec3f, altitude: f32) -> DkSkySample {
         a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, altitude, view, dkParams.sunDirection,
         DK_SAMPLES_SKY_VIEW,
     );
-    return DkSkySample(dkToRgb(a, ray.luminance), ray.hitsGround, ray.direction, ray.transmittance);
+    var luminance = dkToRgb(a, ray.luminance);
+    if (DK_MOONLIGHT && dkParams.moonlight > 0.0) {
+        let moon = dkRaymarchFromSpace(
+            a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, altitude, view, dkParams.moonDirection,
+            DK_SAMPLES_SKY_VIEW,
+        );
+        luminance = luminance + dkToRgb(a, moon.luminance) * dkParams.moonlight;
+    }
+    return DkSkySample(luminance, ray.hitsGround, ray.direction, ray.transmittance);
 }
 
 fn dkSkyAt(view: vec3f) -> DkSkySample {
@@ -151,28 +169,38 @@ fn dkSkySunCoverage(sky: DkSkySample, footprint: f32) -> f32 {
 // is a five-thousandth of its peak, lost against the sky the tables already hold.
 const DK_AUREOLE_REACH: vec2f = vec2f(12.0, 20.0);
 
-// The angle between a view ray and where the sun shows, in degrees.
-fn dkFromApparentSun(view: vec3f) -> f32 {
-    return 2.0 * asin(min(length(view - dkParams.apparentSunDirection) * 0.5, 1.0)) * 57.29577951308232;
+// The angle between a view ray and where a light shows, in degrees.
+fn dkFromApparent(view: vec3f, apparent: vec3f) -> f32 {
+    return 2.0 * asin(min(length(view - apparent) * 0.5, 1.0)) * 57.29577951308232;
 }
 
 // The aureole along a view ray, in cd/m²: the narrow lobe's share of the aerosols' scattering, marched along the ray as
 // the sky is, dkRaymarchAerosol, times Henyey and Greenstein's lobe. The scattering angle is measured in the view's own
 // directions from where the sun shows: the sunlight reaching the aerosols near the observer is bent as the view rays
 // are, so the glow sits on the disc, and runs on unbroken across the horizon, where the bent direction a ray leaves the
-// atmosphere in gives way to the ground. Nothing from space, where the observer is above the aerosols.
+// atmosphere in gives way to the ground. Nothing from space, where the observer is above the aerosols. The Moon's too,
+// the same glow at its share of the Sun's light: what makes a halo-less Moon in haze glow.
 fn dkSkyAureole(view: vec3f) -> vec3f {
     if (DK_AUREOLE_SHARE <= 0.0 || dkInSpace()) {
         return vec3f(0.0);
     }
-    let angle = dkFromApparentSun(view);
+    var glow = dkAureoleOf(view, dkParams.sunDirection, dkParams.apparentSunDirection);
+    if (DK_MOONLIGHT && dkParams.moonlight > 0.0) {
+        glow = glow + dkAureoleOf(view, dkParams.moonDirection, dkParams.apparentMoonDirection) * dkParams.moonlight;
+    }
+    return glow;
+}
+
+// The aureole of a light of the Sun's illuminance towards `light`, showing at `apparent`.
+fn dkAureoleOf(view: vec3f, light: vec3f, apparent: vec3f) -> vec3f {
+    let angle = dkFromApparent(view, apparent);
     if (angle >= DK_AUREOLE_REACH.y) {
         return vec3f(0.0);
     }
     let a = dkAtmosphere;
     let h = max(dkParams.observerAltitude, 0.0);
-    let column = dkRaymarchAerosol(a, dkTransmittanceLut, dkLutSampler, h, view, dkParams.sunDirection);
-    let phase = dkPhaseHenyeyGreenstein(DK_AUREOLE_G, dot(view, dkParams.apparentSunDirection));
+    let column = dkRaymarchAerosol(a, dkTransmittanceLut, dkLutSampler, h, view, light);
+    let phase = dkPhaseHenyeyGreenstein(DK_AUREOLE_G, dot(view, apparent));
     let fade = 1.0 - smoothstep(DK_AUREOLE_REACH.x, DK_AUREOLE_REACH.y, angle);
     return dkToRgb(a, column * a.solarIlluminance) * (DK_AUREOLE_SHARE * phase * fade);
 }

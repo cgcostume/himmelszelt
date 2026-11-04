@@ -205,16 +205,20 @@ confirmed yet.
 | Mare Crisium on the right with north up, selenographic east | The face we see | web, lib | SVS map centered on 0°, Crisium right of center; `moonOrientation` test puts +90° east on the disc's right; render of 2026-11-24 compared with sternzeit's Moon view | ok | 2026-11-04 |
 | LROC WAC mosaic from over 100,000 images, color map remade December 2025 | The face we see, people | web | svs.gsfc.nasa.gov/4720 | ok | 2026-11-04 |
 | Maps 4096 and 2048 texels around | The face we see | lib | `scripts/maps.mjs` output | ok | 2026-11-04 |
+| Pairs of 80 KB, 270 KB and 3.6 MB, enough up to a disc of some 160 and 330 pixels | The face we see | lib | 41 + 38 KB, 105 + 165 KB, 1,362 + 2,247 KB; `mapWidthFor(163)` = 512, `mapWidthFor(326)` = 1,024 | ok | 2026-11-04 |
 | Near side mean reflectance 0.396 | Quick start | lib | `scripts/maps.mjs` | ok | 2026-11-04 |
 | A full Earth lights the Moon with some 13 lux, a ten thousandth of the Sun | Earthshine | lib | `earthshineIlluminance(0, 384400)` = 12.9 lx; 12.9 / 128,000 = 1.0e-4 | ok | 2026-11-04 |
 | About fifty times what a full Moon gives Earth | Earthshine | derived | full Moon 4,889 cd/m² times 0.71 air times 6.5e-5 sr = 0.23 lx; 12.9 / 0.23 = 56 | ok | 2026-11-04 |
 | Earth four times wider and three times brighter | Earthshine | src | radii 6,371 / 1,737 = 3.7; albedo 0.367 / 0.12 = 3.1 | ok | 2026-11-04 |
-| Night side half a candela per square meter, thirteen stops short | Earthshine | derived | 0.12 / pi times 12.9 = 0.49 cd/m²; 4,889 / 0.49 = 10,000 = 13.3 stops | ok | 2026-11-04 |
+| Night side half a candela per square meter, thirteen stops below | Earthshine | derived | 0.12 / pi times 12.9 = 0.49 cd/m²; 4,889 / 0.49 = 10,000 = 13.3 stops | ok | 2026-11-04 |
 | March 21, 2026, 19:30 local, Berlin: a crescent of a tenth 21° up in the west, end of twilight | Earthshine | lib | 18:30 UTC: lit 9.7 %, altitude 21.3°, azimuth 271°, Sun -11.1° | ok | 2026-11-04 |
 | Penumbra some 8,200 km wide, umbra 4,600 km in radius | Earth's shadow | lib | sternzeit's glossary; `eclipse.lunar` radii | ok | 2026-11-04 |
 | A degree of parallax moves the Moon by 6,700 km | Earth's shadow | derived | 384,400 km times 1° in radians = 6,709 km | ok | 2026-11-04 |
 | Umbra some ten thousand times fainter than full | Earth's shadow | lib | the model's 1e-5 at the axis to 3e-4 at the edge, about 1e-4 on average | ok | 2026-11-04 |
 | Danjon scale, dust from volcanoes | Earth's shadow | src | Espenak & Meeus 2009, the canon's introduction | ok | 2026-11-04 |
+| Earth's center at most a degree from the observer, seen from the Moon | Earthshine | derived | asin(6,371 / 384,400) = 0.95° | ok | 2026-11-04 |
+| Lower limb lifted some 6′ more on the horizon, squeezed to four fifths; from orbit to a quarter | Through the air | lib | Bennett: 34.5′ at 0°, 28.7′ at 0.5°; dunstkreis' `refractionAngle` from 1 m: 0.81; from 165 km at -13.58°: 0.236 | ok | 2026-11-04 |
+| Full Moon some 0.3 lux above the air, a four hundred thousandth of the Sun | Through the air | lib | `moonIlluminance(0)` = 0.31 lx; 128,000 / 0.31 = 410,000; magnitude -12.74 against -26.74 gives 0.32 | ok | 2026-11-04 |
 | Full Moon exposes around 14, looney 11 | Through the air | lib | `ev100ForLuminance(4889)` - 1 = 14.3, 13.8 through 71 % air; f/11 at 1/100 s is EV100 log2(121 · 100) = 13.6 | ok | 2026-11-04 |
 | Hapke 1963 and 1966, Jensen et al. 2001, van de Hulst 1980 | People | src | the references | ok | 2026-11-04 |
 

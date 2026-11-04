@@ -97,13 +97,20 @@ export interface SkyPassOptions {
      * 32x32 froxels in 32 slices out to 32 km, or its shape. Off by default.
      */
     aerialPerspective?: boolean | AerialPerspectiveOptions;
+    /**
+     * The Moon as a second light of the sky: a sky-view table of its own, built from `moonDirection` by the same march,
+     * read beside the Sun's, and an aureole around it. The sky by moonlight, blue like the day at a few millionths of
+     * its light, and the glow around the Moon in haze. The meter, the ground's light from the sky and the aerial
+     * perspective volume stay the Sun's. Off by default.
+     */
+    moonlight?: boolean;
 }
 
 /**
- * Byte size of DkSkyParams in frame.wgsl: a vec3 and a scalar, a mat4x4, four scalars, a vec2 and two scalars, and a
- * vec3 padded to 16.
+ * Byte size of DkSkyParams in frame.wgsl: a vec3 and a scalar, a mat4x4, four scalars, a vec2 and two scalars, a vec3
+ * and a scalar twice, and a vec3 padded to 16.
  */
-const SKY_PARAMS_SIZE = 128;
+const SKY_PARAMS_SIZE = 160;
 /** The light meter's directions per cap, `DK_METER_SAMPLES` in frame.wgsl, one per invocation of 128 per workgroup. */
 const METER_SAMPLES = 4096;
 const METER_WORKGROUPS = METER_SAMPLES / 128;
@@ -123,6 +130,8 @@ const DEFAULTS: SkyParams = {
     pixelRatio: 1,
     sunAngularDiameter: 0.533,
     projectionDistance: 0,
+    moonDirection: [0, 0, -1],
+    moonIlluminance: 0,
 };
 
 const EIGHT_BIT = ["rgba8unorm", "bgra8unorm"];
@@ -187,6 +196,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         supersample = true,
         groundLight = true,
         headroom = 1,
+        moonlight = false,
     } = options;
     if (!(veil >= 0)) throw new Error(`dunstkreis: a veil of ${veil}; its strength is 0 or more`);
     if (aureole && !(aureole.share >= 0 && aureole.share <= 1 && aureole.g > 0 && aureole.g < 1)) {
@@ -236,6 +246,9 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     };
 
     const skyView = createLut(device, "dunstkreis:skyView", config.skyView.width, config.skyView.height);
+    const moonView = moonlight
+        ? createLut(device, "dunstkreis:moonView", config.skyView.width, config.skyView.height)
+        : null;
     const aerial = options.aerialPerspective && {
         width: 32,
         height: 32,
@@ -289,11 +302,11 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     const skyViewModule = device.createShaderModule({
         code: [wgsl.workgroupSum(64, device.features.has("subgroups")), ...prelude, wgsl.skyview].join("\n"),
     });
-    const skyViewStep = (entryPoint: string, skyViewRows: 0 | 1 | 2) =>
+    const skyViewStep = (entryPoint: string, skyViewRows: 0 | 1 | 2, moonView = false) =>
         device.createComputePipelineAsync({
-            label: `dunstkreis:${entryPoint}`,
+            label: `dunstkreis:${moonView ? "moonView" : entryPoint}`,
             layout: "auto",
-            compute: { module: skyViewModule, entryPoint, constants: constants({ skyViewRows }) },
+            compute: { module: skyViewModule, entryPoint, constants: constants({ skyViewRows, moonView }) },
         });
     const meterModule = device.createShaderModule({
         code: [
@@ -322,6 +335,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         meterPipeline,
         skyPipeline,
         aerialPipeline,
+        moonViewPipeline,
     ] = await Promise.all([
         skyViewStep("dkPrecomputeSkyView", groundLight ? 1 : 0),
         groundLight ? skyViewStep("dkGroundIrradiance", 0) : null,
@@ -344,6 +358,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                     veil,
                     discAlpha,
                     supersample,
+                    moonlight,
                 }),
             },
         }),
@@ -372,6 +387,8 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                     },
                 },
             }),
+        // The Moon's table in one dispatch: the ground below lit by the Moon alone, not by the moonlit sky.
+        moonView ? skyViewStep("dkPrecomputeSkyView", 0, true) : null,
     ]);
 
     const skyViewEntries: GPUBindGroupEntry[] = [
@@ -386,6 +403,15 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     const bindGroup = (pipeline: GPUComputePipeline, entries: GPUBindGroupEntry[]) =>
         device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries });
     const skyViewBindGroup = bindGroup(skyViewPipeline, skyViewEntries);
+    const moonViewBindGroup =
+        moonViewPipeline &&
+        moonView &&
+        bindGroup(
+            moonViewPipeline,
+            skyViewEntries.map((entry) =>
+                entry.binding === 5 ? { binding: 5, resource: moonView.createView() } : entry,
+            ),
+        );
     const groundBindGroup = groundPipeline && bindGroup(groundPipeline, skyViewEntries);
     const groundIrradianceBindGroup =
         groundIrradiancePipeline &&
@@ -423,6 +449,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             { binding: 4, resource: luts.sampler },
             { binding: 5, resource: luts.multiScattering.createView() },
             { binding: 6, resource: { buffer: metering } },
+            { binding: 7, resource: (moonView ?? skyView).createView() },
         ]);
     const skyBindGroup = skyBindGroupFor(skyPipeline);
     const aerialBindGroup =
@@ -447,11 +474,13 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     let params: SkyParams = { ...DEFAULTS };
     const outputs = new WeakMap<GPUTexture, GPUBindGroup>();
     let skyViewKey = "";
+    let moonViewKey = "";
     let aerialKey = "";
     let compensation = 0;
     let scale = 1;
     // Where the sun shows, for the aureole and the veil, and the sun and height it was traced for.
     let apparent: { key: string; direction: readonly number[] } = { key: "", direction: [0, 0, 1] };
+    let apparentMoon: { key: string; direction: readonly number[] } = { key: "", direction: [0, 0, -1] };
 
     async function readMetering(offset: number, floats: number): Promise<Float32Array> {
         const staging = device.createBuffer({
@@ -503,6 +532,17 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             if (apparent.key !== sunKey)
                 apparent = { key: sunKey, direction: apparentDirection([sx, sy, sz], model, height) };
             sky.set(apparent.direction, 28);
+            // The Moon's light as a share of the Sun's, and its table's scale, from its altitude as the Sun's is.
+            const [mx, my, mz] = params.moonDirection;
+            const moonShare = moonView ? Math.max(params.moonIlluminance, 0) / model.solarIlluminance : 0;
+            const moonAltitude = (Math.atan2(mz, Math.hypot(mx, my)) * 180) / Math.PI + dip;
+            sky[31] = moonShare;
+            sky.set([mx, my, mz], 32);
+            sky[35] = moonShare > 0 ? skyViewScale(model.solarIlluminance * moonShare, moonAltitude) : 1;
+            const moonKey = `${mx},${my},${mz},${height}`;
+            if (moonShare > 0 && apparentMoon.key !== moonKey)
+                apparentMoon = { key: moonKey, direction: apparentDirection([mx, my, mz], model, height) };
+            sky.set(apparentMoon.direction, 36);
             device.queue.writeBuffer(skyParams, 0, sky);
 
             // Rebuilding the sky-view table is the expensive part, and it is why the sky pass itself is one fetch
@@ -512,15 +552,22 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             const cameraKey = `${key},${params.inverseViewProjection.join(",")}`;
             const rebuildSkyView = key !== skyViewKey;
             const rebuildAerial = Boolean(aerialPipeline) && cameraKey !== aerialKey;
-            if (!rebuildSkyView && !rebuildAerial) return;
+            const inSpace = height / 1000 > model.planet.thicknessKm;
+            const moonTableKey = moonShare > 0 && !inSpace ? `${moonKey},${moonShare}` : "";
+            const rebuildMoon = moonTableKey !== "" && moonTableKey !== moonViewKey;
+            if (!rebuildSkyView && !rebuildAerial && !rebuildMoon) return;
             skyViewKey = key;
             aerialKey = cameraKey;
+            moonViewKey = moonTableKey;
             const encoder = frameEncoder ?? device.createCommandEncoder({ label: "dunstkreis:skyView" });
             const pass = encoder.beginComputePass({ label: "dunstkreis:skyView" });
             const { height: rows } = config.skyView;
+            if (rebuildMoon && moonViewPipeline && moonViewBindGroup) {
+                sweep(pass, moonViewPipeline, moonViewBindGroup, rows);
+            }
             if (!rebuildSkyView) {
                 // The camera alone moved: the table stands.
-            } else if (height / 1000 > model.planet.thicknessKm) {
+            } else if (inSpace) {
                 // In space: the meter alone.
             } else if (groundPipeline && groundBindGroup && groundIrradiancePipeline && groundIrradianceBindGroup) {
                 sweep(pass, skyViewPipeline, skyViewBindGroup, Math.floor(rows / 2));
@@ -603,6 +650,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                                 cubify,
                                 sunDisc,
                                 veil: 0,
+                                moonlight,
                             },
                             { cube: samples },
                         ),
@@ -695,6 +743,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
 
         destroy() {
             skyView.destroy();
+            moonView?.destroy();
             skyParams.destroy();
             aerialVolume?.luminance.destroy();
             aerialVolume?.transmittance.destroy();

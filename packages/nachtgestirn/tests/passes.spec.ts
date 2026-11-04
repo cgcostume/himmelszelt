@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { PARAMS_SIZE, paramsData } from "../dist/index.js";
-import { moonOrientation } from "../src/orientation.js";
+import { moonOrientation, type RefractionTable, refractionTable } from "../src/orientation.js";
 import { moonOutput } from "../src/wgsl/output.js";
 import { compileWgsl, gpuDevice } from "./gpu.js";
 
@@ -56,6 +56,8 @@ test("the params pack to the uniform's size with the flags where the shader read
             law: "lambert",
             eclipse: { axis: [0, 0, -1], moonCenterKm: [0, 0, 384_400], umbraKm: 4600, penumbraKm: 8200 },
             sunAngularDiameter: 0.533,
+            refraction: refractionTable([0, 1, 0], 0.5, () => 0.5),
+            distanceKm: 384_400,
         },
         null,
     );
@@ -67,6 +69,10 @@ test("the params pack to the uniform's size with the flags where the shader read
     expect(u[57]).toBe(1);
     expect(f[47]).toBe(4600);
     expect(f[52]).toBeCloseTo(1 / (1.2 * 2 ** 15), 9);
+    // The refraction table, and Earth's center from the Moon due north on the horizon: south, a degree below.
+    expect(f[64]).toBeCloseTo(0.5 * (Math.PI / 180), 6);
+    expect(f[61]).toBeCloseTo(-1, 3);
+    expect(f[62]).toBeCloseTo(-6371 / 384_400, 3);
 });
 
 /**
@@ -94,8 +100,13 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
     const angularDiameter = 0.5;
     const half = Math.tan(((angularDiameter * 1.1) / 2) * (Math.PI / 180));
     const inverseViewProjection = new Float32Array([half, 0, 0, 0, 0, 0, half, 0, 0, 0, 0, 1, 0, 1, 0, 0]);
-    const render = async (sunDirection: [number, number, number], earthshine: number) => {
+    const render = async (
+        sunDirection: [number, number, number],
+        earthshine: number,
+        refraction: RefractionTable | null = null,
+    ) => {
         pass.update({
+            refraction,
             direction: [0, 1, 0],
             angularDiameter,
             sunDirection,
@@ -133,6 +144,21 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
     expect(night).toBeGreaterThan(0);
     expect(night).toBeLessThan(expected * 2e-4);
     expect(night).toBeCloseTo((0.12 * 13) / Math.PI, 1);
+
+    // Squeezed by a refraction that bends rays a quarter of their altitude up: 0.8 of its height, as wide as before.
+    const squeezed = await render(
+        [0, -1, 0],
+        0,
+        refractionTable([0, 1, 0], angularDiameter, (a) => -0.25 * a),
+    );
+    const extent = (pixels: Float32Array, along: (i: number) => [number, number]) =>
+        Array.from({ length: size }, (_, i) => alpha(pixels, ...along(i))).reduce((sum, a) => sum + a, 0);
+    const wide = extent(squeezed, (i) => [i, 32]);
+    expect(wide).toBeCloseTo(
+        extent(full, (i) => [i, 32]),
+        0,
+    );
+    expect(extent(squeezed, (i) => [32, i]) / wide).toBeCloseTo(0.8, 1);
 
     for (const resource of [target, staging]) resource.destroy();
     pass.destroy();
