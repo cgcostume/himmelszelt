@@ -8,6 +8,8 @@ test("the Moon figure renders without WebGPU errors and reports the Moon", async
     await page.locator("#moon").scrollIntoViewIfNeeded();
     await page.waitForTimeout(4000);
     await expect(page.locator('#moon [data-field="moon"]')).toContainText("% lit");
+    for (const name of ["shadows", "relief"]) await page.locator(`#moon [data-field="${name}"]`).click();
+    await page.waitForTimeout(1000);
     expect(problems).toEqual([]);
 });
 
@@ -55,6 +57,8 @@ test("the textured Moon view draws behind sternzeit's overlay, from the place an
     // The overlay leaves the disc to the canvas.
     await expect(figure.locator(".moon-panel > svg .moon-day")).toHaveCount(0);
     await figure.locator('[data-field="lockMoon"]').click();
+    await figure.locator('[data-field="annotations"]').click();
+    await expect(figure.locator(".moon-panel > svg")).toBeHidden();
     await page.waitForTimeout(1500);
     expect(problems).toEqual([]);
 });

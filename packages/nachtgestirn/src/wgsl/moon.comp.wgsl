@@ -4,7 +4,7 @@
 
 @group(0) @binding(0) var<uniform> nbParams: NbParams;
 @group(0) @binding(1) var nbColorMap: texture_2d<f32>;
-@group(0) @binding(2) var nbNormalMap: texture_2d<f32>;
+@group(0) @binding(2) var nbReliefMap: texture_2d<f32>;
 @group(0) @binding(3) var nbMapSampler: sampler;
 @group(0) @binding(4) var nbBackground: texture_2d<f32>;
 
@@ -100,6 +100,48 @@ fn nbSampleMap(map: texture_2d<f32>, uv: vec2f, lod: f32) -> vec3f {
     return g0.y * (g0.x * a + g1.x * b) + g1.y * (g0.x * c + g1.x * d);
 }
 
+// Up to which elevation over its horizontal the Sun can still be hidden from a point by the terrain, in radians: no
+// crater rim or mountain stands steeper above a point than some 25°. Above it, no march.
+const NB_SHADOW_ELEVATION: f32 = 0.45;
+// Steps towards the Sun, each this much farther than the last, from three quarters of a texel on: 24 of them reach
+// some 450 km on the 4096 texel map, as far as a mountain's shadow runs with the Sun a degree up.
+const NB_SHADOW_STEPS: u32 = 24u;
+const NB_SHADOW_GROWTH: f32 = 1.26;
+
+// How much of the Sun's disc stands above the terrain's horizon towards it, seen from a point of the surface: the
+// relief marched along the great circle towards the Sun, the highest elevation the terrain reaches above the point's
+// horizontal, and the share of the Sun's disc above it. Near what casts it that angle changes fast and the shadow's
+// edge is sharp; far from it slowly, and the penumbra widens with the distance, as the Sun's half degree makes it.
+// `up` the point's direction and `sun` the Sun's, in the Moon's frame; `height` its height in km; `lod` its level.
+fn nbSunAboveTerrain(up: vec3f, sun: vec3f, height: f32, lod: f32) -> f32 {
+    let p = nbParams;
+    let elevation = asin(clamp(dot(sun, up), -1.0, 1.0));
+    let along = sun - dot(sun, up) * up;
+    if (elevation > NB_SHADOW_ELEVATION || length(along) < 1e-6) {
+        return 1.0;
+    }
+    let toward = normalize(along);
+    let texelKm = 2.0 * NB_PI * p.moonRadiusKm / f32(textureDimensions(nbReliefMap).x);
+    let origin = (p.moonRadiusKm + height) * up;
+    var horizon = -0.5 * NB_PI;
+    for (var k = 0u; k < NB_SHADOW_STEPS; k = k + 1u) {
+        let distanceKm = 0.75 * texelKm * pow(NB_SHADOW_GROWTH, f32(k));
+        let angle = distanceKm / p.moonRadiusKm;
+        let q = up * cos(angle) + toward * sin(angle);
+        // Read as coarse as the steps are apart, so no peak falls between two of them.
+        let level = max(lod, log2(distanceKm * 0.3 / texelKm));
+        let h = textureSampleLevel(nbReliefMap, nbMapSampler, nbMapUv(nbSelenographic(q)), level).x;
+        let to = (p.moonRadiusKm + h) * q - origin;
+        horizon = max(horizon, atan2(dot(to, up), dot(to, toward)));
+        if (horizon > elevation + p.sunAngularRadius) {
+            return 0.0;
+        }
+    }
+    // The share of a disc above a line through it, the line x radii below its center.
+    let x = clamp((elevation - horizon) / p.sunAngularRadius, -1.0, 1.0);
+    return 0.5 + (x * sqrt(1.0 - x * x) + asin(x)) / NB_PI;
+}
+
 // One ray's share of a pixel: `view` as seen, `sampleAngle` the width it stands for.
 fn nbMoon(view: vec3f, sampleAngle: f32) -> NbMoon {
     let p = nbParams;
@@ -130,13 +172,17 @@ fn nbMoon(view: vec3f, sampleAngle: f32) -> NbMoon {
     var albedo = vec3f(p.albedo);
     if ((p.flags & NB_FLAG_COLOR) != 0u) {
         let lod = nbLod(textureDimensions(nbColorMap), footprint, lonLat.y);
-        albedo = nbSrgbToLinear(nbSampleMap(nbColorMap, uv, lod)) * p.albedoScale;
+        albedo = nbSrgbToLinear(nbSampleMap(nbColorMap, uv, lod)) * p.albedoScale * p.albedoTint;
     }
+    // The relief: the surface's normal from the slopes, and its height for the shadows.
     var shading = n;
-    if ((p.flags & NB_FLAG_NORMALS) != 0u) {
-        let lod = nbLod(textureDimensions(nbNormalMap), footprint, lonLat.y);
-        let tangent = nbSampleMap(nbNormalMap, uv, lod) * vec3f(2.0, 2.0, 1.0) - vec3f(1.0, 1.0, 0.0);
-        shading = transpose(p.orientation) * nbBodyNormal(lonLat, tangent);
+    var height = 0.0;
+    var reliefLod = 0.0;
+    if ((p.flags & NB_FLAG_RELIEF) != 0u) {
+        reliefLod = nbLod(textureDimensions(nbReliefMap), footprint, lonLat.y);
+        let relief = nbSampleMap(nbReliefMap, uv, reliefLod);
+        height = relief.x;
+        shading = transpose(p.orientation) * nbBodyNormal(lonLat, normalize(vec3f(-relief.y, -relief.z, 1.0)));
     }
 
     // Sunlight by the reflectance law: the phase angle between the Sun and the viewer at that point.
@@ -145,6 +191,9 @@ fn nbMoon(view: vec3f, sampleAngle: f32) -> NbMoon {
     let mu0 = dot(shading, s);
     let muView = dot(shading, -v);
     var sunlight = vec3f(p.sunIlluminance * nbReflectance(p.law, mu0, muView, g));
+    if ((p.flags & NB_FLAG_SHADOWS) != 0u && mu0 > 0.0) {
+        sunlight = sunlight * nbSunAboveTerrain(body, p.orientation * s, height, reliefLod);
+    }
     if ((p.flags & NB_FLAG_ECLIPSE) != 0u && mu0 > 0.0) {
         sunlight = sunlight * nbShadow(p, p.moonCenterKm + n * p.moonRadiusKm);
     }

@@ -31,6 +31,9 @@ other package at runtime: the astronomy comes in as directions and angles, from
   dunstkreis' `refractionAngle`, turns every ray down before it meets the Moon, as dunstkreis does for the sun disc:
   the disc shows lifted and squeezed near the horizon, to some four fifths of its height from the ground and to a
   quarter from orbit, and sinks smoothly behind the horizon. `liftedDirection` says where its center shows.
+- **The relief**: the surface's slope from LOLA's heights for its shading, and its shadows, marched through the
+  heights towards the Sun: the share of the Sun's half degree above the terrain's horizon, so the penumbra widens with
+  the distance from what casts it, contact hardening by the Sun's own size. `shadows` turns them off.
 - **Supersampled**: 8 rays per pixel on and around the disc by default (`samples`), and the maps read by a cubic
   B-spline when magnified, so the terminator and the relief along it stay smooth.
 - **The exposure**: `moonEV100` meters the lit part a stop over mid gray, the photographer's "looney 11", EV100 13.6 at
@@ -40,15 +43,17 @@ other package at runtime: the astronomy comes in as directions and angles, from
 ## The maps
 
 `pnpm maps <outDir>` makes them from NASA's [CGI Moon Kit](https://svs.gsfc.nasa.gov/4720): the color map of
-December 2025, from the LROC wide angle camera's Hapke-normalized mosaic, as a 4096 x 2048 WebP, and a 2048 x 1024
-normal map from the LOLA elevation map, and the same pair at a quarter and an eighth of the size. The package ships
-all three in `maps/`, as `MOON_MAPS.large` (3.6 MB), `medium` (270 KB) and `small` (80 KB), resolved by
-`new URL(..., import.meta.url)`, which bundlers copy along: a disc shows a map `mapWidthFor(pixels)`, π times its width,
-at one texel per pixel, so `small` does up to a disc of some 160 pixels, `medium` to some 330. All equirectangular,
-centered on 0° longitude, east to the right, north up; the pass reads them that way. The color map is balanced to look
-right, not to measure: `createMoonMaps` takes the near side's mean reflectance the script prints and scales the map
-to normal albedo, so the drawn disc averages the geometric albedo; `MOON_MAPS` carries it along. `loadMoonMaps` loads
-`MOON_MAPS.large` by default, or any pair laid out the same way.
+December 2025, from the LROC wide angle camera's Hapke-normalized mosaic, as WebP, and a height map from the LOLA
+elevation map at 64 texels per degree, LOLA's 16-bit half meters in a lossless WebP's red and green, each 4096, 1024
+and 512 texels around. The package ships them in `maps/`, as `MOON_MAPS.large` (11.5 MB), `medium` (840 KB) and
+`small` (230 KB), resolved by `new URL(..., import.meta.url)`, which bundlers copy along: a disc shows a map
+`mapWidthFor(pixels)`, π times its width, at one texel per pixel, so `small` does up to a disc of some 160 pixels,
+`medium` to some 330. All equirectangular, centered on 0° longitude, east to the right, north up; the pass reads them
+that way, the heights turned on the GPU into heights and slopes with mip levels. The color map is balanced to look
+right, not to measure, and nearly neutral: `createMoonMaps` takes the near side's mean color the script prints, scales
+the map to normal albedo, so the drawn disc averages the geometric albedo, and tints it to `MOON_COLOR`, the Moon's
+B-V of 0.92, a warm gray; `MOON_MAPS` carries the mean along. `loadMoonMaps` loads `MOON_MAPS.large` by default, or any
+set laid out the same way.
 
 ## Use
 

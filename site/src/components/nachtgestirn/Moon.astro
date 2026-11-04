@@ -70,6 +70,7 @@ const TONE = {
             <OptionGroup name="surface">
                 <button type="button" class="view-toggle" data-field="albedo" aria-pressed="true" title="NASA's color map of the Moon, from the Lunar Reconnaissance Orbiter's wide angle camera; off, a uniform disc of the Moon's geometric albedo">map</button>
                 <button type="button" class="view-toggle" data-field="relief" aria-pressed="true" title="The relief from the Lunar Orbiter Laser Altimeter's elevation map: craters and mountains catch the light along the terminator">relief</button>
+                <button type="button" class="view-toggle" data-field="shadows" aria-pressed="true" title="The shadows the relief casts, marched through the heights towards the Sun: soft by the Sun's half degree, sharper towards the rim or peak that casts them">shadows</button>
                 <button type="button" class="view-toggle" data-field="earthshine" aria-pressed="true" title="Earthshine, sunlight reflected by Earth onto the Moon's night side: a full Earth lights it with some 13 lux">earthshine</button>
                 <button type="button" class="view-toggle" data-field="eclipse" aria-pressed="true" title="Earth's shadow on the Moon during a lunar eclipse: the penumbra's dimming, the umbra's copper, and the turquoise rim ozone leaves">eclipse</button>
                 <Choice figure={id} {...MAPS} />

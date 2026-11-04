@@ -8,9 +8,10 @@
 import mips from "./mips.comp.wgsl";
 import moon from "./moon.comp.wgsl";
 import params from "./params.wgsl";
+import relief from "./relief.comp.wgsl";
 import surface from "./surface.wgsl";
 
 export { camera } from "@himmelszelt/dunstkreis/wgsl";
 export { tonemap } from "@himmelszelt/helldunkel/wgsl";
 export { moonOutput } from "./output.js";
-export { mips, moon, params, surface };
+export { mips, moon, params, relief, surface };

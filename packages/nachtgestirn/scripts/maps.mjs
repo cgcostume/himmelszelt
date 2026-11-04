@@ -1,23 +1,23 @@
 #!/usr/bin/env node
 // Makes the Moon's maps for a renderer from NASA's CGI Moon Kit (svs.gsfc.nasa.gov/4720): the color map of December
-// 2025, from the LROC WAC Hapke-normalized mosaic, at 4096 x 2048, and a normal map at 2048 x 1024 from the LOLA
-// elevation map at 16 pixels per degree. Both equirectangular, centered on 0° longitude, east to the right, north up.
-// Two smaller pairs beside them, a quarter and an eighth of the size, for a Moon small in the view: see `mapWidthFor`.
-// Rerunnable: `node scripts/maps.mjs <outDir> [--cache <dir>]`. Needs ImageMagick 7 (`magick`) with TIFF and WebP.
-// Downloads some 95 MB once into the cache. Prints the near side's mean reflectance, which `createMoonMaps` takes as
-// `meanReflectance`, so that the drawn disc averages the Moon's geometric albedo.
+// 2025, from the LROC WAC Hapke-normalized mosaic, and a height map from the LOLA elevation map at 64 pixels per
+// degree, each 4096, 1024 and 512 texels around (`mapWidthFor` says which a disc needs). Equirectangular, centered on
+// 0° longitude, east to the right, north up. Rerunnable: `node scripts/maps.mjs <outDir> [--cache <dir>]`. Needs
+// ImageMagick 7 (`magick`) with TIFF and WebP, and a few GB of memory for the elevation map. Downloads some 565 MB once
+// into the cache. Prints the near side's mean color, which `createMoonMaps` takes as `meanColor`, so that the drawn
+// disc averages the Moon's geometric albedo and color.
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const SVS = "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720";
 const COLOR = "lroc_color_16bit_srgb_4k.tif";
-const DEM = "ldem_16_uint.tif";
-const MOON_RADIUS_M = 1_737_400;
-// The elevation map's values: half meters, offset by 10 km, over a sphere of 1727.4 km, so 20,000 is the mean radius.
-const DEM_OFFSET = 20_000;
-const DEM_SCALE_M = 0.5;
-const NORMALS = { width: 2048, height: 1024 };
+const DEM = "ldem_64_uint.tif";
+const SIZES = [
+    ["4k", 4096],
+    ["1k", 1024],
+    ["512", 512],
+];
 const MEAN = { width: 1024, height: 512 };
 
 const args = process.argv.slice(2);
@@ -40,7 +40,7 @@ function download(name) {
 }
 
 function magick(args, input) {
-    const result = spawnSync("magick", args, { input, maxBuffer: 1 << 30 });
+    const result = spawnSync("magick", args, { input, maxBuffer: 2 ** 31 });
     if (result.status !== 0) throw new Error(`magick ${args.join(" ")}: ${result.stderr}`);
     return result.stdout;
 }
@@ -48,15 +48,21 @@ function magick(args, input) {
 const color = download(COLOR);
 const dem = download(DEM);
 
-// The color map as 8-bit sRGB WebP, lossy: the albedo map is smooth enough for it.
-magick([color, "-depth", "8", "-quality", "88", "-define", "webp:method=6", join(out, "moon-color-4k.webp")]);
-console.log("wrote moon-color-4k.webp");
+// The color map as 8-bit sRGB WebP, lossy: the albedo map is smooth enough for it. The smaller ones averaged down in
+// linear light.
+for (const [name, width] of SIZES) {
+    const resize = width === 4096 ? [] : ["-colorspace", "RGB", "-filter", "Box", "-resize", `${width}x${width / 2}!`];
+    const back = width === 4096 ? [] : ["-colorspace", "sRGB"];
+    const file = `moon-color-${name}.webp`;
+    magick([color, ...resize, ...back, "-depth", "8", "-quality", "88", "-define", "webp:method=6", join(out, file)]);
+    console.log(`wrote ${file}`);
+}
 
-// The near side's mean reflectance at full moon, linear: each texel weighted by the area it shows from the sub-Earth
-// point, cos(lon) cos(lat) for the slant and cos(lat) for the equirectangular stretch.
+// The near side's mean color at full moon, linear: each texel weighted by the area it shows from the sub-Earth point,
+// cos(lon) cos(lat) for the slant and cos(lat) for the equirectangular stretch.
 const srgb = magick([color, "-resize", `${MEAN.width}x${MEAN.height}!`, "-depth", "8", "rgb:-"]);
 const linear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-let sum = 0;
+const sum = [0, 0, 0];
 let weights = 0;
 for (let y = 0; y < MEAN.height; y++) {
     const lat = (0.5 - (y + 0.5) / MEAN.height) * Math.PI;
@@ -65,99 +71,65 @@ for (let y = 0; y < MEAN.height; y++) {
         if (Math.abs(lon) >= Math.PI / 2) continue;
         const w = Math.cos(lon) * Math.cos(lat) ** 2;
         const i = (y * MEAN.width + x) * 3;
-        // Luminance, Rec. 709.
-        const l =
-            0.2126 * linear(srgb[i] / 255) + 0.7152 * linear(srgb[i + 1] / 255) + 0.0722 * linear(srgb[i + 2] / 255);
-        sum += l * w;
+        for (let c = 0; c < 3; c++) sum[c] += linear(srgb[i + c] / 255) * w;
         weights += w;
     }
 }
-const mean = sum / weights;
-console.log(`near side mean reflectance ${mean.toFixed(4)} (linear luminance)`);
+const meanColor = sum.map((s) => s / weights);
+// Luminance, Rec. 709.
+const mean = 0.2126 * meanColor[0] + 0.7152 * meanColor[1] + 0.0722 * meanColor[2];
+const meanText = `${meanColor.map((c) => c.toFixed(4)).join(", ")}, reflectance ${mean.toFixed(4)}`;
+console.log(`near side mean color ${meanText}`);
 
-// Normals from the elevation map: slopes in meters per meter, east and north, over a sphere of the Moon's mean radius.
-const { width, height } = NORMALS;
+// The heights as they are, LOLA's 16-bit half meters offset by 20,000 over the mean radius, averaged down from 64
+// texels per degree, and stored losslessly in two 8-bit channels, red the high byte and green the low one: WebP holds
+// no 16-bit gray.
+const full = { width: 4096, height: 2048 };
 const raw = magick([
     dem,
     "-filter",
-    "Triangle",
+    "Box",
     "-resize",
-    `${width}x${height}!`,
+    `${full.width}x${full.height}!`,
     "-endian",
     "LSB",
     "-depth",
     "16",
     "gray:-",
 ]);
-const heights = new Uint16Array(raw.buffer, raw.byteOffset, width * height);
-const h = (x, y) =>
-    (heights[Math.min(Math.max(y, 0), height - 1) * width + ((x + width) % width)] - DEM_OFFSET) * DEM_SCALE_M;
-const normals = new Uint8Array(width * height * 3);
-const metersY = (Math.PI * MOON_RADIUS_M) / height;
-for (let y = 0; y < height; y++) {
-    const lat = (0.5 - (y + 0.5) / height) * Math.PI;
-    const metersX = (2 * Math.PI * MOON_RADIUS_M * Math.max(Math.cos(lat), 0.05)) / width;
-    for (let x = 0; x < width; x++) {
-        const east = (h(x + 1, y) - h(x - 1, y)) / (2 * metersX);
-        // Image rows run south, so the slope northward is the negative of the one down the image.
-        const north = (h(x, y - 1) - h(x, y + 1)) / (2 * metersY);
-        const length = Math.hypot(east, north, 1);
-        const i = (y * width + x) * 3;
-        normals[i] = Math.round(((-east / length) * 0.5 + 0.5) * 255);
-        normals[i + 1] = Math.round(((-north / length) * 0.5 + 0.5) * 255);
-        normals[i + 2] = Math.round((1 / length) * 255);
+const heights = new Uint16Array(raw.buffer, raw.byteOffset, full.width * full.height);
+for (const [name, width] of SIZES) {
+    const height = width / 2;
+    const step = full.width / width;
+    const rgb = new Uint8Array(width * height * 3);
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            let total = 0;
+            for (let dy = 0; dy < step; dy++)
+                for (let dx = 0; dx < step; dx++) total += heights[(y * step + dy) * full.width + x * step + dx];
+            const v = Math.round(total / (step * step));
+            const i = (y * width + x) * 3;
+            rgb[i] = v >> 8;
+            rgb[i + 1] = v & 255;
+        }
     }
+    const file = `moon-height-${name}.webp`;
+    magick(
+        ["-size", `${width}x${height}`, "-depth", "8", "rgb:-", "-define", "webp:lossless=true", join(out, file)],
+        Buffer.from(rgb.buffer),
+    );
+    console.log(`wrote ${file}`);
 }
-const normalsFile = join(out, "moon-normals-2k.webp");
-magick(
-    ["-size", `${width}x${height}`, "-depth", "8", "rgb:-", "-define", "webp:lossless=true", normalsFile],
-    Buffer.from(normals.buffer),
-);
-console.log("wrote moon-normals-2k.webp");
 
-// The smaller pairs, averaged down from the full one: the color in linear light, the normals as they are, which the
-// shader normalizes, like a mip level.
-for (const [color, normals, width] of [
-    ["moon-color-1k.webp", "moon-normals-512.webp", 1024],
-    ["moon-color-512.webp", "moon-normals-256.webp", 512],
-]) {
-    const size = (w) => `${w}x${w / 2}!`;
-    magick([
-        join(out, "moon-color-4k.webp"),
-        "-colorspace",
-        "RGB",
-        "-filter",
-        "Box",
-        "-resize",
-        size(width),
-        "-colorspace",
-        "sRGB",
-        "-quality",
-        "88",
-        "-define",
-        "webp:method=6",
-        join(out, color),
-    ]);
-    magick([
-        normalsFile,
-        "-filter",
-        "Box",
-        "-resize",
-        size(width / 2),
-        "-define",
-        "webp:lossless=true",
-        join(out, normals),
-    ]);
-    console.log(`wrote ${color} and ${normals}`);
-}
 writeFileSync(
     join(out, "README.md"),
     `# The Moon's maps
 
 Made by \`pnpm --filter @himmelszelt/nachtgestirn maps\` from NASA's CGI Moon Kit (https://svs.gsfc.nasa.gov/4720),
 credit NASA's Scientific Visualization Studio: the color map of December 2025, from the LROC WAC Hapke-normalized
-mosaic, and a normal map from the LOLA elevation map, each also at a quarter and an eighth of the size for a Moon
-small in the view. Equirectangular, centered on 0° longitude, east to the right, north up. Near side mean
-reflectance ${mean.toFixed(4)}.
+mosaic, and a height map from the LOLA elevation map at 64 pixels per degree, LOLA's 16-bit half meters offset by
+20,000 over the mean radius of 1737.4 km, red the high byte and green the low one. Each 4096, 1024 and 512 texels
+around, equirectangular, centered on 0° longitude, east to the right, north up. Near side mean color, linear,
+${meanText}.
 `,
 );

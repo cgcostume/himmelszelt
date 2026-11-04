@@ -1,5 +1,5 @@
 // Halves one level of a map into the next: each texel the mean of the four below it. The color map holds sRGB-encoded
-// values, averaged as the light they stand for and encoded again; a normal map is averaged as it is. Requires
+// values, averaged as the light they stand for and encoded again; the relief, heights and slopes, is averaged as it is. Requires
 // `surface.wgsl` for the sRGB curve and the output binding from `moonOutput`.
 
 @group(0) @binding(0) var nbMipSource: texture_2d<f32>;

@@ -20,3 +20,7 @@
     stroke-width: 3px;
     stroke-linejoin: round;
 }
+/* Without the annotations, the Moon alone. */
+.moon-face .without-annotations .moon-panel > svg {
+    visibility: hidden;
+}

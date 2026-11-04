@@ -3,8 +3,9 @@ import { find } from "../dom";
 import { paintRange } from "../range";
 import { ephemerisDay, onChange, state, update } from "./state";
 
-// The slider runs through the lunation the moment is in, from one true full moon to the next: the moments the Moon's
-// apparent longitude stands 180° from the Sun's. The last quarter is at 270°, the new moon at 0°, the first at 90°.
+// The slider runs through the lunation the moment is in, from one true new moon to the next, the full moon in the
+// middle: the moments the Moon's apparent longitude stands 0° from the Sun's. The first quarter is at 90°, the full
+// moon at 180°, the last at 270°. Its value is the Moon's age, the days since the new moon.
 const { MEAN_NEW_MOON, MEAN_SYNODIC_MONTH } = precise.moon;
 const HOUR = 1 / 24;
 const SECOND = 1 / 86_400;
@@ -25,20 +26,20 @@ function phaseTime(guess: number, target: number) {
 interface Lunation {
     start: number;
     end: number;
-    /** Each phase's moment and elongation, full moon to full moon. */
+    /** Each phase's moment and elongation, new moon to new moon. */
     phases: [number, number][];
 }
 function lunationAt(jd: number): Lunation {
-    const k = Math.floor((jd - MEAN_NEW_MOON) / MEAN_SYNODIC_MONTH - 0.5);
-    let start = phaseTime(MEAN_NEW_MOON + (k + 0.5) * MEAN_SYNODIC_MONTH, 180);
-    if (start > jd) start = phaseTime(start - MEAN_SYNODIC_MONTH, 180);
-    let end = phaseTime(start + MEAN_SYNODIC_MONTH, 180);
-    if (end <= jd) [start, end] = [end, phaseTime(end + MEAN_SYNODIC_MONTH, 180)];
-    const between = [270, 0, 90].map((target, i): [number, number] => [
+    const k = Math.floor((jd - MEAN_NEW_MOON) / MEAN_SYNODIC_MONTH);
+    let start = phaseTime(MEAN_NEW_MOON + k * MEAN_SYNODIC_MONTH, 0);
+    if (start > jd) start = phaseTime(start - MEAN_SYNODIC_MONTH, 0);
+    let end = phaseTime(start + MEAN_SYNODIC_MONTH, 0);
+    if (end <= jd) [start, end] = [end, phaseTime(end + MEAN_SYNODIC_MONTH, 0)];
+    const between = [90, 180, 270].map((target, i): [number, number] => [
         phaseTime(start + ((i + 1) / 4) * MEAN_SYNODIC_MONTH, target),
         target,
     ]);
-    return { start, end, phases: [[start, 180], ...between, [end, 180]] };
+    return { start, end, phases: [[start, 0], ...between, [end, 0]] };
 }
 let lunation = lunationAt(state.jd);
 

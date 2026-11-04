@@ -137,6 +137,7 @@ export interface MoonFrame {
     ev100: number | null;
     albedo: boolean;
     relief: boolean;
+    shadows: boolean;
     earthshine: boolean;
     eclipse: boolean;
     law: "hapke" | "lambert";
@@ -297,6 +298,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                 horizonZ: frame.air ? horizonZ(m.heightM, m.model.planet.groundRadiusKm) : -1,
                 albedoMap: frame.albedo,
                 relief: frame.relief,
+                shadows: frame.shadows,
                 law: frame.law,
                 eclipse: frame.eclipse ? m.earthShadow : null,
                 sunAngularDiameter: m.sunAngularDiameter,

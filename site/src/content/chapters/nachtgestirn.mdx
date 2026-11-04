@@ -64,13 +64,9 @@ Four lines are the whole setup: the maps once, the pass once, and per frame the 
 [the face we see](#the-face-we-see).
 
 ```ts
-import { createMoonPass, loadMoonMaps } from "@himmelszelt/nachtgestirn";
+import { createMoonPass, loadMoonMaps, MOON_MAPS } from "@himmelszelt/nachtgestirn";
 
-const maps = await loadMoonMaps(
-    device,
-    { color: "moon-color-4k.webp", normals: "moon-normals-2k.webp" },
-    { meanReflectance: 0.396 },
-);
+const maps = await loadMoonMaps(device, MOON_MAPS.medium);
 const pass = await createMoonPass(device, { format: "rgba8unorm", maps });
 // Per frame: where it is, how large, where the Sun is from it, how it is turned.
 pass.update({ direction, angularDiameter, sunDirection, orientation, ev100: 14 });
@@ -137,18 +133,27 @@ The maps are NASA's, from the CGI Moon Kit of its Scientific Visualization Studi
 from the Lunar Reconnaissance Orbiter's wide angle camera, over 100,000 images into one mosaic, remade in December 2025
 with more of the source's color and range, and the relief from its laser altimeter. Both are laid out with 0° longitude
 in the middle and east to the right, so a point's longitude and latitude read straight off them, with no mirroring, which
-osgHimmel's cube map needed. The color map is balanced to look right, not to measure, so the package scales it to
-normal albedo by the near side's mean: a rerunnable script makes both maps from the kit, 4096 texels around for the
-color and 2048 for the relief, which it turns from heights into normals along east and north, and pairs a quarter
-and an eighth that size, all shipped with the package. A disc shows a map π times its width in pixels at one texel
-per pixel, so the 80 KB pair does for a disc up to some 160 pixels across, the 270 KB one to some 330, and the figure
-loads the 3.6 MB one only once you zoom in further, or when you ask for it. The normals matter
-along the <Term of="Terminator">terminator</Term>, where the Sun stands low over the surface and every crater rim
-catches the light; elsewhere the disc is a sphere, and the color does the rest.
+osgHimmel's cube map needed. A rerunnable script makes both from the kit, the heights from the altimeter's 64 texels
+per degree, each 4096, 1024 and 512 texels around, all shipped with the package. A disc shows a map π times its width
+in pixels at one texel per pixel, so the 230 KB set does for a disc up to some 160 pixels across, the 840 KB one to
+some 330, and the figure loads the 11.5 MB one only once you zoom in further, or when you ask for it.
+
+The color map is balanced to look right, not to measure, and nearly neutral, so the package scales it to normal
+albedo by the near side's mean and tints it towards the Moon's own color, keeping its variations: the Moon is redder
+than the sunlight it reflects, a <Term of="Color index">color index</Term> B-V of 0.92 against the Sun's 0.65
+<Cite id="cox2000" />, which makes it a warm gray outside the air, as the astronauts photographed it, with the
+titanium-rich Mare Tranquillitatis a little bluer than the rest.
+
+The heights matter along the <Term of="Terminator">terminator</Term>, where the Sun stands low over the surface. The
+pass turns them into the surface's slope for its shading, and marches from every point through them towards the Sun
+for its shadows: the highest the terrain rises above the point's horizon against how much of the Sun's half degree
+stands above that. Near the rim or peak that casts it, that height changes fast with the point, and the shadow's edge
+is sharp; farther off slowly, and the penumbra widens, the contact hardening a renderer of soft shadows looks for,
+here by the Sun's own size. Crater floors fill with shadow, and peaks beyond the terminator catch the light first.
 
 Step the moment a day at a time in <Fig id="moon" /> and the face stays put while the terminator sweeps across it,
-Crisium on the right throughout, nodding in and out with the libration. With the relief off the terminator goes
-smooth; with the map off the Moon is a plain disc of its albedo, the coin of the opening.
+Crisium on the right throughout, nodding in and out with the libration. With the shadows off the terminator goes
+soft, with the relief off smooth; with the map off the Moon is a plain disc of its albedo, the coin of the opening.
 
 ```ts
 import { moonOrientation } from "@himmelszelt/nachtgestirn";

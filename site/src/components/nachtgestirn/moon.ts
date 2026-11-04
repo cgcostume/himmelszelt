@@ -133,6 +133,7 @@ export function moonFigure(root: HTMLElement) {
             ev100: pressed("auto") ? null : evOfSlider(),
             albedo: pressed("albedo"),
             relief: pressed("relief"),
+            shadows: pressed("shadows"),
             earthshine: pressed("earthshine"),
             eclipse: pressed("eclipse"),
             law: choice("law") === "lambert" ? "lambert" : "hapke",
@@ -179,7 +180,7 @@ export function moonFigure(root: HTMLElement) {
         for (const name of ["law", "maps"])
             for (const input of root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-${name}"]`))
                 input.addEventListener("change", requestRender);
-        for (const name of ["auto", "lock", "albedo", "relief", "earthshine", "eclipse"]) {
+        for (const name of ["auto", "lock", "albedo", "relief", "shadows", "earthshine", "eclipse"]) {
             maybe(name)?.addEventListener("click", () => {
                 field(name).setAttribute("aria-pressed", String(!pressed(name)));
                 requestRender();

@@ -30,7 +30,7 @@ export {
 } from "./orientation.js";
 
 export type { MoonMapFiles, MoonMaps, MoonMapsOptions } from "./maps.js";
-export { createMoonMaps, loadMoonMaps, MOON_MAPS } from "./maps.js";
+export { createMoonMaps, loadMoonMaps, MOON_COLOR, MOON_MAPS } from "./maps.js";
 
 export type { EarthShadow, EncodeOptions, MoonParams, MoonPass, MoonPassOptions } from "./moon.js";
 export { createMoonPass, PARAMS_SIZE, paramsData } from "./moon.js";

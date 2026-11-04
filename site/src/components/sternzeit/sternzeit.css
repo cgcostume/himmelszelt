@@ -1167,7 +1167,7 @@ g.eclipse-corona {
     min-width: 7ch;
     text-align: right;
 }
-/* The days since the full moon, as wide as two digits ever need, so the rail stays put as they drop to one. */
+/* The days since the new moon, as wide as two digits ever need, so the rail stays put as they drop to one. */
 .figure-slider[data-lunation] output {
     min-width: 6ch;
     text-align: right;

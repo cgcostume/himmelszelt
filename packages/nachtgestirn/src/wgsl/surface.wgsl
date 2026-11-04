@@ -14,7 +14,7 @@ fn nbMapUv(lonLat: vec2f) -> vec2f {
     return vec2f(lonLat.x / (2.0 * NB_PI) + 0.5, 0.5 - lonLat.y / NB_PI);
 }
 
-// A normal map's normal, east, north and up in the map's own tangent frame, turned into the Moon's frame at `lonLat`.
+// A normal, east, north and up in the surface's own tangent frame, turned into the Moon's frame at `lonLat`.
 fn nbBodyNormal(lonLat: vec2f, tangent: vec3f) -> vec3f {
     let sinLon = sin(lonLat.x);
     let cosLon = cos(lonLat.x);

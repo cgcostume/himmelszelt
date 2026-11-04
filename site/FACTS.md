@@ -205,7 +205,11 @@ confirmed yet.
 | Mare Crisium on the right with north up, selenographic east | The face we see | web, lib | SVS map centered on 0°, Crisium right of center; `moonOrientation` test puts +90° east on the disc's right; render of 2026-11-24 compared with sternzeit's Moon view | ok | 2026-11-04 |
 | LROC WAC mosaic from over 100,000 images, color map remade December 2025 | The face we see, people | web | svs.gsfc.nasa.gov/4720 | ok | 2026-11-04 |
 | Maps 4096 and 2048 texels around | The face we see | lib | `scripts/maps.mjs` output | ok | 2026-11-04 |
-| Pairs of 80 KB, 270 KB and 3.6 MB, enough up to a disc of some 160 and 330 pixels | The face we see | lib | 41 + 38 KB, 105 + 165 KB, 1,362 + 2,247 KB; `mapWidthFor(163)` = 512, `mapWidthFor(326)` = 1,024 | ok | 2026-11-04 |
+| Sets of 230 KB, 840 KB and 11.5 MB, enough up to a disc of some 160 and 330 pixels | The face we see | lib | color 41 / 106 / 1,362 KB, heights 190 / 731 / 10,196 KB; `mapWidthFor(163)` = 512, `mapWidthFor(326)` = 1,024 | ok | 2026-11-04 |
+| Heights from the altimeter's 64 texels per degree | The face we see | src | svs4720: ldem_64_uint.tif, 23040 x 11520 | ok | 2026-11-04 |
+| Moon's B-V 0.92, the Sun's 0.65; the Moon redder than sunlight | The face we see | src | cox2000 (Allen's): Moon B-V 0.92, Sun 0.65; B/V reflectance 10^(-0.4 x 0.27) = 0.78 | ok | 2026-11-04 |
+| The color map nearly neutral | The face we see | lib | near side mean linear 0.4125, 0.3924, 0.3828: R/G 1.05, B/G 0.98 | ok | 2026-11-04 |
+| Mare Tranquillitatis bluer, titanium-rich | The face we see | src | LROC WAC color; high-Ti basalts are bluer (common knowledge in lunar spectroscopy) | ok | 2026-11-04 |
 | Near side mean reflectance 0.396 | Quick start | lib | `scripts/maps.mjs` | ok | 2026-11-04 |
 | A full Earth lights the Moon with some 13 lux, a ten thousandth of the Sun | Earthshine | lib | `earthshineIlluminance(0, 384400)` = 12.9 lx; 12.9 / 128,000 = 1.0e-4 | ok | 2026-11-04 |
 | About fifty times what a full Moon gives Earth | Earthshine | derived | full Moon 4,889 cd/m² times 0.71 air times 6.5e-5 sr = 0.23 lx; 12.9 / 0.23 = 56 | ok | 2026-11-04 |

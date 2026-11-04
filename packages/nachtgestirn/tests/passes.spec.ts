@@ -20,6 +20,7 @@ function wgslSource(name: string): string {
 const PASSES: Record<string, readonly string[]> = {
     moon: ["params", "camera", "surface", "tonemap", "moon"],
     mips: ["params", "surface", "mips"],
+    relief: ["params", "surface", "relief"],
 };
 
 for (const [name, fragments] of Object.entries(PASSES)) {
@@ -53,6 +54,7 @@ test("the params pack to the uniform's size with the flags where the shader read
             horizonZ: -1,
             albedoMap: true,
             relief: true,
+            shadows: true,
             law: "lambert",
             eclipse: { axis: [0, 0, -1], moonCenterKm: [0, 0, 384_400], umbraKm: 4600, penumbraKm: 8200 },
             sunAngularDiameter: 0.533,

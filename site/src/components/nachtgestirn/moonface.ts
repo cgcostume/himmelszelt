@@ -75,6 +75,7 @@ export function moonFace(root: HTMLElement) {
             ev100: null,
             albedo: true,
             relief: true,
+            shadows: true,
             earthshine: true,
             eclipse: true,
             law: "hapke",
@@ -89,4 +90,11 @@ export function moonFace(root: HTMLElement) {
     });
     onTables(requestRender);
     onDisplay(requestRender);
+    // The overlay hidden or shown; the Moon behind it stays as it is.
+    const annotations = find('[data-field="annotations"]', view);
+    annotations.addEventListener("click", () => {
+        const shown = annotations.getAttribute("aria-pressed") !== "true";
+        annotations.setAttribute("aria-pressed", String(shown));
+        view.classList.toggle("without-annotations", !shown);
+    });
 }

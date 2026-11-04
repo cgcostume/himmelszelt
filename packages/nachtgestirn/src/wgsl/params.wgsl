@@ -29,10 +29,10 @@ struct NbParams {
     // What luminance is multiplied by, 1 / (1.2 * 2^EV100), and below which z of a ray the Moon is hidden.
     exposure: f32,
     horizonZ: f32,
-    // What the color map is multiplied by to read as normal albedo, and the albedo without a map.
+    // What the color map is multiplied by to read as normal albedo, and the albedo without a map; per channel, below.
     albedoScale: f32,
     albedo: f32,
-    // 1 the color map, 2 the normal map, 4 the eclipse.
+    // 1 the color map, 2 the relief, 4 the eclipse, 8 the relief's shadows.
     flags: u32,
     // The reflectance law: 0 Hapke's lunar law after Jensen et al., 1 Lambert's, to compare.
     law: u32,
@@ -47,10 +47,13 @@ struct NbParams {
     // How far the air bends a ray down, in radians, at NB_REFRACTION_SAMPLES apparent altitudes over the disc's band,
     // from `refractionFrom` on by `refractionStep`.
     refraction: array<vec4f, 8>,
+    // What the color map is multiplied by per channel besides `albedoScale`: from its own mean color to the Moon's.
+    albedoTint: vec3f,
 }
 
 const NB_REFRACTION_SAMPLES: u32 = 32u;
 
 const NB_FLAG_COLOR: u32 = 1u;
-const NB_FLAG_NORMALS: u32 = 2u;
+const NB_FLAG_RELIEF: u32 = 2u;
 const NB_FLAG_ECLIPSE: u32 = 4u;
+const NB_FLAG_SHADOWS: u32 = 8u;

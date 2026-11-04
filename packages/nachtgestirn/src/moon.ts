@@ -72,9 +72,11 @@ export interface MoonParams {
     ev100: number;
     /** The z below which a ray hits the ground and the Moon is hidden, `horizonZ`; -1 by default, drawn everywhere. */
     horizonZ: number;
-    /** Draw the color map, true by default where there is one, and the relief from the normal map. */
+    /** Draw the color map, true by default where there is one, the relief from the heights, and the shadows the relief
+     *  casts, soft by the Sun's disc and harder towards what casts them. */
     albedoMap: boolean;
     relief: boolean;
+    shadows: boolean;
     /** The reflectance law: Hapke's lunar law after Jensen et al. 2001, or Lambert's, to see what it gets wrong. */
     law: "hapke" | "lambert";
     /** Earth's shadow on the Moon, null for none. */
@@ -109,9 +111,9 @@ export interface MoonPass {
 const DEG = Math.PI / 180;
 const EIGHT_BIT = ["rgba8unorm", "bgra8unorm"];
 const TONE_CURVES: Record<string, number> = { neutral: 1, agx: 2, aces: 3, clip: 4 };
-/** Byte size of NbParams in params.wgsl: a mat4x4, a mat3x3 of three padded columns, twelve vec4-sized rows and the
- *  refraction table's eight. */
-export const PARAMS_SIZE = 384;
+/** Byte size of NbParams in params.wgsl: a mat4x4, a mat3x3 of three padded columns, twelve vec4-sized rows, the
+ *  refraction table's eight and the albedo's tint. */
+export const PARAMS_SIZE = 400;
 
 const DEFAULTS: MoonParams = {
     direction: [0, 0, 1],
@@ -128,6 +130,7 @@ const DEFAULTS: MoonParams = {
     horizonZ: -1,
     albedoMap: true,
     relief: true,
+    shadows: true,
     law: "hapke",
     eclipse: null,
     sunAngularDiameter: 0.533,
@@ -162,13 +165,16 @@ export function paramsData(params: MoonParams, maps: MoonMaps | null): ArrayBuff
     f[53] = Math.max(params.horizonZ, params.refraction ? Math.sin(params.refraction.horizon) : -1);
     f[54] = maps?.albedoScale ?? 1;
     f[55] = 0.12;
-    u[56] = (params.albedoMap && maps ? 1 : 0) | (params.relief && maps?.normals ? 2 : 0) | (eclipse ? 4 : 0);
+    const relief = params.relief && maps?.relief;
+    u[56] =
+        (params.albedoMap && maps ? 1 : 0) | (relief ? 2 : 0) | (eclipse ? 4 : 0) | (relief && params.shadows ? 8 : 0);
     u[57] = params.law === "lambert" ? 1 : 0;
     f[58] = eclipse?.umbraLight ?? 1;
     const { refraction } = params;
     f[59] = refraction?.step ?? 0;
     f[63] = refraction?.from ?? 0;
     if (refraction) f.set(refraction.bends.subarray(0, REFRACTION_SAMPLES), 64);
+    f.set(maps?.albedoTint ?? [1, 1, 1], 96);
     // Earth's center from the Moon's, the observer on Earth's surface straight above it.
     const [dx, dy, dz] = params.direction;
     const d = params.distanceKm;
@@ -239,7 +245,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
                 entries: [
                     { binding: 0, resource: { buffer: uniform } },
                     { binding: 1, resource: (maps?.color ?? blank).createView() },
-                    { binding: 2, resource: (maps?.normals ?? blank).createView() },
+                    { binding: 2, resource: (maps?.relief ?? blank).createView() },
                     { binding: 3, resource: sampler },
                     { binding: 4, resource: (encodeOptions.background ?? noBackground).createView() },
                 ],
