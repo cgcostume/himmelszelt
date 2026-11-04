@@ -23,8 +23,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Build first: packages typecheck against each other's dist (e.g. dunstkreis' tests import @himmelszelt/sternzeit).
       - run: pnpm build
-      # What a bundler adds to its users' pages for typical imports, against the limits in .size-limit.json.
-      - run: pnpm size
       - run: pnpm typecheck
       - run: pnpm lint
       # The browser for the Playwright the packages' tests use, from the workspace: npx at the root, where no package

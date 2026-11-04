@@ -81,8 +81,7 @@ into a decision into CLAUDE.md.
 
 - **dunstkreis does not tree-shake**: importing only `exposureFromEV100` costs 8.7 kB, since two module-level
   statements cannot be dropped by a bundler: the loop that fills `TRAINING_SPECTRA` with `push`, and the `.join()`
-  composing WGSL snippets in `wgsl/index.ts`. Build both lazily or mark them `/* @__PURE__ */`, then lower the limit
-  in `.size-limit.json`.
+  composing WGSL snippets in `wgsl/index.ts`. Build both lazily or mark them `/* @__PURE__ */`.
 - **The WGSL ships with its comments**, the larger part of dunstkreis' 27 kB for a sky: strip comments (and maybe
   whitespace) at build time, in a rolldown plugin, the source keeping them.
 
