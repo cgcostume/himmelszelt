@@ -27,6 +27,24 @@ const CLOUDSCAPE: Slider[] = [
     ["cloudscape.coverage", "coverage", 0, 1, 0.01, 0.42, "How much of the sky the low clouds cover"],
     ["cloudscape.sharpness", "sharpness", 0, 0.9, 0.01, 0.35, "How hard their edges are"],
     [
+        "cloudscape.size",
+        "size",
+        0.5,
+        3,
+        0.05,
+        1,
+        "How much larger the clouds are, every length of them but the base's height: plusher, not nearer",
+    ],
+    [
+        "cloudscape.extinction",
+        "density",
+        4,
+        128,
+        1,
+        32,
+        "Extinction per km of full density: less lets the light deeper in and the clouds glow, more makes them opaque, their undersides darker, their edges harder",
+    ],
+    [
         "cloudscape.towers",
         "towers",
         0,
@@ -135,6 +153,45 @@ const SHEET: Slider[] = [
         "Where the sheet's wind blows from, in degrees from north through east: its strands run along it",
     ],
 ];
+// The cirrus' layers of noise, broad to fine, as gewoelk's SheetNoise; sizes in km.
+const NOISE: Slider[] = [
+    [
+        "sheet.noise.broad",
+        "broad",
+        0,
+        1,
+        0.05,
+        0.4,
+        "How far the sheet is denser and thinner by turns over a broad field",
+    ],
+    ["sheet.noise.broadKm", "broad size", 2, 40, 1, 12, "The broad field's size, in km"],
+    ["sheet.noise.sweep", "sweep", 0, 3, 0.05, 1, "How far the strands sweep along a broad flow, some 15 km across"],
+    ["sheet.noise.hook", "hooks", 0, 3, 0.05, 1, "How far the strands curl into hooks, some 3 km across"],
+    [
+        "sheet.noise.bundles",
+        "bundles",
+        0,
+        1,
+        0.05,
+        0.5,
+        "How strongly the strands gather into bundles, feathers with sky between",
+    ],
+    ["sheet.noise.bundleKm", "bundle size", 0.5, 10, 0.1, 3, "A bundle's width across the wind, in km"],
+    [
+        "sheet.noise.fiberPower",
+        "fiber sharpness",
+        1,
+        12,
+        0.5,
+        4,
+        "The power the fibers' ridges are raised to: higher, thinner strands",
+    ],
+    ["sheet.noise.fiberStretch", "fiber stretch", 2, 30, 1, 10, "How many times as long as wide the fibers start"],
+    ["sheet.noise.flocks", "flocks", 0, 1, 0.05, 0.15, "How far tufts of turbulence break the sheet"],
+    ["sheet.noise.flockKm", "flock size", 0.02, 1, 0.01, 0.15, "A tuft's size, in km"],
+    ["sheet.noise.grain", "grain", 0, 1, 0.05, 0.5, "How far a fine grain of four turned octaves roughens the sheet"],
+    ["sheet.noise.grainKm", "grain size", 0.01, 0.5, 0.01, 0.1, "The grain's coarsest size, in km"],
+];
 const SCALE = {
     name: "scale",
     label: "Render scale",
@@ -207,19 +264,26 @@ const LAYERS = {
             </OptionGroup>
             <OptionGroup name="cloudscape">
                 <button type="button" class="view-toggle" data-field="cloudscape.enabled" aria-pressed="true" title="The low clouds, a voxel volume marched by its distance field">low clouds</button>
+                <button type="button" class="view-toggle" data-copy="cloudscape" title="Copies the low clouds' sliders as a preset for gewoelk's WEATHER">copy</button>
                 {CLOUDSCAPE.map(([param, label, min, max, step, value, title]) => (
                     <label class="sky-ev clouds-slider" title={title}>{label} <input data-param={param} type="range" min={min} max={max} step={step} value={value} /> <output /></label>
                 ))}
             </OptionGroup>
             <OptionGroup name="sheet">
                 <button type="button" class="view-toggle" data-field="sheet.enabled" aria-pressed="true" title="A thin sheet of high cloud, read once where a ray crosses it">cirrus</button>
+                <button type="button" class="view-toggle" data-copy="sheet" title="Copies the cirrus' and its noise's sliders as a preset for gewoelk's WEATHER">copy</button>
                 {SHEET.map(([param, label, min, max, step, value, title]) => (
+                    <label class="sky-ev clouds-slider" title={title}>{label} <input data-param={param} type="range" min={min} max={max} step={step} value={value} /> <output /></label>
+                ))}
+            </OptionGroup>
+            <OptionGroup name="cirrus noise">
+                {NOISE.map(([param, label, min, max, step, value, title]) => (
                     <label class="sky-ev clouds-slider" title={title}>{label} <input data-param={param} type="range" min={min} max={max} step={step} value={value} /> <output /></label>
                 ))}
             </OptionGroup>
             <OptionGroup name="light">
                 <button type="button" class="view-toggle" data-field="light.sun" aria-pressed="true" title="The Sun's light, through the summed density towards it, with its forward lobe">sun</button>
-                <button type="button" class="view-toggle" data-field="light.multi" aria-pressed="true" title="Nubis' multiple scattering: the profile as the chance of in-scattering, the inner glow">multiple</button>
+                <button type="button" class="view-toggle" data-field="light.multi" aria-pressed="true" title="The orders of scattering after the first, as octaves: each a share of the one before, through less cloud, with a wider lobe">multiple</button>
                 <button type="button" class="view-toggle" data-field="light.ambient" aria-pressed="true" title="The sky's light from above and the ground's from below, fading with depth">ambient</button>
             </OptionGroup>
             <OptionGroup name="render">

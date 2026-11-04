@@ -43,7 +43,7 @@ test("the packer writes GwParams as params.wgsl lays it out", () => {
     const cloudscape = layout(source, "GwCloudscape", structs);
     const params = layout(source, "GwParams", structs);
     expect(params.size).toBe(PARAMS_SIZE);
-    expect(sheet.size).toBe(80);
+    expect(sheet.size).toBe(128);
     expect(cloudscape.size).toBe(112);
 
     const p = {
@@ -63,15 +63,15 @@ test("the packer writes GwParams as params.wgsl lays it out", () => {
     expect(u[(params.members.sheets ?? -4) / 4]).toBe(2);
     const volume = (params.members.cloudscape ?? 0) + (cloudscape.members.extinction ?? 0);
     expect(at(volume)).toBe(p.cloudscape.extinction);
-    const second = (params.members.sheet ?? 0) + 80 + (sheet.members.seed ?? 0);
+    const second = (params.members.sheet ?? 0) + 128 + (sheet.members.seed ?? 0);
     expect(u[second / 4]).toBe(9);
     const windDrift = (params.members.sheet ?? 0) + (sheet.members.drift ?? 0);
-    expect(at(windDrift)).toBeCloseTo(drift(DEFAULT_SHEET.wind, 3600, DEFAULT_SHEET.scaleKm)[0]);
+    expect(at(windDrift)).toBeCloseTo(drift(DEFAULT_SHEET.wind, 3600)[0]);
 });
 
 test("drift and evolution wrap", () => {
     // 25 m/s for an hour is 90 km, 10 km into the third 40 km tile.
-    expect(drift([25, 0], 3600, 40)[0]).toBeCloseTo(10);
-    expect(drift([-25, 0], 3600, 40)[0]).toBeCloseTo(30);
+    expect(drift([25, 0], 3600)[0]).toBeCloseTo(90);
+    expect(drift([-25, 0], 3600)[0]).toBeCloseTo(8192 - 90);
     expect(evolutionAt(1, 9 * 3600)).toBeCloseTo(1);
 });

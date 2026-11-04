@@ -2,14 +2,14 @@
  * Weather as presets of the clouds' shape: what the low clouds and the high sheet look like, without the light, the
  * wind or the time. Numbers only, so two blend into a third: `mixWeather` moves between them, as weather changes.
  */
-import type { CloudscapeParams, SheetParams } from "./params.js";
+import type { CloudscapeParams, SheetNoise, SheetParams } from "./params.js";
 
 type Numeric<T> = { [K in keyof T as T[K] extends number | undefined ? K : never]?: number };
 
-/** The shape of a weather: the cloudscape's and the sheet's numbers it sets, the rest left as they are. */
+/** The shape of a weather: the cloudscape's and the sheet's numbers it sets, its noise's too, the rest left as they are. */
 export interface Weather {
     cloudscape: Numeric<CloudscapeParams>;
-    sheet: Numeric<SheetParams>;
+    sheet: Numeric<SheetParams> & { noise?: Partial<SheetNoise> };
 }
 
 /** Presets, from a clear sky to a closed deck. Coverage 0 stands for none, so a layer blends in and out. */
@@ -100,5 +100,11 @@ export function mixWeather(a: Weather, b: Weather, t: number): Weather {
         }
         return out as T;
     };
-    return { cloudscape: mix(a.cloudscape, b.cloudscape), sheet: mix(a.sheet, b.sheet) };
+    const { noise: na = {}, ...sa } = a.sheet;
+    const { noise: nb = {}, ...sb } = b.sheet;
+    const noise = mix<Partial<SheetNoise>>(na, nb);
+    return {
+        cloudscape: mix(a.cloudscape, b.cloudscape),
+        sheet: { ...mix(sa, sb), ...(Object.keys(noise).length ? { noise } : {}) },
+    };
 }

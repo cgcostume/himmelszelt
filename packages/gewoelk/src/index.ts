@@ -5,20 +5,23 @@
 
 // biome-ignore-all assist/source/organizeImports: exports are hand-grouped by domain, not alphabetical
 
-export type { CloudParams, CloudscapeParams, SheetParams, SunlightRow } from "./params.js";
+export type { CloudParams, CloudscapeParams, SheetNoise, SheetParams, SunlightRow } from "./params.js";
 export {
     DEFAULT_CLOUD_PARAMS,
     DEFAULT_CLOUDSCAPE,
     DEFAULT_SHEET,
+    DEFAULT_SHEET_NOISE,
     EVOLUTION_PERIOD,
     MAX_SHEETS,
     PARAMS_SIZE,
     SUNLIGHT_ENTRIES,
     SUNLIGHT_SIZE,
+    DRIFT_PERIOD_KM,
     drift,
     evolutionAt,
     paramsData,
     sunlightData,
+    sizedCloudscape,
     slabHeightKm,
     sunlightRows,
 } from "./params.js";

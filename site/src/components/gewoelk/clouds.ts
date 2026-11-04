@@ -12,7 +12,6 @@ import {
     DEFAULT_CLOUD_PARAMS,
     DEFAULT_CLOUDSCAPE,
     DEFAULT_SHEET,
-    mixWeather,
     sunlightRows,
     WEATHER,
 } from "@himmelszelt/gewoelk";
@@ -101,6 +100,9 @@ function horizonLuminance(sh: Float32Array, scale: number): [number, number, num
 
 /** The clouds figure on `root`, a `figure[data-clouds]`: dunstkreis' sky in cd/m² into a float texture, gewoelk's
  *  clouds marched over it and composed into the canvas, both on the page's moment, place and tables. */
+const prefixed = (prefix: string, values: object) =>
+    Object.fromEntries(Object.entries(values).map(([key, value]) => [`${prefix}.${key}`, value as number | undefined]));
+
 export function cloudsFigure(root: HTMLElement) {
     const field = <T extends HTMLElement = HTMLElement>(name: string) => find<T>(`[data-field="${name}"]`, root);
     const maybe = <T extends HTMLElement = HTMLElement>(name: string) =>
@@ -239,28 +241,41 @@ export function cloudsFigure(root: HTMLElement) {
     // drawn only while it lasts.
     let weatherFrame = 0;
     function changeWeather(name: WeatherName) {
-        const target: Weather = WEATHER[name];
-        const from: Weather = { cloudscape: {}, sheet: {} };
-        for (const [layer, values] of Object.entries(target) as [keyof Weather, Record<string, number>][]) {
-            for (const key of Object.keys(values))
-                (from[layer] as Record<string, number>)[key] = slider(`${layer}.${key}`);
-        }
+        const { noise, ...sheet } = (WEATHER[name] as Weather).sheet;
+        const target = Object.entries({
+            ...prefixed("cloudscape", WEATHER[name].cloudscape),
+            ...prefixed("sheet", sheet),
+            ...prefixed("sheet.noise", noise ?? {}),
+        }).flatMap(([param, to]) => {
+            const input = sliders.find((s) => s.dataset.param === param);
+            return input && to !== undefined ? [{ input, from: Number(input.value), to }] : [];
+        });
         const start = performance.now();
         cancelAnimationFrame(weatherFrame);
         const step = (now: number) => {
             const t = Math.min(1, (now - start) / 3000);
-            const mixed = mixWeather(from, target, t * t * (3 - 2 * t));
-            for (const [layer, values] of Object.entries(mixed) as [string, Record<string, number>][]) {
-                for (const [key, value] of Object.entries(values)) {
-                    const input = sliders.find((s) => s.dataset.param === `${layer}.${key}`);
-                    if (!input) continue;
-                    input.value = String(value);
-                    input.dispatchEvent(new Event("input", { bubbles: true }));
-                }
+            const s = t * t * (3 - 2 * t);
+            for (const { input, from, to } of target) {
+                input.value = String(from + (to - from) * s);
+                input.dispatchEvent(new Event("input", { bubbles: true }));
             }
             if (t < 1) weatherFrame = requestAnimationFrame(step);
         };
         weatherFrame = requestAnimationFrame(step);
+    }
+
+    // A layer's sliders as a preset for gewoelk's WEATHER, to paste: the shape only, without the wind and the time.
+    const UNSHAPED = new Set(["windSpeed", "windFrom", "evolution"]);
+    function preset(layer: string): string {
+        const values = (prefix: string) =>
+            sliders.flatMap((input) => {
+                const key = input.dataset.param?.slice(prefix.length + 1) ?? "";
+                const own = input.dataset.param?.startsWith(`${prefix}.`) && !key.includes(".") && !UNSHAPED.has(key);
+                return own ? [`${key}: ${Number(input.value)}`] : [];
+            });
+        const inner = values(layer);
+        if (layer === "sheet") inner.push(`noise: { ${values("sheet.noise").join(", ")} }`);
+        return `${layer}: { ${inner.join(", ")} },`;
     }
 
     function cloudParams(): Partial<CloudParams> {
@@ -292,6 +307,8 @@ export function cloudsFigure(root: HTMLElement) {
                 clearingFromKm: slider("cloudscape.clearingFromKm"),
                 variation: slider("cloudscape.variation"),
                 towers: slider("cloudscape.towers"),
+                extinction: slider("cloudscape.extinction"),
+                size: slider("cloudscape.size"),
                 towerScale: slider("cloudscape.towerScale"),
                 billows: slider("cloudscape.billows"),
                 multiScatter: pressed("light.multi") ? DEFAULT_CLOUDSCAPE.multiScatter : 0,
@@ -305,6 +322,11 @@ export function cloudsFigure(root: HTMLElement) {
                     opticalDepth: slider("sheet.opticalDepth"),
                     wind: windOf(slider("sheet.windSpeed"), slider("sheet.windFrom") + 180),
                     ripples: slider("sheet.ripples"),
+                    noise: Object.fromEntries(
+                        sliders
+                            .filter((input) => input.dataset.param?.startsWith("sheet.noise."))
+                            .map((input) => [input.dataset.param?.slice(12) ?? "", Number(input.value)]),
+                    ),
                 },
             ],
         };
@@ -454,6 +476,13 @@ export function cloudsFigure(root: HTMLElement) {
         }
         for (const input of root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-weather"]`)) {
             input.addEventListener("change", () => changeWeather(input.value as WeatherName));
+        }
+        for (const button of root.querySelectorAll<HTMLButtonElement>("button[data-copy]")) {
+            button.addEventListener("click", async () => {
+                await navigator.clipboard.writeText(preset(button.dataset.copy ?? ""));
+                button.textContent = "copied";
+                setTimeout(() => (button.textContent = "copy"), 1200);
+            });
         }
         for (const button of root.querySelectorAll<HTMLButtonElement>("button.view-toggle[data-field]")) {
             button.addEventListener("click", () => {

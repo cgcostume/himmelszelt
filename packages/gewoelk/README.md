@@ -28,8 +28,9 @@ voxel:
 The march per pixel is Nubis3's: outside the clouds the step is the signed distance, inside it grows with the square
 root of the distance from the camera, and the first is jittered; at each step inside, the profile is eroded by the
 detail composite, two samples towards the sun add detail to the summed light, Henyey-Greenstein lobes shape the
-scattering, the orders of scattering after the first come as octaves (Wrenninge 2013, Hillaire 2016), the profile
-stands in for Nubis3's inner glow, and the ambient light fades with depth.
+scattering, the orders of scattering after the first come as octaves (Wrenninge 2013, Hillaire 2016), each through
+no less of a factor of the depth than its share, so they keep energy, and the ambient light fades with depth after
+Nubis3's profile. Nubis3's inner glow is left out: it stands in for the same orders the octaves already give.
 
 The air in front of the clouds is taken step by step, at each step's own distance, and leaves them as opaque as they
 are. Given an `aerialPerspective` volume at `encode`, RGB froxels laid out as Hillaire's (dunstkreis' volume, turned
@@ -63,7 +64,8 @@ cloudscape's `clearingKm` with it:
 the map's value as an optical depth, thicker at a slant. Its patches are drawn out along the wind into plumes; strands
 of ridged noise, finer and longer each octave down to hairs, sweep along a broad flow, curl into hooks and gather in
 bundles, so feathers stand apart against the sky. `ripples` breaks the sheet into the rows of cloudlets of
-cirrocumulus instead.
+cirrocumulus instead. Over both, a broad field makes the sheet denser and thinner by turns, fine turbulence breaks
+it into flocks, and a grain of four turned octaves roughens it; every layer's strength and size is in `SheetNoise`.
 
 `WEATHER` holds presets of the clouds' shape, from clear to overcast, the sheet's included, and `mixWeather` blends
 two, number by number, for weather that changes.

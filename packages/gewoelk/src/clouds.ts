@@ -13,6 +13,7 @@ import {
     paramsData,
     SUNLIGHT_SIZE,
     type SunlightRow,
+    sizedCloudscape,
     sunlightData,
     sunlightRows,
 } from "./params.js";
@@ -175,9 +176,11 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         usage: GPUBufferUsage.STORAGE,
     });
     const models = Array.from({ length: layers }, (_, i) => uniform(`gewoelk:model${i}`, MODEL_SIZE));
-    // The flood's jumps, halving from half the grid's largest side down to 1.
+    // The flood's jumps, halving down to 1 from what reaches a quarter of the grid across, beyond the stored distance's
+    // range, and its whole height.
     const jumps: number[] = [];
-    for (let step = Math.max(grid.size, grid.layers) >> 1; step >= 1; step >>= 1) jumps.push(step);
+    const reach = Math.min(Math.max(grid.size >> 3, grid.layers >> 1), Math.max(grid.size, grid.layers) >> 1);
+    for (let step = reach; step >= 1; step >>= 1) jumps.push(step);
     const jumpBuffers = jumps.map((step) => {
         const buffer = uniform(`gewoelk:jump${step}`, 16);
         device.queue.writeBuffer(buffer, 0, new Uint32Array([step, 0, 0, 0]));
@@ -396,7 +399,8 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         update(next, frameEncoder) {
             current = { ...current, ...next };
             frame += 1;
-            const { cloudscape: c, sheets, timeS } = current;
+            const { sheets, timeS } = current;
+            const c = sizedCloudscape(current.cloudscape);
             device.queue.writeBuffer(params, 0, paramsData(current, frame));
             const { fromRad, toRad } = sunlightRows(current)[0] as SunlightRow;
             device.queue.writeBuffer(cloudscape, 0, cloudscapeData(c, timeS, [fromRad, toRad]));

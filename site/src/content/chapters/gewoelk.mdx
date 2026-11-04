@@ -129,11 +129,10 @@ voxel and one and a half voxels on, which keeps the edges crisp.
 Light scattered once is not enough: a sunlit cloud top is nearly white, and single scattering with a forward lobe
 gives it a dull gray, since little of that lobe points at the eye. The light that has scattered two, three, many times
 is what fills it in, and gewoelk takes it as octaves, the trick from the film Oz <Cite id="wrenninge2013" /> that
-Frostbite brought to games <Cite id="hillaire2016" />: each order a share of the one before, through half as much
-cloud, with a lobe half as narrow, four of them. Two more terms from Nubis³ make a cloud look lit from within. Light that has scattered many times loses its direction
-and glows out of the cloud's core, strongest looking towards the Sun; the profile already says how deep a point lies,
-so it stands in for the chance of that in-scattering, attenuated less near the Sun's direction and deep inside. And the
-sky's light reaches a point the more the closer it lies to the surface: the square root of one minus the profile.
+Frostbite brought to games <Cite id="hillaire2016" />: each order a share of the one before, through less cloud, with
+a lobe half as narrow, eight of them. The share may never be larger than the factor the cloud thins by, or the octaves
+would make light out of nothing. The sky's light reaches a point the more the closer it lies to the surface, as in
+Nubis³: the square root of one minus the profile, the profile saying how deep the point lies.
 Switch the three parts in <Fig id="clouds" />, the Sun, the multiple scattering and the ambient light, to see what
 each one adds: the Sun alone gives a cloud with black shadows, the multiple scattering its glow, the ambient light its
 gray underside. The Sun's light reaches the clouds at their own altitude, not the observer's: after sunset the

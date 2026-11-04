@@ -26,8 +26,24 @@ struct GwSheet {
     detail: f32,
     // How far ripples across the wind break the sheet into waves, cirrocumulus, 0 for none.
     ripples: f32,
+    // The noise the sheet is made of, see SheetNoise in params.ts: the flow's sweep and hooks, how strongly and how
+    // wide the strands bundle, the fibers' sharpness and stretch, the flocks' and the grain's erosion and size, and the
+    // broad variation's depth and size. Sizes in km.
+    sweep: f32,
+    hook: f32,
+    bundles: f32,
+    bundleSize: f32,
+    fiberPower: f32,
+    fiberStretch: f32,
+    flocks: f32,
+    flockSize: f32,
+    grain: f32,
+    grainSize: f32,
+    broad: f32,
+    broadSize: f32,
     pad0: f32,
-    pad1: vec2f,
+    pad1: f32,
+    pad2: f32,
 }
 
 // The cloudscape: the voxel volume the low clouds live in, a slab of `height` km from `base` km up, repeating every
@@ -49,9 +65,9 @@ struct GwCloudscape {
     // The smallest step inside a cloud, in km, and how steps grow with the square root of the distance.
     stepMin: f32,
     stepGrowth: f32,
-    // The phase function's forward lobe, the inner glow's lobe, and each order of scattering's share of the one before.
+    // The phase function's forward and backward lobes, and each order of scattering's share of the one before.
     forwardG: f32,
-    secondaryG: f32,
+    backwardG: f32,
     multiScatter: f32,
     enabled: u32,
     // How far the detail noise erodes the profile, 0 for the profile alone, 1 for Nubis3's full erosion.
@@ -68,7 +84,10 @@ struct GwCloudscape {
     // repeats, the gaps it leaves do not.
     variation: f32,
     variationScale: f32,
-    pad: vec2f,
+    // The map's shaping into clouds, as the voxels have it, for thinning them in the march: the bottoms' offset and
+    // how many times the ordinary clouds' height the slab is.
+    offset: f32,
+    towerScale: f32,
 }
 
 struct GwParams {

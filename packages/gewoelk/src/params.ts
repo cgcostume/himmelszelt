@@ -33,7 +33,47 @@ export interface SheetParams {
     detail: number;
     /** How far ripples across the wind break the sheet into the waves of cirrocumulus, 0 to 1, none by default. */
     ripples?: number;
+    /** The noise the sheet is made of, `DEFAULT_SHEET_NOISE` where left out. */
+    noise?: Partial<SheetNoise>;
 }
+
+/** The layers of noise a sheet is made of, from broad to fine. Sizes in km. */
+export interface SheetNoise {
+    /** How far the strands sweep along a broad flow, some 15 km across, and curl into hooks, some 3 km: 1 as made. */
+    sweep: number;
+    hook: number;
+    /** How strongly the strands gather into bundles, 0 to 1, and a bundle's width across the wind. */
+    bundles: number;
+    bundleKm: number;
+    /** The fibers' sharpness, the power their ridges are raised to, and how many times as long as wide they start. */
+    fiberPower: number;
+    fiberStretch: number;
+    /** How far flocks of turbulence break the sheet, 0 to 1, and a flock's size. */
+    flocks: number;
+    flockKm: number;
+    /** How far a fine grain, four turned octaves of gradient noise, roughens it, 0 to 1, keeping its density on
+     *  average, and the grain's coarsest size. */
+    grain: number;
+    grainKm: number;
+    /** How far it is denser and thinner by turns over a broad field, 0 to 1, and that field's size. */
+    broad: number;
+    broadKm: number;
+}
+
+export const DEFAULT_SHEET_NOISE: SheetNoise = {
+    sweep: 1,
+    hook: 1,
+    bundles: 0.5,
+    bundleKm: 3,
+    fiberPower: 4,
+    fiberStretch: 10,
+    flocks: 0.15,
+    flockKm: 0.15,
+    grain: 0.5,
+    grainKm: 0.1,
+    broad: 0.4,
+    broadKm: 12,
+};
 
 /** The voxel volume the low clouds live in: a slab repeating east and north, modeled from the cloud map. */
 export interface CloudscapeParams {
@@ -56,16 +96,18 @@ export interface CloudscapeParams {
     albedo: number;
     /** One tile of the detail noise, in km. */
     noiseScaleKm: number;
-    /** How far inside a cloud the dimensional profile reaches 1, and how far outside the distance field reaches. */
+    /** How far inside a cloud the dimensional profile reaches 1, and how far outside the distance field reaches, at most
+     *  a quarter of the extent. */
     profileDepthKm: number;
     sdfRangeKm: number;
     /** The smallest step inside a cloud, in km, and the growth of steps with the square root of the distance. */
     stepMinKm: number;
     stepGrowth: number;
-    /** The phase function's forward lobe, Nubis3's inner glow's lobe, and each further order of scattering's share of
-     *  the one before, 0 for single scattering alone: the octaves of Wrenninge and Hillaire. */
+    /** The phase function's forward and backward lobes, four parts to one, and each further order of scattering's share
+     *  of the one before, 0 for single scattering alone: the octaves of Wrenninge and Hillaire, each through
+     *  max(0.5, multiScatter) of the depth of the one before, so they keep energy. */
     forwardG: number;
-    secondaryG: number;
+    backwardG: number;
     multiScatter: number;
     /** How far the detail noise erodes the profile: 0 leaves the voxels' shape, 1 is Nubis3's full erosion. */
     detail: number;
@@ -87,10 +129,32 @@ export interface CloudscapeParams {
      *  the coverage rises past a half and is gone at full coverage, which stays a closed deck. */
     variation?: number;
     variationKm?: number;
+    /** How much larger the clouds are, every length of them but the base's height: 1 as given. Their extinction
+     *  falls by as much, so a cloud as a whole lets as much light through. */
+    size?: number;
 }
 
-/** The slab's height, in km: the ordinary clouds' layer, times the towers' scale. */
+/** The slab's height, in km: the ordinary clouds' layer, times the towers' scale. Of a cloudscape already sized. */
 export const slabHeightKm = (c: CloudscapeParams) => c.heightKm * Math.max(1, c.towerScale ?? 1);
+
+/** The cloudscape with every length of its clouds times its `size`, its base and the distances in sight kept, and
+ *  its extinction divided by it, so each cloud lets as much light through as before. */
+export function sizedCloudscape(c: CloudscapeParams): CloudscapeParams {
+    const s = c.size ?? 1;
+    if (s === 1) return c;
+    return {
+        ...c,
+        size: 1,
+        extentKm: c.extentKm * s,
+        heightKm: c.heightKm * s,
+        noiseScaleKm: c.noiseScaleKm * s,
+        profileDepthKm: c.profileDepthKm * s,
+        sdfRangeKm: c.sdfRangeKm * s,
+        stepMinKm: c.stepMinKm * s,
+        billowKm: (c.billowKm ?? 0.5) * s,
+        extinction: c.extinction / s,
+    };
+}
 
 type Rgb = readonly [number, number, number];
 
@@ -149,7 +213,7 @@ export const DEFAULT_CLOUDSCAPE: CloudscapeParams = {
     stepMinKm: 0.015,
     stepGrowth: 0.01,
     forwardG: 0.8,
-    secondaryG: 0.2,
+    backwardG: -0.15,
     multiScatter: 0.7,
     detail: 0.55,
     towers: 0.3,
@@ -197,10 +261,10 @@ export const DEFAULT_CLOUD_PARAMS: CloudParams = {
 export const EVOLUTION_PERIOD = 8;
 
 /** Byte sizes of the uniform structs in params.wgsl. */
-export const PARAMS_SIZE = 432;
+export const PARAMS_SIZE = 528;
 export const SUNLIGHT_SIZE = 64 + 128 * 16;
 export const CLOUDSCAPE_SIZE = 112;
-export const SHEET_SIZE = 80;
+export const SHEET_SIZE = 128;
 export const MODEL_SIZE = 48;
 const CLOUDSCAPE_OFFSET = 160;
 /** Where the cloudscape's `aerial` lies in `GwParams`, which the pass writes when it encodes. */
@@ -210,9 +274,13 @@ export const MAX_SHEETS = 2;
 
 const wrap = (value: number, period: number) => ((value % period) + period) % period;
 
-/** Where a layer's map has drifted to with its wind by `timeS`, in km, wrapped by the map's tile. */
-export function drift(wind: readonly [number, number], timeS: number, tileKm: number): [number, number] {
-    return [wrap((wind[0] * timeS) / 1000, tileKm), wrap((wind[1] * timeS) / 1000, tileKm)];
+/** Where the drift wraps, in km: far beyond any tile, so the noises of other periods never jump, and still within
+ *  what 32-bit floats resolve to a meter. At 8 m/s it wraps once in twelve days. */
+export const DRIFT_PERIOD_KM = 8192;
+
+/** Where a layer has drifted to with its wind by `timeS`, in km, wrapped by `DRIFT_PERIOD_KM`. */
+export function drift(wind: readonly [number, number], timeS: number): [number, number] {
+    return [wrap((wind[0] * timeS) / 1000, DRIFT_PERIOD_KM), wrap((wind[1] * timeS) / 1000, DRIFT_PERIOD_KM)];
 }
 
 /** The map's third coordinate at `timeS` for a layer evolving at `evolution` changes per hour. */
@@ -265,10 +333,10 @@ export function sunlightRows(p: CloudParams): SunlightRow[] {
         const fromRad = Math.max(-Math.PI / 2, elevation - reach);
         return { altitudeKm, fromRad, toRad: Math.min(Math.PI / 2, elevation + reach) };
     };
-    const { baseKm } = p.cloudscape;
-    const top = baseKm + slabHeightKm(p.cloudscape);
+    const sized = sizedCloudscape(p.cloudscape);
+    const top = sized.baseKm + slabHeightKm(sized);
     const sheet = (i: number) => p.sheets[i]?.altitudeKm ?? top;
-    return [row(baseKm, top), row(top), row(sheet(0)), row(sheet(1))];
+    return [row(sized.baseKm, top), row(top), row(sheet(0)), row(sheet(1))];
 }
 
 /** The sun's illuminance without a table: the observer's, where the sun clears the horizon at that altitude. */
@@ -298,16 +366,17 @@ export function sunlightData(p: CloudParams): ArrayBuffer {
 
 /** `GwCloudscape` packed, at `timeS`, its light grid's slices over `lightElevations` radians. */
 export function cloudscapeData(
-    c: CloudscapeParams,
+    cloudscape: CloudscapeParams,
     timeS: number,
     lightElevations: readonly [number, number],
 ): ArrayBuffer {
+    const c = sizedCloudscape(cloudscape);
     const buffer = new ArrayBuffer(CLOUDSCAPE_SIZE);
     const f = new Float32Array(buffer);
     const u = new Uint32Array(buffer);
-    f.set(drift(c.wind, timeS, c.extentKm), 0);
+    f.set(drift(c.wind, timeS), 0);
     f.set([c.extentKm, c.baseKm, slabHeightKm(c), c.extinction, c.albedo, c.noiseScaleKm, c.profileDepthKm], 2);
-    f.set([c.sdfRangeKm, c.stepMinKm, c.stepGrowth, c.forwardG, c.secondaryG, c.multiScatter], 9);
+    f.set([c.sdfRangeKm, c.stepMinKm, c.stepGrowth, c.forwardG, c.backwardG, c.multiScatter], 9);
     u[15] = c.enabled ? 1 : 0;
     f[16] = c.detail;
     f.set(lightElevations, 18);
@@ -315,7 +384,7 @@ export function cloudscapeData(
     f.set([clearing, Math.min(c.clearingFromKm ?? clearing / 2, clearing)], 20);
     // Less as the coverage closes the sky: a full deck stays full.
     const variation = (c.variation ?? 0) * Math.min(1, 2 * (1 - c.coverage));
-    f.set([Math.max(0, variation), c.variationKm ?? 40], 24);
+    f.set([Math.max(0, variation), c.variationKm ?? 40, c.offset, Math.max(1, c.towerScale ?? 1)], 24);
     return buffer;
 }
 
@@ -325,7 +394,7 @@ export function sheetData(s: SheetParams, timeS: number): ArrayBuffer {
     const f = new Float32Array(buffer);
     const u = new Uint32Array(buffer);
     f.set([s.altitudeKm, s.opticalDepth, s.coverage, s.sharpness], 0);
-    f.set(drift(s.wind, timeS, s.scaleKm), 4);
+    f.set(drift(s.wind, timeS), 4);
     f.set([s.scaleKm, evolutionAt(s.evolution, timeS), s.albedo, s.forwardG], 6);
     u.set([s.enabled ? 1 : 0, s.seed >>> 0], 10);
     const speed = Math.hypot(s.wind[0], s.wind[1]);
@@ -333,6 +402,9 @@ export function sheetData(s: SheetParams, timeS: number): ArrayBuffer {
         [speed > 0 ? s.wind[0] / speed : 1, speed > 0 ? s.wind[1] / speed : 0, s.fiberKm, s.detail, s.ripples ?? 0],
         12,
     );
+    const k = { ...DEFAULT_SHEET_NOISE, ...s.noise };
+    f.set([k.sweep, k.hook, k.bundles, k.bundleKm, k.fiberPower, k.fiberStretch, k.flocks, k.flockKm], 17);
+    f.set([k.grain, k.grainKm, k.broad, k.broadKm], 25);
     return buffer;
 }
 
