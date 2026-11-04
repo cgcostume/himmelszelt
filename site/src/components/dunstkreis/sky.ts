@@ -3,6 +3,7 @@ import {
     apparentDirection,
     clampObserverHeight,
     createSkyPass,
+    DEFAULT_AUREOLE,
     DEFAULT_AUTO_EXPOSURE_KEYS,
     precomputeAtmosphere,
 } from "@himmelszelt/dunstkreis";
@@ -256,6 +257,8 @@ export function skyFigure(root: HTMLElement) {
             toneMap,
             format,
             headroom,
+            // On in every figure; the one with the air's parts switches it.
+            aureole: pressed("aureole") ? DEFAULT_AUREOLE : false,
             ...(parts ? { scattering: scattering() } : {}),
         };
         if (!pass || !holds(passFor, settings)) {
@@ -345,7 +348,16 @@ export function skyFigure(root: HTMLElement) {
         });
         new ResizeObserver(requestRender).observe(canvas);
         maybe("exposure")?.addEventListener("input", requestRender);
-        for (const name of ["auto", "ramp", "lock", "refraction", "dither", ...INGREDIENTS, ...Object.keys(ORDERS)]) {
+        for (const name of [
+            "auto",
+            "ramp",
+            "lock",
+            "refraction",
+            "dither",
+            "aureole",
+            ...INGREDIENTS,
+            ...Object.keys(ORDERS),
+        ]) {
             maybe(name)?.addEventListener("click", async () => {
                 field(name).setAttribute("aria-pressed", String(!pressed(name)));
                 // The environment and the lighting figure take their exposure from this meter: rebuilt with it.

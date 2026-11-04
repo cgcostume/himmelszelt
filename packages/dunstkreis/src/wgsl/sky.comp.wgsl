@@ -1,6 +1,7 @@
 // The sky pass: a compute pass that turns the precomputed tables into pixels, one invocation per pixel of the target,
 // with no rasterization. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`, `sampling.wgsl`, `raymarch.wgsl`,
-// `camera.wgsl`, `cube.wgsl`, `sun.wgsl`, `tonemap.wgsl`, `grid.wgsl`, `frame.wgsl`, `quality.wgsl` and `features.wgsl`, plus the output
+// `camera.wgsl`, `cube.wgsl`, `sun.wgsl`, `glare.wgsl`, `tonemap.wgsl`, `grid.wgsl`, `frame.wgsl`, `quality.wgsl` and
+// `features.wgsl`, plus the output
 // at group 1, `dkOutputSize` and `dkOutputStore`, declared by whoever builds the pipeline since its format has to be
 // spelled out: `skyOutput(format)` for an image, `skyCubeOutput(format)` for a cube map's six faces.
 //
@@ -144,6 +145,47 @@ fn dkSkySunLuminance(sky: DkSkySample) -> vec3f {
 
 fn dkSkySunCoverage(sky: DkSkySample, footprint: f32) -> f32 {
     return dkSunDiscCoverage(sky.direction, dkParams.sunDirection, dkParams.sunAngularRadius, footprint);
+}
+
+// Within how many degrees of the sun the aureole is marched, and from where it fades out towards that: at 12° its lobe
+// is a five-thousandth of its peak, lost against the sky the tables already hold.
+const DK_AUREOLE_REACH: vec2f = vec2f(12.0, 20.0);
+
+// The angle between a view ray and where the sun shows, in degrees.
+fn dkFromApparentSun(view: vec3f) -> f32 {
+    return 2.0 * asin(min(length(view - dkParams.apparentSunDirection) * 0.5, 1.0)) * 57.29577951308232;
+}
+
+// The aureole along a view ray, in cd/m²: the narrow lobe's share of the aerosols' scattering, marched along the ray as
+// the sky is, dkRaymarchAerosol, times Henyey and Greenstein's lobe. The scattering angle is measured in the view's own
+// directions from where the sun shows: the sunlight reaching the aerosols near the observer is bent as the view rays
+// are, so the glow sits on the disc, and runs on unbroken across the horizon, where the bent direction a ray leaves the
+// atmosphere in gives way to the ground. Nothing from space, where the observer is above the aerosols.
+fn dkSkyAureole(view: vec3f) -> vec3f {
+    if (DK_AUREOLE_SHARE <= 0.0 || dkInSpace()) {
+        return vec3f(0.0);
+    }
+    let angle = dkFromApparentSun(view);
+    if (angle >= DK_AUREOLE_REACH.y) {
+        return vec3f(0.0);
+    }
+    let a = dkAtmosphere;
+    let h = max(dkParams.observerAltitude, 0.0);
+    let column = dkRaymarchAerosol(a, dkTransmittanceLut, dkLutSampler, h, view, dkParams.sunDirection);
+    let phase = dkPhaseHenyeyGreenstein(DK_AUREOLE_G, dot(view, dkParams.apparentSunDirection));
+    let fade = 1.0 - smoothstep(DK_AUREOLE_REACH.x, DK_AUREOLE_REACH.y, angle);
+    return dkToRgb(a, column * a.solarIlluminance) * (DK_AUREOLE_SHARE * phase * fade);
+}
+
+// The eye's veil along a view ray, from glare.wgsl, by the sun's illuminance the light meter wrote: for an eye of
+// thirty years, blue-green, times DK_VEIL. An effect of the eye, so centered on where the sun shows, in the view's
+// directions.
+fn dkSkyVeil(view: vec3f) -> vec3f {
+    if (DK_VEIL <= 0.0) {
+        return vec3f(0.0);
+    }
+    let veil = hdVeil(view, dkParams.apparentSunDirection, dkMetering.sunIlluminance, 30.0, 1.0);
+    return veil * DK_VEIL;
 }
 
 // Rays through a pixel the disc's edge or the horizon crosses, with DK_SUPERSAMPLE.
@@ -292,12 +334,14 @@ fn dkCubeTexel(face: u32, texel: vec2u, size: u32) -> vec3f {
             dkCubeRay(face, position + vec2f(side, 0.0), size),
             dkCubeRay(face, position + vec2f(0.0, side), size),
         );
-        luminance = luminance + dkSkyRayLuminance(view, sky, cell);
+        luminance = luminance + dkSkyRayLuminance(view, sky, cell) + dkSkyAureole(view);
         if (DK_SUN_DISC && dkSkySunCoverage(sky, 0.0) > 0.0) {
             luminance = luminance + dkSkySunLuminance(sky);
         }
     }
-    return luminance / f32(DK_SAMPLES_CUBE) * select(1.0, dkParams.skyViewScale, DK_CUBE_SCALED);
+    luminance = luminance / f32(DK_SAMPLES_CUBE) * select(1.0, dkParams.skyViewScale, DK_CUBE_SCALED);
+    // Without the disc the cube map is half floats, which the aureole's peak at noon can pass: held at their largest.
+    return select(min(luminance, vec3f(65504.0)), luminance, DK_SUN_DISC);
 }
 
 @compute @workgroup_size(8, 8, 1)
@@ -343,6 +387,9 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
             luminance = mix(above.luminance, under.luminance, below);
         }
     }
+
+    // The aureole and the eye's veil, both smooth enough for the center ray.
+    luminance = luminance + dkSkyAureole(view) + dkSkyVeil(view);
 
     // In cd/m², exposed. Without tone mapping, that is what is written: linear, for the caller's own tone mapping.
     let exposure = dkExposure();

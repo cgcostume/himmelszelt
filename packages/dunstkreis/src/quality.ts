@@ -49,6 +49,8 @@ export interface Features {
     autoExposure: boolean;
     debugGrid: boolean;
     sunDisc: boolean;
+    /** The eye's veil around the sun, its strength: 1 the eye's own, 0 none. */
+    veil: number;
     discAlpha: boolean;
     supersample: boolean;
     cube: boolean;
@@ -65,6 +67,7 @@ export const DEFAULT_FEATURES: Features = {
     autoExposure: false,
     debugGrid: false,
     sunDisc: true,
+    veil: 0,
     discAlpha: false,
     supersample: true,
     cube: false,
@@ -83,6 +86,7 @@ export function featureConstants(features: Partial<Features> = {}): Record<strin
         DK_AUTO_EXPOSURE: Number(f.autoExposure),
         DK_DEBUG_GRID: Number(f.debugGrid),
         DK_SUN_DISC: Number(f.sunDisc),
+        DK_VEIL: f.veil,
         DK_DISC_ALPHA: Number(f.discAlpha),
         DK_SUPERSAMPLE: Number(f.supersample),
         DK_CUBE: Number(f.cube),
@@ -105,4 +109,24 @@ export const scatteringConstants = ({
 } = {}) => ({
     DK_SINGLE_SCATTERING: Number(single),
     DK_MULTIPLE_SCATTERING: Number(multiple),
+});
+
+/**
+ * The aureole, the aerosols' narrow forward lobe around the sun: the share of their scattering in it and its asymmetry.
+ * 5 % at 0.98 by default, a glow of about a degree around the Sun, which brings a single Cornette-Shanks lobe's
+ * forward peak to about what measured aerosols show; off, the one lobe carries all of it, as Bruneton's and Hillaire's
+ * skies do. At the horizon the aerosol along a ray is some hundred times the zenith's and thins fast with altitude,
+ * so a wide lobe there would be a band along the horizon rather than a glow.
+ */
+export interface Aureole {
+    share: number;
+    g: number;
+}
+
+export const DEFAULT_AUREOLE: Aureole = { share: 0.05, g: 0.98 };
+
+/** `common.wgsl`'s aureole overrides, for every pass that marches the air and the sky pass that adds it. */
+export const aureoleConstants = (aureole: Aureole | false = DEFAULT_AUREOLE) => ({
+    DK_AUREOLE_SHARE: aureole === false ? 0 : aureole.share,
+    DK_AUREOLE_G: aureole === false ? DEFAULT_AUREOLE.g : aureole.g,
 });

@@ -16,6 +16,7 @@ const source = [
     goldenSet("goldenSet64", GOLDEN_SET_64),
     wgsl.cube,
     wgsl.sun,
+    wgsl.glare,
     wgsl.tonemap,
     scene,
 ].join("\n");
@@ -106,9 +107,8 @@ export type SceneOptions = {
     background?: GPUTexture | null;
     sunLight?: boolean;
     skyLight?: boolean;
-    bloom?: number;
+    veil?: number;
     godRaySamples?: number;
-    airDensity?: number;
     hazeDensity?: number;
     cubified?: boolean;
     dither?: boolean;
@@ -165,9 +165,10 @@ export function createScene(device: GPUDevice) {
          * holding the sky in cd/m² through the same camera, replaces the sky map behind the solids. `cubified` for a sky map written cubified, `skyScale` for one written scaled, which its light and coefficients are divided by. The ground is
          * the backdrop's own, with the solids' shadows taken out of it. `sunLight` and `skyLight`, both on
          * by default, switch the direct sunlight and the sky's light from the coefficients.
-         * `bloom`, 0 to 1, how strong the sun's veil is, `godRaySamples`, 8 or 64, haze lit by the sun
-         * with the solids' shadows through it, 0 for none. `airDensity` and `hazeDensity`, around the camera relative to
-         * the ground's, 1 by default, thin the veil and the haze. `discDirection` and `discIlluminance`, the sun as the
+         * `veil`, 0 by default to 1 for the eye's own,
+         * is the eye's glare around the sun, `godRaySamples`, 8 or 64, haze lit by the sun
+         * with the solids' shadows through it, 0 for none. `hazeDensity`, around the camera relative to
+         * the ground's, 1 by default, thins the haze. `discDirection` and `discIlluminance`, the sun as the
          * camera sees it from its own height, the sun's by default, place and light the disc and its veil; `horizonZ`,
          * the planet's horizon as the camera sees it, hides the disc below it, -1 by default for none. `dither`, on by
          * default, dithers the 8-bit output against banding. `toneCurve`, "neutral" by default, "agx", "aces" or "clip", as dunstkreis'.
@@ -197,9 +198,8 @@ export function createScene(device: GPUDevice) {
             flags[108] = rest.shadowRays ?? 0;
             flags[109] = rest.background ? 1 : 0;
             flags[111] = (rest.sunLight === false ? 0 : 1) | (rest.skyLight === false ? 0 : 2);
-            data[113] = rest.bloom ?? 0;
+            data[113] = rest.veil ?? 0;
             flags[114] = rest.godRaySamples ?? 0;
-            data[115] = rest.airDensity ?? 1;
             data[116] = rest.hazeDensity ?? 1;
             flags[117] = rest.cubified ? 1 : 0;
             flags[118] = rest.dither === false ? 0 : 1;

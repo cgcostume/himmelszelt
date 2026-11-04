@@ -7,6 +7,7 @@ draft: true
 references:
     - bayer1973
     - bt2408
+    - cie2002
     - goethe1810
     - iec1999
     - jimenez2014
@@ -224,6 +225,22 @@ const bloom = await createBloomPass(device);
 bloom.encode(encoder, exposed, bloomed, 0.04);
 ```
 
+## The veil
+
+Bloom knows only the image. The eye knows the source: whatever is bright scatters a little of its light across the
+retina, a veil over everything near it, and by the Sun that veil outshines the sky out to some ten degrees, which is why
+nothing can be made out around it. The CIE measured it on people <Cite id="cie2002" />: the veil's luminance per lux the
+source throws into the eye falls with the cube of the angle close in and with its square farther out, and grows with
+age, to twice at 62. `hdVeil` lays that over a pixel from the source's direction and its illuminance at the eye, in
+cd/m², to add before the exposure; `veilingGlare` is the same curve on the CPU. A lens veils less, with a flare of its
+own, so a two-hundredth of it stands in for a camera. How it meets the Sun's disc, the air's own glow and the bloom around them is
+[dunstkreis'](../dunstkreis/#the-sun-in-the-picture).
+
+```wgsl
+// The Sun's veil over a pixel looking along `direction`, for an eye of thirty years, blue-green.
+let veil = hdVeil(direction, sunDirection, sunIlluminance, 30.0, 1.0);
+```
+
 ## Beyond white
 
 A display that shows more gets more, and only the last step changes. An rgba16float canvas with extended tone mapping
@@ -250,7 +267,8 @@ Lagarde and Charles de Rousiers wrote down for Frostbite the exposure convention
 curves are Khronos' <Cite id="khronos2024" />, Troy Sobotka's AgX <Cite id="sobotka2023" /> in Benjamin Wrensch's fit
 <Cite id="wrensch2023" />, and Krzysztof Narkowicz's fit of the ACES curve <Cite id="narkowicz2016" />. Jorge Jimenez
 showed the bloom chain and the gradient noise at SIGGRAPH 2014 <Cite id="jimenez2014" />, and Robert Ulichney the blue
-of noise, in 1988 <Cite id="ulichney1988" />.
+of noise, in 1988 <Cite id="ulichney1988" />. The veil is the CIE's equation, from the committee Johannes Vos and Thomas
+van den Berg wrote it for <Cite id="cie2002" />.
 
 The panoramas of this chapter are [Poly Haven](https://polyhaven.com/)'s, who give some thousand HDRIs away, under CC0,
 to anyone <Cite id="polyhaven" />. Without such a shelf of

@@ -33,6 +33,9 @@ export {
     meteredLuminance,
 } from "./meter.js";
 
+// The veil of a bright point source, the eye's own glare.
+export { veilingGlare } from "./glare.js";
+
 // Bloom, over a linear, exposed image.
 export type { BloomPass, BloomPassOptions } from "./bloom.js";
 export { createBloomPass } from "./bloom.js";

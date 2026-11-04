@@ -1,5 +1,5 @@
 import type { AtmosphereLUTs, SkyPass, SkyPassOptions } from "@himmelszelt/dunstkreis";
-import { apparentDirection, clampObserverHeight, createSkyPass } from "@himmelszelt/dunstkreis";
+import { apparentDirection, clampObserverHeight, createSkyPass, DEFAULT_AUREOLE } from "@himmelszelt/dunstkreis";
 import { type BloomPass, createBloomPass } from "@himmelszelt/helldunkel";
 import type { Direction } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
@@ -110,8 +110,13 @@ const bloomChosen = () => Number(chosen("lighting-bloom", 0)) > 0;
 
 /** Whether the sky pass is ready for the current settings; if not, it is compiled, and renders once it is in. */
 function readySkyPass(luts: AtmosphereLUTs) {
-    // With the sun disc, drawn along every bent ray, as the sky figure draws it.
-    const settings = { luts, groundLight: quality.groundLight, sunDisc: pressed("sunDisc") && !bloomChosen() };
+    // With the sun disc, drawn along every bent ray, as the sky figure draws it, and the aureole.
+    const settings = {
+        luts,
+        groundLight: quality.groundLight,
+        sunDisc: pressed("sunDisc") && !bloomChosen(),
+        aureole: pressed("aureole") ? DEFAULT_AUREOLE : (false as const),
+    };
     const same = (other: object | null) =>
         other !== null &&
         Object.entries(settings).every(([key, value]) => (other as Record<string, unknown>)[key] === value);
@@ -266,10 +271,9 @@ function render() {
         ev100,
         // Behind the live atmosphere, the sky pass has drawn the disc already.
         sunDisc: pressed("sunDisc") && (live === null || bloomChosen()),
-        bloom: ({ off: 0, light: 0.35, strong: 1 } as Record<string, number>)[chosen("lighting-veil", "strong")],
+        veil: ({ off: 0, lens: 0.005, eye: 1 } as Record<string, number>)[chosen("lighting-veil", "lens")],
         godRaySamples: Number(chosen("lighting-godrays", 8)),
-        // The air thins with a scale height of 8 km, the haze in it with 1.2 km.
-        airDensity: Math.exp(-cameraFrame(camera).eye[2] / 8000),
+        // The haze thins with a scale height of 1.2 km.
         hazeDensity: Math.exp(-cameraFrame(camera).eye[2] / 1200),
         occlusionRays: occlusionRays(),
         shadowRays: shadowRays(),
@@ -326,7 +330,7 @@ if (gpu.error) {
         'input[name="lighting-shadows"], input[name="lighting-background"], input[name="lighting-occlusion"], input[name="lighting-godrays"], input[name="lighting-bloom"], input[name="lighting-veil"]',
     ))
         radio.addEventListener("change", requestRender);
-    for (const name of ["rotate", "sunDisc", "sunLight", "skyLight", "dither", "lock"]) {
+    for (const name of ["rotate", "sunDisc", "aureole", "sunLight", "skyLight", "dither", "lock"]) {
         field(name).addEventListener("click", () => {
             field(name).setAttribute("aria-pressed", String(!pressed(name)));
             if (name === "lock" && !pressed("lock")) unlock();

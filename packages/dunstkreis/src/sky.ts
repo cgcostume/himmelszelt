@@ -13,12 +13,15 @@ import {
     type SkyPass,
 } from "./pass.js";
 import {
+    type Aureole,
+    aureoleConstants,
     type Features,
     featureConstants,
     pipelineConstants,
     refractionConstants,
     scatteringConstants,
 } from "./quality.js";
+import { apparentDirection } from "./refraction.js";
 import * as wgsl from "./wgsl/index.js";
 
 export interface SkyPassOptions {
@@ -55,6 +58,18 @@ export interface SkyPassOptions {
     /** Draw the sun disc. Default true. */
     sunDisc?: boolean;
     /**
+     * The aureole, the white glow of a few degrees around the sun: a share of the aerosols' scattering in a narrow forward
+     * lobe, which the sky-view table leaves out and the sky pass adds per pixel, exactly, to the image as to a cube map.
+     * `DEFAULT_AUREOLE` by default, 5 % of it at g 0.98; `false` for Bruneton's one lobe alone.
+     */
+    aureole?: Aureole | false;
+    /**
+     * The eye's veil around the sun, by CIE's glare equation, from the sun's illuminance at the observer: its strength,
+     * 1 for the eye's own, which washes out some 10° around the Sun by day, a two-hundredth for a camera's lens. 0 by
+     * default, none. Needs the sun's illuminance, which the light meter writes with every sky-view table.
+     */
+    veil?: number;
+    /**
      * With `toneMap` off, write how much of each pixel the sun disc covers into alpha, 0 off the disc, rather than 1: a
      * caller that tone maps can curve the sky and the disc apart and mix them after, so the disc's edge stays smooth.
      * The disc's own light is the difference to a pass without it, divided by the share. Off by default.
@@ -84,8 +99,11 @@ export interface SkyPassOptions {
     aerialPerspective?: boolean | AerialPerspectiveOptions;
 }
 
-/** Byte size of DkSkyParams in frame.wgsl: a vec3 and a scalar, a mat4x4, four scalars, a vec2 and two scalars. */
-const SKY_PARAMS_SIZE = 112;
+/**
+ * Byte size of DkSkyParams in frame.wgsl: a vec3 and a scalar, a mat4x4, four scalars, a vec2 and two scalars, and a
+ * vec3 padded to 16.
+ */
+const SKY_PARAMS_SIZE = 128;
 /** The light meter's directions per cap, `DK_METER_SAMPLES` in frame.wgsl, one per invocation of 128 per workgroup. */
 const METER_SAMPLES = 4096;
 const METER_WORKGROUPS = METER_SAMPLES / 128;
@@ -163,11 +181,19 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         autoExposure = false,
         debugGrid = false,
         sunDisc = true,
+        aureole,
+        veil = 0,
         discAlpha = false,
         supersample = true,
         groundLight = true,
         headroom = 1,
     } = options;
+    if (!(veil >= 0)) throw new Error(`dunstkreis: a veil of ${veil}; its strength is 0 or more`);
+    if (aureole && !(aureole.share >= 0 && aureole.share <= 1 && aureole.g > 0 && aureole.g < 1)) {
+        throw new Error(
+            "dunstkreis: an aureole takes a share from 0 to 1 of the aerosols' scattering and a g within (0, 1)",
+        );
+    }
     const dither = options.dither ?? (toneMap !== false && EIGHT_BIT.includes(format));
     const storable = ["rgba8unorm", "rgba16float", "rgba32float"].includes(format);
     if (!storable && !(format === "bgra8unorm" && device.features.has("bgra8unorm-storage"))) {
@@ -181,6 +207,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         ...featureConstants(features),
         ...refractionConstants(model),
         ...scatteringConstants(options.scattering),
+        ...aureoleConstants(aureole),
     });
     const prelude = [
         wgsl.quality,
@@ -194,7 +221,9 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     ];
     // Everything but the output, which differs between an image and a cube map.
     const skySource = (output: string) =>
-        [...prelude, wgsl.camera, wgsl.cube, wgsl.sun, wgsl.tonemap, wgsl.grid, output, wgsl.sky].join("\n");
+        [...prelude, wgsl.camera, wgsl.cube, wgsl.sun, wgsl.glare, wgsl.tonemap, wgsl.grid, output, wgsl.sky].join(
+            "\n",
+        );
     // A cube map's format and settings.
     const checkEnvironment = (format: GPUTextureFormat, sunDisc: boolean, samples: number) => {
         if (format !== "rgba16float" && format !== "rgba32float") {
@@ -312,6 +341,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                     autoExposure,
                     debugGrid,
                     sunDisc,
+                    veil,
                     discAlpha,
                     supersample,
                 }),
@@ -420,6 +450,8 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     let aerialKey = "";
     let compensation = 0;
     let scale = 1;
+    // Where the sun shows, for the aureole and the veil, and the sun and height it was traced for.
+    let apparent: { key: string; direction: readonly number[] } = { key: "", direction: [0, 0, 1] };
 
     async function readMetering(offset: number, floats: number): Promise<Float32Array> {
         const staging = device.createBuffer({
@@ -466,6 +498,11 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             scale = skyViewScale(model.solarIlluminance, sunAltitude);
             sky[26] = scale;
             sky[27] = params.pixelRatio;
+            // Traced by bisection on the CPU, so once per sun and height.
+            const sunKey = `${sx},${sy},${sz},${height}`;
+            if (apparent.key !== sunKey)
+                apparent = { key: sunKey, direction: apparentDirection([sx, sy, sz], model, height) };
+            sky.set(apparent.direction, 28);
             device.queue.writeBuffer(skyParams, 0, sky);
 
             // Rebuilding the sky-view table is the expensive part, and it is why the sky pass itself is one fetch
@@ -558,7 +595,15 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                         module: device.createShaderModule({ code: skySource(wgsl.skyCubeOutput(cubeFormat)) }),
                         entryPoint: "dkSky",
                         constants: constants(
-                            { toneMap: false, dither: false, cube: true, cubeScaled: scaled, cubify, sunDisc },
+                            {
+                                toneMap: false,
+                                dither: false,
+                                cube: true,
+                                cubeScaled: scaled,
+                                cubify,
+                                sunDisc,
+                                veil: 0,
+                            },
                             { cube: samples },
                         ),
                     },

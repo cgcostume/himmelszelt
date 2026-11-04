@@ -23,6 +23,11 @@ override DK_DEBUG_GRID: bool = false;
 // 10^9 cd/m² in a few texels would outshine the whole sky in every filtered lookup.
 override DK_SUN_DISC: bool = true;
 
+// The eye's veil around the sun, by CIE's glare equation (glare.wgsl): its strength, 1 for the eye's own, 0 for none.
+// The sun's illuminance at the observer comes from the light meter's buffer, so it needs no tone curve, only that the
+// sky-view table was built. Added to the sky's light before it is exposed, over the disc too.
+override DK_VEIL: f32 = 0.0;
+
 // Without a tone curve, write how much of each pixel the disc covers into alpha, 0 off it: a caller that tone maps can
 // then curve the sky and the disc apart and mix them after, as the pass does, rather than whitening every pixel the disc
 // barely touches.

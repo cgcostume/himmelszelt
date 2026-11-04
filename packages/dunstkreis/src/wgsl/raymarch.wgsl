@@ -45,8 +45,10 @@ fn dkRaymarchStep(
     let sunTransmittance = dkSampleTransmittanceToTop(a, transmittanceLut, lutSampler, altitude, muS);
 
     // Single scattering carries the phase functions, which is what puts the glow around the sun and the
-    // blue overhead. The multiple-scattering term does not: it was built isotropically on purpose.
-    let phases = a.betaR * densityR * dkPhaseRayleigh(nu) + a.betaMSca * densityM * dkPhaseMie(a, nu);
+    // blue overhead. The multiple-scattering term does not: it was built isotropically on purpose. The aureole's
+    // share of the aerosols' lobe is left out here and added per pixel by the sky pass, where a table cannot hold it.
+    let phases = a.betaR * densityR * dkPhaseRayleigh(nu)
+        + a.betaMSca * densityM * dkPhaseMie(a, nu) * (1.0 - DK_AUREOLE_SHARE);
     var inScatter = vec4f(0.0);
     if (DK_SINGLE_SCATTERING) {
         inScatter += sunTransmittance * phases;
@@ -108,6 +110,55 @@ fn dkRaymarchSegment(
     result.direction = dkPathToWorld(path.direction, up, horizontal);
     result.endUp = dkPathToWorld(dkPathUp(a, h, path.position), up, horizontal);
     return result;
+}
+
+// Steps of the aureole's march: its integrand is smooth, the phase function is not in it.
+const DK_AUREOLE_SAMPLES: u32 = 24u;
+
+// The aureole's march: the sunlight the aerosols along a ray scatter, without the phase function, at the four
+// wavelengths, ∫ βM ρM(t) T(0, t) T☉(t) dt, from an observer at altitude h, z up, to where the ray leaves the atmosphere
+// or meets the ground. Along the same bent path as the sky's own march, so the ground, the bent horizon and the
+// observer's height are the sky's; dimmed by the air in front, as the sky is, which keeps a ray along the horizon, with
+// some hundred times the aerosols overhead, from glowing white. Times solarIlluminance and the narrow lobe's phase and
+// share, it is the aureole: that close to the sun, the scattering angle hardly changes along the ray.
+fn dkRaymarchAerosol(
+    a: DkAtmosphere,
+    transmittanceLut: texture_2d<f32>,
+    lutSampler: sampler,
+    h: f32,
+    direction: vec3f,
+    sunDirection: vec3f,
+) -> vec4f {
+    let up = vec3f(0.0, 0.0, 1.0);
+    let horizontal = dkPathHorizontal(up, direction);
+    let mu = clamp(direction.z, -1.0, 1.0);
+    let hitsGround = dkIntersectsGround(a, h, mu);
+    let quadratic = mu >= 0.0;
+    let n = f32(DK_AUREOLE_SAMPLES);
+    var path = dkPathStart(mu);
+    let total = dkPathRemainingStart(a, h, path, hitsGround);
+    var transmittance = vec4f(1.0);
+    var column = vec4f(0.0);
+    for (var i = 0u; i < DK_AUREOLE_SAMPLES; i = i + 1u) {
+        let k = f32(i);
+        let share = select(1.0 / (n - k), (2.0 * k + 1.0) / (n * n - k * k), quadratic);
+        var remaining = total * select((n - k) / n, (n * n - k * k) / (n * n), quadratic);
+        if (DK_REFRACTION) {
+            remaining = dkPathRemaining(a, h, path, hitsGround);
+        }
+        let ds = remaining * share;
+        let step = dkPathAdvance(a, h, path, ds);
+        let pointUp = dkPathToWorld(dkPathUp(a, h, step.middle.position), up, horizontal);
+        let muS = clamp(dot(pointUp, sunDirection), -1.0, 1.0);
+        let extinction = max(dkExtinction(a, step.altitude), vec4f(1e-9));
+        let stepTransmittance = exp(-extinction * ds);
+        let toSun = dkSampleTransmittanceToTop(a, transmittanceLut, lutSampler, step.altitude, muS);
+        let scattering = a.betaMSca * dkDensityMie(a, step.altitude);
+        column += transmittance * toSun * scattering * (1.0 - stepTransmittance) / extinction;
+        transmittance *= stepTransmittance;
+        path = step.next;
+    }
+    return column;
 }
 
 // A distance longer than any ray through the atmosphere: a segment that long is the whole ray.

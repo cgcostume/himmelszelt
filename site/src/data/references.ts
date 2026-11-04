@@ -283,6 +283,13 @@ export const references: Record<string, Reference> = {
         year: 2011,
         note: "The solar constant, 1361 W/m².",
     },
+    cie2002: {
+        authors: "CIE Technical Committee 1-50, Johannes J. Vos, Thomas J. T. P. van den Berg",
+        title: "CIE equations for disability glare",
+        venue: "CIE 146:2002",
+        year: 2002,
+        note: "The general glare equation: the eye's veil around a bright source by the angle, the age and the pigment.",
+    },
     lagarde2014: {
         authors: "Sébastien Lagarde, Charles de Rousiers",
         title: "Moving Frostbite to Physically Based Rendering",

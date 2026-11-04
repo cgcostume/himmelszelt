@@ -34,6 +34,9 @@ fn show(luminance: vec3f, exposure: f32) -> vec3f {
 - `adaptEV100(current, target, seconds, { toBrighter, toDarker })`: the same following on the CPU.
 - `createBloomPass(device)`: `encode(encoder, source, target, strength)` over a linear, exposed rgba16float image, after
   Jimenez 2014, before the tone curve. It moves light rather than adding it.
+- `veilingGlare(angle, age, pigment)` and `hdVeil` in `wgsl.glare`: the eye's veil around a bright point source, CIE's
+  general disability glare equation (CIE 146:2002), in cd/m² per lux at the eye, to add before the exposure. The Sun's
+  veil in a sky, where bloom knows only the image.
 
 Gamut mapping and Display P3 are planned. `@himmelszelt/dunstkreis` bundles this package's curves for its sky pass, so
 installing it needs nothing else. Part of the [himmelszelt monorepo](https://github.com/cgcostume/himmelszelt).

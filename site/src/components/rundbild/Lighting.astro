@@ -6,7 +6,7 @@ import OptionGroup from "../dunstkreis/OptionGroup.astro";
 import SkyFrame from "../dunstkreis/SkyFrame.astro";
 import "../dunstkreis/dunstkreis.css";
 
-const { bloom = "0" } = Astro.props as { bloom?: "0" | "0.04" | "0.15" };
+const { bloom = "0", caption } = Astro.props as { bloom?: "0" | "0.04" | "0.15"; caption?: string };
 
 // The choices over the scene, in its options' groups: what lies behind it, how it is lit, and how finely it is sampled.
 const GROUPS = {
@@ -33,13 +33,13 @@ const GROUPS = {
     veil: {
         label: "Veil",
         heading: "veil",
-        title: "The air's wide, soft veil around the Sun, thinning with height, gone in space: none, light or strong",
+        title: "The veil around the Sun from its illuminance, CIE's glare equation: none, a two-hundredth of it as a camera's lens veils, or the eye's own, measured on people, which washes out some 10° around the Sun by day",
         options: [
             ["off", "off"],
-            ["light", "light"],
-            ["strong", "strong"],
+            ["lens", "lens"],
+            ["eye", "eye"],
         ],
-        checked: "strong",
+        checked: "lens",
     },
     shadows: {
         label: "Shadow rays over the Sun's disc",
@@ -88,6 +88,7 @@ const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
             <OptionGroup name="background">
                 <Choice {...group("background")} />
                 <button type="button" class="view-toggle" data-field="sunDisc" aria-pressed="true" title="Draw the Sun's disc in the background">sun disc</button>
+                <button type="button" class="view-toggle" data-field="aureole" aria-pressed="true" title="The aureole, the air's glow of a few degrees around the Sun: a share of the aerosols' scattering in a narrow forward lobe, added per pixel behind the solids. Off, Bruneton's one lobe alone. The sky map behind keeps the page's">aureole</button>
             </OptionGroup>
             <OptionGroup name="light">
                 <button type="button" class="view-toggle" data-field="sunLight" aria-pressed="true" title="Light the solids by the Sun directly, with its shadows">sunlight</button>
@@ -115,12 +116,10 @@ const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
     </SkyFrame>
     <p class="view-status" data-field="info"></p>
     <figcaption class="figure-caption">
-        The five Platonic solids, on a pentagon around a sphere, lit by the sky above: the Sun as a light of its own, with its
-        shadows, soft from rays spread over its disc, and the sky's light from its nine coefficients, dimmed where the
-        solids hide the sky. Raytraced, not a triangle in it, four rays per pixel. Every surface is white but the
-        ground, a darker gray; the colors are the light's. The ground is the backdrop's own below the horizon, with
-        their shadows taken out of it.
-        Exposed like the sky.
+        {
+            caption ??
+                "The five Platonic solids, on a pentagon around a sphere, lit by the sky above: the Sun as a light of its own, with its shadows, soft from rays spread over its disc, and the sky's light from its nine coefficients, dimmed where the solids hide the sky. Raytraced, not a triangle in it, four rays per pixel. Every surface is white but the ground, a darker gray; the colors are the light's. The ground is the backdrop's own below the horizon, with their shadows taken out of it. Exposed like the sky."
+        }
     </figcaption>
 </figure>
 

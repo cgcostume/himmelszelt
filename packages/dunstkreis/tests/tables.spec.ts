@@ -64,7 +64,9 @@ test("the tables, the sky-view table, the meter and a few pixels of sky hold the
     near(texel(multiScattering, 64, 32), [3.8262, 3.6113, 4.3359, 4.7266], 0.01);
 
     // Exposed by ev100, not metered, so the pixels below are of a known exposure; the meter runs and is read either way.
-    const pass = await createSkyPass(device, { luts, format: "rgba16float", toneMap: false });
+    // Without the aureole, which takes a share of the aerosols' forward lobe out of the table: the values are of the
+    // march as Hillaire's.
+    const pass = await createSkyPass(device, { luts, format: "rgba16float", toneMap: false, aureole: false });
     const width = 1920;
     const height = 1080;
     const params = {
@@ -138,5 +140,81 @@ test("the light scattered once and the light scattered more than once add up to 
         for (const part of [single[i], multiple[i]])
             expect((part as number[])[0]).toBeLessThan((whole[0] as number) * 0.99);
     }
+    luts.destroy();
+});
+
+test("the aureole sits on the setting sun and runs on across the horizon without a step", async () => {
+    const device = await gpuDevice();
+    test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
+    if (!device) return;
+
+    const luts = await precomputeAtmosphere(device);
+    // Due north, 0.2° up, through a narrow camera looking straight at the horizon: 8° high, 256 pixels, 0.03° each.
+    const altitude = (0.2 * Math.PI) / 180;
+    const size = 256;
+    const ty = Math.tan((8 * Math.PI) / 360);
+    // biome-ignore format: a matrix reads best as one
+    const inverseViewProjection = new Float32Array([ty, 0, 0, 0, 0, 0, ty, 0, 0, 0, 0, 1, 0, 1, 0, 0]);
+    const params = {
+        sunDirection: [0, Math.cos(altitude), Math.sin(altitude)] as [number, number, number],
+        sunAngularDiameter: 0.533,
+        // An exposure of 1: the luminance itself.
+        ev100: -Math.log2(1.2),
+        inverseViewProjection,
+        observerHeightM: 10,
+    };
+    const render = async (aureole: false | undefined) => {
+        const pass = await createSkyPass(device, {
+            luts,
+            format: "rgba32float",
+            toneMap: false,
+            sunDisc: false,
+            ...(aureole === false ? { aureole } : {}),
+        });
+        pass.update(params);
+        const target = device.createTexture({
+            size: [size, size],
+            format: "rgba32float",
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC,
+        });
+        const encoder = device.createCommandEncoder();
+        pass.encode(encoder, target);
+        device.queue.submit([encoder.finish()]);
+        const image = await readTexture(device, target);
+        target.destroy();
+        pass.destroy();
+        return image;
+    };
+    const [withAureole, without] = await Promise.all([render(undefined), render(false)]);
+    const green = (image: typeof withAureole, x: number, y: number) => texel(image, x, y)[1] as number;
+    const aureole = (x: number, y: number) => green(withAureole, x, y) - green(without, x, y);
+
+    // Brightest where the sun shows, a little above the image's middle row, the horizon.
+    let peak = { x: 0, y: 0, value: 0 };
+    for (let y = 0; y < size; ++y)
+        for (let x = 0; x < size; ++x) if (aureole(x, y) > peak.value) peak = { x, y, value: aureole(x, y) };
+    expect(Math.abs(peak.x - size / 2)).toBeLessThanOrEqual(2);
+    expect(peak.y).toBeLessThan(size / 2);
+    expect(peak.y).toBeGreaterThan(size / 2 - 30);
+
+    // The horizon: the row below which the sky drops to the ground's light in front of it, short of the long rays above.
+    const column = peak.x + 50;
+    let horizon = size / 2 - 40;
+    while (green(without, column, horizon) < 3 * green(without, column, horizon + 1)) ++horizon;
+    // 1.5° to the side, 50 pixels, down the column, above the horizon and below it: from row to row the aureole changes
+    // by at most a quarter more than the sky does, which falls steeply just below the horizon, where the ground comes
+    // near fast. Across it the aureole drops as the sky does, since both are the air's light along the same rays.
+    const sky = (x: number, y: number) => green(without, x, y);
+    const ratio = (f: (x: number, y: number) => number, y: number) =>
+        Math.max(f(column, y), f(column, y + 1)) / Math.min(f(column, y), f(column, y + 1));
+    for (let y = horizon - 40; y < horizon + 40; ++y) {
+        if (y === horizon) continue;
+        expect(ratio(aureole, y), `rows ${y} and ${y + 1}`).toBeLessThan(1.25 * Math.max(1, ratio(sky, y)));
+    }
+    expect(ratio(aureole, horizon)).toBeLessThan(2 * ratio(sky, horizon));
+    // A glow of a degree or so: 1.5° to the side as bright as the sky there at most, at 4° a few percent of it.
+    expect(aureole(column, peak.y) / green(without, column, peak.y)).toBeLessThan(1);
+    const far = peak.x + Math.round(4 / (8 / size));
+    expect(aureole(far, peak.y) / green(without, far, peak.y)).toBeLessThan(0.05);
     luts.destroy();
 });

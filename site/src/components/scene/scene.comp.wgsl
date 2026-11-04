@@ -40,15 +40,16 @@ struct Params {
     free0: f32,
     // Which lights shine on the scene: 1 the sun directly, 2 the sky by its coefficients.
     lights: u32,
-    // Free, where the choice of ground was: it is always the backdrop's, with the solids' shadows taken out of it.
-    free1: u32,
-    // How strong the sun's veil is, 0 for none to 1 for full: light ones are fainter and narrower.
-    bloom: f32,
+    // Free, where the darkening of the disc towards its rim was.
+    free2: u32,
+    // The eye's veil around the sun, from helldunkel's glare.wgsl: its strength, 1 for the eye's own, 0 for none.
+    veil: f32,
     // Samples along each camera ray through the haze for god rays, 0 for none.
     godRaySamples: u32,
-    // The air's density around the camera relative to the ground's, and the haze's: the veil and the god rays thin out
-    // with height and are gone in space.
-    airDensity: f32,
+    // Free, where the air's density around the camera was.
+    free1: f32,
+    // The haze's density around the camera relative to the ground's: the god rays thin out with height and are gone
+    // in space.
     hazeDensity: f32,
     // Nonzero when the sky map is cubified, sampled through rbCubeFromSphere from dunstkreis' cube.wgsl.
     cubified: u32,
@@ -79,8 +80,6 @@ struct Params {
 @group(0) @binding(5) var background: texture_2d<f32>;
 @group(0) @binding(6) var blueNoiseTexture: texture_2d<f32>;
 
-// The sun's glare: a wide, soft veil around it, a share of the sunlight, its width in radians.
-const GLARE_VEIL: vec2f = vec2f(0.03, 0.15);
 // The haze the god rays show in: its scattering coefficient per meter, how far in front of the camera it reaches, in
 // meters, and the forward lobe of its phase function.
 const HAZE: f32 = 0.002;
@@ -367,15 +366,10 @@ fn cameraRay(pixel: vec2u, size: vec2u, subsample: vec2f) -> vec3f {
     return normalize(params.forward + across - params.up * (uv.y * params.tanHalfFov));
 }
 
-// A normalized long-tailed lobe over the sphere, per steradian, falling off with the cube of the angle beyond `width`,
-// as measured veiling glare does (Spencer et al. 1995).
-fn veil(angle: f32, width: f32) -> f32 {
-    return width / (2.0 * PI * pow(angle * angle + width * width, 1.5));
-}
-
-// The sun's veil, in cd/m², looking along `direction`. It lies over whatever is in front, as glare does, and dims as
-// far as the solids hide the sun from the eye, which eight fixed rays over its disc tell.
-fn bloom(direction: vec3f) -> vec3f {
+// The eye's veil around the sun, in cd/m², looking along `direction`: CIE's glare, for an eye of thirty years, from
+// helldunkel's glare.wgsl. It lies over whatever is in front, as glare does, and dims as far as the solids hide the
+// sun from the eye, which eight fixed rays over its disc tell.
+fn veil(direction: vec3f) -> vec3f {
     var visible = 0.0;
     let sun = params.discDirection;
     let helper = select(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 1.0, 0.0), abs(sun.x) > 0.9);
@@ -390,11 +384,7 @@ fn bloom(direction: vec3f) -> vec3f {
     if (visible == 0.0) {
         return vec3f(0.0);
     }
-    let angle = 2.0 * asin(min(length(direction - sun) / 2.0, 1.0));
-    // The veil is the air's, scattering forward around the sun: it thins with the air around the camera, gone in space.
-    let width = GLARE_VEIL.y * mix(0.5, 1.0, params.bloom);
-    let spread = GLARE_VEIL.x * params.bloom * params.airDensity * veil(angle, width);
-    return params.discIlluminance * spread * visible;
+    return hdVeil(direction, sun, params.discIlluminance, 30.0, 1.0) * params.veil * visible;
 }
 
 // The haze's light along a camera ray up to `end`: the sun's light it scatters towards the camera, wherever the solids
@@ -480,8 +470,8 @@ fn render(@builtin(global_invocation_id) id: vec3u) {
         let air = haze(id.xy, center, rayLength(center));
         luminance = luminance * air.w + air.rgb;
     }
-    if (params.bloom > 0.0 && params.discIlluminance.g > 0.0) {
-        luminance = luminance + bloom(center);
+    if (params.veil > 0.0 && params.discIlluminance.g > 0.0) {
+        luminance = luminance + veil(center);
     }
     if (params.linearOutput != 0u) {
         var light = luminance;

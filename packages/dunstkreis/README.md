@@ -115,6 +115,27 @@ fade towards white as film does, flatter and grayer by day, or Narkowicz's ACES 
 triangular distribution, from the pixel alone, without a texture. Off, it writes the exposed luminance, linear and unclamped, for a float target and
 a renderer that tone maps the frame itself, with `wgsl.tonemap` if it likes.
 
+## The Sun in the picture
+
+The Sun is drawn per pixel over the sky, never stored in a table, and in parts a renderer can take or leave:
+
+- The disc, `sunDisc`, dimmed and reddened by the air in front of it, supersampled where its rim or the horizon crosses
+  a pixel.
+- The aureole, `aureole`, the air's glow of about a degree around it: aerosols scatter sunlight far more sharply forward
+  than the tables' one Cornette-Shanks lobe says, so a share of their scattering, `DEFAULT_AUREOLE`'s 5 % at g 0.98,
+  goes into a narrow Henyey-Greenstein lobe the tables leave out and the sky pass adds per pixel within 20° of the Sun:
+  the aerosols' sunlit scattering marched along the same bent path as the sky, dimmed by the air in front, times the
+  lobe, centered on where the Sun shows. The cube map gets it too. `false` for Bruneton's one lobe alone.
+- The veil, `veil`, the eye's own glare: CIE's equation (CIE 146:2002) from the Sun's illuminance at the observer, which
+  the light meter writes, 1 for the eye's, which washes out some 10° around the Sun by day, a two-hundredth for a lens, 0
+  by default. From `@himmelszelt/helldunkel`'s `glare.wgsl`, bundled.
+
+Bloom is the lens's and needs the image, helldunkel's `createBloomPass` over the exposed frame; god rays need something
+that casts a shadow, which the sky alone has not. The four add up without counting each other twice: the aureole is
+light in the air, the veil and bloom what the eye or the lens spreads of all that reaches it. `wgsl.sun` holds the disc
+binding-free, `wgsl.raymarch` the aureole's march, `dkRaymarchAerosol`, and `wgsl.common` its lobe, for a renderer's
+own sky.
+
 ## The ground
 
 Below the horizon the sky-view table shows the ground, in its albedo `groundAlbedo` (linear RGB, 0.3 by default, the

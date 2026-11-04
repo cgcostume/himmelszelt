@@ -24,6 +24,9 @@ struct DkSkyParams {
     skyViewScale: f32,
     // Device pixels per CSS pixel, which the debug overlay's sizes are measured in.
     pixelRatio: f32,
+    // Where the sun shows, lifted by the air as seen from the observer, `apparentDirection`: what the aureole and the
+    // veil are centered on, in the view's own directions, whether a ray ends in the sky or on the ground.
+    apparentSunDirection: vec3f,
 }
 
 // Directions the light meter reads per cap, above and below the horizon: 32 workgroups of 128 sample one each.

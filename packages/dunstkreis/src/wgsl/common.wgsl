@@ -16,6 +16,12 @@ override DK_REFRACTION: bool = true;
 override DK_SINGLE_SCATTERING: bool = true;
 override DK_MULTIPLE_SCATTERING: bool = true;
 
+// The aureole's share of the aerosols' scattering, in a narrow forward lobe the march leaves out of the single
+// scattering and the sky pass adds per pixel around the sun (see sun.wgsl), and that lobe's asymmetry. 0 for none:
+// the one Cornette-Shanks lobe then carries all of it.
+override DK_AUREOLE_SHARE: f32 = 0.0;
+override DK_AUREOLE_G: f32 = 0.98;
+
 // The model's refractivity on the ground, or 0 with DK_REFRACTION off.
 fn dkGroundRefractivity(a: DkAtmosphere) -> f32 {
     return select(0.0, a.refractivity, DK_REFRACTION);
@@ -207,6 +213,12 @@ fn dkExtinction(a: DkAtmosphere, altitudeKm: f32) -> vec4f {
 // Rayleigh phase function: gentle, symmetric, slightly favouring forward and backward over sideways.
 fn dkPhaseRayleigh(nu: f32) -> f32 {
     return 3.0 / (16.0 * DK_PI) * (1.0 + nu * nu);
+}
+
+// Henyey and Greenstein's phase function, per steradian, 1 over the sphere: the aureole's narrow forward lobe.
+fn dkPhaseHenyeyGreenstein(g: f32, nu: f32) -> f32 {
+    let g2 = g * g;
+    return (1.0 - g2) / (4.0 * DK_PI * pow(max(1.0 + g2 - 2.0 * g * nu, 1e-7), 1.5));
 }
 
 // Mie phase function, Cornette-Shanks rather than plain Henyey-Greenstein, as Hillaire's. Strongly forward-biased,

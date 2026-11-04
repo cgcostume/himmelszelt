@@ -47,8 +47,8 @@ export { ATMOSPHERE_UNIFORM_SIZE, atmosphereUniformData } from "./uniforms.js";
 
 // Pipeline-overridable sample counts, for specializing a shader at pipeline creation.
 export type { ToneCurve } from "@himmelszelt/helldunkel";
-export type { QualityConstants } from "./quality.js";
-export { DEFAULT_QUALITY, pipelineConstants } from "./quality.js";
+export type { Aureole, QualityConstants } from "./quality.js";
+export { aureoleConstants, DEFAULT_AUREOLE, DEFAULT_QUALITY, pipelineConstants } from "./quality.js";
 
 // What a device needs: the features and limits to request it with, and what one lacks.
 export type { DeviceRequirements, RequirementOptions } from "./requirements.js";
