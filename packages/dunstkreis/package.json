@@ -26,6 +26,10 @@
         ".": {
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
+        },
+        "./wgsl": {
+            "types": "./dist/wgsl.d.ts",
+            "import": "./dist/wgsl.js"
         }
     },
     "files": [

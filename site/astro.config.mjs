@@ -42,6 +42,8 @@ export default defineConfig({
                 { find: /^@himmelszelt\/sternzeit$/, replacement: source("sternzeit/src/index.ts") },
                 { find: /^@himmelszelt\/sternzeit\/approx$/, replacement: source("sternzeit/src/approx.ts") },
                 { find: /^@himmelszelt\/dunstkreis$/, replacement: source("dunstkreis/src/index.ts") },
+                { find: /^@himmelszelt\/dunstkreis\/wgsl$/, replacement: source("dunstkreis/src/wgsl/index.ts") },
+                { find: /^@himmelszelt\/gewoelk$/, replacement: source("gewoelk/src/index.ts") },
                 { find: /^@himmelszelt\/helldunkel$/, replacement: source("helldunkel/src/index.ts") },
                 { find: /^@himmelszelt\/helldunkel\/wgsl$/, replacement: source("helldunkel/src/wgsl/index.ts") },
                 { find: /^@himmelszelt\/rundbild$/, replacement: source("rundbild/src/index.ts") },

@@ -30,8 +30,8 @@ osghimmel/         read-only reference clone, gitignored
 | `@himmelszelt/helldunkel` (from light to pixels: EV100, light meter, bloom, tone curves, display encoding) | `packages/helldunkel` | chapter drafted with its figures (withheld); HDRIs come live from Poly Haven's API, cached in OPFS, the site hosts none; gamut mapping and Display P3 pending |
 | `@himmelszelt/rundbild` (skies as images: projections and conversions, fading environments, a flat ground and lifted horizon for an image, diffuse IBL, Radiance HDR files) | `packages/rundbild` | chapter drafted (withheld); HDRIs in its figures, horizon band and specular IBL pending. Named after the Rundgemaelde, the 19th century panorama |
 | `@himmelszelt/dunstkreis` (WebGPU atmosphere after Hillaire, on Bruneton's model) | `packages/dunstkreis` | tables, sky pass, traced refraction, metering and day ramp, sky cube map working, live in its chapter under `pnpm dev` (a draft, withheld from the published site); Bruneton as another sky-view filler pending |
-| `@himmelszelt/sternwarte` (the website, `private: true`) | `site/` | chapter order helldunkel, rundbild, sternzeit, dunstkreis, then the planned ones; sternzeit done (figures, glossary tooltips, references, TOC); helldunkel, rundbild and dunstkreis drafts, and `planned: true` placeholders for nachtgestirn, sternenheer, gewoelk; deployed to GitHub Pages by CI from main |
-| `@himmelszelt/gewoelk` (clouds, contrails, flocks of birds, rainbows, halos; weather as plain inputs) | not created yet | later |
+| `@himmelszelt/sternwarte` (the website, `private: true`) | `site/` | chapter order helldunkel, rundbild, sternzeit, dunstkreis, then the planned ones; sternzeit done (figures, glossary tooltips, references, TOC); helldunkel, rundbild, dunstkreis and gewoelk drafts, and `planned: true` placeholders for nachtgestirn, sternenheer; deployed to GitHub Pages by CI from main |
+| `@himmelszelt/gewoelk` (clouds, contrails, flocks of birds, rainbows, halos; weather as plain inputs) | `packages/gewoelk` | first draft after Nubis3 (Schneider 2023): a voxel cloudscape built on the GPU from the thesis' cloud map, jump-flood SDF, per-voxel summed light, Nubis' march and up-rez, plus sheets of high cloud; chapter drafted with one live figure; bundles dunstkreis' `camera.wgsl` and helldunkel's tone curves at build time |
 | `@himmelszelt/sternenheer` (star rendering and constellations) | not created yet | later; the old poetic word for the host of stars, and clear of himmelszelt |
 | `@himmelszelt/nachtgestirn` (moon rendering) | not created yet | later |
 
@@ -58,7 +58,7 @@ render under `pnpm dev` only. Both switch on `import.meta.env.DEV` (see `site/sr
 sun/moon direction vector + time as plain inputs. Whoever embeds it computes that vector however
 they like. Keep this decoupling for every future module too. One exception, at build time only: a package may bundle a small
 piece another owns, as a dev dependency inlined into its `dist` (dunstkreis: helldunkel's tone curves and EV100 math,
-rundbild's cube map layout, through their `/wgsl` entries). One source, and npm users still install one package.
+rundbild's cube map layout, through their `/wgsl` entries; gewoelk: dunstkreis' camera rays and helldunkel's tone curves). One source, and npm users still install one package.
 
 **Directions are ENU** (x east, y north, z up, right-handed) in every package: sternzeit's
 `horizontalToDirection` and `moon.sunDirection`, dunstkreis' `sunDirection` input and view rays. Azimuths are

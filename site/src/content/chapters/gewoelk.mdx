@@ -1,26 +1,172 @@
 ---
 title: gewoelk
 package: "@himmelszelt/gewoelk"
-summary: "Clouds, from a clear-sky haze to a closed overcast."
+summary: "Clouds you can fly through, built and lit on the GPU after Nubis3, over dunstkreis' sky."
 order: 7
-planned: true
+draft: true
+references:
+    - schneider2023
+    - schneider2015
+    - hart1996
+    - henyey1941
+    - beer1852
+    - perlin2002
+    - sidefx2023
+    - wrenninge2013
+    - hillaire2016
+    - mueller2012thesis
 ---
 
-Clouds, the part of the sky that changes by the minute. They are lit by the Sun and the Moon, whose directions come
-from [sternzeit](../sternzeit/), take their colors from the light that [dunstkreis](../dunstkreis/) lets through the
-atmosphere, and hide the stars of [sternenheer](../sternenheer/) and the Moon of [nachtgestirn](../nachtgestirn/)
-behind them.
+import Cite from "../../components/Cite.astro";
+import Controls from "../../components/sternzeit/Controls.astro";
+import Planned from "../../components/Planned.astro";
+import Term from "../../components/Term.astro";
+import Fig from "../../components/Fig.astro";
+import Clouds from "../../components/gewoelk/Clouds.astro";
 
-This chapter is a placeholder: the library does not exist yet.
+This chapter is being written. The sky below is live, and it grows with the chapter; the dashed boxes are the figures
+still to come.
 
-## Watch the clouds
+Clouds are the part of the sky that changes by the minute, and the part a renderer gives up on first: a sky is one
+lookup per pixel, a cloud is a volume, and light wanders through it. gewoelk renders them anyway, on the GPU, in the
+way Guerrilla's Nubis³ renders the clouds a player flies through in Horizon Forbidden West
+<Cite id="schneider2023" />: the low clouds live in a <Term of="Voxel">voxel</Term> volume with a
+<Term of="Signed distance field">distance field</Term> that tells each ray how far it may step, every voxel knows how
+much cloud lies between it and the Sun before a single pixel is drawn, and detail noise turns coarse voxels into
+billows and wisps. Where Nubis³ models its clouds in Houdini, gewoelk grows them from a
+<Term of="Cloud map">cloud map</Term>, the two-dimensional field osgHimmel drew its clouds from
+<Cite id="mueller2012thesis" />, so they can change shape and drift with the wind. Above them a thin sheet of
+<Term of="Cirrus">cirrus</Term> is read once where a ray crosses it. The sky behind, the Sun's light at the ground and
+the light of the sky come from [dunstkreis](../dunstkreis/) here, as plain numbers: gewoelk takes a direction, lux and
+irradiance, from wherever a renderer has them.
 
-A sky with clouds to play with. Not written yet.
+For a developer: TypeScript and WGSL, WebGPU compute passes, no dependency on any other package at runtime. One pass
+builds the volume whenever the clouds change shape, one sums the light whenever the Sun moves, and one marches the
+clouds per pixel, at a share of the frame's resolution if the budget asks for it, and composes them over your sky in
+cd/m², tone mapped or linear. What that costs on your GPU is on the line under <Fig id="clouds" />.
+
+Drag to look around, scroll to zoom, and set the moment and the place under it, which the clouds, the Sun and the sky
+follow. The sliders in the panel shape the clouds and switch the parts of their light. The figure is exposed a stop
+brighter than [dunstkreis' light meter](../dunstkreis/#from-light-to-pixels) reads the clear sky, as a photographer
+exposes for clouds: metered as they come, bright clouds turn gray.
+
+<Clouds
+    try={{
+        label: "Sunset over Potsdam",
+        set: "date=2026-06-21T19:36:00Z&lat=52.395&lon=13.085&h=1",
+        text: "the Sun a degree below the horizon, set for the ground but not for a cloud 2 km up: the undersides glow orange from below while the tops have gone gray, and a few minutes later the light leaves them too.",
+    }}
+/>
+
+<Controls open />
+
+## Two kinds of cloud
+
+Look up on a fair day and there are two skies of cloud: the <Term of="Cumulus">heaps</Term> a few kilometers up,
+flat below and billowing above, and far above them the veils and streaks of cirrus, ice crystals 6 to 12 km up that
+hardly move and hardly shade. The two ask for different renderers. A sheet of cirrus is thin: a ray crosses it once,
+and what it takes from the Sun and what it adds is one lookup into its cloud map, the map's value read as an
+<Term of="Optical depth">optical depth</Term>, thicker at a slant, and the light forward scattered by a narrow
+<Term of="Phase function">phase function</Term> <Cite id="henyey1941" />, which is why the Sun behind cirrus has a
+glow. The heaps are volumes, and the rest of this chapter is about them.
+
+## From a map to a volume
+
+osgHimmel modeled its clouds as a height field: octaves of Perlin's gradient noise <Cite id="perlin2002" /> summed
+into one tileable map, shaped by a coverage, which decides how much of it is sky, and a sharpness, which hardens the
+edges, and each value read as a height, so a value of 1 is a column reaching the top of the layer and a small value a
+wisp. One trick made them look like cumulus: the bottoms dip below the layer's base level by only a fraction of the
+value, the offset, while the tops rise by the rest, so the bottoms stay nearly flat where the tops billow
+<Cite id="mueller2012thesis" />. Real cumulus are flat below for a reason: that is the height where rising air has
+cooled enough for its water to condense, the same for the whole sky that day.
+
+gewoelk keeps the map and the trick, and voxelizes the result: a grid of 256 by 256 by 32 voxels over a slab 16 km
+across and 2.4 km tall, which repeats east and north so it reaches the horizon, each voxel inside or outside the
+height field. From that grid a <Term of="Jump flooding">jump flood</Term> finds, for every voxel, the nearest voxel of
+the clouds' surface, in eight passes, and the distance to it becomes Nubis³'s modeling data: outside the clouds the
+signed distance, stored in 8 bits and rounded down so no step ever overshoots; inside, the
+<Term of="Dimensional profile">dimensional profile</Term>, a gradient from 0 at the surface to 1 some 150 m in, which
+is both the shape the detail noise erodes and, later, the chance that light scatters there. All of it is rebuilt on the
+GPU whenever the map evolves, which is what Nubis³ left for the future: its distance fields were baked
+<Cite id="schneider2023" />.
+
+<Planned title="The map, the voxels and the distance field">
+The cloud map as a texture beside a cross section through the voxel grid: the profile inside, the distance outside,
+both from the same jump flood. A slider for the offset, which flattens the bottoms.
+</Planned>
+
+## Billows and wisps
+
+Nubis³'s voxels are 8 m across and the clouds still look soft up close, because the shape is not the voxels': at every
+sample the profile is eroded by a composite of detail noise, and the noise carries the detail
+<Cite id="schneider2023" />. Two kinds of it, in one tiling 3D texture of 128 texels a side: billows, where vapor
+pushes out through weak spots and the surface rounds into lumps, and wisps, where the surrounding air eats into the
+cloud and leaves webs and curls. Both are cut with <Term of="Alligator noise">alligator noise</Term>, a cellular noise
+from Houdini <Cite id="sidefx2023" />: one random point in each cell, a smooth bump around each, and the largest bump
+less the second largest, which draws ridges between the cells. As it is, it makes billows; inverted and swirled by a
+curl field, wisps. Each at a low and a high frequency, blended by the profile so the core stays coarse and the surface
+fine, and the two kinds blended by a type field from the map, so one cloud is billowy and its neighbor frayed. A power
+at the end sharpens the thin parts. gewoelk's voxels are some 60 m across, eight times Nubis³'s, and the same erosion
+has to carry correspondingly more.
+
+<Planned title="Billows, wisps and the erosion">
+The four channels of the detail texture as slices, and one cloud rendered with the profile alone, with wispy noise,
+with billowy noise, and with both blended by the type, as the talk shows it.
+</Planned>
 
 ## Light in a cloud
 
-How clouds take their light from the Sun, the Moon and the sky. Not written yet.
+A cloud is bright on the side the Sun lights and gray underneath, and that is almost the whole story of its light: of
+the sunlight entering it, what reaches a point inside falls off with the amount of cloud in the way, by the
+<Term of="Beer-Lambert law">Beer-Lambert law</Term> <Cite id="beer1852" />, and what scatters from there towards the
+eye depends on the angle, by the phase function. A raymarcher that is honest about it marches a second ray from every
+sample towards the Sun, and that second march is what makes volumetric clouds expensive <Cite id="schneider2015" />.
+Nubis³ cuts it loose: for every voxel that holds cloud, the density to the Sun is summed once, in a pass of its own,
+and the march reads the sum. gewoelk sums it to the sky above and the ground below as well, so the ambient light fades
+with depth too. The sum is coarse, so the first two samples towards the Sun are still taken in full detail, half a
+voxel and one and a half voxels on, which keeps the edges crisp.
 
-## Code examples
+Light scattered once is not enough: a sunlit cloud top is nearly white, and single scattering with a forward lobe
+gives it a dull gray, since little of that lobe points at the eye. The light that has scattered two, three, many times
+is what fills it in, and gewoelk takes it as octaves, the trick from the film Oz <Cite id="wrenninge2013" /> that
+Frostbite brought to games <Cite id="hillaire2016" />: each order a share of the one before, through half as much
+cloud, with a lobe half as narrow, four of them. Two more terms from Nubis³ make a cloud look lit from within. Light that has scattered many times loses its direction
+and glows out of the cloud's core, strongest looking towards the Sun; the profile already says how deep a point lies,
+so it stands in for the chance of that in-scattering, attenuated less near the Sun's direction and deep inside. And the
+sky's light reaches a point the more the closer it lies to the surface: the square root of one minus the profile.
+Switch the three parts in <Fig id="clouds" />, the Sun, the multiple scattering and the ambient light, to see what
+each one adds: the Sun alone gives a cloud with black shadows, the multiple scattering its glow, the ambient light its
+gray underside. The Sun's light reaches the clouds at their own altitude, not the observer's: after sunset the
+ground lies in shadow while a cloud base 2 km up is still lit, from below, by a reddened Sun, and the summed density
+towards it runs downward through the volume then. Step the moment past sunset and watch the undersides turn.
 
-Not written yet.
+<Planned title="Direct, multiple and ambient">
+One cloud lit by each term alone, and the summed density towards the Sun as a slice through the light grid, at three
+Sun altitudes.
+</Planned>
+
+## Marching by the distance field
+
+Without knowing where the clouds are, a march samples empty sky at the same pace as cloud. Nubis³ steps by the
+distance field instead, the <Term of="Sphere tracing">sphere tracing</Term> of John Hart <Cite id="hart1996" />:
+outside a cloud the step is the distance to the nearest surface, which no cloud lies within, and the ray crosses the
+gaps in a handful of steps. Inside, where the distance is negative, the step grows with the square root of the distance
+from the camera, 15 m at the first cloud and some 30 m ten kilometers out, finer than a pixel covers there.
+The first step is jittered by a pattern that changes every frame, so the bands a fixed step would draw turn into noise.
+Nubis³ shipped at 2.2 to 4 ms at 960 by 540 pixels on a PlayStation 5, from the ground and in flight, and halved it at
+60 Hz by marching the near clouds at a quarter of the pixels and the far ones at all of them
+<Cite id="schneider2023" />. gewoelk marches the whole sky at one scale of your choosing and composes it bilinearly;
+the two-pass split is on its list. Set the render scale and the steps in the figure and watch the time on the line
+under it.
+
+## The people behind the numbers
+
+Andrew Schneider modeled clouds for the animated film Rio with fluid simulation and spent the next decade getting them
+into a game. Nubis began in 2015 with Horizon Zero Dawn, the first real-time cloudscape that raymarched noise
+<Cite id="schneider2015" />, and Nubis³ in 2023 turned the voxel clouds of film into something a player flies through
+<Cite id="schneider2023" />. John Hart named sphere tracing in 1996, for the ray tracing of implicit surfaces
+<Cite id="hart1996" />; distance fields have carried it into every demo scene since. Louis Henyey and Jesse
+Greenstein were astronomers, and their phase function of 1941 described the dust of the Milky Way
+<Cite id="henyey1941" /> before it described every cloud in every game. August Beer measured how red light faded in
+colored liquids in 1852 <Cite id="beer1852" />, and Ken Perlin improved his own noise in 2002 <Cite id="perlin2002" />,
+twenty years after the original won him an Academy Award.

@@ -35,7 +35,10 @@ async function acquire(): Promise<{ device?: GPUDevice; adapterName?: string; er
         };
     }
     // With subgroups where the GPU has them, for the sums over a workgroup.
-    const device = await adapter.requestDevice(skyRequirements({ format: "rgba8unorm" }, adapter));
+    const requirements = skyRequirements({ format: "rgba8unorm" }, adapter);
+    // Timestamps around a pass, for the figures that show what a pass costs, where the GPU gives them.
+    if (adapter.features.has("timestamp-query")) requirements.requiredFeatures.push("timestamp-query");
+    const device = await adapter.requestDevice(requirements);
     // Which GPU, for the timings: a fallback adapter renders on the CPU, a hundred times slower.
     const { vendor, architecture, description, isFallbackAdapter } = adapter.info ?? {};
     const name = description || [vendor, architecture].filter(Boolean).join(" ") || "unknown GPU";

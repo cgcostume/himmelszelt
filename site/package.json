@@ -17,6 +17,7 @@
     "dependencies": {
         "@astrojs/mdx": "^8.0.3",
         "@himmelszelt/dunstkreis": "workspace:*",
+        "@himmelszelt/gewoelk": "workspace:*",
         "@himmelszelt/helldunkel": "workspace:*",
         "@himmelszelt/rundbild": "workspace:*",
         "@himmelszelt/sternzeit": "workspace:*",

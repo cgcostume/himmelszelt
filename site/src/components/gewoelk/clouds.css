@@ -1,0 +1,16 @@
+/* The cloud figure's sliders, one a row under their group's name, label, rail and value in a line. */
+.clouds-slider {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    width: 100%;
+}
+.clouds-slider input {
+    flex: 1;
+    width: auto;
+    min-width: 4rem;
+}
+.clouds-slider output {
+    min-width: 3.5ch;
+    text-align: right;
+}

@@ -19,6 +19,7 @@ export const wgsl = (): Plugin => ({
 export default defineConfig({
     input: {
         index: "src/index.ts",
+        wgsl: "src/wgsl/index.ts",
     },
     plugins: [wgsl(), dts()],
     output: {

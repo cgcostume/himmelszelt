@@ -167,3 +167,23 @@ confirmed yet.
 | Potsdam, 1 km, 2026-04-06: sunset 17:57 UTC, so 17:37 is 20 minutes before; at +30 minutes, looking east, Earth's shadow and the Belt of Venus show | Fig. sky, Try | lib | sternzeit sun.direction and apparentDirection at 1 km; rendered in the figure | ok | 2026-10-17 |
 | Sun 408 km up over Potsdam, 2026-04-06 02:04 UTC: on the planet's rim, lower limb lifted by about a degree, the disc a sixth as tall as wide | planned refraction figure | lib | refractionAngle at 408 km; rendered | ok | 2026-10-17 |
 
+
+## gewoelk
+
+### Text
+
+| Claim | Where | Against | Result | Status | Checked |
+|---|---|---|---|---|---|
+| Nubis³ shipped at 2.2 to 4 ms at 960 by 540 on a PlayStation 5, halved at 60 Hz by a near/far split | Marching | src | Schneider 2023, slides 172 to 180: 2.2, 4.0, 4.0 ms; 4 to 2.1 ms with the split | ok | 2026-11-04 |
+| Nubis³'s voxels are 8 m, its modeling data 512 x 512 x 64, its light grid 256 x 256 x 32 | Billows, Light | src | Schneider 2023, slides 79, 86, 126 | ok | 2026-11-04 |
+| Nubis³ left evolving clouds and on-the-fly distance fields for the future | From a map | src | Schneider 2023, slide 193 | ok | 2026-11-04 |
+| gewoelk's grid 256 x 256 x 32 over 16 km and 2.4 km: voxels some 60 m across | From a map, Billows | lib | 16 km / 256 = 62.5 m, 2.4 km / 32 = 75 m | ok | 2026-11-04 |
+| The jump flood finds the nearest surface voxel in eight passes | From a map | lib | jumps 128, 64, ..., 1 for a grid 256 across | ok | 2026-11-04 |
+| The profile reaches 1 some 150 m in | From a map | lib | `profileDepthKm` 0.15 | ok | 2026-11-04 |
+| Steps 15 m at the first cloud, some 30 m ten kilometers out | Marching | lib | `stepMinKm` 0.015; 0.01 × sqrt(10) = 0.032 km | ok | 2026-11-04 |
+| Cirrus 6 to 12 km up, of ice crystals | Two kinds, opening | web | WMO cloud atlas: cirrus in the high étage, 5 to 13 km in temperate latitudes | ok | 2026-11-04 |
+| Cumulus flat below at the condensation level | From a map | web | lifting condensation level, standard meteorology | ok | 2026-11-04 |
+| Perlin's original noise won an Academy Award twenty years before Improving Noise | People | web | Technical Achievement Award 1997, for work of 1983; "twenty years" is loose, 14 to 19 | open | 2026-11-04 |
+| Henyey and Greenstein 1941 described the Milky Way's dust; Hart 1996; Beer 1852 | People | src | titles and venues of the papers | ok | 2026-11-04 |
+| Schneider modeled Rio's clouds with fluid simulation | People | src | Schneider 2023, slide 3 | ok | 2026-11-04 |
+| Potsdam 2026-06-21 19:36 UTC: Sun 1° below the horizon, cloud undersides at 2 km lit orange from below (Try) | Fig. clouds, Try | lib | sternzeit: −1.08° geometric; sunlight pass at 2.4 km nonzero and red; rendered in the figure | ok | 2026-11-04 |

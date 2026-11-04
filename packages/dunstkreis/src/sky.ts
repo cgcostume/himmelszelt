@@ -194,7 +194,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     ];
     // Everything but the output, which differs between an image and a cube map.
     const skySource = (output: string) =>
-        [...prelude, wgsl.cube, wgsl.sun, wgsl.tonemap, wgsl.grid, output, wgsl.sky].join("\n");
+        [...prelude, wgsl.camera, wgsl.cube, wgsl.sun, wgsl.tonemap, wgsl.grid, output, wgsl.sky].join("\n");
     // A cube map's format and settings.
     const checkEnvironment = (format: GPUTextureFormat, sunDisc: boolean, samples: number) => {
         if (format !== "rgba16float" && format !== "rgba32float") {

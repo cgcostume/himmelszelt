@@ -5,6 +5,7 @@
     { "name": "helldunkel: everything", "path": "packages/helldunkel/dist/index.js", "limit": "8.5 kB" },
     { "name": "rundbild: everything", "path": "packages/rundbild/dist/index.js", "limit": "11 kB" },
     { "name": "dunstkreis: everything", "path": "packages/dunstkreis/dist/index.js", "limit": "38.5 kB" },
+    { "name": "gewoelk: everything", "path": "packages/gewoelk/dist/index.js", "limit": "16 kB" },
     {
         "name": "dunstkreis: sky cube map and display",
         "path": "packages/dunstkreis/size/sky-cube.js",

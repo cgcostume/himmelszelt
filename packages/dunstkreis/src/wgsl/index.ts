@@ -19,6 +19,7 @@
 import aerial from "./aerial.wgsl";
 import aerialvolume from "./aerialvolume.comp.wgsl";
 import atmosphere from "./atmosphere.wgsl";
+import camera from "./camera.wgsl";
 import common from "./common.wgsl";
 import exposure from "./exposure.comp.wgsl";
 import features from "./features.wgsl";
@@ -48,6 +49,7 @@ export {
     aerial,
     aerialvolume,
     atmosphere,
+    camera,
     common,
     exposure,
     features,
