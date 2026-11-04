@@ -33,7 +33,7 @@ osghimmel/         read-only reference clone, gitignored
 | `@himmelszelt/sternwarte` (the website, `private: true`) | `site/` | chapter order helldunkel, rundbild, sternzeit, dunstkreis, then the planned ones; sternzeit done (figures, glossary tooltips, references, TOC); helldunkel, rundbild, dunstkreis and gewoelk drafts, and `planned: true` placeholders for nachtgestirn, sternenheer; deployed to GitHub Pages by CI from main |
 | `@himmelszelt/gewoelk` (clouds, contrails, flocks of birds, rainbows, halos; weather as plain inputs) | `packages/gewoelk` | first draft after Nubis3 (Schneider 2023): a voxel cloudscape built on the GPU from the thesis' cloud map, jump-flood SDF, per-voxel summed light, Nubis' march and up-rez, plus sheets of high cloud; chapter drafted with one live figure; bundles dunstkreis' `camera.wgsl` and helldunkel's tone curves at build time |
 | `@himmelszelt/sternenheer` (star rendering and constellations) | not created yet | later; the old poetic word for the host of stars, and clear of himmelszelt |
-| `@himmelszelt/nachtgestirn` (moon rendering) | not created yet | later |
+| `@himmelszelt/nachtgestirn` (the Moon's disc: Hapke's reflectance law over NASA's maps, earthshine, lunar eclipses, over a sky in cd/m²) | `packages/nachtgestirn` | pass, maps script (`pnpm maps`, from the CGI Moon Kit into `site/public/moon`) and one live figure done; chapter drafted (withheld); the Moon lighting dunstkreis' night sky pending |
 
 **sternwarte** is one site for all libraries, structured like a blog with one chapter per library:
 explains the techniques, showcases them, makes them explorable (WebGPU canvases, zdog

@@ -45,6 +45,7 @@ export default defineConfig({
                 { find: /^@himmelszelt\/dunstkreis\/wgsl$/, replacement: source("dunstkreis/src/wgsl/index.ts") },
                 { find: /^@himmelszelt\/gewoelk$/, replacement: source("gewoelk/src/index.ts") },
                 { find: /^@himmelszelt\/helldunkel$/, replacement: source("helldunkel/src/index.ts") },
+                { find: /^@himmelszelt\/nachtgestirn$/, replacement: source("nachtgestirn/src/index.ts") },
                 { find: /^@himmelszelt\/helldunkel\/wgsl$/, replacement: source("helldunkel/src/wgsl/index.ts") },
                 { find: /^@himmelszelt\/rundbild$/, replacement: source("rundbild/src/index.ts") },
                 { find: /^@himmelszelt\/rundbild\/wgsl$/, replacement: source("rundbild/src/wgsl/index.ts") },

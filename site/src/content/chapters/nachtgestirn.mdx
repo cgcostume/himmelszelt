@@ -1,38 +1,221 @@
 ---
 title: nachtgestirn
 package: "@himmelszelt/nachtgestirn"
-summary: "The Moon, as it actually looks tonight."
+summary: "The Moon as it looks tonight: its phase, its face, its glow and Earth's shadow, on the GPU."
 order: 5
-planned: true
+draft: true
+references:
+    - hapke1963
+    - hapke1966
+    - jensen2001
+    - vandehulst1980
+    - nssdc
+    - cox2000
+    - svs4720
+    - espenak2009
+    - mueller2012thesis
 ---
 
+import Cite from "../../components/Cite.astro";
+import Controls from "../../components/sternzeit/Controls.astro";
 import Planned from "../../components/Planned.astro";
+import Term from "../../components/Term.astro";
+import Fig from "../../components/Fig.astro";
+import Moon from "../../components/nachtgestirn/Moon.astro";
 
-<Planned what="opening" title="two hooks to choose from" plan="One opens the chapter, the other may close its first section.">
-    The crescent lit from above: hang a crescent in the night sky with its lit side up, and anyone who has looked up at
-    night senses something is wrong, even without saying what. It cannot happen: a crescent stands less than 90° from
-    the Sun, so with its lit side up the Sun would stand above it, and above the horizon too. It would be day. The Moon
-    by day: it is above the horizon in daylight about as often as at night, over four years in Berlin 51.5% of its
-    time up, yet many people are surprised to see it there.
+This chapter is being written. The Moon below is live, and it grows with the chapter; the dashed boxes are the figures
+still to come.
+
+Look at a full Moon and it is a coin, not a ball: as bright at its very edge as in its middle, with no shading to
+round it off. A sphere lit from behind the viewer should darken towards its rim, and every planet a renderer shades
+with the usual cosine does. The Moon does not, because its surface is dust: light that reaches a grain at a slant
+leaves it at the same slant, through the same thin layer of other grains, and the two slants cancel. nachtgestirn
+draws the Moon that way: its disc along every pixel's ray, shaded by the lunar reflectance law of Bruce Hapke
+<Cite id="hapke1963" /> as Jensen and colleagues used it in their night sky model <Cite id="jensen2001" />, over NASA's
+maps of its color and its relief <Cite id="svs4720" />, lit by the Sun and by <Term of="Earthshine">earthshine</Term>,
+and darkened and reddened in Earth's shadow during a lunar eclipse. Where the Moon is, how large, how it is turned and
+where the Sun is from it come from [sternzeit](../sternzeit/); the sky it is drawn over, and the air in front of it,
+from [dunstkreis](../dunstkreis/). osgHimmel did the same with a cube map and a few hand-set intensities
+<Cite id="mueller2012thesis" />; here the light is in lux and the disc in cd/m², so the Moon exposes like the sky
+around it.
+
+For a developer: TypeScript and WGSL, one WebGPU compute pass, no dependency on any other package at runtime. It takes
+directions, angles and lux, draws into a texture you own over a background in cd/m², or alone with its coverage in
+alpha, and tone maps or stays linear, as dunstkreis' sky does. What it costs is on the line under <Fig id="moon" />:
+a fraction of a millisecond, most of it the astronomy on the CPU.
+
+The Moon below is that pass over dunstkreis' sky, the view kept on the Moon and zoomed in on it: drag to let go,
+scroll to zoom out to the sky around it, and set the moment and the place under it, which every figure of the chapter
+follows.
+
+<Moon
+    try={{
+        label: "New Year's Eve 2028",
+        set: "date=2028-12-31T17:00Z&lat=52.52&lon=13.405&h=1",
+        text: "a total lunar eclipse over Berlin: the Moon 16° up in the east-northeast, copper in Earth's umbra, two hours after sunset. Slide the time back an hour and a half to watch the shadow's edge cross the disc.",
+    }}
+/>
+
+<Controls open />
+
+Four lines are the whole setup: the maps once, the pass once, and per frame the astronomy as sternzeit computes it,
+`moon.direction`, `moon.topocentricAngularDiameter`, `moon.sunDirection` and the orientation from
+[the face we see](#the-face-we-see).
+
+```ts
+import { createMoonPass, loadMoonMaps } from "@himmelszelt/nachtgestirn";
+
+const maps = await loadMoonMaps(
+    device,
+    { color: "moon-color-4k.webp", normals: "moon-normals-2k.webp" },
+    { meanReflectance: 0.396 },
+);
+const pass = await createMoonPass(device, { format: "rgba8unorm", maps });
+// Per frame: where it is, how large, where the Sun is from it, how it is turned.
+pass.update({ direction, angularDiameter, sunDirection, orientation, ev100: 15 });
+pass.encode(encoder, target, { background: skyInCandelaPerSquareMeter });
+```
+
+## Sunlight on dust
+
+Hold a ball up to the Sun and its edge goes dark: the light falls on the rim at a slant, and a surface that scatters
+light evenly in every direction, a Lambert surface, the law a renderer reaches for first, reflects a slant of 80° at a
+sixth of what it reflects face on. The Moon's surface is a powder, and a powder is lit and seen through the same loose
+layer of grains: what a slant costs on the way in, it gives back on the way out. The
+<Term of="Lommel-Seeliger law">Lommel-Seeliger law</Term> says it in one fraction, the cosine of the light's angle over
+the sum of the cosines of the light's and the viewer's angles, and at full Moon, where the two angles are the same
+everywhere on the disc, the fraction is a half at the center and a half at the rim. The Moon is flat.
+
+Hapke's lunar law adds what a powder does near opposition, with the Sun behind the viewer: every grain hides its own
+shadow, and the surface brightens by the <Term of="Opposition surge">opposition surge</Term>, a factor 2 at a
+<Term of="Phase angle">phase angle</Term> of 0 that is gone by 90° <Cite id="hapke1963" />, and a little forward
+scattering, which keeps a thin crescent a rim of light towards the Sun. Jensen and colleagues brought the law into
+rendering <Cite id="jensen2001" />; osgHimmel used it with a scattering term from Hapke's second paper
+<Cite id="hapke1966" />, which makes the quarters a stop too bright, and nachtgestirn keeps Jensen's. The law is
+scaled so that a point seen and lit straight on reflects its <Term of="Normal albedo">normal albedo</Term> as a
+Lambert surface would: the full Moon, of <Term of="Geometric albedo">geometric albedo</Term> 0.12
+<Cite id="nssdc" />, in the 128,000 lux of the Sun above the air, is a flat disc of some 4,900 cd/m², a sunlit rock,
+to be exposed like a landscape at noon. By the Moon's phase law a quarter Moon gives a tenth of that, not half
+<Cite id="cox2000" />: the <Term of="Illuminated fraction">illuminated fraction</Term> is half, but every crater throws
+a shadow, and the surge is gone. The figure's light meter follows that law and exposes the lit part a stop brighter
+than mid gray, as a photographer does.
+
+Switch the law to Lambert's in <Fig id="moon" /> at a full Moon, and the disc turns into a ball with a dark rim; switch
+back, and it is a coin again. We never see the surge in full: the Moon passes above or below Earth's shadow most
+months, and the phase angle at full Moon stays a few degrees. The one time the Moon stands exactly opposite the Sun is
+when Earth's shadow falls on it.
+
+<Planned title="Lambert against Hapke" plan="Two discs side by side at the chosen phase, the terminator and the limb compared, or folded into the figure's law switch.">
+    The same Moon shaded by Lambert's law and by Hapke's: at full Moon a ball against a coin, at a quarter the lit
+    half darkening towards the terminator under Lambert's law and staying bright under Hapke's, the terminator itself
+    sharper.
 </Planned>
 
-The Moon as a renderable body rather than a point in the sky. Where it is, how large it appears, how it is tilted and
-lit, and how much of Earth's own light reaches its night side all come from [sternzeit](../sternzeit/): its phase and
-sun direction, its libration and position angle, its earthshine, and whether Earth's shadow is falling on it. What is
-left is the look: a textured disc, shaded by the sunlight on its surface, ashen in earthshine, and during a lunar
-eclipse darkened and reddened by the sunlight Earth's atmosphere bends into its umbra. Its glow in turn lights the night
-sky of [dunstkreis](../dunstkreis/).
+## The face we see
 
-This chapter is a placeholder: the library does not exist yet.
+The Moon turns once per orbit, so it shows us one face, almost: the <Term of="Libration">libration</Term> nods it a
+few degrees each way over a month, and the face is turned on the sky as well, by the
+<Term of="Position angle of axis">position angle of its axis</Term> from the sky's north, and from the sky's north to
+your own up by the <Term of="Parallactic angle">parallactic angle</Term>, both from sternzeit. nachtgestirn folds the
+three into one rotation, from your frame into the Moon's own, and asks the maps where every point of the disc is in
+<Term of="Selenographic coordinates">selenographic coordinates</Term>: longitude east positive, latitude north. East
+on the Moon is the side where the Sun rises on it, the side of Mare Crisium, the lone dark oval which stands on the
+right of the disc with north up as seen from Earth's northern hemisphere, and which sternzeit's own Moon, drawn with a
+grid rather than a map, puts in the same place.
 
-## Watch the Moon
+The maps are NASA's, from the CGI Moon Kit of its Scientific Visualization Studio <Cite id="svs4720" />: the color
+from the Lunar Reconnaissance Orbiter's wide angle camera, over 100,000 images into one mosaic, remade in December 2025
+with more of the source's color and range, and the relief from its laser altimeter. Both are laid out with 0° longitude
+in the middle and east to the right, so a point's longitude and latitude read straight off them, with no mirroring, which
+osgHimmel's cube map needed. The color map is balanced to look right, not to measure, so the package scales it to
+normal albedo by the near side's mean: a rerunnable script makes both maps from the kit, 4096 texels around for the
+color and 2048 for the relief, which it turns from heights into normals along east and north. The normals matter
+along the <Term of="Terminator">terminator</Term>, where the Sun stands low over the surface and every crater rim
+catches the light; elsewhere the disc is a sphere, and the color does the rest.
 
-A Moon to turn through its phases. Not written yet.
+Step the moment a day at a time in <Fig id="moon" /> and the face stays put while the terminator sweeps across it,
+Crisium on the right throughout, nodding in and out with the libration. With the relief off the terminator goes
+smooth; with the map off the Moon is a plain disc of its albedo, the coin of the opening.
 
-## Phase, libration and earthshine
+```ts
+import { moonOrientation } from "@himmelszelt/nachtgestirn";
+import { fromDate, julianEphemerisDay, moon } from "@himmelszelt/sternzeit";
 
-What makes the Moon look the way it does tonight. Not written yet.
+const time = fromDate(new Date());
+const obs = { latitude, longitude };
+const jde = julianEphemerisDay(time);
+// From your frame into the Moon's own, east, north and up on the Moon.
+const orientation = moonOrientation({
+    direction: moon.direction(time, obs),
+    libration: moon.librations(jde),
+    positionAngleOfAxis: moon.positionAngleOfAxis(jde),
+    parallacticAngle: moon.parallacticAngle(time, obs),
+});
+```
 
-## Code examples
+## Earthshine
 
-Not written yet.
+The night side of a thin crescent is not black: it glows with sunlight Earth reflects onto it, and the glow is
+strongest when the crescent is thinnest, because the Moon then sees an almost full Earth. nachtgestirn takes
+earthshine as what it is, an illuminance at the Moon in lux: Earth as a Lambert sphere of its geometric albedo of
+0.367 <Cite id="nssdc" />, at its phase as the Moon sees it, which is the Moon's own phase turned around
+<Cite id="vandehulst1980" />. A full Earth lights the Moon with some 13 lux, a ten thousandth of the Sun's 128,000, and
+about fifty times what a full Moon gives Earth back: Earth is four times wider and three times brighter. The night
+side then shines at half a candela per square meter, a thirteenth of a stop short of nothing next to the crescent's
+sunlit part, which is why a photograph exposed for the crescent shows it faintly and the eye, which adapts across
+the disc, sees it plainly. The light comes from where we look from, so the night side is lit face on, flat like the
+day side at full Moon.
+
+Set <Fig id="moon" /> to March 21, 2026 at 19:30 local time in Berlin, a crescent of a tenth 21° up in the west at the
+end of twilight: the night side shows the maria faintly in the earthshine, and lowering the exposure by a few stops
+brings them out, as a long exposure does.
+
+## Earth's shadow
+
+Twice or so a year the full Moon passes through Earth's shadow, and the shadow has two parts: the
+<Term of="Umbra">penumbra</Term>, where Earth covers the Sun's disc only partly, and the umbra, where it
+covers it whole. nachtgestirn computes both per point of the Moon's surface, from the point's own view: how much of the
+Sun's disc Earth's disc hides is the area two circles share, which is a smooth ramp across the penumbra, some 8,200 km
+wide at the Moon's distance, and nothing of the Sun is left in the umbra, 4,600 km in radius. The geometry comes from
+sternzeit's `eclipse.lunar`, the umbra's and penumbra's radii and the Moon's distance; the Moon's place in the shadow
+has to be taken from Earth's center, not from where you stand, since the parallax of up to a degree would move the
+Moon by 6,700 km, more than the umbra's radius.
+
+The umbra is not black either. Earth's atmosphere bends sunlight around the planet into the shadow, the light of
+every sunrise and sunset on Earth at once, and leaves the eclipsed Moon copper, some ten thousand times fainter than
+full. Along the umbra's rim the light has passed the stratosphere, where ozone takes the orange out, and the rim
+turns turquoise. How bright the umbra is varies from eclipse to eclipse with the dust in the stratosphere, after a
+volcano above all, which the Danjon scale grades <Cite id="espenak2009" />; nachtgestirn models it as a tenth of a
+thousandth of the sunlight at the shadow's axis, thirty times that at its edge, and lets a renderer scale it. The
+figure's light meter follows the shadow: as the umbra swallows the disc, the exposure opens up until the copper
+shows, which is what the eye does too.
+
+<Planned title="The umbra's light" plan="A strip across the shadow, penumbra to axis, with the model's brightness and color along it, or a row of discs through one eclipse.">
+    Earth's shadow as a function of the distance from its axis: the Sun's disc uncovered across the penumbra, the
+    refracted light in the umbra, copper in the middle and turquoise at the rim, on a logarithmic scale of stops.
+</Planned>
+
+## Through the air
+
+The Moon's light crosses the same air as the Sun's, and the same two things happen to it: the air takes some of it
+away, more of the blue, and adds its own light in front. nachtgestirn takes the first as a
+<Term of="Transmittance">transmittance</Term> per channel along the line of sight, which the figure reads from
+dunstkreis' transmittance table, so the rising Moon comes out dim and orange; the second it leaves to the background,
+the sky drawn behind it in cd/m², whose light it adds on top of the disc. That is the whole secret of the Moon by day:
+it is as bright as at night, the sky in front of it is simply brighter still, and a renderer that draws the Moon over
+the daytime sky in physical units gets the pale daytime Moon for free.
+
+The exposure is the renderer's: the pass takes an EV100 like dunstkreis' sky pass, and the two agree, since both
+start from the same 128,000 lux. A full Moon exposes around 14 like a sunny day, the photographer's "looney 11" of
+f/11 at the film's speed, which is why a night sky metered for the stars burns the Moon out to a white disc. The figure
+meters on the Moon, or by day on the sky, whichever is brighter.
+
+## The people behind the numbers
+
+Bruce Hapke worked out the photometric function of a powdered surface in 1963 and improved its scattering term in 1966
+<Cite id="hapke1963" /> <Cite id="hapke1966" />; the full Moon's flatness and the opposition surge are his. Henrik Wann
+Jensen and his colleagues put that law, with earthshine and the night sky's other lights, into a renderer in 2001
+<Cite id="jensen2001" />, the paper osgHimmel's Moon followed. Hendrik van de Hulst's phase function of a scattering
+sphere, from his book on multiple scattering of 1980 <Cite id="vandehulst1980" />, is where the earthshine's
+dependence on Earth's phase comes from. The maps are Ernie Wright's, of NASA's Scientific Visualization Studio, who
+assembled the CGI Moon Kit in 2019 and remade its color map in December 2025 <Cite id="svs4720" />.

@@ -19,6 +19,7 @@
         "@himmelszelt/dunstkreis": "workspace:*",
         "@himmelszelt/gewoelk": "workspace:*",
         "@himmelszelt/helldunkel": "workspace:*",
+        "@himmelszelt/nachtgestirn": "workspace:*",
         "@himmelszelt/rundbild": "workspace:*",
         "@himmelszelt/sternzeit": "workspace:*",
         "@photostructure/tz-lookup": "^11.7.0",

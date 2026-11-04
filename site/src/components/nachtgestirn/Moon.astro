@@ -1,0 +1,83 @@
+---
+import "../sternzeit/sternzeit.css";
+import "../dunstkreis/dunstkreis.css";
+import Choice from "../dunstkreis/Choice.astro";
+import OptionGroup from "../dunstkreis/OptionGroup.astro";
+import SkyFrame from "../dunstkreis/SkyFrame.astro";
+import Try from "../Try.astro";
+
+/**
+ * The Moon figure: nachtgestirn's disc over dunstkreis' sky in cd/m², composed and tone mapped by the Moon pass, in the
+ * shared frame, the view kept on the Moon and zoomed in on it. Its options switch the maps, the earthshine, the
+ * eclipse and the reflectance law, and set the exposure.
+ */
+interface Props {
+    id?: string;
+    caption?: string;
+    try?: { label: string; set: string; text: string };
+}
+const {
+    id = "moon",
+    caption = "The Moon at the chosen moment and place over dunstkreis' sky: its phase from the Sun's direction, its face turned by the libration and the position angle of its axis, its night side in earthshine, and Earth's shadow on it during an eclipse. The compass directions on the horizon. The view keeps to the Moon; drag to let go, scroll to see the sky around it.",
+    try: experiment,
+} = Astro.props;
+
+const LAW = {
+    name: "law",
+    label: "Reflectance law",
+    title: "How the surface reflects sunlight: Hapke's lunar law, which keeps the full Moon flat to its edge, or Lambert's, which darkens the limb as a billiard ball's",
+    options: [
+        ["hapke", "Hapke"],
+        ["lambert", "Lambert"],
+    ],
+    checked: "hapke",
+};
+const TONE = {
+    name: "tone",
+    label: "Tone curve",
+    title: "Khronos PBR Neutral keeps colors as they are and compresses only the brightest, AgX fades bright colors towards white as film does, ACES is the saturated filmic curve used before, none cuts the light off where it saturates",
+    options: [
+        ["clip", "none"],
+        ["neutral", "neutral"],
+        ["agx", "AgX"],
+        ["aces", "ACES"],
+    ],
+    checked: "neutral",
+};
+---
+
+<figure class="scene-frame wide" id={id} data-moon>
+    <SkyFrame png grid={false} lockIcon="moonLock" lockTitle="Keep the view on the Moon; dragging lets go" hint="Drag to look around, scroll to zoom. Rendered with WebGPU, the Moon over dunstkreis' sky.">
+        <canvas data-field="canvas" aria-label="The Moon at the chosen moment and place"></canvas>
+        <div class="sky-compass" data-field="compassLabels"></div>
+        <Fragment slot="options">
+            <OptionGroup name="exposure">
+                <label class="sky-ev">EV<sub>100</sub> <input data-field="exposure" type="range" min="-20" max="6" step="0.1" value="-14" title="Brighter to the right: a lower EV lets in more light" /> <output data-field="ev" /></label>
+                <button type="button" class="view-toggle" data-field="auto" aria-pressed="true" title="Expose for the Moon's lit surface, a stop brighter than mid gray, as a photographer exposes the Moon, or for the sky around it where that is brighter">auto</button>
+            </OptionGroup>
+            <OptionGroup name="surface">
+                <button type="button" class="view-toggle" data-field="albedo" aria-pressed="true" title="NASA's color map of the Moon, from the Lunar Reconnaissance Orbiter's wide angle camera; off, a uniform disc of the Moon's geometric albedo">map</button>
+                <button type="button" class="view-toggle" data-field="relief" aria-pressed="true" title="The relief from the Lunar Orbiter Laser Altimeter's elevation map: craters and mountains catch the light along the terminator">relief</button>
+                <button type="button" class="view-toggle" data-field="earthshine" aria-pressed="true" title="Earthshine, sunlight reflected by Earth onto the Moon's night side: a full Earth lights it with some 13 lux">earthshine</button>
+                <button type="button" class="view-toggle" data-field="eclipse" aria-pressed="true" title="Earth's shadow on the Moon during a lunar eclipse: the penumbra's dimming, the umbra's copper, and the turquoise rim ozone leaves">eclipse</button>
+            </OptionGroup>
+            <OptionGroup name="reflectance">
+                <Choice figure={id} {...LAW} />
+            </OptionGroup>
+            <OptionGroup name="tone mapping">
+                <Choice figure={id} {...TONE} />
+            </OptionGroup>
+        </Fragment>
+    </SkyFrame>
+    <p class="view-status"><span data-field="moon" /> <span class="sky-timing" data-field="timing" /></p>
+    <figcaption class="figure-caption">
+        {caption}
+        {experiment && <Try label={experiment.label} set={experiment.set} fig={id}>{experiment.text}</Try>}
+    </figcaption>
+</figure>
+
+<script>
+    import { moonFigure } from "./moon";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-moon]")) moonFigure(root);
+</script>

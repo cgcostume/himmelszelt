@@ -187,3 +187,40 @@ confirmed yet.
 | Henyey and Greenstein 1941 described the Milky Way's dust; Hart 1996; Beer 1852 | People | src | titles and venues of the papers | ok | 2026-11-04 |
 | Schneider modeled Rio's clouds with fluid simulation | People | src | Schneider 2023, slide 3 | ok | 2026-11-04 |
 | Potsdam 2026-06-21 19:36 UTC: Sun 1° below the horizon, cloud undersides at 2 km lit orange from below (Try) | Fig. clouds, Try | lib | sternzeit: −1.08° geometric; sunlight pass at 2.4 km nonzero and red; rendered in the figure | ok | 2026-11-04 |
+
+## nachtgestirn
+
+### Text
+
+| Claim | Where | Against | Result | Status | Checked |
+|---|---|---|---|---|---|
+| Lambert reflects a slant of 80° at a sixth of face on | Sunlight on dust | derived | cos 80° = 0.174 | ok | 2026-11-04 |
+| Lommel-Seeliger at full Moon: a half at the center and at the rim | Sunlight on dust | derived | mu0 / (mu0 + mu) with mu0 = mu | ok | 2026-11-04 |
+| Opposition surge a factor 2 at 0, gone by 90° | Sunlight on dust | src, lib | Hapke's B(g, 0.6) as Jensen et al. 2001; `nbRetrodirective` | ok | 2026-11-04 |
+| osgHimmel's scattering term makes the quarters a stop too bright | Sunlight on dust | derived | Hapke66's S at 90°: 0.477 against Jensen's 0.418, times the same LS integral: 0.18 vs 0.077 of full, about 1.2 stops | ok | 2026-11-04 |
+| Geometric albedo 0.12, Earth's 0.367 | Sunlight on dust, Earthshine, glossary | src | NASA fact sheets | ok | 2026-11-04 |
+| Full Moon some 4,900 cd/m² before the air | Sunlight on dust | lib | `meanLuminance(0)` = 4,889 | ok | 2026-11-04 |
+| A quarter Moon gives a tenth, by the phase law | Sunlight on dust | src, lib | Cox 2000: 10^(-0.4 (0.026 a + 4e-9 a^4)); `phaseLaw(90)` = 0.091 | ok | 2026-11-04 |
+| Phase angle at full Moon stays a few degrees | Sunlight on dust | lib | `moon.phaseAngle` on 2026-11-24 18:00 UTC: 5.2°; 0.3° in the eclipse of 2028-12-31 | ok | 2026-11-04 |
+| Mare Crisium on the right with north up, selenographic east | The face we see | web, lib | SVS map centered on 0°, Crisium right of center; `moonOrientation` test puts +90° east on the disc's right; render of 2026-11-24 compared with sternzeit's Moon view | ok | 2026-11-04 |
+| LROC WAC mosaic from over 100,000 images, color map remade December 2025 | The face we see, people | web | svs.gsfc.nasa.gov/4720 | ok | 2026-11-04 |
+| Maps 4096 and 2048 texels around | The face we see | lib | `scripts/maps.mjs` output | ok | 2026-11-04 |
+| Near side mean reflectance 0.396 | Quick start | lib | `scripts/maps.mjs` | ok | 2026-11-04 |
+| A full Earth lights the Moon with some 13 lux, a ten thousandth of the Sun | Earthshine | lib | `earthshineIlluminance(0, 384400)` = 12.9 lx; 12.9 / 128,000 = 1.0e-4 | ok | 2026-11-04 |
+| About fifty times what a full Moon gives Earth | Earthshine | derived | full Moon 4,889 cd/m² times 0.71 air times 6.5e-5 sr = 0.23 lx; 12.9 / 0.23 = 56 | ok | 2026-11-04 |
+| Earth four times wider and three times brighter | Earthshine | src | radii 6,371 / 1,737 = 3.7; albedo 0.367 / 0.12 = 3.1 | ok | 2026-11-04 |
+| Night side half a candela per square meter, thirteen stops short | Earthshine | derived | 0.12 / pi times 12.9 = 0.49 cd/m²; 4,889 / 0.49 = 10,000 = 13.3 stops | ok | 2026-11-04 |
+| March 21, 2026, 19:30 local, Berlin: a crescent of a tenth 21° up in the west, end of twilight | Earthshine | lib | 18:30 UTC: lit 9.7 %, altitude 21.3°, azimuth 271°, Sun -11.1° | ok | 2026-11-04 |
+| Penumbra some 8,200 km wide, umbra 4,600 km in radius | Earth's shadow | lib | sternzeit's glossary; `eclipse.lunar` radii | ok | 2026-11-04 |
+| A degree of parallax moves the Moon by 6,700 km | Earth's shadow | derived | 384,400 km times 1° in radians = 6,709 km | ok | 2026-11-04 |
+| Umbra some ten thousand times fainter than full | Earth's shadow | lib | the model's 1e-5 at the axis to 3e-4 at the edge, about 1e-4 on average | ok | 2026-11-04 |
+| Danjon scale, dust from volcanoes | Earth's shadow | src | Espenak & Meeus 2009, the canon's introduction | ok | 2026-11-04 |
+| Full Moon exposes around 14, looney 11 | Through the air | lib | `ev100ForLuminance(4889)` - 1 = 14.3, 13.8 through 71 % air; f/11 at 1/100 s is EV100 log2(121 · 100) = 13.6 | ok | 2026-11-04 |
+| Hapke 1963 and 1966, Jensen et al. 2001, van de Hulst 1980 | People | src | the references | ok | 2026-11-04 |
+
+### Experiments in the captions
+
+| Claim | Where | Against | Result | Status | Checked |
+|---|---|---|---|---|---|
+| New Year's Eve 2028, 17:00 UTC, Berlin: total eclipse, the Moon 16° up in the east-northeast, two hours after sunset | Moon figure | lib | umbral magnitude 1.21, altitude 15.9°, azimuth 73°; Sun -0.6° at 15:00 UTC, -16.7° at 17:00 | ok | 2026-11-04 |
+| An hour and a half back, the shadow's edge crosses the disc | Moon figure | lib | 15:30 UTC: umbral magnitude 0.33, the Moon 4.0° up | ok | 2026-11-04 |

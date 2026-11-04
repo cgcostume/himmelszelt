@@ -1,0 +1,54 @@
+{
+    "name": "@himmelszelt/nachtgestirn",
+    "version": "0.1.0",
+    "description": "The Moon on WebGPU: a compute pass that draws its disc as it looks tonight, phase, libration, earthshine and lunar eclipses included, shaded by a lunar reflectance law over NASA's maps, into a texture you own.",
+    "type": "module",
+    "license": "MIT",
+    "sideEffects": false,
+    "author": "Daniel Limberger <cgdaniel@outlook.com> (https://github.com/cgcostume)",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/cgcostume/himmelszelt.git",
+        "directory": "packages/nachtgestirn"
+    },
+    "homepage": "https://github.com/cgcostume/himmelszelt/tree/main/packages/nachtgestirn#readme",
+    "keywords": [
+        "moon",
+        "lunar",
+        "sky-rendering",
+        "earthshine",
+        "lunar-eclipse",
+        "webgpu",
+        "compute-shader"
+    ],
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "rolldown -c rolldown.config.ts",
+        "typecheck": "tsc --noEmit",
+        "test": "pnpm build && playwright test",
+        "test:gpu": "pnpm build && NACHTGESTIRN_GPU=1 playwright test",
+        "maps": "node scripts/maps.mjs"
+    },
+    "devDependencies": {
+        "@himmelszelt/dunstkreis": "workspace:*",
+        "@himmelszelt/helldunkel": "workspace:*",
+        "@himmelszelt/sternzeit": "workspace:*",
+        "@playwright/test": "^1.62.1",
+        "@types/node": "^26.6.2",
+        "@webgpu/types": "^0.1.71",
+        "rolldown": "^1.2.2",
+        "rolldown-plugin-dts": "^0.28.0",
+        "typescript": "^7.0.2",
+        "webgpu": "^0.6.1"
+    }
+}
