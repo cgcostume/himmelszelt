@@ -12,9 +12,10 @@ import detail from "./detail.comp.wgsl";
 import light from "./light.comp.wgsl";
 import noise from "./noise.wgsl";
 import params from "./params.wgsl";
+import sheet from "./sheet.wgsl";
 import voxel from "./voxel.comp.wgsl";
 
 export { camera } from "@himmelszelt/dunstkreis/wgsl";
 export { tonemap } from "@himmelszelt/helldunkel/wgsl";
 export { cloudOutput } from "./output.js";
-export { cloudmap, clouds, compose, detail, light, noise, params, voxel };
+export { cloudmap, clouds, compose, detail, light, noise, params, sheet, voxel };

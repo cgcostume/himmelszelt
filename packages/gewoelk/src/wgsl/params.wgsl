@@ -20,9 +20,10 @@ struct GwSheet {
     forwardG: f32,
     enabled: u32,
     seed: u32,
-    // The sun's illuminance at the sheet's altitude, per channel in lux: reddened, and still there after sunset.
-    sunIlluminance: vec3f,
-    pad: f32,
+    // The wind's direction, along which the fibers stretch, one tile of them across it in km, and how far they erode.
+    streak: vec2f,
+    fiberScale: f32,
+    detail: f32,
 }
 
 // The cloudscape: the voxel volume the low clouds live in, a slab of `height` km from `base` km up, repeating every
@@ -51,9 +52,19 @@ struct GwCloudscape {
     enabled: u32,
     // How far the detail noise erodes the profile, 0 for the profile alone, 1 for Nubis3's full erosion.
     detail: f32,
-    // The sun's illuminance at the clouds' altitude, per channel in lux: from below around sunset.
-    sunIlluminance: vec3f,
-    pad: f32,
+    // The sun's elevations above the local horizon the light grid's four slices hold, the first and the last, radians.
+    lightElevations: vec2f,
+    // How far over the ground the clouds reach before they have cleared away, in km, 0 for no end, and the share of
+    // that over which they shrink towards it.
+    clearing: f32,
+    clearingSoftness: f32,
+    // The aerial perspective volume's reach in km and the scale its luminance is stored at; a reach of 0 for none.
+    aerial: vec2f,
+    // How far a broad, unrepeating field thins the clouds out in places, 0 to 1, and its size in km: the volume
+    // repeats, the gaps it leaves do not.
+    variation: f32,
+    variationScale: f32,
+    pad: vec2f,
 }
 
 struct GwParams {
@@ -77,11 +88,21 @@ struct GwParams {
     jitter: f32,
     frame: u32,
     sheets: u32,
-    // The sky's luminance along the horizon, in cd/m²: what far clouds fade into.
+    // The sky's luminance along the horizon, in cd/m²: what far clouds fade into without a background, and the cap with.
     horizonLuminance: vec3f,
     pad: f32,
     cloudscape: GwCloudscape,
     sheet: array<GwSheet, 2>,
+}
+
+// The sun's illuminance in lux by its elevation above the local horizon, which grows by a degree every 111 km towards
+// the sun: rows for the cloudscape's base and top and each sheet, `GW_SUNLIGHT_ENTRIES` evenly from `span.x` to
+// `span.y` radians each. Reddened and cut off by the planet's shadow, it lights far clouds after the near ones.
+const GW_SUNLIGHT_ENTRIES: u32 = 32u;
+
+struct GwSunlight {
+    span: array<vec4f, 4>,
+    illuminance: array<vec4f, 128>,
 }
 
 // What a cloud map is made from: the shaping of gwFbm into coverage, the map's third coordinate, and for the
@@ -98,6 +119,13 @@ struct GwModel {
     layer: u32,
     // Lattice cells of the first octave across the map.
     cells: u32,
+    // How much of the cloudscape grows into towers, 0 to 1, how deep its billows are, as a share of its height, and
+    // billows across the volume, east and north.
+    towers: f32,
+    billows: f32,
+    billowCells: u32,
+    // How many times taller than the ordinary clouds the slab is, for the towers to rise into.
+    towerScale: f32,
 }
 
 const GW_PI: f32 = 3.141592653589793;

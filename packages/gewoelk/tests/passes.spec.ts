@@ -17,11 +17,11 @@ function wgslSource(name: string): string {
 // Each pass with exactly the fragments its header names, so none grows a dependency it does not declare.
 const PASSES: Record<string, readonly string[]> = {
     cloudmap: ["noise", "params", "cloudmap"],
-    voxel: ["params", "voxel"],
+    voxel: ["noise", "params", "voxel"],
     detail: ["noise", "detail"],
     light: ["params", "light"],
-    clouds: ["params", "camera", "clouds"],
-    compose: ["params", "tonemap", "compose"],
+    clouds: ["noise", "params", "camera", "sheet", "clouds"],
+    compose: ["noise", "params", "camera", "sheet", "tonemap", "compose"],
 };
 const OUTPUTS: Record<string, string> = { clouds: cloudOutput("rgba16float"), compose: cloudOutput("rgba8unorm") };
 

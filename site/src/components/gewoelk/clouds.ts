@@ -1,12 +1,21 @@
-import type { AtmosphereLUTs, SkyPass } from "@himmelszelt/dunstkreis";
+import type { AtmosphereLUTs, AtmosphereModel, SkyPass } from "@himmelszelt/dunstkreis";
 import {
     apparentDirection,
     clampObserverHeight,
     createSkyPass,
     DEFAULT_AUTO_EXPOSURE_KEYS,
+    refractionAngle,
 } from "@himmelszelt/dunstkreis";
-import type { CloudParams, CloudPass } from "@himmelszelt/gewoelk";
-import { createCloudPass, DEFAULT_CLOUDSCAPE, DEFAULT_SHEET } from "@himmelszelt/gewoelk";
+import type { CloudParams, CloudPass, Weather, WeatherName } from "@himmelszelt/gewoelk";
+import {
+    createCloudPass,
+    DEFAULT_CLOUD_PARAMS,
+    DEFAULT_CLOUDSCAPE,
+    DEFAULT_SHEET,
+    mixWeather,
+    sunlightRows,
+    WEATHER,
+} from "@himmelszelt/gewoelk";
 import { fromJulianDay, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
 import {
@@ -27,6 +36,7 @@ import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
+import { createAerialRgb } from "./aerial";
 import { createSunlight } from "./sunlight";
 
 const DEG = Math.PI / 180;
@@ -50,6 +60,40 @@ function irradianceAt(sh: Float32Array, up: 1 | -1, scale: number): [number, num
 }
 
 /** The sky's luminance along the horizon, averaged over the azimuths: the zonal terms of the coefficients at z = 0. */
+// Where the sun shows from an altitude, lifted by the air, for true elevations from -4° to 10° in steps of 0.1°: traced
+// once per model and altitude, as dunstkreis' refractionAngle does it, then looked up. Above, the lift is a few
+// arcminutes at most, and taken as none.
+const LIFT_FROM = -4 * DEG;
+const LIFT_STEP = 0.1 * DEG;
+const LIFT_COUNT = 141;
+const lifts = new WeakMap<AtmosphereModel, Map<number, Float64Array>>();
+
+function lifted(model: AtmosphereModel, altitudeKm: number, elevation: number): number {
+    const byAltitude = lifts.get(model) ?? new Map<number, Float64Array>();
+    lifts.set(model, byAltitude);
+    let table = byAltitude.get(altitudeKm);
+    if (!table) {
+        table = new Float64Array(LIFT_COUNT);
+        for (let i = 0; i < LIFT_COUNT; i++) {
+            const e = LIFT_FROM + i * LIFT_STEP;
+            // The apparent altitude a whose ray, bent by refractionAngle(a), leaves towards e: a = e + bend(a).
+            let a = e + 0.6 * DEG;
+            for (let k = 0; k < 5; k++) {
+                const bend = refractionAngle(model, altitudeKm * 1000, a / DEG);
+                if (bend === null) break;
+                a = e + bend * DEG;
+            }
+            table[i] = a;
+        }
+        byAltitude.set(altitudeKm, table);
+    }
+    const f = (elevation - LIFT_FROM) / LIFT_STEP;
+    if (f < 0) return elevation;
+    if (f >= LIFT_COUNT - 1) return elevation;
+    const i = Math.floor(f);
+    return (table[i] as number) + ((table[i + 1] as number) - (table[i] as number)) * (f - i);
+}
+
 function horizonLuminance(sh: Float32Array, scale: number): [number, number, number] {
     const l = [0, 1, 2].map((k) => Math.max((0.282095 * (sh[k] ?? 0) - 0.315392 * (sh[18 + k] ?? 0)) / scale, 0));
     return [l[0] ?? 0, l[1] ?? 0, l[2] ?? 0];
@@ -121,10 +165,11 @@ export function cloudsFigure(root: HTMLElement) {
     let skyIrradiance: [number, number, number] = [0, 0, 0];
     let groundIrradiance: [number, number, number] = [0, 0, 0];
     let horizon: [number, number, number] = [0, 0, 0];
-    // The sun's light at the cloudscape's middle and the sheet's altitude, read back along with the meter.
+    // The sun's light aloft by altitude and its elevation over the local horizon, read back when the rows change.
     const sunlight = gpu ? createSunlight(gpu.device) : null;
-    let sunAtClouds: [number, number, number] | undefined;
-    let sunAtSheet: [number, number, number] | undefined;
+    const aerialRgb = gpu ? createAerialRgb(gpu.device) : null;
+    let sunTable: [number, number, number][] | undefined;
+    let sunTableFor = "";
     const requestRender = onDemand(render, root);
 
     function buildSky(luts: AtmosphereLUTs) {
@@ -137,6 +182,8 @@ export function cloudsFigure(root: HTMLElement) {
             autoExposure: false,
             groundLight: quality.groundLight,
             dither: false,
+            // The air in front of the clouds, out to beyond the farthest in sight.
+            aerialPerspective: { maxDistanceKm: 400 },
         }).then((pass) => {
             if (skyBuilding !== luts) return pass.destroy();
             sky?.pass.destroy();
@@ -146,10 +193,10 @@ export function cloudsFigure(root: HTMLElement) {
             requestRender();
         });
     }
-    function buildClouds(key: string, scale: number, maxSteps: number) {
+    function buildClouds(key: string, scale: number, maxSteps: number, layers: number) {
         if (!gpu || cloudsBuilding === key) return;
         cloudsBuilding = key;
-        createCloudPass(gpu.device, { format: SDR, scale, maxSteps }).then((pass) => {
+        createCloudPass(gpu.device, { format: SDR, scale, maxSteps, grid: { layers } }).then((pass) => {
             if (cloudsBuilding !== key) return pass.destroy();
             clouds?.pass.destroy();
             clouds = { pass, key };
@@ -188,6 +235,34 @@ export function cloudsFigure(root: HTMLElement) {
         note.textContent = `${gpu.adapterName} · ${cost}`;
     }
 
+    // A change of weather: the sliders blended from where they stand to the preset's over a few seconds, the frames
+    // drawn only while it lasts.
+    let weatherFrame = 0;
+    function changeWeather(name: WeatherName) {
+        const target: Weather = WEATHER[name];
+        const from: Weather = { cloudscape: {}, sheet: {} };
+        for (const [layer, values] of Object.entries(target) as [keyof Weather, Record<string, number>][]) {
+            for (const key of Object.keys(values))
+                (from[layer] as Record<string, number>)[key] = slider(`${layer}.${key}`);
+        }
+        const start = performance.now();
+        cancelAnimationFrame(weatherFrame);
+        const step = (now: number) => {
+            const t = Math.min(1, (now - start) / 3000);
+            const mixed = mixWeather(from, target, t * t * (3 - 2 * t));
+            for (const [layer, values] of Object.entries(mixed) as [string, Record<string, number>][]) {
+                for (const [key, value] of Object.entries(values)) {
+                    const input = sliders.find((s) => s.dataset.param === `${layer}.${key}`);
+                    if (!input) continue;
+                    input.value = String(value);
+                    input.dispatchEvent(new Event("input", { bubbles: true }));
+                }
+            }
+            if (t < 1) weatherFrame = requestAnimationFrame(step);
+        };
+        weatherFrame = requestAnimationFrame(step);
+    }
+
     function cloudParams(): Partial<CloudParams> {
         const windOf = (speed: number, azimuth: number): [number, number] => [
             speed * Math.sin(azimuth * DEG),
@@ -197,6 +272,7 @@ export function cloudsFigure(root: HTMLElement) {
         const ambientOn = pressed("light.ambient");
         return {
             sunIlluminance: sunOn ? sunIlluminance : [0, 0, 0],
+            ...(sunOn && sunTable ? { sunlight: sunTable } : {}),
             skyIrradiance: ambientOn ? skyIrradiance : [0, 0, 0],
             groundIrradiance: ambientOn ? groundIrradiance : [0, 0, 0],
             horizonLuminance: horizon,
@@ -210,10 +286,15 @@ export function cloudsFigure(root: HTMLElement) {
                 baseKm: slider("cloudscape.baseKm"),
                 heightKm: slider("cloudscape.heightKm"),
                 offset: slider("cloudscape.offset"),
-                wind: windOf(slider("cloudscape.windSpeed"), 250),
+                wind: windOf(slider("cloudscape.windSpeed"), slider("cloudscape.windFrom") + 180),
                 evolution: slider("cloudscape.evolution"),
+                clearingKm: slider("cloudscape.clearingKm"),
+                clearingSoftness: slider("cloudscape.clearingSoftness"),
+                variation: slider("cloudscape.variation"),
+                towers: slider("cloudscape.towers"),
+                towerScale: slider("cloudscape.towerScale"),
+                billows: slider("cloudscape.billows"),
                 multiScatter: pressed("light.multi") ? DEFAULT_CLOUDSCAPE.multiScatter : 0,
-                ...(sunOn && sunAtClouds ? { sunIlluminance: sunAtClouds } : {}),
             },
             sheets: [
                 {
@@ -222,8 +303,7 @@ export function cloudsFigure(root: HTMLElement) {
                     coverage: slider("sheet.coverage"),
                     altitudeKm: slider("sheet.altitudeKm"),
                     opticalDepth: slider("sheet.opticalDepth"),
-                    wind: windOf(slider("sheet.windSpeed"), 270),
-                    ...(sunOn && sunAtSheet ? { sunIlluminance: sunAtSheet } : {}),
+                    wind: windOf(slider("sheet.windSpeed"), slider("sheet.windFrom") + 180),
                 },
             ],
         };
@@ -238,9 +318,10 @@ export function cloudsFigure(root: HTMLElement) {
         }
         const scale = Number(choice("scale")) || 1;
         const maxSteps = Number(choice("steps")) || 128;
-        const key = `${scale},${maxSteps}`;
+        const layers = Number(choice("layers")) || 64;
+        const key = `${scale},${maxSteps},${layers}`;
         if (clouds?.key !== key) {
-            buildClouds(key, scale, maxSteps);
+            buildClouds(key, scale, maxSteps, layers);
             return;
         }
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -288,38 +369,50 @@ export function cloudsFigure(root: HTMLElement) {
             skyViewFor = skyViewKey;
             const { pass } = sky;
             skyViewChanged({ pass, sunDirection, apparentSun: [x, y, z], sunAngularDiameter, observerHeightM });
-            const altitudes = [
-                slider("cloudscape.baseKm") + slider("cloudscape.heightKm") / 2,
-                slider("sheet.altitudeKm"),
-            ];
-            Promise.all([
-                pass.meteredEV100(),
-                pass.sunIlluminance(),
-                sunlight?.at(table.luts, altitudes, sunDirection) ?? [],
-            ]).then(([metered, illuminance, aloft]) => {
+            Promise.all([pass.meteredEV100(), pass.sunIlluminance()]).then(([metered, illuminance]) => {
                 if (sky?.pass !== pass) return;
                 const changed = Math.abs(metered - ev100) > 0.02 || illuminance.some((v, i) => v !== sunIlluminance[i]);
                 ev100 = metered;
                 sunIlluminance = illuminance;
-                if (aloft.length === 2) [sunAtClouds, sunAtSheet] = aloft;
-                if (changed || aloft.length === 2) requestRender();
+                if (changed) requestRender();
             });
         }
-        clouds.pass.update({
+        const params = {
             sunDirection,
             observerHeightM,
             inverseViewProjection: ivp,
             projectionDistance: basis.d,
             planetRadiusKm: table.luts.model.planet.groundRadiusKm,
             ...cloudParams(),
-        });
+        };
+        const rows = sunlightRows({ ...DEFAULT_CLOUD_PARAMS, ...params });
+        const rowsKey = `${JSON.stringify(rows)},${sky.luts === table.luts}`;
+        if (rowsKey !== sunTableFor && sunlight) {
+            const luts = sky.luts;
+            sunlight
+                .table(luts, rows, (h, e) => lifted(luts.model, h, e))
+                .then((values) => {
+                    if (!values || sky?.luts !== luts) return;
+                    sunTableFor = rowsKey;
+                    sunTable = values;
+                    requestRender();
+                });
+        }
+        clouds.pass.update(params);
 
         placeCompass(basis, canvas.clientWidth, canvas.clientHeight);
         const encoder = gpu.device.createCommandEncoder({ label: "sternwarte:clouds" });
         sky.pass.encode(encoder, background);
+        // The air in front of the clouds from dunstkreis' volume, or, chosen so, a blend into the sky behind them.
+        const volume = sky.pass.aerialPerspective;
+        const aerialPerspective =
+            choice("air") === "volume" && volume && aerialRgb
+                ? aerialRgb.encode(encoder, sky.luts, volume, sky.pass.skyViewScale)
+                : undefined;
         const timestamps = timing && !timing.busy;
         clouds.pass.encode(encoder, gpu.context.getCurrentTexture(), {
             background,
+            ...(aerialPerspective ? { aerialPerspective } : {}),
             ...(timestamps
                 ? { timestampWrites: { querySet: timing.set, beginningOfPassWriteIndex: 0, endOfPassWriteIndex: 1 } }
                 : {}),
@@ -357,6 +450,9 @@ export function cloudsFigure(root: HTMLElement) {
         }
         for (const input of root.querySelectorAll<HTMLInputElement>('input[type="radio"]')) {
             input.addEventListener("change", requestRender);
+        }
+        for (const input of root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-weather"]`)) {
+            input.addEventListener("change", () => changeWeather(input.value as WeatherName));
         }
         for (const button of root.querySelectorAll<HTMLButtonElement>("button.view-toggle[data-field]")) {
             button.addEventListener("click", () => {

@@ -3,7 +3,8 @@
 //
 // Octaves of gradient noise, summed as osgHimmel's HighCloudLayerGeode did, then shaped: what lies below 1 - coverage
 // is sky, the rest stretched to [0, 1] and raised to 1 - sharpness, so the edges harden as sharpness grows. The green
-// channel keeps a second field of the same kind, which decides between wispy and billowy detail.
+// channel keeps a second field of the same kind, which decides between wispy and billowy detail; the alpha channel a
+// third, broader one, shaped by the towers' coverage, where clouds grow tall.
 
 @group(0) @binding(0) var<uniform> gwModel: GwModel;
 @group(0) @binding(1) var gwMapOut: texture_storage_2d_array<rgba16float, write>;
@@ -29,5 +30,7 @@ fn gwCloudMap(@builtin(global_invocation_id) id: vec3u) {
     let n = clamp(0.5 + (gwFbm(p, period, gwModel.octaves, gwModel.seed) - 0.5) * 2.4, 0.0, 1.0);
     let kind = gwFbm(p * 0.5 + vec3f(3.7, 1.3, 0.0), max(period / 2, vec3i(1)), 3u, gwModel.seed + 977u);
     let shaped = gwShape(n, gwModel.coverage, gwModel.sharpness);
-    textureStore(gwMapOut, vec2i(id.xy), i32(gwModel.layer), vec4f(shaped, kind, n, 1.0));
+    let tall = gwFbm(p * 0.5 + vec3f(1.9, 6.1, 0.0), max(period / 2, vec3i(1)), 3u, gwModel.seed + 1777u);
+    let tower = gwShape(clamp(0.5 + (tall - 0.5) * 2.4, 0.0, 1.0), gwModel.towers, 0.3);
+    textureStore(gwMapOut, vec2i(id.xy), i32(gwModel.layer), vec4f(shaped, kind, n, tower));
 }

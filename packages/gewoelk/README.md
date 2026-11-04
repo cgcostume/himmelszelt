@@ -31,13 +31,40 @@ detail composite, two samples towards the sun add detail to the summed light, He
 scattering, the orders of scattering after the first come as octaves (Wrenninge 2013, Hillaire 2016), the profile
 stands in for Nubis3's inner glow, and the ambient light fades with depth.
 
-Far clouds fade into the sky along the horizon, `horizonLuminance`, as aerial perspective does, and stay as opaque as
-they are. Each layer may take the sun's illuminance at its own altitude, `sunIlluminance` on the layer: after sunset
-the ground lies in shadow while a cloud base 2 km up is still lit from below by a reddened sun, and the summed density
-towards it runs downward through the volume then.
+The air in front of the clouds is taken step by step, at each step's own distance, and leaves them as opaque as they
+are. Given an `aerialPerspective` volume at `encode`, RGB froxels laid out as Hillaire's (dunstkreis' volume, turned
+into RGB), it is the atmosphere's own in-scattering and transmittance. Without, for a baked background, far clouds fade
+into the background's own pixel by `horizonFadeKm`, held below a few times `horizonLuminance` so the sun's disc does
+not shine through, or into `horizonLuminance` where there is no background. With `clearingKm` the clouds grow fewer towards that distance, the map's coverage falling and their tops
+sinking first, and leave a clear horizon, under which a low sun reaches them.
 
-Up to two **sheets** of high cloud, cirrus and cirrostratus, are read once each where the ray crosses their sphere:
-the map's value as an optical depth, thicker at a slant.
+The voxels are shaped from the map in a pass of their own: where a second, broader field is up (`towers`), clouds
+rise up to `towerScale` times the layer's height and spread at the top, while the others keep to the layer; the slab
+grows with the towers, so more `grid.layers` keep its voxels fine; `billows` of 3D turbulence
+heap the surface up, deeper with height, so tops grow cauliflowers over flat bases.
+
+The volume repeats every `extentKm`; `variation` thins its clouds out in places by a broad field that does not
+repeat with it (the map's raw field, turned and stretched to `variationKm`), so the repetition hides towards the
+horizon. Like the clearing, it only removes clouds, and it lightens the light grid's shadows as far as it does.
+
+The air in front of the clouds lies in their shadow where the deck closes towards the sun: its light is dimmed by what
+the light grid lets through where the ray meets the slab, which the grid holds for every voxel, cloud or not.
+
+The layers are shells around the planet, so the sun stands higher over a cloud towards it, by a degree every 111 km.
+The light grid holds the summed density towards the sun at four elevations above the local horizon, along straight
+rays through the curved slab, and the march interpolates them at each point's own elevation: no flip when the sun
+crosses the horizontal, but a sweep across the sky. The sun's light itself comes from `sunlight`, a table by altitude
+and elevation that `sunlightRows` asks for (dunstkreis' transmittance table fills it): far clouds towards the sun stay
+lit after the near ones, reddened, and the planet's shadow climbs them at dusk.
+
+Up to two **sheets** of high cloud, cirrus and cirrostratus, are read once each where the ray crosses their sphere,
+in the compose pass at the target's full size, so their strands stay sharp at any `scale`, and clear away towards the
+cloudscape's `clearingKm` with it:
+the map's value as an optical depth, thicker at a slant, eroded into strands by ridged noise drawn out along the wind
+and bent into hooks.
+
+`WEATHER` holds presets of the clouds' shape, from clear to overcast, the sheet's included, and `mixWeather` blends
+two, number by number, for weather that changes.
 
 Wind drifts each layer at its own speed; evolution, in map changes per hour, reshapes a map over time and, for the
 cloudscape, rebuilds its voxels, distance field and light. Both are 0 for a sky that stands still, which then costs

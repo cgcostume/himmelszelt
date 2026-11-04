@@ -1,8 +1,8 @@
-// The clouds along every pixel's ray, written premultiplied with the transmittance behind them, at the size of the
-// target, which may be smaller than the frame. The sheets are read once each where the ray crosses them; the cloudscape
-// is marched as Nubis3 marches its voxel clouds: steps the signed distance long outside the clouds and adaptive inside,
+// The cloudscape along every pixel's ray, written premultiplied with the transmittance behind it, at the size of the
+// target, which may be smaller than the frame; the sheets are left to the compose pass, at the frame's. It is marched
+// as Nubis3 marches its voxel clouds: steps the signed distance long outside the clouds and adaptive inside,
 // the density up-rezzed from the dimensional profile by the detail noise, the light summed per voxel beforehand.
-// Requires `params.wgsl`, `camera.wgsl` and the output binding.
+// Requires `noise.wgsl`, `params.wgsl`, `camera.wgsl`, `sheet.wgsl` and the output binding.
 
 @group(0) @binding(0) var<uniform> gwParams: GwParams;
 @group(0) @binding(1) var gwMap: texture_2d_array<f32>;
@@ -10,6 +10,15 @@
 @group(0) @binding(3) var gwModeling: texture_3d<f32>;
 @group(0) @binding(4) var gwLight: texture_3d<f32>;
 @group(0) @binding(5) var gwDetail: texture_3d<f32>;
+@group(0) @binding(6) var<uniform> gwSunlight: GwSunlight;
+@group(0) @binding(7) var gwAmbient: texture_3d<f32>;
+@group(0) @binding(8) var gwBackground: texture_2d<f32>;
+@group(0) @binding(9) var gwAerialLuminance: texture_3d<f32>;
+@group(0) @binding(10) var gwAerialTransmittance: texture_3d<f32>;
+@group(0) @binding(11) var gwClampSampler: sampler;
+
+// Whether a background is bound, the sky in cd/m² the far clouds fade into.
+override GW_BACKGROUND: bool = true;
 
 // Steps a ray takes at most through the cloudscape, and detailed density samples towards the sun per step: Nubis3's
 // two, whose remaining light comes from the summed grid.
@@ -20,80 +29,10 @@ override GW_SCATTERING_OCTAVES: u32 = 8u;
 // Below this transmittance a ray is done.
 const GW_MIN_TRANSMITTANCE: f32 = 0.01;
 
-// The ray through a point of the target, in pixels from its top left corner, on dunstkreis' camera.
-fn gwPixelRay(position: vec2f, size: vec2u) -> vec3f {
-    let uv = position / vec2f(size);
-    let ndc = vec2f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
-    return dkProjectRay(gwParams.inverseViewProjection, ndc, clamp(gwParams.projectionDistance, 0.0, 1.0));
-}
-
 // Interleaved gradient noise (Jimenez 2014), a different frame of it each frame.
 fn gwJitter(pixel: vec2u, frame: u32) -> f32 {
     let p = vec2f(pixel) + 5.588238 * f32(frame % 64u);
     return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y));
-}
-
-// Light scattered along a ray and what passes through: premultiplied, to composite front to back.
-struct GwLayer {
-    luminance: vec3f,
-    transmittance: f32,
-}
-
-fn gwOver(front: GwLayer, behind: GwLayer) -> GwLayer {
-    return GwLayer(front.luminance + front.transmittance * behind.luminance, front.transmittance * behind.transmittance);
-}
-
-// Faded into the sky by the air between, as aerial perspective does: at `fade` km a cloud keeps 1/e of its own light
-// and takes the rest from the sky along the horizon, and it hides what lies behind it as before.
-fn gwFaded(layer: GwLayer, distance: f32) -> GwLayer {
-    let f = exp(-distance / max(gwParams.fade, 1e-3));
-    let air = gwParams.horizonLuminance * (1.0 - f) * (1.0 - layer.transmittance);
-    return GwLayer(layer.luminance * f + air, layer.transmittance);
-}
-
-// A sheet where the ray crosses its sphere: the map's value as an optical depth, thicker at a slant, lit by the sun
-// through it with a forward lobe, and by the sky and the ground as an even glow.
-fn gwSheet(index: u32, o: vec3f, v: vec3f, sun: vec3f, distance: ptr<function, f32>) -> GwLayer {
-    let sheet = gwParams.sheet[index];
-    let r = gwParams.planetRadius + sheet.altitude;
-    let hit = gwSphere(o, v, r);
-    let ro = length(o);
-    var t = hit.far;
-    if (ro > r) {
-        t = hit.near;
-    }
-    let earth = gwSphere(o, v, gwParams.planetRadius);
-    if (!hit.hits || t <= 0.0 || (ro < r && earth.hits && earth.near > 0.0)) {
-        *distance = -1.0;
-        return GwLayer(vec3f(0.0), 1.0);
-    }
-    *distance = t;
-    let p = o + v * t;
-    let uv = (gwGround(p) - sheet.drift) / sheet.scale;
-    let n = textureSampleLevel(gwMap, gwVolumeSampler, uv, i32(index + 1u), 0.0).r;
-    if (n <= 0.0) {
-        return GwLayer(vec3f(0.0), 1.0);
-    }
-    let up = p / length(p);
-    let slant = max(abs(dot(v, up)), 0.1);
-    let tau = n * sheet.opticalDepth;
-    let transmittance = exp(-tau / slant);
-    let scattered = 1.0 - transmittance;
-    // Half the depth towards the sun, as its light scatters on through the sheet; at a grazing sun no more than
-    // three sheets' worth.
-    let toSun = exp(-tau / max(abs(dot(sun, up)), 0.3) * 0.5);
-    let cosTheta = dot(v, sun);
-    let phase = 0.8 * gwHenyeyGreenstein(cosTheta, sheet.forwardG) + 0.2 * gwHenyeyGreenstein(cosTheta, -0.2);
-    let direct = sheet.sunIlluminance * toSun * phase;
-    let ambient = (gwParams.skyIrradiance + gwParams.groundIrradiance) / (2.0 * GW_PI) * 0.5;
-    return GwLayer(sheet.albedo * scattered * (direct + ambient), transmittance);
-}
-
-// Where a point stands over the ground, east and north in km along the planet's surface from below the observer,
-// not across the tangent plane: the maps bend around the planet with the shells, and never fold back from orbit.
-fn gwGround(p: vec3f) -> vec2f {
-    let across = length(p.xy);
-    return p.xy / max(across, 1e-6) * (gwParams.planetRadius * atan2(across, p.z));
 }
 
 // A point of the observer's frame in the cloudscape's unit cube: east and north wrapped by the extent, the height above
@@ -109,6 +48,9 @@ struct GwSample {
     full: f32,
     profile: f32,
     kind: f32,
+    // The share of the volume's clouds the clearing and the variation leave around here, for the light grid, which
+    // still holds them all.
+    kept: f32,
 }
 
 // The modeling data at a unit-cube point, and the signed distance in km it encodes.
@@ -131,9 +73,31 @@ fn gwSignedDistance(m: vec4f, q: vec3f) -> f32 {
 // eroded by the result, scaled and sharpened.
 fn gwDensity(m: vec4f, p: vec3f) -> GwSample {
     let volume = gwParams.cloudscape;
-    let profile = m.r;
+    // Towards the clearing the map's coverage falls: its threshold rises, so small clouds go first and large ones
+    // shrink from their edges in, keeping their density. Read at the point, as the volume repeats but the clearing not.
+    // The broad variation thins them the same way, where its field is up: drifting with the clouds, never repeating.
+    let left = gwClearing(p);
+    var thinned = 0.0;
+    if (volume.variation > 0.0) {
+        // The map's raw field again, turned by 37° and stretched to the variation's size, so its repeats never line up
+        // with the volume's.
+        let g = (gwGround(p) - volume.drift) / max(volume.variationScale, 1.0);
+        let turned = vec2f(0.7986 * g.x - 0.6018 * g.y, 0.6018 * g.x + 0.7986 * g.y);
+        let field = textureSampleLevel(gwMap, gwVolumeSampler, turned, 0, 0.0).b;
+        thinned = volume.variation * smoothstep(0.35, 0.65, field) * 0.8;
+    }
+    var profile = m.r;
+    if (left < 1.0 || thinned > 0.0) {
+        let uv = (gwGround(p) - volume.drift) / volume.extent;
+        let column = textureSampleLevel(gwMap, gwVolumeSampler, uv, 0, 0.0).r;
+        // Higher up, the threshold more: tops sink first and what is left are low mounds, not cut-off columns. The last
+        // remnants thin out too, so none ends as a hard little block on the horizon.
+        let height = clamp((length(p) - gwParams.planetRadius - volume.base) / volume.height, 0.0, 1.0);
+        let threshold = max(1.0 - left, thinned) * (1.0 + 2.0 * height);
+        profile = profile * smoothstep(threshold, threshold + 0.4, column) * smoothstep(0.0, 0.3, left);
+    }
     if (profile <= 0.0) {
-        return GwSample(0.0, 0.0, 0.0);
+        return GwSample(0.0, 0.0, 0.0, 1.0);
     }
     // Read at the height above the base, not above the planet's center: a sampler's fixed-point texel coordinates
     // overflow some ten thousand tiles out.
@@ -148,18 +112,29 @@ fn gwDensity(m: vec4f, p: vec3f) -> GwSample {
     density = density * scale;
     // Sharpened less than Nubis3 does, whose voxels are eight times finer: softer edges at this scale.
     density = pow(density, mix(0.65, 0.9, max(1e-3, scale)));
-    return GwSample(density, profile * m.b, m.g);
+    return GwSample(density, profile * m.b, m.g, 1.0 - max(1.0 - left, thinned));
 }
 
 // The cloudscape along the ray from `t0` to `t1`.
-fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32) -> GwLayer {
+// The sun's light through the cloudscape at `p`, 1 to 0, from the light grid: the slices at the sun's elevation there.
+fn gwSunThrough(p: vec3f, sun: vec3f) -> f32 {
     let volume = gwParams.cloudscape;
+    let q = gwVolumeCoordinate(p);
+    let span = volume.lightElevations;
+    let slice = clamp((gwElevation(sun, p / length(p)) - span.x) / max(span.y - span.x, 1e-6), 0.0, 1.0) * 3.0;
+    let summed = dot(textureSampleLevel(gwLight, gwVolumeSampler, q, 0.0), max(1.0 - abs(slice - vec4f(0.0, 1.0, 2.0, 3.0)), vec4f(0.0)));
+    return exp(-volume.extinction * summed);
+}
+
+fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, uv: vec2f, sky: vec3f) -> GwLayer {
+    let volume = gwParams.cloudscape;
+    // The air in front of the clouds lies in their shadow where the deck closes towards the sun: its light, the sun's
+    // forward glow above all, dimmed by what the deck lets through where the ray meets it, a share kept for the sky's.
+    let shade = mix(0.3, 1.0, gwSunThrough(o + v * max(t0, 0.0), sun));
     let extinction = volume.extinction;
     let cosTheta = dot(v, sun);
     let phaseSecondary = gwHenyeyGreenstein(cosTheta, volume.secondaryG);
     let cell = volume.height / f32(textureDimensions(gwModeling).z);
-    // The sun's direction in the unit cube, for the near light samples.
-    let sunUnit = sun / vec3f(volume.extent, volume.extent, volume.height);
     var layer = GwLayer(vec3f(0.0), 1.0);
     // Jittered by up to the smallest step, so the bands a fixed start would draw turn into fine noise and no more.
     var t = t0 + jitter * gwParams.jitter * volume.stepMin;
@@ -168,6 +143,10 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32) -
             break;
         }
         let p = o + v * t;
+        // Beyond the clearing nothing is left, and a ray from the observer only gets farther from it.
+        if (gwClearing(p) <= 0.0) {
+            break;
+        }
         let q = gwVolumeCoordinate(p);
         let m = gwModelingAt(q);
         let sdf = gwSignedDistance(m, q);
@@ -176,16 +155,21 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32) -
         if (sdf < 0.0) {
             let sample = gwDensity(m, p);
             if (sample.full > 1e-4) {
-                let summed = textureSampleLevel(gwLight, gwVolumeSampler, q, 0.0).rgb;
+                // The light grid's slices interpolated at the sun's elevation over this point.
+                let up = p / length(p);
+                let elevation = gwElevation(sun, up);
+                let slice = clamp((elevation - volume.lightElevations.x) / max(volume.lightElevations.y - volume.lightElevations.x, 1e-6), 0.0, 1.0) * 3.0;
+                let toSun = sample.kept * dot(textureSampleLevel(gwLight, gwVolumeSampler, q, 0.0), max(1.0 - abs(slice - vec4f(0.0, 1.0, 2.0, 3.0)), vec4f(0.0)));
+                let open = sample.kept * textureSampleLevel(gwAmbient, gwVolumeSampler, q, 0.0).rg * volume.height;
                 // Nubis3's two detailed samples towards the sun, within the first voxel: a quarter and three quarters
                 // of it on, each standing for half of it.
                 var near = 0.0;
                 for (var k = 0u; k < GW_NEAR_LIGHT_SAMPLES; k = k + 1u) {
-                    let along = (f32(k) + 0.5) * cell / f32(GW_NEAR_LIGHT_SAMPLES);
-                    let qk = q + sunUnit * along;
-                    near = near + gwDensity(gwModelingAt(vec3f(fract(qk.xy), qk.z)), p + sun * along).full * cell / f32(GW_NEAR_LIGHT_SAMPLES);
+                    let pk = p + sun * (f32(k) + 0.5) * cell / f32(GW_NEAR_LIGHT_SAMPLES);
+                    let qk = gwVolumeCoordinate(pk);
+                    near = near + gwDensity(gwModelingAt(qk), pk).full * cell / f32(GW_NEAR_LIGHT_SAMPLES);
                 }
-                let tauSun = extinction * (near + summed.r);
+                let tauSun = extinction * (near + toSun);
                 // The sun's light scattered once, and the orders after it as octaves (Wrenninge 2013, Hillaire 2016):
                 // each a share of the one before, through less of the cloud, with a wider lobe.
                 var orders = 0.0;
@@ -202,24 +186,31 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32) -
                 // Nubis3's inner glow: the profile as the chance of in-scattering, attenuated less looking towards the
                 // sun and deep inside.
                 let relax = mix(0.25, mix(0.05, 0.25, clamp(sdf / -volume.profileDepth, 0.0, 1.0)), clamp(cosTheta / 0.9, 0.0, 1.0));
-                let glow = sample.profile * exp(-extinction * summed.r * relax);
-                let direct = volume.sunIlluminance * (orders + glow * phaseSecondary);
+                let glow = sample.profile * exp(-extinction * toSun * relax);
+                let sunlight = mix(gwSunAt(0u, elevation), gwSunAt(1u, elevation), clamp(q.z, 0.0, 1.0));
+                let direct = sunlight * (orders + glow * phaseSecondary);
                 // Nubis3's ambient, by the profile: strongest at the surface, and a share of it deep inside, where the
                 // sky's light arrives after many bounces; attenuated by the summed density like the glow, relaxed.
-                let open = mix(0.35, 1.0, pow(1.0 - sample.profile, 0.5));
-                let fromSky = gwParams.skyIrradiance * exp(-extinction * summed.g * 0.25);
-                let fromGround = gwParams.groundIrradiance * exp(-extinction * summed.b * 0.25);
-                let ambient = open * (fromSky + fromGround) / GW_PI;
+                let surface = mix(0.35, 1.0, pow(1.0 - sample.profile, 0.5));
+                let fromSky = gwParams.skyIrradiance * exp(-extinction * open.r * 0.25);
+                let fromGround = gwParams.groundIrradiance * exp(-extinction * open.g * 0.25);
+                let ambient = surface * (fromSky + fromGround) / GW_PI;
                 let sigmaT = extinction * sample.full;
                 let sigmaS = sigmaT * volume.albedo;
                 let scattered = sigmaS * (direct + ambient);
                 let through = exp(-sigmaT * step);
-                layer.luminance = layer.luminance + layer.transmittance * scattered * (1.0 - through) / sigmaT;
+                // Seen through the air between, at this step's own distance, as gwFaded sees a whole layer.
+                var air = gwAirAt(uv, t, sky);
+                air.luminance = air.luminance * shade;
+                let covered = layer.transmittance * (1.0 - through);
+                layer.luminance = layer.luminance + covered * (air.transmittance * scattered / sigmaT + air.luminance);
                 layer.transmittance = layer.transmittance * through;
             }
         }
         t = t + step;
     }
+    // What the march gave up on below the last percent is opaque, as Nubis3 remaps it: no layer behind shows through.
+    layer.transmittance = max(layer.transmittance - GW_MIN_TRANSMITTANCE, 0.0) / (1.0 - GW_MIN_TRANSMITTANCE);
     return layer;
 }
 
@@ -233,48 +224,23 @@ fn gwClouds(@builtin(global_invocation_id) id: vec3u) {
     let o = vec3f(0.0, 0.0, gwParams.planetRadius + gwParams.observerAltitude);
     let sun = normalize(gwParams.sunDirection);
     let volume = gwParams.cloudscape;
-
-    // Each layer with where the ray meets it, composited from the farthest in.
-    var layers: array<GwLayer, 3>;
-    var at: array<f32, 3>;
-    var count = 0u;
-    for (var s = 0u; s < min(gwParams.sheets, 2u); s = s + 1u) {
-        if (gwParams.sheet[s].enabled == 0u) {
-            continue;
-        }
-        var distance = -1.0;
-        let sheet = gwSheet(s, o, v, sun, &distance);
-        if (distance > 0.0) {
-            layers[count] = gwFaded(sheet, distance);
-            at[count] = distance;
-            count = count + 1u;
-        }
-    }
+    var result = GwLayer(vec3f(0.0), 1.0);
     if (volume.enabled != 0u) {
         let r0 = gwParams.planetRadius + volume.base;
         let shell = gwShell(o, v, r0, r0 + volume.height, gwParams.planetRadius);
         if (shell.hits) {
             // Beyond a few fades nothing shows: the march ends there.
             let t1 = min(shell.far, shell.near + 4.0 * gwParams.fade);
-            let marched = gwCloudscape(o, v, sun, shell.near, t1, gwJitter(id.xy, gwParams.frame));
-            layers[count] = gwFaded(marched, max(shell.near, 0.0) + 0.5 * min(t1 - shell.near, 2.0 * gwParams.fade));
-            at[count] = shell.near;
-            count = count + 1u;
-        }
-    }
-    var result = GwLayer(vec3f(0.0), 1.0);
-    // Three at most: the farthest first, by a sort of swaps.
-    for (var n = 0u; n < count; n = n + 1u) {
-        var farthest = 0u;
-        var farthestAt = -1.0;
-        for (var k = 0u; k < count; k = k + 1u) {
-            if (at[k] > farthestAt) {
-                farthestAt = at[k];
-                farthest = k;
+            var behind = vec3f(0.0);
+            if (GW_BACKGROUND) {
+                let full = textureDimensions(gwBackground);
+                let at = min(vec2u((vec2f(id.xy) + 0.5) / vec2f(size) * vec2f(full)), full - 1u);
+                behind = textureLoad(gwBackground, at, 0).rgb;
             }
+            let sky = gwAirLight(behind, GW_BACKGROUND);
+            let uv = (vec2f(id.xy) + 0.5) / vec2f(size);
+            result = gwCloudscape(o, v, sun, shell.near, t1, gwJitter(id.xy, gwParams.frame), uv, sky);
         }
-        result = gwOver(layers[farthest], result);
-        at[farthest] = -2.0;
     }
     gwOutputStore(id.xy, vec4f(result.luminance, result.transmittance));
 }

@@ -44,7 +44,7 @@ test("the packer writes GwParams as params.wgsl lays it out", () => {
     const params = layout(source, "GwParams", structs);
     expect(params.size).toBe(PARAMS_SIZE);
     expect(sheet.size).toBe(64);
-    expect(cloudscape.size).toBe(96);
+    expect(cloudscape.size).toBe(112);
 
     const p = {
         ...DEFAULT_CLOUD_PARAMS,

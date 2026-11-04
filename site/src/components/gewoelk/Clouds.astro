@@ -26,6 +26,25 @@ type Slider = [param: string, label: string, min: number, max: number, step: num
 const CLOUDSCAPE: Slider[] = [
     ["cloudscape.coverage", "coverage", 0, 1, 0.01, 0.42, "How much of the sky the low clouds cover"],
     ["cloudscape.sharpness", "sharpness", 0, 0.9, 0.01, 0.35, "How hard their edges are"],
+    [
+        "cloudscape.towers",
+        "towers",
+        0,
+        1,
+        0.01,
+        0.3,
+        "How much of the layer grows into towers that rise through it and spread at the top",
+    ],
+    ["cloudscape.towerScale", "tower height", 1, 4, 0.1, 1.5, "How many times taller than the layer the towers grow"],
+    [
+        "cloudscape.billows",
+        "billows",
+        0,
+        0.3,
+        0.01,
+        0.12,
+        "How deep billows heap up the clouds' surface, as a share of the layer's height",
+    ],
     ["cloudscape.baseKm", "base", 0.3, 4, 0.1, 1.2, "The height of the layer's base, in km"],
     ["cloudscape.heightKm", "height", 0.5, 5, 0.1, 2.4, "How tall the layer is, in km"],
     [
@@ -47,6 +66,15 @@ const CLOUDSCAPE: Slider[] = [
         "The wind the low clouds drift with, in m/s; the time slider and play move them",
     ],
     [
+        "cloudscape.windFrom",
+        "from",
+        0,
+        360,
+        5,
+        70,
+        "Where the low clouds' wind blows from, in degrees from north through east",
+    ],
+    [
         "cloudscape.evolution",
         "change",
         0,
@@ -55,12 +83,48 @@ const CLOUDSCAPE: Slider[] = [
         0,
         "How fast the low clouds change shape, in changes per hour: 0 keeps them",
     ],
+    [
+        "cloudscape.clearingKm",
+        "clearing",
+        0,
+        300,
+        5,
+        80,
+        "Where the low clouds have cleared away, in km, so a low sun reaches them; 0 keeps them to the horizon",
+    ],
+    [
+        "cloudscape.variation",
+        "variation",
+        0,
+        1,
+        0.05,
+        0.5,
+        "How far a broad field 40 km across thins the clouds out in places, so the volume's repetition hides",
+    ],
+    [
+        "cloudscape.clearingSoftness",
+        "softness",
+        0.1,
+        1,
+        0.05,
+        0.7,
+        "Over how much of the way to the clearing the clouds shrink: more begins earlier and fades out more gently",
+    ],
 ];
 const SHEET: Slider[] = [
     ["sheet.coverage", "coverage", 0, 1, 0.01, 0.35, "How much of the sky the high sheet covers"],
     ["sheet.altitudeKm", "altitude", 5, 12, 0.1, 9, "The sheet's height, in km"],
     ["sheet.opticalDepth", "depth", 0.1, 3, 0.1, 0.5, "The sheet's optical depth where its map reads 1"],
     ["sheet.windSpeed", "wind", 0, 60, 1, 25, "The wind the sheet drifts with, in m/s"],
+    [
+        "sheet.windFrom",
+        "from",
+        0,
+        360,
+        5,
+        90,
+        "Where the sheet's wind blows from, in degrees from north through east: its strands run along it",
+    ],
 ];
 const SCALE = {
     name: "scale",
@@ -84,6 +148,43 @@ const STEPS = {
     ],
     checked: "256",
 };
+const WEATHER = {
+    name: "weather",
+    label: "Weather",
+    title: "Presets of the clouds' shape, low and high: a click blends the sliders over to one",
+    options: [
+        ["clear", "clear"],
+        ["fair", "fair"],
+        ["scattered", "scattered"],
+        ["towering", "towering"],
+        ["overcast", "overcast"],
+        ["cirrus", "cirrus"],
+    ],
+    checked: "scattered",
+};
+const AIR = {
+    name: "air",
+    label: "Air",
+    title: "The air in front of the clouds: dunstkreis' aerial perspective volume, or a blend into the sky behind, as for a baked background",
+    options: [
+        ["volume", "in-scattering"],
+        ["blend", "blend"],
+    ],
+    checked: "volume",
+};
+const LAYERS = {
+    name: "layers",
+    label: "Voxel layers",
+    title: "Layers of voxels over the slab's height: towers several times the layer's height need more, at more memory",
+    options: [
+        ["32", "32"],
+        ["48", "48"],
+        ["64", "64"],
+        ["96", "96"],
+        ["128", "128"],
+    ],
+    checked: "64",
+};
 ---
 
 <figure class="scene-frame wide" id={id} data-clouds>
@@ -91,6 +192,9 @@ const STEPS = {
         <canvas data-field="canvas" aria-label="Clouds over the sky at the chosen moment and place"></canvas>
         <div class="sky-compass" data-field="compassLabels"></div>
         <Fragment slot="options">
+            <OptionGroup name="weather">
+                <Choice figure={id} {...WEATHER} />
+            </OptionGroup>
             <OptionGroup name="cloudscape">
                 <button type="button" class="view-toggle" data-field="cloudscape.enabled" aria-pressed="true" title="The low clouds, a voxel volume marched by its distance field">low clouds</button>
                 {CLOUDSCAPE.map(([param, label, min, max, step, value, title]) => (
@@ -111,6 +215,8 @@ const STEPS = {
             <OptionGroup name="render">
                 <Choice figure={id} {...SCALE} />
                 <Choice figure={id} {...STEPS} />
+                <Choice figure={id} {...LAYERS} />
+                <Choice figure={id} {...AIR} />
             </OptionGroup>
         </Fragment>
     </SkyFrame>

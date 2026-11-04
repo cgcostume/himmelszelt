@@ -1,29 +1,34 @@
 import type { AtmosphereLUTs } from "@himmelszelt/dunstkreis";
 import { wgsl } from "@himmelszelt/dunstkreis";
+import { SUNLIGHT_ENTRIES, type SunlightRow } from "@himmelszelt/gewoelk";
 
 /**
- * The sun's illuminance at a few altitudes above the observer, per channel in lux, from dunstkreis' transmittance
- * table: clouds a few kilometers up are lit after the ground has fallen into shadow, and by a redder sun. One tiny
- * compute pass per sky-view change, read back for gewoelk's per-layer `sunIlluminance`.
+ * gewoelk's sunlight table from dunstkreis' transmittance table: the sun's illuminance at each row's altitude for each
+ * of its elevations above the local horizon, per channel in lux. Far clouds towards the sun stay lit after the ground
+ * has fallen into shadow, by a redder sun. One small compute pass per sky-view change, read back.
  */
 const SOURCE = `${wgsl.scattering}
 @group(0) @binding(0) var<uniform> atmosphere: DkAtmosphere;
 @group(0) @binding(1) var transmittanceLut: texture_2d<f32>;
 @group(0) @binding(2) var lutSampler: sampler;
-@group(0) @binding(3) var<uniform> query: array<vec4f, 4>;
-@group(0) @binding(4) var<storage, read_write> result: array<vec4f, 4>;
+@group(0) @binding(3) var<storage, read> query: array<vec2f>;
+@group(0) @binding(4) var<storage, read_write> result: array<vec4f>;
 
-@compute @workgroup_size(4)
+@compute @workgroup_size(64)
 fn sunlight(@builtin(global_invocation_id) id: vec3u) {
+    if (id.x >= arrayLength(&query)) {
+        return;
+    }
     let a = atmosphere;
     let altitude = query[id.x].x;
-    let sun = query[id.x].yzw;
     var transmittance = vec4f(0.0);
     if (altitude <= a.Rt - a.Rg) {
-        transmittance = dkSampleTransmittanceToTop(a, transmittanceLut, lutSampler, altitude, sun.z);
+        transmittance = dkSampleTransmittanceToTop(a, transmittanceLut, lutSampler, altitude, query[id.x].y);
     }
     result[id.x] = vec4f(dkToRgb(a, a.solarIlluminance * transmittance), 1.0);
 }`;
+
+type Rgb = [number, number, number];
 
 export function createSunlight(device: GPUDevice) {
     const module = device.createShaderModule({ label: "sternwarte:sunlight", code: SOURCE });
@@ -32,22 +37,30 @@ export function createSunlight(device: GPUDevice) {
         layout: "auto",
         compute: { module, entryPoint: "sunlight" },
     });
-    const query = device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    const result = device.createBuffer({ size: 64, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
-    const staging = device.createBuffer({ size: 64, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+    const count = 4 * SUNLIGHT_ENTRIES;
+    const query = device.createBuffer({ size: count * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    const result = device.createBuffer({ size: count * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+    const staging = device.createBuffer({ size: count * 16, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
     let busy = false;
     return {
-        /** The sun's illuminance at up to four `altitudesKm`, for the sun at `sunDirection`, through `luts`' air. */
-        async at(
+        /** The table for gewoelk's `rows`, through `luts`' air, or nothing while the last is still being read. The
+         *  table's rays start in the apparent direction: `apparent` lifts a true elevation at an altitude to it. */
+        async table(
             luts: AtmosphereLUTs,
-            altitudesKm: number[],
-            sunDirection: readonly [number, number, number],
-        ): Promise<[number, number, number][]> {
-            if (busy) return [];
+            rows: SunlightRow[],
+            apparent: (altitudeKm: number, elevation: number) => number = (_, e) => e,
+        ): Promise<Rgb[] | null> {
+            if (busy) return null;
             busy = true;
-            const data = new Float32Array(16);
-            altitudesKm.slice(0, 4).forEach((h, i) => {
-                data.set([h, ...sunDirection], i * 4);
+            const data = new Float32Array(count * 2);
+            rows.slice(0, 4).forEach((row, i) => {
+                for (let k = 0; k < SUNLIGHT_ENTRIES; k++) {
+                    const elevation = row.fromRad + ((row.toRad - row.fromRad) * k) / (SUNLIGHT_ENTRIES - 1);
+                    data.set(
+                        [row.altitudeKm, Math.sin(apparent(row.altitudeKm, elevation))],
+                        (i * SUNLIGHT_ENTRIES + k) * 2,
+                    );
+                }
             });
             device.queue.writeBuffer(query, 0, data);
             const bindGroup = device.createBindGroup({
@@ -64,19 +77,18 @@ export function createSunlight(device: GPUDevice) {
             const pass = encoder.beginComputePass();
             pass.setPipeline(pipeline);
             pass.setBindGroup(0, bindGroup);
-            pass.dispatchWorkgroups(1);
+            pass.dispatchWorkgroups(Math.ceil(count / 64));
             pass.end();
-            encoder.copyBufferToBuffer(result, 0, staging, 0, 64);
+            encoder.copyBufferToBuffer(result, 0, staging, 0, count * 16);
             device.queue.submit([encoder.finish()]);
             await staging.mapAsync(GPUMapMode.READ);
             const values = new Float32Array(staging.getMappedRange().slice(0));
             staging.unmap();
             busy = false;
-            return altitudesKm.slice(0, 4).map((_, i) => [values[i * 4], values[i * 4 + 1], values[i * 4 + 2]]) as [
-                number,
-                number,
-                number,
-            ][];
+            return Array.from(
+                { length: count },
+                (_, i): Rgb => [values[i * 4], values[i * 4 + 1], values[i * 4 + 2]] as Rgb,
+            );
         },
     };
 }

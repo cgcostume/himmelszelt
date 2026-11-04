@@ -1,5 +1,6 @@
 import type { ToneCurve } from "@himmelszelt/helldunkel";
 import {
+    AERIAL_OFFSET,
     CLOUDSCAPE_SIZE,
     type CloudParams,
     cloudscapeData,
@@ -10,6 +11,10 @@ import {
     modelData,
     PARAMS_SIZE,
     paramsData,
+    SUNLIGHT_SIZE,
+    type SunlightRow,
+    sunlightData,
+    sunlightRows,
 } from "./params.js";
 import * as wgsl from "./wgsl/index.js";
 
@@ -44,9 +49,25 @@ export interface CloudPassOptions {
     nearLightSamples?: number;
 }
 
+/**
+ * An aerial perspective volume in RGB, as Hillaire's: froxels over the camera's frustum, x and y following the target
+ * from its top left, slice k of the depth at `maxDistanceKm * ((k + 0.5) / depth) ** 2`. Two 3D textures, filterable,
+ * with `TEXTURE_BINDING` usage: the light the air adds in cd/m² times `scale` in rgb, and what it lets through in rgb.
+ * dunstkreis' volume holds four wavelengths; turned into RGB, with its `skyViewScale`, it fits.
+ */
+export interface AerialPerspective {
+    luminance: GPUTexture;
+    transmittance: GPUTexture;
+    maxDistanceKm: number;
+    scale: number;
+}
+
 export interface EncodeOptions {
     /** The sky behind the clouds, in cd/m², the target's size: a float texture with `TEXTURE_BINDING` usage. */
     background?: GPUTexture;
+    /** The air between the camera and the clouds, for their aerial perspective; without, they fade into the
+     *  background, or into `horizonLuminance` without one, by `horizonFadeKm`. */
+    aerialPerspective?: AerialPerspective;
     /** Timestamps around the pass, for timing it. */
     timestampWrites?: GPUComputePassTimestampWrites;
 }
@@ -59,10 +80,12 @@ export interface CloudPass {
     /** The clouds as last rendered, premultiplied luminance in cd/m² and transmittance, rgba16float, at the scaled size. */
     readonly cloudsTexture: GPUTexture | null;
     /** The cloud maps, one layer per cloud layer, the cloudscape's first, and the cloudscape's voxel grids: Nubis3's
-     *  modeling data and its summed light. For inspection; nothing in a render path needs them. */
+     *  modeling data, its summed light towards the sun at four elevations, and towards the sky and the ground. For
+     *  inspection; nothing in a render path needs them. */
     readonly mapTexture: GPUTexture;
     readonly modelingTexture: GPUTexture;
     readonly lightTexture: GPUTexture;
+    readonly ambientTexture: GPUTexture;
     /** The detail noise, 3D, four channels of billows and wisps. */
     readonly detailTexture: GPUTexture;
     /**
@@ -113,8 +136,10 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
     const volume = (label: string, format: GPUTextureFormat) =>
         device.createTexture({ label, dimension: "3d", size: [grid.size, grid.size, grid.layers], format, usage });
     const flood = [volume("gewoelk:floodA", "r32uint"), volume("gewoelk:floodB", "r32uint")] as const;
+    const shape = volume("gewoelk:shape", "r32uint");
     const modeling = volume("gewoelk:modeling", "rgba8unorm");
     const light = volume("gewoelk:light", "rgba16float");
+    const ambient = volume("gewoelk:ambient", "rgba8unorm");
     const detail = device.createTexture({
         label: "gewoelk:detail",
         dimension: "3d",
@@ -143,6 +168,12 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         device.createBuffer({ label, size, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const params = uniform("gewoelk:params", PARAMS_SIZE);
     const cloudscape = uniform("gewoelk:cloudscape", CLOUDSCAPE_SIZE);
+    const sunlight = uniform("gewoelk:sunlight", SUNLIGHT_SIZE);
+    const coverage = device.createBuffer({
+        label: "gewoelk:coverage",
+        size: 4 * grid.layers,
+        usage: GPUBufferUsage.STORAGE,
+    });
     const models = Array.from({ length: layers }, (_, i) => uniform(`gewoelk:model${i}`, MODEL_SIZE));
     // The flood's jumps, halving from half the grid's largest side down to 1.
     const jumps: number[] = [];
@@ -160,32 +191,54 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
             layout: "auto",
             compute: { module, entryPoint, ...(constants ? { constants } : {}) },
         });
-    const voxelModule = module("gewoelk:voxel", [wgsl.params, wgsl.voxel]);
+    const voxelModule = module("gewoelk:voxel", [wgsl.noise, wgsl.params, wgsl.voxel]);
+    const lightModule = module("gewoelk:light", [wgsl.params, wgsl.light]);
     const [
         cloudMapPipeline,
+        shapePipeline,
         floodInitPipeline,
         floodJumpPipeline,
         modelingPipeline,
         detailPipeline,
         lightPipeline,
+        coveragePipeline,
+        ambientPipeline,
         cloudsPipeline,
         composePipeline,
     ] = await Promise.all([
         pipeline("cloudMap", module("gewoelk:cloudMap", [wgsl.noise, wgsl.params, wgsl.cloudmap]), "gwCloudMap"),
+        pipeline("shape", voxelModule, "gwShape"),
         pipeline("floodInit", voxelModule, "gwFloodInit"),
         pipeline("floodJump", voxelModule, "gwFloodJump"),
         pipeline("modeling", voxelModule, "gwModeling"),
         pipeline("detail", module("gewoelk:detail", [wgsl.noise, wgsl.detail]), "gwDetail"),
-        pipeline("light", module("gewoelk:light", [wgsl.params, wgsl.light]), "gwLight"),
+        pipeline("light", lightModule, "gwLight"),
+        pipeline("coverage", lightModule, "gwCoverageMean"),
+        pipeline("ambient", lightModule, "gwAmbient"),
         pipeline(
             "clouds",
-            module("gewoelk:clouds", [wgsl.params, wgsl.camera, wgsl.cloudOutput("rgba16float"), wgsl.clouds]),
+            module("gewoelk:clouds", [
+                wgsl.noise,
+                wgsl.params,
+                wgsl.camera,
+                wgsl.sheet,
+                wgsl.cloudOutput("rgba16float"),
+                wgsl.clouds,
+            ]),
             "gwClouds",
-            { GW_MAX_STEPS: maxSteps, GW_NEAR_LIGHT_SAMPLES: nearLightSamples },
+            { GW_MAX_STEPS: maxSteps, GW_NEAR_LIGHT_SAMPLES: nearLightSamples, GW_BACKGROUND: background ? 1 : 0 },
         ),
         pipeline(
             "compose",
-            module("gewoelk:compose", [wgsl.params, wgsl.tonemap, wgsl.cloudOutput(format), wgsl.compose]),
+            module("gewoelk:compose", [
+                wgsl.noise,
+                wgsl.params,
+                wgsl.camera,
+                wgsl.sheet,
+                wgsl.tonemap,
+                wgsl.cloudOutput(format),
+                wgsl.compose,
+            ]),
             "gwCompose",
             {
                 GW_TONE_MAP: toneMap === false ? 0 : (TONE_CURVES[toneMap] ?? 1),
@@ -210,9 +263,14 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         { binding: 1, resource: mapArray },
         { binding: 2, resource: volumeSampler },
     ];
-    const floodInitBindGroup = bindGroup(floodInitPipeline, [
+    const shapeBindGroup = bindGroup(shapePipeline, [
         ...modelEntries,
+        { binding: 6, resource: { buffer: cloudscape } },
+        { binding: 8, resource: shape.createView() },
+    ]);
+    const floodInitBindGroup = bindGroup(floodInitPipeline, [
         { binding: 4, resource: flood[0].createView() },
+        { binding: 9, resource: shape.createView() },
     ]);
     const floodJumpBindGroups = jumpBuffers.map((buffer, i) =>
         bindGroup(floodJumpPipeline, [
@@ -227,6 +285,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         { binding: 3, resource: (flood[jumps.length % 2] as GPUTexture).createView() },
         { binding: 6, resource: { buffer: cloudscape } },
         { binding: 7, resource: modeling.createView() },
+        { binding: 9, resource: shape.createView() },
     ]);
     const detailBindGroup = bindGroup(detailPipeline, [{ binding: 0, resource: detail.createView() }]);
     const lightBindGroup = bindGroup(lightPipeline, [
@@ -234,15 +293,69 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         { binding: 1, resource: modeling.createView() },
         { binding: 2, resource: volumeSampler },
         { binding: 3, resource: light.createView() },
+        { binding: 5, resource: { buffer: coverage } },
     ]);
-    const cloudsBindGroup = bindGroup(cloudsPipeline, [
+    const coverageBindGroup = bindGroup(coveragePipeline, [
+        { binding: 1, resource: modeling.createView() },
+        { binding: 4, resource: { buffer: coverage } },
+    ]);
+    const ambientBindGroup = bindGroup(ambientPipeline, [
+        { binding: 1, resource: modeling.createView() },
+        { binding: 2, resource: volumeSampler },
+        { binding: 6, resource: ambient.createView() },
+    ]);
+    // With the sky behind them, which far clouds fade into: one per background, as the compose pass' groups.
+    const cloudsEntries: GPUBindGroupEntry[] = [
         { binding: 0, resource: { buffer: params } },
         { binding: 1, resource: mapArray },
         { binding: 2, resource: volumeSampler },
         { binding: 3, resource: modeling.createView() },
         { binding: 4, resource: light.createView() },
         { binding: 5, resource: detail.createView() },
-    ]);
+        { binding: 6, resource: { buffer: sunlight } },
+        { binding: 7, resource: ambient.createView() },
+    ];
+    const clampSampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
+    // Bound where no aerial perspective volume is: the shaders read it only with a reach above 0.
+    const noAir = device.createTexture({
+        label: "gewoelk:noAir",
+        dimension: "3d",
+        size: [1, 1, 1],
+        format: "rgba16float",
+        usage: GPUTextureUsage.TEXTURE_BINDING,
+    });
+    // The groups that take the frame's background and air, remade only when those change.
+    let lastInputs: readonly (GPUTexture | GPUTextureView | null)[] = [];
+    let inputGroups: [GPUBindGroup, GPUBindGroup] | null = null;
+    const groupsFor = (behind: GPUTexture, air: AerialPerspective | undefined) => {
+        const inputs = [behind, air?.luminance ?? noAir, air?.transmittance ?? noAir, cloudsView];
+        if (inputGroups && inputs.every((x, i) => x === lastInputs[i])) return inputGroups;
+        lastInputs = inputs;
+        const luminance = (air?.luminance ?? noAir).createView();
+        const transmittance = (air?.transmittance ?? noAir).createView();
+        inputGroups = [
+            bindGroup(cloudsPipeline, [
+                ...cloudsEntries,
+                { binding: 8, resource: behind.createView() },
+                { binding: 9, resource: luminance },
+                { binding: 10, resource: transmittance },
+                { binding: 11, resource: clampSampler },
+            ]),
+            bindGroup(composePipeline, [
+                { binding: 0, resource: { buffer: params } },
+                { binding: 1, resource: cloudsView as GPUTextureView },
+                { binding: 2, resource: cloudsSampler },
+                { binding: 3, resource: behind.createView() },
+                { binding: 4, resource: mapArray },
+                { binding: 5, resource: volumeSampler },
+                { binding: 6, resource: { buffer: sunlight } },
+                { binding: 7, resource: luminance },
+                { binding: 8, resource: transmittance },
+                { binding: 9, resource: clampSampler },
+            ]),
+        ];
+        return inputGroups;
+    };
 
     // The detail noise, once.
     {
@@ -262,9 +375,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
     let lightKey = "";
     let clouds: GPUTexture | null = null;
     let cloudsView: GPUTextureView | null = null;
-    const composeGroups = new WeakMap<GPUTexture, GPUBindGroup>();
     const outputs = new WeakMap<GPUTexture, GPUBindGroup>();
-    let composeAlone: GPUBindGroup | null = null;
 
     const sweep = (pass: GPUComputePassEncoder, pipeline: GPUComputePipeline, group: GPUBindGroup) => {
         pass.setPipeline(pipeline);
@@ -279,6 +390,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         mapTexture: map,
         modelingTexture: modeling,
         lightTexture: light,
+        ambientTexture: ambient,
         detailTexture: detail,
 
         update(next, frameEncoder) {
@@ -286,27 +398,46 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
             frame += 1;
             const { cloudscape: c, sheets, timeS } = current;
             device.queue.writeBuffer(params, 0, paramsData(current, frame));
-            device.queue.writeBuffer(cloudscape, 0, cloudscapeData(c, timeS, current.sunIlluminance));
+            const { fromRad, toRad } = sunlightRows(current)[0] as SunlightRow;
+            device.queue.writeBuffer(cloudscape, 0, cloudscapeData(c, timeS, [fromRad, toRad]));
+            device.queue.writeBuffer(sunlight, 0, sunlightData(current));
 
             // Which maps changed shape: the cloudscape's first, then the sheets'.
+            const growth = {
+                towers: c.towers ?? 0,
+                billows: c.billows ?? 0,
+                billowCells: Math.max(1, Math.round(c.extentKm / (c.billowKm ?? 0.5))),
+                towerScale: Math.max(1, c.towerScale ?? 1),
+            };
             const shapes = [
-                { model: c, evolution: evolutionAt(c.evolution, timeS), offset: c.offset },
-                ...sheets
-                    .slice(0, MAX_SHEETS)
-                    .map((s) => ({ model: s, evolution: evolutionAt(s.evolution, timeS), offset: 0 })),
+                { model: c, evolution: evolutionAt(c.evolution, timeS), offset: c.offset, growth },
+                ...sheets.slice(0, MAX_SHEETS).map((s) => ({
+                    model: s,
+                    evolution: evolutionAt(s.evolution, timeS),
+                    offset: 0,
+                    growth: undefined,
+                })),
             ];
             const changed: number[] = [];
-            shapes.forEach(({ model, evolution, offset }, layer) => {
+            shapes.forEach(({ model, evolution, offset, growth }, layer) => {
                 const { coverage, sharpness, seed, octaves, cells } = model;
-                const key = `${coverage},${sharpness},${evolution},${seed},${octaves},${cells},${mapSize}`;
+                const key = `${coverage},${sharpness},${evolution},${seed},${octaves},${cells},${mapSize},${growth?.towers}`;
                 if (key === mapKeys[layer]) return;
                 mapKeys[layer] = key;
                 changed.push(layer);
-                device.queue.writeBuffer(models[layer] as GPUBuffer, 0, modelData(layer, model, evolution, offset));
+                const data = modelData(layer, model, evolution, offset, growth);
+                device.queue.writeBuffer(models[layer] as GPUBuffer, 0, data);
             });
-            const nextVolumeKey = `${mapKeys[0]},${c.offset},${c.extentKm},${c.heightKm},${c.profileDepthKm},${c.sdfRangeKm}`;
+            // The billows only shape the voxels: a change rewrites the cloudscape's model without remaking its map.
+            if (!changed.includes(0))
+                device.queue.writeBuffer(
+                    models[0] as GPUBuffer,
+                    0,
+                    modelData(0, c, evolutionAt(c.evolution, timeS), c.offset, growth),
+                );
+            const nextVolumeKey = `${mapKeys[0]},${c.offset},${c.extentKm},${c.heightKm},${c.profileDepthKm},${c.sdfRangeKm},${growth.billows},${growth.billowCells},${growth.towerScale}`;
             const rebuildVolume = c.enabled && nextVolumeKey !== volumeKey;
-            const nextLightKey = `${nextVolumeKey},${current.sunDirection.join(",")}`;
+            const nextLightKey = `${nextVolumeKey},${c.baseKm},${current.observerHeightM},${current.planetRadiusKm},${current.sunDirection.join(",")}`;
             const rebuildLight = c.enabled && nextLightKey !== lightKey;
             if (changed.length === 0 && !rebuildVolume && !rebuildLight) return;
             volumeKey = c.enabled ? nextVolumeKey : volumeKey;
@@ -320,9 +451,14 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                 pass.dispatchWorkgroups(dispatch(mapSize, 8), dispatch(mapSize, 8));
             }
             if (rebuildVolume) {
+                sweep(pass, shapePipeline, shapeBindGroup);
                 sweep(pass, floodInitPipeline, floodInitBindGroup);
                 for (const group of floodJumpBindGroups) sweep(pass, floodJumpPipeline, group);
                 sweep(pass, modelingPipeline, modelingBindGroup);
+                sweep(pass, ambientPipeline, ambientBindGroup);
+                pass.setPipeline(coveragePipeline);
+                pass.setBindGroup(0, coverageBindGroup);
+                pass.dispatchWorkgroups(grid.layers);
             }
             if (rebuildLight) sweep(pass, lightPipeline, lightBindGroup);
             pass.end();
@@ -330,7 +466,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         },
 
         encode(encoder, target, encodeOptions = {}) {
-            const { background: behind, timestampWrites } = encodeOptions;
+            const { background: behind, aerialPerspective: air, timestampWrites } = encodeOptions;
             if (background && !behind) throw new Error("gewoelk: this pass composes over a background; pass one");
             const width = Math.max(1, Math.round(target.width * scale));
             const height = Math.max(1, Math.round(target.height * scale));
@@ -343,28 +479,12 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                     usage,
                 });
                 cloudsView = clouds.createView();
-                composeAlone = null;
             }
             const cloudsOutput = bindGroup(cloudsPipeline, [{ binding: 0, resource: cloudsView as GPUTextureView }], 1);
-            const composeEntries: GPUBindGroupEntry[] = [
-                { binding: 0, resource: { buffer: params } },
-                { binding: 1, resource: cloudsView as GPUTextureView },
-                { binding: 2, resource: cloudsSampler },
-            ];
-            let composeGroup: GPUBindGroup;
-            if (behind) {
-                const cached = composeGroups.get(behind);
-                composeGroup =
-                    cached ??
-                    bindGroup(composePipeline, [...composeEntries, { binding: 3, resource: behind.createView() }]);
-                if (!cached) composeGroups.set(behind, composeGroup);
-            } else {
-                composeAlone ??= bindGroup(composePipeline, [
-                    ...composeEntries,
-                    { binding: 3, resource: noBackground.createView() },
-                ]);
-                composeGroup = composeAlone;
-            }
+            const [cloudsGroup, composeGroup] = groupsFor(behind ?? noBackground, air);
+            // The air's reach and scale, into the cloudscape's block of the frame's uniforms.
+            const aerial = air ? [air.maxDistanceKm, air.scale] : [0, 1];
+            device.queue.writeBuffer(params, AERIAL_OFFSET, new Float32Array(aerial));
             let output = outputs.get(target);
             if (!output) {
                 output = bindGroup(composePipeline, [{ binding: 0, resource: target.createView() }], 1);
@@ -375,7 +495,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                 ...(timestampWrites ? { timestampWrites } : {}),
             });
             pass.setPipeline(cloudsPipeline);
-            pass.setBindGroup(0, cloudsBindGroup);
+            pass.setBindGroup(0, cloudsGroup);
             pass.setBindGroup(1, cloudsOutput);
             pass.dispatchWorkgroups(dispatch(width, 8), dispatch(height, 8));
             pass.setPipeline(composePipeline);
@@ -386,9 +506,10 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         },
 
         destroy() {
-            for (const texture of [map, ...flood, modeling, light, detail, noBackground]) texture.destroy();
+            for (const texture of [map, ...flood, shape, modeling, light, ambient, detail, noBackground, noAir])
+                texture.destroy();
             clouds?.destroy();
-            for (const buffer of [params, cloudscape, ...models, ...jumpBuffers]) buffer.destroy();
+            for (const buffer of [params, cloudscape, sunlight, coverage, ...models, ...jumpBuffers]) buffer.destroy();
         },
     };
 }
