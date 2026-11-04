@@ -1,6 +1,6 @@
 import type { AtmosphereLUTs, AtmosphereModel, SkyPass } from "@himmelszelt/dunstkreis";
-import { clampObserverHeight, createSkyPass, refractionAngle } from "@himmelszelt/dunstkreis";
-import type { EarthShadow, MoonMapFiles, MoonMaps, MoonPass } from "@himmelszelt/nachtgestirn";
+import { airTransmittance, clampObserverHeight, createSkyPass, refractionAngle } from "@himmelszelt/dunstkreis";
+import type { EarthShadow, MoonMaps, MoonPass } from "@himmelszelt/nachtgestirn";
 import {
     createMoonPass,
     earthshineIlluminance,
@@ -26,7 +26,6 @@ import {
     sun,
 } from "@himmelszelt/sternzeit";
 import { quality, SDR } from "../dunstkreis/atmosphere";
-import { createTransmittance, type Rgb } from "./transmittance";
 
 // The sky pass writes cd/m² when its exposure is 1: EV100 of -log2(1.2).
 const UNIT_EV100 = -Math.log2(1.2);
@@ -55,6 +54,8 @@ export function moonAt(
     const trueDirection = moon.direction(time, observer);
     // The same air the sky is traced through bends every ray to the Moon, and lifts where it shows.
     const bend = (altitude: number) => refractionAngle(model, heightM, altitude);
+    // And dims and reddens it, the lower limb more than the upper near the horizon.
+    const through = (altitude: number) => airTransmittance(model, heightM, altitude);
     const phaseAngle = moon.phaseAngle(jde);
     const lit = moon.illuminatedFraction(jde);
     const positionAngleOfAxis = moon.positionAngleOfAxis(jde);
@@ -85,6 +86,7 @@ export function moonAt(
         horizontal: moon.horizontalPosition(time, observer),
         trueDirection,
         bend,
+        through,
         direction: liftedDirection(trueDirection, bend),
         /** From the observer, and from Earth's center. */
         angularDiameter: moon.topocentricAngularDiameter(time, observer),
@@ -111,10 +113,10 @@ export function moonAt(
 export type MoonAt = ReturnType<typeof moonAt>;
 
 // The maps once per page, however many figures draw the Moon.
-const loadedMaps = new Map<MoonMapFiles, Promise<MoonMaps>>();
-function sharedMaps(device: GPUDevice, files: MoonMapFiles) {
-    const maps = loadedMaps.get(files) ?? loadMoonMaps(device, files);
-    loadedMaps.set(files, maps);
+const loadedMaps = new Map<string, Promise<MoonMaps>>();
+function sharedMaps(device: GPUDevice, size: (typeof SIZES)[number]) {
+    const maps = loadedMaps.get(size) ?? loadMoonMaps(device, MOON_MAPS[size]);
+    loadedMaps.set(size, maps);
     return maps;
 }
 
@@ -141,6 +143,8 @@ export interface MoonFrame {
     earthshine: boolean;
     eclipse: boolean;
     law: "hapke" | "lambert";
+    /** As the eye sees it at night, rather than a camera. */
+    nightVision: boolean;
 }
 
 /**
@@ -159,10 +163,6 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     let mapsBound = "";
     let mapsWanted = "";
     let background: GPUTexture | null = null;
-    // What the air lets through towards the Moon, read back after each change of the sky.
-    const air = createTransmittance(device);
-    let transmittance: Rgb = [1, 1, 1];
-    let transmittanceFor = "";
     // dunstkreis' meter on the sky, read back whenever the sky view may have been rebuilt: by day the sky sets the exposure.
     let skyEV100 = Number.NEGATIVE_INFINITY;
     let skyMeteredFor = "";
@@ -183,15 +183,14 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             sky?.pass.destroy();
             sky = { pass, luts };
             skyBuilding = null;
-            transmittanceFor = "";
             skyMeteredFor = "";
             requestRender();
         });
     }
-    function buildMoon(key: string, toneMap: ToneCurveName) {
+    function buildMoon(key: string, { toneMap, nightVision }: MoonFrame) {
         if (moonBuilding === key) return;
         moonBuilding = key;
-        createMoonPass(device, { format: SDR, toneMap, maps }).then((pass) => {
+        createMoonPass(device, { format: SDR, toneMap, maps, nightVision }).then((pass) => {
             if (moonBuilding !== key) return pass.destroy();
             moonPass?.pass.destroy();
             moonPass = { pass, key };
@@ -202,7 +201,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     function loadMaps(size: (typeof SIZES)[number]) {
         if (mapsWanted === size) return;
         mapsWanted = size;
-        sharedMaps(device, MOON_MAPS[size]).then((loaded) => {
+        sharedMaps(device, size).then((loaded) => {
             if (mapsWanted !== size) return;
             maps = loaded;
             mapsBound = size;
@@ -226,10 +225,11 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             const needed =
                 SIZES.find((size) => (MOON_MAPS[size].width ?? 0) >= mapWidthFor(frame.discPixels)) ?? "large";
             const kept = mapsBound === "" ? 0 : SIZES.indexOf(mapsBound as (typeof SIZES)[number]);
-            loadMaps(frame.maps === "auto" ? (SIZES[Math.max(SIZES.indexOf(needed), kept)] ?? "large") : frame.maps);
-            const key = `${frame.toneMap} ${maps ? mapsBound : "plain"}`;
+            const size = frame.maps === "auto" ? (SIZES[Math.max(SIZES.indexOf(needed), kept)] ?? "large") : frame.maps;
+            loadMaps(size);
+            const key = `${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.nightVision}`;
             if (!moonPass || moonPass.key !== key) {
-                buildMoon(key, frame.toneMap);
+                buildMoon(key, frame);
                 return null;
             }
             if (!background || background.width !== width || background.height !== height) {
@@ -245,17 +245,12 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                 });
             }
 
-            // The air towards the Moon, asked for anew whenever the sky or the Moon moved; the last answer until then.
-            const airKey = `${m.jd},${m.trueDirection.join(",")},${m.heightM},${quality.model},${quality.refraction}`;
-            if (frame.air && airKey !== transmittanceFor) {
-                air.at(luts, m.heightM / 1000, m.direction[2]).then((t) => {
-                    if (!t) return;
-                    transmittanceFor = airKey;
-                    transmittance = t;
-                    requestRender();
-                });
-            }
-            const through = frame.air ? (transmittance[0] + transmittance[1] + transmittance[2]) / 3 : 1;
+            // The air towards the Moon, per ray of its disc in the table, and at its center for the meter.
+            const refraction = frame.air
+                ? refractionTable(m.trueDirection, m.angularDiameter, m.bend, m.through)
+                : null;
+            const center = m.through((Math.asin(Math.min(Math.max(m.direction[2], -1), 1)) * 180) / Math.PI);
+            const through = frame.air ? (center ? (center[0] + center[1] + center[2]) / 3 : 0) : 1;
             // Metered on the lit part of the disc outside the umbra, down to a ten thousandth of it, the umbra's own
             // light, or on the sky around it where that is brighter, so neither burns out.
             const outsideUmbra = frame.eclipse ? Math.max(1 - Math.max(m.shadow.umbralMagnitude, 0), 1e-4) : 1;
@@ -293,7 +288,6 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                 sunIlluminance: SUN_ILLUMINANCE,
                 earthshine: frame.earthshine ? m.earthshine : 0,
                 orientation: m.orientation,
-                transmittance: frame.air ? transmittance : [1, 1, 1],
                 ev100,
                 horizonZ: frame.air ? horizonZ(m.heightM, m.model.planet.groundRadiusKm) : -1,
                 albedoMap: frame.albedo,
@@ -302,7 +296,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                 law: frame.law,
                 eclipse: frame.eclipse ? m.earthShadow : null,
                 sunAngularDiameter: m.sunAngularDiameter,
-                refraction: frame.air ? refractionTable(m.trueDirection, m.angularDiameter, m.bend) : null,
+                refraction,
                 // From the observer, an Earth radius nearer when the Moon is overhead.
                 distanceKm: m.distanceKm - m.model.planet.groundRadiusKm * m.trueDirection[2],
             });

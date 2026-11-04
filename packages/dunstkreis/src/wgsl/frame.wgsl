@@ -46,6 +46,9 @@ struct DkMetering {
     // The sun's illuminance at the observer, per channel in lux: what reaches it through the air, for a renderer that
     // lights its scene by the sun as a light of its own.
     sunIlluminance: vec3f,
+    // The Moon's, the same way, with `moonlight` on: its light above the air, `moonlight` times the Sun's, through the
+    // air along its true direction. 0 without.
+    moonIlluminance: vec3f,
     // The sky's irradiance on the ground at the four wavelengths, gathered by dkGroundIrradiance.
     groundLight: vec4f,
     // The observer's visible horizon, of its altitude alone, as dkHorizonOf gives it: the cosine, the sine and the

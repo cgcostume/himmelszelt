@@ -3,6 +3,13 @@
 
 const NB_PI: f32 = 3.141592653589793;
 
+// A ray's footprint on the Moon's unit sphere, in its own frame: two axes along the surface, in radians, the short one
+// across the line of sight and the long one along it, stretched where the surface is seen at a slant.
+struct NbFootprint {
+    across: vec3f,
+    along: vec3f,
+}
+
 // A point on the unit sphere in the Moon's own frame as selenographic longitude, east positive, and latitude, radians.
 fn nbSelenographic(body: vec3f) -> vec2f {
     return vec2f(atan2(body.y, body.x), asin(clamp(body.z, -1.0, 1.0)));
@@ -14,16 +21,10 @@ fn nbMapUv(lonLat: vec2f) -> vec2f {
     return vec2f(lonLat.x / (2.0 * NB_PI) + 0.5, 0.5 - lonLat.y / NB_PI);
 }
 
-// A normal, east, north and up in the surface's own tangent frame, turned into the Moon's frame at `lonLat`.
-fn nbBodyNormal(lonLat: vec2f, tangent: vec3f) -> vec3f {
-    let sinLon = sin(lonLat.x);
-    let cosLon = cos(lonLat.x);
-    let sinLat = sin(lonLat.y);
-    let cosLat = cos(lonLat.y);
-    let east = vec3f(-sinLon, cosLon, 0.0);
-    let north = vec3f(-sinLat * cosLon, -sinLat * sinLon, cosLat);
-    let up = vec3f(cosLat * cosLon, cosLat * sinLon, sinLat);
-    return normalize(tangent.x * east + tangent.y * north + tangent.z * up);
+fn nbLinearToSrgb(c: vec3f) -> vec3f {
+    let low = c * 12.92;
+    let high = 1.055 * pow(max(c, vec3f(0.0)), vec3f(1.0 / 2.4)) - 0.055;
+    return select(high, low, c <= vec3f(0.0031308));
 }
 
 fn nbSrgbToLinear(c: vec3f) -> vec3f {

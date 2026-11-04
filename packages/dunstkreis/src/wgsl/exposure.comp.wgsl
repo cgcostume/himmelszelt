@@ -64,17 +64,16 @@ fn dkMeterLog2(a: DkAtmosphere, h: f32, horizon: vec3f, mu: f32, azimuth: f32, s
     return log2(max(dot(rgb, vec3f(0.2126, 0.7152, 0.0722)), DK_METER_FLOOR));
 }
 
-// Transmittance from the sun to the observer: by the table inside the atmosphere, raymarched from above it, where the
-// sunlight may still graze the air or be hidden by the planet.
-fn dkSunTransmittance(a: DkAtmosphere, h: f32) -> vec4f {
-    let sun = dkParams.sunDirection;
+// Transmittance from a light towards `light`, the Sun or the Moon, to the observer: by the table inside the atmosphere,
+// raymarched from above it, where the light may still graze the air or be hidden by the planet.
+fn dkLightTransmittance(a: DkAtmosphere, h: f32, light: vec3f) -> vec4f {
     if (h > a.Rt - a.Rg) {
         let ray = dkRaymarchFromSpace(
-            a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, h, sun, sun, DK_METER_RAY_SAMPLES,
+            a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, h, light, light, DK_METER_RAY_SAMPLES,
         );
         return select(ray.transmittance, vec4f(0.0), ray.hitsGround);
     }
-    return dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, h, sun.z);
+    return dkSampleTransmittanceToTop(a, dkTransmittanceLut, dkLutSampler, h, light.z);
 }
 
 // One direction per cap per invocation, on Fibonacci spirals over the caps above and below the horizon: even in solid
@@ -99,7 +98,7 @@ fn dkMeterSample(@builtin(global_invocation_id) id: vec3u) {
 }
 
 // The reading from the samples, one workgroup: the brightest of each cap, then the geometric mean of the samples held
-// within DK_METER_RANGE of it, and the brighter cap's. Also the sun's light and the observer's horizon.
+// within DK_METER_RANGE of it, and the brighter cap's. Also the Sun's light, the Moon's and the observer's horizon.
 @compute @workgroup_size(128)
 fn dkMeterSky(@builtin(local_invocation_index) index: u32) {
     let a = dkAtmosphere;
@@ -129,7 +128,10 @@ fn dkMeterSky(@builtin(local_invocation_index) index: u32) {
     let sums = dkWorkgroupSum(vec4f(sum, 0.0, 0.0), index);
     if (index == 0u) {
         dkMeteringOut.log2Luminance = max(sums.x, sums.y) / f32(DK_METER_SAMPLES);
-        dkMeteringOut.sunIlluminance = dkToRgb(a, a.solarIlluminance * dkSunTransmittance(a, h));
+        let sun = a.solarIlluminance * dkLightTransmittance(a, h, dkParams.sunDirection);
+        dkMeteringOut.sunIlluminance = dkToRgb(a, sun);
+        let moon = a.solarIlluminance * dkParams.moonlight * dkLightTransmittance(a, h, dkParams.moonDirection);
+        dkMeteringOut.moonIlluminance = select(vec3f(0.0), dkToRgb(a, moon), dkParams.moonlight > 0.0);
         dkMeteringOut.horizon = vec4f(dkHorizonOf(a, h), 0.0);
     }
 }

@@ -188,6 +188,12 @@ export interface SkyPass {
      */
     sunIlluminance(): Promise<[number, number, number]>;
     /**
+     * The Moon's illuminance at the observer, the same way, with `moonlight` on: `moonIlluminance` through the air along
+     * `moonDirection`, sunlight's color, zero without. For lighting a night scene by the Moon as a directional light,
+     * from where it shows (`apparentDirection`), next to the moonlit sky in the cube map.
+     */
+    moonIlluminance(): Promise<[number, number, number]>;
+    /**
      * Makes a pass that writes this sky into a cube map, its pipelines compiled without blocking. Without the sun disc,
      * a cube map lights a scene, and shows behind it with the disc drawn over it by `dkSunDisc` from `wgsl.sun`. `@himmelszelt/rundbild` lights a scene by it and lays it out as a panorama.
      */

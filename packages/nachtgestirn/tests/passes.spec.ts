@@ -1,13 +1,20 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { PARAMS_SIZE, paramsData } from "../dist/index.js";
-import { moonOrientation, type RefractionTable, refractionTable } from "../src/orientation.js";
+import { moonOrientation, phaseLaw, type RefractionTable, refractionTable } from "../src/orientation.js";
 import { moonOutput } from "../src/wgsl/output.js";
 import { compileWgsl, gpuDevice } from "./gpu.js";
 
 /** A shader by name, this package's or one of the fragments it bundles from the packages that own them. */
 function wgslSource(name: string): string {
-    const owner = { camera: "../../dunstkreis/src/wgsl", tonemap: "../../helldunkel/src/wgsl" }[name] ?? "../src/wgsl";
+    const helldunkel = "../../helldunkel/src/wgsl";
+    const owner =
+        {
+            camera: "../../dunstkreis/src/wgsl",
+            cube: "../../rundbild/src/wgsl",
+            tonemap: helldunkel,
+            vision: helldunkel,
+        }[name] ?? "../src/wgsl";
     const read = (file: string) => readFileSync(new URL(`${owner}/${file}`, import.meta.url), "utf8");
     try {
         return read(`${name}.wgsl`);
@@ -18,7 +25,7 @@ function wgslSource(name: string): string {
 
 // Each pass with exactly the fragments its header names, so none grows a dependency it does not declare.
 const PASSES: Record<string, readonly string[]> = {
-    moon: ["params", "camera", "surface", "tonemap", "moon"],
+    moon: ["params", "camera", "surface", "tonemap", "vision", "moon"],
     mips: ["params", "surface", "mips"],
     relief: ["params", "surface", "relief"],
 };
@@ -162,6 +169,50 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
     );
     expect(extent(squeezed, (i) => [32, i]) / wide).toBeCloseTo(0.8, 1);
 
+    // With transmittances, each ray dimmed by its own: half at the lower limb, all at the upper, as the table says.
+    const graded = await render(
+        [0, -1, 0],
+        0,
+        refractionTable(
+            [0, 1, 0],
+            angularDiameter,
+            () => 0,
+            (a) => {
+                const t = Math.min(Math.max(0.75 + a / angularDiameter, 0.5), 1);
+                return [t, t, t];
+            },
+        ),
+    );
+    const rows = [5, 32, 58].map((y) => at(graded, 32, y) / at(full, 32, y));
+    expect(rows[0]).toBeGreaterThan(0.9);
+    expect(rows[1]).toBeCloseTo(0.75, 1);
+    expect(rows[2]).toBeLessThan(0.6);
+
+    // At the quarters the disc averages close to what the meter's phase law says, a tenth of the full Moon: 0.84 of
+    // it, Hapke's law after Jensen et al. falling a quarter of a stop faster than Allen's.
+    const mean = (pixels: Float32Array) => {
+        let [sum, covered] = [0, 0];
+        for (let i = 0; i < size * size; i++) {
+            sum += pixels[i * 4] ?? 0;
+            covered += pixels[i * 4 + 3] ?? 0;
+        }
+        return sum / covered;
+    };
+    const quarter = mean(await render([1, 0, 0], 0)) / mean(full);
+    expect(quarter / phaseLaw(90)).toBeGreaterThan(0.8);
+    expect(quarter / phaseLaw(90)).toBeLessThan(0.9);
+
     for (const resource of [target, staging]) resource.destroy();
+    pass.destroy();
+});
+
+test("the pass compiles with night vision", async () => {
+    const device = await gpuDevice();
+    test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
+    if (!device) return;
+    const { createMoonPass } = await import("../dist/index.js");
+    device.pushErrorScope("validation");
+    const pass = await createMoonPass(device, { format: "rgba16float", nightVision: true });
+    expect(await device.popErrorScope()).toBeNull();
     pass.destroy();
 });

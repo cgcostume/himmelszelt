@@ -30,12 +30,19 @@ other package at runtime: the astronomy comes in as directions and angles, from
   it over adds its light in front. The air's bending, a `refractionTable` from any refraction function such as
   dunstkreis' `refractionAngle`, turns every ray down before it meets the Moon, as dunstkreis does for the sun disc:
   the disc shows lifted and squeezed near the horizon, to some four fifths of its height from the ground and to a
-  quarter from orbit, and sinks smoothly behind the horizon. `liftedDirection` says where its center shows.
+  quarter from orbit, and sinks smoothly behind the horizon. `liftedDirection` says where its center shows. Given a
+  transmittance function too, such as dunstkreis' `airTransmittance`, the table holds the air's transmittance over
+  the disc, and each ray is dimmed by its own: at moonrise the lower limb is far darker and redder than the upper.
 - **The relief**: the surface's slope from LOLA's heights for its shading, and its shadows, marched through the
   heights towards the Sun: the share of the Sun's half degree above the terrain's horizon, so the penumbra widens with
   the distance from what casts it, contact hardening by the Sun's own size. `shadows` turns them off.
+- **Night vision**: `nightVision` on the pass turns the composed Moon and sky into what the eye sees, helldunkel's
+  blue shift for the rods: the moonlit sky blue, the disc, far brighter, as it is.
 - **Supersampled**: 8 rays per pixel on and around the disc by default (`samples`), and the maps read by a cubic
-  B-spline when magnified, so the terminator and the relief along it stay smooth.
+  B-spline when magnified, so the terminator and the relief along it stay smooth. Minified, they are filtered
+  anisotropically, `textureSampleGrad` over each ray's footprint with up to 16 taps along its long axis: towards the
+  poles an equirectangular map crowds its texels east to west, and at the limb the slant stretches the footprint, so
+  one isotropic mip level would blur the poles, which always lie near the limb.
 - **The exposure**: `moonEV100` meters the lit part a stop over mid gray, the photographer's "looney 11", EV100 13.6 at
   full Moon; `moonIlluminance` gives the Moon's light above the air, some 0.3 lux at full Moon, for lighting a sky by
   it, as dunstkreis' `moonlight` does.
@@ -90,7 +97,9 @@ pass.encode(encoder, target, { background: skyInCdPerM2 });
 
 Directions are ENU, x east, y north, z up, as in every himmelszelt package; a y-up engine converts with `(x, z, -y)`.
 With `background: false` the pass writes the Moon alone, premultiplied, its coverage of each pixel in alpha, for a
-renderer that composites itself; with `toneMap: false` it writes the exposed luminance, linear.
+renderer that composites itself; with `toneMap: false` it writes the exposed luminance, linear. Add the Moon to the
+sky, don't lay it over: the sky's light is the air's, in front of the Moon, so it stays. Only what lies behind the
+Moon, the stars, is covered, times one minus alpha.
 
 ## Tests
 

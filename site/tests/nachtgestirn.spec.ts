@@ -29,7 +29,7 @@ test("the meter exposes a full Moon by looney 11 and a day Moon for the sky", as
 test("the maps follow the disc's size, and the switch picks one", async ({ page, problems }) => {
     const maps: string[] = [];
     page.on("request", (request) => {
-        const name = /moon-(color|normals)-[^/?]+/.exec(request.url())?.[0];
+        const name = /moon-(color|height)-[^/?]+/.exec(request.url())?.[0];
         if (name) maps.push(name);
     });
     await page.goto("nachtgestirn/");

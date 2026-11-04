@@ -70,6 +70,13 @@ export interface SkyPassOptions {
      */
     veil?: number;
     /**
+     * The sky as the eye sees it at night rather than a camera, by helldunkel's `hdNightVision`: below some 4 cd/m² the
+     * rods take over from the cones, colors fade and shift towards blue, and by moonlight the sky turns from a camera's
+     * violet gray to the blue painters give the night. Per pixel, before the exposure. A renderer that composes the sky
+     * with more makes it on the composed light instead. Off by default, as a camera sees it.
+     */
+    nightVision?: boolean;
+    /**
      * With `toneMap` off, write how much of each pixel the sun disc covers into alpha, 0 off the disc, rather than 1: a
      * caller that tone maps can curve the sky and the disc apart and mix them after, so the disc's edge stays smooth.
      * The disc's own light is the difference to a pass without it, divided by the share. Off by default.
@@ -114,9 +121,9 @@ const SKY_PARAMS_SIZE = 160;
 /** The light meter's directions per cap, `DK_METER_SAMPLES` in frame.wgsl, one per invocation of 128 per workgroup. */
 const METER_SAMPLES = 4096;
 const METER_WORKGROUPS = METER_SAMPLES / 128;
-/** Byte size of DkMetering before its bend per sky-view row: a scalar, a vec3 and two vec4s, each aligned to 16, then
- *  the meter's samples, a vec2f each. */
-const METERING_SIZE = 64 + METER_SAMPLES * 8;
+/** Byte size of DkMetering before its bend per sky-view row: a scalar, two vec3s and two vec4s, each aligned to 16,
+ *  then the meter's samples, a vec2f each. */
+const METERING_SIZE = 80 + METER_SAMPLES * 8;
 
 const DEFAULTS: SkyParams = {
     sunDirection: [0, 0, 1],
@@ -197,6 +204,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         groundLight = true,
         headroom = 1,
         moonlight = false,
+        nightVision = false,
     } = options;
     if (!(veil >= 0)) throw new Error(`dunstkreis: a veil of ${veil}; its strength is 0 or more`);
     if (aureole && !(aureole.share >= 0 && aureole.share <= 1 && aureole.g > 0 && aureole.g < 1)) {
@@ -231,9 +239,18 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     ];
     // Everything but the output, which differs between an image and a cube map.
     const skySource = (output: string) =>
-        [...prelude, wgsl.camera, wgsl.cube, wgsl.sun, wgsl.glare, wgsl.tonemap, wgsl.grid, output, wgsl.sky].join(
-            "\n",
-        );
+        [
+            ...prelude,
+            wgsl.camera,
+            wgsl.cube,
+            wgsl.sun,
+            wgsl.glare,
+            wgsl.tonemap,
+            wgsl.vision,
+            wgsl.grid,
+            output,
+            wgsl.sky,
+        ].join("\n");
     // A cube map's format and settings.
     const checkEnvironment = (format: GPUTextureFormat, sunDisc: boolean, samples: number) => {
         if (format !== "rgba16float" && format !== "rgba32float") {
@@ -359,6 +376,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                     discAlpha,
                     supersample,
                     moonlight,
+                    nightVision,
                 }),
             },
         }),
@@ -475,6 +493,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
     const outputs = new WeakMap<GPUTexture, GPUBindGroup>();
     let skyViewKey = "";
     let moonViewKey = "";
+    let meteredMoonKey = "";
     let aerialKey = "";
     let compensation = 0;
     let scale = 1;
@@ -555,10 +574,14 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             const inSpace = height / 1000 > model.planet.thicknessKm;
             const moonTableKey = moonShare > 0 && !inSpace ? `${moonKey},${moonShare}` : "";
             const rebuildMoon = moonTableKey !== "" && moonTableKey !== moonViewKey;
-            if (!rebuildSkyView && !rebuildAerial && !rebuildMoon) return;
+            // The meter also writes the Moon's light at the observer, from space as well.
+            const moonLightKey = moonShare > 0 ? `${moonKey},${moonShare}` : "";
+            const remeter = rebuildSkyView || moonLightKey !== meteredMoonKey;
+            if (!remeter && !rebuildAerial && !rebuildMoon) return;
             skyViewKey = key;
             aerialKey = cameraKey;
             moonViewKey = moonTableKey;
+            meteredMoonKey = moonLightKey;
             const encoder = frameEncoder ?? device.createCommandEncoder({ label: "dunstkreis:skyView" });
             const pass = encoder.beginComputePass({ label: "dunstkreis:skyView" });
             const { height: rows } = config.skyView;
@@ -578,7 +601,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             } else {
                 sweep(pass, skyViewPipeline, skyViewBindGroup, rows);
             }
-            if (rebuildSkyView) {
+            if (remeter) {
                 // The light meter reads the table just built, so its reading always matches the sky, and writes the
                 // observer's horizon for the sky pass.
                 pass.setPipeline(samplePipeline);
@@ -606,6 +629,11 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
 
         async sunIlluminance() {
             const [r, g, b] = await readMetering(16, 3);
+            return [r as number, g as number, b as number];
+        },
+
+        async moonIlluminance() {
+            const [r, g, b] = await readMetering(32, 3);
             return [r as number, g as number, b as number];
         },
 

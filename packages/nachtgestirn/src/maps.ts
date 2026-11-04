@@ -86,6 +86,8 @@ export function createMoonMaps(device: GPUDevice, options: MoonMapsOptions): Moo
         magFilter: "linear",
         minFilter: "linear",
         mipmapFilter: "linear",
+        // Up to sixteen taps along a footprint's long axis, at the poles and the limb.
+        maxAnisotropy: 16,
     });
     // The tint keeps the luminance: the albedo scale alone sets the brightness.
     const tint = meanColor

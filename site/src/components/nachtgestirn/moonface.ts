@@ -76,6 +76,7 @@ export function moonFace(root: HTMLElement) {
             albedo: true,
             relief: true,
             shadows: true,
+            nightVision: false,
             earthshine: true,
             eclipse: true,
             law: "hapke",

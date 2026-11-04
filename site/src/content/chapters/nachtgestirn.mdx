@@ -216,8 +216,11 @@ shows, which is what the eye does too.
 
 The Moon's light crosses the same air as the Sun's, and the same two things happen to it: the air takes some of it
 away, more of the blue, and adds its own light in front. nachtgestirn takes the first as a
-<Term of="Transmittance">transmittance</Term> per channel along the line of sight, which the figure reads from
-dunstkreis' transmittance table, so the rising Moon comes out dim and orange; the second it leaves to the background,
+<Term of="Transmittance">transmittance</Term> per channel along the line of sight, so the rising Moon comes out dim and
+orange. Near the horizon a ray half a degree lower crosses far more air: at moonrise the lower limb lets a third as much
+green through as the upper, and none of the blue. So the table that bends the rays, below, holds what the air lets
+through at each of its altitudes too, from dunstkreis' `airTransmittance`, traced along the same bent path as its
+refraction. The second it leaves to the background,
 the sky drawn behind it in cd/m², whose light it adds on top of the disc. That is the whole secret of the Moon by day:
 it is as bright as at night, the sky in front of it is simply brighter still, and a renderer that draws the Moon over
 the daytime sky in physical units gets the pale daytime Moon for free.
@@ -234,6 +237,13 @@ Moon, which `moonIlluminance` gives. The sky by moonlight is the day's sky at th
 haze around the disc, and dunstkreis draws it from a second sky-view table built from the Moon's direction when its
 sky pass is made with `moonlight`. In <Fig id="moon" />, turn the exposure off auto, take it down to −3 and zoom out:
 the night around the full Moon is blue.
+
+That is the camera's blue, the day's sky a million times dimmer. The eye sees the night differently: below some
+4 cd/m² its <Term of="Scotopic vision">rods</Term> take over from the cones, which see color, and by moonlight the
+rods see alone. Colors fade, red goes dark first, and what is left looks blue, which painters have always given the
+night. The pass' `nightVision`, helldunkel's blue shift after Jensen et al. <Cite id="jensen2001" />, turns the composed light into that before
+it is exposed: switch the figure to `eye`. The disc itself, at 2,500 cd/m² far brighter than what the rods handle,
+keeps its color.
 
 The exposure is the renderer's: the pass takes an EV100 like dunstkreis' sky pass, and the two agree, since both
 start from the same 128,000 lux. A full Moon exposes around 14 like a sunny day, the photographer's "looney 11" of

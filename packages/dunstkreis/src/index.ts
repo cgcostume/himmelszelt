@@ -74,7 +74,7 @@ export type {
 export { clampObserverHeight, MAX_OBSERVER_HEIGHT_M, MIN_OBSERVER_HEIGHT_M } from "./pass.js";
 
 // Atmospheric refraction, traced through the model's air like the view rays: where the sun shows, on the CPU.
-export { airRefractivity, apparentDirection, refractionAngle } from "./refraction.js";
+export { airRefractivity, airTransmittance, apparentDirection, refractionAngle } from "./refraction.js";
 
 // Reading a LUT back to the CPU, for inspecting or exporting one.
 export type { TexturePixels } from "./readback.js";

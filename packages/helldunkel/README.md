@@ -37,6 +37,10 @@ fn show(luminance: vec3f, exposure: f32) -> vec3f {
 - `veilingGlare(angle, age, pigment)` and `hdVeil` in `wgsl.glare`: the eye's veil around a bright point source, CIE's
   general disability glare equation (CIE 146:2002), in cd/m² per lux at the eye, to add before the exposure. The Sun's
   veil in a sky, where bloom knows only the image.
+- `nightVision(rgb)` and `hdNightVision` in `wgsl.vision`: linear sRGB in cd/m² as the eye sees it at night, Jensen et
+  al.'s blue shift (Night Rendering, 2000) on Larson et al.'s scotopic luminance. Below 0.01 cd/m² the rods see alone,
+  above 4 the cones, `coneShare` between; the rods' light takes the chromaticity (0.25, 0.25), so colors fade and the
+  moonlit night turns blue. Per pixel, before the exposure; a camera, which has no rods, sees none of it.
 
 Gamut mapping and Display P3 are planned. `@himmelszelt/dunstkreis` bundles this package's curves for its sky pass, so
 installing it needs nothing else. Part of the [himmelszelt monorepo](https://github.com/cgcostume/himmelszelt).

@@ -55,6 +55,10 @@ override DK_MOONLIGHT: bool = false;
 // Build the Moon's sky-view table rather than the Sun's: the same march from the Moon's direction, times its light.
 override DK_MOON_VIEW: bool = false;
 
+// The sky as the eye sees it at night, by `hdNightVision` (vision.wgsl, helldunkel's): below some 4 cd/m² the rods take
+// over, and its colors fade towards blue. Before the exposure, the sky's light as it is.
+override DK_NIGHT_VISION: bool = false;
+
 // Which rows of the sky-view table a dispatch writes: 0 all, 1 the sky above the horizon, 2 the ground below it, lit
 // by the sky as well as the sun.
 override DK_SKY_VIEW_ROWS: u32 = 0u;

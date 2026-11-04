@@ -32,7 +32,7 @@ struct NbParams {
     // What the color map is multiplied by to read as normal albedo, and the albedo without a map; per channel, below.
     albedoScale: f32,
     albedo: f32,
-    // 1 the color map, 2 the relief, 4 the eclipse, 8 the relief's shadows.
+    // 1 the color map, 2 the relief, 4 the eclipse, 8 the relief's shadows, 16 the table's transmittances.
     flags: u32,
     // The reflectance law: 0 Hapke's lunar law after Jensen et al., 1 Lambert's, to compare.
     law: u32,
@@ -49,6 +49,8 @@ struct NbParams {
     refraction: array<vec4f, 8>,
     // What the color map is multiplied by per channel besides `albedoScale`: from its own mean color to the Moon's.
     albedoTint: vec3f,
+    // What the air lets through at each of the refraction table's entries, per channel, with NB_FLAG_AIR.
+    airTransmittance: array<vec4f, 32>,
 }
 
 const NB_REFRACTION_SAMPLES: u32 = 32u;
@@ -57,3 +59,4 @@ const NB_FLAG_COLOR: u32 = 1u;
 const NB_FLAG_RELIEF: u32 = 2u;
 const NB_FLAG_ECLIPSE: u32 = 4u;
 const NB_FLAG_SHADOWS: u32 = 8u;
+const NB_FLAG_AIR: u32 = 16u;

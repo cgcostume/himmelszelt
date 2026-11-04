@@ -6,7 +6,8 @@
  * No fit is involved. Near the ground it lands within a few percent of Bennett's (Meeus 16.3), which a test pins, and
  * it holds at any height, looking up or down, from inside the atmosphere or through it from space.
  */
-import type { AtmosphereModel } from "./model.js";
+import type { AtmosphereModel, Spectral } from "./model.js";
+import { spectrumToRgb } from "./model.js";
 
 /**
  * Refractivity n - 1 of dry air around 550 nm, proportional to its density: 2.778e-4 at the standard atmosphere's
@@ -28,11 +29,23 @@ function refractionMargin(model: AtmosphereModel): number {
     );
 }
 
+/** The air's extinction at an altitude in km, per km at the four wavelengths: molecules, aerosols and ozone. */
+function extinctionAt(model: AtmosphereModel, altitude: number): Spectral {
+    const { rayleigh, mie, ozone } = model;
+    const molecules = Math.exp(-altitude / rayleigh.scaleHeightKm);
+    const aerosols = Math.exp(-altitude / mie.scaleHeightKm);
+    const o3 = Math.max(0, 1 - Math.abs(altitude - ozone.centerAltitudeKm) / (ozone.widthKm / 2));
+    return rayleigh.beta.map(
+        (b, i) => b * molecules + (mie.betaExtinction[i] ?? 0) * aerosols + (ozone.betaAbsorption[i] ?? 0) * o3,
+    ) as unknown as Spectral;
+}
+
 /**
- * How far a ray bends, in radians, from altitude `h` (km) with the local cosine `mu` until it leaves the atmosphere,
- * or `null` when it ends on the ground. Followed through its vertical plane: x along the horizontal it starts in, y up.
+ * How far a ray bends, in radians, from altitude `h` (km) with the local cosine `mu` until it leaves the atmosphere, and
+ * the optical depth it passes at the four wavelengths, or `null` when it ends on the ground. Followed through its
+ * vertical plane: x along the horizontal it starts in, y up.
  */
-function bending(model: AtmosphereModel, h: number, mu: number): number | null {
+function trace(model: AtmosphereModel, h: number, mu: number): { bend: number; depth: number[] } | null {
     const { groundRadiusKm: rg, thicknessKm } = model.planet;
     const scaleHeight = model.rayleigh.scaleHeightKm;
     const rt = rg + thicknessKm;
@@ -62,6 +75,7 @@ function bending(model: AtmosphereModel, h: number, mu: number): number | null {
 
     let position: Vec2 = [0, 0];
     let direction: Vec2 = [Math.sqrt(Math.max(1 - mu * mu, 0)), mu];
+    const depth = [0, 0, 0, 0];
     for (let i = 0; i < SAMPLES; ++i) {
         const r = rg + altitudeAt(position);
         const [ux, uy] = upAt(position);
@@ -71,13 +85,38 @@ function bending(model: AtmosphereModel, h: number, mu: number): number | null {
 
         const [tx, ty] = turn(position, direction);
         const middle = normalize([direction[0] + tx * 0.5 * ds, direction[1] + ty * 0.5 * ds]);
-        const [mx, my] = turn([position[0] + middle[0] * 0.5 * ds, position[1] + middle[1] * 0.5 * ds], middle);
+        const halfway: Vec2 = [position[0] + middle[0] * 0.5 * ds, position[1] + middle[1] * 0.5 * ds];
+        const [mx, my] = turn(halfway, middle);
+        extinctionAt(model, Math.max(altitudeAt(halfway), 0)).forEach((e, k) => {
+            depth[k] = (depth[k] ?? 0) + e * ds;
+        });
         position = [position[0] + middle[0] * ds, position[1] + middle[1] * ds];
         direction = normalize([direction[0] + mx * ds, direction[1] + my * ds]);
     }
     // The angle between the start and exit directions, both in the start's frame.
     const [sx, sy] = [Math.sqrt(Math.max(1 - mu * mu, 0)), mu];
-    return Math.atan2(sx * direction[1] - sy * direction[0], sx * direction[0] + sy * direction[1]) * -1;
+    return {
+        bend: Math.atan2(sx * direction[1] - sy * direction[0], sx * direction[0] + sy * direction[1]) * -1,
+        depth,
+    };
+}
+
+/** The ray seen at `apparentAltitude` degrees from `observerHeightM` meters up, traced from where it is in the air:
+ *  null on the ground, `{ bend: 0, depth: none }` past the atmosphere from space. */
+function traceSeen(model: AtmosphereModel, observerHeightM: number, apparentAltitude: number) {
+    const a = (apparentAltitude * Math.PI) / 180;
+    const h = observerHeightM / 1000;
+    const { groundRadiusKm: rg, thicknessKm } = model.planet;
+    if (h <= thicknessKm) return trace(model, h, Math.sin(a));
+
+    // From space: straight to where the ray enters the atmosphere, if it does.
+    const r = rg + h;
+    const b = r * Math.sin(a);
+    const discriminant = b * b - (h - thicknessKm) * (r + rg + thicknessKm);
+    if (discriminant < 0 || b >= 0) return { bend: 0, depth: [0, 0, 0, 0] };
+    const t = -b - Math.sqrt(discriminant);
+    const [ex, ey] = [t * Math.cos(a), r + t * Math.sin(a)];
+    return trace(model, thicknessKm, (ex * Math.cos(a) + ey * Math.sin(a)) / Math.hypot(ex, ey));
 }
 
 /**
@@ -90,23 +129,29 @@ export function refractionAngle(
     observerHeightM: number,
     apparentAltitude: number,
 ): number | null {
-    const a = (apparentAltitude * Math.PI) / 180;
-    const h = observerHeightM / 1000;
-    const { groundRadiusKm: rg, thicknessKm } = model.planet;
-    if (h <= thicknessKm) {
-        const bend = bending(model, h, Math.sin(a));
-        return bend === null ? null : (bend * 180) / Math.PI;
-    }
+    const ray = traceSeen(model, observerHeightM, apparentAltitude);
+    return ray === null ? null : (ray.bend * 180) / Math.PI;
+}
 
-    // From space: straight to where the ray enters the atmosphere, if it does.
-    const r = rg + h;
-    const b = r * Math.sin(a);
-    const discriminant = b * b - (h - thicknessKm) * (r + rg + thicknessKm);
-    if (discriminant < 0 || b >= 0) return 0;
-    const t = -b - Math.sqrt(discriminant);
-    const [ex, ey] = [t * Math.cos(a), r + t * Math.sin(a)];
-    const bend = bending(model, thicknessKm, (ex * Math.cos(a) + ey * Math.sin(a)) / Math.hypot(ex, ey));
-    return bend === null ? null : (bend * 180) / Math.PI;
+/**
+ * What the air lets through of sunlight along a ray seen at `apparentAltitude` degrees from `observerHeightM` meters
+ * up, per channel of linear sRGB: the light of a body there, the Moon's or a planet's, dimmed and reddened, traced along
+ * the same bent path as `refractionAngle`, so it agrees with the transmittance table the sky is drawn from. `null` for a
+ * ray that ends on the ground. The CPU twin of the table's lookup, for a few rays per frame without a round trip.
+ */
+export function airTransmittance(
+    model: AtmosphereModel,
+    observerHeightM: number,
+    apparentAltitude: number,
+): [number, number, number] | null {
+    const ray = traceSeen(model, observerHeightM, apparentAltitude);
+    if (ray === null) return null;
+    const toRgb = spectrumToRgb(model);
+    const rgb = (spectrum: readonly number[]) =>
+        toRgb.map((row) => row.reduce((sum, m, j) => sum + m * (spectrum[j] ?? 0), 0));
+    const sun = rgb(model.solarSpectrum);
+    const through = rgb(model.solarSpectrum.map((s, k) => s * Math.exp(-(ray.depth[k] ?? 0))));
+    return through.map((c, i) => Math.max(c, 0) / Math.max(sun[i] ?? 1, 1e-12)) as [number, number, number];
 }
 
 /**

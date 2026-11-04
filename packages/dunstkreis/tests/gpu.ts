@@ -17,9 +17,12 @@ import { readFileSync } from "node:fs";
 export function wgslSource(name: string): string {
     // Fragments shared with the packages that own them.
     const owner =
-        { tonemap: "../../helldunkel/src/wgsl", glare: "../../helldunkel/src/wgsl", cube: "../../rundbild/src/wgsl" }[
-            name
-        ] ?? "../src/wgsl";
+        {
+            tonemap: "../../helldunkel/src/wgsl",
+            glare: "../../helldunkel/src/wgsl",
+            vision: "../../helldunkel/src/wgsl",
+            cube: "../../rundbild/src/wgsl",
+        }[name] ?? "../src/wgsl";
     const read = (file: string) => readFileSync(new URL(`${owner}/${file}`, import.meta.url), "utf8");
     try {
         return read(`${name}.wgsl`);

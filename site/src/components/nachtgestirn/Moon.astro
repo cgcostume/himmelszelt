@@ -35,7 +35,7 @@ const LAW = {
 const MAPS = {
     name: "maps",
     label: "Map size",
-    title: "Which of nachtgestirn's maps the disc is drawn from, the color map's width: auto takes the smallest that gives a texel per pixel, 512 (80 KB) is sharp up to a disc of some 160 pixels, 1K (270 KB) to some 330, 4K (3.6 MB) when zoomed in",
+    title: "Which of nachtgestirn's maps the disc is drawn from, the color map's width: auto takes the smallest that gives a texel per pixel, 512 (230 KB) is sharp up to a disc of some 160 pixels, 1K (840 KB) to some 330, 4K (11.5 MB) when zoomed in",
     options: [
         ["auto", "auto"],
         ["small", "512"],
@@ -80,6 +80,7 @@ const TONE = {
             </OptionGroup>
             <OptionGroup name="tone mapping">
                 <Choice figure={id} {...TONE} />
+                <button type="button" class="view-toggle" data-field="eye" aria-pressed="false" title="As the eye sees it at night rather than a camera: below some 4 cd/m² the rods take over, colors fade and shift towards blue, and the moonlit sky turns blue, as painters paint the night. The bright disc stays as it is">eye</button>
             </OptionGroup>
         </Fragment>
     </SkyFrame>

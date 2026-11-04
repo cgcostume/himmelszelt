@@ -190,6 +190,9 @@ export interface RefractionTable {
     /** The apparent altitude below which the rays end on the ground, in radians, found to a hundredth of an arc second:
      *  the pass hides the Moon there. -π/2 where the whole band reaches space. */
     horizon: number;
+    /** What the air lets through at each, per channel, three numbers an entry, with `transmittance`: the lower limb
+     *  near the horizon is dimmer and redder than the upper. Filled below the horizon as the bends are. */
+    transmittances?: Float32Array;
 }
 
 /** The entries of a `RefractionTable`, `NB_REFRACTION_SAMPLES` in params.wgsl. */
@@ -201,12 +204,15 @@ export const REFRACTION_SAMPLES = 32;
  * on the ground, such as `@himmelszelt/dunstkreis`' `refractionAngle` for a model and height. Built around the true
  * direction, which the pass then takes as `direction`, and over where its limbs show, found by bisection: all its
  * entries lie on the disc, however hard the air squeezes it, from space to a fifth of its height. The disc stays whole
- * and smooth as it sinks, even with its center below the horizon.
+ * and smooth as it sinks, even with its center below the horizon. With `transmittance`, what the air lets through
+ * along a ray seen at an apparent altitude in degrees, per channel, null on the ground, such as dunstkreis'
+ * `airTransmittance`, the table holds that over the band too, and the pass dims each ray by its own.
  */
 export function refractionTable(
     trueDirection: Vec3,
     angularDiameter: number,
     bend: (apparentAltitude: number) => number | null,
+    transmittance?: (apparentAltitude: number) => Vec3 | null,
 ): RefractionTable {
     const [x, y, z] = trueDirection;
     const altitude = Math.atan2(z, Math.hypot(x, y)) / DEG;
@@ -242,7 +248,14 @@ export function refractionTable(
         horizon = high;
     }
     const bends = new Float32Array(values.map((value, i) => (i < first ? (values[first] ?? 0) : (value ?? 0)) * DEG));
-    return { from, step, bends, horizon };
+    if (!transmittance) return { from, step, bends, horizon };
+    const transmittances = new Float32Array(REFRACTION_SAMPLES * 3);
+    let last: Vec3 = [0, 0, 0];
+    for (let i = REFRACTION_SAMPLES - 1; i >= 0; i--) {
+        last = (i >= first && transmittance((from + i * step) / DEG)) || last;
+        transmittances.set(last, i * 3);
+    }
+    return { from, step, bends, horizon, transmittances };
 }
 
 /**

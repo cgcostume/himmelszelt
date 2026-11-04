@@ -53,8 +53,10 @@ at the horizon, where the model's single scale height makes the lowest air dense
 
 Set `refractivity: 0` to turn it off, which means recomputing the tables and making the passes anew; they then compile
 the straight march (`DK_REFRACTION` off), which skips the bending's two exponentials per step and aims each step once. `airRefractivity(temperatureC, pressureHPa)`
-gives the value for other air, and `apparentDirection` traces where a body shows on the CPU. Feed the true sun
-direction: an already refracted one would be lifted twice.
+gives the value for other air, and `apparentDirection` traces where a body shows on the CPU, `refractionAngle` how far
+a ray seen at an apparent altitude bends, and `airTransmittance` what the air lets through along it, per channel, the
+CPU twin of the transmittance table, for the Moon's disc or a planet. Feed the true sun direction: an already
+refracted one would be lifted twice.
 
 ## Units, exposure and tone mapping
 
@@ -128,7 +130,8 @@ The Sun is drawn per pixel over the sky, never stored in a table, and in parts a
   lobe, centered on where the Sun shows. The cube map gets it too. `false` for Bruneton's one lobe alone.
 - The veil, `veil`, the eye's own glare: CIE's equation (CIE 146:2002) from the Sun's illuminance at the observer, which
   the light meter writes, 1 for the eye's, which washes out some 10° around the Sun by day, a two-hundredth for a lens, 0
-  by default. From `@himmelszelt/helldunkel`'s `glare.wgsl`, bundled.
+  by default. With `moonlight` around the Moon as well: the moonlit sky is the day's at the Moon's share, so its veil
+  outshines it as far out as the Sun's does by day. From `@himmelszelt/helldunkel`'s `glare.wgsl`, bundled.
 
 Bloom is the lens's and needs the image, helldunkel's `createBloomPass` over the exposed frame; god rays need something
 that casts a shadow, which the sky alone has not. The four add up without counting each other twice: the aureole is
@@ -142,9 +145,12 @@ own sky.
 moonIlluminance })` takes the Moon's true direction and its illuminance above the air in lux, some 0.3 at full Moon, as
 `@himmelszelt/nachtgestirn`'s `moonIlluminance` gives it. A second sky-view table, the same march from the Moon's
 direction at its share of the Sun's light, is rebuilt when the Moon moves and read beside the Sun's, and the aureole
-glows around the Moon as well, centered on where it shows. The sky by full moon comes out blue at around EV100 −3, as a
-camera sees it. The disc itself is not drawn: that is nachtgestirn's. The light meter, the ground's light from the sky
-and the aerial perspective volume stay the Sun's.
+glows around the Moon as well, centered on where it shows, and so does the eye's `veil`. The sky by full moon comes
+out blue at around EV100 −3, as a camera sees it. The disc itself is not drawn: that is nachtgestirn's. The light
+meter writes the Moon's light at the observer, `moonIlluminance()`, for lighting a scene by it; the meter's reading,
+the ground's light from the sky and the aerial perspective volume stay the Sun's. A camera sees the moonlit sky as the
+day's, only dimmer; the eye does not, its rods take over and see it blue. `nightVision: true` draws it so, by
+helldunkel's `hdNightVision`, bundled.
 
 ## The ground
 
@@ -161,6 +167,8 @@ The Sun and the sky light a scene apart, the usual split for image-based lightin
 
 - The Sun as a directional light, from its apparent direction (`apparentDirection`), with `sunIlluminance()`: the
   sunlight that reaches the observer through the air, per channel in lux, measured by the light meter on the GPU.
+- The Moon the same way with `moonlight`, from its apparent direction, with `moonIlluminance()`: its light through
+  the air, in sunlight's color, some 0.3 lux at full Moon high up. The cube map holds the moonlit sky too.
 - The sky as a cube map, from a cube pass made once, `await sky.createCubePass({ format: "rgba16float" })`, then
   `encode(encoder, cube)` per update: the six faces of a square texture with six layers, in cd/m², linear, indexed by
   ENU directions, so a y-up engine samples it with (x, -z, y). Without the Sun's disc by default: some 10^9 cd/m² in a

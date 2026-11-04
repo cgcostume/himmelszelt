@@ -29,6 +29,10 @@ export interface MoonPassOptions {
     /** Rays per pixel on and around the disc, 8 by default: the terminator and the relief's shading are sharper than
      *  a pixel. 1 for one through each pixel's center. */
     samples?: number;
+    /** The Moon and the sky behind it as the eye sees them at night rather than a camera, by helldunkel's
+     *  `hdNightVision`, on the composed light before the exposure: the moonlit sky blue, the bright disc as it
+     *  is. With a background only; off by default. */
+    nightVision?: boolean;
 }
 
 /** Earth's shadow, for a lunar eclipse: as `eclipse.lunar` of `@himmelszelt/sternzeit` gives its radii. */
@@ -38,7 +42,8 @@ export interface EarthShadow {
     /** The Moon's center from Earth's center, in km, in the ENU axes: the geocentric direction times the distance. The
      *  topocentric one is up to a degree off, more than the umbra is wide. */
     moonCenterKm: Vec3;
-    /** The umbra's and the penumbra's radii at the Moon's distance, in km. */
+    /** The umbra's and the penumbra's radii at the Moon's distance, in km. The pass does not read `penumbraKm`: it
+     *  finds the penumbra from the geometry, the share of the Sun's disc Earth covers seen from each point. */
     umbraKm: number;
     penumbraKm: number;
     /** How bright the umbra's refracted light is, 1 for a typical eclipse: more after a clear stratosphere, less after a
@@ -63,7 +68,8 @@ export interface MoonParams {
      *  it is turned. By default the Moon's 0° meridian faces the viewer with its north up. */
     orientation: Float32Array;
     /** What the air lets through along the line of sight, per channel, 1 by default: the Moon's light is dimmed and
-     *  reddened by it, and the sky's light in the background is added in front of it. */
+     *  reddened by it, and the sky's light in the background is added in front of it. A `refraction` table with
+     *  `transmittances` takes its place, per ray. */
     transmittance: Vec3;
     /** Inverse view-projection, column major, and the projection's bend, as `@himmelszelt/dunstkreis`' sky pass. */
     inverseViewProjection: Float32Array;
@@ -112,8 +118,8 @@ const DEG = Math.PI / 180;
 const EIGHT_BIT = ["rgba8unorm", "bgra8unorm"];
 const TONE_CURVES: Record<string, number> = { neutral: 1, agx: 2, aces: 3, clip: 4 };
 /** Byte size of NbParams in params.wgsl: a mat4x4, a mat3x3 of three padded columns, twelve vec4-sized rows, the
- *  refraction table's eight and the albedo's tint. */
-export const PARAMS_SIZE = 400;
+ *  refraction table's eight, the albedo's tint and the table's transmittances, a vec4 each. */
+export const PARAMS_SIZE = 912;
 
 const DEFAULTS: MoonParams = {
     direction: [0, 0, 1],
@@ -166,8 +172,13 @@ export function paramsData(params: MoonParams, maps: MoonMaps | null): ArrayBuff
     f[54] = maps?.albedoScale ?? 1;
     f[55] = 0.12;
     const relief = params.relief && maps?.relief;
+    const air = params.refraction?.transmittances;
     u[56] =
-        (params.albedoMap && maps ? 1 : 0) | (relief ? 2 : 0) | (eclipse ? 4 : 0) | (relief && params.shadows ? 8 : 0);
+        (params.albedoMap && maps ? 1 : 0) |
+        (relief ? 2 : 0) |
+        (eclipse ? 4 : 0) |
+        (relief && params.shadows ? 8 : 0) |
+        (air ? 16 : 0);
     u[57] = params.law === "lambert" ? 1 : 0;
     f[58] = eclipse?.umbraLight ?? 1;
     const { refraction } = params;
@@ -175,6 +186,7 @@ export function paramsData(params: MoonParams, maps: MoonMaps | null): ArrayBuff
     f[63] = refraction?.from ?? 0;
     if (refraction) f.set(refraction.bends.subarray(0, REFRACTION_SAMPLES), 64);
     f.set(maps?.albedoTint ?? [1, 1, 1], 96);
+    if (air) for (let i = 0; i < REFRACTION_SAMPLES; i++) f.set(air.subarray(i * 3, i * 3 + 3), 100 + i * 4);
     // Earth's center from the Moon's, the observer on Earth's surface straight above it.
     const [dx, dy, dz] = params.direction;
     const d = params.distanceKm;
@@ -188,14 +200,30 @@ export function paramsData(params: MoonParams, maps: MoonMaps | null): ArrayBuff
 }
 
 export async function createMoonPass(device: GPUDevice, options: MoonPassOptions): Promise<MoonPass> {
-    const { format, toneMap = "neutral", headroom = 1, background = true, maps = null, samples = 8 } = options;
+    const {
+        format,
+        toneMap = "neutral",
+        headroom = 1,
+        background = true,
+        maps = null,
+        samples = 8,
+        nightVision = false,
+    } = options;
     if (!(Number.isInteger(samples) && samples >= 1)) throw new Error(`nachtgestirn: ${samples} rays per pixel`);
     const dither = options.dither ?? (toneMap !== false && EIGHT_BIT.includes(format));
     const storable = ["rgba8unorm", "rgba16float", "rgba32float"].includes(format);
     if (!storable && !(format === "bgra8unorm" && device.features.has("bgra8unorm-storage"))) {
         throw new Error(`nachtgestirn: the pass writes ${format} as a storage texture, which this device cannot`);
     }
-    const code = [wgsl.moonOutput(format), wgsl.params, wgsl.camera, wgsl.surface, wgsl.tonemap, wgsl.moon].join("\n");
+    const code = [
+        wgsl.moonOutput(format),
+        wgsl.params,
+        wgsl.camera,
+        wgsl.surface,
+        wgsl.tonemap,
+        wgsl.vision,
+        wgsl.moon,
+    ].join("\n");
     const module = device.createShaderModule({ label: "nachtgestirn:moon", code });
     const pipeline = await device.createComputePipelineAsync({
         label: "nachtgestirn:moon",
@@ -209,6 +237,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
                 NB_DITHER: dither ? 1 : 0,
                 NB_BACKGROUND: background ? 1 : 0,
                 NB_SAMPLES: samples,
+                NB_NIGHT_VISION: nightVision ? 1 : 0,
             },
         },
     });

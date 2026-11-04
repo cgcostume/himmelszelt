@@ -36,6 +36,9 @@ export {
 // The veil of a bright point source, the eye's own glare.
 export { veilingGlare } from "./glare.js";
 
+// The eye at night: the rods' blue shift, before the exposure.
+export { coneShare, nightVision } from "./vision.js";
+
 // Bloom, over a linear, exposed image.
 export type { BloomPass, BloomPassOptions } from "./bloom.js";
 export { createBloomPass } from "./bloom.js";

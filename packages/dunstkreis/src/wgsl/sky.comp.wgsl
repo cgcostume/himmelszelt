@@ -1,6 +1,6 @@
 // The sky pass: a compute pass that turns the precomputed tables into pixels, one invocation per pixel of the target,
 // with no rasterization. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`, `sampling.wgsl`, `raymarch.wgsl`,
-// `camera.wgsl`, `cube.wgsl`, `sun.wgsl`, `glare.wgsl`, `tonemap.wgsl`, `grid.wgsl`, `frame.wgsl`, `quality.wgsl` and
+// `camera.wgsl`, `cube.wgsl`, `sun.wgsl`, `glare.wgsl`, `tonemap.wgsl`, `vision.wgsl`, `grid.wgsl`, `frame.wgsl`, `quality.wgsl` and
 // `features.wgsl`, plus the output
 // at group 1, `dkOutputSize` and `dkOutputStore`, declared by whoever builds the pipeline since its format has to be
 // spelled out: `skyOutput(format)` for an image, `skyCubeOutput(format)` for a cube map's six faces.
@@ -205,14 +205,17 @@ fn dkAureoleOf(view: vec3f, light: vec3f, apparent: vec3f) -> vec3f {
     return dkToRgb(a, column * a.solarIlluminance) * (DK_AUREOLE_SHARE * phase * fade);
 }
 
-// The eye's veil along a view ray, from glare.wgsl, by the sun's illuminance the light meter wrote: for an eye of
-// thirty years, blue-green, times DK_VEIL. An effect of the eye, so centered on where the sun shows, in the view's
-// directions.
+// The eye's veil along a view ray, from glare.wgsl, by the illuminance the light meter wrote of the Sun and, with
+// DK_MOONLIGHT, of the Moon: for an eye of thirty years, blue-green, times DK_VEIL. An effect of the eye, so centered
+// on where each shows, in the view's directions.
 fn dkSkyVeil(view: vec3f) -> vec3f {
     if (DK_VEIL <= 0.0) {
         return vec3f(0.0);
     }
-    let veil = hdVeil(view, dkParams.apparentSunDirection, dkMetering.sunIlluminance, 30.0, 1.0);
+    var veil = hdVeil(view, dkParams.apparentSunDirection, dkMetering.sunIlluminance, 30.0, 1.0);
+    if (DK_MOONLIGHT) {
+        veil = veil + hdVeil(view, dkParams.apparentMoonDirection, dkMetering.moonIlluminance, 30.0, 1.0);
+    }
     return veil * DK_VEIL;
 }
 
@@ -418,6 +421,9 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
 
     // The aureole and the eye's veil, both smooth enough for the center ray.
     luminance = luminance + dkSkyAureole(view) + dkSkyVeil(view);
+    if (DK_NIGHT_VISION) {
+        luminance = hdNightVision(luminance);
+    }
 
     // In cd/m², exposed. Without tone mapping, that is what is written: linear, for the caller's own tone mapping.
     let exposure = dkExposure();
