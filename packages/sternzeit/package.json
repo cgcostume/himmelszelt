@@ -39,7 +39,6 @@
         "build": "rolldown -c rolldown.config.ts",
         "typecheck": "tsc --noEmit",
         "test": "playwright test",
-        "generate:catalog": "node scripts/csv-to-bin.mjs",
         "generate:deltat": "node scripts/deltat-from-iers.mjs"
     },
     "devDependencies": {

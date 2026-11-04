@@ -225,6 +225,14 @@ confirmed yet.
 | Full Moon some 0.3 lux above the air, a four hundred thousandth of the Sun | Through the air | lib | `moonIlluminance(0)` = 0.31 lx; 128,000 / 0.31 = 410,000; magnitude -12.74 against -26.74 gives 0.32 | ok | 2026-11-04 |
 | Full Moon exposes around 14, looney 11 | Through the air | lib | `ev100ForLuminance(4889)` - 1 = 14.3, 13.8 through 71 % air; f/11 at 1/100 s is EV100 log2(121 · 100) = 13.6 | ok | 2026-11-04 |
 | Hapke 1963 and 1966, Jensen et al. 2001, van de Hulst 1980 | People | src | the references | ok | 2026-11-04 |
+| A Lambert sphere gives two thirds of a flat disc's light at full, a third of its own full at a quarter | Sunlight on dust | derived | disc integral of mu0 / pi: 2/3 at g = 0; (sin g + (pi - g) cos g) / pi = 1 / pi at 90° | ok | 2026-11-04 |
+| Hapke's law within a quarter of a stop of Allen's law from full to a thin crescent | Sunlight on dust, Fig. laws | lib | disc integral of `nbHapke` against `phaseLaw`: 0.01 at 5°, 0.13 at 60°, 0.24 at 90°, 0.21 at 120°, 0.20 at 150°, 0.43 at 170° | ok | 2026-11-04 |
+| Lambert's half Moon more than twice too bright | Sunlight on dust | derived | Lambert 2.24 stops below full against 3.46 measured: 2.3 times | ok | 2026-11-04 |
+| Perigee 33.5′ against apogee 29.4′, 14% wider; a third more light | Near and far | lib | 2 asin(1737.1 / 356,500) and / 406,700; (406,700 / 356,500)^2 = 1.30 | ok | 2026-11-04 |
+| Overhead an Earth radius nearer, almost 2% wider; the rising Moon 1.7% smaller | Near and far, glossary | derived | 6,371 / 384,400 = 1.66%; sternzeit's caption says the same | ok | 2026-11-04 |
+| Over a night the face turns by up to a degree, which sternzeit does not follow | The face we see | derived | diurnal libration: asin(6,371 / 384,400) = 0.95°; `moon.librations` is geocentric | ok | 2026-11-04 |
+| The umbra twelve to seventeen stops below the sunlight | Earth's shadow | lib | the model's 1e-5 at the axis = -16.6 stops, 3.2e-4 at the edge = -11.6 | ok | 2026-11-04 |
+| Ciechanowski's Moon, December 17, 2024 | Opening, references | web | ciechanow.ski/archives | ok | 2026-11-04 |
 
 ### Experiments in the captions
 
@@ -232,3 +240,36 @@ confirmed yet.
 |---|---|---|---|---|---|
 | New Year's Eve 2028, 17:00 UTC, Berlin: total eclipse, the Moon 16° up in the east-northeast, two hours after sunset | Moon figure | lib | umbral magnitude 1.21, altitude 15.9°, azimuth 73°; Sun -0.6° at 15:00 UTC, -16.7° at 17:00 | ok | 2026-11-04 |
 | An hour and a half back, the shadow's edge crosses the disc | Moon figure | lib | 15:30 UTC: umbral magnitude 0.33, the Moon 4.0° up | ok | 2026-11-04 |
+| First quarter, November 17, 2026, 12:00 UTC: Lambert a third of its full, Hapke a tenth | Fig. laws, Try | lib | phase angle 89.7°, lit 0.502; curves -2.2 (Lambert, -1.7 of its own full) and -3.7 stops | ok | 2026-11-04 |
+| The supermoon of November 25, 2034, 22:00 UTC: a full Moon within hours of a close perigee | Fig. near-far, Try | lib | `moon.distance` 356,448 km, phase angle 4.8° | ok | 2026-11-04 |
+| New Year's Eve 2028, 17:00 UTC: the Moon's center halfway in from the umbra's edge; in the umbra 16:09 to 19:35 local | Fig. eclipse-row, Try | lib | axis offset 2,135 km of 4,601; the figure's bisection on `umbralMagnitude` | ok | 2026-11-04 |
+
+## sternenheer
+
+### Text
+
+| Claim | Where | Against | Result | Status | Checked |
+|---|---|---|---|---|---|
+| Some two thousand stars seen at once, a magnitude 0 star 2.6 millionths of a lux, the faintest a four hundredth | Opening | lib, derived | `illuminanceFromMagnitude(0)` = 2.58e-6 lx from the Sun's 128,000 lux at -26.74; 10^(-0.4 · 6.5) = 1/398; half of the 8,403 naked-eye stars are above the horizon | ok | 2026-11-04 |
+| Sirius -1.46, the Sun -26.74, Sirius ten millionths of a lux, 6.5 six billionths | Nine thousand stars | lib, src | catalog; Cox 2000; 9.9e-6 lx, 6.5e-9 lx | ok | 2026-11-04 |
+| 9,093 stars to magnitude 7.1, 8,403 within 6.5, 291 KB, together magnitude -5.0, Venus at its brightest | Nine thousand stars | lib, src | `data/brightstars.bin` 290,976 bytes; faintest row 7.1; sum of fluxes 96 magnitude-0 stars = -4.96; Venus at most -4.9 | ok | 2026-11-04 |
+| In a view of the whole sky Sirius peaks at a fraction of a cd/m², a thousand times the night sky | Points of light | derived | 0.8 px at 180° over 900 px is 2.8e-3 rad: 9.9e-6 lx / (2π (2.8e-3)²) = 0.2 cd/m², at 120° 0.45; a dark sky 2.75e-4 cd/m², 700 to 1,600 times | ok | 2026-11-04 |
+| Sirius' veil a degree wide | Points of light | derived | CIE: 10 E / θ² = 1e-4 cd/m² at 1°, a third of the dark sky | ok | 2026-11-04 |
+| Precession some 50 arcseconds a year; Vega 11 arcminutes from its catalog place, a third of the Moon's width | The sky turning | src, lib | Meeus ch. 21; `stars.apparentPosition` of Vega on 2026-08-12: 10.7′ | ok | 2026-11-04 |
+| Groombridge 1830 the fastest in the catalog, a Moon's width in 260 years | The sky turning | lib, derived | largest proper motion in the CSV 7.06″/yr at RA 11h53m, dec +37.7°, mag 6.45; 31′ / 7.06″ = 263 years | ok | 2026-11-04 |
+| A degree a day, four minutes earlier each night | The sky turning | src | the sidereal day, Meeus ch. 12 | ok | 2026-11-04 |
+| Ballesteros: Vega 10,100 K, the Sun 5,800 K, Betelgeuse 3,300 K; Jensen: 12,500 and 2,900 | Colors, Precise and approximate | lib | `temperatureFromColorIndex(0)` = 10,125, (0.65) = 5,778, (1.85) = 3,333; approx 12,500, 2,905 | ok | 2026-11-04 |
+| Refraction on the horizon some 35 arcminutes, a star truly on the horizon half a degree up | Through the air | lib | dunstkreis' `refractionAngle` from 1 m: 0.623° at 0°; `liftedDirection` of a star at 0°: 30.2′ | ok | 2026-11-04 |
+| Zenith 87% green, 77% blue; 5° a quarter and a sixteenth; horizon under one percent | Through the air | lib | `airTransmittance`: 90°: 0.905, 0.868, 0.770; 5°: 0.397, 0.239, 0.063; 0°: 0.038, 0.006, 0.000 | ok | 2026-11-04 |
+| Twinkling a fifth at the zenith, doubling by 30° and saturating | Through the air | lib, src | `scintillationIndex(90)` = 0.18, (30) = 0.6 the cap; Young's 0.09 D^(-2/3) X^1.75 (2Δt)^(-1/2), Dravins et al. 1998 | ok | 2026-11-04 |
+| Stars fainter than the eleventh magnitude, 1.7 billion | The Milky Way | src | svs4851: Tycho-2 to 11.5, Gaia DR2 1.7 billion stars | ok | 2026-11-04 |
+| 23.2 mag/arcsec² at the zenith of 40° N, a fifth of the natural sky | The Milky Way | src, derived | Masana et al. 2021 table 4: 75 nW/m²/sr, 21.7%; -2.5 log10(75e-9 / 143.1685) = 23.20 | ok | 2026-11-04 |
+| Galactic center 21.0 mag/arcsec², the poles 25.5, a dark sky 21.5 | The Milky Way | lib | map texel 0.256 and 0.004 times 1.756e-3 cd/m²; `surfaceBrightnessFromLuminance` | ok | 2026-11-04 |
+| Approximate precession within an arcsecond of Meeus' over this century | Precise and approximate | lib | sternzeit's `stars.spec.ts` | ok | 2026-11-04 |
+| Hoffleit and Warren 1991, Dravins et al. three papers in the nineties | People | src | the references; Dravins et al. 1997a, 1997b, 1998 | ok | 2026-11-04 |
+
+### Experiments in the captions
+
+| Claim | Against | Result | Status | Checked |
+|---|---|---|---|---|
+| August 12, 2026, 22:00 UTC, Berlin: the Milky Way from Cygnus overhead to Sagittarius on the south-southwestern horizon, no Moon | lib | galactic center 2.1° up at azimuth 213°; Sun -21°; Moon 0% lit, -21.5° | ok | 2026-11-04 |

@@ -3,6 +3,7 @@ import * as earthImpl from "./earth.js";
 import * as moonImpl from "./moon.js";
 import * as sunImpl from "./sun.js";
 import * as eclipseImpl from "./eclipse.js";
+import * as starsImpl from "./stars.js";
 import { EQUATORIAL_RADIUS_KM } from "./coords.js";
 
 // Math auxiliaries, generic enough to be useful to any consumer, not just internally.
@@ -125,4 +126,20 @@ export type { SolarEclipseState, LunarEclipseState } from "./eclipse.js";
 export const eclipse = {
     solar: eclipseImpl.solarEclipseState,
     lunar: eclipseImpl.lunarEclipseState,
+};
+
+// Stars: where a catalog star stands tonight, and the one rotation that turns a whole J2000 catalog into the sky.
+export type { CatalogStar, Matrix3 } from "./stars.js";
+export const stars = {
+    precessionAngles: starsImpl.precessionAngles,
+    precessionMatrix: starsImpl.precessionMatrix,
+    properMotion: starsImpl.properMotion,
+    apparentPosition: starsImpl.apparentPosition,
+    horizontalPosition: starsImpl.horizontalPosition,
+    equatorialToHorizontalMatrix: starsImpl.equatorialToHorizontalMatrix,
+    horizontalMatrix: starsImpl.horizontalMatrix,
+    equatorialToVector: starsImpl.equatorialToVector,
+    vectorToEquatorial: starsImpl.vectorToEquatorial,
+    multiplyMatrix3: starsImpl.multiplyMatrix3,
+    applyMatrix3: starsImpl.applyMatrix3,
 };

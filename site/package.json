@@ -21,6 +21,7 @@
         "@himmelszelt/helldunkel": "workspace:*",
         "@himmelszelt/nachtgestirn": "workspace:*",
         "@himmelszelt/rundbild": "workspace:*",
+        "@himmelszelt/sternenheer": "workspace:*",
         "@himmelszelt/sternzeit": "workspace:*",
         "@photostructure/tz-lookup": "^11.7.0",
         "astro": "^7.3.8",

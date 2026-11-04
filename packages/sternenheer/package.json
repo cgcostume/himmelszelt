@@ -1,0 +1,57 @@
+{
+    "name": "@himmelszelt/sternenheer",
+    "version": "0.1.0",
+    "description": "The stars on WebGPU: the nine thousand stars of the Yale Bright Star Catalogue and the Milky Way behind them, drawn by compute passes in cd/m² over your sky, dimmed, bent and twinkling in the air near the horizon, into a texture you own.",
+    "type": "module",
+    "license": "MIT",
+    "sideEffects": false,
+    "author": "Daniel Limberger <cgdaniel@outlook.com> (https://github.com/cgcostume)",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/cgcostume/himmelszelt.git",
+        "directory": "packages/sternenheer"
+    },
+    "homepage": "https://github.com/cgcostume/himmelszelt/tree/main/packages/sternenheer#readme",
+    "keywords": [
+        "stars",
+        "star-catalog",
+        "milky-way",
+        "night-sky",
+        "scintillation",
+        "sky-rendering",
+        "webgpu",
+        "compute-shader"
+    ],
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "data"
+    ],
+    "scripts": {
+        "build": "rolldown -c rolldown.config.ts",
+        "typecheck": "tsc --noEmit",
+        "test": "pnpm build && playwright test",
+        "test:gpu": "pnpm build && STERNENHEER_GPU=1 playwright test",
+        "catalog": "node scripts/catalog.mjs",
+        "milkyway": "node scripts/milkyway.mjs data"
+    },
+    "devDependencies": {
+        "@himmelszelt/dunstkreis": "workspace:*",
+        "@himmelszelt/helldunkel": "workspace:*",
+        "@himmelszelt/sternzeit": "workspace:*",
+        "@playwright/test": "^1.62.1",
+        "@types/node": "^26.6.2",
+        "@webgpu/types": "^0.1.71",
+        "rolldown": "^1.2.2",
+        "rolldown-plugin-dts": "^0.28.0",
+        "typescript": "^7.0.2",
+        "webgpu": "^0.6.1"
+    }
+}

@@ -1,0 +1,90 @@
+---
+import "../sternzeit/sternzeit.css";
+import "../dunstkreis/dunstkreis.css";
+import Choice from "../dunstkreis/Choice.astro";
+import OptionGroup from "../dunstkreis/OptionGroup.astro";
+import SkyFrame from "../dunstkreis/SkyFrame.astro";
+import Try from "../Try.astro";
+
+/**
+ * The stars figure: sternenheer's stars and Milky Way over dunstkreis' sky in cd/m², nachtgestirn's Moon over them,
+ * composed and tone mapped by the Moon pass, in the shared frame, a wide view towards the south. Its options switch the
+ * stars, the Milky Way, the air, the twinkling, the eye's veil and night vision, the Moon, and set the exposure and the
+ * faintest magnitude drawn.
+ */
+interface Props {
+    id?: string;
+    caption?: string;
+    try?: { label: string; set: string; text: string };
+}
+const {
+    id = "stars",
+    caption = "The stars at the chosen moment and place over dunstkreis' sky, with nachtgestirn's Moon: every star of the Yale Bright Star Catalogue at its light in lux, a point that brightens as you zoom in, the Milky Way from NASA's Deep Star Maps behind them, all lifted, dimmed and reddened by the air near the horizon. The compass directions on the horizon. Drag to look around, scroll to zoom.",
+    try: experiment,
+} = Astro.props;
+
+const MAPS = {
+    name: "maps",
+    label: "Milky Way map",
+    title: "Which of sternenheer's maps of the Milky Way is drawn: 2K (490 KB), a texel ten arcminutes, or 4K (2.6 MB) for zooming in",
+    options: [
+        ["small", "2K"],
+        ["large", "4K"],
+    ],
+    checked: "small",
+};
+const TONE = {
+    name: "tone",
+    label: "Tone curve",
+    title: "Khronos PBR Neutral keeps colors as they are and compresses only the brightest, AgX fades bright colors towards white as film does, ACES is the saturated filmic curve used before, none cuts the light off where it saturates",
+    options: [
+        ["clip", "none"],
+        ["neutral", "neutral"],
+        ["agx", "AgX"],
+        ["aces", "ACES"],
+    ],
+    checked: "neutral",
+};
+---
+
+<figure class="scene-frame wide" id={id} data-stars>
+    <SkyFrame png grid={false} locked={false} lockIcon="moonLock" lockTitle="Keep the view on the Moon; dragging lets go" hint="Drag to look around, scroll to zoom. Rendered with WebGPU, the stars and the Moon over dunstkreis' sky.">
+        <canvas data-field="canvas" aria-label="The stars at the chosen moment and place"></canvas>
+        <div class="sky-compass" data-field="compassLabels"></div>
+        <Fragment slot="options">
+            <OptionGroup name="exposure">
+                <label class="sky-ev">EV<sub>100</sub> <input data-field="exposure" type="range" min="-20" max="14" step="0.1" value="9" title="Brighter to the right: a lower EV lets in more light" /> <output data-field="ev" /></label>
+                <button type="button" class="view-toggle" data-field="auto" aria-pressed="true" title="Expose for the sky where it is brighter than the stars, by day and by moonlight, else for the Milky Way">auto</button>
+            </OptionGroup>
+            <OptionGroup name="sky">
+                <button type="button" class="view-toggle" data-field="stars" aria-pressed="true" title="The 9,093 stars of the Yale Bright Star Catalogue, each at its light in lux">stars</button>
+                <button type="button" class="view-toggle" data-field="milkyway" aria-pressed="true" title="The Milky Way, the light of the stars too faint for the catalog, from NASA's Deep Star Maps of Gaia's stars, calibrated to the integrated starlight">Milky Way</button>
+                <button type="button" class="view-toggle" data-field="moon" aria-pressed="true" title="nachtgestirn's Moon, lighting the sky and hiding the stars behind its disc, lit or not">Moon</button>
+                <Choice figure={id} {...MAPS} />
+                <label class="sky-ev">mag <input data-field="magnitude" type="range" min="-1.5" max="8" step="0.1" value="8" title="The faintest magnitude drawn: 6.5 is the naked eye's limit under a dark sky, the catalog ends at 7.1" /> <output data-field="magnitudeValue">8</output></label>
+            </OptionGroup>
+            <OptionGroup name="air">
+                <button type="button" class="view-toggle" data-field="air" aria-pressed="true" title="The air: every star lifted by the refraction, dimmed and reddened by the extinction, and the sky's own light in front; off, the stars from space, over black">air</button>
+                <button type="button" class="view-toggle" data-field="twinkle" aria-pressed="false" title="The twinkling: each star's light flickers by the air's turbulence, more near the horizon, where its colors come apart. Runs on while pressed">twinkle</button>
+            </OptionGroup>
+            <OptionGroup name="eye">
+                <button type="button" class="view-toggle" data-field="glare" aria-pressed="true" title="Your eye's veil around a bright star on the screen, CIE's glare equation: Sirius throws a halo a degree wide">glare</button>
+                <button type="button" class="view-toggle" data-field="eye" aria-pressed="false" title="As the eye sees it at night rather than a camera: below some 4 cd/m² the rods take over, colors fade and shift towards blue">night vision</button>
+            </OptionGroup>
+            <OptionGroup name="tone mapping">
+                <Choice figure={id} {...TONE} />
+            </OptionGroup>
+        </Fragment>
+    </SkyFrame>
+    <p class="view-status"><span data-field="status" /> <span class="sky-timing" data-field="timing" /></p>
+    <figcaption class="figure-caption">
+        {caption}
+        {experiment && <Try label={experiment.label} set={experiment.set} fig={id}>{experiment.text}</Try>}
+    </figcaption>
+</figure>
+
+<script>
+    import { starsFigure } from "./stars";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-stars]")) starsFigure(root);
+</script>

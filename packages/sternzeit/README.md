@@ -20,14 +20,12 @@ position math (coordinates, orbital elements, nutation, apparent position,
 distance, optical and physical libration, parallactic angle, phase, earthshine,
 eclipses, atmospheric refraction in both directions) are implemented, each with
 a precise (Meeus) and a cheaper approximate (Jensen et al.) variant; see `.`
-vs. `./approx` in `package.json#exports`. The bright
-star catalog is checked in (`src/data/`), but there is no star API yet.
-
-Stars are next, and the reason the package is named `sternzeit` at all:
-apparent position (proper motion and precession of the J2000 catalog
-coordinates), the B-V to color-temperature to sRGB colorimetry, apparent
-magnitude to linear radiance, and an optionally importable loader for the
-~290 KB binary catalog. `src/stars.ts` sketches the intended surface.
+vs. `./approx` in `package.json#exports`. Stars too: where a catalog star
+stands at a date (proper motion, then the precession from J2000.0, Meeus
+ch. 21), its azimuth and altitude, and the one rotation, `stars.horizontalMatrix`,
+that turns a whole J2000 catalog into the observer's ENU frame for a renderer.
+The catalog itself, its colors and its light in lux are
+[`@himmelszelt/sternenheer`](../sternenheer)'s, which draws them.
 
 ## Conventions
 
@@ -94,4 +92,3 @@ pnpm test        # playwright
 pnpm dev         # the site, where this library's chapter lives: http://localhost:4321/sternzeit/
 ```
 
-`pnpm generate:catalog` (inside `packages/sternzeit`) regenerates the binary star catalog from its CSV.

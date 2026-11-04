@@ -3,6 +3,7 @@ import * as earthImpl from "./earth.js";
 import * as moonImpl from "./moon.js";
 import * as sunImpl from "./sun.js";
 import * as eclipseImpl from "./eclipse.js";
+import * as starsImpl from "./stars.js";
 import { EQUATORIAL_RADIUS_KM } from "./coords.js";
 
 // Math auxiliaries, same in both entry points (no precise/approx distinction applies to these).
@@ -130,4 +131,20 @@ export type { SolarEclipseState, LunarEclipseState } from "./eclipse.js";
 export const eclipse = {
     solar: eclipseImpl.solarEclipseStateApprox,
     lunar: eclipseImpl.lunarEclipseStateApprox,
+};
+
+// Stars, with Jensen et al.'s precession and sidereal time.
+export type { CatalogStar, Matrix3 } from "./stars.js";
+export const stars = {
+    precessionAngles: starsImpl.precessionAngles,
+    precessionMatrix: starsImpl.precessionMatrixApprox,
+    properMotion: starsImpl.properMotion,
+    apparentPosition: starsImpl.apparentPositionApprox,
+    horizontalPosition: starsImpl.horizontalPositionApprox,
+    equatorialToHorizontalMatrix: starsImpl.equatorialToHorizontalMatrix,
+    horizontalMatrix: starsImpl.horizontalMatrixApprox,
+    equatorialToVector: starsImpl.equatorialToVector,
+    vectorToEquatorial: starsImpl.vectorToEquatorial,
+    multiplyMatrix3: starsImpl.multiplyMatrix3,
+    applyMatrix3: starsImpl.applyMatrix3,
 };
