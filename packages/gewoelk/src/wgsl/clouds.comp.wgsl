@@ -16,6 +16,7 @@
 @group(0) @binding(9) var gwAerialLuminance: texture_3d<f32>;
 @group(0) @binding(10) var gwAerialTransmittance: texture_3d<f32>;
 @group(0) @binding(11) var gwClampSampler: sampler;
+@group(0) @binding(12) var<storage, read> gwDeck: array<f32>;
 
 // Whether a background is bound, the sky in cd/m² the far clouds fade into.
 override GW_BACKGROUND: bool = true;
@@ -33,23 +34,6 @@ const GW_MIN_TRANSMITTANCE: f32 = 0.01;
 fn gwJitter(pixel: vec2u, frame: u32) -> f32 {
     let p = vec2f(pixel) + 5.588238 * f32(frame % 64u);
     return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y));
-}
-
-// A point in the cloudscape: over which point of the ground, east and north of the observer along the surface, and
-// how high above the base, each in km. Taken once per point, as the arc tangent it costs is read many times.
-struct GwPoint {
-    ground: vec2f,
-    height: f32,
-}
-
-fn gwPointAt(p: vec3f) -> GwPoint {
-    return GwPoint(gwGround(p), length(p) - gwParams.planetRadius - gwParams.cloudscape.base);
-}
-
-// A point in the cloudscape's unit cube: east and north wrapped by the extent, the height over the slab's.
-fn gwVolumeCoordinate(x: GwPoint) -> vec3f {
-    let volume = gwParams.cloudscape;
-    return vec3f(fract((x.ground - volume.drift) / volume.extent), x.height / volume.height);
 }
 
 struct GwSample {
@@ -130,9 +114,9 @@ fn gwDensity(m: vec4f, x: GwPoint, thinning: vec2f) -> GwSample {
     // Read at the height above the base, not above the planet's center: a sampler's fixed-point texel coordinates
     // overflow some ten thousand tiles out.
     let local = vec3f(x.ground - volume.drift, x.height);
-    // Wrapped here, in full float precision, before the sampler's coarser coordinates see it.
-    let tile = local / volume.noiseScale;
-    let noise = textureSampleLevel(gwDetail, gwVolumeSampler, vec3f(fract(tile.xy), tile.z), 0.0);
+    // Wrapped here, in full float precision, before the sampler's coarser coordinates see it, and in height too: the
+    // sampler clamps there, and above a tile the noise would stand still, a seam at one height through every cloud.
+    let noise = textureSampleLevel(gwDetail, gwVolumeSampler, fract(local / volume.noiseScale), 0.0);
     let wispy = mix(noise.r, noise.g, profile);
     let billowy = mix(noise.b * 0.3, noise.a * 0.3, pow(profile, 0.25));
     // Billowy rather than wispy for the most part: the map's type field only shifts the blend.
@@ -162,6 +146,7 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
     // forward glow above all, dimmed by what the deck lets through where the ray meets it, a share kept for the sky's.
     let shade = mix(0.3, 1.0, gwSunThrough(o + v * max(t0, 0.0), sun));
     let extinction = volume.extinction;
+    let groundShade = gwGroundShade(sun);
     // Each order's lobe, the same all along the ray.
     let cosTheta = dot(v, sun);
     var phases: array<f32, 8>;
@@ -172,8 +157,9 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
     }
     let cell = volume.height / f32(textureDimensions(gwModeling).z);
     var layer = GwLayer(vec3f(0.0), 1.0);
-    // Jittered by up to the smallest step, so the bands a fixed start would draw turn into fine noise and no more.
-    var t = t0 + jitter * gwParams.jitter * volume.stepMin;
+    // Jittered by up to a step as long as the first, so the bands a fixed start would draw turn into fine noise: far
+    // off, where the steps have grown, by as much more.
+    var t = t0 + jitter * gwParams.jitter * max(volume.stepMin, volume.stepGrowth * sqrt(max(t0, 0.0)));
     for (var i = 0u; i < GW_MAX_STEPS; i = i + 1u) {
         if (t >= t1 || layer.transmittance < GW_MIN_TRANSMITTANCE) {
             break;
@@ -201,7 +187,8 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
                 // Read a voxel on towards the sun: the near samples below cover the first one, the grid the rest.
                 let beyond = gwVolumeCoordinate(gwPointAt(p + sun * cell));
                 let toSun = sample.kept * dot(textureSampleLevel(gwLight, gwVolumeSampler, beyond, 0.0), max(1.0 - abs(slice - vec4f(0.0, 1.0, 2.0, 3.0)), vec4f(0.0)));
-                let open = sample.kept * textureSampleLevel(gwAmbient, gwVolumeSampler, q, 0.0).rg * volume.height;
+                // What the thinning leaves of the clouds around lets through more of the sky's and the ground's light.
+                let open = mix(vec2f(1.0), textureSampleLevel(gwAmbient, gwVolumeSampler, q, 0.0).rg, sample.kept);
                 // Nubis3's two detailed samples towards the sun, within the first voxel: a quarter and three quarters
                 // of it on, each standing for half of it.
                 var near = 0.0;
@@ -223,15 +210,20 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
                     share = share * volume.multiScatter;
                     depth = depth * thinning;
                 }
+                // Deep inside, the octaves die out long before the light does: it diffuses, isotropic by then.
+                if (volume.multiScatter > 0.0) {
+                    orders = max(orders, volume.multiScatter * gwDiffused(tauSun, volume.forwardG) / (4.0 * GW_PI));
+                }
                 let sunlight = mix(gwSunAt(0u, elevation), gwSunAt(1u, elevation), clamp(q.z, 0.0, 1.0));
                 let direct = sunlight * orders;
                 // The sky's light from above and the ground's from below, each a hemisphere of even radiance E / pi,
-                // half of which an isotropic phase scatters our way; strongest at the surface, after Nubis3's profile,
-                // and relaxed in depth, where it arrives after many bounces.
-                let surface = mix(0.35, 1.0, pow(1.0 - sample.profile, 0.5));
-                let fromSky = gwParams.skyIrradiance * exp(-extinction * open.r * 0.25);
-                let fromGround = gwParams.groundIrradiance * exp(-extinction * open.g * 0.25);
-                let ambient = surface * (fromSky + fromGround) / (2.0 * GW_PI);
+                // half of which an isotropic phase scatters our way, through the clouds around as the ambient grid has
+                // it. Not dimmed by the profile as well, as Nubis3's is: that counted the depth twice, and drew the
+                // walls between sky-lit tops and ground-lit bases as dark bands.
+                let fromSky = gwParams.skyIrradiance * open.r;
+                // The ground's light from below, dimmed where the deck shades the ground.
+                let fromGround = gwParams.groundIrradiance * groundShade * open.g;
+                let ambient = (fromSky + fromGround) / (2.0 * GW_PI);
                 let sigmaT = extinction * sample.full;
                 let sigmaS = sigmaT * volume.albedo;
                 let scattered = sigmaS * (direct + ambient);

@@ -20,8 +20,12 @@ voxel:
 - the **modeling data** (rgba8unorm, 256 x 256 x 32 by default): the dimensional profile, a gradient from the surface
   into the cloud; the detail type, wispy to billowy; a density scale; and the signed distance outside, from a jump
   flood over the grid, over 8 bits rounded down so a step never overshoots;
-- the **summed light** (rgba16float): per cloud voxel the density summed to the sun, to the sky above and to the
-  ground below, once per sun instead of per pixel and step;
+- the **summed light** (rgba16float): per voxel the density summed to the sun, once per sun instead of per pixel and
+  step;
+- the **ambient light** (rgba16float, half the voxels east and north): per voxel how much of the sky's light and the
+  ground's gets through, along two rings of rays up and two down, cosine-weighted, once per cloudscape and density. A
+  wall under an overhang sees the sky beside it, so the ambient light is not dimmed by the profile again, as Nubis3's
+  is;
 - the **detail noise** (rgba8unorm, 128³, once): alligator noise after SideFX's for billows, inverted and swirled by a
   curl field for wisps, each at two frequencies.
 
@@ -50,6 +54,11 @@ horizon. Like the clearing, it only removes clouds, and it lightens the light gr
 
 The air in front of the clouds lies in their shadow where the deck closes towards the sun: its light is dimmed by what
 the light grid lets through where the ray meets the slab, which the grid holds for every voxel, cloud or not.
+The ground in the background lies in it too: where a ray meets the ground, the light grid at the base towards the sun
+dims the sun's share of what the ground sends back, so the clouds cast their shadows, the air in front kept. What the
+deck lets through on average, of the sun's light and the sky's, dims the ground's light on the clouds' undersides.
+Deep in a thick cloud, where the octaves of scattering die out, the light diffuses on: the two-stream approximation's
+1 / (1 + 3/4 (1 - g) tau) holds it up.
 
 The layers are shells around the planet, so the sun stands higher over a cloud towards it, by a degree every 111 km.
 The light grid holds the summed density towards the sun at four elevations above the local horizon, along straight

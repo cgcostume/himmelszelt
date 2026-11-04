@@ -287,7 +287,8 @@ export function cloudsFigure(root: HTMLElement) {
         const ambientOn = pressed("light.ambient");
         return {
             sunIlluminance: sunOn ? sunIlluminance : [0, 0, 0],
-            ...(sunOn && sunTable ? { sunlight: sunTable } : {}),
+            // Set every time, so the table goes with the sun: a partial update keeps what it is not given.
+            sunlight: sunOn ? sunTable : undefined,
             skyIrradiance: ambientOn ? skyIrradiance : [0, 0, 0],
             groundIrradiance: ambientOn ? groundIrradiance : [0, 0, 0],
             horizonLuminance: horizon,

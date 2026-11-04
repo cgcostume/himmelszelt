@@ -134,13 +134,14 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         format: "rgba16float",
         usage,
     });
-    const volume = (label: string, format: GPUTextureFormat) =>
-        device.createTexture({ label, dimension: "3d", size: [grid.size, grid.size, grid.layers], format, usage });
+    const volume = (label: string, format: GPUTextureFormat, across = grid.size) =>
+        device.createTexture({ label, dimension: "3d", size: [across, across, grid.layers], format, usage });
     const flood = [volume("gewoelk:floodA", "r32uint"), volume("gewoelk:floodB", "r32uint")] as const;
     const shape = volume("gewoelk:shape", "r32uint");
     const modeling = volume("gewoelk:modeling", "rgba8unorm");
     const light = volume("gewoelk:light", "rgba16float");
-    const ambient = volume("gewoelk:ambient", "rgba8unorm");
+    // Smooth across, as light through the clouds around is: half the grid's voxels east and north, a quarter the rays.
+    const ambient = volume("gewoelk:ambient", "rgba16float", Math.max(1, grid.size >> 1));
     const detail = device.createTexture({
         label: "gewoelk:detail",
         dimension: "3d",
@@ -175,6 +176,13 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         size: 4 * grid.layers,
         usage: GPUBufferUsage.STORAGE,
     });
+    // What the deck lets through to the ground on average, the sun's light and the sky's; all of it until measured.
+    const deck = device.createBuffer({
+        label: "gewoelk:deck",
+        size: 16,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(deck, 0, new Float32Array([1, 1, 1, 1]));
     const models = Array.from({ length: layers }, (_, i) => uniform(`gewoelk:model${i}`, MODEL_SIZE));
     // The flood's jumps, halving down to 1 from what reaches a quarter of the grid across, beyond the stored distance's
     // range, and its whole height.
@@ -206,6 +214,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         lightPipeline,
         coveragePipeline,
         ambientPipeline,
+        deckPipeline,
         cloudsPipeline,
         composePipeline,
     ] = await Promise.all([
@@ -218,6 +227,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         pipeline("light", lightModule, "gwLight"),
         pipeline("coverage", lightModule, "gwCoverageMean"),
         pipeline("ambient", lightModule, "gwAmbient"),
+        pipeline("deck", lightModule, "gwDeck"),
         pipeline(
             "clouds",
             module("gewoelk:clouds", [
@@ -303,9 +313,17 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         { binding: 4, resource: { buffer: coverage } },
     ]);
     const ambientBindGroup = bindGroup(ambientPipeline, [
+        { binding: 0, resource: { buffer: params } },
         { binding: 1, resource: modeling.createView() },
         { binding: 2, resource: volumeSampler },
+        { binding: 5, resource: { buffer: coverage } },
         { binding: 6, resource: ambient.createView() },
+    ]);
+    const deckBindGroup = bindGroup(deckPipeline, [
+        { binding: 0, resource: { buffer: params } },
+        { binding: 7, resource: light.createView() },
+        { binding: 8, resource: ambient.createView() },
+        { binding: 9, resource: { buffer: deck } },
     ]);
     // With the sky behind them, which far clouds fade into: one per background, as the compose pass' groups.
     const cloudsEntries: GPUBindGroupEntry[] = [
@@ -317,6 +335,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         { binding: 5, resource: detail.createView() },
         { binding: 6, resource: { buffer: sunlight } },
         { binding: 7, resource: ambient.createView() },
+        { binding: 12, resource: { buffer: deck } },
     ];
     const clampSampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
     // Bound where no aerial perspective volume is: the shaders read it only with a reach above 0.
@@ -355,6 +374,8 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                 { binding: 7, resource: luminance },
                 { binding: 8, resource: transmittance },
                 { binding: 9, resource: clampSampler },
+                { binding: 10, resource: light.createView() },
+                { binding: 11, resource: { buffer: deck } },
             ]),
         ];
         return inputGroups;
@@ -376,6 +397,8 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
     const mapKeys = Array.from({ length: layers }, () => "");
     let volumeKey = "";
     let lightKey = "";
+    let deckKey = "";
+    let ambientKey = "";
     let clouds: GPUTexture | null = null;
     let cloudsView: GPUTextureView | null = null;
     const outputs = new WeakMap<GPUTexture, GPUBindGroup>();
@@ -443,7 +466,14 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
             const rebuildVolume = c.enabled && nextVolumeKey !== volumeKey;
             const nextLightKey = `${nextVolumeKey},${c.baseKm},${current.observerHeightM},${current.planetRadiusKm},${current.sunDirection.join(",")}`;
             const rebuildLight = c.enabled && nextLightKey !== lightKey;
-            if (changed.length === 0 && !rebuildVolume && !rebuildLight) return;
+            // The ambient grid and the deck's mean depend on the density too, which the light grid leaves out.
+            const nextDeckKey = `${c.extinction},${c.forwardG}`;
+            const rebuildDeck = c.enabled && nextDeckKey !== deckKey;
+            const nextAmbientKey = `${nextVolumeKey},${c.baseKm},${current.planetRadiusKm},${nextDeckKey}`;
+            const rebuildAmbient = c.enabled && nextAmbientKey !== ambientKey;
+            if (changed.length === 0 && !rebuildVolume && !rebuildLight && !rebuildDeck && !rebuildAmbient) return;
+            deckKey = c.enabled ? nextDeckKey : deckKey;
+            ambientKey = c.enabled ? nextAmbientKey : ambientKey;
             volumeKey = c.enabled ? nextVolumeKey : volumeKey;
             lightKey = c.enabled ? nextLightKey : lightKey;
 
@@ -459,12 +489,22 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                 sweep(pass, floodInitPipeline, floodInitBindGroup);
                 for (const group of floodJumpBindGroups) sweep(pass, floodJumpPipeline, group);
                 sweep(pass, modelingPipeline, modelingBindGroup);
-                sweep(pass, ambientPipeline, ambientBindGroup);
                 pass.setPipeline(coveragePipeline);
                 pass.setBindGroup(0, coverageBindGroup);
                 pass.dispatchWorkgroups(grid.layers);
             }
+            if (rebuildAmbient) {
+                pass.setPipeline(ambientPipeline);
+                pass.setBindGroup(0, ambientBindGroup);
+                const across = dispatch(ambient.width, 4);
+                pass.dispatchWorkgroups(across, across, dispatch(grid.layers, 4));
+            }
             if (rebuildLight) sweep(pass, lightPipeline, lightBindGroup);
+            if (rebuildLight || rebuildAmbient) {
+                pass.setPipeline(deckPipeline);
+                pass.setBindGroup(0, deckBindGroup);
+                pass.dispatchWorkgroups(1);
+            }
             pass.end();
             if (!frameEncoder) device.queue.submit([encoder.finish()]);
         },
@@ -513,7 +553,8 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
             for (const texture of [map, ...flood, shape, modeling, light, ambient, detail, noBackground, noAir])
                 texture.destroy();
             clouds?.destroy();
-            for (const buffer of [params, cloudscape, sunlight, coverage, ...models, ...jumpBuffers]) buffer.destroy();
+            for (const buffer of [params, cloudscape, sunlight, coverage, ...models, ...jumpBuffers, deck])
+                buffer.destroy();
         },
     };
 }

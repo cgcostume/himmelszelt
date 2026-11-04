@@ -158,6 +158,13 @@ fn gwHenyeyGreenstein(cosTheta: f32, g: f32) -> f32 {
     return (1.0 - g2) / (4.0 * GW_PI * pow(max(1.0 + g2 - 2.0 * g * cosTheta, 1e-4), 1.5));
 }
 
+// What a cloud of optical depth `tau` lets through, scattered and not, of light falling on it: the two-stream
+// approximation's 1 / (1 + 3/4 (1 - g) tau) for a forward lobe of asymmetry `g`, which the octaves of scattering
+// fall far short of in thick cloud.
+fn gwDiffused(tau: f32, g: f32) -> f32 {
+    return 1.0 / (1.0 + 0.75 * (1.0 - g) * tau);
+}
+
 // Where a ray from `o` crosses a sphere of radius `r` about the origin: the two distances, the nearer first, or none.
 struct GwHit {
     near: f32,

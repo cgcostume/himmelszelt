@@ -1,8 +1,8 @@
 // What the passes share along a pixel's ray: its direction, layers of cloud to composite front to back, the ground
 // beneath a point, the sun's light aloft, and the sheets of high cloud, read once each where the ray crosses their
 // sphere, cheap enough for every pixel of the frame. Requires `noise.wgsl`, `params.wgsl` and `camera.wgsl`, and of
-// the pass `gwParams`, `gwMap`, `gwVolumeSampler`, `gwSunlight`, `gwAerialLuminance`, `gwAerialTransmittance` and
-// `gwClampSampler`.
+// the pass `gwParams`, `gwMap`, `gwVolumeSampler`, `gwSunlight`, `gwAerialLuminance`, `gwAerialTransmittance`,
+// `gwClampSampler`, `gwLight` and `gwDeck`.
 
 // The ray through a point of the target, in pixels from its top left corner, on dunstkreis' camera.
 fn gwPixelRay(position: vec2f, size: vec2u) -> vec3f {
@@ -284,4 +284,59 @@ fn gwSheets(o: vec3f, v: vec3f, sun: vec3f, spread: f32, uv: vec2f, sky: vec3f) 
         }
     }
     return result;
+}
+
+// A point in the cloudscape: over which point of the ground, east and north of the observer along the surface, and
+// how high above the base, each in km. Taken once per point, as the arc tangent it costs is read many times.
+struct GwPoint {
+    ground: vec2f,
+    height: f32,
+}
+
+fn gwPointAt(p: vec3f) -> GwPoint {
+    return GwPoint(gwGround(p), length(p) - gwParams.planetRadius - gwParams.cloudscape.base);
+}
+
+// A point in the cloudscape's unit cube: east and north wrapped by the extent, the height over the slab's.
+fn gwVolumeCoordinate(x: GwPoint) -> vec3f {
+    let volume = gwParams.cloudscape;
+    return vec3f(fract((x.ground - volume.drift) / volume.extent), x.height / volume.height);
+}
+
+// The sun's share of the light on the ground where `up` points up, by illuminance; the rest is the sky's.
+fn gwSunShare(up: vec3f, sun: vec3f) -> f32 {
+    let weights = vec3f(0.2126, 0.7152, 0.0722);
+    let fromSun = dot(gwParams.sunIlluminance, weights) * max(dot(sun, up), 0.0);
+    return fromSun / max(fromSun + dot(gwParams.skyIrradiance, weights), 1e-6);
+}
+
+// How much of its light the ground keeps under the cloudscape on average, the sun's and the sky's, 1 without one.
+fn gwGroundShade(sun: vec3f) -> f32 {
+    if (gwParams.cloudscape.enabled == 0u) {
+        return 1.0;
+    }
+    let share = gwSunShare(vec3f(0.0, 0.0, 1.0), sun);
+    return share * gwDeck[0] + (1.0 - share) * gwDeck[1];
+}
+
+// How much of its light the ground keeps at `g`, on the ground: the sun's through the clouds towards it, from the light
+// grid where its ray enters the base, the sky's as on average.
+fn gwGroundShadow(g: vec3f, sun: vec3f) -> f32 {
+    let volume = gwParams.cloudscape;
+    if (volume.enabled == 0u) {
+        return 1.0;
+    }
+    let up = normalize(g);
+    var through = 1.0;
+    if (dot(sun, up) > 0.0) {
+        let b = g + sun * gwSphere(g, sun, gwParams.planetRadius + volume.base).far;
+        let x = gwPointAt(b);
+        let q = gwVolumeCoordinate(x);
+        let span = volume.lightElevations;
+        let slice = clamp((gwElevation(sun, b / length(b)) - span.x) / max(span.y - span.x, 1e-6), 0.0, 1.0) * 3.0;
+        let summed = dot(textureSampleLevel(gwLight, gwVolumeSampler, vec3f(q.xy, 0.0), 0.0), max(1.0 - abs(slice - vec4f(0.0, 1.0, 2.0, 3.0)), vec4f(0.0)));
+        through = gwDiffused(volume.extinction * summed * gwClearingOver(x.ground), volume.forwardG);
+    }
+    let share = gwSunShare(up, sun);
+    return share * through + (1.0 - share) * gwDeck[1];
 }
