@@ -84,7 +84,7 @@ fn gwDensity(m: vec4f, p: vec3f) -> GwSample {
         let g = (gwGround(p) - volume.drift) / max(volume.variationScale, 1.0);
         let turned = vec2f(0.7986 * g.x - 0.6018 * g.y, 0.6018 * g.x + 0.7986 * g.y);
         let field = textureSampleLevel(gwMap, gwVolumeSampler, turned, 0, 0.0).b;
-        thinned = volume.variation * smoothstep(0.35, 0.65, field) * 0.8;
+        thinned = volume.variation * smoothstep(0.3, 0.7, field);
     }
     var profile = m.r;
     if (left < 1.0 || thinned > 0.0) {

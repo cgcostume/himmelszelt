@@ -31,6 +31,8 @@ export interface SheetParams {
      *  how far they erode the map's patches into strands: 0 leaves the patches, 1 leaves strands alone. */
     fiberKm: number;
     detail: number;
+    /** How far ripples across the wind break the sheet into the waves of cirrocumulus, 0 to 1, none by default. */
+    ripples?: number;
 }
 
 /** The voxel volume the low clouds live in: a slab repeating east and north, modeled from the cloud map. */
@@ -68,10 +70,10 @@ export interface CloudscapeParams {
     /** How far the detail noise erodes the profile: 0 leaves the voxels' shape, 1 is Nubis3's full erosion. */
     detail: number;
     /** Where the clouds have cleared away, in km over the ground from the observer: a clear horizon, under which a low
-     *  sun lights them. 0 lets them reach the horizon. They shrink and thin over the last `clearingSoftness` of the way,
-     *  0.5 by default: 0.9 begins early and fades out gently. */
+     *  sun lights them. 0 lets them reach the horizon. Within `clearingFromKm` they are all there, half of
+     *  `clearingKm` by default; beyond, they grow fewer steadily towards it. */
     clearingKm?: number;
-    clearingSoftness?: number;
+    clearingFromKm?: number;
     /** How much of the cloudscape grows into towers that rise through the slab and spread at the top, 0 to 1, and how
      *  deep billows heap up its surface, as a share of its height, each about `billowKm` across: 0 keeps the map's
      *  smooth mounds. */
@@ -169,8 +171,8 @@ export const DEFAULT_SHEET: SheetParams = {
     cells: 4,
     albedo: 1,
     forwardG: 0.85,
-    fiberKm: 1,
-    detail: 0.6,
+    fiberKm: 0.6,
+    detail: 0.7,
 };
 
 export const DEFAULT_CLOUD_PARAMS: CloudParams = {
@@ -195,10 +197,10 @@ export const DEFAULT_CLOUD_PARAMS: CloudParams = {
 export const EVOLUTION_PERIOD = 8;
 
 /** Byte sizes of the uniform structs in params.wgsl. */
-export const PARAMS_SIZE = 400;
+export const PARAMS_SIZE = 432;
 export const SUNLIGHT_SIZE = 64 + 128 * 16;
 export const CLOUDSCAPE_SIZE = 112;
-export const SHEET_SIZE = 64;
+export const SHEET_SIZE = 80;
 export const MODEL_SIZE = 48;
 const CLOUDSCAPE_OFFSET = 160;
 /** Where the cloudscape's `aerial` lies in `GwParams`, which the pass writes when it encodes. */
@@ -309,7 +311,8 @@ export function cloudscapeData(
     u[15] = c.enabled ? 1 : 0;
     f[16] = c.detail;
     f.set(lightElevations, 18);
-    f.set([c.clearingKm ?? 0, c.clearingSoftness ?? 0.5], 20);
+    const clearing = c.clearingKm ?? 0;
+    f.set([clearing, Math.min(c.clearingFromKm ?? clearing / 2, clearing)], 20);
     // Less as the coverage closes the sky: a full deck stays full.
     const variation = (c.variation ?? 0) * Math.min(1, 2 * (1 - c.coverage));
     f.set([Math.max(0, variation), c.variationKm ?? 40], 24);
@@ -326,7 +329,10 @@ export function sheetData(s: SheetParams, timeS: number): ArrayBuffer {
     f.set([s.scaleKm, evolutionAt(s.evolution, timeS), s.albedo, s.forwardG], 6);
     u.set([s.enabled ? 1 : 0, s.seed >>> 0], 10);
     const speed = Math.hypot(s.wind[0], s.wind[1]);
-    f.set([speed > 0 ? s.wind[0] / speed : 1, speed > 0 ? s.wind[1] / speed : 0, s.fiberKm, s.detail], 12);
+    f.set(
+        [speed > 0 ? s.wind[0] / speed : 1, speed > 0 ? s.wind[1] / speed : 0, s.fiberKm, s.detail, s.ripples ?? 0],
+        12,
+    );
     return buffer;
 }
 

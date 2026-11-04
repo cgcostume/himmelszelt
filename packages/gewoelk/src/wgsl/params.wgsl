@@ -24,6 +24,10 @@ struct GwSheet {
     streak: vec2f,
     fiberScale: f32,
     detail: f32,
+    // How far ripples across the wind break the sheet into waves, cirrocumulus, 0 for none.
+    ripples: f32,
+    pad0: f32,
+    pad1: vec2f,
 }
 
 // The cloudscape: the voxel volume the low clouds live in, a slab of `height` km from `base` km up, repeating every
@@ -54,10 +58,10 @@ struct GwCloudscape {
     detail: f32,
     // The sun's elevations above the local horizon the light grid's four slices hold, the first and the last, radians.
     lightElevations: vec2f,
-    // How far over the ground the clouds reach before they have cleared away, in km, 0 for no end, and the share of
-    // that over which they shrink towards it.
+    // How far over the ground the clouds reach before they have cleared away, in km, 0 for no end, and how far they
+    // are all there, from where they grow fewer.
     clearing: f32,
-    clearingSoftness: f32,
+    clearingFrom: f32,
     // The aerial perspective volume's reach in km and the scale its luminance is stored at; a reach of 0 for none.
     aerial: vec2f,
     // How far a broad, unrepeating field thins the clouds out in places, 0 to 1, and its size in km: the volume

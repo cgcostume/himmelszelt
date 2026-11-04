@@ -289,7 +289,7 @@ export function cloudsFigure(root: HTMLElement) {
                 wind: windOf(slider("cloudscape.windSpeed"), slider("cloudscape.windFrom") + 180),
                 evolution: slider("cloudscape.evolution"),
                 clearingKm: slider("cloudscape.clearingKm"),
-                clearingSoftness: slider("cloudscape.clearingSoftness"),
+                clearingFromKm: slider("cloudscape.clearingFromKm"),
                 variation: slider("cloudscape.variation"),
                 towers: slider("cloudscape.towers"),
                 towerScale: slider("cloudscape.towerScale"),
@@ -304,6 +304,7 @@ export function cloudsFigure(root: HTMLElement) {
                     altitudeKm: slider("sheet.altitudeKm"),
                     opticalDepth: slider("sheet.opticalDepth"),
                     wind: windOf(slider("sheet.windSpeed"), slider("sheet.windFrom") + 180),
+                    ripples: slider("sheet.ripples"),
                 },
             ],
         };

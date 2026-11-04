@@ -35,7 +35,7 @@ The air in front of the clouds is taken step by step, at each step's own distanc
 are. Given an `aerialPerspective` volume at `encode`, RGB froxels laid out as Hillaire's (dunstkreis' volume, turned
 into RGB), it is the atmosphere's own in-scattering and transmittance. Without, for a baked background, far clouds fade
 into the background's own pixel by `horizonFadeKm`, held below a few times `horizonLuminance` so the sun's disc does
-not shine through, or into `horizonLuminance` where there is no background. With `clearingKm` the clouds grow fewer towards that distance, the map's coverage falling and their tops
+not shine through, or into `horizonLuminance` where there is no background. With `clearingKm` the clouds grow fewer towards that distance from `clearingFromKm` on, the map's coverage falling and their tops
 sinking first, and leave a clear horizon, under which a low sun reaches them.
 
 The voxels are shaped from the map in a pass of their own: where a second, broader field is up (`towers`), clouds
@@ -60,8 +60,10 @@ lit after the near ones, reddened, and the planet's shadow climbs them at dusk.
 Up to two **sheets** of high cloud, cirrus and cirrostratus, are read once each where the ray crosses their sphere,
 in the compose pass at the target's full size, so their strands stay sharp at any `scale`, and clear away towards the
 cloudscape's `clearingKm` with it:
-the map's value as an optical depth, thicker at a slant, eroded into strands by ridged noise drawn out along the wind
-and bent into hooks.
+the map's value as an optical depth, thicker at a slant. Its patches are drawn out along the wind into plumes; strands
+of ridged noise, finer and longer each octave down to hairs, sweep along a broad flow, curl into hooks and gather in
+bundles, so feathers stand apart against the sky. `ripples` breaks the sheet into the rows of cloudlets of
+cirrocumulus instead.
 
 `WEATHER` holds presets of the clouds' shape, from clear to overcast, the sheet's included, and `mixWeather` blends
 two, number by number, for weather that changes.

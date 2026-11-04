@@ -17,7 +17,7 @@ export const WEATHER = {
     /** Blue sky, a few wisps. */
     clear: {
         cloudscape: { coverage: 0, sharpness: 0.4, towers: 0, towerScale: 1, billows: 0.1, baseKm: 1.2, heightKm: 1.6 },
-        sheet: { coverage: 0.1, opticalDepth: 0.3 },
+        sheet: { coverage: 0.1, opticalDepth: 0.3, ripples: 0 },
     },
     /** Fair-weather cumulus: small, flat, spread out. */
     fair: {
@@ -31,7 +31,7 @@ export const WEATHER = {
             heightKm: 1.6,
             offset: 0.2,
         },
-        sheet: { coverage: 0.15, opticalDepth: 0.3 },
+        sheet: { coverage: 0.15, opticalDepth: 0.3, ripples: 0 },
     },
     /** Scattered cumulus, some of it growing. */
     scattered: {
@@ -45,7 +45,7 @@ export const WEATHER = {
             heightKm: 2.4,
             offset: 0.25,
         },
-        sheet: { coverage: 0.35, opticalDepth: 0.5 },
+        sheet: { coverage: 0.35, opticalDepth: 0.5, ripples: 0 },
     },
     /** Towering cumulus, congestus: tall, heaped, an afternoon in summer. */
     towering: {
@@ -59,7 +59,7 @@ export const WEATHER = {
             heightKm: 2.4,
             offset: 0.2,
         },
-        sheet: { coverage: 0.25, opticalDepth: 0.6 },
+        sheet: { coverage: 0.25, opticalDepth: 0.6, ripples: 0 },
     },
     /** A deck of stratocumulus under a veil of cirrostratus. */
     overcast: {
@@ -73,12 +73,17 @@ export const WEATHER = {
             heightKm: 1.2,
             offset: 0.1,
         },
-        sheet: { coverage: 0.7, opticalDepth: 1.5 },
+        sheet: { coverage: 0.7, opticalDepth: 1.5, ripples: 0 },
+    },
+    /** A mackerel sky: cirrocumulus in ripples across the wind, over a few low clouds. */
+    mackerel: {
+        cloudscape: { coverage: 0.1, sharpness: 0.4, towers: 0, towerScale: 1, billows: 0.1, heightKm: 1.4 },
+        sheet: { coverage: 0.75, opticalDepth: 1, ripples: 0.9 },
     },
     /** High cloud ahead of a front: cirrus spreading over a few low clouds. */
     cirrus: {
         cloudscape: { coverage: 0.15, sharpness: 0.4, towers: 0, towerScale: 1, billows: 0.1, heightKm: 1.4 },
-        sheet: { coverage: 0.7, opticalDepth: 0.8 },
+        sheet: { coverage: 0.65, opticalDepth: 0.8, ripples: 0 },
     },
 } satisfies Record<string, Weather>;
 
