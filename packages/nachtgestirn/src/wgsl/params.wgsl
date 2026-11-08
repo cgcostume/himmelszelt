@@ -32,9 +32,12 @@ struct NbParams {
     // What the color map is multiplied by to read as normal albedo, and the albedo without a map; per channel, below.
     albedoScale: f32,
     albedo: f32,
-    // 1 the color map, 2 the relief, 4 the eclipse, 8 the relief's shadows, 16 the table's transmittances.
+    // 1 the color map, 2 the relief, 4 the eclipse, 8 the relief's shadows, 16 the table's transmittances, 32 the
+    // color map as gray, its luminance alone, 64 the map's own color, untinted, 128 the comparison with `compareLaw`,
+    // 256 the air's shimmer.
     flags: u32,
-    // The reflectance law: 0 Hapke's lunar law after Jensen et al., 1 Lambert's, to compare.
+    // The reflectance law: 0 Hapke's lunar law after Jensen et al., 1 Lambert's, 2 Oren-Nayar's, 3 a PBR
+    // renderer's metallic-roughness dielectric, Burley's diffuse at roughness 1, to compare.
     law: u32,
     // How strong the umbra's refracted light is, 1 for a typical eclipse.
     umbraLight: f32,
@@ -49,9 +52,22 @@ struct NbParams {
     refraction: array<vec4f, 8>,
     // What the color map is multiplied by per channel besides `albedoScale`: from its own mean color to the Moon's.
     albedoTint: vec3f,
+    // With NB_FLAG_COMPARE, the law the disc is held against, numbered as `law`: where the two differ by more than a
+    // third of a stop, the pixel is striped, red where `law` is brighter, blue where darker.
+    compareLaw: u32,
     // What the air lets through at each of the refraction table's entries, per channel, with NB_FLAG_AIR.
     airTransmittance: array<vec4f, 32>,
+    // The sunlight Earth's air bends into its shadow, as a share of the sunlight per channel, at NB_UMBRA_SAMPLES
+    // distances from the shadow's axis, from the axis to the penumbra's edge.
+    umbraTable: array<vec4f, 64>,
+    // Where the detail strip lies in the whole maps' uv, west, north, east and south edges; east not past west for none.
+    detailRegion: vec4f,
+    // The air's shimmer, with NB_FLAG_SHIMMER: the image's rms wander in radians, the time in seconds the turbulence
+    // has drifted by, and how far the air spreads green from red and blue, in radians of refraction.
+    shimmer: vec4f,
 }
+
+const NB_UMBRA_SAMPLES: u32 = 64u;
 
 const NB_REFRACTION_SAMPLES: u32 = 32u;
 
@@ -60,3 +76,7 @@ const NB_FLAG_RELIEF: u32 = 2u;
 const NB_FLAG_ECLIPSE: u32 = 4u;
 const NB_FLAG_SHADOWS: u32 = 8u;
 const NB_FLAG_AIR: u32 = 16u;
+const NB_FLAG_GRAY: u32 = 32u;
+const NB_FLAG_UNTINTED: u32 = 64u;
+const NB_FLAG_COMPARE: u32 = 128u;
+const NB_FLAG_SHIMMER: u32 = 256u;

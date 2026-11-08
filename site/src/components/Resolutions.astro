@@ -1,0 +1,24 @@
+---
+/** A row of resolutions to choose from, each with a spinner for while it comes, and a progress bar under the row: the
+ *  environments' and the Moon's maps'. Whatever holds it sets `data-busy` on the button coming, and `data-progress`
+ *  and `--progress` on itself. */
+import Icon from "./Icon.astro";
+import type { IconName } from "./icons";
+import "./resolutions.css";
+
+interface Props {
+    options: readonly (readonly [value: string, icon: IconName, title: string])[];
+    chosen: string;
+}
+const { options, chosen } = Astro.props;
+---
+
+<span class="view-buttons env-resolutions" style={`--count: ${options.length}`}>
+    {options.map(([value, name, title]) => (
+        <button type="button" class="view-icon env-resolution" data-resolution={value} aria-pressed={value === chosen ? "true" : "false"} title={title} aria-label={title}>
+            <Icon name={name} />
+            <Icon name="loading" />
+        </button>
+    ))}
+    <span class="env-progress" aria-hidden="true"><span></span></span>
+</span>

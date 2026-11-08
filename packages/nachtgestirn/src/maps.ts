@@ -13,6 +13,13 @@ export interface MoonMaps {
     readonly albedoScale: number;
     /** And per channel: from the map's own mean color to the Moon's. */
     readonly albedoTint: Vec3;
+    /** A strip of the Moon at a finer size, read instead of the whole maps where it lies, or none. */
+    readonly detail?: {
+        readonly color: GPUTexture;
+        readonly relief: GPUTexture;
+        /** Where it lies in the whole maps' uv: west, north, east and south edges. */
+        readonly region: readonly [number, number, number, number];
+    };
     destroy(): void;
 }
 
@@ -38,6 +45,10 @@ export interface MoonMapsOptions {
      *  by default, it tints the map so its mean is the Moon's color while its own variations stay. Without, untinted. */
     meanColor?: Vec3;
     moonColor?: Vec3;
+    /** A strip of the Moon at a finer size, from the same sources, decoded the same way, and where it lies in the whole
+     *  maps' uv: west, north, east and south edges. The pass reads it instead of the whole maps where it lies, for a
+     *  close-up sharper than a whole map the GPU could hold. */
+    detail?: { color: ImageBitmap; heights: ImageBitmap; region: readonly [number, number, number, number] };
 }
 
 const mipLevels = (width: number, height: number) => Math.floor(Math.log2(Math.max(width, height))) + 1;
@@ -63,21 +74,32 @@ export function createMoonMaps(device: GPUDevice, options: MoonMapsOptions): Moo
         device.queue.copyExternalImageToTexture({ source: image }, { texture }, [image.width, image.height]);
         return texture;
     };
-    const colorTexture = upload(color, "nachtgestirn:color", true);
-    buildMips(device, colorTexture, "rgba8unorm", true);
-    let relief: GPUTexture | null = null;
-    if (heights) {
-        const packed = upload(heights, "nachtgestirn:heights", false);
-        relief = device.createTexture({
-            label: "nachtgestirn:relief",
-            size: [heights.width, heights.height],
+    const reliefOf = (image: ImageBitmap, label: string, region?: readonly [number, number, number, number]) => {
+        const packed = upload(image, `${label}:heights`, false);
+        const relief = device.createTexture({
+            label: `${label}:relief`,
+            size: [image.width, image.height],
             format: "rgba16float",
-            mipLevelCount: mipLevels(heights.width, heights.height),
+            mipLevelCount: mipLevels(image.width, image.height),
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
         });
-        decodeRelief(device, packed, relief);
+        decodeRelief(device, packed, relief, region);
         buildMips(device, relief, "rgba16float", false);
         packed.destroy();
+        return relief;
+    };
+    const colorTexture = upload(color, "nachtgestirn:color", true);
+    buildMips(device, colorTexture, "rgba8unorm", true);
+    const relief = heights ? reliefOf(heights, "nachtgestirn") : null;
+    let detail: MoonMaps["detail"];
+    if (options.detail) {
+        const detailColor = upload(options.detail.color, "nachtgestirn:detail:color", true);
+        buildMips(device, detailColor, "rgba8unorm", true);
+        detail = {
+            color: detailColor,
+            relief: reliefOf(options.detail.heights, "nachtgestirn:detail", options.detail.region),
+            region: options.detail.region,
+        };
     }
     const sampler = device.createSampler({
         label: "nachtgestirn:maps",
@@ -101,9 +123,12 @@ export function createMoonMaps(device: GPUDevice, options: MoonMapsOptions): Moo
         sampler,
         albedoScale: geometricAlbedo / meanReflectance,
         albedoTint: tint,
+        ...(detail ? { detail } : {}),
         destroy() {
             colorTexture.destroy();
             relief?.destroy();
+            detail?.color.destroy();
+            detail?.relief.destroy();
         },
     };
 }
@@ -116,6 +141,13 @@ export interface MoonMapFiles {
     width?: number;
     meanReflectance?: number;
     meanColor?: Vec3;
+    /** A strip at a finer size, and where it lies in the whole maps' uv: west, north, east and south edges. */
+    detail?: { color: string | URL; heights: string | URL; region: readonly [number, number, number, number] };
+}
+
+/** `loadMoonMaps`' options besides the maps': how far the files have come, in bytes, as they come. */
+export interface LoadMoonMapsOptions extends Omit<MoonMapsOptions, "color" | "heights" | "detail"> {
+    onProgress?: (loaded: number, total: number) => void;
 }
 
 // The near side's mean, as `pnpm maps` printed it for the shipped maps.
@@ -150,22 +182,61 @@ export const MOON_MAPS: { small: MoonMapFiles; medium: MoonMapFiles; large: Moon
 
 /**
  * Fetches and decodes a set of maps, as a browser does, and uploads them: `createMoonMaps` with the images. The
- * package's own large set by default.
+ * package's own large set by default. `onProgress` hears how many bytes of all the files have come, of how many, once
+ * every file has said its size.
  */
 export async function loadMoonMaps(
     device: GPUDevice,
     files: MoonMapFiles = MOON_MAPS.large,
-    options: Omit<MoonMapsOptions, "color" | "heights"> = {},
+    options: LoadMoonMapsOptions = {},
 ): Promise<MoonMaps> {
-    const decode = async (url: string | URL) =>
-        createImageBitmap(await (await fetch(url)).blob(), { colorSpaceConversion: "none", premultiplyAlpha: "none" });
-    const [color, heights] = await Promise.all([decode(files.color), files.heights ? decode(files.heights) : null]);
-    const meanReflectance = options.meanReflectance ?? files.meanReflectance;
-    const meanColor = options.meanColor ?? files.meanColor;
+    const { onProgress, ...rest } = options;
+    const urls = [files.color, files.heights, files.detail?.color, files.detail?.heights];
+    const loaded = urls.map(() => 0);
+    const sizes = urls.map((url) => (url ? Number.NaN : 0));
+    const report = () => {
+        const total = sizes.reduce((a, b) => a + b, 0);
+        if (onProgress && Number.isFinite(total))
+            onProgress(
+                Math.min(
+                    loaded.reduce((a, b) => a + b, 0),
+                    total,
+                ),
+                total,
+            );
+    };
+    const decode = async (url: string | URL | undefined, i: number) => {
+        if (!url) return null;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`nachtgestirn: ${url} gave ${response.status}`);
+        const type = response.headers.get("content-type") ?? "";
+        sizes[i] = Number(response.headers.get("content-length")) || 0;
+        let blob: Blob;
+        if (onProgress && response.body) {
+            const pieces: Uint8Array[] = [];
+            const reader = response.body.getReader();
+            for (let piece = await reader.read(); !piece.done; piece = await reader.read()) {
+                pieces.push(piece.value);
+                loaded[i] = (loaded[i] ?? 0) + piece.value.length;
+                report();
+            }
+            blob = new Blob(pieces as BlobPart[], { type });
+        } else {
+            blob = await response.blob();
+        }
+        return createImageBitmap(blob, { colorSpaceConversion: "none", premultiplyAlpha: "none" });
+    };
+    const [color, heights, detailColor, detailHeights] = await Promise.all(urls.map(decode));
+    if (!color) throw new Error("nachtgestirn: no color map");
+    const meanReflectance = rest.meanReflectance ?? files.meanReflectance;
+    const meanColor = rest.meanColor ?? files.meanColor;
     return createMoonMaps(device, {
         color,
         ...(heights ? { heights } : {}),
-        ...options,
+        ...(files.detail && detailColor && detailHeights
+            ? { detail: { color: detailColor, heights: detailHeights, region: files.detail.region } }
+            : {}),
+        ...rest,
         ...(meanReflectance === undefined ? {} : { meanReflectance }),
         ...(meanColor === undefined ? {} : { meanColor }),
     });
@@ -210,13 +281,21 @@ function dispatch(
     pass.end();
 }
 
-function decodeRelief(device: GPUDevice, packed: GPUTexture, relief: GPUTexture) {
-    const pipe = pipeline(device, "relief", () =>
+function decodeRelief(
+    device: GPUDevice,
+    packed: GPUTexture,
+    relief: GPUTexture,
+    region: readonly [number, number, number, number] = [0, 0, 1, 1],
+) {
+    const [west, north, east, south] = region;
+    const constants = { NB_RELIEF_NORTH: north, NB_RELIEF_SPAN_U: east - west, NB_RELIEF_SPAN_V: south - north };
+    const pipe = pipeline(device, `relief ${region.join(" ")}`, () =>
         compute(
             device,
             "nachtgestirn:relief",
             [wgsl.moonOutput("rgba16float"), wgsl.params, wgsl.surface, wgsl.relief].join("\n"),
             "nbRelief",
+            constants,
         ),
     );
     const encoder = device.createCommandEncoder({ label: "nachtgestirn:relief" });

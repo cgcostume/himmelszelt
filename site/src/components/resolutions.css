@@ -1,0 +1,55 @@
+/* A row of resolutions to choose from, as the environments and the Moon's maps have them (see Resolutions.astro). */
+/* A resolution's digits, or while it comes, a spinner in their place. */
+@keyframes environments-spin {
+    to {
+        transform: rotate(1turn);
+    }
+}
+.env-resolution > svg:last-child,
+.env-resolution[data-busy] > svg:first-child {
+    display: none;
+}
+/* The whole icon turns, about its middle, on the compositor: it keeps turning while the file is decoded on the main
+   thread. It says something is happening, so it turns even for reduced motion, which only slows it. */
+.env-resolution[data-busy] > svg:last-child {
+    display: block;
+    transform-origin: center;
+    will-change: transform;
+    animation: environments-spin 0.9s linear infinite !important;
+}
+@media (prefers-reduced-motion: reduce) {
+    .env-resolution[data-busy] > svg:last-child {
+        animation-duration: 3s !important;
+    }
+}
+/* While a file comes over the network, not from a cache, the group grows a line at its foot: the track empty and
+   muted, what has come in the ink. No border, and nothing runs along it while the size is unknown; that the file is
+   coming, the spinner in the chosen resolution says. Whatever holds the group sets `data-progress` and `--progress`. */
+.env-resolutions {
+    display: inline-grid;
+    grid-template-columns: repeat(var(--count, 4), auto);
+    row-gap: 0;
+}
+/* Always there, without height until a file comes: the group grows and shrinks to it. */
+.env-progress {
+    display: block;
+    overflow: hidden;
+    border-radius: 1px;
+    background: color-mix(in oklab, var(--overlay-ink), transparent 80%);
+    grid-column: 1 / -1;
+    height: 0;
+    margin: 0 4px;
+    transition:
+        height 0.18s ease-out,
+        margin 0.18s ease-out;
+}
+[data-progress] .env-progress {
+    height: 2px;
+    margin: 6px 4px 1px;
+}
+.env-progress > span {
+    display: block;
+    height: 100%;
+    width: calc(var(--progress, 0) * 100%);
+    background: var(--overlay-ink);
+}

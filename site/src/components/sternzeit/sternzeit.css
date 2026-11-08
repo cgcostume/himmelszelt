@@ -37,6 +37,7 @@
     margin: 0;
     padding: 0;
     color: var(--muted);
+    opacity: 0.7;
     pointer-events: none;
 }
 .vis-credit a {
@@ -2131,13 +2132,6 @@ span.daylight-day {
 .moon-view.textured .moon-panel > svg {
     position: relative;
     background: transparent;
-}
-/* The overlay's text over a bright sky: edged in the page's background. */
-.moon-view.textured .moon-panel > svg text {
-    paint-order: stroke;
-    stroke: color-mix(in srgb, var(--bg) 70%, transparent);
-    stroke-width: 3px;
-    stroke-linejoin: round;
 }
 /* Without the annotations, the Moon alone. */
 .moon-view.without-annotations .moon-panel > svg {

@@ -17,14 +17,17 @@ interface Props {
     /** Another caption and experiment than sternzeit's own, as plain text. */
     caption?: string;
     try?: { label: string; set: string; text: string };
+    /** Whether the view starts locked to the Moon; by default unless textured from the start. */
+    locked?: boolean;
 }
 const { id = "moon-view", textured = "toggle", annotations = false, caption, try: experiment } = Astro.props;
+const locked = Astro.props.locked ?? textured !== "on";
 ---
 
 <figure class="moon-figure" id={id} data-moon-view data-textured={textured}>
     <div class={`moon-view as-seen${textured === "on" ? " textured" : ""}`} data-export="moon">
         <span class="view-buttons">
-            <button type="button" class="view-icon" data-field="lockMoon" aria-pressed={textured === "on" ? "false" : "true"} title="Lock the view to the Moon itself: north up, seen from Earth's center, without the air" aria-label="Moon frame"><Icon name="moonLock" /></button>
+            <button type="button" class="view-icon" data-field="lockMoon" aria-pressed={locked ? "true" : "false"} title="Lock the view to the Moon itself: north up, seen from Earth's center, without the air" aria-label="Moon frame"><Icon name="moonLock" /></button>
             <button type="button" class="view-icon" data-field="opticalLibration" aria-pressed="true" title="The tilt of the Moon's axis against its orbit and its uneven speed along it let us see a little around its edges" aria-label="Optical libration"><Icon name="libration" /></button>
             <button type="button" class="view-icon" data-field="textured" aria-pressed={textured === "on" ? "true" : "false"} title="The Moon as nachtgestirn renders it, NASA's maps under Hapke's law over dunstkreis' sky, in place of the diagram's disc. Rendered with WebGPU" aria-label="Textured Moon"><Icon name="moonMap" /></button>
             {annotations && <button type="button" class="view-icon" data-field="annotations" aria-pressed="true" title="sternzeit's annotations over the Moon: its grid, axis, the arrow to the Sun and the readouts" aria-label="Annotations"><Icon name="labels" /></button>}

@@ -56,6 +56,14 @@ export const references: Record<string, Reference> = {
         url: "https://ciechanow.ski/moon/",
         note: "The Moon's motion, light and surface explained with interactive figures, at length: the page to read for all this chapter leaves out.",
     },
+    link1969: {
+        authors: "František Link",
+        title: "Eclipse Phenomena in Astronomy",
+        venue: "Springer",
+        year: 1969,
+        url: "https://doi.org/10.1007/978-3-642-86475-9",
+        note: "The theory of the umbra's light: sunlight refracted around Earth by its atmosphere, ring by ring.",
+    },
     yapo2009: {
         authors: "Theodore C. Yapo, Barbara Cutler",
         title: "Rendering Lunar Eclipses",

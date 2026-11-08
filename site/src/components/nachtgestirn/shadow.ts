@@ -1,23 +1,29 @@
 import type { AtmosphereLUTs, AtmosphereModel } from "@himmelszelt/dunstkreis";
-import { EARTH_RADIUS_KM, MOON_RADIUS_KM, moonEV100 } from "@himmelszelt/nachtgestirn";
+import { EARTH_RADIUS_KM, MOON_RADIUS_KM, moonEV100, typicalUmbra, umbraLightAt } from "@himmelszelt/nachtgestirn";
 import { eclipse, fromJulianDay, julianEphemerisDay, toDate } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
-import { display, onDisplay, onTables, gpu as shared, tables } from "../dunstkreis/atmosphere";
+import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
-import { nearestEclipse, SEARCH_YEARS } from "../sternzeit/eclipsesearch";
+import { nearestEclipse } from "../sternzeit/eclipsesearch";
 import { drawSvg, svgText } from "../sternzeit/figure";
-import { onChange, state } from "../sternzeit/state";
+import { onChange, state, update } from "../sternzeit/state";
 import { clock } from "../sternzeit/zone";
-import { moonAt, type ToneCurveName } from "./renderer";
+import { noGpu } from "./laws";
+import { moonAt, onUmbraTable, type ToneCurveName, UMBRA_EV100, umbraTable } from "./renderer";
 import { createTiles, pxPerRadian, tileFrame } from "./tiles";
 
 const COUNT = 7;
 const MINUTE = 1 / 1440;
-// The umbra's light exposed as the lit Moon is: a ten thousandth of the sunlight, the lit part burning out.
-const UMBRA_EV100 = moonEV100(0, 1, 1e-4);
+const YEAR = 365.25;
+// How far the timeline reaches either way from its middle, in years, and the years at each end where choosing an
+// eclipse moves the strip along.
+const TIMELINE_YEARS = 12;
+const TIMELINE_EDGE_YEARS = 2;
+
 const f = (n: number) => n.toFixed(1);
-const umbral = (jd: number) => eclipse.lunar(julianEphemerisDay(fromJulianDay(jd))).umbralMagnitude;
+const lunar = (jd: number) => eclipse.lunar(julianEphemerisDay(fromJulianDay(jd)));
+const umbral = (jd: number) => lunar(jd).umbralMagnitude;
 
 /** The first minute between a and b where `test` turns true, by halving. */
 function bisect(a: number, b: number, test: (jd: number) => boolean) {
@@ -29,8 +35,9 @@ function bisect(a: number, b: number, test: (jd: number) => boolean) {
     return b;
 }
 
-/** The sunlight reaching a point `axisKm` from the shadow's axis, per channel, as surface.wgsl's nbShadow has it. */
-export function shadowLight(axisKm: number, distanceKm: number, umbraKm: number, sunAngularRadius: number) {
+/** The share of the Sun's disc Earth leaves uncovered, seen from a point `axisKm` from the shadow's axis, as
+ *  surface.wgsl's nbShadow has it before the air's light is added. */
+export function directSunlight(axisKm: number, distanceKm: number, sunAngularRadius: number) {
     const earthRadius = Math.asin(Math.min(EARTH_RADIUS_KM / distanceKm, 1));
     const separation = Math.atan(axisKm / distanceKm);
     const lens = (a: number, b: number, d: number) => {
@@ -45,29 +52,63 @@ export function shadowLight(axisKm: number, distanceKm: number, umbraKm: number,
             d * y
         );
     };
-    const direct =
-        1 - lens(earthRadius, sunAngularRadius, separation) / (Math.PI * sunAngularRadius * sunAngularRadius);
-    const depth = axisKm / Math.max(umbraKm, 1);
-    const smooth = (a: number, b: number, t: number) => {
-        const u = Math.min(Math.max((t - a) / (b - a), 0), 1);
-        return u * u * (3 - 2 * u);
+    return 1 - lens(earthRadius, sunAngularRadius, separation) / (Math.PI * sunAngularRadius * sunAngularRadius);
+}
+
+/**
+ * The lunar eclipses around the chosen moment, found once each and kept: `within(from, to)` extends the known span
+ * with sternzeit's search as far as asked, a lunation at a time, umbral ones only.
+ */
+function eclipseList() {
+    const known: { jd: number; magnitude: number }[] = [];
+    let covered: { from: number; to: number } | null = null;
+    const add = (jd: number) => {
+        known.push({ jd, magnitude: umbral(jd) });
+        known.sort((a, b) => a.jd - b.jd);
     };
-    if (depth > 1.5) return [direct, direct, direct];
-    const d1 = Math.min(depth, 1);
-    const amount = 1e-5 * 10 ** (1.5 * d1 * d1) * (1 - smooth(1, 1.5, depth));
-    const t = smooth(0.8, 1.05, depth);
-    const copper = [1, 0.32, 0.1];
-    const rim = [0.55, 0.8, 1];
-    return copper.map((c, i) => direct + (c * (1 - t) + (rim[i] ?? 0) * t) * amount);
+    return {
+        /** Whether the last `within` found all there is in its span, or ran out of its time first. */
+        complete: true,
+        within(from: number, to: number, budgetMs = 8) {
+            const until = performance.now() + budgetMs;
+            if (!covered) covered = { from: (from + to) / 2, to: (from + to) / 2 };
+            // Forwards and backwards in turn, so the timeline fills out from its middle.
+            let forwards = true;
+            while ((covered.to < to || covered.from > from) && performance.now() < until) {
+                if (forwards && covered.to < to) {
+                    const next = nearestEclipse(covered.to, 1, true);
+                    if (next === null || next > to) covered.to = to;
+                    else {
+                        add(next);
+                        covered.to = next;
+                    }
+                } else if (covered.from > from) {
+                    const previous = nearestEclipse(covered.from, -1, true);
+                    if (previous === null || previous < from) covered.from = from;
+                    else {
+                        add(previous);
+                        covered.from = previous;
+                    }
+                }
+                forwards = !forwards;
+            }
+            this.complete = covered.to >= to && covered.from <= from;
+            return known.filter((e) => e.jd >= from && e.jd <= to);
+        },
+    };
 }
 
 const BOTTOM = -18;
 const MARGIN = { top: 10, bottom: 22, left: 34, right: 8 };
+// The timeline strip: its height, and the room its labels take under it.
+const TIMELINE = { height: 54, top: 6, bottom: 18 };
 
-/** The shadow figure on `root`: a row of Moons through the next lunar eclipse, and the shadow's light by the radius. */
+/** The shadow figure on `root`: the Moon through the next lunar eclipse, a timeline of the eclipses around the chosen
+ *  moment, a row of discs across the eclipse, and the shadow's light by the radius. */
 export function shadowFigure(root: HTMLElement) {
-    const canvas = find<HTMLCanvasElement>("canvas", root);
+    const canvas = find<HTMLCanvasElement>("[data-field=row]", root);
     const plot = find<SVGSVGElement>(".tiles-plot > svg", root);
+    const timeline = find<SVGSVGElement>("[data-field=timeline]", root);
     const labels = root.querySelectorAll<HTMLElement>(".tiles-labels > li");
     const note = find("[data-field=note]", root);
     const metered = find("[data-field=metered]", root);
@@ -79,14 +120,18 @@ export function shadowFigure(root: HTMLElement) {
     const tiles = createTiles(canvas, requestRender);
     const bigTile = createTiles(big, requestRender);
     if (!tiles || !bigTile) {
-        const error = document.createElement("p");
-        error.className = "tiles-empty";
-        error.textContent = shared.error ?? "WebGPU is not available here.";
-        canvas.replaceWith(error);
-        big.replaceWith(error.cloneNode(true));
+        noGpu(canvas);
+        noGpu(big);
     }
-    // The eclipse found last: its greatest moment and the umbra's first and last contact, kept while the chosen
-    // moment stays between where the search started and the eclipse's end.
+    const eclipses = eclipseList();
+    let lastShown: number | null = null;
+    // The timeline's middle: the chosen moment when the figure is made, and after a jump to its ends, never by itself.
+    let center = state.jd;
+    const recenter = (jd: number) => {
+        if (Math.abs(jd - center) > (TIMELINE_YEARS - TIMELINE_EDGE_YEARS) * YEAR) center = jd;
+    };
+    // The eclipse shown: its greatest moment and the umbra's first and last contact, kept while the chosen moment stays
+    // between where the search started and the eclipse's end.
     let found: { from: number; greatest: number; first: number; last: number } | null = null;
 
     function findEclipse() {
@@ -107,8 +152,9 @@ export function shadowFigure(root: HTMLElement) {
         const table = tables();
         if (!table) return;
         const e = findEclipse();
+        renderTimeline(e?.greatest ?? null);
         if (!e) {
-            note.textContent = `no lunar eclipse within ${SEARCH_YEARS} years after the chosen moment`;
+            note.textContent = `no lunar eclipse within ${TIMELINE_YEARS} years after the chosen moment`;
             return;
         }
         const width = root.clientWidth || 600;
@@ -121,14 +167,15 @@ export function shadowFigure(root: HTMLElement) {
         // One exposure for the row: the umbra's own where the eclipse is total, else the greatest moment's, metered on
         // what the umbra leaves of the lit disc, so a shallow bite still shows.
         const total = (greatest?.shadow.umbralMagnitude ?? 0) >= 1;
-        const shared = total
-            ? UMBRA_EV100
-            : moonEV100(
-                  greatest?.phaseAngle ?? 0,
-                  greatest?.lit ?? 1,
-                  Math.max(1 - Math.max(greatest?.shadow.umbralMagnitude ?? 0, 0), 1e-4),
-              );
-        tiles?.draw(COUNT, tilePx, (first?.geocentricDiameter ?? 0.5) * 1.12, (i) => ({
+        const shared = Math.max(
+            moonEV100(
+                greatest?.phaseAngle ?? 0,
+                greatest?.lit ?? 1,
+                Math.max(1 - Math.max(greatest?.shadow.umbralMagnitude ?? 0, 0), 1e-4),
+            ),
+            UMBRA_EV100,
+        );
+        tiles?.draw({ count: COUNT, width: tilePx, degreesAcross: (first?.geocentricDiameter ?? 0.5) * 1.3 }, (i) => ({
             moon: moons[i] ?? (first as NonNullable<typeof first>),
             luts: table.luts,
             toneMap: display.toneCurve as ToneCurveName,
@@ -150,38 +197,84 @@ export function shadowFigure(root: HTMLElement) {
             label.innerHTML = `<span class="tiles-name">${text}</span> <span class="tiles-value">${depth >= 1 ? "total" : `umbra ${Math.round(depth * 100)}%`}</span>`;
         });
         if (greatest) renderPlot(greatest);
-        renderBig(e.greatest + Number(offset.value) * MINUTE, table.luts.model, table.luts);
+        const where = renderBig(e.greatest + Number(offset.value) * MINUTE, table.luts.model, table.luts);
         const date = clock(toDate(fromJulianDay(e.greatest)), { day: "numeric", month: "long", year: "numeric" });
         const span = clock(toDate(fromJulianDay(e.first)), { hour: "2-digit", minute: "2-digit" });
         const end = clock(toDate(fromJulianDay(e.last)), { hour: "2-digit", minute: "2-digit" });
         const depth = umbral(e.greatest);
         note.textContent =
             `${date.text}, in the umbra from ${span.text} to ${end.text} ${date.offset} · ` +
-            `${depth >= 1 ? "total" : "partial"}, umbral magnitude ${depth.toFixed(2)} · ` +
+            `${depth >= 1 ? "total" : "partial"}, umbral magnitude ${depth.toFixed(2)} · the big Moon ${where} · ` +
             `${perTile ? "each disc metered on its own" : `all at EV100 ${shared.toFixed(1)}, ${total ? "the umbra's" : "the greatest moment's"}`}`;
+    }
+
+    /** The eclipses of the years around the chosen moment, a bar each as tall as the eclipse is deep. */
+    function renderTimeline(shown: number | null) {
+        lastShown = shown;
+        const width = timeline.clientWidth || 600;
+        const height = TIMELINE.height;
+        timeline.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        const from = center - TIMELINE_YEARS * YEAR;
+        const to = center + TIMELINE_YEARS * YEAR;
+        const x = (jd: number) => ((jd - from) / (to - from)) * width;
+        const base = height - TIMELINE.bottom;
+        let svg = `<line x1="0" y1="${base}" x2="${width}" y2="${base}" class="figure-grid"/>`;
+        // The ends, where a choice carries the strip along, dimmed and named.
+        const edge = (TIMELINE_EDGE_YEARS / (2 * TIMELINE_YEARS)) * width;
+        svg += `<rect x="0" y="0" width="${f(edge)}" height="${base}" class="timeline-edge"/>`;
+        svg += `<rect x="${f(width - edge)}" y="0" width="${f(edge)}" height="${base}" class="timeline-edge"/>`;
+        svg += svgText(4, TIMELINE.top + 8, "earlier", "figure-grid-label figure-anchor-start");
+        svg += svgText(width - 4, TIMELINE.top + 8, "later", "figure-grid-label figure-anchor-end");
+        // A year's first day labeled every other year, so the labels keep apart.
+        const firstYear = toDate(fromJulianDay(from)).getUTCFullYear() + 1;
+        for (let year = firstYear; year <= firstYear + 2 * TIMELINE_YEARS; year++) {
+            const jd = (Date.UTC(year, 0, 1) - Date.UTC(2000, 0, 1, 12)) / 86_400_000 + 2_451_545;
+            if (jd > to) break;
+            svg += `<line x1="${f(x(jd))}" y1="${base}" x2="${f(x(jd))}" y2="${base + 3}" class="figure-grid"/>`;
+            if (year % 2 === 0) svg += svgText(x(jd), height - 4, `${year}`, "figure-grid-label");
+        }
+        for (const e of eclipses.within(from, to)) {
+            const depth = Math.min(Math.max(e.magnitude, 0), 1.9) / 1.9;
+            const top = base - TIMELINE.top - depth * (base - TIMELINE.top - 4);
+            const cls = `timeline-eclipse${e.magnitude >= 1 ? " timeline-total" : ""}${shown !== null && Math.abs(e.jd - shown) < 0.5 ? " timeline-shown" : ""}`;
+            const date = clock(toDate(fromJulianDay(e.jd)), { day: "numeric", month: "long", year: "numeric" });
+            const title = `${date.text}: ${e.magnitude >= 1 ? "total" : "partial"}, umbral magnitude ${e.magnitude.toFixed(2)}`;
+            svg += `<g class="${cls}" data-jd="${e.jd.toFixed(5)}"><title>${title}</title><rect x="${f(x(e.jd) - 5)}" y="${TIMELINE.top}" width="10" height="${f(base - TIMELINE.top)}" class="timeline-hit"/><line x1="${f(x(e.jd))}" y1="${base}" x2="${f(x(e.jd))}" y2="${f(top)}"/></g>`;
+        }
+        if (state.jd >= from && state.jd <= to) {
+            svg += `<line x1="${f(x(state.jd))}" y1="${TIMELINE.top}" x2="${f(x(state.jd))}" y2="${base}" class="plot-now"/>`;
+        }
+        drawSvg(timeline, svg, 1);
+        // The rest of the span found a little at a time, the timeline alone drawn again as it fills.
+        if (!eclipses.complete) setTimeout(() => renderTimeline(lastShown), 0);
     }
 
     /** The big Moon at `jd`, metered, and the shadow's edges over it. */
     function renderBig(jd: number, model: AtmosphereModel, luts: AtmosphereLUTs) {
         const m = moonAt(jd, state, model);
-        const cssPx = big.clientWidth || 480;
+        const cssW = big.clientWidth || 600;
+        const cssH = Math.round(cssW / 2);
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        const across = m.geocentricDiameter * 1.7;
-        bigTile?.draw(1, Math.round(cssPx * dpr), across, () => ({
-            moon: m,
-            luts,
-            toneMap: display.toneCurve as ToneCurveName,
-            maps: "auto",
-            ev100: null,
-            albedo: true,
-            relief: true,
-            shadows: true,
-            earthshine: true,
-            eclipse: true,
-            law: "hapke",
-            nightVision: false,
-        }));
-        outline.setAttribute("viewBox", `0 0 ${cssPx} ${cssPx}`);
+        // The disc fills most of the panel's height, the shadow's edges either side.
+        const across = m.geocentricDiameter * 1.8 * (cssW / cssH);
+        bigTile?.draw(
+            { count: 1, width: Math.round(cssW * dpr), height: Math.round(cssH * dpr), degreesAcross: across },
+            () => ({
+                moon: m,
+                luts,
+                toneMap: display.toneCurve as ToneCurveName,
+                maps: "auto",
+                ev100: null,
+                albedo: true,
+                relief: true,
+                shadows: true,
+                earthshine: true,
+                eclipse: true,
+                law: "hapke",
+                nightVision: false,
+            }),
+        );
+        outline.setAttribute("viewBox", `0 0 ${cssW} ${cssH}`);
         let svg = "";
         const shadow = m.earthShadow;
         if (shadow) {
@@ -194,25 +287,32 @@ export function shadowFigure(root: HTMLElement) {
             const { right, up } = tileFrame(m);
             const dotWith = (u: number[]) =>
                 -((v[0] ?? 0) * (u[0] ?? 0) + (v[1] ?? 0) * (u[1] ?? 0) + (v[2] ?? 0) * (u[2] ?? 0));
-            const scale = pxPerRadian(across, cssPx) / m.distanceKm;
-            const cx = cssPx / 2 + dotWith(right) * scale;
-            const cy = cssPx / 2 - dotWith(up) * scale;
+            const scale = pxPerRadian(across, cssW) / m.distanceKm;
+            const cx = cssW / 2 + dotWith(right) * scale;
+            const cy = cssH / 2 - dotWith(up) * scale;
             for (const [km, cls, name] of [
-                [shadow.penumbraKm, "shadow-outline shadow-outline-penumbra", "penumbra"],
+                [shadow.penumbraKm, "shadow-outline", "penumbra"],
                 [shadow.umbraKm, "shadow-outline", "umbra"],
             ] as const) {
                 const r = km * scale;
                 svg += `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" class="${cls}"/>`;
                 // Named where its edge is nearest the panel's center, so the name stays in view.
-                const toCenter = Math.atan2(cssPx / 2 - cy, cssPx / 2 - cx);
+                const toCenter = Math.atan2(cssH / 2 - cy, cssW / 2 - cx);
                 const [lx, ly] = [cx + Math.cos(toCenter) * (r + 10), cy + Math.sin(toCenter) * (r + 10)];
                 svg += svgText(lx, ly, name, "figure-note");
             }
         }
         drawSvg(outline, svg, 1);
-        const { text, offset: zone } = clock(toDate(m.time), { hour: "2-digit", minute: "2-digit" });
+        // The readout keeps one width, so the slider does not shift: the clock alone, the depth in the note.
+        offsetValue.textContent = clock(toDate(m.time), { hour: "2-digit", minute: "2-digit" }).text;
         const depth = m.shadow.umbralMagnitude;
-        offsetValue.textContent = `${text} ${zone} · ${depth >= 1 ? "total" : depth > 0 ? `umbra ${Math.round(depth * 100)}%` : m.shadow.penumbralMagnitude > 0 ? "penumbra" : "clear"}`;
+        return depth >= 1
+            ? "total"
+            : depth > 0
+              ? `umbra ${Math.round(depth * 100)}%`
+              : m.shadow.penumbralMagnitude > 0
+                ? "in the penumbra"
+                : "clear of the shadow";
     }
 
     function renderPlot(m: ReturnType<typeof moonAt>) {
@@ -233,9 +333,13 @@ export function shadowFigure(root: HTMLElement) {
             svg += svgText(x(km), height - 6, km === 0 ? "axis" : `${km.toLocaleString("en-US")} km`, "figure-label");
         }
         const sunRadius = (m.sunAngularDiameter / 2) * (Math.PI / 180);
+        // The typical umbra until this eclipse's own is integrated.
+        const table = umbraTable(m.model, umbraRadiusKm, penumbraRadiusKm, m.distanceKm) ?? typicalUmbra();
         const samples = Array.from({ length: 241 }, (_, i) => {
             const km = (i / 240) * reach;
-            return { km, light: shadowLight(km, m.distanceKm, umbraRadiusKm, sunRadius) };
+            const direct = directSunlight(km, m.distanceKm, sunRadius);
+            const air = umbraLightAt(table, km, penumbraRadiusKm);
+            return { km, light: air.map((a) => Math.max(direct + a, 0)) };
         });
         for (const [channel, cls] of [
             [2, "plot-line-blue"],
@@ -256,7 +360,7 @@ export function shadowFigure(root: HTMLElement) {
         const barY = y(BOTTOM) - 6;
         svg += `<line x1="${f(x(0))}" y1="${f(barY)}" x2="${f(x(2 * MOON_RADIUS_KM))}" y2="${f(barY)}" class="plot-bar"/>`;
         svg += svgText(x(2 * MOON_RADIUS_KM) + 4, barY, "the Moon's width", "figure-note figure-anchor-start");
-        const now = eclipse.lunar(julianEphemerisDay(fromJulianDay(state.jd)));
+        const now = lunar(state.jd);
         if (now.penumbralMagnitude > 0) {
             const px = x(now.axisOffsetKm);
             svg += `<line x1="${f(px)}" y1="${f(MARGIN.top)}" x2="${f(px)}" y2="${f(y(BOTTOM))}" class="plot-now"/>`;
@@ -285,8 +389,27 @@ export function shadowFigure(root: HTMLElement) {
         metered.setAttribute("aria-pressed", String(metered.getAttribute("aria-pressed") !== "true"));
         requestRender();
     });
+    // A click on an eclipse's bar goes to its greatest moment; the buttons to the one before or after the shown one.
+    timeline.addEventListener("click", (event) => {
+        const bar = (event.target as Element).closest?.("[data-jd]");
+        const jd = Number(bar?.getAttribute("data-jd"));
+        if (!bar || Number.isNaN(jd)) return;
+        recenter(jd);
+        update({ jd, live: false, animate: false });
+    });
+    for (const button of root.querySelectorAll<HTMLElement>("[data-jump]")) {
+        button.addEventListener("click", () => {
+            const step = Number(button.dataset.jump);
+            const from = found ? found.greatest + (step > 0 ? 0 : -0.5) : state.jd;
+            const jd = nearestEclipse(from, step, true);
+            if (jd === null) return;
+            recenter(jd);
+            update({ jd, live: false, animate: false });
+        });
+    }
     onChange(requestRender);
     onTables(requestRender);
+    onUmbraTable(requestRender);
     onDisplay(requestRender);
     new ResizeObserver(requestRender).observe(root);
     requestRender();

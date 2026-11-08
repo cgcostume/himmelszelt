@@ -70,12 +70,56 @@ fn nbLambert(mu0: f32) -> f32 {
     return mu0 / NB_PI;
 }
 
+// Oren and Nayar's rough diffuse surface, the law a renderer reaches for when Lambert's limb looks wrong, with a
+// roughness of 0.5 rad: it brightens the limb towards full Moon, but has no surge and lets a half Moon fade into its
+// terminator. The azimuth between the light and the viewer about the normal from the three angles alone.
+fn nbOrenNayar(mu0: f32, mu: f32, g: f32) -> f32 {
+    const sigma2 = 0.25;
+    let a = 1.0 - 0.5 * sigma2 / (sigma2 + 0.33);
+    let b = 0.45 * sigma2 / (sigma2 + 0.09);
+    let sin0 = sqrt(max(1.0 - mu0 * mu0, 0.0));
+    let sinV = sqrt(max(1.0 - mu * mu, 0.0));
+    let cosAzimuth = max((cos(g) - mu0 * mu) / max(sin0 * sinV, 1e-4), 0.0);
+    let alpha = max(sin0, sinV);
+    let tanBeta = min(sin0 / max(mu0, 1e-4), sinV / max(mu, 1e-4));
+    return mu0 * (a + b * cosAzimuth * alpha * tanBeta) / NB_PI;
+}
+
+// The metallic-roughness surface of a PBR renderer at its best for the Moon: a dielectric of roughness 1, Burley's
+// diffuse, as Disney's and Unreal's materials have it, which lifts a rough surface towards its rim, under a GGX lobe
+// with Smith's shadowing and Schlick's Fresnel. The half vector's cosines from the three angles alone: the Sun and
+// the viewer are the phase angle apart. It still has no backscatter, which no metallic-roughness material can.
+fn nbMetallicRoughness(mu0: f32, mu: f32, g: f32) -> f32 {
+    const roughness = 1.0;
+    const f0 = 0.04;
+    let alpha = roughness * roughness;
+    let cosG = cos(g);
+    let nh = (mu0 + mu) / max(sqrt(2.0 + 2.0 * cosG), 1e-4);
+    let vh = sqrt(max((1.0 + cosG) / 2.0, 0.0));
+    let a2 = alpha * alpha;
+    let dd = nh * nh * (a2 - 1.0) + 1.0;
+    let d = a2 / (NB_PI * dd * dd);
+    let k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
+    let gs = (mu0 / (mu0 * (1.0 - k) + k)) * (mu / max(mu * (1.0 - k) + k, 1e-4));
+    let fresnel = f0 + (1.0 - f0) * pow(1.0 - vh, 5.0);
+    let specular = d * gs * fresnel / max(4.0 * mu0 * mu, 1e-4);
+    let f90 = 0.5 + 2.0 * roughness * vh * vh;
+    let diffuse = (1.0 + (f90 - 1.0) * pow(1.0 - mu0, 5.0)) * (1.0 + (f90 - 1.0) * pow(1.0 - mu, 5.0)) / NB_PI;
+    return mu0 * (diffuse + specular);
+}
+
 fn nbReflectance(law: u32, mu0: f32, mu: f32, g: f32) -> f32 {
     if (mu0 <= 0.0) {
         return 0.0;
     }
     if (law == 1u) {
         return nbLambert(mu0);
+    }
+    if (law == 2u) {
+        return nbOrenNayar(mu0, max(mu, 0.0), g);
+    }
+    if (law == 3u) {
+        return nbMetallicRoughness(mu0, max(mu, 0.0), g);
     }
     return nbHapke(mu0, max(mu, 0.0), g);
 }
@@ -95,8 +139,8 @@ fn nbLens(a: f32, b: f32, d: f32) -> f32 {
 }
 
 // What of the sunlight reaches a point of the Moon through Earth's shadow, per channel: the share of the Sun's disc
-// Earth leaves uncovered, seen from that point, plus the sunlight Earth's atmosphere bends into the umbra, red in the
-// middle, with the turquoise rim ozone leaves where the light passed the stratosphere. `pointKm` from Earth's center.
+// Earth leaves uncovered, seen from that point, plus what its atmosphere bends into the umbra, red in the middle, with
+// the turquoise rim ozone leaves where the light passed the stratosphere. `pointKm` from Earth's center.
 fn nbShadow(params: NbParams, pointKm: vec3f) -> vec3f {
     let distanceKm = length(pointKm);
     let toEarth = -pointKm / distanceKm;
@@ -106,16 +150,13 @@ fn nbShadow(params: NbParams, pointKm: vec3f) -> vec3f {
     let separation = acos(clamp(dot(toEarth, -params.shadowAxis), -1.0, 1.0));
     let covered = nbLens(earthRadius, sunRadius, separation) / (NB_PI * sunRadius * sunRadius);
     let direct = vec3f(1.0 - covered);
-    // How far into the umbra, 0 at its axis and 1 at its edge, from the point's distance from the shadow's axis.
+    // What the air adds, from the table over the distance from the axis, the axis to the penumbra's edge.
     let axisKm = length(pointKm - dot(pointKm, params.shadowAxis) * params.shadowAxis);
-    let depth = axisKm / max(params.umbraKm, 1.0);
-    if (depth > 1.5) {
+    let x = axisKm / max(params.penumbraKm, 1.0) * f32(NB_UMBRA_SAMPLES - 1u);
+    if (x >= f32(NB_UMBRA_SAMPLES - 1u)) {
         return direct;
     }
-    // The umbra's light: some 10^-5 of the sunlight at its axis, thirty times that at its edge, fading out beyond.
-    let amount = 1e-5 * pow(10.0, 1.5 * min(depth, 1.0) * min(depth, 1.0)) * (1.0 - smoothstep(1.0, 1.5, depth));
-    let copper = vec3f(1.0, 0.32, 0.1);
-    let rim = vec3f(0.55, 0.8, 1.0);
-    let refracted = mix(copper, rim, smoothstep(0.8, 1.05, depth)) * amount * params.umbraLight;
-    return direct + refracted;
+    let i = u32(floor(x));
+    let refracted = mix(params.umbraTable[i].rgb, params.umbraTable[i + 1u].rgb, fract(x));
+    return direct + refracted * params.umbraLight;
 }

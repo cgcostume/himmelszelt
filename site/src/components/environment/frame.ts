@@ -41,8 +41,8 @@ function sync() {
         press('[data-env="map"]', !view.projected);
         press('[data-env="view"]', view.projected);
         press('[data-env="clipped"]', view.clipped);
-        for (const button of frame.querySelectorAll<HTMLElement>("[data-env-resolution]")) {
-            const chosen = button.dataset.envResolution === hdri.resolution;
+        for (const button of frame.querySelectorAll<HTMLElement>("[data-resolution]")) {
+            const chosen = button.dataset.resolution === hdri.resolution;
             button.setAttribute("aria-pressed", String(chosen));
             button.toggleAttribute("data-busy", chosen && pending.id !== null);
         }
@@ -89,8 +89,8 @@ for (const frame of frames) {
     on("clipped", () => {
         view.clipped = !view.clipped;
     });
-    for (const button of frame.querySelectorAll<HTMLElement>("[data-env-resolution]")) {
-        button.addEventListener("click", () => setResolution(button.dataset.envResolution as typeof hdri.resolution));
+    for (const button of frame.querySelectorAll<HTMLElement>("[data-resolution]")) {
+        button.addEventListener("click", () => setResolution(button.dataset.resolution as typeof hdri.resolution));
     }
     const ev = frame.querySelector<HTMLInputElement>('[data-env="ev"]');
     // Only under a pointer: a key's or the wheel's small steps would never get away from it again.

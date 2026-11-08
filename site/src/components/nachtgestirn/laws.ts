@@ -1,59 +1,20 @@
-import { moonEV100, phaseLaw, type Vec3 } from "@himmelszelt/nachtgestirn";
+import { moonEV100, type Vec3 } from "@himmelszelt/nachtgestirn";
 import { find } from "../dom";
 import { display, onDisplay, onTables, gpu as shared, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
-import { drawSvg, svgText } from "../sternzeit/figure";
 import { onChange, state } from "../sternzeit/state";
+import { lobeLight, onLobeLight } from "./lobes";
 import { moonAt, type ToneCurveName } from "./renderer";
-import { createTiles } from "./tiles";
+import { createTiles, tileFrame } from "./tiles";
 
-// Hapke's lunar law as surface.wgsl has it, for the disc's total light, and Lambert's.
 const PI = Math.PI;
-function retrodirective(g: number) {
-    const h = 0.6;
-    if (g < 1e-4) return 2;
-    if (g >= PI / 2) return 1;
-    const t = Math.tan(g);
-    const e = Math.exp(-h / t);
-    return 2 - (t / (2 * h)) * (1 - e) * (3 - e);
-}
-function scattering(g: number) {
-    const c = Math.cos(g);
-    return (Math.sin(g) + (PI - g) * c) / PI + 0.1 * (1 - c / 2) ** 2;
-}
-const hapke = (mu0: number, mu: number, g: number) =>
-    (((2 * mu0) / Math.max(mu0 + mu, 1e-4)) * ((retrodirective(g) * scattering(g)) / (2 * scattering(0)))) / PI;
-const lambert = (mu0: number) => mu0 / PI;
-
-/**
- * The light the whole disc sends towards the viewer at a phase angle in radians, relative to a flat disc of the same
- * normal albedo seen and lit straight on: the reflectance summed over the disc's projected area, where a Lambert
- * sphere gives two thirds at full and Hapke's law one.
- */
-function discLight(law: "hapke" | "lambert", g: number) {
-    const N = 120;
-    const s = [Math.sin(g), 0, Math.cos(g)];
-    let sum = 0;
-    for (let i = 0; i < N; i++) {
-        for (let j = 0; j < N; j++) {
-            const x = ((i + 0.5) / N) * 2 - 1;
-            const y = ((j + 0.5) / N) * 2 - 1;
-            const rr = x * x + y * y;
-            if (rr >= 1) continue;
-            const z = Math.sqrt(1 - rr);
-            const mu0 = x * (s[0] ?? 0) + z * (s[2] ?? 0);
-            if (mu0 <= 0) continue;
-            sum += law === "hapke" ? hapke(mu0, z, g) : lambert(mu0);
-        }
-    }
-    return (sum * 4) / (N * N);
-}
-
 const DEG = PI / 180;
-const STEP = 2;
+export type Law = "lambert" | "orenNayar" | "metallicRoughness" | "hapke";
+/** The laws in the order the figures show them: by their distance from the measured Moon, the farthest first. */
+export const LAWS: readonly Law[] = ["lambert", "metallicRoughness", "orenNayar", "hapke"];
 
 // A rotation about `axis` by `angle` radians, as a column major 3 x 3 matrix, and its use.
-function rotation(axis: Vec3, angle: number): Float32Array {
+export function rotation(axis: Vec3, angle: number): Float32Array {
     const [x, y, z] = axis;
     const [c, s] = [Math.cos(angle), Math.sin(angle)];
     const t = 1 - c;
@@ -69,13 +30,13 @@ function rotation(axis: Vec3, angle: number): Float32Array {
         t * z * z + c,
     ]);
 }
-const apply = (m: Float32Array, v: Vec3): Vec3 => [
+export const apply = (m: Float32Array, v: Vec3): Vec3 => [
     (m[0] ?? 0) * v[0] + (m[3] ?? 0) * v[1] + (m[6] ?? 0) * v[2],
     (m[1] ?? 0) * v[0] + (m[4] ?? 0) * v[1] + (m[7] ?? 0) * v[2],
     (m[2] ?? 0) * v[0] + (m[5] ?? 0) * v[1] + (m[8] ?? 0) * v[2],
 ];
 /** a times b, both column major. */
-function multiply(a: Float32Array, b: Float32Array): Float32Array {
+export function multiply(a: Float32Array, b: Float32Array): Float32Array {
     const out = new Float32Array(9);
     for (let col = 0; col < 3; col++) {
         for (let row = 0; row < 3; row++) {
@@ -86,143 +47,161 @@ function multiply(a: Float32Array, b: Float32Array): Float32Array {
     }
     return out;
 }
-function transpose(m: Float32Array): Float32Array {
+export function transpose(m: Float32Array): Float32Array {
     return new Float32Array([m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]].map((v) => v ?? 0));
 }
-const normalize = (v: Vec3): Vec3 => {
+export const normalize = (v: Vec3): Vec3 => {
     const l = Math.hypot(v[0], v[1], v[2]) || 1;
     return [v[0] / l, v[1] / l, v[2] / l];
 };
-const cross = (a: Vec3, b: Vec3): Vec3 => [
+export const cross = (a: Vec3, b: Vec3): Vec3 => [
     a[1] * b[2] - a[2] * b[1],
     a[2] * b[0] - a[0] * b[2],
     a[0] * b[1] - a[1] * b[0],
 ];
-const curves = {
-    hapke: Array.from({ length: 180 / STEP + 1 }, (_, i) => discLight("hapke", i * STEP * DEG)),
-    lambert: Array.from({ length: 180 / STEP + 1 }, (_, i) => discLight("lambert", i * STEP * DEG)),
-    measured: Array.from({ length: 180 / STEP + 1 }, (_, i) => phaseLaw(i * STEP)),
-};
-const stops = (value: number) => Math.log2(Math.max(value, 1e-9));
-// The plot, phase angle across and stops down to this many below a full Moon.
-const BOTTOM = -12;
-const MARGIN = { top: 10, bottom: 22, left: 34, right: 8 };
-const f = (n: number) => n.toFixed(1);
+export const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
 /**
- * The reflectance laws figure on `root`: Hapke's and Lambert's Moon side by side, and the light of each over the phase
- * angle. Dragging carries the viewer around the Moon, the Sun staying where it is: towards it, into the crescent, or
- * behind it, where the Sun stands at the viewer's back and the surge is at its fullest.
+ * The Moon `m` as seen from where a viewer orbited to, by `yaw` about the Moon's north axis and `pitch` over it, in
+ * radians, the Sun staying where it is: the Moon and the Sun turn together the other way, the line of sight staying as
+ * it is, so the phase changes with the viewer's place. With `sunAt`, the Sun is put at that phase angle instead, in
+ * radians, east of the viewer about the Moon's north axis: the terminator a meridian, the lit side on the right.
+ */
+export function orbited(m: ReturnType<typeof moonAt>, yaw: number, pitch: number, sunAt?: number) {
+    const o = m.orientation;
+    // The Moon's north pole in the viewer's frame: the row of the orientation that maps to the body's z.
+    const north = normalize([o[2] ?? 0, o[5] ?? 0, o[8] ?? 1]);
+    const toViewer: Vec3 = [-m.trueDirection[0], -m.trueDirection[1], -m.trueDirection[2]];
+    const right = normalize(cross(m.trueDirection, north));
+    const r = multiply(rotation(right, pitch), rotation(north, yaw));
+    let moonSunDirection = apply(r, m.moonSunDirection);
+    if (sunAt !== undefined) {
+        // The viewer's direction with the pole's part taken out, turned about the pole by the phase angle.
+        const level = normalize(cross(cross(north, toViewer), north));
+        moonSunDirection = apply(rotation(north, -sunAt), level);
+    }
+    const cosG = Math.max(-1, Math.min(1, dot(moonSunDirection, toViewer)));
+    return {
+        ...m,
+        moonSunDirection,
+        orientation: multiply(o, transpose(r)),
+        // Earth turns with the Moon and the Sun: earthshine stays on the half of the Moon turned to it.
+        earthDirection: apply(r, toViewer),
+        phaseAngle: Math.acos(cosG) / DEG,
+        lit: (1 + cosG) / 2,
+    };
+}
+
+/** Replaces a figure's canvas by a note that WebGPU is missing. */
+export function noGpu(canvas: HTMLCanvasElement) {
+    const error = document.createElement("p");
+    error.className = "tiles-empty";
+    error.textContent = shared.error ?? "WebGPU is not available here.";
+    canvas.replaceWith(error);
+}
+
+/**
+ * The reflectance laws figure on `root`: the Moon under Lambert's law, Oren-Nayar's and Hapke's side by side. Dragging
+ * carries the viewer around the Moon, the Sun staying where it is: towards it, into the crescent, or behind it, where
+ * the Sun stands at the viewer's back and the surge is at its fullest.
  */
 export function lawsFigure(root: HTMLElement) {
     const canvas = find<HTMLCanvasElement>("canvas", root);
-    const plot = find<SVGSVGElement>(".tiles-plot > svg", root);
     const note = find("[data-field=note]", root);
+    const metered = find("[data-field=metered]", root);
+    const mapped = find("[data-field=map]", root);
+    const deviation = find("[data-field=deviation]", root);
+    const outline = find<SVGSVGElement>("[data-field=outline]", root);
+    const pressed = (button: HTMLElement) => button.getAttribute("aria-pressed") === "true";
     const requestRender = onDemand(render, root);
     // How far the viewer has been dragged around the Moon: about its north axis, and up or down over it, in radians.
     const orbit = { yaw: 0, pitch: 0 };
     const tiles = createTiles(canvas, requestRender);
-    if (!tiles) {
-        const error = document.createElement("p");
-        error.className = "tiles-empty";
-        error.textContent = shared.error ?? "WebGPU is not available here.";
-        canvas.replaceWith(error);
-    }
+    if (!tiles) noGpu(canvas);
 
     function render() {
         const table = tables();
         if (!table) return;
         const real = moonAt(state.jd, state, table.luts.model);
-        const m = orbited(real);
+        const m = orbit.yaw === 0 && orbit.pitch === 0 ? real : orbited(real, orbit.yaw, orbit.pitch);
         const width = root.clientWidth || 600;
-        const tilePx = Math.round((Math.min(width, 640) / 2) * Math.min(window.devicePixelRatio || 1, 2));
-        // Both at the full Moon's exposure whatever the phase, so the light the curves count is the light seen: a quarter
+        const tilePx = Math.round((width / LAWS.length) * Math.min(window.devicePixelRatio || 1, 2));
+        // All at the full Moon's exposure whatever the phase, so the light seen is the light each law gives: a quarter
         // Moon darker than a full one, and Lambert's disc darker than Hapke's.
-        const ev100 = moonEV100(0, 1);
-        tiles?.draw(2, tilePx, m.geocentricDiameter * 1.15, (i) => ({
+        const perDisc = pressed(metered);
+        const withMap = pressed(mapped);
+        // Held against Hapke's law, which follows the measured Moon within a quarter of a stop over the month.
+        const compare = pressed(deviation) ? ("hapke" as const) : null;
+        const ev100 = perDisc ? null : moonEV100(0, 1);
+        tiles?.draw({ count: LAWS.length, width: tilePx, degreesAcross: m.geocentricDiameter * 1.4 }, (i) => ({
             moon: m,
             luts: table.luts,
             toneMap: display.toneCurve as ToneCurveName,
             maps: "auto",
             ev100,
-            albedo: true,
-            relief: true,
-            shadows: true,
-            earthshine: false,
+            albedo: withMap,
+            relief: withMap,
+            shadows: withMap,
+            compare,
+            earthshine: true,
             eclipse: false,
-            law: i === 0 ? "hapke" : "lambert",
+            law: LAWS[i] ?? "hapke",
             nightVision: false,
         }));
-        renderPlot(m.phaseAngle);
-        const at = (c: number[]) => stops(c[Math.round(m.phaseAngle / STEP)] ?? 1);
-        note.textContent =
-            `phase angle ${m.phaseAngle.toFixed(1)}°: Hapke ${at(curves.hapke).toFixed(1)}, ` +
-            `Lambert ${at(curves.lambert).toFixed(1)}, measured ${at(curves.measured).toFixed(1)} stops below a full Moon`;
+        drawOutline(m, width);
+        const where =
+            orbit.yaw === 0 && orbit.pitch === 0
+                ? "from Earth"
+                : `${(Math.abs(orbit.yaw) / DEG).toFixed(0)}° ${orbit.yaw > 0 ? "east" : "west"} and ${(Math.abs(orbit.pitch) / DEG).toFixed(0)}° ${orbit.pitch > 0 ? "over" : "under"} Earth's line of sight`;
+        note.textContent = `seen ${where}: phase angle ${m.phaseAngle.toFixed(1)}°, ${(m.lit * 100).toFixed(0)}% lit, ${perDisc ? "each disc metered on its lit part" : "all four at the full Moon's exposure"}`;
     }
 
-    /**
-     * The Moon as seen from where the viewer was dragged to: the viewer orbits, so the Moon and the Sun turn together
-     * the other way, about the Moon's north axis and about the screen's right, the line of sight staying as it is.
-     */
-    function orbited(m: ReturnType<typeof moonAt>) {
-        if (orbit.yaw === 0 && orbit.pitch === 0) return m;
-        const o = m.orientation;
-        // The Moon's north pole in the viewer's frame: the row of the orientation that maps to the body's z.
-        const north = normalize([o[2] ?? 0, o[5] ?? 0, o[8] ?? 1]);
-        const right = normalize(cross(m.trueDirection, north));
-        const r = multiply(rotation(right, orbit.pitch), rotation(north, orbit.yaw));
-        const moonSunDirection = apply(r, m.moonSunDirection);
-        const toViewer: Vec3 = [-m.trueDirection[0], -m.trueDirection[1], -m.trueDirection[2]];
-        const cosG = Math.max(
-            -1,
-            Math.min(
-                1,
-                moonSunDirection[0] * toViewer[0] +
-                    moonSunDirection[1] * toViewer[1] +
-                    moonSunDirection[2] * toViewer[2],
-            ),
-        );
-        const phaseAngle = Math.acos(cosG) / DEG;
-        return {
-            ...m,
-            moonSunDirection,
-            orientation: multiply(o, transpose(r)),
-            phaseAngle,
-            lit: (1 + cosG) / 2,
-        };
-    }
-
-    function renderPlot(phaseAngle: number) {
-        const width = plot.clientWidth || 600;
-        const height = plot.clientHeight || 180;
-        plot.setAttribute("viewBox", `0 0 ${width} ${height}`);
-        const x = (deg: number) => MARGIN.left + (deg / 180) * (width - MARGIN.left - MARGIN.right);
-        const y = (s: number) => MARGIN.top + (Math.max(s, BOTTOM) / BOTTOM) * (height - MARGIN.top - MARGIN.bottom);
+    // Where on the disc the Sun stands at the lobes' angle from the normal: a small circle about the point under the
+    // Sun, its near half, the same on all four discs.
+    let last: { m: ReturnType<typeof moonAt>; width: number } | null = null;
+    function drawOutline(m: ReturnType<typeof moonAt>, width: number) {
+        last = { m, width };
+        const tile = width / LAWS.length;
+        const height = outline.parentElement?.clientHeight || tile;
+        outline.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        const { right, up, toward } = tileFrame(m);
+        const sun = m.moonSunDirection;
+        const helper: Vec3 = Math.abs(sun[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+        const a = normalize(cross(sun, helper));
+        const b = cross(sun, a);
+        const angle = Math.abs(lobeLight.angle);
+        const radius = tile / 2.8;
+        // The view frame's toward points back at the viewer.
+        const toViewer = toward;
         let svg = "";
-        for (let s = 0; s >= BOTTOM; s -= 2) {
-            svg += `<line x1="${f(MARGIN.left)}" y1="${f(y(s))}" x2="${f(width - MARGIN.right)}" y2="${f(y(s))}" class="figure-grid"/>`;
-            svg += svgText(MARGIN.left - 6, y(s), s === 0 ? "0" : `${s}`, "figure-grid-label figure-anchor-end");
+        for (let i = 0; i < LAWS.length; i++) {
+            const [cx, cy] = [tile * (i + 0.5), height / 2];
+            let path = "";
+            let pen = false;
+            for (let k = 0; k <= 180; k++) {
+                const t = (k / 180) * 2 * PI;
+                const p = [0, 1, 2].map(
+                    (c) =>
+                        (sun[c] ?? 0) * Math.cos(angle) +
+                        ((a[c] ?? 0) * Math.cos(t) + (b[c] ?? 0) * Math.sin(t)) * Math.sin(angle),
+                );
+                const seen = p.reduce((sum, v, c) => sum + v * (toViewer[c] ?? 0), 0) > 0;
+                if (!seen) {
+                    pen = false;
+                    continue;
+                }
+                const x = cx + p.reduce((sum, v, c) => sum + v * (right[c] ?? 0), 0) * radius;
+                const y = cy - p.reduce((sum, v, c) => sum + v * (up[c] ?? 0), 0) * radius;
+                path += `${pen ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
+                pen = true;
+            }
+            if (path) svg += `<path d="${path}" class="laws-outline-under"/><path d="${path}" class="laws-outline"/>`;
         }
-        for (const deg of [0, 45, 90, 135, 180]) {
-            svg += svgText(x(deg), height - 6, `${deg}°`, `figure-label${deg === 180 ? " figure-anchor-end" : ""}`);
-        }
-        const line = (values: number[], cls: string) =>
-            `<polyline points="${values.map((v, i) => `${f(x(i * STEP))},${f(y(stops(v)))}`).join(" ")}" class="plot-line ${cls}"/>`;
-        svg += line(curves.measured, "plot-line-measured");
-        svg += line(curves.lambert, "plot-line-lambert");
-        svg += line(curves.hapke, "");
-        svg += svgText(x(100), y(stops(curves.hapke[50] ?? 1)) + 14, "Hapke", "figure-note figure-anchor-start");
-        svg += svgText(x(100), y(stops(curves.lambert[50] ?? 1)) - 8, "Lambert", "figure-note figure-anchor-start");
-        svg += svgText(x(150), y(stops(curves.measured[75] ?? 1)) + 14, "measured", "figure-note figure-anchor-end");
-        // The chosen moment's phase angle, and each law's light there.
-        const px = x(phaseAngle);
-        svg += `<line x1="${f(px)}" y1="${f(MARGIN.top)}" x2="${f(px)}" y2="${f(y(BOTTOM))}" class="plot-now"/>`;
-        const i = Math.round(phaseAngle / STEP);
-        for (const c of [curves.hapke, curves.lambert, curves.measured]) {
-            svg += `<circle cx="${f(px)}" cy="${f(y(stops(c[i] ?? 1)))}" r="3" class="plot-dot"/>`;
-        }
-        drawSvg(plot, svg, 1);
+        outline.innerHTML = svg;
     }
+    onLobeLight(() => {
+        if (last) drawOutline(last.m, last.width);
+    });
 
     // Dragging carries the viewer around the Moon; a double click brings it back to Earth.
     let dragging: { x: number; y: number } | null = null;
@@ -248,6 +227,12 @@ export function lawsFigure(root: HTMLElement) {
     };
     canvas.addEventListener("pointerup", release);
     canvas.addEventListener("pointercancel", release);
+    for (const button of [metered, mapped, deviation]) {
+        button.addEventListener("click", () => {
+            button.setAttribute("aria-pressed", String(!pressed(button)));
+            requestRender();
+        });
+    }
     canvas.addEventListener("dblclick", () => {
         orbit.yaw = 0;
         orbit.pitch = 0;

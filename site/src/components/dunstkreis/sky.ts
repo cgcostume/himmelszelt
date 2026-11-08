@@ -9,7 +9,7 @@ import {
 } from "@himmelszelt/dunstkreis";
 import { fromJulianDay, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
-import { onDemand } from "../frame";
+import { onDemand, watchView } from "../frame";
 import { paintRange } from "../range";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
@@ -301,15 +301,11 @@ export function skyFigure(root: HTMLElement) {
     // Whether the canvas is within a screen of the viewport, as onDemand gates a figure; a draw skipped while it was not
     // is made up for when it is again.
     let onScreen = true;
-    new IntersectionObserver(
-        ([entry]) => {
-            const now = entry?.isIntersecting ?? true;
-            if (now === onScreen) return;
-            onScreen = now;
-            if (onScreen) requestRender();
-        },
-        { rootMargin: "100% 0px" },
-    ).observe(canvas);
+    watchView(canvas, "100% 0px", (now) => {
+        if (now === onScreen) return;
+        onScreen = now;
+        if (onScreen) requestRender();
+    });
 
     // The slider runs brighter to the right, so it holds minus the EV100: a lower EV lets in more light. Without one, the
     // figure is metered.

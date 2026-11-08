@@ -10,6 +10,7 @@ import {
 import type { IrradiancePass } from "@himmelszelt/rundbild";
 import { createIrradiancePass } from "@himmelszelt/rundbild";
 import type { Direction } from "@himmelszelt/sternzeit";
+import { watchView } from "../frame";
 import type { ToneCurve } from "../scene/scene";
 
 /**
@@ -38,6 +39,16 @@ async function acquire(): Promise<{ device?: GPUDevice; adapterName?: string; er
     const requirements = skyRequirements({ format: "rgba8unorm" }, adapter);
     // Timestamps around a pass, for the figures that show what a pass costs, where the GPU gives them.
     if (adapter.features.has("timestamp-query")) requirements.requiredFeatures.push("timestamp-query");
+    // As large a texture as the GPU takes, up to 16384, for nachtgestirn's finest maps.
+    requirements.requiredLimits.maxTextureDimension2D = Math.max(
+        requirements.requiredLimits.maxTextureDimension2D ?? 8192,
+        Math.min(adapter.limits.maxTextureDimension2D, 16384),
+    );
+    // And a buffer to stage such a map in on its way to the GPU: 16384 by 8192 texels are 512 MB.
+    requirements.requiredLimits.maxBufferSize = Math.max(
+        requirements.requiredLimits.maxBufferSize ?? 268_435_456,
+        Math.min(adapter.limits.maxBufferSize, 1 << 30),
+    );
     const device = await adapter.requestDevice(requirements);
     // Which GPU, for the timings: a fallback adapter renders on the CPU, a hundred times slower.
     const { vendor, architecture, description, isFallbackAdapter } = adapter.info ?? {};
@@ -324,16 +335,12 @@ let shownNeeding = 0;
 /** Builds the environment while `element`, a figure that shows it, is on screen or about to be. */
 export function needEnvironment(element: Element) {
     let visible = false;
-    new IntersectionObserver(
-        ([entry]) => {
-            const now = entry?.isIntersecting ?? false;
-            if (now === visible) return;
-            visible = now;
-            shownNeeding += now ? 1 : -1;
-            buildEnvironment();
-        },
-        { rootMargin: "100% 0px" },
-    ).observe(element);
+    watchView(element, "100% 0px", (now) => {
+        if (now === visible) return;
+        visible = now;
+        shownNeeding += now ? 1 : -1;
+        buildEnvironment();
+    });
 }
 
 // One build at a time: while the sky moves on, only its latest state is built next.

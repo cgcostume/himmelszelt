@@ -1,39 +1,50 @@
 ---
-import Term from "../Term.astro";
+import Icon from "../Icon.astro";
 import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
 import "./nachtgestirn.css";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
 
-/** Hapke's law against Lambert's: the Moon under each, side by side, and the light of each over the phase angle. */
+/** Lambert's law, a PBR renderer's, Oren-Nayar's and Hapke's: the Moon under each, side by side, large. */
 interface Props {
     id?: string;
 }
 const { id = "laws" } = Astro.props;
 ---
 
-<figure class="tiles-figure" id={id} data-laws>
+<figure class="tiles-figure wide" id={id} data-laws>
     <div class="tiles-panel as-seen">
-        <canvas aria-label="The Moon shaded by Hapke's law and by Lambert's, rendered with WebGPU" title="Drag to carry yourself around the Moon, the Sun staying put; double click to come back to Earth"></canvas>
+        <canvas aria-label="The Moon shaded by Lambert's law, a PBR renderer's metallic-roughness, Oren-Nayar's and Hapke's, rendered with WebGPU" title="Drag to carry yourself around the Moon, the Sun staying put; double click to come back to Earth"></canvas>
+        <svg class="tiles-overlay" data-field="outline" aria-hidden="true"></svg>
+        <span class="view-buttons">
+            <button type="button" class="view-icon" data-field="map" aria-pressed="false" title="NASA's maps, color and relief; off, plain discs of the law alone" aria-label="Maps"><Icon name="moonMap" /></button>
+            <button type="button" class="view-icon" data-field="deviation" aria-pressed="true" title="Stripe where each disc is more than a third of a stop off Hapke's law, which follows the measured Moon: red where brighter, blue where darker" aria-label="Deviation"><Icon name="clipped" /></button>
+            <button type="button" class="view-icon" data-field="metered" aria-pressed="true" title="Expose each disc by a light meter on its lit part, as a photograph of the Moon is, rather than all four at the full Moon's exposure" aria-label="Metered"><Icon name="meter" /></button>
+        </span>
+        <p class="vis-credit footnote tiles-credit">Drag to go around the Moon, the Sun staying put. Rendered with WebGPU</p>
     </div>
-    <ul class="tiles-labels" style="grid-template-columns: 1fr 1fr">
-        <li><span class="tiles-name">Hapke</span> <span class="tiles-value">a powder</span></li>
-        <li><span class="tiles-name">Lambert</span> <span class="tiles-value">a matte ball</span></li>
+    <ul class="tiles-labels" style="grid-template-columns: repeat(4, 1fr)">
+        <li><span class="tiles-name law-lambert">Lambert</span> <span class="tiles-value">a matte ball</span></li>
+        <li><span class="tiles-name law-metallicRoughness">PBR</span> <span class="tiles-value">a rough dielectric</span></li>
+        <li><span class="tiles-name law-orenNayar">Oren-Nayar</span> <span class="tiles-value">a rough ball</span></li>
+        <li><span class="tiles-name law-hapke">Hapke</span> <span class="tiles-value">a powder, the reference</span></li>
     </ul>
-    <div class="tiles-plot">
-        <svg aria-hidden="true"></svg>
-    </div>
     <LunationSlider />
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        The Moon at the chosen moment shaded by Hapke's lunar law and by Lambert's, both at the full Moon's exposure
-        whatever the phase, from Earth's center with north up; the relief under both. Below, the light the whole disc sends to the viewer over the{" "}
-        <Term of="Phase angle">phase angle</Term>, in stops below a full Moon: Hapke's law, Lambert's, and the Moon as
-        measured, Allen's phase law, dashed. The dots mark the view shown. Drag to leave Earth and go around the Moon,
-        the Sun staying where it is; the slider runs from new moon to new moon.
+        The Moon at the chosen moment shaded by Lambert's law, by the metallic-roughness surface of a PBR renderer at its best for the Moon, a dielectric of roughness 1 with
+        Burley's diffuse, by Oren and
+        Nayar's and by Hapke's lunar law, in the order of their distance from the measured Moon, each metered on its
+        lit part, or all four at the full Moon's exposure whatever the phase, from Earth's center with north up, plain discs of the law alone, or with NASA's maps and the relief under each, and the discs are striped where
+        they are more than a third of a stop off Hapke's, red where brighter, blue where darker, in four steps
+        of strength from a third of a stop, two thirds, one and two stops off. The dashed line on each disc is where the
+        Sun stands at the angle set in the figure below. Lambert
+        darkens the limb like a matte ball, the PBR surface lifts the limb a little and gets no darker towards the terminator than Lambert's, Oren-Nayar
+        brightens the limb a little but keeps no surge, Hapke keeps the lit part
+        flat to its edge. Drag to leave Earth and go around the Moon, the Sun staying where it is; the slider runs from
+        new moon to new moon.
         <Try label="First quarter" set="date=2026-11-17T12:00Z" fig={id}>
-            Lambert's half Moon fades into the terminator and gives a third of its own full Moon's light, Hapke's stays
-            bright up to it and gives a tenth, as the measured Moon does.
+            Lambert's, the PBR and Oren-Nayar's half Moon fade into the terminator, Hapke's stays bright up to it, as the Moon does.
         </Try>
     </figcaption>
 </figure>

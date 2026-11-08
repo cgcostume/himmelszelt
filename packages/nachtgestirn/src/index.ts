@@ -29,11 +29,14 @@ export {
     viewFrame,
 } from "./orientation.js";
 
-export type { MoonMapFiles, MoonMaps, MoonMapsOptions } from "./maps.js";
+export type { LoadMoonMapsOptions, MoonMapFiles, MoonMaps, MoonMapsOptions } from "./maps.js";
 export { createMoonMaps, loadMoonMaps, MOON_COLOR, MOON_MAPS } from "./maps.js";
 
-export type { EarthShadow, EncodeOptions, MoonParams, MoonPass, MoonPassOptions } from "./moon.js";
+export type { EarthShadow, EncodeOptions, MapFilter, MoonParams, MoonPass, MoonPassOptions } from "./moon.js";
 export { createMoonPass, PARAMS_SIZE, paramsData } from "./moon.js";
+
+export type { RefractedSunlightOptions } from "./umbra.js";
+export { refractedSunlight, typicalUmbra, umbraLightAt, UMBRA_SAMPLES } from "./umbra.js";
 
 // The raw WGSL, for inlining into a consumer's own pipelines instead of using the pass above.
 export * as wgsl from "./wgsl/index.js";

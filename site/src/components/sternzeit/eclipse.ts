@@ -1,6 +1,6 @@
 import * as precise from "@himmelszelt/sternzeit";
 import { find } from "../dom";
-import { onDemand } from "../frame";
+import { onDemand, watchView } from "../frame";
 import { nearestEclipse, SEARCH_YEARS, SOLAR_REACH_DEG } from "./eclipsesearch";
 import { drawSvg, escapeText, sunGlow, svgText, veiledHorizon } from "./figure";
 import { arrowAround, offPanelArrowSvg } from "./offpanel";
@@ -360,10 +360,7 @@ for (const button of document.querySelectorAll<HTMLElement>(".eclipse-view [data
 
 // The corona turns only while its panel is in view: off screen its animations pause, where they are.
 for (const panel of document.querySelectorAll<SVGSVGElement>('.eclipse-view[data-kind="solar"] .eclipse-panel > svg')) {
-    new IntersectionObserver(([entry]) => {
-        if (entry?.isIntersecting) panel.unpauseAnimations();
-        else panel.pauseAnimations();
-    }).observe(panel);
+    watchView(panel, "0px", (inView) => (inView ? panel.unpauseAnimations() : panel.pauseAnimations()));
 }
 
 // A click on the greatest eclipse's note goes there: its moment, and its place, at the observer's height.

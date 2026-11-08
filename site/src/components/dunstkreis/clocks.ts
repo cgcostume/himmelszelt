@@ -8,7 +8,7 @@ import {
 } from "@himmelszelt/dunstkreis";
 import { createIrradiancePass, type IrradiancePass } from "@himmelszelt/rundbild";
 import { find } from "../dom";
-import { onDemand } from "../frame";
+import { onDemand, watchView } from "../frame";
 import { drawSvg, escapeText, svgText } from "../sternzeit/figure";
 import {
     currentSky,
@@ -722,19 +722,16 @@ if (gpu.error) costs = { ...TYPICAL };
 
 // Measured once the figure is near the screen, and again whenever the tables or the cube map change size.
 let near = false;
-new IntersectionObserver(
-    ([entry]) => {
-        const was = near;
-        near = entry?.isIntersecting ?? false;
-        if (!near || was) return;
-        measure();
-        // Whatever changed while the figure was away.
-        showTables();
-        showSky(currentSky());
-        showEnvironment();
-    },
-    { rootMargin: "50% 0px" },
-).observe(root);
+watchView(root, "50% 0px", (now) => {
+    const was = near;
+    near = now;
+    if (!near || was) return;
+    measure();
+    // Whatever changed while the figure was away.
+    showTables();
+    showSky(currentSky());
+    showEnvironment();
+});
 onTables(() => {
     requestRender();
     if (!near) return;

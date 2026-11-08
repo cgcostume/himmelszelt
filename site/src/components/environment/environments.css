@@ -131,29 +131,6 @@
 .env-metered[aria-pressed="true"] {
     color: var(--accent);
 }
-/* A resolution's digits, or while it comes, a spinner in their place. */
-@keyframes environments-spin {
-    to {
-        transform: rotate(1turn);
-    }
-}
-.env-resolution > svg:last-child,
-.env-resolution[data-busy] > svg:first-child {
-    display: none;
-}
-/* The whole icon turns, about its middle, on the compositor: it keeps turning while the file is decoded on the main
-   thread. It says something is happening, so it turns even for reduced motion, which only slows it. */
-.env-resolution[data-busy] > svg:last-child {
-    display: block;
-    transform-origin: center;
-    will-change: transform;
-    animation: environments-spin 0.9s linear infinite !important;
-}
-@media (prefers-reduced-motion: reduce) {
-    .env-resolution[data-busy] > svg:last-child {
-        animation-duration: 3s !important;
-    }
-}
 .env-frame[data-mode="view"] canvas,
 .env-frame[data-own-view] canvas {
     cursor: grab;
@@ -241,15 +218,6 @@
     /* The page's ink on its frosted glass, full screen as well, whose dark would otherwise take it light on light. */
     color: var(--overlay-ink);
 }
-/* While an HDRI comes over the network, not from the cache, the resolutions' group grows a line at its foot, and a thumbnail one over its image: the
-   track empty and muted, what has come in the ink. No border, and nothing runs along it while the size is unknown; that
-   the file is coming, the spinner in the chosen resolution says. */
-.env-resolutions {
-    display: inline-grid;
-    grid-template-columns: repeat(4, auto);
-    row-gap: 0;
-}
-.env-progress,
 .env-loading {
     display: none;
     height: 2px;
@@ -257,21 +225,6 @@
     border-radius: 1px;
     background: color-mix(in oklab, var(--overlay-ink), transparent 80%);
 }
-/* Always there, without height until a file comes: the group grows and shrinks to it. */
-.env-progress {
-    display: block;
-    grid-column: 1 / -1;
-    height: 0;
-    margin: 0 4px;
-    transition:
-        height 0.18s ease-out,
-        margin 0.18s ease-out;
-}
-[data-needs-hdri][data-progress] .env-progress {
-    height: 2px;
-    margin: 6px 4px 1px;
-}
-.env-progress > span,
 .env-loading > span {
     display: block;
     height: 100%;

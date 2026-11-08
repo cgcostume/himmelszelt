@@ -1,5 +1,6 @@
 ---
 import Icon from "../Icon.astro";
+import Resolutions from "../Resolutions.astro";
 import "../sternzeit/sternzeit.css";
 import "../dunstkreis/dunstkreis.css";
 import "./environments.css";
@@ -42,15 +43,7 @@ const RESOLUTIONS = [
             <button type="button" class="view-icon" data-env="clipped" aria-pressed="false" title="Stripe what clips: red to white, blue to black" aria-label="Clipped"><Icon name="clipped" /></button>
         </span>
         </Fragment>)}
-        <span class="view-buttons env-resolutions">
-            {RESOLUTIONS.map(([value, name, title]) => (
-                <button type="button" class="view-icon env-resolution" data-env-resolution={value} aria-pressed={value === "1k" ? "true" : "false"} title={title} aria-label={title}>
-                    <Icon name={name} />
-                    <Icon name="loading" />
-                </button>
-            ))}
-            <span class="env-progress" aria-hidden="true"><span></span></span>
-        </span>
+        <Resolutions options={RESOLUTIONS} chosen="1k" />
         <span class="sky-hint footnote" data-env="hint"></span>
         {(fullscreen || options) && (
             <span class="view-buttons env-end">

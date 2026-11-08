@@ -13,7 +13,7 @@ import {
 import { onDemand } from "../frame";
 import type { MoonViewFrame } from "../sternzeit/moonview";
 import { state } from "../sternzeit/state";
-import { createMoonRenderer, inverseViewProjection, moonAt, type ToneCurveName } from "./renderer";
+import { createMoonRenderer, inverseViewProjection, moonAt, onUmbraTable, type ToneCurveName } from "./renderer";
 
 const DEG = Math.PI / 180;
 
@@ -86,6 +86,7 @@ export function attachMoonFace(view: HTMLElement, controller: MoonViewController
     }
 
     onTables(requestRender);
+    onUmbraTable(requestRender);
     onDisplay(requestRender);
     return {
         show(on: boolean) {

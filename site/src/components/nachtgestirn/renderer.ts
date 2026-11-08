@@ -1,9 +1,10 @@
 import type { AtmosphereLUTs, AtmosphereModel, SkyPass } from "@himmelszelt/dunstkreis";
 import { airTransmittance, clampObserverHeight, createSkyPass, refractionAngle } from "@himmelszelt/dunstkreis";
-import type { EarthShadow, MoonMaps, MoonPass } from "@himmelszelt/nachtgestirn";
+import type { EarthShadow, MapFilter, MoonMapFiles, MoonMaps, MoonPass, Vec3 } from "@himmelszelt/nachtgestirn";
 import {
     createMoonPass,
     earthshineIlluminance,
+    ev100ForLuminance,
     horizonZ,
     liftedDirection,
     loadMoonMaps,
@@ -12,6 +13,7 @@ import {
     moonEV100,
     moonIlluminance,
     moonOrientation,
+    refractedSunlight,
     refractionTable,
     SUN_ILLUMINANCE,
 } from "@himmelszelt/nachtgestirn";
@@ -27,15 +29,150 @@ import {
 } from "@himmelszelt/sternzeit";
 import { quality, SDR } from "../dunstkreis/atmosphere";
 
+/** No lower than this does the meter open for the umbra: EV100 4 exposes the umbra's edge, some 2 cd/m², as mid gray,
+ *  and its deep red middle stays dark, as the eye and a camera see a total eclipse. */
+export const UMBRA_EV100 = 4;
+const luminanceOf = ([r, g, b]: readonly [number, number, number]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 // The sky pass writes cd/m² when its exposure is 1: EV100 of -log2(1.2).
 const UNIT_EV100 = -Math.log2(1.2);
 
 export type ToneCurveName = "neutral" | "agx" | "aces" | "clip";
 /** Which of nachtgestirn's maps: "auto" the smallest that shows the disc at a texel per pixel, never a smaller one
  *  than before. */
-export type MapSize = "auto" | keyof typeof MOON_MAPS;
+export type MapSize = "auto" | keyof typeof MOON_MAPS | FineMaps;
 const SIZES = ["small", "medium", "large"] as const;
+
+// The maps finer than the package ships, made by its `maps-hq.mjs` and hosted with the site: the whole Moon at 8K and
+// 16K, the 16K's heights at 8K, and strips of the southern highlands at those sizes over the shipped 4K.
+const HQ = `${import.meta.env.BASE_URL.replace(/\/?$/, "/")}moon/`;
+const STRIPS = {
+    "8k": { x: 1638, y: 2298, width: 4916, height: 934, mapWidth: 8192 },
+    "16k": { x: 3276, y: 4596, width: 9832, height: 1867, mapWidth: 16384 },
+};
+const region = ({ x, y, width, height, mapWidth }: (typeof STRIPS)["8k"]) =>
+    [x / mapWidth, (2 * y) / mapWidth, (x + width) / mapWidth, (2 * (y + height)) / mapWidth] as const;
+const SHIPPED = { meanReflectance: MOON_MAPS.large.meanReflectance, meanColor: MOON_MAPS.large.meanColor };
+export const FINE_MAPS = {
+    "8k": { color: `${HQ}moon-color-8k.webp`, heights: `${HQ}moon-height-8k.webp`, width: 8192, ...SHIPPED },
+    "16k": { color: `${HQ}moon-color-16k.webp`, heights: `${HQ}moon-height-8k.webp`, width: 16382, ...SHIPPED },
+    "8k-strip": {
+        ...MOON_MAPS.large,
+        detail: {
+            color: `${HQ}moon-color-8k-strip.webp`,
+            heights: `${HQ}moon-height-8k-strip.webp`,
+            region: region(STRIPS["8k"]),
+        },
+    },
+    "16k-strip": {
+        ...MOON_MAPS.large,
+        detail: {
+            color: `${HQ}moon-color-16k-strip.webp`,
+            heights: `${HQ}moon-height-16k-strip.webp`,
+            region: region(STRIPS["16k"]),
+        },
+    },
+} satisfies Record<string, MoonMapFiles>;
+export type FineMaps = keyof typeof FINE_MAPS;
+/** The widest texture each set needs, for whether the GPU takes it. */
+export const MAPS_TEXELS: Record<keyof typeof MOON_MAPS | FineMaps, number> = {
+    small: 512,
+    medium: 1024,
+    large: 4096,
+    "8k": 8192,
+    "16k": 16384,
+    "8k-strip": STRIPS["8k"].width,
+    "16k-strip": STRIPS["16k"].width,
+};
+
+// The air's green optical depth at the zenith from sea level, per model: what the shimmer measures a ray's column in.
+const zenithDepths = new WeakMap<AtmosphereModel, number>();
+function zenithDepth(model: AtmosphereModel) {
+    let depth = zenithDepths.get(model);
+    if (depth === undefined) {
+        depth = -Math.log(Math.max(airTransmittance(model, 0, 90)?.[1] ?? 1, 1e-6));
+        zenithDepths.set(model, depth);
+    }
+    return depth;
+}
+
+// The shimmer through the air between the observer and the Moon, from the observer's height: the column from the
+// optical depth towards the Moon against the zenith's from sea level, the bend as the air gives it. None above the air.
+function shimmerThrough(m: MoonAt, shimmer: { seeing: number; time: number; dispersion: number }) {
+    const altitude = (Math.asin(Math.max(-1, Math.min(1, m.direction[2]))) * 180) / Math.PI;
+    const through = m.through(altitude)?.[1] ?? 0;
+    const airColumn = -Math.log(Math.max(through, 1e-6)) / zenithDepth(m.model);
+    const bend = ((m.bend(altitude) ?? 0) * Math.PI) / 180;
+    return { ...shimmer, airColumn, bend };
+}
+
+/** How far each set of maps has come over the network, in bytes, while it comes; gone once it is on the GPU. */
+export const mapsProgress = new Map<string, { loaded: number; total: number }>();
+const progressEvents = new EventTarget();
+export const onMapsProgress = (listener: () => void) => progressEvents.addEventListener("change", listener);
 type Libration = { longitude: number; latitude: number };
+
+// What the air adds to the sunlight in Earth's shadow, integrated over dunstkreis' atmosphere once per model and
+// eclipse: the shadow's radii and the Moon's distance change little over one, and the integral costs some 200 ms.
+const umbraTables = new WeakMap<AtmosphereModel, Map<string, Float32Array>>();
+// A grazing ray through the air at each height, per model: the same for every eclipse, traced once.
+const grazing = new WeakMap<
+    AtmosphereModel,
+    Map<number, { deflection: number; transmittance: [number, number, number] }>
+>();
+function airAt(model: AtmosphereModel, h: number) {
+    const byHeight = grazing.get(model) ?? new Map();
+    grazing.set(model, byHeight);
+    let found = byHeight.get(h);
+    if (!found) {
+        const t = airTransmittance(model, h * 1000, 0) ?? [1, 1, 1];
+        found = {
+            deflection: 2 * (refractionAngle(model, h * 1000, 0) ?? 0) * (Math.PI / 180),
+            transmittance: [t[0] * t[0], t[1] * t[1], t[2] * t[2]],
+        };
+        byHeight.set(h, found);
+    }
+    return found;
+}
+
+const umbraEvents = new EventTarget();
+/** Hears each umbra table once it is integrated, for the figures that drew without it to draw again. */
+export const onUmbraTable = (listener: () => void) => umbraEvents.addEventListener("change", listener);
+const umbraPending = new Set<string>();
+/**
+ * The table of what the air adds in Earth's shadow for this eclipse, or null while it is being integrated: some 200 ms,
+ * done after the frame that asked, so a figure draws at once with the typical umbra and again with its own.
+ */
+export function umbraTable(model: AtmosphereModel, umbraKm: number, penumbraKm: number, distanceKm: number) {
+    const key = `${Math.round(umbraKm / 50)} ${Math.round(penumbraKm / 50)} ${Math.round(distanceKm / 2000)}`;
+    const tables = umbraTables.get(model) ?? new Map<string, Float32Array>();
+    umbraTables.set(model, tables);
+    const table = tables.get(key);
+    if (table) return table;
+    if (!umbraPending.has(key)) {
+        umbraPending.add(key);
+        // After the frame has been shown.
+        requestAnimationFrame(() =>
+            setTimeout(() => {
+                const DEG = Math.PI / 180;
+                tables.set(
+                    key,
+                    refractedSunlight({
+                        deflection: (h) => airAt(model, h).deflection,
+                        transmittance: (h) => airAt(model, h).transmittance,
+                        umbraKm,
+                        penumbraKm,
+                        distanceKm,
+                        sunAngularRadius: 0.2665 * DEG,
+                        topKm: Math.min(80, model.planet.thicknessKm),
+                    }),
+                );
+                umbraPending.delete(key);
+                umbraEvents.dispatchEvent(new Event("change"));
+            }),
+        );
+    }
+    return null;
+}
 
 /**
  * The Moon at a moment and place, all the figures draw it from: where it is, truly and as the air lifts it, how large,
@@ -66,6 +203,7 @@ export function moonAt(
     const shadow = eclipse.lunar(jde);
     let earthShadow: EarthShadow | null = null;
     if (shadow.penumbralMagnitude > 0) {
+        const refracted = umbraTable(model, shadow.umbraRadiusKm, shadow.penumbraRadiusKm, distanceKm);
         const geocentric = equatorialToHorizontal(moon.apparentPosition(jde), apparentSiderealTime(time), observer);
         const center = horizontalToDirection(geocentric);
         earthShadow = {
@@ -73,6 +211,7 @@ export function moonAt(
             moonCenterKm: [center[0] * distanceKm, center[1] * distanceKm, center[2] * distanceKm],
             umbraKm: shadow.umbraRadiusKm,
             penumbraKm: shadow.penumbraRadiusKm,
+            ...(refracted ? { refracted } : {}),
         };
     }
     return {
@@ -103,6 +242,8 @@ export function moonAt(
             positionAngleOfAxis,
             parallacticAngle,
         }),
+        // The Sun where it shows, lifted by the same air.
+        apparentSunDirection: liftedDirection(sunDirection, bend),
         moonSunDirection: moon.sunDirection(time, observer),
         distanceKm,
         earthshine: earthshineIlluminance(180 - phaseAngle, distanceKm),
@@ -114,9 +255,25 @@ export type MoonAt = ReturnType<typeof moonAt>;
 
 // The maps once per page, however many figures draw the Moon.
 const loadedMaps = new Map<string, Promise<MoonMaps>>();
-function sharedMaps(device: GPUDevice, size: (typeof SIZES)[number]) {
-    const maps = loadedMaps.get(size) ?? loadMoonMaps(device, MOON_MAPS[size]);
-    loadedMaps.set(size, maps);
+function sharedMaps(device: GPUDevice, size: Exclude<MapSize, "auto">) {
+    let maps = loadedMaps.get(size);
+    if (!maps) {
+        const files = size in FINE_MAPS ? FINE_MAPS[size as FineMaps] : MOON_MAPS[size as (typeof SIZES)[number]];
+        const changed = () => progressEvents.dispatchEvent(new Event("change"));
+        mapsProgress.set(size, { loaded: 0, total: 0 });
+        changed();
+        maps = loadMoonMaps(device, files, {
+            onProgress: (loaded, total) => {
+                mapsProgress.set(size, { loaded, total });
+                changed();
+            },
+        });
+        maps.finally(() => {
+            mapsProgress.delete(size);
+            changed();
+        });
+        loadedMaps.set(size, maps);
+    }
     return maps;
 }
 
@@ -124,7 +281,8 @@ function sharedMaps(device: GPUDevice, size: (typeof SIZES)[number]) {
 export interface MoonFrame {
     moon: MoonAt;
     luts: AtmosphereLUTs;
-    toneMap: ToneCurveName;
+    /** The display's tone curve, or "linear" for the exposed luminance as it is, for measuring. */
+    toneMap: ToneCurveName | "linear";
     width: number;
     height: number;
     inverseViewProjection: Float32Array;
@@ -142,12 +300,25 @@ export interface MoonFrame {
     shadows: boolean;
     earthshine: boolean;
     eclipse: boolean;
-    law: "hapke" | "lambert";
+    law: "hapke" | "lambert" | "orenNayar" | "metallicRoughness";
+    /** A law to hold the disc against, its pixels striped where they are a third of a stop off it. */
+    compare?: "hapke" | "lambert" | "orenNayar" | "metallicRoughness" | null;
+    /** The color map tinted to the Moon's color, as published, or as gray; tinted by default. */
+    mapColor?: "tinted" | "untinted" | "gray";
     /** As the eye sees it at night, rather than a camera. */
     nightVision: boolean;
+    /** Without the air, what lies behind the Moon, in cd/m²: black by default, or a plain daytime sky. */
+    background?: readonly [number, number, number];
+    /** Rays per pixel, the pass' defaults of 8 and 32 along the terminator unless given: the pass is made anew. */
+    samples?: number;
+    terminatorSamples?: number;
     /** The target's format and how many times SDR white it shows, `displayOutput`: SDR, 1 by default. */
     format?: GPUTextureFormat;
     headroom?: number;
+    /** How the maps are filtered, "bspline" by default, as the package does. */
+    filter?: MapFilter;
+    /** The air's shimmer over the disc, as the pass takes it, or none. */
+    shimmer?: { seeing: number; time: number; dispersion: number } | null;
 }
 
 /**
@@ -159,8 +330,9 @@ export interface MoonFrame {
 export function createMoonRenderer(device: GPUDevice, requestRender: () => void) {
     let sky: { pass: SkyPass; luts: AtmosphereLUTs } | null = null;
     let skyBuilding: AtmosphereLUTs | null = null;
-    let moonPass: { pass: MoonPass; key: string } | null = null;
-    let moonBuilding = "";
+    // One pass per combination of options, kept, since a row of tiles may ask for several in turn.
+    const moonPasses = new Map<string, MoonPass>();
+    const moonBuilding = new Set<string>();
     let maps: MoonMaps | null = null;
     // The pair bound, and the one on its way or bound.
     let mapsBound = "";
@@ -190,33 +362,47 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             requestRender();
         });
     }
-    function buildMoon(key: string, { toneMap, nightVision, format = SDR, headroom = 1 }: MoonFrame) {
-        if (moonBuilding === key) return;
-        moonBuilding = key;
-        createMoonPass(device, { format, headroom, toneMap, maps, nightVision }).then((pass) => {
-            if (moonBuilding !== key) return pass.destroy();
-            moonPass?.pass.destroy();
-            moonPass = { pass, key };
-            moonBuilding = "";
+    function buildMoon(key: string, frame: MoonFrame) {
+        if (moonBuilding.has(key)) return;
+        moonBuilding.add(key);
+        const { toneMap, nightVision, format = SDR, headroom = 1, samples = 8, terminatorSamples = 32 } = frame;
+        const filter = frame.filter ?? "bspline";
+        createMoonPass(device, {
+            format,
+            headroom,
+            toneMap: toneMap === "linear" ? false : toneMap,
+            maps,
+            nightVision,
+            samples,
+            terminatorSamples,
+            filter,
+        }).then((pass) => {
+            if (!moonBuilding.delete(key)) return pass.destroy();
+            moonPasses.set(key, pass);
             requestRender();
         });
     }
-    function loadMaps(size: (typeof SIZES)[number]) {
+    function dropMoonPasses() {
+        moonBuilding.clear();
+        for (const pass of moonPasses.values()) pass.destroy();
+        moonPasses.clear();
+    }
+    function loadMaps(size: Exclude<MapSize, "auto">) {
         if (mapsWanted === size) return;
         mapsWanted = size;
         sharedMaps(device, size).then((loaded) => {
             if (mapsWanted !== size) return;
             maps = loaded;
             mapsBound = size;
-            // The pass binds the maps when it is made: made anew with them.
-            moonBuilding = "";
-            moonPass?.pass.destroy();
-            moonPass = null;
+            // The passes bind the maps when they are made: made anew with them.
+            dropMoonPasses();
             requestRender();
         });
     }
 
     return {
+        /** What the drawings depend on besides the frame: the maps bound. */
+        bound: () => mapsBound,
         /** Draws `frame` into `target`; null while a pass is still being made, which calls `requestRender` when done. */
         draw(target: GPUTexture, frame: MoonFrame) {
             const { moon: m, luts, width, height } = frame;
@@ -227,11 +413,18 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             // The maps asked for, or the smallest that shows the disc sharply, but never smaller than the ones bound.
             const needed =
                 SIZES.find((size) => (MOON_MAPS[size].width ?? 0) >= mapWidthFor(frame.discPixels)) ?? "large";
-            const kept = mapsBound === "" ? 0 : SIZES.indexOf(mapsBound as (typeof SIZES)[number]);
-            const size = frame.maps === "auto" ? (SIZES[Math.max(SIZES.indexOf(needed), kept)] ?? "large") : frame.maps;
+            const kept = Math.max(0, SIZES.indexOf(mapsBound as (typeof SIZES)[number]));
+            // Finer maps once bound stay bound for "auto" too.
+            const size =
+                frame.maps !== "auto"
+                    ? frame.maps
+                    : mapsBound in FINE_MAPS
+                      ? (mapsBound as FineMaps)
+                      : (SIZES[Math.max(SIZES.indexOf(needed), kept)] ?? "large");
             loadMaps(size);
-            const key = `${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.nightVision} ${frame.format ?? SDR} ${frame.headroom ?? 1}`;
-            if (!moonPass || moonPass.key !== key) {
+            const key = `${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.nightVision} ${frame.format ?? SDR} ${frame.headroom ?? 1} ${frame.samples ?? 8} ${frame.terminatorSamples ?? 32} ${frame.filter ?? "bspline"}`;
+            const moonPass = moonPasses.get(key);
+            if (!moonPass) {
                 buildMoon(key, frame);
                 return null;
             }
@@ -252,14 +445,22 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             const refraction = frame.air
                 ? refractionTable(m.trueDirection, m.angularDiameter, m.bend, m.through)
                 : null;
-            const center = m.through((Math.asin(Math.min(Math.max(m.direction[2], -1), 1)) * 180) / Math.PI);
+            // Traced only where there is air: the tiles have none.
+            const center = frame.air
+                ? m.through((Math.asin(Math.min(Math.max(m.direction[2], -1), 1)) * 180) / Math.PI)
+                : null;
             const through = frame.air ? (center ? (center[0] + center[1] + center[2]) / 3 : 0) : 1;
-            // Metered on the lit part of the disc outside the umbra, down to a ten thousandth of it, the umbra's own
-            // light, or on the sky around it where that is brighter, so neither burns out.
+            // Metered on the lit part of the disc outside the umbra, opening up as the umbra swallows it but no further
+            // than the umbra's own exposure, or on the sky around it where that is brighter, so neither burns out.
             const outsideUmbra = frame.eclipse ? Math.max(1 - Math.max(m.shadow.umbralMagnitude, 0), 1e-4) : 1;
             const metered = Math.max(
                 moonEV100(m.phaseAngle, m.lit, Math.max(through, 1e-3) * outsideUmbra),
+                frame.eclipse && m.shadow.umbralMagnitude > 0 ? UMBRA_EV100 : Number.NEGATIVE_INFINITY,
                 frame.air ? skyEV100 : Number.NEGATIVE_INFINITY,
+                // A plain background, a daytime sky behind the tiles, is metered too, so it does not burn out.
+                !frame.air && frame.background
+                    ? ev100ForLuminance(luminanceOf(frame.background))
+                    : Number.NEGATIVE_INFINITY,
             );
             // Held to the slider's range: below the horizon the air lets nothing through, and the meter would run away.
             const ev100 = frame.ev100 ?? Math.min(Math.max(Math.round(metered * 10) / 10, -6), 20);
@@ -283,7 +484,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                 moonDirection: m.trueDirection,
                 moonIlluminance: moonIlluminance(m.phaseAngle, m.distanceKm) * outsideUmbra,
             });
-            moonPass.pass.update({
+            moonPass.update({
                 ...view,
                 direction: m.trueDirection,
                 angularDiameter: frame.air ? m.angularDiameter : m.geocentricDiameter,
@@ -297,23 +498,37 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                 relief: frame.relief,
                 shadows: frame.shadows,
                 law: frame.law,
+                mapColor: frame.mapColor ?? "tinted",
+                compare: frame.compare ?? null,
                 eclipse: frame.eclipse ? m.earthShadow : null,
                 sunAngularDiameter: m.sunAngularDiameter,
                 refraction,
                 // From the observer, an Earth radius nearer when the Moon is overhead.
                 distanceKm: m.distanceKm - m.model.planet.groundRadiusKm * m.trueDirection[2],
+                // Where a figure carried the viewer away from Earth, Earth where it has gone.
+                earthDirection: (m as MoonAt & { earthDirection?: Vec3 }).earthDirection ?? null,
+                // Only through the air, measured in its zenith column from sea level.
+                shimmer: frame.air && frame.shimmer ? shimmerThrough(m, frame.shimmer) : null,
             });
             const encoder = device.createCommandEncoder({ label: "sternwarte:moon" });
             if (frame.air) {
                 sky.pass.encode(encoder, background);
             } else {
+                const [r, g, b] = frame.background ?? [0, 0, 0];
                 encoder
                     .beginRenderPass({
-                        colorAttachments: [{ view: background.createView(), loadOp: "clear", storeOp: "store" }],
+                        colorAttachments: [
+                            {
+                                view: background.createView(),
+                                loadOp: "clear",
+                                storeOp: "store",
+                                clearValue: { r, g, b, a: 1 },
+                            },
+                        ],
                     })
                     .end();
             }
-            moonPass.pass.encode(encoder, target, { background });
+            moonPass.encode(encoder, target, { background });
             device.queue.submit([encoder.finish()]);
             const passesMs = performance.now() - started;
             const skyKey = `${m.jd},${m.trueDirection.join(",")},${m.heightM}`;

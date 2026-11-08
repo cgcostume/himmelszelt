@@ -1,8 +1,10 @@
 import { find } from "../dom";
 import {
+    bindHdr,
     bindToneCurveChoice,
     configureCanvas,
     display,
+    displayOutput,
     gpuDevice,
     onDisplay,
     onTables,
@@ -15,9 +17,19 @@ import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
-import { createMoonRenderer, inverseViewProjection, type MapSize, moonAt, type ToneCurveName } from "./renderer";
+import {
+    createMoonRenderer,
+    inverseViewProjection,
+    type MapSize,
+    moonAt,
+    onUmbraTable,
+    type ToneCurveName,
+} from "./renderer";
 
 const DEG = Math.PI / 180;
+// The image's rms wander through one zenith's column of air, in arcseconds: a camera lens on a fair night, the tilt
+// 0.42 lambda/D (D/r0)^(5/6) for D 5 cm and r0 10 cm at 500 nm.
+const SEEING = 0.5;
 
 /**
  * The Moon figure on `root`, a `figure[data-moon]`: dunstkreis' sky in cd/m² into a float texture, nachtgestirn's
@@ -52,7 +64,7 @@ export function moonFigure(root: HTMLElement) {
         const context = canvas.getContext("webgpu");
         if (!context) return null;
         configureCanvas(context, SDR);
-        return { device: gpuDevice(), context, adapterName: shared.adapterName };
+        return { device: gpuDevice(), context, adapterName: shared.adapterName, format: SDR as GPUTextureFormat };
     }
     const gpu = setup();
 
@@ -113,13 +125,27 @@ export function moonFigure(root: HTMLElement) {
         const m = moonAt(state.jd, state, table.luts.model);
         const astronomyMs = performance.now() - started;
         const { direction, angularDiameter, horizontal, lit, waxing, libration, earthshine, shadow } = m;
-        if (pressed("lock")) {
-            camera.yaw = Math.atan2(direction[0], direction[1]);
-            camera.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, Math.asin(direction[2])));
+        // Kept on the Moon, or on the Sun.
+        const kept = pressed("lock")
+            ? direction
+            : maybe("sunLock") && pressed("sunLock")
+              ? m.apparentSunDirection
+              : null;
+        if (kept) {
+            camera.yaw = Math.atan2(kept[0], kept[1]);
+            camera.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, Math.asin(kept[2])));
         }
         const basis = cameraBasis(camera, width / height);
+        // HDR where the display and the canvas can, into the chosen headroom.
+        const { format, headroom } = displayOutput();
+        if (format !== gpu.format) {
+            configureCanvas(gpu.context, format);
+            gpu.format = format;
+        }
         const drawn = renderer.draw(gpu.context.getCurrentTexture(), {
             moon: m,
+            format,
+            headroom,
             luts: table.luts,
             toneMap: choice("tone") as ToneCurveName,
             width,
@@ -136,8 +162,9 @@ export function moonFigure(root: HTMLElement) {
             shadows: pressed("shadows"),
             earthshine: pressed("earthshine"),
             eclipse: pressed("eclipse"),
-            law: choice("law") === "lambert" ? "lambert" : "hapke",
+            law: (choice("law") || "hapke") as "hapke" | "lambert" | "orenNayar" | "metallicRoughness",
             nightVision: pressed("eye"),
+            shimmer: pressed("shimmer") ? { seeing: SEEING, time: performance.now() / 1000, dispersion: 1 } : null,
         });
         if (!drawn) return;
         const submitted = performance.now();
@@ -165,10 +192,13 @@ export function moonFigure(root: HTMLElement) {
         }
         placeCompass(basis, canvas.clientWidth, canvas.clientHeight);
         showTiming(astronomyMs, drawn.passesMs, submitted);
+        // The shimmer moves on its own: the next frame asked for while it is on, drawn only while the figure shows.
+        if (pressed("shimmer")) requestAnimationFrame(requestRender);
     }
 
     if (gpu) {
         bindToneCurveChoice(root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-tone"]`));
+        bindHdr(find('[data-hdr="note"]', root), find('[data-hdr="choice"]', root));
         onDisplay(() => {
             for (const input of root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-tone"]`))
                 input.checked = input.value === display.toneCurve;
@@ -176,14 +206,30 @@ export function moonFigure(root: HTMLElement) {
         });
         onChange(requestRender);
         onTables(requestRender);
+        onUmbraTable(requestRender);
         new ResizeObserver(requestRender).observe(canvas);
         maybe("exposure")?.addEventListener("input", requestRender);
         for (const name of ["law", "maps"])
             for (const input of root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-${name}"]`))
                 input.addEventListener("change", requestRender);
-        for (const name of ["auto", "lock", "albedo", "relief", "shadows", "earthshine", "eclipse", "eye"]) {
+        for (const name of [
+            "shimmer",
+            "auto",
+            "lock",
+            "sunLock",
+            "albedo",
+            "relief",
+            "shadows",
+            "earthshine",
+            "eclipse",
+            "eye",
+        ]) {
             maybe(name)?.addEventListener("click", () => {
-                field(name).setAttribute("aria-pressed", String(!pressed(name)));
+                const on = !pressed(name);
+                field(name).setAttribute("aria-pressed", String(on));
+                // One lock at a time.
+                const other = name === "lock" ? "sunLock" : name === "sunLock" ? "lock" : null;
+                if (on && other) maybe(other)?.setAttribute("aria-pressed", "false");
                 requestRender();
             });
         }
@@ -215,7 +261,10 @@ export function moonFigure(root: HTMLElement) {
         });
         lookAround(canvas, camera, {
             onChange: requestRender,
-            onDrag: () => field("lock").setAttribute("aria-pressed", "false"),
+            onDrag: () => {
+                field("lock").setAttribute("aria-pressed", "false");
+                maybe("sunLock")?.setAttribute("aria-pressed", "false");
+            },
         });
         requestRender();
     }

@@ -1,0 +1,57 @@
+---
+import Term from "../Term.astro";
+import Try from "../Try.astro";
+import "../sternzeit/sternzeit.css";
+import "./nachtgestirn.css";
+import Icon from "../Icon.astro";
+import Resolutions from "../Resolutions.astro";
+import LunationSlider from "../sternzeit/LunationSlider.astro";
+import { STRIP_RESOLUTIONS } from "./resolution-options";
+
+/** The close-up of the terminator at one, 4, 16 and 64 samples per pixel. */
+interface Props {
+    id?: string;
+}
+const { id = "sampling" } = Astro.props;
+---
+
+<figure class="tiles-figure wide" id={id} data-sampling>
+    <div class="tiles-panel as-seen split" style="--count: 4">
+        <canvas aria-label="A close-up of the Moon's terminator drawn with one, 4, 16 and 64 samples per pixel, rendered with WebGPU"></canvas>
+        <span class="view-buttons tiles-end">
+            <button type="button" class="view-icon" data-filter="nearest" aria-pressed="false" title="The nearest texel of the full size map, no levels" aria-label="Nearest"><Icon name="filterNearest" /></button>
+            <button type="button" class="view-icon" data-filter="bilinear" aria-pressed="false" title="Bilinear: between the four nearest texels of the full size map, no levels" aria-label="Bilinear"><Icon name="filterBilinear" /></button>
+            <button type="button" class="view-icon" data-filter="trilinear" aria-pressed="false" title="Trilinear: bilinear on the two nearest levels, between them" aria-label="Trilinear"><Icon name="filterTrilinear" /></button>
+            <button type="button" class="view-icon" data-filter="bspline" aria-pressed="true" title="As the pass does: anisotropic, and by a cubic B-spline where the map is magnified" aria-label="B-spline"><Icon name="filterBspline" /></button>
+            <button type="button" class="view-icon" data-field="anisotropy" aria-pressed="true" title="Anisotropic: up to sixteen trilinear taps along the footprint where the slant stretches it; with trilinear and the B-spline" aria-label="Anisotropic"><Icon name="anisotropy" /></button>
+        </span>
+        <Resolutions options={STRIP_RESOLUTIONS} chosen="large" />
+    </div>
+    <ul class="tiles-labels" style="grid-template-columns: repeat(4, 1fr)">
+        <li><span class="tiles-name">1 sample</span> <span class="tiles-value">through the pixel's center</span></li>
+        <li><span class="tiles-name">4 samples</span> <span class="tiles-value"></span></li>
+        <li><span class="tiles-name">16 samples</span> <span class="tiles-value"></span></li>
+        <li><span class="tiles-name">64 samples</span> <span class="tiles-value">their light averaged</span></li>
+    </ul>
+    <p class="vis-credit footnote tiles-credit below">Rendered with WebGPU</p>
+    <LunationSlider />
+    <p class="view-status" data-field="note"></p>
+    <figcaption class="figure-caption">
+        Supersampling the relief: the same close-up of the <Term of="Terminator">terminator</Term> as in the figure
+        above, relief and shadows on, drawn with one, 4, 16 and 64 samples per pixel, their light averaged as a sensor
+        does, the maps filtered over the whole pixel whatever the count. With one sample the crater rims and the
+        shadows' edges break into stair steps and sparkle as the slider moves; with 16 they are smooth. The pass takes
+        8, and 32 along the terminator. The slider runs from new moon to
+        new moon.
+        <Try label="Five days after new moon" set="date=2026-11-14T18:00Z" fig={id}>
+            the southern highlands, every crater rim a crease in the relief: step the time an hour at a time and watch
+            the first tile crawl.
+        </Try>
+    </figcaption>
+</figure>
+
+<script>
+    import { samplingFigure } from "./sampling";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-sampling]")) samplingFigure(root);
+</script>

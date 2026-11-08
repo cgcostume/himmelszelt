@@ -17,15 +17,18 @@ other package at runtime: the astronomy comes in as directions and angles, from
   month and the hour, and hidden below the horizon you name.
 - **The light**: the Sun's illuminance at the Moon in lux times the surface's reflectance. Hapke's law (Lommel-Seeliger
   with an opposition surge and a little forward scattering, after Jensen et al. 2001) keeps the full Moon as bright at
-  its edge as in its middle, where Lambert's law, offered to compare, would darken the limb like a billiard ball. A
+  its edge as in its middle, where Lambert's law, Oren-Nayar's and a PBR renderer's metallic-roughness dielectric, offered to compare,
+  darken the limb like a ball's and let a half Moon fade into its terminator. A
   point seen straight on at opposition reflects its normal albedo like a Lambert surface, so a full Moon of geometric
   albedo 0.12 in 128,000 lux is some 4,900 cd/m² before the air, as measured.
 - **Earthshine**, Earth's illuminance at the Moon in lux: `earthshineIlluminance` gives it from Earth's phase as the
   Moon sees it, some 13 lux for a full Earth, a ten thousandth of the Sun.
 - **Earth's shadow**: per point of the surface, the share of the Sun's disc Earth leaves uncovered, which is the
-  penumbra, plus the sunlight Earth's atmosphere bends into the umbra, copper in the middle and turquoise at the rim
-  where ozone takes the orange out. The radii come from `eclipse.lunar` of sternzeit, the geometry is yours to hand
-  over.
+  penumbra, plus the sunlight Earth's atmosphere bends into the umbra, deep red in the middle and brighter towards
+  the rim, from a table over the shadow's radius: `refractedSunlight` integrates it after Link's theory, ring of air
+  by ring, from any two functions of a ray's grazing height, how far the air turns it and what it lets through, such
+  as dunstkreis' `refractionAngle` and `airTransmittance`; without one, `typicalUmbra` is a hand-set copper with a
+  turquoise rim. The radii come from `eclipse.lunar` of sternzeit, the geometry is yours to hand over.
 - **The air**: a transmittance per channel along the line of sight dims and reddens the disc, and the sky you compose
   it over adds its light in front. The air's bending, a `refractionTable` from any refraction function such as
   dunstkreis' `refractionAngle`, turns every ray down before it meets the Moon, as dunstkreis does for the sun disc:
@@ -38,7 +41,13 @@ other package at runtime: the astronomy comes in as directions and angles, from
   the distance from what casts it, contact hardening by the Sun's own size. `shadows` turns them off.
 - **Night vision**: `nightVision` on the pass turns the composed Moon and sky into what the eye sees, helldunkel's
   blue shift for the rods: the moonlit sky blue, the disc, far brighter, as it is.
-- **Supersampled**: 8 rays per pixel on and around the disc by default (`samples`), and the maps read by a cubic
+- **A comparison**: `compare` holds the disc against another law and stripes the pixels more than a third of a
+  stop off it, red where brighter, blue where darker, as a camera stripes what clips.
+- **The color**: the map scaled to normal albedo and tinted to the Moon's own color, B-V 0.92, its variations kept;
+  `mapColor` reads it as published or as gray instead.
+- **Supersampled**: 8 rays per pixel on and around the disc by default (`samples`), 32 along the terminator
+  (`terminatorSamples`), where a crater rim turns from lit to dark within a texel; the maps are filtered over the
+  whole pixel's footprint whatever the count, so the rays sharpen the shading and never alias the maps, and read by a cubic
   B-spline when magnified, so the terminator and the relief along it stay smooth. Minified, they are filtered
   anisotropically, `textureSampleGrad` over each ray's footprint with up to 16 taps along its long axis: towards the
   poles an equirectangular map crowds its texels east to west, and at the limb the slant stretches the footprint, so

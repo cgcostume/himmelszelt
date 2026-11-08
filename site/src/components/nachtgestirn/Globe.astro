@@ -1,0 +1,41 @@
+---
+import Icon from "../Icon.astro";
+import Resolutions from "../Resolutions.astro";
+import LunationSlider from "../sternzeit/LunationSlider.astro";
+import "../sternzeit/sternzeit.css";
+import "./nachtgestirn.css";
+import { WHOLE_RESOLUTIONS } from "./resolution-options";
+
+/** The Moon large, as a ball to turn and zoom: Hapke's law over NASA's maps, lit by the Sun and by earthshine. */
+interface Props {
+    id?: string;
+}
+const { id = "globe" } = Astro.props;
+---
+
+<figure class="tiles-figure" id={id} data-globe>
+    <div class="tiles-panel as-seen globe-panel">
+        <canvas aria-label="The Moon at the chosen moment, lit by the Sun and by earthshine, to turn and zoom, rendered with WebGPU" title="Drag to turn the Moon, scroll to zoom; double click to see it from Earth again"></canvas>
+        <Resolutions options={WHOLE_RESOLUTIONS} chosen="large" />
+        <span class="view-buttons globe-end">
+            <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
+        </span>
+        <p class="vis-credit footnote tiles-credit">Drag to turn, scroll to zoom. Rendered with WebGPU</p>
+    </div>
+    <LunationSlider />
+    <p class="view-status" data-field="note"></p>
+    <figcaption class="figure-caption">
+        The Moon at the chosen moment, out of the air and away from Earth: Hapke's lunar law over NASA's color and
+        LOLA's heights, the relief shading the surface and casting its shadows, the Sun where it stands, and the night
+        side lit by earthshine where it faces Earth. Drag to carry yourself around the Moon, the Sun and Earth staying
+        where they are, onto the far side, which Earth never sees, or behind the Moon into a crescent; scroll to zoom
+        in where the cursor is, or out until the Moon is small, in as far as a texel of the 16K maps to a pixel; double click to see it from Earth again. The maps can be had at 4K, as the package ships
+        them, at 8K, and at 16K, where the GPU takes them. Every pixel is the mean of up to 64 rays, as many as the canvas' size allows, the same whether the Moon turns or rests. The slider runs from new moon to new moon.
+    </figcaption>
+</figure>
+
+<script>
+    import { globeFigure } from "./globe";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-globe]")) globeFigure(root);
+</script>

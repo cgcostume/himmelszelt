@@ -12,19 +12,63 @@
     width: 100%;
     height: auto;
 }
+/* The flat maps, one above the other, the near side's half outlined on the color map. */
+.maps-panel {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-canvas);
+}
+.maps-panel + .maps-panel {
+    margin-top: 0.5rem;
+}
+.maps-panel > img,
+.maps-panel > canvas:not(.maps-seen) {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+/* What Earth does not see, hatched over the map, the panel's size. */
+.maps-seen {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+/* A wide figure breaks out of the column, centered on it; its caption and status keep to the column. */
+.tiles-figure.wide {
+    margin-left: calc(50% - var(--wide-width) / 2);
+}
+@media (max-width: 48rem) {
+    .tiles-figure.wide {
+        width: auto;
+        margin-left: 0;
+    }
+}
+.tiles-figure.wide > .figure-caption,
+.tiles-figure.wide > .view-status,
+.tiles-figure.wide > .figure-slider {
+    max-width: calc(var(--measure) - 3rem);
+    margin-inline: auto;
+}
 /* The discs that can be turned: a hand, and no scrolling of the page while they are dragged on a touch screen. */
-.tiles-figure[data-laws] canvas {
+.tiles-figure[data-laws] canvas,
+.tiles-figure[data-globe] canvas {
     cursor: grab;
     touch-action: none;
     user-select: none;
 }
-.tiles-figure[data-laws] canvas.dragging {
+.tiles-figure[data-laws] canvas.dragging,
+.tiles-figure[data-globe] canvas.dragging {
     cursor: grabbing;
 }
-/* A switch in the status line under the tiles, in the line's flow. */
+/* Switches in the status line under the tiles, in the line's flow. */
 .tiles-figure .view-status > .view-toggle {
     position: static;
     margin-right: 0.5rem;
+}
+.tiles-figure .view-status > .view-toggle + .view-toggle {
+    margin-left: -0.25rem;
 }
 /* The names under the tiles, one column each, muted like a readout, with the number under the name. */
 .tiles-labels {
@@ -65,8 +109,59 @@
     stroke-linejoin: round;
     vector-effect: non-scaling-stroke;
 }
-.plot-line-lambert {
-    stroke: var(--text);
+/* The reflectance laws, each in its color wherever it is named: the Moon's own law in the accent. */
+.tiles-figure {
+    --law-lambert: var(--text);
+    --law-orenNayar: oklch(0.66 0.15 300);
+    --law-metallicRoughness: oklch(0.62 0.14 150);
+    --law-hapke: var(--accent);
+}
+.law-lambert {
+    color: var(--law-lambert);
+}
+.law-orenNayar {
+    color: var(--law-orenNayar);
+}
+.law-metallicRoughness {
+    color: var(--law-metallicRoughness);
+}
+.plot-line-metallicRoughness,
+.plot-dot-metallicRoughness {
+    stroke: var(--law-metallicRoughness);
+}
+.plot-label-metallicRoughness {
+    fill: var(--law-metallicRoughness);
+}
+.law-hapke {
+    color: var(--law-hapke);
+}
+.plot-line-lambert,
+.plot-dot-lambert {
+    stroke: var(--law-lambert);
+}
+.plot-line-orenNayar,
+.plot-dot-orenNayar {
+    stroke: var(--law-orenNayar);
+}
+.plot-line-hapke,
+.plot-dot-hapke {
+    stroke: var(--law-hapke);
+}
+.plot-label-lambert {
+    fill: var(--law-lambert);
+}
+.plot-label-orenNayar {
+    fill: var(--law-orenNayar);
+}
+.plot-label-hapke {
+    fill: var(--law-hapke);
+}
+.plot-label-measured {
+    fill: var(--muted);
+}
+.plot-line-measured,
+.plot-dot-measured {
+    stroke: var(--muted);
 }
 .plot-line-measured {
     stroke: var(--text);
@@ -104,24 +199,96 @@
     stroke-width: 3;
     stroke-linecap: butt;
 }
+/* The strips of small Moons, one law a row, named in a column of 64 px left of the discs (NAMES_PX in phases.ts). */
+/* As much black above the strips as below, where the credit sits, and each law's name in the middle of its row. */
+.tiles-panel.strips {
+    padding-block: 1.75rem;
+    background: #000;
+}
+/* On the dark panels the laws' colors are the dark theme's, resolved there rather than on the page. */
+.tiles-panel.as-seen {
+    --law-lambert: var(--text);
+    --law-hapke: var(--accent);
+}
+.tiles-panel > .strips-canvas {
+    width: calc(100% - 64px);
+    margin-left: 64px;
+}
+.strip-names {
+    position: absolute;
+    inset: 1.75rem auto 1.75rem 0;
+    display: flex;
+    flex-direction: column;
+    width: 64px;
+    margin: 0;
+    padding: 0 0 0 0.5rem;
+    font-size: var(--text-meta);
+    list-style: none;
+    pointer-events: none;
+}
+.strip-names > li {
+    display: flex;
+    flex: 1;
+    align-items: center;
+}
+/* The switches over a panel, at its top left, as over the other figures' scenes. */
+.tiles-panel > .view-buttons:not(.eclipse-jump) {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    z-index: 5;
+}
+/* The phases' strips leave their names' column free. */
+.tiles-panel.strips > .view-buttons {
+    left: auto;
+    right: 6px;
+}
+/* The note at a panel's top left: how to turn it, and that WebGPU renders it. */
+.vis-credit.tiles-credit {
+    top: auto;
+    right: 0.75rem;
+    bottom: 0.4rem;
+    left: auto;
+}
+/* Under the labels where the tiles are filled to their edges with the Moon's ground, in the page's colors. */
+.vis-credit.tiles-credit.below {
+    position: static;
+    margin: 0.25rem 0 0;
+    color: var(--muted);
+    text-align: right;
+}
 .tiles-empty {
     padding: 2rem 1rem;
     color: var(--muted);
     text-align: center;
 }
 
-/* The big Moon of the shadow figure: a square panel in the column's middle, the shadow's edges in an SVG over it. */
-.shadow-big {
-    max-width: 480px;
-    margin: 0 auto 0.5rem;
+/* A row of tiles split by a line of the page's background between them, `--count` tiles wide. The page's
+   background is taken on the figure, outside the dark panel, which has its own. */
+.tiles-figure {
+    --page-bg: var(--bg);
 }
-.shadow-big > svg {
+.tiles-panel.split::after {
+    content: "";
+    position: absolute;
+    inset: 0 -1px 0 0;
+    background:
+        linear-gradient(to right, transparent calc(100% - 1px), var(--page-bg) 0) 0 0 / calc(100% / var(--count)) 100%;
+    pointer-events: none;
+}
+/* Lines and marks drawn over a row of tiles, in an SVG the panel's size. */
+.tiles-overlay {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     pointer-events: none;
 }
+.tiles-overlay .figure-note {
+    fill: oklch(0.85 0.05 230 / 0.9);
+}
+/* Lines laid over the Moon: the shadow's edges, the discs' edges at apogee and perigee, all in one style. */
+.figure-outline,
 .shadow-outline {
     fill: none;
     stroke: oklch(0.85 0.05 230 / 0.8);
@@ -129,9 +296,213 @@
     stroke-dasharray: 5 4;
     vector-effect: non-scaling-stroke;
 }
-.shadow-outline-penumbra {
-    stroke-dasharray: 2 4;
+.distance-arrow {
+    stroke: oklch(0.85 0.05 230 / 0.85);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
 }
-.shadow-big .figure-note {
-    fill: oklch(0.85 0.05 230 / 0.9);
+.distance-arrow-head {
+    fill: oklch(0.85 0.05 230 / 0.85);
+}
+.surface-marker {
+    fill: none;
+    stroke: oklch(0.85 0.05 230 / 0.9);
+    stroke-width: 1.2;
+    vector-effect: non-scaling-stroke;
+}
+
+/* The big Moon of the shadow figure: a wide panel, the shadow's edges in an SVG over it, the jump buttons at its foot. */
+.shadow-big {
+    margin-bottom: 0.5rem;
+}
+.tiles-panel.shadow-big > canvas {
+    aspect-ratio: 2 / 1;
+}
+/* The eclipses around the chosen moment: a bar each, clickable, the shown one and the total ones in the accent. */
+.shadow-timeline {
+    margin: 0.5rem 0 0.75rem;
+}
+.shadow-timeline > svg {
+    display: block;
+    width: 100%;
+    height: 54px;
+    overflow: visible;
+}
+.timeline-eclipse {
+    cursor: pointer;
+}
+.timeline-eclipse > line {
+    stroke: var(--text);
+    stroke-width: 2.5;
+    stroke-linecap: butt;
+}
+.timeline-total > line {
+    stroke: var(--accent);
+}
+.timeline-shown > line {
+    stroke-width: 5;
+}
+.timeline-eclipse:hover > line {
+    stroke: var(--accent);
+    stroke-width: 5;
+}
+.timeline-hit {
+    fill: transparent;
+}
+.timeline-edge {
+    fill: var(--text);
+    opacity: 0.06;
+}
+
+/* The globe's full screen button, top right, and the globe full screen: the canvas the screen's size. */
+.tiles-panel > .view-buttons.globe-end,
+.tiles-panel > .view-buttons.tiles-end {
+    left: auto;
+    right: 6px;
+}
+.globe-panel:fullscreen {
+    background: black;
+}
+.globe-panel:fullscreen > canvas {
+    width: 100%;
+    height: 100%;
+}
+
+/* The phases figure names its laws on their curves, in the ink, not in colors. */
+.tiles-figure[data-phases] .plot-line:not(.plot-line-measured) {
+    stroke: var(--text);
+}
+.tiles-figure[data-phases]
+    :is(.plot-label-lambert, .plot-label-metallicRoughness, .plot-label-orenNayar, .plot-label-hapke) {
+    fill: var(--text);
+}
+/* By day the sky the discs stand in is the ground of the whole figure, the plot and every name on it too, in an ink that reads on it. */
+.tiles-figure[data-day] :is(.tiles-panel.strips, .tiles-plot) {
+    --text: oklch(0.24 0.03 250);
+    --muted: oklch(0.34 0.03 250);
+    color: var(--text);
+    background: var(--sky-bg, #8fb4e0);
+}
+.tiles-figure[data-day][data-sky-dark] :is(.tiles-panel.strips, .tiles-plot) {
+    --text: oklch(0.96 0.01 250);
+    --muted: oklch(0.86 0.02 250);
+}
+.tiles-figure[data-day] .tiles-panel.strips {
+    border-radius: var(--radius-canvas) var(--radius-canvas) 0 0;
+}
+.tiles-figure[data-day] .tiles-plot {
+    margin-top: 0;
+    padding: 0.5rem 0 0.5rem;
+    border-radius: 0 0 var(--radius-canvas) var(--radius-canvas);
+}
+
+/* The phases' cursor and now: a line through the plot, the column framed over the strips, now dashed in the accent. */
+.tiles-figure[data-phases] :is(.plot-cursor, .strips-cursor) {
+    stroke: var(--text);
+    stroke-width: 1;
+    opacity: 0.6;
+}
+.tiles-figure[data-phases] .plot-column {
+    stroke: var(--text);
+    stroke-width: 1;
+    opacity: 0.12;
+}
+.tiles-figure[data-phases] .plot-dot {
+    fill: var(--text);
+}
+.tiles-figure[data-phases] .plot-now {
+    stroke: var(--accent);
+    stroke-width: 1.2;
+    stroke-dasharray: 3 3;
+}
+.tiles-figure[data-phases] .plot-now-label {
+    fill: var(--accent);
+    text-anchor: middle;
+}
+.tiles-figure[data-phases] .strips-now-line {
+    stroke: var(--accent);
+    stroke-width: 1.2;
+    stroke-dasharray: 3 3;
+}
+.tiles-figure[data-phases] .strips-now {
+    fill: var(--accent);
+}
+.tiles-figure[data-phases] .strips-overlay {
+    z-index: 1;
+}
+.tiles-figure[data-phases] :is(.tiles-panel, .tiles-plot) {
+    cursor: crosshair;
+}
+
+/* The laws' lobes from the side, four in a row, two on a phone; the light dragged in any of them. */
+.lobes-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+}
+@media (max-width: 40rem) {
+    .lobes-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+.lobes-panel > svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 200 / 116;
+    cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+}
+.lobes-name {
+    margin: 0.2rem 0 0;
+    font-size: var(--text-meta);
+    text-align: center;
+}
+.lobe {
+    fill: color-mix(in oklab, var(--text), transparent 85%);
+    stroke: var(--text);
+    stroke-width: 1.4;
+    stroke-linejoin: round;
+}
+.lobe-lambert {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+}
+.lobe-surface {
+    stroke: var(--text);
+    stroke-width: 2;
+}
+.lobe-normal {
+    stroke: var(--muted);
+    stroke-width: 1.2;
+}
+.lobe-light {
+    stroke: var(--accent);
+    stroke-width: 1.6;
+}
+.lobe-sun {
+    fill: var(--accent);
+}
+
+/* Where the Sun stands at the lobes' angle, on each disc of the laws' figure. */
+.laws-outline,
+.laws-outline-under {
+    fill: none;
+    stroke-linecap: round;
+}
+/* Light dashes over a dark line, so it reads on the lit disc and on its night side alike. */
+.laws-outline-under {
+    stroke: rgb(0 0 0 / 0.65);
+    stroke-width: 3;
+}
+.laws-outline {
+    stroke: rgb(255 255 255 / 0.95);
+    stroke-width: 1.4;
+    stroke-dasharray: 5 4;
+}
+.lobes-download {
+    vertical-align: middle;
 }
