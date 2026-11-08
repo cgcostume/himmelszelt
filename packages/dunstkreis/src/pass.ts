@@ -88,6 +88,12 @@ export interface SkyParams {
      * of the Sun's light, from the Moon's direction. 0 by default, none.
      */
     moonIlluminance: number;
+    /**
+     * What the debug overlay is drawn in, for a sky pass made with `debugGrid`: 1 by default, white after the tone
+     * curve. Without one the pass writes light the renderer exposes itself, and the grid shows white where this is the
+     * luminance it exposes as white, 1.2 × 2^EV100 for the pass' `ev100` of -log2(1.2), which writes cd/m².
+     */
+    gridInk: number;
 }
 
 /** A sky cube map's settings, fixed when its pass is made. */

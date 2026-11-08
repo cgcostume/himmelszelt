@@ -139,6 +139,7 @@ const DEFAULTS: SkyParams = {
     projectionDistance: 0,
     moonDirection: [0, 0, -1],
     moonIlluminance: 0,
+    gridInk: 1,
 };
 
 const EIGHT_BIT = ["rgba8unorm", "bgra8unorm"];
@@ -562,6 +563,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             if (moonShare > 0 && apparentMoon.key !== moonKey)
                 apparentMoon = { key: moonKey, direction: apparentDirection([mx, my, mz], model, height) };
             sky.set(apparentMoon.direction, 36);
+            sky[39] = params.gridInk;
             device.queue.writeBuffer(skyParams, 0, sky);
 
             // Rebuilding the sky-view table is the expensive part, and it is why the sky pass itself is one fetch

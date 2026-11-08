@@ -2,7 +2,6 @@
 import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
-import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
 
@@ -18,9 +17,6 @@ const { id = "near-far" } = Astro.props;
         <canvas aria-label="The Moon at apogee, at the chosen moment and at perigee, rendered with WebGPU"></canvas>
         <span class="tiles-start">
             <span class="tiles-hint footnote">Rendered with WebGPU</span>
-        </span>
-        <span class="view-buttons tiles-end">
-            <Rays />
         </span>
         <svg class="tiles-overlay" data-field="lines" aria-hidden="true"></svg>
     </div>

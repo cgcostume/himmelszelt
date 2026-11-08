@@ -21,12 +21,15 @@ const { id = "surface" } = Astro.props;
         <canvas aria-label="The Moon, and a close-up of its terminator drawn from the color map alone, with the relief, with the relief's shadows, and with the relief displaced, rendered with WebGPU"></canvas>
         <span class="tiles-start">
             <Resolutions options={STRIP_RESOLUTIONS} chosen="large" />
+            <span class="view-buttons"><button type="button" class="view-toggle" data-field="albedo" aria-pressed="true" title="NASA's color map of the Moon; off, a uniform surface of the Moon's albedo, so the relief and its shadows show alone">albedo</button></span>
             <span class="tiles-hint footnote">Rendered with WebGPU</span>
         </span>
         <svg class="tiles-overlay" data-field="marker" aria-hidden="true"></svg>
-        <span class="view-buttons tiles-end">
-            <Rays />
-            <button type="button" class="view-icon" data-field="download" title="Download the disc and its close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+        <span class="tiles-ends">
+            <span class="view-buttons"><Rays /></span>
+            <span class="view-buttons">
+                <button type="button" class="view-icon" data-field="download" title="Download the disc and its close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+            </span>
         </span>
     </div>
     <ul class="tiles-labels" style="grid-template-columns: repeat(5, 1fr)">
@@ -36,6 +39,19 @@ const { id = "surface" } = Astro.props;
         <li><span class="tiles-name">shadows</span> <span class="tiles-value">cast through the heights</span></li>
         <li><span class="tiles-name">displaced</span> <span class="tiles-value">rays marched through the heights</span></li>
     </ul>
+    <div class="tiles-panel tycho-panel" data-export="tycho-slice">
+        <span class="view-buttons">
+            <button type="button" class="view-toggle" data-field="sliceShadows" aria-pressed="true" title="The shadows: each point's march towards the Sun and the share of the Sun's disc it sees; off, every point sees all of it">shadows</button>
+            <button type="button" class="view-toggle" data-field="sliceNormals" aria-pressed="true" title="The normals: each point lit by the cosine of its normal to the Sun; off, by the share of the Sun it sees alone">normals</button>
+        </span>
+        <svg class="tycho-slice" data-field="slice" role="img" aria-label="A slice through the crater Tycho from west to east, from LOLA's heights: the surface lit as much as it sees of the Sun, its normals, and one point's march towards the Sun" title="Drag along the slice for another point's march; double click for the tip of the shadow"></svg>
+        <span class="tycho-names">
+            <span class="tiles-hint footnote" data-export-text>west</span>
+            <span class="tiles-hint footnote" data-field="sliceName" data-export-text></span>
+            <span class="tiles-hint footnote" data-export-text>east</span>
+        </span>
+    </div>
+    <p class="view-status tycho-note" data-field="sliceNote"></p>
     <LunationSlider />
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
@@ -45,9 +61,22 @@ const { id = "surface" } = Astro.props;
         with the relief, the slopes turned to the Sun bright and away from it dark; and with the shadows marched through
         the heights, the crater floors filling with shadow and the peaks beyond the terminator catching the light; and displaced, each
         ray marched through the heights, so the near rims hide the floors behind them and the peaks stand up. The
-        close-up keeps to the terminator at 30° south as the slider runs from new moon to new moon.
-        <Try label="Five days after new moon" set="date=2026-11-14T18:00Z" fig={id}>
-            craters rim-lit and floored with shadow along the terminator.
+        close-up keeps to the terminator at Tycho's 43° south as the slider runs from new moon to new moon, and so
+        passes over the crater at sunrise and at sunset. Under it, how the
+        pass gets there, on a slice through the crater Tycho from west to east, from the heights of the 8K strip, a texel
+        a kilometer apart, the heights four times as tall and the Moon's curve kept: each texel's normal from its two
+        neighbors' heights, and how much of the Sun's disc it sees, marched towards the Sun from three quarters of a
+        texel on, each step a quarter farther than the last and read from as coarse a level of the map as the steps are
+        apart, so no peak falls between them. The highest angle the terrain reaches is its horizon; the share of the
+        Sun's half degree above it lights the point, all of it, some or none. The surface is drawn thick and bright as
+        far as it sees the Sun, its normals as long as they turn to it and bright where they see it, the shadows dark
+        under the last rays grazing the terrain, and one point's march drawn out, with the map as the march reads it
+        from there dashed beside the real one, coarser with the distance, the tip of the shadow nearest the middle unless you drag to another. Tycho and the slice are marked on the disc.
+        <Try label="Sunrise over Tycho" set="date=2026-11-18T06:00Z" fig={id}>
+            in the slice, the eastern rim's shadow across the floor, the central peak's top in the light.
+        </Try>
+        <Try label="Sunset over Tycho" set="date=2026-12-02T06:00Z" fig={id}>
+            the light from the west, the western rim's shadow reaching for the peak.
         </Try>
     </figcaption>
 </figure>

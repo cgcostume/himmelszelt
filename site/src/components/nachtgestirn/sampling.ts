@@ -63,6 +63,13 @@ export function samplingFigure(root: HTMLElement) {
         });
     }
 
+    // The color map, or a uniform albedo for the relief alone.
+    const albedo = find("[data-field=albedo]", root);
+    albedo.addEventListener("click", () => {
+        albedo.setAttribute("aria-pressed", String(albedo.getAttribute("aria-pressed") !== "true"));
+        requestRender();
+    });
+
     function render() {
         const table = tables();
         if (!table) return;
@@ -81,7 +88,7 @@ export function samplingFigure(root: HTMLElement) {
             maps: resolution(),
             // A stop more open than the disc's meter, for the low Sun at the pole.
             ev100: moonEV100(m.phaseAngle, m.lit) - 1,
-            albedo: true,
+            albedo: albedo.getAttribute("aria-pressed") === "true",
             relief: pressed(relief),
             shadows: pressed(relief) && pressed(shadows),
             displacementFrom: pressed(relief) && pressed(displace) ? 0 : Number.POSITIVE_INFINITY,
@@ -94,7 +101,7 @@ export function samplingFigure(root: HTMLElement) {
         tiles?.draw({ count, width: tilePx, degreesAcross: overview }, (i) =>
             i === 0
                 ? { ...frame, ev100: null }
-                : { ...frame, offset, degreesAcross: closeup, filter: FILTERS[i - 1]?.[0] ?? "bspline" },
+                : { ...frame, offset, degreesAcross: closeup, filter: FILTERS[i - 1]?.[0] ?? "anisotropic" },
         );
         marker.setAttribute("viewBox", `0 0 ${width} ${tileCss}`);
         const scale = tileCss / overview;

@@ -5,7 +5,8 @@ import Icon from "../Icon.astro";
  * The frame every view into the sky shares, full screen with all of it: along the top the Sun lock, the grid and how to
  * navigate, then play, the options, the download and full screen; the observer's height up the left edge, as a y axis;
  * the moment, half a day either way, under it as an x axis. The view's own canvas and overlays go in the default slot,
- * its further switches, in named groups, in the `options` slot, which folds away behind a button.
+ * its further switches, in named groups, in the `options` slot, which folds away behind a button. A few switches the view
+ * wants at hand go along the top, in groups of their own before play's, in the `bar` slot.
  */
 interface Props {
     /** How to navigate the view, after the switches. */
@@ -73,11 +74,14 @@ const named: Record<number, string> = { 0: "1 m", 3: "1 km", 5: "100 km" }
                 </span>
                 <span class="sky-hint footnote">{hint}</span>
             </span>
+            <span class="sky-bar-end">
+            <slot name="bar" />
             <span class="view-buttons">
                 <button type="button" class="view-icon" data-field="play" aria-pressed="false" title="Play: the moment runs on, an hour in 10 seconds, half a day in 2 minutes" aria-label="Play"><Icon name="play" /></button>
                 {options && <button type="button" class="view-icon" data-field="options" aria-pressed="true" title="Show or hide this figure's options" aria-label="Options"><Icon name="options" /></button>}
                 {png && <button type="button" class="view-icon" data-field="png" title="Download the view as PNG" aria-label="Download the view as PNG"><Icon name="download" /></button>}
                 <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
+            </span>
             </span>
         </div>
         <label class="sky-height" data-height title="The observer's height, from eye level to the space station's orbit: drag, or turn the mouse wheel">

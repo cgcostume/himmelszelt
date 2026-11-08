@@ -459,6 +459,15 @@
     justify-content: space-between;
     pointer-events: none;
 }
+/* Text switches in the bar sit in their group, not where sternzeit puts a lone switch. */
+.sky-bar .view-toggle {
+    position: static;
+}
+.sky-bar-end {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
 .sky-bar-start {
     display: flex;
     gap: 6px;

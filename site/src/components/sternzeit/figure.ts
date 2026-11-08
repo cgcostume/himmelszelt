@@ -86,6 +86,9 @@ export function labelAboveY(y: number, unitsPerPx: number) {
  */
 export const SUN_SYMBOL = { radius: 8.5, gap: 5, length: 8.5, rays: 8 };
 
+/** A point to drag in a drawn figure, as a slider's thumb: its radius in screen pixels, with `figure-thumb`. */
+export const THUMB_RADIUS = 7.5;
+
 /** The arrowheads in the 3D scenes, flat triangles the same size in screen pixels in every one of them. */
 export const ARROWHEAD_PX = { length: 12, halfWidth: 4.5 };
 

@@ -3,7 +3,6 @@ import Icon from "../Icon.astro";
 import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
-import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
 import Resolutions from "../Resolutions.astro";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
@@ -22,11 +21,13 @@ const { id = "soft-shadows" } = Astro.props;
         <svg class="tiles-overlay" data-field="marker" aria-hidden="true"></svg>
         <span class="tiles-start">
             <Resolutions options={STRIP_RESOLUTIONS} chosen="large" />
+            <span class="view-buttons"><button type="button" class="view-toggle" data-field="albedo" aria-pressed="true" title="NASA's color map of the Moon; off, a uniform surface of the Moon's albedo, so the relief and its shadows show alone">albedo</button></span>
             <span class="tiles-hint footnote">Rendered with WebGPU</span>
         </span>
-        <span class="view-buttons tiles-end">
-            <Rays />
-            <button type="button" class="view-icon" data-field="download" title="Download the disc and the two close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+        <span class="tiles-ends">
+            <span class="view-buttons">
+                <button type="button" class="view-icon" data-field="download" title="Download the disc and the two close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+            </span>
         </span>
     </div>
     <ul class="tiles-labels" style="grid-template-columns: repeat(3, 1fr)">
@@ -37,7 +38,7 @@ const { id = "soft-shadows" } = Astro.props;
     <LunationSlider />
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        Soft shadows on a close-up of the <Term of="Terminator">terminator</Term>, a twenty-fourth of the disc
+        Soft shadows on a close-up of the <Term of="Terminator">terminator</Term>, a sixteenth of the disc
         across, the disc's size it stands for on the line above: the whole disc at the chosen moment, metered, with the close-up marked, and the close-up twice, a stop more open
         for the low Sun. Its shadows cast by a point, every edge as sharp as the shadow map, and by the Sun's half degree,
         each edge sharp near the rim or peak that casts it and widening into a penumbra as the shadow runs on, a

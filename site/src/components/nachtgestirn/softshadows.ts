@@ -8,11 +8,11 @@ import { noGpu } from "./laws";
 import { moonAt, type ToneCurveName } from "./renderer";
 import { mapResolutions, RESOLUTION_NAMES } from "./resolutions";
 import { saveFigure } from "./snapshot";
-import { closeupOffset } from "./surface";
+import { CLOSEUP_LATITUDE, closeupOffset } from "./surface";
 import { createTiles, type TileFrame } from "./tiles";
 
 // The close-up: this share of the disc across, on the terminator, this many degrees of longitude into the light.
-const SHARE = 1 / 24;
+const SHARE = 1 / 16;
 const INTO_THE_LIGHT = 1.5;
 // A Sun without size, in degrees, for hard edges: an arcsecond, as the pass casts below `softShadowsFrom`.
 const POINT_SUN = 1 / 3600;
@@ -27,6 +27,13 @@ export function softShadowsFigure(root: HTMLElement) {
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
     const resolution = mapResolutions(root, "large", requestRender);
+
+    // The color map, or a uniform albedo for the relief alone.
+    const albedo = find("[data-field=albedo]", root);
+    albedo.addEventListener("click", () => {
+        albedo.setAttribute("aria-pressed", String(albedo.getAttribute("aria-pressed") !== "true"));
+        requestRender();
+    });
 
     function render() {
         const table = tables();
@@ -44,7 +51,7 @@ export function softShadowsFigure(root: HTMLElement) {
             toneMap: display.toneCurve as ToneCurveName,
             maps: resolution(),
             ev100: null,
-            albedo: true,
+            albedo: albedo.getAttribute("aria-pressed") === "true",
             relief: true,
             shadows: true,
             earthshine: true,
@@ -66,7 +73,7 @@ export function softShadowsFigure(root: HTMLElement) {
             1,
         );
         const disc = Math.round(tilePx / SHARE).toLocaleString("en-US");
-        note.textContent = `the close-up ${(closeup * 60).toFixed(1)}′ across, as from a disc of ${disc} pixels, on the terminator at 30° south, from the ${RESOLUTION_NAMES[resolution()]}`;
+        note.textContent = `the close-up ${(closeup * 60).toFixed(1)}′ across, as from a disc of ${disc} pixels, on the terminator at ${Math.abs(CLOSEUP_LATITUDE).toFixed(1)}° south, from the ${RESOLUTION_NAMES[resolution()]}`;
     }
 
     // The tiles as drawn, the marker and the names under them, in one PNG.

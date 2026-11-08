@@ -40,12 +40,6 @@
     stroke-linecap: round;
     stroke-linejoin: round;
 }
-/* The observer as the sliders' thumb: the accent, ringed in the page's color. */
-.blue-sky-observer {
-    fill: var(--accent);
-    stroke: var(--bg);
-    stroke-width: 3;
-}
 .blue-sky-observer-grab {
     cursor: ns-resize;
 }

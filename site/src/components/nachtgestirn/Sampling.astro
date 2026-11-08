@@ -25,15 +25,18 @@ const { id = "sampling" } = Astro.props;
         <span class="tiles-start">
             <Resolutions options={STRIP_RESOLUTIONS} chosen="large" />
             <span class="view-buttons">
+                <button type="button" class="view-toggle" data-field="albedo" aria-pressed="true" title="NASA's color map of the Moon; off, a uniform surface of the Moon's albedo, so the relief and its shadows show alone">albedo</button>
                 <button type="button" class="view-toggle" data-field="relief" aria-pressed="true" title="The relief from LOLA's heights, shading the surface; off, the smooth sphere under the color map alone">relief</button>
                 <button type="button" class="view-toggle" data-field="shadows" aria-pressed="true" title="The shadows the relief casts, marched through the heights towards the Sun">shadows</button>
                 <button type="button" class="view-toggle" data-field="displace" aria-pressed="true" title="The relief displaced, each ray marched through the heights, so the limb shows its mountains; off, the slopes shade a smooth sphere">displaced</button>
             </span>
             <span class="tiles-hint footnote">Rendered with WebGPU</span>
         </span>
-        <span class="view-buttons tiles-end">
-            <Rays pressed={false} />
-            <button type="button" class="view-icon" data-field="download" title="Download the disc and the four close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+        <span class="tiles-ends">
+            <span class="view-buttons"><Rays pressed={false} /></span>
+            <span class="view-buttons">
+                <button type="button" class="view-icon" data-field="download" title="Download the disc and the four close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+            </span>
         </span>
     </div>
     <ul class="tiles-labels" style={`grid-template-columns: repeat(${FILTERS.length + 1}, 1fr)`}>

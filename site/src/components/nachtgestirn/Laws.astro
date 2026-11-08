@@ -26,13 +26,17 @@ const LAWS = [
             <span class="view-buttons">
                 <button type="button" class="view-icon" data-field="map" aria-pressed="false" title="NASA's maps, color and relief; off, plain discs of the law alone" aria-label="Maps"><Icon name="moonMap" /></button>
                 <button type="button" class="view-icon" data-field="deviation" aria-pressed="false" title="Stripe where each disc is more than a third of a stop off Hapke's law, which follows the measured Moon: red where brighter, blue where darker" aria-label="Deviation"><Icon name="clipped" /></button>
-                <button type="button" class="view-icon" data-field="metered" aria-pressed="true" title="Expose each disc by a light meter on its lit part, as a photograph of the Moon is, rather than all four at the full Moon's exposure" aria-label="Metered"><Icon name="meter" /></button>
             </span>
             <span class="tiles-hint footnote">Drag the discs to go around the Moon, the Sun in a side view to move it. Rendered with WebGPU</span>
         </span>
-        <span class="view-buttons tiles-end">
-            <Rays />
-            <button type="button" class="view-icon" data-field="download" title="Download the discs and the side views as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+        <span class="tiles-ends">
+            <span class="view-buttons">
+                <Rays />
+                <button type="button" class="view-icon" data-field="metered" aria-pressed="true" title="Expose each disc by a light meter on its lit part, as a photograph of the Moon is, rather than all four at the full Moon's exposure" aria-label="Metered"><Icon name="meter" /></button>
+            </span>
+            <span class="view-buttons">
+                <button type="button" class="view-icon" data-field="download" title="Download the discs and the side views as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+            </span>
         </span>
     </div>
     <div class="lobes-row">

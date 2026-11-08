@@ -381,6 +381,12 @@ tbody tr:hover {
     vector-effect: non-scaling-stroke;
 }
 /* A filled disc without an outline, so its radius is the symbol's and the Moon's beside it can be set against it. */
+/* A point to drag in a drawn figure, as a slider's thumb: the accent, ringed in the page's color. */
+.figure-thumb {
+    fill: var(--accent);
+    stroke: var(--bg);
+    stroke-width: 3;
+}
 .figure-sun {
     fill: var(--sun-fill);
     stroke: var(--sun-edge);

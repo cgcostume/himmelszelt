@@ -2,7 +2,6 @@
 import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
-import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
 
@@ -18,9 +17,6 @@ const { id = "color" } = Astro.props;
         <canvas aria-label="The Moon from its color map as gray, as published and tinted to the Moon's color, rendered with WebGPU"></canvas>
         <span class="tiles-start">
             <span class="tiles-hint footnote">Rendered with WebGPU</span>
-        </span>
-        <span class="view-buttons tiles-end">
-            <Rays />
         </span>
     </div>
     <ul class="tiles-labels" style="grid-template-columns: 1fr 1fr 1fr">

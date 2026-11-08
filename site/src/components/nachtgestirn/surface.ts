@@ -1,5 +1,6 @@
 import { moonEV100, type Vec3 } from "@himmelszelt/nachtgestirn";
 import { find } from "../dom";
+import "../sternzeit/export";
 import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { drawSvg } from "../sternzeit/figure";
@@ -9,12 +10,15 @@ import { type MoonAt, moonAt, type ToneCurveName } from "./renderer";
 import { mapResolutions, RESOLUTION_NAMES } from "./resolutions";
 import { saveFigure } from "./snapshot";
 import { createTiles, type TileFrame, tileFrame } from "./tiles";
+import { tychoMark, tychoSlice } from "./tycho";
+import { TYCHO } from "./tycho-profile";
 
 const DEG = Math.PI / 180;
-// The close-up: this many disc diameters across, and where it looks, on the terminator in the southern highlands,
-// this many degrees of longitude into the lit side so the craters there catch the light.
-export const CLOSEUP_SHARE = 1 / 6;
-export const CLOSEUP_LATITUDE = -30;
+// The close-up: this many disc diameters across, and where it looks, on the terminator in the southern highlands, at
+// Tycho's latitude so it passes over the crater sliced under the figure, this many degrees of longitude into the lit
+// side so the craters there catch the light.
+const CLOSEUP_SHARE = 1 / 8;
+export const CLOSEUP_LATITUDE = TYCHO.latitude;
 const INTO_THE_LIGHT = 5;
 // The disc and its four close-ups.
 const COUNT = 5;
@@ -62,6 +66,30 @@ export function surfaceFigure(root: HTMLElement) {
     if (!tiles) noGpu(canvas);
     const resolution = mapResolutions(root, "large", requestRender);
 
+    // The color map, or a uniform albedo for the relief alone.
+    const albedo = find("[data-field=albedo]", root);
+    albedo.addEventListener("click", () => {
+        albedo.setAttribute("aria-pressed", String(albedo.getAttribute("aria-pressed") !== "true"));
+        requestRender();
+    });
+
+    // The slice through Tycho, redrawn alone when its point moves or a switch of its own is pressed.
+    const on = (button: HTMLElement) => button.getAttribute("aria-pressed") === "true";
+    const sliceShadows = find("[data-field=sliceShadows]", root);
+    const sliceNormals = find("[data-field=sliceNormals]", root);
+    const slice = tychoSlice(
+        find<SVGSVGElement & HTMLElement>("[data-field=slice]", root),
+        find("[data-field=sliceNote]", root),
+        () => slice.redraw(),
+        { shadows: () => on(sliceShadows), normals: () => on(sliceNormals) },
+    );
+    for (const button of [sliceShadows, sliceNormals]) {
+        button.addEventListener("click", () => {
+            button.setAttribute("aria-pressed", String(!on(button)));
+            slice.redraw();
+        });
+    }
+
     function render() {
         const table = tables();
         if (!table) return;
@@ -82,7 +110,7 @@ export function surfaceFigure(root: HTMLElement) {
             eclipse: false,
             law: "hapke" as const,
             nightVision: false,
-            albedo: true,
+            albedo: albedo.getAttribute("aria-pressed") === "true",
         };
         const close = {
             ...common,
@@ -107,9 +135,20 @@ export function surfaceFigure(root: HTMLElement) {
         const scale = tileCss / overview;
         const side = closeup * scale;
         const [cx, cy] = [tileCss / 2 + offset[0] * scale, tileCss / 2 - offset[1] * scale];
-        const svg = `<rect x="${f(cx - side / 2)}" y="${f(cy - side / 2)}" width="${f(side)}" height="${f(side)}" class="surface-marker"/>`;
+        let svg = `<rect x="${f(cx - side / 2)}" y="${f(cy - side / 2)}" width="${f(side)}" height="${f(side)}" class="surface-marker"/>`;
+        // Tycho and the slice under the figure, on the disc, and on the close-ups where they show it, each clipped to its own.
+        const frame = tileFrame(m);
+        svg += tychoMark(m, frame, [tileCss / 2, tileCss / 2], (m.geocentricDiameter / 2) * scale, 7);
+        const near = tileCss / closeup;
+        for (let i = 1; i < COUNT; i++) {
+            const center = [tileCss / 2 - offset[0] * near, tileCss / 2 + offset[1] * near] as const;
+            const mark = tychoMark(m, frame, center, (m.geocentricDiameter / 2) * near);
+            if (mark)
+                svg += `<svg x="${f(i * tileCss)}" y="0" width="${f(tileCss)}" height="${f(tileCss)}">${mark}</svg>`;
+        }
         drawSvg(marker, svg, 1);
-        note.textContent = `the close-up ${(closeup * 60).toFixed(1)}′ across, a sixth of the disc, on the terminator at ${Math.abs(CLOSEUP_LATITUDE)}° south, from the ${RESOLUTION_NAMES[resolution()]}`;
+        slice.draw(m);
+        note.textContent = `the close-up ${(closeup * 60).toFixed(1)}′ across, an eighth of the disc, on the terminator at Tycho's ${Math.abs(CLOSEUP_LATITUDE).toFixed(1)}° south, from the ${RESOLUTION_NAMES[resolution()]}`;
     }
 
     // The tiles as drawn, the marker and the names under them, in one PNG.

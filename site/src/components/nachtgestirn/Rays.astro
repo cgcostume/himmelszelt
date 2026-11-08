@@ -7,4 +7,4 @@ interface Props {
 const { label = "4×MSAA", pressed = true } = Astro.props;
 ---
 
-<button type="button" class="view-toggle" data-field="rays" aria-pressed={String(pressed)} title="Four rays through each pixel, their light averaged, which smooths what the maps' filters leave of edges sharper than a pixel; off, one through its center">{label}</button>
+<button type="button" class="view-toggle" data-field="rays" aria-pressed={pressed ? "true" : "false"} title="Four rays through each pixel, their light averaged, which smooths what the maps' filters leave of edges sharper than a pixel; off, one through its center">{label}</button>

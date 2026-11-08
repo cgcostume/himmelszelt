@@ -57,12 +57,12 @@ export interface MoonPassOptions {
      *  is. With a background only; off by default. */
     nightVision?: boolean;
     /** How the maps are filtered, to compare: "nearest" and "bilinear" read the full size alone, "trilinear" between
-     *  its levels, "anisotropic" up to sixteen taps along the footprint; "bspline", the default, anisotropic and by a
-     *  cubic B-spline where the maps are magnified. */
+     *  its levels; "anisotropic", the default, up to sixteen taps along the footprint, and by a cubic B-spline where the
+     *  maps are magnified. */
     filter?: MapFilter;
 }
 
-export type MapFilter = "nearest" | "bilinear" | "trilinear" | "anisotropic" | "bspline";
+export type MapFilter = "nearest" | "bilinear" | "trilinear" | "anisotropic";
 
 /** Earth's shadow, for a lunar eclipse: as `eclipse.lunar` of `@himmelszelt/sternzeit` gives its radii. */
 export interface EarthShadow {
@@ -362,7 +362,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         samples = 1,
         terminatorSamples = 4,
         nightVision = false,
-        filter = "bspline",
+        filter = "anisotropic",
         shadowsFrom = 128,
         displacementFrom = 1024,
         softShadowsFrom = 4096,
@@ -384,7 +384,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         NB_SAMPLES: samples,
         NB_TERMINATOR_SAMPLES: Math.max(terminatorSamples, samples),
         NB_NIGHT_VISION: nightVision ? 1 : 0,
-        NB_MAP_BSPLINE: filter === "bspline" ? 1 : 0,
+        NB_MAP_BSPLINE: filter === "anisotropic" ? 1 : 0,
     };
     // One layout for the inputs, which the Moon pass and the shadow map's share, and one for each one's output.
     const texture = (binding: number, sampleType: GPUTextureSampleType = "float"): GPUBindGroupLayoutEntry => ({
@@ -464,7 +464,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
     });
     const linear = filter !== "nearest";
     const sampler =
-        maps && (filter === "bspline" || filter === "anisotropic")
+        maps && filter === "anisotropic"
             ? maps.sampler
             : device.createSampler({
                   label: `nachtgestirn:maps ${filter}`,

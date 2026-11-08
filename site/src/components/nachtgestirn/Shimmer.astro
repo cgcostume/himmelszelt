@@ -2,7 +2,10 @@
 import Icon from "../Icon.astro";
 import Term from "../Term.astro";
 import "../sternzeit/sternzeit.css";
+import Resolutions from "../Resolutions.astro";
+import LunationSlider from "../sternzeit/LunationSlider.astro";
 import Rays from "./Rays.astro";
+import { WHOLE_RESOLUTIONS } from "./resolution-options";
 import "./nachtgestirn.css";
 
 /** The air's shimmer: the Moon's lower limb through the air, and the air the light crosses, from the side. */
@@ -19,6 +22,7 @@ const R0S = ["5", "10", "20"];
         <div class="tiles-panel as-seen">
             <canvas aria-label="The Moon's lower limb through the air, shimmering, rendered with WebGPU"></canvas>
             <span class="tiles-start">
+                <Resolutions options={WHOLE_RESOLUTIONS} chosen="large" />
                 <span class="view-buttons">
                     <button type="button" class="view-toggle" data-part="motion" aria-pressed="true" title="The larger cells of the turbulence, which move patches of the image about as a whole">motion</button>
                     <button type="button" class="view-toggle" data-part="boiling" aria-pressed="true" title="The smaller cells, which make the image boil within those patches">boiling</button>
@@ -26,7 +30,7 @@ const R0S = ["5", "10", "20"];
                 </span>
                 <span class="view-buttons">
                     {R0S.map((r0) => (
-                        <button type="button" class="view-toggle" data-r0={r0} aria-pressed={String(r0 === "10")} title={`Fried's parameter of ${r0} cm through one zenith column of air from sea level: the larger, the steadier the air`}>r₀ {r0} cm</button>
+                        <button type="button" class="view-toggle" data-r0={r0} aria-pressed={r0 === "10" ? "true" : "false"} title={`Fried's parameter of ${r0} cm through one zenith column of air from sea level: the larger, the steadier the air`}>r₀ {r0} cm</button>
                     ))}
                 </span>
             </span>
@@ -35,22 +39,23 @@ const R0S = ["5", "10", "20"];
                 <button type="button" class="view-icon" data-field="play" aria-pressed="true" title="Let the air drift on, or hold it" aria-label="Pause"><Icon name="play" /></button>
             </span>
         </div>
-        <div class="shimmer-cut">
-            <svg data-field="cut" role="img" aria-label="The air between the observer and the Moon from the side: the path the light takes through it, and how much of it" title="Drag the Moon to set how high it stands; double click for where it stands at the chosen moment"></svg>
+        <div class="shimmer-cut" title="Drag the observer up and down, the Moon from one horizon over the zenith to the other; double click for where the page has them">
+            <svg data-field="cut" role="img" aria-label="The air between the observer and the Moon from the side: the path the light takes through it, and how much of it"></svg>
         </div>
     </div>
+    <LunationSlider />
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
         The air's shimmer on the Moon's lower limb, and the air its light crosses, from the side. The air between
         the Moon and the observer is a column of so many zenith columns from sea level, taken from the optical depth
-        towards the Moon, so the observer's height and the air model count; the drawing beside it is not to scale, its
-        bands holding equal shares of the air. How steady the air is, Fried's parameter r₀ through one column, sets how far the image of a 10 cm lens
+        towards the Moon, so the observer's height and the air model count; the drawing under it is not to scale, as
+        dunstkreis draws the sunlight through the air: the planet half as wide, the air four times as thick, in bands of a scale height. How steady the air is, Fried's parameter r₀ through one column, sets how far the image of a 10 cm lens
         moves, as a differential image motion monitor measures the <Term of="Seeing">seeing</Term>: with the square
         root of the air crossed; the turbulence's cells, the lens' width over the distance to the turbulence, shrink
         with it; and the air's dispersion lifts the blue image over the red by a hundredth of the
         refraction. The larger cells move patches of the limb about, the smaller make it boil within them, and the
-        colors fringe the limb, blue on top, red below. Drag the Moon in the drawing to set its height; a double click
-        puts it back where it stands at the chosen moment.
+        colors fringe the limb, blue on top, red below. Drag the observer up and down and the Moon from one horizon over
+        the zenith to the other, and from high up below the level, down to where the horizon has sunk; a double click puts both back where the page has them. Scroll over the limb to zoom in and far out. The slider runs from new moon to new moon.
     </figcaption>
 </figure>
 

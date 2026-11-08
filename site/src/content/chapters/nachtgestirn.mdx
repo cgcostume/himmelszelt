@@ -18,6 +18,14 @@ references:
     - mueller2012vmv
     - mueller2012thesis
     - ciechanowski2024
+    - oren1994
+    - burley2012
+    - karis2013
+    - smith2010
+    - fried1966
+    - sarazin1990
+    - filippenko1982
+    - edlen1966
 ---
 
 import Cite from "../../components/Cite.astro";
@@ -119,9 +127,9 @@ Four laws side by side (<Fig id="laws" />), from the farthest off the measured M
 means for a disc. Lambert's, the cosine of the Sun's angle and nothing else, the term every renderer starts from,
 rounds the full Moon into a ball with a dark rim and lets a half Moon fade into its terminator. The metallic-roughness
 surface every PBR renderer ships does no better at its best, a dielectric of roughness 1 with Burley's diffuse, as
-Disney's and Unreal's materials have it: the limb of a full Moon comes up to a third of the center, and over the month
+Disney's and Unreal's materials have it <Cite id="burley2012" /> <Cite id="karis2013" />: the limb of a full Moon comes up to a third of the center, and over the month
 it stays a stop off the measured Moon, like Lambert's. No metallic-roughness material can do more, it has no term for
-light scattered back towards the Sun. Oren and Nayar's rough surface, the law a renderer reaches for when
+light scattered back towards the Sun. Oren and Nayar's rough surface <Cite id="oren1994" />, the law a renderer reaches for when
 Lambert's limb looks wrong, brightens the limb towards full Moon with the shadows its facets throw on each other, and
 gets the full Moon nearly flat; it has no surge, and its half Moon still fades into the terminator. Hapke's keeps the
 lit part flat to its edge and bright up to the terminator. Why shows best from the side, under the discs: where each
@@ -218,7 +226,10 @@ holds no shadows, so a renderer has to make its own. The thesis' Moon blended a 
 <Term of="Terminator">terminator</Term>, where the Sun stands a few degrees over the surface, the shadows are what the
 eye sees: crater floors in darkness under lit rims, and peaks beyond the terminator lit before the plain around them.
 nachtgestirn ships the heights instead, 16 bits a texel in two bytes of a WebP, and derives the slopes from them on the
-GPU as the maps are loaded. Heights are a surface the pass can march through. A normal map is not.
+GPU as the maps are loaded. Heights are a surface the pass can march through. A normal map is not. LOLA measures them
+from a sphere of the Moon's mean radius, 1737.4 km, up and down: from 9.2 km below it, in the South Pole-Aitken basin,
+to 10.8 km above <Cite id="smith2010" />, so the relief both stands on the smooth sphere and sinks into it, and a march runs through the shell
+between.
 
 <Fig id="surface" /> shows the three stages on a close-up of the terminator, and a fourth, the relief displaced. The shadows come from a march: from every
 point the pass walks towards the Sun along the great circle, 24 steps, each a quarter farther than the last, from three
@@ -385,11 +396,11 @@ into it, the same table squeezes the setting Moon to a quarter of its height, as
 
 The air does not hold still either. Its turbulence moves the image about and makes it boil, the
 <Term of="Seeing">seeing</Term>, some half an arcsecond to an arcsecond overhead on a fair night, and more the more
-air the light crosses. The pass takes that air from the same optical depth it dims the Moon by: the column towards the
+air the light crosses <Cite id="fried1966" /> <Cite id="sarazin1990" />. The pass takes that air from the same optical depth it dims the Moon by: the column towards the
 Moon over the zenith's from sea level, so a Moon on the horizon looks through some forty columns and one seen from a
 mountain through fewer. The image moves with the square root of the column, the turbulence's cells shrink with it, and
 the air's dispersion, which bends blue more than red, lifts the blue image over the red by a hundredth of the
-refraction, tens of arcseconds on the horizon (<Fig id="shimmer" />). `shimmer` sets the seeing and the clock, and
+refraction, tens of arcseconds on the horizon <Cite id="edlen1966" /> <Cite id="filippenko1982" /> (<Fig id="shimmer" />). `shimmer` sets the seeing and the clock, and
 `motion` and `boiling` weigh the larger cells, which move patches of the image as a whole, and the smaller.
 
 <Shimmer />
@@ -408,7 +419,7 @@ That is the camera's blue, the day's sky a million times dimmer. The eye sees th
 4 cd/m² its <Term of="Scotopic vision">rods</Term> take over from the cones, which see color, and by moonlight the
 rods see alone. Colors fade, red goes dark first, and what is left looks blue, which painters have always given the
 night. The pass' `nightVision`, helldunkel's blue shift after Jensen et al. <Cite id="jensen2001" />, turns the composed light into that before
-it is exposed: switch the figure to `eye`. The disc itself, at 2,500 cd/m² far brighter than what the rods handle,
+it is exposed, as sternenheer's night sky shows. The disc itself, at 2,500 cd/m² far brighter than what the rods handle,
 keeps its color.
 
 The exposure is the renderer's: the pass takes an EV100 like dunstkreis' sky pass, and the two agree, since both

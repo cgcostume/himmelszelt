@@ -317,10 +317,15 @@ export interface MoonFrame {
     /** From how many pixels across the disc the relief is displaced, the pass' 1024 unless given: 0 always, Infinity
      *  never. The pass is made anew. */
     displacementFrom?: number;
+    /** From how many pixels across the disc the shadows are soft, the pass' 4096 unless given: 0 always, Infinity
+     *  never. The pass is made anew. */
+    softShadowsFrom?: number;
     /** The target's format and how many times SDR white it shows, `displayOutput`: SDR, 1 by default. */
     format?: GPUTextureFormat;
     headroom?: number;
-    /** How the maps are filtered, "bspline" by default, as the package does. */
+    /** dunstkreis' grid over the sky: altitude lines every 10°, the compass directions and the Sun's symbol. */
+    grid?: boolean;
+    /** How the maps are filtered, "anisotropic" by default, as the package does. */
     filter?: MapFilter;
     /** The air's shimmer over the disc, as the pass takes it, or none. */
     shimmer?: Shimmer | null;
@@ -333,8 +338,9 @@ export interface MoonFrame {
  * waited for arrived.
  */
 export function createMoonRenderer(device: GPUDevice, requestRender: () => void) {
-    let sky: { pass: SkyPass; luts: AtmosphereLUTs } | null = null;
+    let sky: { pass: SkyPass; luts: AtmosphereLUTs; grid: boolean } | null = null;
     let skyBuilding: AtmosphereLUTs | null = null;
+    let skyBuildingGrid = "";
     // One pass per combination of options, kept, since a row of tiles may ask for several in turn.
     const moonPasses = new Map<string, MoonPass>();
     const moonBuilding = new Set<string>();
@@ -347,10 +353,13 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     let skyEV100 = Number.NEGATIVE_INFINITY;
     let skyMeteredFor = "";
 
-    function buildSky(luts: AtmosphereLUTs) {
-        if (skyBuilding === luts) return;
+    function buildSky(luts: AtmosphereLUTs, grid: boolean) {
+        const wanted = `${grid}`;
+        if (skyBuilding === luts && skyBuildingGrid === wanted) return;
         skyBuilding = luts;
+        skyBuildingGrid = wanted;
         createSkyPass(device, {
+            debugGrid: grid,
             luts,
             format: "rgba32float",
             toneMap: false,
@@ -359,9 +368,9 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             groundLight: quality.groundLight,
             dither: false,
         }).then((pass) => {
-            if (skyBuilding !== luts) return pass.destroy();
+            if (skyBuilding !== luts || skyBuildingGrid !== wanted) return pass.destroy();
             sky?.pass.destroy();
-            sky = { pass, luts };
+            sky = { pass, luts, grid };
             skyBuilding = null;
             skyMeteredFor = "";
             requestRender();
@@ -378,8 +387,9 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             samples,
             terminatorSamples,
             displacementFrom,
+            softShadowsFrom,
         } = frame;
-        const filter = frame.filter ?? "bspline";
+        const filter = frame.filter ?? "anisotropic";
         createMoonPass(device, {
             format,
             headroom,
@@ -389,6 +399,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             ...(samples === undefined ? {} : { samples }),
             ...(terminatorSamples === undefined ? {} : { terminatorSamples }),
             ...(displacementFrom === undefined ? {} : { displacementFrom }),
+            ...(softShadowsFrom === undefined ? {} : { softShadowsFrom }),
             filter,
             onReady: requestRender,
         }).then((pass) => {
@@ -421,9 +432,10 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
         /** Draws `frame` into `target`; null while a pass is still being made, which calls `requestRender` when done. */
         draw(target: GPUTexture, frame: MoonFrame) {
             const { moon: m, luts, width, height } = frame;
-            if (!sky || sky.luts !== luts) {
-                buildSky(luts);
-                return null;
+            const grid = frame.grid ?? false;
+            if (!sky || sky.luts !== luts || sky.grid !== grid) {
+                buildSky(luts, grid);
+                if (!sky || sky.luts !== luts) return null;
             }
             // The maps asked for, or the smallest that shows the disc sharply, but never smaller than the ones bound.
             const needed =
@@ -437,7 +449,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                       ? (mapsBound as FineMaps)
                       : (SIZES[Math.max(SIZES.indexOf(needed), kept)] ?? "large");
             loadMaps(size);
-            const key = `${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.nightVision} ${frame.format ?? SDR} ${frame.headroom ?? 1} ${frame.samples} ${frame.terminatorSamples} ${frame.displacementFrom} ${frame.filter ?? "bspline"}`;
+            const key = `${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.nightVision} ${frame.format ?? SDR} ${frame.headroom ?? 1} ${frame.samples} ${frame.terminatorSamples} ${frame.displacementFrom} ${frame.softShadowsFrom} ${frame.filter ?? "anisotropic"}`;
             const moonPass = moonPasses.get(key);
             if (!moonPass) {
                 buildMoon(key, frame);
@@ -492,6 +504,9 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                 observerHeightM: m.heightM,
                 pixelRatio: frame.pixelRatio,
                 ev100: UNIT_EV100,
+                // The grid in an eighth of what the Moon's pass exposes as white: mixed into the linear light, before the
+                // tone curve and the encoding, it shows about as faint as dunstkreis' sky mixes it into the encoded image.
+                gridInk: (1.2 * 2 ** ev100) / 8,
                 autoExposureKeys: [],
                 // Metered for the figure's own exposure, down into the night, where the Moon sets it.
                 autoExposureRange: [-6, 20],

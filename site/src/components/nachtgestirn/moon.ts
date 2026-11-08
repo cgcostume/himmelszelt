@@ -1,6 +1,8 @@
+import type { MapFilter } from "@himmelszelt/nachtgestirn";
 import { find } from "../dom";
 import {
     bindHdr,
+    bindRefractionToggle,
     bindToneCurveChoice,
     configureCanvas,
     display,
@@ -28,6 +30,8 @@ import {
 } from "./renderer";
 
 const DEG = Math.PI / 180;
+// A switch of the pass that is made by the disc's size: from how many pixels across, the pass' own threshold for auto.
+const SIZES: Record<string, number | undefined> = { on: 0, off: Number.POSITIVE_INFINITY };
 // The image's rms wander through one zenith's column of air, in arcseconds: a camera lens on a fair night, the tilt
 // 0.42 lambda/D (D/r0)^(5/6) for D 5 cm and r0 10 cm at 500 nm.
 
@@ -86,14 +90,14 @@ export function moonFigure(root: HTMLElement) {
     const rays = raysOf(root, requestRender);
     const renderer = gpu ? createMoonRenderer(gpu.device, requestRender) : null;
 
-    // Where the time goes, with the compass shown twice: the astronomy, the passes' own CPU work, and when the GPU was done.
+    // Where the time goes, shown with the grid: the astronomy, the passes' own CPU work, and when the GPU was done.
     function showTiming(astronomyMs: number, passesMs: number, submitted: number) {
         if (!gpu) return;
         const timing = maybe("timing");
         if (!timing) return;
         gpu.device.queue.onSubmittedWorkDone().then(() => {
             timing.textContent =
-                marks() === 1
+                marks() === 2
                     ? `${gpu.adapterName} · astronomy ${astronomyMs.toFixed(2)} ms · passes ${passesMs.toFixed(2)} ms · GPU done after ${(performance.now() - submitted).toFixed(2)} ms`
                     : "";
         });
@@ -154,8 +158,13 @@ export function moonFigure(root: HTMLElement) {
             inverseViewProjection: inverseViewProjection(basis.f, basis.r, basis.u, basis.tx, basis.ty),
             projectionDistance: basis.d,
             pixelRatio: dpr,
+            grid: marks() === 2,
             discPixels: ((angularDiameter * DEG) / camera.fov) * height,
             maps: (choice("maps") || "auto") as MapSize,
+            filter: (choice("filter") || "anisotropic") as MapFilter,
+            // Auto as the pass decides by the disc's size, or always, or never.
+            displacementFrom: SIZES[choice("displace")],
+            softShadowsFrom: SIZES[choice("soft")],
             air: true,
             ev100: pressed("auto") ? null : evOfSlider(),
             albedo: pressed("albedo"),
@@ -164,7 +173,7 @@ export function moonFigure(root: HTMLElement) {
             earthshine: pressed("earthshine"),
             eclipse: pressed("eclipse"),
             law: "hapke",
-            nightVision: pressed("eye"),
+            nightVision: false,
             shimmer: pressed("shimmer") ? { time: performance.now() / 1000, dispersion: 1 } : null,
             ...rays(),
         });
@@ -201,6 +210,9 @@ export function moonFigure(root: HTMLElement) {
     if (gpu) {
         bindToneCurveChoice(root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-tone"]`));
         bindHdr(find('[data-hdr="note"]', root), find('[data-hdr="choice"]', root));
+        // Refraction for the whole page: the tables traced anew, the Moon lifted by them.
+        const refraction = maybe("refraction");
+        if (refraction) bindRefractionToggle(refraction);
         onDisplay(() => {
             for (const input of root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-tone"]`))
                 input.checked = input.value === display.toneCurve;
@@ -211,7 +223,7 @@ export function moonFigure(root: HTMLElement) {
         onUmbraTable(requestRender);
         new ResizeObserver(requestRender).observe(canvas);
         maybe("exposure")?.addEventListener("input", requestRender);
-        for (const name of ["maps"])
+        for (const name of ["maps", "filter", "displace", "soft"])
             for (const input of root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-${name}"]`))
                 input.addEventListener("change", requestRender);
         for (const name of [
@@ -224,7 +236,6 @@ export function moonFigure(root: HTMLElement) {
             "shadows",
             "earthshine",
             "eclipse",
-            "eye",
         ]) {
             maybe(name)?.addEventListener("click", () => {
                 const on = !pressed(name);

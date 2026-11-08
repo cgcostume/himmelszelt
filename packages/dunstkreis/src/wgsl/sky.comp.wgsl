@@ -28,7 +28,7 @@ fn dkR2(i: u32) -> vec2f {
 // The grid in white, over the sky (see grid.wgsl).
 fn dkDebugOverlay(color: vec3f, view: vec3f, right: vec3f, below: vec3f) -> vec3f {
     let sun = dkParams.sunDirection;
-    return dkGridOverlay(color, view, right, below, vec3f(1.0), sun, dkParams.sunAngularRadius, dkParams.pixelRatio);
+    return dkGridOverlay(color, view, right, below, vec3f(dkParams.gridInk), sun, dkParams.sunAngularRadius, dkParams.pixelRatio);
 }
 
 // The exposure luminance in cd/m² is multiplied by. Metered, it is the light meter's EV100, log2(L * 100 / 12.5) for

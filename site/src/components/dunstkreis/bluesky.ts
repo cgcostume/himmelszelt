@@ -1,7 +1,7 @@
 import { rayleighAt, rgbOfSpectrum, solarIrradianceAt } from "@himmelszelt/dunstkreis";
 import { find } from "../dom";
 import { onDemand } from "../frame";
-import { drawSvg, SUN_SYMBOL, sunGlow, sunRays, svgText } from "../sternzeit/figure";
+import { drawSvg, SUN_SYMBOL, sunGlow, sunRays, svgText, THUMB_RADIUS } from "../sternzeit/figure";
 import "../sternzeit/export";
 
 // Why the sky is blue, not to scale: a planet half as wide as Earth under air drawn four times as thick, all of it in the
@@ -371,7 +371,7 @@ function render() {
     const [ox, oy] = geometry.observer;
     const real = observer.km / THICKER;
     const airBelow = Math.round(100 * (1 - Math.exp(-real / 8)));
-    svg += `<circle cx="${f(ox)}" cy="${f(oy)}" r="7.5" class="blue-sky-observer"/>`;
+    svg += `<circle cx="${f(ox)}" cy="${f(oy)}" r="${THUMB_RADIUS}" class="figure-thumb"/>`;
     svg += `<circle cx="${f(ox)}" cy="${f(oy)}" r="12" class="blue-sky-grab blue-sky-observer-grab"/>`;
     svg += svgText(
         ox + 44,

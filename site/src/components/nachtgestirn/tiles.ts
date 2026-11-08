@@ -20,6 +20,12 @@ export function tileFrame(m: MoonAt) {
         toward,
     };
 }
+/** The frame looking along `direction` with its up leaning to `lean`, as `viewFrame` leans it to the zenith. */
+function leaningFrame(direction: readonly number[], lean: readonly number[]) {
+    const along = lean.reduce((sum, l, i) => sum + l * (direction[i] ?? 0), 0);
+    const up = normalize(lean.map((l, i) => l - along * (direction[i] ?? 0)));
+    return { right: cross(direction, up), up, toward: direction.map((d) => -d) };
+}
 export const pxPerRadian = (degreesAcross: number, tilePx: number) => tilePx / (degreesAcross * DEG);
 
 /**
@@ -49,6 +55,8 @@ export type TileFrame = Omit<
     degreesAcross?: number;
     /** Through the air from the observer, over the sky, the Moon where the air lifts it and the zenith up; none by default. */
     air?: boolean;
+    /** With `air`, the direction the tile's up leans to instead of the zenith: to turn on past it without a flip. */
+    up?: readonly [number, number, number];
 };
 
 export interface TileLayout {
@@ -131,8 +139,9 @@ export function createTiles(canvas: HTMLCanvasElement, requestRender: () => void
         aspect: number,
         offset?: readonly [number, number],
         air = false,
+        lean?: readonly [number, number, number],
     ) {
-        const frame = air ? viewFrame(m.direction) : tileFrame(m);
+        const frame = air ? (lean ? leaningFrame(m.direction, lean) : viewFrame(m.direction)) : tileFrame(m);
         let { right, up } = frame;
         let forward = frame.toward.map((t) => -t);
         if (offset) {
@@ -220,7 +229,7 @@ export function createTiles(canvas: HTMLCanvasElement, requestRender: () => void
                     ...rays(),
                     format,
                     headroom,
-                    ...view(f.moon, f.degreesAcross ?? degreesAcross, tileW, tileW / tileH, f.offset, f.air),
+                    ...view(f.moon, f.degreesAcross ?? degreesAcross, tileW, tileW / tileH, f.offset, f.air, f.up),
                     width: tileW,
                     height: tileH,
                     projectionDistance: 0,

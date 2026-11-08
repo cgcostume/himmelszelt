@@ -35,6 +35,9 @@ struct DkSkyParams {
     moonViewScale: f32,
     // Where the Moon shows, lifted by the air, like apparentSunDirection: what its aureole is centered on.
     apparentMoonDirection: vec3f,
+    // What the debug overlay is drawn in: 1 for white after the tone curve, or the luminance a renderer that exposes the
+    // pass' linear light itself exposes as white.
+    gridInk: f32,
 }
 
 // Directions the light meter reads per cap, above and below the horizon: 32 workgroups of 128 sample one each.

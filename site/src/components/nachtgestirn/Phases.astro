@@ -24,13 +24,17 @@ const { id = "phases" } = Astro.props;
             <span class="view-buttons">
                 <button type="button" class="view-icon" data-field="map" aria-pressed="false" title="NASA's maps at their smallest, color and relief, as small discs need; off, plain discs of the law alone" aria-label="Maps"><Icon name="moonMap" /></button>
                 <button type="button" class="view-icon" data-field="day" aria-pressed="false" title="The same discs over a plain daytime sky, exposed for the sky: the pale Moon by day" aria-label="By day"><Icon name="day" /></button>
-                <button type="button" class="view-icon" data-field="metered" aria-pressed="false" title="Expose each disc by a light meter on its lit part, as a photograph of the Moon is, rather than all at the full Moon's exposure" aria-label="Metered"><Icon name="meter" /></button>
             </span>
             <span class="tiles-hint footnote">Rendered with WebGPU</span>
         </span>
-        <span class="view-buttons tiles-end">
-            <Rays />
-            <button type="button" class="view-icon" data-field="download" title="Download the strips and the plot as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+        <span class="tiles-ends">
+            <span class="view-buttons">
+                <Rays />
+                <button type="button" class="view-icon" data-field="metered" aria-pressed="false" title="Expose each disc by a light meter on its lit part, as a photograph of the Moon is, rather than all at the full Moon's exposure" aria-label="Metered"><Icon name="meter" /></button>
+            </span>
+            <span class="view-buttons">
+                <button type="button" class="view-icon" data-field="download" title="Download the strips and the plot as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+            </span>
         </span>
     </div>
     <div class="tiles-plot">
