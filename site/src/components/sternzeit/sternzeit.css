@@ -2115,3 +2115,31 @@ span.daylight-day {
         overflow-x: auto;
     }
 }
+
+/* The Moon view textured: nachtgestirn's Moon in a canvas behind the overlay, which keeps its frame but not its
+   background (see moonface.ts). */
+.moon-panel {
+    position: relative;
+}
+.moon-panel > canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: var(--radius-canvas);
+}
+.moon-view.textured .moon-panel > svg {
+    position: relative;
+    background: transparent;
+}
+/* The overlay's text over a bright sky: edged in the page's background. */
+.moon-view.textured .moon-panel > svg text {
+    paint-order: stroke;
+    stroke: color-mix(in srgb, var(--bg) 70%, transparent);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
+/* Without the annotations, the Moon alone. */
+.moon-view.without-annotations .moon-panel > svg {
+    visibility: hidden;
+}

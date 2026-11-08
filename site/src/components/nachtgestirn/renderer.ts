@@ -145,6 +145,9 @@ export interface MoonFrame {
     law: "hapke" | "lambert";
     /** As the eye sees it at night, rather than a camera. */
     nightVision: boolean;
+    /** The target's format and how many times SDR white it shows, `displayOutput`: SDR, 1 by default. */
+    format?: GPUTextureFormat;
+    headroom?: number;
 }
 
 /**
@@ -187,10 +190,10 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             requestRender();
         });
     }
-    function buildMoon(key: string, { toneMap, nightVision }: MoonFrame) {
+    function buildMoon(key: string, { toneMap, nightVision, format = SDR, headroom = 1 }: MoonFrame) {
         if (moonBuilding === key) return;
         moonBuilding = key;
-        createMoonPass(device, { format: SDR, toneMap, maps, nightVision }).then((pass) => {
+        createMoonPass(device, { format, headroom, toneMap, maps, nightVision }).then((pass) => {
             if (moonBuilding !== key) return pass.destroy();
             moonPass?.pass.destroy();
             moonPass = { pass, key };
@@ -227,7 +230,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             const kept = mapsBound === "" ? 0 : SIZES.indexOf(mapsBound as (typeof SIZES)[number]);
             const size = frame.maps === "auto" ? (SIZES[Math.max(SIZES.indexOf(needed), kept)] ?? "large") : frame.maps;
             loadMaps(size);
-            const key = `${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.nightVision}`;
+            const key = `${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.nightVision} ${frame.format ?? SDR} ${frame.headroom ?? 1}`;
             if (!moonPass || moonPass.key !== key) {
                 buildMoon(key, frame);
                 return null;

@@ -4,31 +4,59 @@ import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "./sternzeit.css";
 import LunationSlider from "./LunationSlider.astro";
+
+/**
+ * The Moon as seen from the chosen place: its disc, phase, grid, axis, the Sun's direction and the readouts in an SVG.
+ * Textured, nachtgestirn's Moon over dunstkreis' sky takes the disc's place behind the overlay, as a switch ("toggle",
+ * loaded on the first press) or from the start ("on"); `annotations` adds a switch that hides the overlay.
+ */
+interface Props {
+    id?: string;
+    textured?: "toggle" | "on";
+    annotations?: boolean;
+    /** Another caption and experiment than sternzeit's own, as plain text. */
+    caption?: string;
+    try?: { label: string; set: string; text: string };
+}
+const { id = "moon-view", textured = "toggle", annotations = false, caption, try: experiment } = Astro.props;
 ---
 
-<figure class="moon-figure" id="moon-view">
-    <div class="moon-view as-seen" data-export="moon">
+<figure class="moon-figure" id={id} data-moon-view data-textured={textured}>
+    <div class={`moon-view as-seen${textured === "on" ? " textured" : ""}`} data-export="moon">
         <span class="view-buttons">
-            <button type="button" class="view-icon" data-field="lockMoon" aria-pressed="true" title="Lock the view to the Moon itself: north up, no horizon" aria-label="Moon frame"><Icon name="moonLock" /></button>
+            <button type="button" class="view-icon" data-field="lockMoon" aria-pressed={textured === "on" ? "false" : "true"} title="Lock the view to the Moon itself: north up, seen from Earth's center, without the air" aria-label="Moon frame"><Icon name="moonLock" /></button>
             <button type="button" class="view-icon" data-field="opticalLibration" aria-pressed="true" title="The tilt of the Moon's axis against its orbit and its uneven speed along it let us see a little around its edges" aria-label="Optical libration"><Icon name="libration" /></button>
+            <button type="button" class="view-icon" data-field="textured" aria-pressed={textured === "on" ? "true" : "false"} title="The Moon as nachtgestirn renders it, NASA's maps under Hapke's law over dunstkreis' sky, in place of the diagram's disc. Rendered with WebGPU" aria-label="Textured Moon"><Icon name="moonMap" /></button>
+            {annotations && <button type="button" class="view-icon" data-field="annotations" aria-pressed="true" title="sternzeit's annotations over the Moon: its grid, axis, the arrow to the Sun and the readouts" aria-label="Annotations"><Icon name="labels" /></button>}
         </span>
         <div class="moon-panel">
+            <canvas aria-label="The Moon as seen from the chosen place, rendered with WebGPU" hidden></canvas>
             <svg viewBox="-100 -100 200 200" aria-hidden="true"></svg>
         </div>
     </div>
     <LunationSlider />
     <figcaption class="figure-caption">
-        The Moon as seen from the chosen place, its north pole (N) up: lit by the Sun, its night side in{" "}
-        <Term of="Earthshine">earthshine</Term> (bluer when stronger), the arrow pointing to the Sun. The grid is the
-        Moon's own, shifted by the <Term of="Libration">libration</Term>, the dashed circles its size at{" "}
-        <Term of="Apogee">apogee</Term> and <Term of="Perigee">perigee</Term>. Magnified, disc and horizon true to each
-        other. Unlocked from the moon frame, the zenith is up (dashed), the arc is the turn of the north pole against
-        it, and the size is the one seen from the place: almost 2% more with the Moon high in the sky than on the
-        horizon, as you are then an Earth radius closer. The slider runs from new moon to new moon, the full moon in the middle, its marks the
-        true phases.
-        <Try label="A day and a half after new moon" set="date=2026-11-10T18:00Z" fig="moon-view">
-            the thin crescent's night side at its bluest, lit by an almost full Earth.
-        </Try>
+        {caption ? (
+            <Fragment>
+                {caption}
+                {experiment && <Try label={experiment.label} set={experiment.set} fig={id}>{experiment.text}</Try>}
+            </Fragment>
+        ) : (
+            <Fragment>
+            The Moon as seen from the chosen place, its north pole (N) up: lit by the Sun, its night side in{" "}
+            <Term of="Earthshine">earthshine</Term> (bluer when stronger), the arrow pointing to the Sun. The grid is the
+            Moon's own, shifted by the <Term of="Libration">libration</Term>, the dashed circles its size at{" "}
+            <Term of="Apogee">apogee</Term> and <Term of="Perigee">perigee</Term>. Magnified, disc and horizon true to each
+            other. Unlocked from the moon frame, the zenith is up (dashed), the arc is the turn of the north pole against
+            it, and the size is the one seen from the place: almost 2% more with the Moon high in the sky than on the
+            horizon, as you are then an Earth radius closer. Textured, the disc is the one{" "}
+            <a href="../nachtgestirn/">nachtgestirn</a> renders from NASA's maps, over the sky. The slider runs from new moon to new moon, the full moon in the middle, its marks the
+            true phases.
+            <Try label="A day and a half after new moon" set="date=2026-11-10T18:00Z" fig={id}>
+                the thin crescent's night side at its bluest, lit by an almost full Earth.
+            </Try>
+            </Fragment>
+        )}
     </figcaption>
 </figure>
 
@@ -36,5 +64,37 @@ import LunationSlider from "./LunationSlider.astro";
     import { find } from "../dom";
     import { moonView } from "./moonview";
 
-    moonView(find("#moon-view .moon-view"));
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-moon-view]")) {
+        const view = find(".moon-view", root);
+        const controller = moonView(view);
+        const button = find('[data-field="textured"]', view);
+        const pressed = () => button.getAttribute("aria-pressed") === "true";
+        // nachtgestirn, dunstkreis and the maps are loaded on the first press only, or at once where it starts on.
+        let face: Promise<ReturnType<typeof import("../nachtgestirn/moonface").attachMoonFace>> | null = null;
+        async function apply() {
+            face ??= import("../nachtgestirn/moonface").then(({ attachMoonFace }) => attachMoonFace(view, controller));
+            const attached = await face;
+            if (!attached) {
+                const { gpu } = await import("../dunstkreis/atmosphere");
+                button.setAttribute("aria-pressed", "false");
+                button.setAttribute("title", gpu.error ?? "WebGPU is not available here");
+                button.setAttribute("disabled", "");
+                view.classList.remove("textured");
+                return;
+            }
+            attached.show(pressed());
+            view.classList.toggle("textured", pressed());
+        }
+        button.addEventListener("click", () => {
+            button.setAttribute("aria-pressed", String(!pressed()));
+            apply();
+        });
+        if (pressed()) apply();
+        const annotations = view.querySelector('[data-field="annotations"]');
+        annotations?.addEventListener("click", () => {
+            const shown = annotations.getAttribute("aria-pressed") !== "true";
+            annotations.setAttribute("aria-pressed", String(shown));
+            view.classList.toggle("without-annotations", !shown);
+        });
+    }
 </script>

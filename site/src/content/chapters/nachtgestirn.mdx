@@ -13,19 +13,22 @@ references:
     - cox2000
     - svs4720
     - espenak2009
+    - mueller2012vmv
     - mueller2012thesis
+    - ciechanowski2024
 ---
 
 import Cite from "../../components/Cite.astro";
 import Controls from "../../components/sternzeit/Controls.astro";
-import Planned from "../../components/Planned.astro";
 import Term from "../../components/Term.astro";
 import Fig from "../../components/Fig.astro";
 import Moon from "../../components/nachtgestirn/Moon.astro";
-import MoonFace from "../../components/nachtgestirn/MoonFace.astro";
+import MoonView from "../../components/sternzeit/MoonView.astro";
+import Laws from "../../components/nachtgestirn/Laws.astro";
+import Distance from "../../components/nachtgestirn/Distance.astro";
+import Shadow from "../../components/nachtgestirn/Shadow.astro";
 
-This chapter is being written. The Moon below is live, and it grows with the chapter; the dashed boxes are the figures
-still to come.
+This chapter is being written. The figures are live, the text still settles.
 
 Look at a full Moon and it is a coin, not a ball: as bright at its very edge as in its middle, with no shading to
 round it off. A sphere lit from behind the viewer should darken towards its rim, and every planet a renderer shades
@@ -38,7 +41,9 @@ and darkened and reddened in Earth's shadow during a lunar eclipse. Where the Mo
 where the Sun is from it come from [sternzeit](../sternzeit/); the sky it is drawn over, and the air in front of it,
 from [dunstkreis](../dunstkreis/). osgHimmel did the same with a cube map and a few hand-set intensities
 <Cite id="mueller2012thesis" />; here the light is in lux and the disc in cd/m², so the Moon exposes like the sky
-around it.
+around it. The chapter keeps to what a renderer needs; for the Moon itself, its orbit, its tides, its light and its
+soil, explored at length in interactive figures, Bartosz Ciechanowski's page on it is the one to read
+<Cite id="ciechanowski2024" />.
 
 For a developer: TypeScript and WGSL, one WebGPU compute pass, no dependency on any other package at runtime. It takes
 directions, angles and lux, draws into a texture you own over a background in cd/m², or alone with its coverage in
@@ -97,16 +102,18 @@ to be exposed like a landscape at noon. By the Moon's phase law a quarter Moon g
 a shadow, and the surge is gone. The figure's light meter follows that law and exposes the lit part a stop brighter
 than mid gray, as a photographer does.
 
-Switch the law to Lambert's in <Fig id="moon" /> at a full Moon, and the disc turns into a ball with a dark rim; switch
-back, and it is a coin again. We never see the surge in full: the Moon passes above or below Earth's shadow most
-months, and the phase angle at full Moon stays a few degrees. The one time the Moon stands exactly opposite the Sun is
-when Earth's shadow falls on it.
+The two laws side by side (<Fig id="laws" />) show what that means for a disc: at full Moon a coin against a ball
+with a dark rim, at a quarter a lit half that stays bright up to the terminator against one that fades into it. The
+curves under them add the light up over the whole disc, the number a light meter sees. A Lambert sphere gives two
+thirds of a flat disc's light at full and a third of its own full at a quarter; the Moon, measured, gives a tenth at a
+quarter, and Hapke's law follows it within a quarter of a stop from full to a thin crescent, the surge included. A
+renderer that shades the Moon with Lambert's law gets a half Moon more than twice too bright and a crescent that
+fades too slowly, and a full Moon with a shaded rim that the eye never sees. We never see the surge in full: the Moon
+passes above or below Earth's shadow most months, and the phase angle at full Moon stays a few degrees. The one time
+the Moon stands exactly opposite the Sun is when Earth's shadow falls on it.
 
-<Planned title="Lambert against Hapke" plan="Two discs side by side at the chosen phase, the terminator and the limb compared, or folded into the figure's law switch.">
-    The same Moon shaded by Lambert's law and by Hapke's: at full Moon a ball against a coin, at a quarter the lit
-    half darkening towards the terminator under Lambert's law and staying bright under Hapke's, the terminator itself
-    sharper.
-</Planned>
+<Laws />
+<Controls height={false} />
 
 ## The face we see
 
@@ -120,13 +127,25 @@ on the Moon is the side where the Sun rises on it, the side of Mare Crisium, the
 right of the disc with north up as seen from Earth's northern hemisphere, and which sternzeit's own Moon, drawn with a
 grid rather than a map, puts in the same place.
 
-<Fig id="moon-face" /> lays the two over each other: sternzeit's view of the Moon with its grid, axis and arrow to the
+<Fig id="moon-face" /> lays the two over each other: sternzeit's view of the Moon, [its figure](../sternzeit/#moon-view), with its grid, axis and arrow to the
 Sun, and behind it the Moon from the maps, turned by the same three angles. The grid's center is the point of the
 Moon's face that looks at you, its meridian of 0° the one the map is centered on, and both move together as the
 libration nods the face. Lock it to the Moon frame and the air goes: seen from Earth's center, with its north up, the
-disc is the one the overlay has always drawn.
+disc is the one the overlay has always drawn. The libration is the month's; over a night the Moon's face turns a
+little more, by up to a degree, as Earth's turning carries you from one side of its center to the other, which neither
+sternzeit nor the figure follow yet.
 
-<MoonFace />
+<MoonView
+    id="moon-face"
+    textured="on"
+    annotations
+    caption="sternzeit's view of the Moon, as nachtgestirn draws it: NASA's maps under Hapke's law, the night side in earthshine, the air in front dimming, reddening and lifting it, over dunstkreis' sky, with sternzeit's grid, axis and arrow to the Sun on top, shifted by the libration. Zenith up, from the place; locked to the Moon frame, its north up and seen from Earth's center, where there is no air. The slider runs from new moon to new moon, the full moon in the middle."
+    try={{
+        label: "A day and a half after new moon",
+        set: "date=2026-11-10T18:00Z",
+        text: "a thin crescent low in the twilight, its night side faint in the earthshine.",
+    }}
+/>
 <Controls height={false} />
 
 The maps are NASA's, from the CGI Moon Kit of its Scientific Visualization Studio <Cite id="svs4720" />: the color
@@ -171,6 +190,20 @@ const orientation = moonOrientation({
 });
 ```
 
+## Near and far
+
+The Moon's orbit is not a circle, and its size in the sky says so: at <Term of="Perigee">perigee</Term> the disc is
+14% wider than at <Term of="Apogee">apogee</Term>, 33.5 arcminutes against 29.4, and a full Moon near perigee, the
+supermoon of the news, gives a third more light than one near apogee. The pass takes the diameter as a plain angle,
+`moon.topocentricAngularDiameter` on the site, so the size follows the orbit without the pass knowing of one
+(<Fig id="near-far" />). The second number in that name matters too: from where you stand, not from Earth's center,
+the Moon overhead is an Earth radius nearer than on the horizon, and almost 2% wider. The rising Moon is the smaller
+one, whatever it looks like: the <Term of="Moon illusion">Moon illusion</Term> is the mind's, and a renderer that
+draws the Moon larger on the horizon is drawing the illusion, not the sky.
+
+<Distance />
+<Controls height={false} />
+
 ## Earthshine
 
 The night side of a thin crescent is not black: it glows with sunlight Earth reflects onto it, and the glow is
@@ -207,10 +240,16 @@ thousandth of the sunlight at the shadow's axis, thirty times that at its edge, 
 figure's light meter follows the shadow: as the umbra swallows the disc, the exposure opens up until the copper
 shows, which is what the eye does too.
 
-<Planned title="The umbra's light" plan="A strip across the shadow, penumbra to axis, with the model's brightness and color along it, or a row of discs through one eclipse.">
-    Earth's shadow as a function of the distance from its axis: the Sun's disc uncovered across the penumbra, the
-    refracted light in the umbra, copper in the middle and turquoise at the rim, on a logarithmic scale of stops.
-</Planned>
+<Fig id="eclipse-row" /> runs the Moon through the next eclipse from the umbra's first contact to its last, all at
+the one exposure the umbra needs, where the sunlit part of the disc is burned out: the shadow's edge is a soft ramp,
+the Sun's disc setting behind Earth as seen from the Moon, and the copper inside it is twelve to seventeen stops
+below the sunlight, deeper towards the axis and bluer towards the rim. The curves under the discs are that light along a line
+out from the axis, as the pass computes it. A renderer that cannot spare the geometry per point can read the shadow's
+color from the eclipse's single phase instead, as sternzeit's chapter suggests and osgHimmel did
+<Cite id="mueller2012vmv" />; what it gives up is the soft edge sweeping across the relief.
+
+<Shadow />
+<Controls height={false} />
 
 ## Through the air
 

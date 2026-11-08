@@ -19,9 +19,11 @@ import "./export";
 const DEG = precise.DEG_TO_RAD;
 // The Moon's disc at perigee gets this radius in the 200 x 200 viewBox; smaller at any other distance.
 const PERIGEE_RADIUS = 72;
-const PERIGEE_KM = 356_500;
-const APOGEE_KM = 406_700;
-const radiusAt = (km: number) => Math.asin(precise.moon.MEAN_RADIUS_KM / km);
+/** The Moon's distance at its nearest and farthest, in km, which the dashed circles show the disc at. */
+export const PERIGEE_KM = 356_500;
+export const APOGEE_KM = 406_700;
+/** The disc's angular radius at a distance in km, in radians. */
+export const radiusAt = (km: number) => Math.asin(precise.moon.MEAN_RADIUS_KM / km);
 const UNITS_PER_RADIAN = PERIGEE_RADIUS / radiusAt(PERIGEE_KM);
 // Selenographic grid spacing, in degrees.
 const GRID_STEP = 30;
@@ -50,9 +52,12 @@ export interface MoonViewFrame {
     libration: { longitude: number; latitude: number };
 }
 
+/** A renderer that draws the Moon behind the overlay, which then leaves out its own disc, phase and veiled horizon. */
+export type MoonViewBehind = (frame: MoonViewFrame) => void;
+
 export interface MoonViewOptions {
-    /** Draws the Moon behind the overlay: without its own disc, phase and veiled horizon, which the renderer shows. */
-    behind?: (frame: MoonViewFrame) => void;
+    /** Draws the Moon behind the overlay from the start; `setBehind` switches it later. */
+    behind?: MoonViewBehind;
 }
 
 // The panel is wider than the Moon needs: the readouts sit beside it. Its height keeps the disc at the size a 416 px
@@ -92,6 +97,7 @@ export function moonView(view: HTMLElement, options: MoonViewOptions = {}) {
     // Off leaves only the physical libration, the Moon's own wobble, well below a pixel here.
     let optical = opticalButton.getAttribute("aria-pressed") !== "false";
     const cornerRowPx = () => CORNER_PX + lockButton.offsetHeight / 2;
+    let behind: MoonViewBehind | null = options.behind ?? null;
 
     function render() {
         const { jd } = state;
@@ -136,7 +142,6 @@ export function moonView(view: HTMLElement, options: MoonViewOptions = {}) {
         const bulge = sunFrame.toward / Math.hypot(sunFrame.right, sunFrame.up, sunFrame.toward);
 
         let svg = "";
-        const { behind } = options;
         // The night side in the earthshine, bluer the stronger it is, as on the moon calendar's discs.
         const glow = Math.min(earthshine, EARTHSHINE_MAX) / EARTHSHINE_MAX;
         if (!behind) svg += `<circle r="${f(radius)}" class="moon-night" style="--earthshine: ${glow.toFixed(3)}"/>`;
@@ -293,5 +298,12 @@ export function moonView(view: HTMLElement, options: MoonViewOptions = {}) {
     // Its text keeps the page's small size in screen pixels, so a resized panel redraws.
     new ResizeObserver(requestRender).observe(svgEl);
     render();
-    return { requestRender };
+    return {
+        requestRender,
+        /** Hands the Moon itself to `renderer`, or takes it back with null: the overlay redraws either way. */
+        setBehind(renderer: MoonViewBehind | null) {
+            behind = renderer;
+            render();
+        },
+    };
 }

@@ -11,34 +11,36 @@ import {
     tables,
 } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
-import { type MoonViewFrame, moonView } from "../sternzeit/moonview";
+import type { MoonViewFrame } from "../sternzeit/moonview";
 import { state } from "../sternzeit/state";
 import { createMoonRenderer, inverseViewProjection, moonAt, type ToneCurveName } from "./renderer";
 
 const DEG = Math.PI / 180;
 
+/** What the overlay hands over: the frame it drew, and a way to take the Moon back. */
+export interface MoonViewController {
+    setBehind(renderer: ((frame: MoonViewFrame) => void) | null): void;
+}
+
 /**
- * The textured Moon view on `root`, a `figure[data-moon-face]`: sternzeit's overlay redrawn as ever, and behind it the
- * Moon as nachtgestirn renders it, at the overlay's scale and turn. Without WebGPU, the overlay draws its own disc.
+ * The textured Moon behind sternzeit's Moon view on `view`, a `.moon-view` with a canvas in its panel: the Moon as
+ * nachtgestirn renders it, at the overlay's scale and turn, over dunstkreis' sky where the air is shown. `show` turns
+ * it on, when the overlay leaves its own disc out, and off again. Null without WebGPU, with the reason in `shared.error`.
  */
-export function moonFace(root: HTMLElement) {
-    const view = find(".moon-view", root);
+export function attachMoonFace(view: HTMLElement, controller: MoonViewController) {
     const canvas = find<HTMLCanvasElement>("canvas", view);
     const context = shared.error ? null : canvas.getContext("webgpu");
-    if (!context) {
-        canvas.remove();
-        moonView(view);
-        return;
-    }
+    if (!context) return null;
     configureCanvas(context, SDR);
     const device = gpuDevice();
     let frame: MoonViewFrame | null = null;
-    const requestRender = onDemand(render, root);
+    let shown = false;
+    const requestRender = onDemand(render, view);
     const renderer = createMoonRenderer(device, requestRender);
 
     function render() {
         const table = tables();
-        if (!table || !frame || !context) return;
+        if (!shown || !table || !frame || !context) return;
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const width = Math.max(1, Math.round(frame.widthPx * dpr));
         const height = Math.max(1, Math.round(frame.heightPx * dpr));
@@ -83,19 +85,20 @@ export function moonFace(root: HTMLElement) {
         });
     }
 
-    moonView(view, {
-        behind: (next) => {
-            frame = next;
-            render();
-        },
-    });
     onTables(requestRender);
     onDisplay(requestRender);
-    // The overlay hidden or shown; the Moon behind it stays as it is.
-    const annotations = find('[data-field="annotations"]', view);
-    annotations.addEventListener("click", () => {
-        const shown = annotations.getAttribute("aria-pressed") !== "true";
-        annotations.setAttribute("aria-pressed", String(shown));
-        view.classList.toggle("without-annotations", !shown);
-    });
+    return {
+        show(on: boolean) {
+            shown = on;
+            canvas.hidden = !on;
+            controller.setBehind(
+                on
+                    ? (next) => {
+                          frame = next;
+                          render();
+                      }
+                    : null,
+            );
+        },
+    };
 }

@@ -26,6 +26,9 @@ export const ICONS = {
     loading: '<path d="M8 2.5a5.5 5.5 0 1 1-5.5 5.5"/>',
     /** The view kept on the Sun: brackets that close in round a Sun, filled while on. */
     sunLock: `${BRACKETS}<circle class="fill-on" cx="8" cy="8" r="2.4"/><path class="spin" d="M8 2.9v1.2M8 11.9v1.2M2.9 8h1.2M11.9 8h1.2M4.4 4.4l.85.85M10.75 10.75l.85.85M4.4 11.6l.85-.85M10.75 5.25l.85-.85"/>`,
+    /** The Moon textured: its disc with two of its maria, filled while on. */
+    moonMap:
+        '<circle cx="8" cy="8" r="6"/><ellipse class="fill-on" cx="6.2" cy="6.3" rx="2.2" ry="1.6"/><ellipse class="fill-on" cx="10" cy="9.8" rx="1.7" ry="1.3"/>',
     /** The view kept on the Moon: the same brackets round the theme toggle's crescent (see Base.astro). */
     moonLock: `${BRACKETS}<path class="solid" d="M7.115 3.943A4 4 0 1 0 11.485 10.257 4 4 0 0 1 7.115 3.943z"/>`,
     /** Back and on in time, each stepping its way on hover. */

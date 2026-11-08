@@ -1,0 +1,45 @@
+---
+import Term from "../Term.astro";
+import Try from "../Try.astro";
+import "../sternzeit/sternzeit.css";
+import "./nachtgestirn.css";
+import LunationSlider from "../sternzeit/LunationSlider.astro";
+
+/** Hapke's law against Lambert's: the Moon under each, side by side, and the light of each over the phase angle. */
+interface Props {
+    id?: string;
+}
+const { id = "laws" } = Astro.props;
+---
+
+<figure class="tiles-figure" id={id} data-laws>
+    <div class="tiles-panel as-seen">
+        <canvas aria-label="The Moon shaded by Hapke's law and by Lambert's, rendered with WebGPU" title="Drag to carry yourself around the Moon, the Sun staying put; double click to come back to Earth"></canvas>
+    </div>
+    <ul class="tiles-labels" style="grid-template-columns: 1fr 1fr">
+        <li><span class="tiles-name">Hapke</span> <span class="tiles-value">a powder</span></li>
+        <li><span class="tiles-name">Lambert</span> <span class="tiles-value">a matte ball</span></li>
+    </ul>
+    <div class="tiles-plot">
+        <svg aria-hidden="true"></svg>
+    </div>
+    <LunationSlider />
+    <p class="view-status" data-field="note"></p>
+    <figcaption class="figure-caption">
+        The Moon at the chosen moment shaded by Hapke's lunar law and by Lambert's, both at the full Moon's exposure
+        whatever the phase, from Earth's center with north up; the relief under both. Below, the light the whole disc sends to the viewer over the{" "}
+        <Term of="Phase angle">phase angle</Term>, in stops below a full Moon: Hapke's law, Lambert's, and the Moon as
+        measured, Allen's phase law, dashed. The dots mark the view shown. Drag to leave Earth and go around the Moon,
+        the Sun staying where it is; the slider runs from new moon to new moon.
+        <Try label="First quarter" set="date=2026-11-17T12:00Z" fig={id}>
+            Lambert's half Moon fades into the terminator and gives a third of its own full Moon's light, Hapke's stays
+            bright up to it and gives a tenth, as the measured Moon does.
+        </Try>
+    </figcaption>
+</figure>
+
+<script>
+    import { lawsFigure } from "./laws";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-laws]")) lawsFigure(root);
+</script>

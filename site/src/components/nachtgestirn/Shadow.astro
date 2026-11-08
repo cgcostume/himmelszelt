@@ -1,0 +1,56 @@
+---
+import Term from "../Term.astro";
+import Try from "../Try.astro";
+import "../sternzeit/sternzeit.css";
+import "./nachtgestirn.css";
+
+/** The Moon through Earth's shadow: a row of discs across the next lunar eclipse, and the shadow's light by the radius. */
+interface Props {
+    id?: string;
+}
+const { id = "eclipse-row" } = Astro.props;
+---
+
+<figure class="tiles-figure" id={id} data-shadow>
+    <div class="tiles-panel as-seen shadow-big">
+        <canvas data-field="big" aria-label="The Moon in Earth's shadow at the slider's moment, rendered with WebGPU"></canvas>
+        <svg data-field="outline" aria-hidden="true"></svg>
+    </div>
+    <label class="figure-slider" title="The moment through the eclipse, four hours either way from its greatest: drag, or turn the mouse wheel for a minute a notch">
+        <span class="figure-slider-rail">
+            <input type="range" data-field="offset" min="-240" max="240" step="1" value="0" aria-label="Minutes from the greatest eclipse" />
+            <span class="figure-slider-scale" aria-hidden="true">{["−4", "0", "+4"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 50}%`}>{mark}{i !== 1 && <span class="figure-slider-unit"> h</span>}</span>)}</span>
+        </span>
+        <output data-field="offsetValue"></output>
+    </label>
+    <div class="tiles-panel as-seen">
+        <canvas aria-label="The Moon at seven moments of a lunar eclipse, rendered with WebGPU"></canvas>
+    </div>
+    <ul class="tiles-labels" style="grid-template-columns: repeat(7, 1fr)">
+        <li></li><li></li><li></li><li></li><li></li><li></li><li></li>
+    </ul>
+    <div class="tiles-plot">
+        <svg aria-hidden="true"></svg>
+    </div>
+    <p class="view-status"><button type="button" class="view-toggle" data-field="metered" aria-pressed="false" title="Expose each disc on its own, as the figure above meters, rather than all at one exposure">metered</button> <span data-field="note"></span></p>
+    <figcaption class="figure-caption">
+        Through Earth's shadow, the next lunar eclipse after the chosen moment, from Earth's center with north up:
+        (a) the Moon at the slider's moment, metered, with the edges of the <Term of="Umbra">umbra</Term> and the
+        penumbra drawn over it as it moves through them. (b) Seven moments from the Moon's first contact with the umbra
+        to its last, all at one exposure: the umbra's when the eclipse is total, so the sunlit part burns out and the copper shows, the
+        greatest moment's when it is partial. (c) What of the sunlight reaches
+        the Moon, by the distance from the shadow's axis, red, green and blue, on a scale of stops: the{" "}
+        <Term of="Penumbra">penumbra</Term>'s ramp, the umbra's copper and its turquoise rim, as nachtgestirn models
+        them; the bar is the Moon's own width. The time is the page's clock.
+        <Try label="New Year's Eve 2028, Berlin" set="date=2028-12-31T17:00Z&lat=52.52&lon=13.405&h=1" fig={id}>
+            the total eclipse of that evening, the Moon's center marked in the shadow where it stands at the chosen
+            moment, halfway in from the umbra's edge.
+        </Try>
+    </figcaption>
+</figure>
+
+<script>
+    import { shadowFigure } from "./shadow";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-shadow]")) shadowFigure(root);
+</script>
