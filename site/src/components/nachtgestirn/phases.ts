@@ -7,6 +7,7 @@ import { onDemand } from "../frame";
 import { drawSvg, svgText } from "../sternzeit/figure";
 import { onChange, state } from "../sternzeit/state";
 import { type Law, noGpu, orbited } from "./laws";
+import { saveFigure } from "./snapshot";
 
 // The two laws worth comparing with the measured Moon over the month: the best rough diffuse one, and the lunar one.
 const LAWS: readonly Law[] = ["orenNayar", "hapke"];
@@ -208,6 +209,14 @@ export function phasesFigure(root: HTMLElement) {
     let cursor: number | null = null;
     let lastTileCss = 0;
     const requestRender = onDemand(render, root);
+    // The strips as drawn, their names and marks, and the plot under them, in one PNG.
+    find("[data-field=download]", root).addEventListener("click", () =>
+        saveFigure(root, canvas, render, {
+            grounds: [panel],
+            svgs: [overlay, plot],
+            texts: root.querySelectorAll<HTMLElement>(".strip-names > li"),
+        }),
+    );
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
     // The curves' own renderer, linear and unmapped, apart from the strips'.
@@ -240,7 +249,7 @@ export function phasesFigure(root: HTMLElement) {
                 rows: LAWS.length,
                 width: tilePx,
                 degreesAcross: real.geocentricDiameter * 1.5,
-                // By day the sky as drawn becomes the ground of the whole figure.
+                // By day the sky as drawn becomes the strips' ground.
                 ...(byDay
                     ? {
                           probe: ([r, g, b]: readonly [number, number, number]) => {
@@ -299,30 +308,6 @@ export function phasesFigure(root: HTMLElement) {
             svg += `<polyline points="${points(above(curves[law] ?? [])).join(" ")}" class="plot-line plot-line-${law}"/>`;
         }
         const series = (law: Law | "measured") => (law === "measured" ? measuredCurve : curves[law]);
-        // Names pushed apart where they would overlap, at `deg`, left of it near the plot's right end.
-        const named = (deg: number, text: (law: Law | "measured", value: number) => string) => {
-            const left = deg > 140;
-            const ends = [...drawn, "measured" as const]
-                .map((law) => {
-                    const value = stopsAt(series(law) ?? [], deg);
-                    return { law, value, y: y(value) };
-                })
-                .sort((a, b) => a.y - b.y);
-            for (let i = 1; i < ends.length; i++) {
-                const [over, here] = [ends[i - 1], ends[i]];
-                if (over && here && here.y - over.y < 15) here.y = over.y + 15;
-            }
-            let out = "";
-            for (const end of ends) {
-                out += svgText(
-                    x(deg) + (left ? -6 : 6),
-                    end.y - 4,
-                    text(end.law, end.value),
-                    `figure-note ${left ? "figure-anchor-end" : "figure-anchor-start"} plot-label-${end.law}`,
-                );
-            }
-            return out;
-        };
         // A dim line at each column's angle.
         for (let deg = 0; deg <= 180; deg += STRIP_STEP) {
             svg += `<line x1="${f(x(deg))}" y1="${f(MARGIN.top)}" x2="${f(x(deg))}" y2="${f(y(BOTTOM))}" class="plot-column"/>`;
@@ -331,35 +316,30 @@ export function phasesFigure(root: HTMLElement) {
         const now = nowAngle();
         svg += `<line x1="${f(x(now))}" y1="${f(MARGIN.top)}" x2="${f(x(now))}" y2="${f(y(BOTTOM))}" class="plot-now"/>`;
         svg += svgText(x(now), MARGIN.top - 4, `now ${now.toFixed(0)}°`, "figure-note plot-now-label");
-        if (cursor === null) {
-            // Each curve named where it passes 100°.
-            svg += named(100, (law) => NAMES[law]);
-        } else {
-            // The cursor: a line at its angle, a dot on each curve, and each curve's stops there.
+        // The readouts at the cursor, or at now while nothing is pointed at: a dot on each curve, and each curve's stops
+        // beside the line, in a fixed order, one to each row between the grid lines, the lowest rows where there is
+        // more room below the curves, else the highest; left of the line near the plot's right end.
+        const at = cursor ?? now;
+        if (cursor !== null) {
             svg += `<line x1="${f(x(cursor))}" y1="${f(MARGIN.top)}" x2="${f(x(cursor))}" y2="${f(y(BOTTOM))}" class="plot-cursor"/>`;
-            for (const law of [...drawn, "measured" as const]) {
-                const value = stopsAt(series(law) ?? [], cursor);
-                if (value >= BOTTOM)
-                    svg += `<circle cx="${f(x(cursor))}" cy="${f(y(value))}" r="2.5" class="plot-dot"/>`;
-            }
-            // The readouts stacked beside the line, in a fixed order, below the curves where there is more room
-            // there, else above them; left of the line near the plot's right end.
-            const order = [...LAWS.filter((law) => curves[law] !== undefined), "measured" as const];
-            const values = order.map((law) => stopsAt(series(law) ?? [], cursor ?? 0));
-            const left = cursor > 140;
-            const line = 14;
-            const above = Math.min(...values.map(y)) - MARGIN.top;
-            const below = y(BOTTOM) - Math.max(...values.map(y));
-            const top = below >= above ? y(BOTTOM) - (order.length - 1) * line - 4 : MARGIN.top + 10;
-            for (const [i, law] of order.entries()) {
-                svg += svgText(
-                    x(cursor) + (left ? -6 : 6),
-                    top + i * line,
-                    `${NAMES[law]} ${(values[i] ?? 0).toFixed(1)}`,
-                    `figure-note ${left ? "figure-anchor-end" : "figure-anchor-start"} plot-label-${law}`,
-                );
-            }
             svg += svgText(x(cursor), height - 6, `${cursor.toFixed(0)}°`, "figure-label plot-cursor-label");
+        }
+        const order = [...LAWS.filter((law) => curves[law] !== undefined), "measured" as const];
+        const values = order.map((law) => stopsAt(series(law) ?? [], at));
+        for (const value of values) {
+            if (value >= BOTTOM) svg += `<circle cx="${f(x(at))}" cy="${f(y(value))}" r="2.5" class="plot-dot"/>`;
+        }
+        const left = at > 140;
+        const over = Math.min(...values.map(y)) - MARGIN.top;
+        const under = y(BOTTOM) - Math.max(...values.map(y));
+        const first = under >= over ? BOTTOM + 2 * order.length - 1 : -1;
+        for (const [i, law] of order.entries()) {
+            svg += svgText(
+                x(at) + (left ? -6 : 6),
+                y(first - 2 * i),
+                `${NAMES[law]} ${(values[i] ?? 0).toFixed(1)}`,
+                `figure-note ${left ? "figure-anchor-end" : "figure-anchor-start"} plot-label-${law}`,
+            );
         }
         drawSvg(plot, svg, 1);
         renderOverlay(tileCss, now);
@@ -389,7 +369,9 @@ export function phasesFigure(root: HTMLElement) {
     for (const target of [panel, plot] as HTMLElement[]) {
         // The hovered column's Moons follow the pointer's angle, so the whole span is drawn: the strips are redrawn.
         target.addEventListener("pointermove", (event: PointerEvent) => {
-            cursor = angleAt(event.clientX);
+            // Over the switches and the download, no column: they are not the strips.
+            const over = (event.target as Element | null)?.closest(".view-buttons");
+            cursor = over ? null : angleAt(event.clientX);
             requestRender();
         });
         target.addEventListener("pointerleave", () => {

@@ -1,13 +1,15 @@
 ---
+import Icon from "../Icon.astro";
 import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
+import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
 import Resolutions from "../Resolutions.astro";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
 import { STRIP_RESOLUTIONS } from "./resolution-options";
 
-/** The disc with a close-up marked, and the close-up as the color map alone, with the relief, and with its shadows. */
+/** The disc with a close-up marked, and the close-up as the color map alone, with the relief, with its shadows, and displaced. */
 interface Props {
     id?: string;
 }
@@ -15,29 +17,37 @@ const { id = "surface" } = Astro.props;
 ---
 
 <figure class="tiles-figure wide" id={id} data-surface>
-    <div class="tiles-panel as-seen split" style="--count: 4">
-        <canvas aria-label="The Moon, and a close-up of its terminator drawn from the color map alone, with the relief, and with the relief's shadows, rendered with WebGPU"></canvas>
-        <Resolutions options={STRIP_RESOLUTIONS} chosen="large" />
+    <div class="tiles-panel as-seen split" style="--count: 5">
+        <canvas aria-label="The Moon, and a close-up of its terminator drawn from the color map alone, with the relief, with the relief's shadows, and with the relief displaced, rendered with WebGPU"></canvas>
+        <span class="tiles-start">
+            <Resolutions options={STRIP_RESOLUTIONS} chosen="large" />
+            <span class="tiles-hint footnote">Rendered with WebGPU</span>
+        </span>
         <svg class="tiles-overlay" data-field="marker" aria-hidden="true"></svg>
+        <span class="view-buttons tiles-end">
+            <Rays />
+            <button type="button" class="view-icon" data-field="download" title="Download the disc and its close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+        </span>
     </div>
-    <ul class="tiles-labels" style="grid-template-columns: repeat(4, 1fr)">
+    <ul class="tiles-labels" style="grid-template-columns: repeat(5, 1fr)">
         <li><span class="tiles-name">the disc</span> <span class="tiles-value">metered</span></li>
         <li><span class="tiles-name">map</span> <span class="tiles-value">a smooth sphere</span></li>
         <li><span class="tiles-name">relief</span> <span class="tiles-value">the slopes shaded</span></li>
         <li><span class="tiles-name">shadows</span> <span class="tiles-value">cast through the heights</span></li>
+        <li><span class="tiles-name">displaced</span> <span class="tiles-value">rays marched through the heights</span></li>
     </ul>
-    <p class="vis-credit footnote tiles-credit below">Rendered with WebGPU</p>
     <LunationSlider />
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
         The relief along the <Term of="Terminator">terminator</Term>, from the 4K maps: the whole disc at the chosen
-        moment, metered, with the close-up marked on it, and the close-up three times, two stops more open for the low
+        moment, metered, with the close-up marked on it, and the close-up four times, a stop more open for the low
         Sun. The color map alone on a smooth sphere, where the terminator is a soft ramp and every crater a flat stain;
         with the relief, the slopes turned to the Sun bright and away from it dark; and with the shadows marched through
-        the heights, the crater floors filling with shadow and the peaks beyond the terminator catching the light. The
+        the heights, the crater floors filling with shadow and the peaks beyond the terminator catching the light; and displaced, each
+        ray marched through the heights, so the near rims hide the floors behind them and the peaks stand up. The
         close-up keeps to the terminator at 30° south as the slider runs from new moon to new moon.
         <Try label="Five days after new moon" set="date=2026-11-14T18:00Z" fig={id}>
-            the terminator crossing the southern highlands, their craters rim-lit and floored with shadow.
+            craters rim-lit and floored with shadow along the terminator.
         </Try>
     </figcaption>
 </figure>

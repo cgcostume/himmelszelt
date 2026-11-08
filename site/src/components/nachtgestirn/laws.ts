@@ -3,9 +3,10 @@ import { find } from "../dom";
 import { display, onDisplay, onTables, gpu as shared, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { onChange, state } from "../sternzeit/state";
-import { lobeLight, onLobeLight } from "./lobes";
+import { lobesFigure } from "./lobes";
 import { moonAt, type ToneCurveName } from "./renderer";
-import { createTiles, tileFrame } from "./tiles";
+import { saveFigure } from "./snapshot";
+import { createTiles } from "./tiles";
 
 const PI = Math.PI;
 const DEG = PI / 180;
@@ -111,13 +112,13 @@ export function lawsFigure(root: HTMLElement) {
     const metered = find("[data-field=metered]", root);
     const mapped = find("[data-field=map]", root);
     const deviation = find("[data-field=deviation]", root);
-    const outline = find<SVGSVGElement>("[data-field=outline]", root);
     const pressed = (button: HTMLElement) => button.getAttribute("aria-pressed") === "true";
     const requestRender = onDemand(render, root);
     // How far the viewer has been dragged around the Moon: about its north axis, and up or down over it, in radians.
     const orbit = { yaw: 0, pitch: 0 };
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
+    lobesFigure(root);
 
     function render() {
         const table = tables();
@@ -148,7 +149,6 @@ export function lawsFigure(root: HTMLElement) {
             law: LAWS[i] ?? "hapke",
             nightVision: false,
         }));
-        drawOutline(m, width);
         const where =
             orbit.yaw === 0 && orbit.pitch === 0
                 ? "from Earth"
@@ -156,52 +156,13 @@ export function lawsFigure(root: HTMLElement) {
         note.textContent = `seen ${where}: phase angle ${m.phaseAngle.toFixed(1)}°, ${(m.lit * 100).toFixed(0)}% lit, ${perDisc ? "each disc metered on its lit part" : "all four at the full Moon's exposure"}`;
     }
 
-    // Where on the disc the Sun stands at the lobes' angle from the normal: a small circle about the point under the
-    // Sun, its near half, the same on all four discs.
-    let last: { m: ReturnType<typeof moonAt>; width: number } | null = null;
-    function drawOutline(m: ReturnType<typeof moonAt>, width: number) {
-        last = { m, width };
-        const tile = width / LAWS.length;
-        const height = outline.parentElement?.clientHeight || tile;
-        outline.setAttribute("viewBox", `0 0 ${width} ${height}`);
-        const { right, up, toward } = tileFrame(m);
-        const sun = m.moonSunDirection;
-        const helper: Vec3 = Math.abs(sun[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
-        const a = normalize(cross(sun, helper));
-        const b = cross(sun, a);
-        const angle = Math.abs(lobeLight.angle);
-        const radius = tile / 2.8;
-        // The view frame's toward points back at the viewer.
-        const toViewer = toward;
-        let svg = "";
-        for (let i = 0; i < LAWS.length; i++) {
-            const [cx, cy] = [tile * (i + 0.5), height / 2];
-            let path = "";
-            let pen = false;
-            for (let k = 0; k <= 180; k++) {
-                const t = (k / 180) * 2 * PI;
-                const p = [0, 1, 2].map(
-                    (c) =>
-                        (sun[c] ?? 0) * Math.cos(angle) +
-                        ((a[c] ?? 0) * Math.cos(t) + (b[c] ?? 0) * Math.sin(t)) * Math.sin(angle),
-                );
-                const seen = p.reduce((sum, v, c) => sum + v * (toViewer[c] ?? 0), 0) > 0;
-                if (!seen) {
-                    pen = false;
-                    continue;
-                }
-                const x = cx + p.reduce((sum, v, c) => sum + v * (right[c] ?? 0), 0) * radius;
-                const y = cy - p.reduce((sum, v, c) => sum + v * (up[c] ?? 0), 0) * radius;
-                path += `${pen ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
-                pen = true;
-            }
-            if (path) svg += `<path d="${path}" class="laws-outline-under"/><path d="${path}" class="laws-outline"/>`;
-        }
-        outline.innerHTML = svg;
-    }
-    onLobeLight(() => {
-        if (last) drawOutline(last.m, last.width);
-    });
+    // The discs as drawn, and the side views and names under them, in one PNG.
+    find("[data-field=download]", root).addEventListener("click", () =>
+        saveFigure(root, canvas, render, {
+            svgs: root.querySelectorAll<SVGSVGElement>("svg[data-law]"),
+            texts: root.querySelectorAll<HTMLElement>(".tiles-labels .tiles-name"),
+        }),
+    );
 
     // Dragging carries the viewer around the Moon; a double click brings it back to Earth.
     let dragging: { x: number; y: number } | null = null;

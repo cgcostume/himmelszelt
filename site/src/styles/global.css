@@ -1262,3 +1262,23 @@ dialog.cyanometer::backdrop {
     justify-content: flex-end;
     gap: 0.5rem;
 }
+/* A figure's labels, credits, readouts and slider scales are not text to select: a drag that strays onto them would
+   select them and the slider or canvas under it would stop following. The caption, code and fields stay selectable. */
+figure {
+    user-select: none;
+    -webkit-user-select: none;
+}
+figure figcaption,
+figure code,
+figure input,
+figure textarea {
+    user-select: text;
+    -webkit-user-select: text;
+}
+/* A button's or a switch's text is not text to select, wherever it stands, a caption's included. */
+button,
+summary,
+label:has(> input[type="checkbox"], > input[type="radio"]) {
+    user-select: none;
+    -webkit-user-select: none;
+}

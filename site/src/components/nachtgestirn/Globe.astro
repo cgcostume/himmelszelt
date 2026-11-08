@@ -2,7 +2,9 @@
 import Icon from "../Icon.astro";
 import Resolutions from "../Resolutions.astro";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
+import "../dunstkreis/dunstkreis.css";
 import "../sternzeit/sternzeit.css";
+import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
 import { WHOLE_RESOLUTIONS } from "./resolution-options";
 
@@ -13,24 +15,42 @@ interface Props {
 const { id = "globe" } = Astro.props;
 ---
 
-<figure class="tiles-figure" id={id} data-globe>
-    <div class="tiles-panel as-seen globe-panel">
-        <canvas aria-label="The Moon at the chosen moment, lit by the Sun and by earthshine, to turn and zoom, rendered with WebGPU" title="Drag to turn the Moon, scroll to zoom; double click to see it from Earth again"></canvas>
-        <Resolutions options={WHOLE_RESOLUTIONS} chosen="large" />
-        <span class="view-buttons globe-end">
-            <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
-        </span>
-        <p class="vis-credit footnote tiles-credit">Drag to turn, scroll to zoom. Rendered with WebGPU</p>
+<figure class="tiles-figure wide" id={id} data-globe>
+    <div class="sky-stage globe-stage" data-field="stage">
+        <div class="tiles-panel as-seen globe-panel">
+            <canvas aria-label="The Moon at the chosen moment, lit by the Sun and by earthshine, to turn and zoom, rendered with WebGPU" title="Drag to turn the Moon, shift and drag to move the view, scroll to zoom; double click to see it from Earth again"></canvas>
+            <span class="tiles-start">
+                <Resolutions options={WHOLE_RESOLUTIONS} chosen="large" />
+                <span class="view-buttons">
+                    <button type="button" class="view-icon" data-field="lock" aria-pressed="true" title="Seen from Earth: turns the Moon back to the face Earth sees; turning it lets go" aria-label="Moon lock"><Icon name="moonLock" /></button>
+                    <button type="button" class="view-toggle" data-field="far" aria-pressed="false" title="The far side, which Earth never sees: the Moon turned half round, the Sun staying where it is; turning it lets go">far side</button>
+                </span>
+                <span class="view-buttons">
+                    <button type="button" class="view-toggle" data-field="relief" aria-pressed="true" title="The relief from LOLA's heights, shading the surface; off, the smooth sphere under the color map alone">relief</button>
+                    <button type="button" class="view-toggle" data-field="shadows" aria-pressed="true" title="The shadows the relief casts, marched through the heights towards the Sun">shadows</button>
+                    <button type="button" class="view-toggle" data-field="displace" aria-pressed="true" title="The relief displaced, not only shaded: each ray near the limb marched through the heights, so the limb shows its mountains and near rims hide what lies behind them; off, the slopes shade a smooth sphere, as the pass does for a disc under 1024 pixels">displaced</button>
+                </span>
+                <span class="tiles-hint footnote">Drag to turn, shift-drag to move, scroll to zoom. Rendered with WebGPU</span>
+            </span>
+            <span class="view-buttons globe-end">
+                <Rays />
+                <button type="button" class="view-icon" data-field="download" title="Download the Moon as shown, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+                <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
+            </span>
+        </div>
+        <LunationSlider class="sky-time" />
     </div>
-    <LunationSlider />
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
         The Moon at the chosen moment, out of the air and away from Earth: Hapke's lunar law over NASA's color and
         LOLA's heights, the relief shading the surface and casting its shadows, the Sun where it stands, and the night
         side lit by earthshine where it faces Earth. Drag to carry yourself around the Moon, the Sun and Earth staying
         where they are, onto the far side, which Earth never sees, or behind the Moon into a crescent; scroll to zoom
-        in where the cursor is, or out until the Moon is small, in as far as a texel of the 16K maps to a pixel; double click to see it from Earth again. The maps can be had at 4K, as the package ships
-        them, at 8K, and at 16K, where the GPU takes them. Every pixel is the mean of up to 64 rays, as many as the canvas' size allows, the same whether the Moon turns or rests. The slider runs from new moon to new moon.
+        in where the cursor is, or out until the Moon is small, in until a texel of the 8K maps is four pixels wide; shift and drag to move the view, never so far the Moon leaves it;
+        the lock or a double click turns it back to the face Earth sees, the far side switch half round. The maps can be had at 1K and 4K, as the package
+        ships them, and at 2K and 8K. The relief is displaced, not only shaded, so the limb shows its mountains; the switch shows it shaded on a smooth
+        sphere instead, as the pass draws a disc under 1024 pixels. Its shadows are marched once into a map for the Sun
+        where it stands, soft from a disc of 4096 pixels on. Every pixel is the mean of four rays, or with the switch of one. The slider runs from new moon to new moon.
     </figcaption>
 </figure>
 

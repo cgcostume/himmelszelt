@@ -1,8 +1,13 @@
 ---
 // The lunation the moment is in, from one full moon to the next, its true phases marked (see lunation.ts).
+interface Props {
+    /** More classes, such as dunstkreis' `sky-time`, which lays the slider over a view gone full screen. */
+    class?: string;
+}
+const { class: extra } = Astro.props;
 ---
 
-<label class="figure-slider" data-lunation title="The lunation, new moon to new moon, the full moon in the middle: drag, or turn the mouse wheel for an hour a notch">
+<label class:list={["figure-slider", extra]} data-lunation title="The lunation, new moon to new moon, the full moon in the middle: drag, or turn the mouse wheel for an hour a notch">
     <span class="note">Lunation</span>
     <span class="figure-slider-rail">
         <input type="range" data-field="lunation" min="0" max="708" step="1" aria-label="Hours since the new moon" />

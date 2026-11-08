@@ -1,8 +1,9 @@
 import { MOON_MAPS } from "@himmelszelt/nachtgestirn";
 import { fromJulianDay, julianEphemerisDay, moon } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
+import { save } from "../dunstkreis/download";
 import { onDemand } from "../frame";
-import { onChange, state } from "../sternzeit/state";
+import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
 
 const DEG = Math.PI / 180;
 // The librations' reach, in degrees of longitude and latitude: what Earth ever sees, some 59% of the Moon.
@@ -164,6 +165,35 @@ export function mapsFigure(root: HTMLElement) {
         requestRender();
     };
     image.src = files.heights ? String(files.heights) : "";
+    // One map at a time, the color or the heights.
+    const choices = [...root.querySelectorAll<HTMLButtonElement>("[data-map]")];
+    for (const choice of choices)
+        choice.addEventListener("click", () => {
+            for (const other of choices) other.setAttribute("aria-pressed", String(other === choice));
+            color.hidden = choice.dataset.map !== "color";
+            heights.hidden = choice.dataset.map !== "heights";
+            requestRender();
+        });
+    // The map shown at its own size, what Earth sees over it, the moment and the place in a corner.
+    find("[data-field=download]", root).addEventListener("click", () => {
+        const map = color.hidden ? heights : color;
+        const [width, height] = color.hidden
+            ? [heights.width, heights.height]
+            : [color.naturalWidth, color.naturalHeight];
+        const copy = Object.assign(document.createElement("canvas"), { width, height });
+        const context = copy.getContext("2d");
+        if (!context || !width) return;
+        context.drawImage(map, 0, 0, width, height);
+        if (seen[0]) context.drawImage(seen[0], 0, 0, width, height);
+        Object.assign(context, {
+            font: `${Math.round(height / 40)}px ${getComputedStyle(root).fontFamily}`,
+            fillStyle: "rgb(255 255 255 / 0.85)",
+            textBaseline: "bottom",
+        });
+        context.fillText(momentAndPlace(), width / 100, height - height / 100);
+        const which = color.hidden ? "heights" : "color";
+        copy.toBlob((blob) => save(blob, `himmelszelt-${root.id}-${which}-${momentStamp()}.png`), "image/png");
+    });
     onChange(requestRender);
     new ResizeObserver(requestRender).observe(root);
     requestRender();

@@ -1,4 +1,4 @@
-import { drawSvg } from "../sternzeit/figure";
+import { drawSvg, SUN_SYMBOL, sunGlow, sunRays } from "../sternzeit/figure";
 import type { Law } from "./laws";
 
 // The four laws as nachtgestirn's surface.wgsl has them, line for line, for a diagram of a few hundred directions.
@@ -61,62 +61,73 @@ export function reflectance(law: Law, mu0: number, mu: number, g: number) {
 const DEG = PI / 180;
 const f = (n: number) => n.toFixed(1);
 
-/** The light's angle from the normal the lobes are drawn for, radians, negative to the left: the laws' figure outlines
- *  where on the Moon the Sun stands at that angle now. */
-export const lobeLight = { angle: -40 * DEG };
-const lightEvents = new EventTarget();
-export const onLobeLight = (listener: () => void) => lightEvents.addEventListener("change", listener);
+// The side views' box, in their own units: the patch at the bottom middle, room on either side for the Sun's handle at
+// its lowest, which the panels must not crop.
+const W = 224;
+const H = 118;
+const ORIGIN = { x: W / 2, y: H - 8 };
+// A Lambert surface lit straight from above, a half circle of this radius, well inside the Sun's path.
+const LAMBERT = 68;
+const SCALE = LAMBERT * PI;
+const REACH = 88;
 
 /**
- * The lobes figure on `root`: a patch of surface seen from the side under each law, its normal up and the light coming
- * in from where it is dragged to, and around it how much light the patch sends to each direction in that plane. All
- * four on one scale, a Lambert surface lit straight from above a half circle.
+ * The laws' side views in `root`'s `svg[data-law]` panels: a patch of surface under each law, its normal up, the Sun
+ * dragged around it, and around the patch how much light it sends to each direction in that plane, all four on one
+ * scale, a Lambert surface lit straight from above a half circle. The Sun's angle from the normal, radians, negative to
+ * the left.
  */
 export function lobesFigure(root: HTMLElement) {
     const panels = [...root.querySelectorAll<SVGSVGElement>("svg[data-law]")];
-    const note = root.querySelector<HTMLElement>("[data-field=note]");
-    let light = lobeLight.angle;
-    const W = 200;
-    const H = 116;
-    const origin = { x: W / 2, y: H - 6 };
-    const scale = 80 * PI;
-    const toward = (angle: number, r: number) => [origin.x + Math.sin(angle) * r, origin.y - Math.cos(angle) * r];
+    const note = root.querySelector<HTMLElement>("[data-field=lobes]");
+    let light = -40 * DEG;
+    const toward = (angle: number, r: number) => [ORIGIN.x + Math.sin(angle) * r, ORIGIN.y - Math.cos(angle) * r];
+
+    // The Sun as the figures draw it as a symbol, its size in screen pixels whatever the panel's width.
+    function sun(x: number, y: number, unitsPerPx: number) {
+        const r = SUN_SYMBOL.radius * unitsPerPx;
+        let svg = sunGlow(x, y, r, ORIGIN.y, "figure-sun");
+        svg += `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}" class="figure-sun lobe-sun"/>`;
+        for (const [a, b] of sunRays()) {
+            svg += `<line x1="${f(x + a.x * unitsPerPx)}" y1="${f(y + a.y * unitsPerPx)}" x2="${f(x + b.x * unitsPerPx)}" y2="${f(y + b.y * unitsPerPx)}" class="figure-sun-ray"/>`;
+        }
+        return svg;
+    }
 
     function draw() {
         const mu0 = Math.cos(light);
         for (const panel of panels) {
             const law = panel.dataset.law as Law;
+            const unitsPerPx = W / (panel.clientWidth || W);
             panel.setAttribute("viewBox", `0 0 ${W} ${H}`);
+            panel.style.setProperty("--units-per-px", String(unitsPerPx));
             const points: string[] = [];
             for (let i = 0; i <= 180; i++) {
-                const view = (i - 90) * DEG;
-                const g = Math.abs(view - light);
-                const r = reflectance(law, mu0, Math.cos(view), g) * scale;
-                const [x, y] = toward(view, Math.min(r, 140));
-                points.push(`${f(x)},${f(y)}`);
+                const out = (i - 90) * DEG;
+                const r = reflectance(law, mu0, Math.cos(out), Math.abs(out - light)) * SCALE;
+                const [x, y] = toward(out, Math.min(r, LAMBERT * 1.75));
+                points.push(`${f(x ?? 0)},${f(y ?? 0)}`);
             }
-            let svg = `<path d="M${f(toward(-PI / 2, 80)[0] ?? 0)} ${f(origin.y)} A80 80 0 0 1 ${f(toward(PI / 2, 80)[0] ?? 0)} ${f(origin.y)}" class="lobe-lambert"/>`;
-            svg += `<polygon points="${f(origin.x)},${f(origin.y)} ${points.join(" ")}" class="lobe"/>`;
-            svg += `<line x1="8" y1="${f(origin.y)}" x2="${W - 8}" y2="${f(origin.y)}" class="lobe-surface"/>`;
-            svg += `<line x1="${f(origin.x)}" y1="${f(origin.y)}" x2="${f(origin.x)}" y2="${f(origin.y - 30)}" class="lobe-normal"/>`;
-            const [lx, ly] = toward(light, 104);
-            const [hx, hy] = toward(light, 14);
-            svg += `<line x1="${f(lx ?? 0)}" y1="${f(ly ?? 0)}" x2="${f(hx ?? 0)}" y2="${f(hy ?? 0)}" class="lobe-light"/>`;
-            svg += `<circle cx="${f(lx ?? 0)}" cy="${f(ly ?? 0)}" r="6" class="lobe-sun"/>`;
+            let svg = `<path d="M${f(ORIGIN.x - LAMBERT)} ${f(ORIGIN.y)} A${LAMBERT} ${LAMBERT} 0 0 1 ${f(ORIGIN.x + LAMBERT)} ${f(ORIGIN.y)}" class="lobe-lambert"/>`;
+            svg += `<polygon points="${f(ORIGIN.x)},${f(ORIGIN.y)} ${points.join(" ")}" class="lobe"/>`;
+            svg += `<line x1="6" y1="${f(ORIGIN.y)}" x2="${W - 6}" y2="${f(ORIGIN.y)}" class="lobe-surface"/>`;
+            svg += `<line x1="${f(ORIGIN.x)}" y1="${f(ORIGIN.y)}" x2="${f(ORIGIN.x)}" y2="${f(ORIGIN.y - 30)}" class="lobe-normal"/>`;
+            // The incoming light, from the Sun down to the patch.
+            const [lx, ly] = toward(light, REACH);
+            svg += `<line x1="${f(lx ?? 0)}" y1="${f(ly ?? 0)}" x2="${f(ORIGIN.x)}" y2="${f(ORIGIN.y)}" class="lobe-light"/>`;
+            svg += sun(lx ?? 0, ly ?? 0, unitsPerPx);
             drawSvg(panel, svg, 1);
         }
         if (note)
-            note.textContent = `the light ${Math.abs(light / DEG).toFixed(0)}° from the normal, ${light < 0 ? "left" : "right"}`;
+            note.textContent = `side views: the Sun ${Math.abs(light / DEG).toFixed(0)}° ${light < 0 ? "left" : "right"} of the normal`;
     }
 
     for (const panel of panels) {
         const set = (event: PointerEvent) => {
             const box = panel.getBoundingClientRect();
-            const x = ((event.clientX - box.left) / box.width) * W - origin.x;
-            const y = origin.y - ((event.clientY - box.top) / box.height) * H;
+            const x = ((event.clientX - box.left) / box.width) * W - ORIGIN.x;
+            const y = ORIGIN.y - ((event.clientY - box.top) / box.height) * H;
             light = Math.max(-88 * DEG, Math.min(88 * DEG, Math.atan2(x, Math.max(y, 0.001))));
-            lobeLight.angle = light;
-            lightEvents.dispatchEvent(new Event("change"));
             draw();
         };
         panel.addEventListener("pointerdown", (event) => {
@@ -127,38 +138,6 @@ export function lobesFigure(root: HTMLElement) {
             if (panel.hasPointerCapture(event.pointerId)) set(event);
         });
     }
-    root.querySelector("[data-field=download]")?.addEventListener("click", () => download(root, panels));
+    new ResizeObserver(draw).observe(root);
     draw();
-}
-
-// What the stylesheet gives the diagram's parts, written onto them, so the file draws the same anywhere.
-const STYLED = ["fill", "fill-opacity", "stroke", "stroke-width", "stroke-dasharray", "stroke-linejoin", "opacity"];
-
-/** The four lobes as one SVG file, each under its law's name, the colors as the page shows them. */
-function download(root: HTMLElement, panels: SVGSVGElement[]) {
-    const W = 200;
-    const H = 116;
-    const gap = 16;
-    const label = 22;
-    const ink = getComputedStyle(root).color;
-    let body = "";
-    for (const [i, panel] of panels.entries()) {
-        const copy = panel.cloneNode(true) as SVGSVGElement;
-        const sources = panel.querySelectorAll("*");
-        copy.querySelectorAll("*").forEach((element, k) => {
-            const style = getComputedStyle(sources[k] as Element);
-            for (const name of STYLED) element.setAttribute(name, style.getPropertyValue(name));
-            element.removeAttribute("class");
-        });
-        const name = panel.parentElement?.querySelector(".tiles-name")?.textContent ?? "";
-        body += `<g transform="translate(${i * (W + gap)} 0)">${copy.innerHTML}`;
-        body += `<text x="${W / 2}" y="${H + 16}" text-anchor="middle" font-family="sans-serif" font-size="12" fill="${ink}">${name}</text></g>`;
-    }
-    const width = panels.length * W + (panels.length - 1) * gap;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${H + label}" width="${width}" height="${H + label}">${body}</svg>`;
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
-    link.download = `himmelszelt-lobes-${Math.abs(lobeLight.angle / DEG).toFixed(0)}deg.svg`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }

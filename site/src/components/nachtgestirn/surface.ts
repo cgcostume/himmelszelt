@@ -2,11 +2,12 @@ import { moonEV100, type Vec3 } from "@himmelszelt/nachtgestirn";
 import { find } from "../dom";
 import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
-import { drawSvg, svgText } from "../sternzeit/figure";
+import { drawSvg } from "../sternzeit/figure";
 import { onChange, state } from "../sternzeit/state";
 import { apply, cross, dot, noGpu, transpose } from "./laws";
 import { type MoonAt, moonAt, type ToneCurveName } from "./renderer";
 import { mapResolutions, RESOLUTION_NAMES } from "./resolutions";
+import { saveFigure } from "./snapshot";
 import { createTiles, type TileFrame, tileFrame } from "./tiles";
 
 const DEG = Math.PI / 180;
@@ -15,14 +16,16 @@ const DEG = Math.PI / 180;
 export const CLOSEUP_SHARE = 1 / 6;
 export const CLOSEUP_LATITUDE = -30;
 const INTO_THE_LIGHT = 5;
+// The disc and its four close-ups.
+const COUNT = 5;
 const f = (n: number) => n.toFixed(1);
 
 /**
  * Where the close-up looks, off the disc's center, right and up, in degrees of sky: the point of the terminator at
  * `CLOSEUP_LATITUDE` on the side facing the viewer, turned a few degrees towards the Sun. Near full Moon the terminator
- * is at the limb, and so is the close-up.
+ * is at the limb, and so is the close-up. `into` the degrees towards the Sun.
  */
-export function closeupOffset(m: MoonAt): readonly [number, number] {
+export function closeupOffset(m: MoonAt, into = INTO_THE_LIGHT): readonly [number, number] {
     const o = m.orientation;
     const sun = apply(o, m.moonSunDirection);
     const toViewer = apply(o, [-m.trueDirection[0], -m.trueDirection[1], -m.trueDirection[2]]);
@@ -37,7 +40,7 @@ export function closeupOffset(m: MoonAt): readonly [number, number] {
     );
     const point = candidates.reduce((best, p) => (dot(p, toViewer) > dot(best, toViewer) ? p : best));
     // Turned towards the Sun about the pole, into the light.
-    const lon = Math.atan2(point[1], point[0]) + Math.sign(dot(cross(point, sun), [0, 0, 1])) * INTO_THE_LIGHT * DEG;
+    const lon = Math.atan2(point[1], point[0]) + Math.sign(dot(cross(point, sun), [0, 0, 1])) * into * DEG;
     const lit: Vec3 = [Math.cos(lat) * Math.cos(lon), Math.cos(lat) * Math.sin(lon), Math.sin(lat)];
     const n = apply(transpose(o), lit);
     const { right, up } = tileFrame(m);
@@ -47,8 +50,8 @@ export function closeupOffset(m: MoonAt): readonly [number, number] {
 }
 
 /**
- * The surface figure on `root`: the whole disc with the close-up marked on it, and the close-up three times, the color
- * map alone on a smooth sphere, with the relief shading it, and with the shadows the relief casts.
+ * The surface figure on `root`: the whole disc with the close-up marked on it, and the close-up four times, the color
+ * map alone on a smooth sphere, with the relief shading it, with the shadows the relief casts, and displaced.
  */
 export function surfaceFigure(root: HTMLElement) {
     const canvas = find<HTMLCanvasElement>("canvas", root);
@@ -64,13 +67,13 @@ export function surfaceFigure(root: HTMLElement) {
         if (!table) return;
         const m = moonAt(state.jd, state, table.luts.model);
         const width = root.clientWidth || 600;
-        const tileCss = width / 4;
+        const tileCss = width / COUNT;
         const tilePx = Math.round(tileCss * Math.min(window.devicePixelRatio || 1, 2));
         const overview = m.geocentricDiameter * 1.35;
         const closeup = m.geocentricDiameter * CLOSEUP_SHARE;
         const offset = closeupOffset(m);
-        // The close-ups two stops more open than the disc's meter, for the low Sun at the terminator.
-        const ev100 = moonEV100(m.phaseAngle, m.lit) - 2;
+        // The close-ups a stop more open than the disc's meter, for the low Sun at the terminator.
+        const ev100 = moonEV100(m.phaseAngle, m.lit) - 1;
         const common = {
             moon: m,
             luts: table.luts,
@@ -81,33 +84,41 @@ export function surfaceFigure(root: HTMLElement) {
             nightVision: false,
             albedo: true,
         };
-        // The close-ups at the most samples the sampling figure shows, every pixel of them.
         const close = {
             ...common,
             maps: resolution(),
             ev100,
             offset,
             degreesAcross: closeup,
-            samples: 64,
-            terminatorSamples: 64,
         };
         const frames: TileFrame[] = [
             { ...common, maps: resolution(), ev100: null, relief: true, shadows: true },
             { ...close, relief: false, shadows: false },
-            { ...close, relief: true, shadows: false },
-            { ...close, relief: true, shadows: true },
+            { ...close, relief: true, shadows: false, displacementFrom: Number.POSITIVE_INFINITY },
+            { ...close, relief: true, shadows: true, displacementFrom: Number.POSITIVE_INFINITY },
+            { ...close, relief: true, shadows: true, displacementFrom: 0 },
         ];
         // The overview at the disc's size, the close-ups at theirs: one canvas, two scales.
-        tiles?.draw({ count: 4, width: tilePx, degreesAcross: overview }, (i) => frames[i] ?? (frames[0] as TileFrame));
+        tiles?.draw(
+            { count: COUNT, width: tilePx, degreesAcross: overview },
+            (i) => frames[i] ?? (frames[0] as TileFrame),
+        );
         marker.setAttribute("viewBox", `0 0 ${width} ${tileCss}`);
         const scale = tileCss / overview;
         const side = closeup * scale;
         const [cx, cy] = [tileCss / 2 + offset[0] * scale, tileCss / 2 - offset[1] * scale];
-        let svg = `<rect x="${f(cx - side / 2)}" y="${f(cy - side / 2)}" width="${f(side)}" height="${f(side)}" class="surface-marker"/>`;
-        svg += svgText(cx, cy - side / 2 - 5, "the close-up", "figure-note");
+        const svg = `<rect x="${f(cx - side / 2)}" y="${f(cy - side / 2)}" width="${f(side)}" height="${f(side)}" class="surface-marker"/>`;
         drawSvg(marker, svg, 1);
         note.textContent = `the close-up ${(closeup * 60).toFixed(1)}′ across, a sixth of the disc, on the terminator at ${Math.abs(CLOSEUP_LATITUDE)}° south, from the ${RESOLUTION_NAMES[resolution()]}`;
     }
+
+    // The tiles as drawn, the marker and the names under them, in one PNG.
+    find("[data-field=download]", root).addEventListener("click", () =>
+        saveFigure(root, canvas, render, {
+            svgs: [marker],
+            texts: root.querySelectorAll<HTMLElement>(".tiles-labels :is(.tiles-name, .tiles-value)"),
+        }),
+    );
 
     onChange(requestRender);
     onTables(requestRender);

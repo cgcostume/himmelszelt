@@ -17,6 +17,7 @@ import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
+import { raysOf } from "./rays";
 import {
     createMoonRenderer,
     inverseViewProjection,
@@ -29,7 +30,6 @@ import {
 const DEG = Math.PI / 180;
 // The image's rms wander through one zenith's column of air, in arcseconds: a camera lens on a fair night, the tilt
 // 0.42 lambda/D (D/r0)^(5/6) for D 5 cm and r0 10 cm at 500 nm.
-const SEEING = 0.5;
 
 /**
  * The Moon figure on `root`, a `figure[data-moon]`: dunstkreis' sky in cd/m² into a float texture, nachtgestirn's
@@ -83,6 +83,7 @@ export function moonFigure(root: HTMLElement) {
     }
 
     const requestRender = onDemand(render, root);
+    const rays = raysOf(root, requestRender);
     const renderer = gpu ? createMoonRenderer(gpu.device, requestRender) : null;
 
     // Where the time goes, with the compass shown twice: the astronomy, the passes' own CPU work, and when the GPU was done.
@@ -162,9 +163,10 @@ export function moonFigure(root: HTMLElement) {
             shadows: pressed("shadows"),
             earthshine: pressed("earthshine"),
             eclipse: pressed("eclipse"),
-            law: (choice("law") || "hapke") as "hapke" | "lambert" | "orenNayar" | "metallicRoughness",
+            law: "hapke",
             nightVision: pressed("eye"),
-            shimmer: pressed("shimmer") ? { seeing: SEEING, time: performance.now() / 1000, dispersion: 1 } : null,
+            shimmer: pressed("shimmer") ? { time: performance.now() / 1000, dispersion: 1 } : null,
+            ...rays(),
         });
         if (!drawn) return;
         const submitted = performance.now();
@@ -209,7 +211,7 @@ export function moonFigure(root: HTMLElement) {
         onUmbraTable(requestRender);
         new ResizeObserver(requestRender).observe(canvas);
         maybe("exposure")?.addEventListener("input", requestRender);
-        for (const name of ["law", "maps"])
+        for (const name of ["maps"])
             for (const input of root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-${name}"]`))
                 input.addEventListener("change", requestRender);
         for (const name of [

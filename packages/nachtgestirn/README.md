@@ -38,15 +38,27 @@ other package at runtime: the astronomy comes in as directions and angles, from
   the disc, and each ray is dimmed by its own: at moonrise the lower limb is far darker and redder than the upper.
 - **The relief**: the surface's slope from LOLA's heights for its shading, and its shadows, marched through the
   heights towards the Sun: the share of the Sun's half degree above the terrain's horizon, so the penumbra widens with
-  the distance from what casts it, contact hardening by the Sun's own size. `shadows` turns them off.
+  the distance from what casts it, contact hardening by the Sun's own size. `shadows` turns them off. The march runs
+  once into a shadow map of the band around the terminator, as fine as the disc on screen needs, the whole ring or
+  the part the view shows, kept while the Sun and the view stay put; a disc under `shadowsFrom` pixels, 128 by
+  default, the Moon as a sky shows it, takes no shadows and needs no map. Below `softShadowsFrom` pixels, 4096 by
+  default, the Sun casts as a point: a penumbra is a hundredth of the shadow's length, under a pixel on a smaller disc.
+  Where the view magnifies the relief, the map is up to four times finer than its texels, so no edge shows their stairs.
+- **Displaced**: from a disc of `displacementFrom` pixels on, 1024 by default, the rays near the limb are marched
+  through the heights and the terrain shaded where they meet it, so the limb shows its mountains and near rims hide
+  what lies behind them, where a shaded smooth sphere would show slopes turned away as black dashes.
+- **Shimmer**: `shimmer` moves the image about as the air's turbulence does in a short exposure and spreads its colors
+  by the air's dispersion, from Fried's `r0`, the lens' `aperture` and the `wind`, through as much air as lies towards
+  the Moon: the motion as a differential image motion monitor measures it, growing with the square root of the air,
+  the cells shrinking with it, blue lifted over red by a hundredth of the refraction. `shimmerScales` gives the numbers.
 - **Night vision**: `nightVision` on the pass turns the composed Moon and sky into what the eye sees, helldunkel's
   blue shift for the rods: the moonlit sky blue, the disc, far brighter, as it is.
 - **A comparison**: `compare` holds the disc against another law and stripes the pixels more than a third of a
   stop off it, red where brighter, blue where darker, as a camera stripes what clips.
 - **The color**: the map scaled to normal albedo and tinted to the Moon's own color, B-V 0.92, its variations kept;
   `mapColor` reads it as published or as gray instead.
-- **Supersampled**: 8 rays per pixel on and around the disc by default (`samples`), 32 along the terminator
-  (`terminatorSamples`), where a crater rim turns from lit to dark within a texel; the maps are filtered over the
+- **Cheap**: one ray per pixel by default (`samples`), four along the terminator and a displaced limb
+  (`terminatorSamples`), where a crater rim turns from lit to dark within a pixel; the maps are filtered over the
   whole pixel's footprint whatever the count, so the rays sharpen the shading and never alias the maps, and read by a cubic
   B-spline when magnified, so the terminator and the relief along it stay smooth. Minified, they are filtered
   anisotropically, `textureSampleGrad` over each ray's footprint with up to 16 taps along its long axis: towards the

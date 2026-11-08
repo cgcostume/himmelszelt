@@ -1,5 +1,6 @@
 import { viewFrame } from "@himmelszelt/nachtgestirn";
 import { displayOutput, gpuDevice, gpu as shared } from "../dunstkreis/atmosphere";
+import { raysOf } from "./rays";
 import { createMoonRenderer, inverseViewProjection, type MoonAt, type MoonFrame } from "./renderer";
 
 const DEG = Math.PI / 180;
@@ -46,6 +47,8 @@ export type TileFrame = Omit<
     offset?: readonly [number, number];
     /** This tile's own degrees of sky across its width, where the row's do not hold for it. */
     degreesAcross?: number;
+    /** Through the air from the observer, over the sky, the Moon where the air lifts it and the zenith up; none by default. */
+    air?: boolean;
 };
 
 export interface TileLayout {
@@ -100,6 +103,8 @@ export function createTiles(canvas: HTMLCanvasElement, requestRender: () => void
     const context = shared.error ? null : canvas.getContext("webgpu");
     if (!context) return null;
     const device = gpuDevice();
+    // The figure's supersampling switch, where it has one, for every tile.
+    const rays = raysOf(canvas, requestRender);
     let configured: GPUTextureFormat | null = null;
     function configure(format: GPUTextureFormat) {
         if (configured === format) return;
@@ -125,8 +130,9 @@ export function createTiles(canvas: HTMLCanvasElement, requestRender: () => void
         widthPx: number,
         aspect: number,
         offset?: readonly [number, number],
+        air = false,
     ) {
-        const frame = tileFrame(m);
+        const frame = air ? viewFrame(m.direction) : tileFrame(m);
         let { right, up } = frame;
         let forward = frame.toward.map((t) => -t);
         if (offset) {
@@ -211,14 +217,15 @@ export function createTiles(canvas: HTMLCanvasElement, requestRender: () => void
                 const f = frame(i);
                 const tile = {
                     ...f,
+                    ...rays(),
                     format,
                     headroom,
-                    ...view(f.moon, f.degreesAcross ?? degreesAcross, tileW, tileW / tileH, f.offset),
+                    ...view(f.moon, f.degreesAcross ?? degreesAcross, tileW, tileW / tileH, f.offset, f.air),
                     width: tileW,
                     height: tileH,
                     projectionDistance: 0,
                     pixelRatio: 1,
-                    air: false,
+                    air: f.air ?? false,
                 };
                 const key = `${renderer.bound()} ${keyOf(tile)}`;
                 if (keys[i] === key) continue;

@@ -1,5 +1,6 @@
 ---
 import Cite from "../Cite.astro";
+import Icon from "../Icon.astro";
 import "../sternzeit/sternzeit.css";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
 import "./nachtgestirn.css";
@@ -14,20 +15,23 @@ const { id = "maps" } = Astro.props;
 <figure class="tiles-figure" id={id} data-maps>
     <div class="maps-panel as-seen">
         <img data-field="color" alt="NASA's color map of the Moon, an equirectangular mosaic from the Lunar Reconnaissance Orbiter's wide angle camera" />
+        <canvas data-field="heights" aria-label="The Moon's heights from the Lunar Orbiter Laser Altimeter, as gray, low to high" hidden></canvas>
         <canvas class="maps-seen" data-field="seen" aria-hidden="true"></canvas>
-    </div>
-    <div class="maps-panel as-seen">
-        <canvas data-field="heights" aria-label="The Moon's heights from the Lunar Orbiter Laser Altimeter, as gray, low to high"></canvas>
-        <canvas class="maps-seen" data-field="seen" aria-hidden="true"></canvas>
+        <span class="view-buttons">
+            <button type="button" class="view-toggle" data-map="color" aria-pressed="true" title="The color map, the surface's albedo">albedo</button>
+            <button type="button" class="view-toggle" data-map="heights" aria-pressed="false" title="The heights, as gray from the lowest ground to the highest">heights</button>
+        </span>
+        <span class="view-buttons maps-end">
+            <button type="button" class="view-icon" data-field="download" title="Download the map shown, with what Earth sees, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+        </span>
     </div>
     <LunationSlider />
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
         The two maps nachtgestirn ships, at their middle size, laid out flat with 0° longitude in the middle, north up
-        and east to the right: (a) the color, from the Lunar Reconnaissance Orbiter's wide angle camera, as NASA's
-        Scientific Visualization Studio balanced it; (b) the heights from the Lunar
-        Orbiter Laser Altimeter, as gray from the lowest ground to the highest, decoded from the two bytes a texel the
-        package stores them in. Over both, what Earth sees of the Moon at the chosen moment, the half around the point
+        and east to the right, one or the other: the color, from the Lunar Reconnaissance Orbiter's wide angle camera, as
+        NASA's Scientific Visualization Studio balanced it, or the heights from the Lunar Orbiter Laser Altimeter, as gray from the lowest ground to the highest, decoded from the two bytes a texel the
+        package stores them in. Over it, what Earth sees of the Moon at the chosen moment, the half around the point
         the librations turn towards it, inside the line; hatched what is turned away, and densely what no libration ever
         brings into view; the slider runs from new moon to new moon. Both from the CGI Moon Kit <Cite id="svs4720" />.
     </figcaption>

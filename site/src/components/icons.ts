@@ -13,16 +13,6 @@ export const ICONS = {
     res2k: `<path d="M2 5.5a2 2 0 0 1 4 0c0 1.8-4 3.8-4 7h4.2"/>${K}`,
     res4k: `<path d="M5.5 12.5v-9L2 9.5h5.2"/>${K}`,
     res8k: `<circle cx="4.5" cy="5.4" r="1.9"/><circle cx="4.5" cy="10.2" r="2.4"/>${K}`,
-    res16k: `<path d="M1.5 4.5l1-1v9"/><path d="M7.4 4a2.4 2.4 0 0 0-3.4 2.2v4.1"/><circle cx="5.7" cy="10.5" r="1.9"/>${K}`,
-    /** A map's filters, to compare: the nearest texel, blocks; between texels, a ramp; between levels too, a mip chain;
-     *  a cubic B-spline, its bell; and anisotropic, a footprint stretched along a slant. */
-    filterNearest:
-        '<rect x="2" y="2" width="12" height="12" rx="1"/><path class="solid" d="M2.5 2.5h5.5v5.5H2.5zM8 8h5.5v5.5H8z"/>',
-    filterBilinear: '<rect x="2" y="2" width="12" height="12" rx="1"/><path d="M4 12 12 4"/>',
-    filterTrilinear:
-        '<rect x="1.5" y="5.5" width="9" height="9"/><rect x="10.5" y="9.5" width="4.5" height="5"/><rect x="10.5" y="6.5" width="2.5" height="3"/>',
-    filterBspline: '<path d="M1.5 13.5h13"/><path d="M2 13.3c3 0 3.6-9.8 6-9.8s3 9.8 6 9.8"/>',
-    anisotropy: '<ellipse cx="8" cy="8" rx="6.6" ry="2.4" transform="rotate(-35 8 8)"/><path d="M3.4 11.6 12.6 4.4"/>',
     /** An environment map as stored: a sheet, its horizon across and meridians down. */
     envMap: '<rect x="1.5" y="3.5" width="13" height="9" rx="1"/><path d="M1.5 8h13M6 3.5v9M10 3.5v9"/>',
     /** The view from inside: a globe with its equator and a meridian, the eye in its middle. */

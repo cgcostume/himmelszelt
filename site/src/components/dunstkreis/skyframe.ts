@@ -38,7 +38,7 @@ const PAUSE = [
 const MORPH_MS = 200;
 
 /** Folds `button`'s icon towards pause while `playing`, towards play otherwise, from wherever it is. */
-function morph(button: Element) {
+export function morph(button: Element) {
     const paths = [...button.querySelectorAll("path")];
     let t = 0;
     let target = 0;

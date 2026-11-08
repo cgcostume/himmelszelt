@@ -3,6 +3,7 @@ import Icon from "../Icon.astro";
 import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
+import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
 
 /** The Moon through Earth's shadow: the eclipses around the chosen moment, the next one across a row of discs, and the shadow's light by the radius. */
@@ -16,9 +17,14 @@ const { id = "eclipse-row" } = Astro.props;
     <div class="tiles-panel as-seen shadow-big">
         <canvas data-field="big" aria-label="The Moon in Earth's shadow at the slider's moment, rendered with WebGPU"></canvas>
         <svg class="tiles-overlay" data-field="outline" aria-hidden="true"></svg>
-        <p class="vis-credit footnote tiles-credit">Rendered with WebGPU</p>
-        <span class="view-buttons">
-            <button type="button" class="view-icon" data-field="metered" aria-pressed="true" title="Expose each disc of the row on its own, as the big Moon is metered, rather than all at one exposure, the umbra's, where the sunlit part burns out" aria-label="Metered"><Icon name="meter" /></button>
+        <span class="tiles-start">
+            <span class="view-buttons">
+                <button type="button" class="view-icon" data-field="metered" aria-pressed="true" title="Expose each disc of the row on its own, as the big Moon is metered, rather than all at the uneclipsed Moon's exposure, where the umbra's red is barely there" aria-label="Metered"><Icon name="meter" /></button>
+            </span>
+            <span class="tiles-hint footnote">Rendered with WebGPU</span>
+        </span>
+        <span class="view-buttons tiles-end">
+            <Rays />
         </span>
         <span class="eclipse-jump view-buttons">
             <button type="button" class="button-xs" data-jump="-1" title="The lunar eclipse before the one shown" aria-label="The lunar eclipse before the one shown"><Icon name="earlier" />earlier</button>
@@ -52,14 +58,13 @@ const { id = "eclipse-row" } = Astro.props;
         eclipses of twelve years either side, a bar each, as tall as the eclipse is deep, the total ones in the accent,
         the chosen moment a line; the strip moves along only when an eclipse at its dimmed ends is chosen. (c) Seven
         moments from the Moon's first contact with the umbra to its last, each metered on its own, as a photographer
-        exposes them; switched off, all at one exposure, the umbra's when the eclipse is total, so the sunlit part burns
-        out and the copper shows, the greatest moment's when it is partial. (d) What of the sunlight reaches the Moon, by the distance from the
+        exposes them; switched off, all at the uneclipsed Moon's exposure, the sunlit part as on any night and
+        the umbra's copper barely there. (d) What of the sunlight reaches the Moon, by the distance from the
         shadow's axis, red, green and blue, on a scale of stops: the <Term of="Penumbra">penumbra</Term>'s ramp and
         the light Earth's air bends into the umbra, integrated over dunstkreis' atmosphere; the bar is the Moon's own
         width. The time is the page's clock.
         <Try label="New Year's Eve 2028, Berlin" set="date=2028-12-31T17:00Z&lat=52.52&lon=13.405&h=1" fig={id}>
-            the total eclipse of that evening, the Moon's center marked in the shadow where it stands at the chosen
-            moment, halfway in from the umbra's edge.
+            a total eclipse, the Moon halfway in from the umbra's edge.
         </Try>
     </figcaption>
 </figure>

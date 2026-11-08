@@ -10,7 +10,7 @@ import { drawSvg, svgText } from "../sternzeit/figure";
 import { onChange, state, update } from "../sternzeit/state";
 import { clock } from "../sternzeit/zone";
 import { noGpu } from "./laws";
-import { moonAt, onUmbraTable, type ToneCurveName, UMBRA_EV100, umbraTable } from "./renderer";
+import { moonAt, onUmbraTable, type ToneCurveName, umbraTable } from "./renderer";
 import { createTiles, pxPerRadian, tileFrame } from "./tiles";
 
 const COUNT = 7;
@@ -164,17 +164,8 @@ export function shadowFigure(root: HTMLElement) {
         const perTile = metered.getAttribute("aria-pressed") === "true";
         const first = moons[0];
         const greatest = moons[Math.floor(COUNT / 2)];
-        // One exposure for the row: the umbra's own where the eclipse is total, else the greatest moment's, metered on
-        // what the umbra leaves of the lit disc, so a shallow bite still shows.
-        const total = (greatest?.shadow.umbralMagnitude ?? 0) >= 1;
-        const shared = Math.max(
-            moonEV100(
-                greatest?.phaseAngle ?? 0,
-                greatest?.lit ?? 1,
-                Math.max(1 - Math.max(greatest?.shadow.umbralMagnitude ?? 0, 0), 1e-4),
-            ),
-            UMBRA_EV100,
-        );
+        // One exposure for the row, the uneclipsed Moon's: the sunlit part as on any night, the umbra's red barely there.
+        const shared = moonEV100(greatest?.phaseAngle ?? 0, greatest?.lit ?? 1);
         tiles?.draw({ count: COUNT, width: tilePx, degreesAcross: (first?.geocentricDiameter ?? 0.5) * 1.3 }, (i) => ({
             moon: moons[i] ?? (first as NonNullable<typeof first>),
             luts: table.luts,
@@ -205,7 +196,7 @@ export function shadowFigure(root: HTMLElement) {
         note.textContent =
             `${date.text}, in the umbra from ${span.text} to ${end.text} ${date.offset} · ` +
             `${depth >= 1 ? "total" : "partial"}, umbral magnitude ${depth.toFixed(2)} · the big Moon ${where} · ` +
-            `${perTile ? "each disc metered on its own" : `all at EV100 ${shared.toFixed(1)}, ${total ? "the umbra's" : "the greatest moment's"}`}`;
+            `${perTile ? "each disc metered on its own" : `all at EV100 ${shared.toFixed(1)}, the uneclipsed Moon's`}`;
     }
 
     /** The eclipses of the years around the chosen moment, a bar each as tall as the eclipse is deep. */

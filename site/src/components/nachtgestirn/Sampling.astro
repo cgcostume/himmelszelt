@@ -1,14 +1,17 @@
 ---
+import Fig from "../Fig.astro";
+import Icon from "../Icon.astro";
 import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
+import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
-import Icon from "../Icon.astro";
 import Resolutions from "../Resolutions.astro";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
+import { FILTERS } from "./filters";
 import { STRIP_RESOLUTIONS } from "./resolution-options";
 
-/** The close-up of the terminator at one, 4, 16 and 64 samples per pixel. */
+/** The disc, and the limb near the south pole under four of the maps' filters, one ray a pixel or four. */
 interface Props {
     id?: string;
 }
@@ -16,36 +19,45 @@ const { id = "sampling" } = Astro.props;
 ---
 
 <figure class="tiles-figure wide" id={id} data-sampling>
-    <div class="tiles-panel as-seen split" style="--count: 4">
-        <canvas aria-label="A close-up of the Moon's terminator drawn with one, 4, 16 and 64 samples per pixel, rendered with WebGPU"></canvas>
-        <span class="view-buttons tiles-end">
-            <button type="button" class="view-icon" data-filter="nearest" aria-pressed="false" title="The nearest texel of the full size map, no levels" aria-label="Nearest"><Icon name="filterNearest" /></button>
-            <button type="button" class="view-icon" data-filter="bilinear" aria-pressed="false" title="Bilinear: between the four nearest texels of the full size map, no levels" aria-label="Bilinear"><Icon name="filterBilinear" /></button>
-            <button type="button" class="view-icon" data-filter="trilinear" aria-pressed="false" title="Trilinear: bilinear on the two nearest levels, between them" aria-label="Trilinear"><Icon name="filterTrilinear" /></button>
-            <button type="button" class="view-icon" data-filter="bspline" aria-pressed="true" title="As the pass does: anisotropic, and by a cubic B-spline where the map is magnified" aria-label="B-spline"><Icon name="filterBspline" /></button>
-            <button type="button" class="view-icon" data-field="anisotropy" aria-pressed="true" title="Anisotropic: up to sixteen trilinear taps along the footprint where the slant stretches it; with trilinear and the B-spline" aria-label="Anisotropic"><Icon name="anisotropy" /></button>
+    <div class="tiles-panel as-seen split" style={`--count: ${FILTERS.length + 1}`}>
+        <canvas aria-label="The Moon with a close-up of its limb near the south pole marked, and the close-up with its maps read by the nearest texel, bilinear, trilinear and anisotropic, rendered with WebGPU"></canvas>
+        <svg class="tiles-overlay" data-field="marker" aria-hidden="true"></svg>
+        <span class="tiles-start">
+            <Resolutions options={STRIP_RESOLUTIONS} chosen="large" />
+            <span class="view-buttons">
+                <button type="button" class="view-toggle" data-field="relief" aria-pressed="true" title="The relief from LOLA's heights, shading the surface; off, the smooth sphere under the color map alone">relief</button>
+                <button type="button" class="view-toggle" data-field="shadows" aria-pressed="true" title="The shadows the relief casts, marched through the heights towards the Sun">shadows</button>
+                <button type="button" class="view-toggle" data-field="displace" aria-pressed="true" title="The relief displaced, each ray marched through the heights, so the limb shows its mountains; off, the slopes shade a smooth sphere">displaced</button>
+            </span>
+            <span class="tiles-hint footnote">Rendered with WebGPU</span>
         </span>
-        <Resolutions options={STRIP_RESOLUTIONS} chosen="large" />
+        <span class="view-buttons tiles-end">
+            <Rays pressed={false} />
+            <button type="button" class="view-icon" data-field="download" title="Download the disc and the four close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+        </span>
     </div>
-    <ul class="tiles-labels" style="grid-template-columns: repeat(4, 1fr)">
-        <li><span class="tiles-name">1 sample</span> <span class="tiles-value">through the pixel's center</span></li>
-        <li><span class="tiles-name">4 samples</span> <span class="tiles-value"></span></li>
-        <li><span class="tiles-name">16 samples</span> <span class="tiles-value"></span></li>
-        <li><span class="tiles-name">64 samples</span> <span class="tiles-value">their light averaged</span></li>
+    <ul class="tiles-labels" style={`grid-template-columns: repeat(${FILTERS.length + 1}, 1fr)`}>
+        <li><span class="tiles-name">the disc</span> <span class="tiles-value">the close-up marked</span></li>
+        {FILTERS.map(([, name, what]) => (
+            <li><span class="tiles-name">{name}</span> <span class="tiles-value">{what}</span></li>
+        ))}
     </ul>
-    <p class="vis-credit footnote tiles-credit below">Rendered with WebGPU</p>
     <LunationSlider />
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        Supersampling the relief: the same close-up of the <Term of="Terminator">terminator</Term> as in the figure
-        above, relief and shadows on, drawn with one, 4, 16 and 64 samples per pixel, their light averaged as a sensor
-        does, the maps filtered over the whole pixel whatever the count. With one sample the crater rims and the
-        shadows' edges break into stair steps and sparkle as the slider moves; with 16 they are smooth. The pass takes
-        8, and 32 along the terminator. The slider runs from new moon to
-        new moon.
+        The maps' filters on the limb near the Moon's south pole: the disc at the chosen moment, metered, with the
+        close-up marked, and the close-up four times, one ray through each pixel's center, or with the switch four,
+        which hides much of the first two filters' noise. The nearest texel of the full size map, in noise where many
+        texels fall into a pixel; bilinear, between the four nearest, still noisy; trilinear, between the two nearest of
+        the map's levels too, quiet but blurred towards the limb, where the slant stretches a pixel's footprint across
+        the map and one round level has to cover all of it; and anisotropic, up to sixteen trilinear taps along that
+        footprint, sharp and quiet, as the pass reads its maps. Where the map is magnified, a texel over several
+        pixels, the pass takes a cubic B-spline instead, so the texels do not show as stairs along the rims; zoom in
+        all the way in <Fig id="globe" /> to see it. The <Term of="Terminator">terminator</Term> runs near the poles all
+        month, so the relief there is all long shadows, and the close-up leans along the limb from the pole towards the
+        Sun. The slider runs from new moon to new moon.
         <Try label="Five days after new moon" set="date=2026-11-14T18:00Z" fig={id}>
-            the southern highlands, every crater rim a crease in the relief: step the time an hour at a time and watch
-            the first tile crawl.
+            step the time an hour at a time, the first two tiles crawl.
         </Try>
     </figcaption>
 </figure>

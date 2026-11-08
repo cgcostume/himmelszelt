@@ -8,10 +8,9 @@ export const RESOLUTION_NAMES: Record<Choice, string> = {
     small: "512 maps",
     medium: "1K maps",
     large: "4K maps",
+    "2k": "2K maps",
     "8k": "8K maps",
-    "16k": "16K color map and 8K heights",
     "8k-strip": "8K strip over the 4K maps",
-    "16k-strip": "16K strip over the 4K maps",
 };
 
 /**

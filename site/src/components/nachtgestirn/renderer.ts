@@ -1,6 +1,14 @@
 import type { AtmosphereLUTs, AtmosphereModel, SkyPass } from "@himmelszelt/dunstkreis";
 import { airTransmittance, clampObserverHeight, createSkyPass, refractionAngle } from "@himmelszelt/dunstkreis";
-import type { EarthShadow, MapFilter, MoonMapFiles, MoonMaps, MoonPass, Vec3 } from "@himmelszelt/nachtgestirn";
+import type {
+    EarthShadow,
+    MapFilter,
+    MoonMapFiles,
+    MoonMaps,
+    MoonPass,
+    Shimmer as PassShimmer,
+    Vec3,
+} from "@himmelszelt/nachtgestirn";
 import {
     createMoonPass,
     earthshineIlluminance,
@@ -42,33 +50,24 @@ export type ToneCurveName = "neutral" | "agx" | "aces" | "clip";
 export type MapSize = "auto" | keyof typeof MOON_MAPS | FineMaps;
 const SIZES = ["small", "medium", "large"] as const;
 
-// The maps finer than the package ships, made by its `maps-hq.mjs` and hosted with the site: the whole Moon at 8K and
-// 16K, the 16K's heights at 8K, and strips of the southern highlands at those sizes over the shipped 4K.
+// The maps the package does not ship, made by its `maps-hq.mjs` and hosted with the site: the whole Moon at 2K, between
+// the package's 1K and 4K, and at 8K, and a strip of the southern highlands at 8K over the shipped 4K.
 const HQ = `${import.meta.env.BASE_URL.replace(/\/?$/, "/")}moon/`;
 const STRIPS = {
     "8k": { x: 1638, y: 2298, width: 4916, height: 934, mapWidth: 8192 },
-    "16k": { x: 3276, y: 4596, width: 9832, height: 1867, mapWidth: 16384 },
 };
 const region = ({ x, y, width, height, mapWidth }: (typeof STRIPS)["8k"]) =>
     [x / mapWidth, (2 * y) / mapWidth, (x + width) / mapWidth, (2 * (y + height)) / mapWidth] as const;
 const SHIPPED = { meanReflectance: MOON_MAPS.large.meanReflectance, meanColor: MOON_MAPS.large.meanColor };
 export const FINE_MAPS = {
+    "2k": { color: `${HQ}moon-color-2k.webp`, heights: `${HQ}moon-height-2k.webp`, width: 2048, ...SHIPPED },
     "8k": { color: `${HQ}moon-color-8k.webp`, heights: `${HQ}moon-height-8k.webp`, width: 8192, ...SHIPPED },
-    "16k": { color: `${HQ}moon-color-16k.webp`, heights: `${HQ}moon-height-8k.webp`, width: 16382, ...SHIPPED },
     "8k-strip": {
         ...MOON_MAPS.large,
         detail: {
             color: `${HQ}moon-color-8k-strip.webp`,
             heights: `${HQ}moon-height-8k-strip.webp`,
             region: region(STRIPS["8k"]),
-        },
-    },
-    "16k-strip": {
-        ...MOON_MAPS.large,
-        detail: {
-            color: `${HQ}moon-color-16k-strip.webp`,
-            heights: `${HQ}moon-height-16k-strip.webp`,
-            region: region(STRIPS["16k"]),
         },
     },
 } satisfies Record<string, MoonMapFiles>;
@@ -78,10 +77,9 @@ export const MAPS_TEXELS: Record<keyof typeof MOON_MAPS | FineMaps, number> = {
     small: 512,
     medium: 1024,
     large: 4096,
+    "2k": 2048,
     "8k": 8192,
-    "16k": 16384,
     "8k-strip": STRIPS["8k"].width,
-    "16k-strip": STRIPS["16k"].width,
 };
 
 // The air's green optical depth at the zenith from sea level, per model: what the shimmer measures a ray's column in.
@@ -95,9 +93,12 @@ function zenithDepth(model: AtmosphereModel) {
     return depth;
 }
 
+/** The air's shimmer as the figures ask for it: nachtgestirn's, the air it crosses taken from the Moon's place. */
+export type Shimmer = Omit<PassShimmer, "airColumn" | "bend">;
+
 // The shimmer through the air between the observer and the Moon, from the observer's height: the column from the
 // optical depth towards the Moon against the zenith's from sea level, the bend as the air gives it. None above the air.
-function shimmerThrough(m: MoonAt, shimmer: { seeing: number; time: number; dispersion: number }) {
+export function shimmerThrough(m: MoonAt, shimmer: Shimmer) {
     const altitude = (Math.asin(Math.max(-1, Math.min(1, m.direction[2]))) * 180) / Math.PI;
     const through = m.through(altitude)?.[1] ?? 0;
     const airColumn = -Math.log(Math.max(through, 1e-6)) / zenithDepth(m.model);
@@ -309,16 +310,20 @@ export interface MoonFrame {
     nightVision: boolean;
     /** Without the air, what lies behind the Moon, in cd/m²: black by default, or a plain daytime sky. */
     background?: readonly [number, number, number];
-    /** Rays per pixel, the pass' defaults of 8 and 32 along the terminator unless given: the pass is made anew. */
+    /** Rays per pixel, the pass' defaults of 1 and 4 along the terminator and a displaced limb unless given: the pass
+     *  is made anew. */
     samples?: number;
     terminatorSamples?: number;
+    /** From how many pixels across the disc the relief is displaced, the pass' 1024 unless given: 0 always, Infinity
+     *  never. The pass is made anew. */
+    displacementFrom?: number;
     /** The target's format and how many times SDR white it shows, `displayOutput`: SDR, 1 by default. */
     format?: GPUTextureFormat;
     headroom?: number;
     /** How the maps are filtered, "bspline" by default, as the package does. */
     filter?: MapFilter;
     /** The air's shimmer over the disc, as the pass takes it, or none. */
-    shimmer?: { seeing: number; time: number; dispersion: number } | null;
+    shimmer?: Shimmer | null;
 }
 
 /**
@@ -365,7 +370,15 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     function buildMoon(key: string, frame: MoonFrame) {
         if (moonBuilding.has(key)) return;
         moonBuilding.add(key);
-        const { toneMap, nightVision, format = SDR, headroom = 1, samples = 8, terminatorSamples = 32 } = frame;
+        const {
+            toneMap,
+            nightVision,
+            format = SDR,
+            headroom = 1,
+            samples,
+            terminatorSamples,
+            displacementFrom,
+        } = frame;
         const filter = frame.filter ?? "bspline";
         createMoonPass(device, {
             format,
@@ -373,9 +386,11 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             toneMap: toneMap === "linear" ? false : toneMap,
             maps,
             nightVision,
-            samples,
-            terminatorSamples,
+            ...(samples === undefined ? {} : { samples }),
+            ...(terminatorSamples === undefined ? {} : { terminatorSamples }),
+            ...(displacementFrom === undefined ? {} : { displacementFrom }),
             filter,
+            onReady: requestRender,
         }).then((pass) => {
             if (!moonBuilding.delete(key)) return pass.destroy();
             moonPasses.set(key, pass);
@@ -422,7 +437,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                       ? (mapsBound as FineMaps)
                       : (SIZES[Math.max(SIZES.indexOf(needed), kept)] ?? "large");
             loadMaps(size);
-            const key = `${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.nightVision} ${frame.format ?? SDR} ${frame.headroom ?? 1} ${frame.samples ?? 8} ${frame.terminatorSamples ?? 32} ${frame.filter ?? "bspline"}`;
+            const key = `${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.nightVision} ${frame.format ?? SDR} ${frame.headroom ?? 1} ${frame.samples} ${frame.terminatorSamples} ${frame.displacementFrom} ${frame.filter ?? "bspline"}`;
             const moonPass = moonPasses.get(key);
             if (!moonPass) {
                 buildMoon(key, frame);

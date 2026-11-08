@@ -60,7 +60,7 @@ export function distanceFigure(root: HTMLElement) {
                 `<path d="M${f(x)} ${f(top)}l${-head / 2} ${head}h${head}z M${f(x)} ${f(bottom)}l${-head / 2} ${-head}h${head}z" class="distance-arrow-head"/>`
             );
         };
-        // The labels in the margin above the perigee disc's top line, clear of every disc.
+        // The labels in the margin below the perigee disc's bottom line, clear of every disc and of the switches above.
         const margin = tileCss / 2 - ((diameterAt(PERIGEE_KM) / across) * tileCss) / 2;
         for (const [km, name, x, anchor] of [
             [APOGEE_KM, "apogee", tileCss * 0.05, "figure-anchor-start"],
@@ -72,7 +72,12 @@ export function distanceFigure(root: HTMLElement) {
                 svg += `<line x1="0" y1="${f(edge)}" x2="${f(width)}" y2="${f(edge)}" class="figure-outline"/>`;
             }
             svg += arrow(x, top, bottom);
-            svg += svgText(x, margin / 2, `${name} ${(diameterAt(km) * 60).toFixed(1)}′`, `figure-note ${anchor}`);
+            svg += svgText(
+                x,
+                tileCss - margin / 2,
+                `${name} ${(diameterAt(km) * 60).toFixed(1)}′`,
+                `figure-note ${anchor}`,
+            );
         }
         drawSvg(lines, svg, 1);
     }

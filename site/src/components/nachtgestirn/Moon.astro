@@ -6,11 +6,12 @@ import Hdr from "../dunstkreis/Hdr.astro";
 import OptionGroup from "../dunstkreis/OptionGroup.astro";
 import SkyFrame from "../dunstkreis/SkyFrame.astro";
 import Try from "../Try.astro";
+import Rays from "./Rays.astro";
 
 /**
  * The Moon figure: nachtgestirn's disc over dunstkreis' sky in cd/m², composed and tone mapped by the Moon pass, in the
- * shared frame, the view kept on the Moon and zoomed in on it. Its options switch the maps, the earthshine, the
- * eclipse and the reflectance law, and set the exposure.
+ * shared frame, the view kept on the Moon and zoomed in on it, everything on: Hapke's law, the maps, the relief, the
+ * shadows, the earthshine, the eclipse and the air's shimmer. Its options switch them off and set the exposure.
  */
 interface Props {
     id?: string;
@@ -23,18 +24,6 @@ const {
     try: experiment,
 } = Astro.props;
 
-const LAW = {
-    name: "law",
-    label: "Reflectance law",
-    title: "How the surface reflects sunlight: Hapke's lunar law, which keeps the full Moon flat to its edge, Lambert's, which darkens the limb as a matte ball's, Oren-Nayar's rough surface, which brightens the limb but has no surge, or a PBR renderer's metallic-roughness dielectric",
-    options: [
-        ["hapke", "Hapke"],
-        ["lambert", "Lambert"],
-        ["orenNayar", "Oren-Nayar"],
-        ["metallicRoughness", "PBR"],
-    ],
-    checked: "hapke",
-};
 const MAPS = {
     name: "maps",
     label: "Map size",
@@ -76,11 +65,9 @@ const TONE = {
                 <button type="button" class="view-toggle" data-field="shadows" aria-pressed="true" title="The shadows the relief casts, marched through the heights towards the Sun: soft by the Sun's half degree, sharper towards the rim or peak that casts them">shadows</button>
                 <button type="button" class="view-toggle" data-field="earthshine" aria-pressed="true" title="Earthshine, sunlight reflected by Earth onto the Moon's night side: a full Earth lights it with some 13 lux">earthshine</button>
                 <button type="button" class="view-toggle" data-field="eclipse" aria-pressed="true" title="Earth's shadow on the Moon during a lunar eclipse: the penumbra's dimming, the umbra's copper, and the turquoise rim ozone leaves">eclipse</button>
-                <button type="button" class="view-toggle" data-field="shimmer" aria-pressed="false" title="The air's shimmer: turbulence moves the image about, half an arcsecond at the zenith, growing with the air the light crosses from where you stand, some 3 arcseconds on the horizon and none above the air, and the air spreads the colors, blue lifted more than red, near the horizon some tens of arcseconds. It moves, so the figure draws on while it is on">shimmer</button>
+                <button type="button" class="view-toggle" data-field="shimmer" aria-pressed="true" title="The air's shimmer: turbulence moves the image about, half an arcsecond at the zenith, growing with the air the light crosses from where you stand, some 3 arcseconds on the horizon and none above the air, and the air spreads the colors, blue lifted more than red, near the horizon some tens of arcseconds. It moves, so the figure draws on while it is on">shimmer</button>
+                <Rays />
                 <Choice figure={id} {...MAPS} />
-            </OptionGroup>
-            <OptionGroup name="reflectance">
-                <Choice figure={id} {...LAW} />
             </OptionGroup>
             <OptionGroup name="HDR (× SDR white)">
                 <Hdr figure={id} />

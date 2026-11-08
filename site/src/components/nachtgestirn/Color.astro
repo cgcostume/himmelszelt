@@ -2,6 +2,7 @@
 import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
+import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
 
@@ -15,7 +16,12 @@ const { id = "color" } = Astro.props;
 <figure class="tiles-figure" id={id} data-color>
     <div class="tiles-panel as-seen">
         <canvas aria-label="The Moon from its color map as gray, as published and tinted to the Moon's color, rendered with WebGPU"></canvas>
-        <p class="vis-credit footnote tiles-credit">Rendered with WebGPU</p>
+        <span class="tiles-start">
+            <span class="tiles-hint footnote">Rendered with WebGPU</span>
+        </span>
+        <span class="view-buttons tiles-end">
+            <Rays />
+        </span>
     </div>
     <ul class="tiles-labels" style="grid-template-columns: 1fr 1fr 1fr">
         <li><span class="tiles-name">gray</span> <span class="tiles-value">the map's luminance</span></li>
@@ -29,8 +35,7 @@ const { id = "color" } = Astro.props;
         own color, a <Term of="Color index">color index</Term> B−V of 0.92 against the Sun's 0.65, a warm gray, the
         map's own variations kept, Mare Tranquillitatis a little bluer than the highlands.
         <Try label="Full Moon" set="date=2026-11-24T14:00Z" fig={id}>
-            the maria and the highlands apart in all three, the tint only in the third: the Moon of the astronauts'
-            photographs, not the paper-white disc.
+            maria and highlands apart in all three, the astronauts' tint only in the third.
         </Try>
     </figcaption>
 </figure>

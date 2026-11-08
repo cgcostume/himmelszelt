@@ -32,9 +32,9 @@ struct NbParams {
     // What the color map is multiplied by to read as normal albedo, and the albedo without a map; per channel, below.
     albedoScale: f32,
     albedo: f32,
-    // 1 the color map, 2 the relief, 4 the eclipse, 8 the relief's shadows, 16 the table's transmittances, 32 the
-    // color map as gray, its luminance alone, 64 the map's own color, untinted, 128 the comparison with `compareLaw`,
-    // 256 the air's shimmer.
+    // 1 the color map, 2 the relief, 4 the eclipse, 8 the relief's shadows from the shadow map, 16 the table's
+    // transmittances, 32 the color map as gray, its luminance alone, 64 the map's own color, untinted, 128 the comparison
+    // with `compareLaw`, 256 the air's shimmer, 512 the relief displaced where it shows, not only shaded.
     flags: u32,
     // The reflectance law: 0 Hapke's lunar law after Jensen et al., 1 Lambert's, 2 Oren-Nayar's, 3 a PBR
     // renderer's metallic-roughness dielectric, Burley's diffuse at roughness 1, to compare.
@@ -65,6 +65,16 @@ struct NbParams {
     // The air's shimmer, with NB_FLAG_SHIMMER: the image's rms wander in radians, the time in seconds the turbulence
     // has drifted by, and how far the air spreads green from red and blue, in radians of refraction.
     shimmer: vec4f,
+    // The shadow map, with NB_FLAG_SHADOWS, from `shadow.comp.wgsl`: the Sun's direction in the Moon's frame it was
+    // made for, and a texel's angle on the unit sphere; the axis its longitudes about the Sun count from, and the first
+    // longitude of its window; the window's first angle from the subsolar point, its width and height in texels, and
+    // the Sun's angular radius it casts with, 0 a point.
+    shadowSun: vec4f,
+    shadowEast: vec4f,
+    shadowWindow: vec4f,
+    // The shimmer's parts, weighed: its larger cells, which move patches of the image as a whole, and its smaller,
+    // which make it boil within them; and how fast the wind carries the cells across the sky, in radians a second.
+    shimmerParts: vec4f,
 }
 
 const NB_UMBRA_SAMPLES: u32 = 64u;
@@ -80,3 +90,4 @@ const NB_FLAG_GRAY: u32 = 32u;
 const NB_FLAG_UNTINTED: u32 = 64u;
 const NB_FLAG_COMPARE: u32 = 128u;
 const NB_FLAG_SHIMMER: u32 = 256u;
+const NB_FLAG_DISPLACE: u32 = 512u;

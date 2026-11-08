@@ -28,6 +28,8 @@ const PASSES: Record<string, readonly string[]> = {
     moon: ["params", "camera", "surface", "tonemap", "vision", "moon"],
     mips: ["params", "surface", "mips"],
     relief: ["params", "surface", "relief"],
+    shadow: ["params", "camera", "surface", "tonemap", "vision", "moon", "shadow"],
+    shimmer: ["params", "camera", "surface", "tonemap", "vision", "moon", "shimmer"],
 };
 
 for (const [name, fragments] of Object.entries(PASSES)) {

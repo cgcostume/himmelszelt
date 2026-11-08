@@ -10,6 +10,10 @@
 // A strip of the maps at a finer size, where `nbParams.detailRegion` says, read instead of the whole maps within it.
 @group(0) @binding(5) var nbDetailColor: texture_2d<f32>;
 @group(0) @binding(6) var nbDetailRelief: texture_2d<f32>;
+// What of the Sun the terrain leaves each point of the band around the terminator, from `shadow.comp.wgsl`.
+@group(0) @binding(7) var nbShadowMap: texture_2d<f32>;
+// The Moon alone, linear and premultiplied, as the layer pass wrote it: what `shimmer.comp.wgsl` moves about.
+@group(0) @binding(8) var nbLayer: texture_2d<f32>;
 
 // Tone map for a display by Neutral (1), AgX (2), ACES (3) or none (4); 0 writes the exposed luminance, linear.
 override NB_TONE_MAP: u32 = 1u;
@@ -19,6 +23,8 @@ override NB_DITHER: bool = true;
 override NB_BACKGROUND: bool = true;
 // The composed light as the eye sees it at night, with a background: the rods' blue shift, `hdNightVision`.
 override NB_NIGHT_VISION: bool = false;
+// The Moon alone, linear and premultiplied, its coverage in alpha, for the shimmer's pass to move about and finish.
+override NB_LAYER: bool = false;
 
 fn nbToneMap(exposed: vec3f) -> vec3f {
     if (NB_TONE_MAP == 2u) {
@@ -132,13 +138,6 @@ fn nbInDetail(body: vec3f) -> bool {
     return nbDetailUv(nbMapUv(nbSelenographic(body))).x >= 0.0;
 }
 
-// The relief's level for a ray's footprint, by its width across, for the march of the shadows; in the strip's levels
-// where `fine`.
-fn nbReliefLevel(body: vec3f, footprint: NbFootprint, fine: bool) -> f32 {
-    let level = log2(max(length(footprint.across) * f32(textureDimensions(nbReliefMap).y) / NB_PI, 1e-4));
-    return select(level, level + nbDetailLevels(), fine);
-}
-
 // The height at a point in km, and the slope there as a vector along the surface, in the Moon's frame, km per km.
 fn nbReliefAt(body: vec3f, footprint: NbFootprint) -> vec4f {
     let lonLat = nbSelenographic(body);
@@ -237,8 +236,9 @@ const NB_SHADOW_GROWTH: f32 = 1.26;
 // horizontal, and the share of the Sun's disc above it. Near what casts it that angle changes fast and the shadow's
 // edge is sharp; far from it slowly, and the penumbra widens with the distance, as the Sun's half degree makes it.
 // `up` the point's direction and `sun` the Sun's, in the Moon's frame; `height` its height in km; `lod` its level.
+// The Sun's size the shadow map's, a point for a small disc.
 fn nbSunAboveTerrain(up: vec3f, sun: vec3f, height: f32, lod: f32, fine: bool) -> f32 {
-    return nbAboveTerrain(up, sun, height, lod, fine, nbParams.sunAngularRadius);
+    return nbAboveTerrain(up, sun, height, lod, fine, max(nbParams.shadowWindow.w, 1e-7));
 }
 
 // The same for any direction, a disc of `radius` around it: the Sun's, or the viewer's, a point.
@@ -271,38 +271,192 @@ fn nbAboveTerrain(up: vec3f, sun: vec3f, height: f32, lod: f32, fine: bool, radi
     return 0.5 + (x * sqrt(1.0 - x * x) + asin(x)) / NB_PI;
 }
 
+// The band the shadow map covers, as angles from the subsolar point: from where the Sun stands too high for any slope to
+// hide it to where it has set for the highest peak, some 11 km up, a little more than six degrees past the terminator.
+const NB_BAND_FROM: f32 = NB_PI / 2.0 - NB_SHADOW_ELEVATION;
+const NB_BAND_TO: f32 = NB_PI / 2.0 + 0.12;
+
+// A point of the Moon's unit sphere in the shadow map's frame: its longitude about the Sun from the window's first, in
+// [0, 2π), and its angle from the subsolar point.
+fn nbBandAt(body: vec3f) -> vec2f {
+    let p = nbParams;
+    let s = p.shadowSun.xyz;
+    let east = p.shadowEast.xyz;
+    let longitude = atan2(dot(body, cross(s, east)), dot(body, east)) - p.shadowEast.w;
+    return vec2f(longitude - floor(longitude / (2.0 * NB_PI)) * 2.0 * NB_PI, acos(clamp(dot(body, s), -1.0, 1.0)));
+}
+
+// The share of the Sun's disc a point sees above the terrain, from the shadow map: lit before the band, dark past it,
+// and outside the window, which holds only what the view shows, lit on the day side.
+fn nbShadowAt(body: vec3f) -> f32 {
+    let p = nbParams;
+    let band = nbBandAt(body);
+    if (band.y < NB_BAND_FROM) {
+        return 1.0;
+    }
+    if (band.y > NB_BAND_TO) {
+        return 0.0;
+    }
+    let texel = vec2f(band.x, band.y - p.shadowWindow.x) / p.shadowSun.w;
+    if (texel.x > p.shadowWindow.y || texel.y < 0.0 || texel.y > p.shadowWindow.z) {
+        return select(0.0, 1.0, band.y < NB_PI / 2.0);
+    }
+    // Between the four nearest texels, by hand: the map is larger than its window, rounded up, and a sampler would mix in
+    // the texels past its edges. The whole ring wraps around, a window stops at its edges.
+    let size = vec2i(i32(p.shadowWindow.y), i32(p.shadowWindow.z));
+    let ring = p.shadowWindow.y * p.shadowSun.w >= 2.0 * NB_PI - 1e-4;
+    let q = texel - 0.5;
+    let first = vec2i(floor(q));
+    let t = q - floor(q);
+    var xs = vec2i(first.x, first.x + 1);
+    if (ring) {
+        xs = (xs % size.x + size.x) % size.x;
+    } else {
+        xs = clamp(xs, vec2i(0), vec2i(size.x - 1));
+    }
+    let ys = clamp(vec2i(first.y, first.y + 1), vec2i(0), vec2i(size.y - 1));
+    let a = textureLoad(nbShadowMap, vec2i(xs.x, ys.x), 0).r;
+    let b = textureLoad(nbShadowMap, vec2i(xs.y, ys.x), 0).r;
+    let c = textureLoad(nbShadowMap, vec2i(xs.x, ys.y), 0).r;
+    let d = textureLoad(nbShadowMap, vec2i(xs.y, ys.y), 0).r;
+    return mix(mix(a, b, t.x), mix(c, d, t.x), t.y);
+}
+
+// How far the relief reaches below and above the mean radius, in km: Antoniadi's floor and the Selenean summit.
+const NB_HEIGHT_MIN_KM: f32 = -9.2;
+const NB_HEIGHT_MAX_KM: f32 = 10.8;
+const NB_DISPLACE_STEPS: u32 = 96u;
+
+// A ray against the Moon's sphere at unit distance, kept well conditioned: the ray and the direction to the center are
+// nearly parallel, and their dot product, near 1, keeps only some five digits of the angle between them, steps of a
+// third of a percent of the radius, which showed as stairs in a large disc. Their difference keeps all of f32's. `w`
+// from the ray to the center, `w2` its square, `s2` the square of the ray's distance from the center and `angle` the
+// angle between them. Points along the ray are `nbAlong(ray, tau)`, tau the distance past unit distance.
+struct NbRay {
+    v: vec3f,
+    w: vec3f,
+    w2: f32,
+    s2: f32,
+    angle: f32,
+}
+
+fn nbRayOf(v: vec3f) -> NbRay {
+    let w = nbParams.direction - v;
+    let w2 = dot(w, w);
+    // The center's part across the ray, m - (m·v) v, with m·v = 1 - w2 / 2.
+    let across = w + 0.5 * w2 * v;
+    return NbRay(v, w, w2, dot(across, across), 2.0 * asin(min(0.5 * sqrt(w2), 1.0)));
+}
+
+// Where a ray enters the sphere of radius `r` about the center, as tau; past it, the point of closest approach.
+fn nbEnter(ray: NbRay, r: f32) -> f32 {
+    return -0.5 * ray.w2 - sqrt(max(r * r - ray.s2, 0.0));
+}
+
+// The point at tau along a ray, from the Moon's center.
+fn nbAlong(ray: NbRay, tau: f32) -> vec3f {
+    return tau * ray.v - ray.w;
+}
+
+// A ray's footprint where it meets the sphere at `body`, in the Moon's frame: `width` across the line of sight, and
+// along it stretched by the slant, up to fifty times at the limb.
+fn nbFootprintAt(body: vec3f, v: vec3f, width: f32) -> NbFootprint {
+    let toViewer = nbParams.orientation * -v;
+    let side = toViewer - dot(toViewer, body) * body;
+    let helper = select(vec3f(0.0, 0.0, 1.0), vec3f(1.0, 0.0, 0.0), abs(body.z) > 0.9);
+    let along = select(normalize(cross(body, helper)), normalize(side), length(side) > 1e-5);
+    let mu = max(dot(body, toViewer), 0.0);
+    return NbFootprint(cross(body, along) * width, along * width / max(mu, 0.02));
+}
+
+// How far a point lies above the relief, radially, at unit distance: `q` from the Moon's center, `scale` km to those
+// units, the heights read at `level` of the whole relief. As finely as the pixel is wide, not over its footprint along
+// the line of sight, which near the limb would average the peaks that stand against the sky away.
+fn nbAboveRelief(q: vec3f, sinA: f32, scale: f32, level: f32) -> f32 {
+    let r = length(q);
+    let body = nbParams.orientation * (q / r);
+    let fine = nbInDetail(body);
+    let h = nbHeightAt(body, max(select(level, level + nbDetailLevels(), fine), 0.0), fine);
+    return r - (sinA + h * scale);
+}
+
+// Where a ray meets the relief itself, not the smooth sphere: marched through the shell the heights span, from where it
+// enters, in steps half as long as its height over the terrain, as no slope rises steeper than 63°, but no shorter than
+// half a pixel, and the crossing found between the last two steps. A ray that passes over the terrain covers the pixel
+// by how near it came, within its own width: the limb shows its mountains. Where the heights would move the surface by less than a quarter pixel, the smooth sphere, as before.
+// `limb` the coverage of the smooth limb; returns the surface's direction from the center and the ray's coverage.
+fn nbDisplaced(ray: NbRay, sampleAngle: f32, pixelAngle: f32, limb: f32) -> vec4f {
+    let p = nbParams;
+    let v = ray.v;
+    let sinA = sin(p.angularRadius);
+    let scale = sinA / p.moonRadiusKm;
+    let r0 = sinA + NB_HEIGHT_MIN_KM * scale;
+    let r1 = sinA + NB_HEIGHT_MAX_KM * scale;
+    if (ray.s2 >= r1 * r1) {
+        return vec4f(0.0);
+    }
+    if (ray.s2 < sinA * sinA) {
+        let n = normalize(nbAlong(ray, nbEnter(ray, sinA)));
+        let mu = max(dot(n, -v), 1e-3);
+        if ((r1 - r0) * sqrt(max(1.0 - mu * mu, 0.0)) / mu < 0.25 * pixelAngle) {
+            return vec4f(n, limb);
+        }
+    }
+    let tIn = nbEnter(ray, r1);
+    let tOut = select(-0.5 * ray.w2 + sqrt(r1 * r1 - ray.s2), nbEnter(ray, r0), ray.s2 < r0 * r0);
+    // Near the limb a ray runs hundreds of pixels through the shell, close over the terrain: its steps no shorter than
+    // a 64th of that run, and a ray still above the terrain when they are spent is taken to meet it there.
+    let minStep = max(0.5 * pixelAngle, (tOut - tIn) / 64.0);
+    let level = log2(max(pixelAngle / scale / nbReliefTexelKm(false), 1e-4));
+    var t = tIn;
+    var margin = nbAboveRelief(nbAlong(ray, t), sinA, scale, level);
+    var closest = margin;
+    var closestT = t;
+    for (var i = 0u; i < NB_DISPLACE_STEPS && margin > 0.0 && t < tOut; i = i + 1u) {
+        let previous = margin;
+        let previousT = t;
+        t = min(t + max(0.5 * margin, minStep), tOut);
+        margin = nbAboveRelief(nbAlong(ray, t), sinA, scale, level);
+        if (margin <= 0.0) {
+            t = previousT + (t - previousT) * previous / max(previous - margin, 1e-12);
+        } else if (margin < closest) {
+            closest = margin;
+            closestT = t;
+        }
+    }
+    if (margin <= 0.0 || t < tOut) {
+        return vec4f(normalize(nbAlong(ray, t)), 1.0);
+    }
+    return vec4f(normalize(nbAlong(ray, closestT)), clamp(1.0 - closest / max(sampleAngle, 1e-9), 0.0, 1.0));
+}
+
 // One ray's share of a pixel: `view` as seen, `sampleAngle` the width it stands for among the pixel's rays, and
 // `pixelAngle` the whole pixel's, which the maps are filtered over: the rays resolve the shading and the shadows'
 // edges, the filtering the maps, so more rays sharpen the one and never alias the other.
 fn nbMoon(view: vec3f, sampleAngle: f32, pixelAngle: f32) -> NbMoon {
     let p = nbParams;
-    let m = p.direction;
     let v = nbUnbend(view);
-    let cosC = dot(v, m);
-    let angle = acos(clamp(cosC, -1.0, 1.0));
-    // The limb antialiased by the ray's share of the pixel; the ground hides whatever is below the horizon.
-    var coverage = clamp((p.angularRadius - angle) / max(sampleAngle, 1e-7) + 0.5, 0.0, 1.0);
-    if (view.z < p.horizonZ) {
-        coverage = 0.0;
+    let ray = nbRayOf(v);
+    // The limb antialiased by the ray's share of the pixel.
+    var coverage = clamp((p.angularRadius - ray.angle) / max(sampleAngle, 1e-7) + 0.5, 0.0, 1.0);
+    // The sphere of that angular radius at unit distance, hit where the ray enters it; a ray past the limb takes the
+    // point nearest the center, so the partly covered rays at the edge are shaded like the limb. Or the relief itself.
+    let sinA = sin(p.angularRadius);
+    var n: vec3f;
+    if ((p.flags & NB_FLAG_DISPLACE) != 0u) {
+        let hit = nbDisplaced(ray, sampleAngle, pixelAngle, coverage);
+        n = hit.xyz;
+        coverage = hit.w;
+    } else {
+        n = normalize(nbAlong(ray, nbEnter(ray, sinA)));
     }
     if (coverage <= 0.0) {
         return NbMoon(vec3f(0.0), 0.0, vec3f(0.0));
     }
-    // The sphere of that angular radius at unit distance, hit where the ray enters it; a ray past the limb takes the
-    // point nearest the center, so the partly covered rays at the edge are shaded like the limb.
-    let sinA = sin(p.angularRadius);
-    let t = cosC - sqrt(max(cosC * cosC - 1.0 + sinA * sinA, 0.0));
-    let n = normalize(t * v - m);
     let body = p.orientation * n;
-    let mu = max(dot(n, -v), 0.0);
     // The pixel's footprint on the sphere: its width across, and along the line of sight stretched by the slant, up to
     // fifty times at the limb. The maps are filtered anisotropically over it, so the limb and the poles stay sharp.
-    let width = pixelAngle / sinA;
-    let toViewer = p.orientation * -v;
-    let side = toViewer - dot(toViewer, body) * body;
-    let helper = select(vec3f(0.0, 0.0, 1.0), vec3f(1.0, 0.0, 0.0), abs(body.z) > 0.9);
-    let along = select(normalize(cross(body, helper)), normalize(side), length(side) > 1e-5);
-    let footprint = NbFootprint(cross(body, along) * width, along * width / max(mu, 0.02));
+    let footprint = nbFootprintAt(body, v, pixelAngle / sinA);
 
     var albedo = vec3f(p.albedo);
     if ((p.flags & NB_FLAG_COLOR) != 0u) {
@@ -313,15 +467,10 @@ fn nbMoon(view: vec3f, sampleAngle: f32, pixelAngle: f32) -> NbMoon {
             albedo = albedo * p.albedoTint;
         }
     }
-    // The relief: the surface's normal from its slope, and its height for the shadows.
+    // The relief: the surface's normal from its slope.
     var shading = n;
-    var height = 0.0;
-    var reliefLod = 0.0;
-    let fine = nbInDetail(body);
     if ((p.flags & NB_FLAG_RELIEF) != 0u) {
-        reliefLod = nbReliefLevel(body, footprint, fine);
         let relief = nbReliefAt(body, footprint);
-        height = relief.x;
         shading = transpose(p.orientation) * normalize(body - relief.yzw);
     }
 
@@ -339,12 +488,7 @@ fn nbMoon(view: vec3f, sampleAngle: f32, pixelAngle: f32) -> NbMoon {
     // What reaches the point of the sunlight: the terrain's shadows and Earth's.
     var shade = vec3f(1.0);
     if ((p.flags & NB_FLAG_SHADOWS) != 0u && mu0 > 0.0) {
-        // The rays meet the smooth sphere, not the heights: near the limb a point the terrain in front hides from the
-        // viewer is seen anyway. Its shadow is then the hidden part of the occluder's, which near full Moon, the Sun at
-        // the viewer's back, the eye would not see: where the viewer cannot see the point, it takes no shadow.
-        let sunShare = nbSunAboveTerrain(body, p.orientation * s, height, reliefLod, fine);
-        let seen = select(1.0, nbAboveTerrain(body, toViewer, height, reliefLod, fine, p.sunAngularRadius), sunShare < 1.0);
-        shade = shade * mix(1.0, sunShare, seen);
+        shade = shade * nbShadowAt(body);
     }
     if ((p.flags & NB_FLAG_ECLIPSE) != 0u && mu0 > 0.0) {
         shade = shade * nbShadow(p, p.moonCenterKm + n * p.moonRadiusKm);
@@ -364,13 +508,14 @@ fn nbMoon(view: vec3f, sampleAngle: f32, pixelAngle: f32) -> NbMoon {
     return NbMoon(luminance, coverage, reference);
 }
 
-// Rays per pixel on and around the disc, spread by Roberts' R2 sequence: the terminator, the limb and the relief's
-// shading are all sharper than a pixel. Along the terminator, where the Sun stands low over the relief and every
-// crater rim turns from lit to dark within a texel, NB_TERMINATOR_SAMPLES rays instead.
-override NB_SAMPLES: u32 = 8u;
+// Rays per pixel on and around the disc, spread by Roberts' R2 sequence. One suffices: the maps are filtered over the
+// pixel, the shadows read from their map, the smooth limb covered by its distance. Along the terminator, where the Sun
+// stands low over the relief and every crater rim turns from lit to dark within a texel, and along a displaced limb,
+// NB_TERMINATOR_SAMPLES rays instead.
+override NB_SAMPLES: u32 = 1u;
 // Whether magnified maps are read by the cubic B-spline, rather than as the sampler filters them.
 override NB_MAP_BSPLINE: bool = true;
-override NB_TERMINATOR_SAMPLES: u32 = 32u;
+override NB_TERMINATOR_SAMPLES: u32 = 4u;
 // How much at least a slope faces the viewer, as the cosine of its normal to the line of sight.
 const NB_FACING: f32 = 0.05;
 // How near the terminator a pixel takes the extra rays: the cosine of the Sun's angle over the surface at its center.
@@ -380,54 +525,21 @@ fn nbR2(i: u32) -> vec2f {
     return fract(vec2f(0.5) + f32(i) * vec2f(0.7548776662466927, 0.5698402909980532)) - 0.5;
 }
 
-// Whether a pixel's center ray meets the Moon near the terminator, where the relief's shading changes fastest.
-fn nbNearTerminator(center: vec3f) -> bool {
+// Whether a pixel's center ray meets the Moon near the terminator, where the relief's shading changes fastest, or, with
+// the relief displaced, near the limb, where its mountains stand against the sky.
+fn nbNearTerminator(center: vec3f, pixelAngle: f32) -> bool {
     let p = nbParams;
-    let v = nbUnbend(center);
-    let cosC = dot(v, p.direction);
+    let ray = nbRayOf(nbUnbend(center));
     let sinA = sin(p.angularRadius);
-    let t = cosC - sqrt(max(cosC * cosC - 1.0 + sinA * sinA, 0.0));
-    let n = normalize(t * v - p.direction);
-    return abs(dot(n, p.sunDirection)) < NB_TERMINATOR_BAND;
-}
-
-// The air's shimmer. Turbulence tilts the light arriving, and the image wanders: by an rms angle that grows with the
-// air crossed as the Fried parameter shrinks, r0 ~ airmass^-3/5, the tilt ~ r0^-5/6. The air also bends blue more than
-// red, by about a hundredth of the refraction, so near the horizon each color comes from a little higher than the one
-// redder than it. Both are given per disc, from the air between the observer and the Moon; the turbulence is a few
-// drifting waves on the sky, cells some 20 arcseconds across, anchored to azimuth and altitude.
-fn nbTurbulence(q: vec2f, t: f32) -> vec2f {
-    var d = vec2f(0.0);
-    var k = 1.0;
-    for (var i = 0u; i < 4u; i = i + 1u) {
-        let angle = f32(i) * 2.399963;
-        let dir = vec2f(cos(angle), sin(angle));
-        let across = vec2f(-dir.y, dir.x);
-        let phase = dot(q, dir) * k + t * (1.7 + 0.6 * f32(i)) + f32(i) * 1.3;
-        let phase2 = dot(q, across) * k * 1.13 - t * (1.3 + 0.5 * f32(i)) + f32(i) * 2.1;
-        d = d + vec2f(sin(phase) + 0.6 * sin(phase2), cos(phase2) + 0.6 * cos(phase)) / k;
-        k = k * 1.9;
+    if ((p.flags & NB_FLAG_DISPLACE) != 0u) {
+        let scale = sinA / p.moonRadiusKm;
+        let low = asin(sinA + NB_HEIGHT_MIN_KM * scale) - pixelAngle;
+        if (ray.angle > low && ray.angle < asin(sinA + NB_HEIGHT_MAX_KM * scale) + pixelAngle) {
+            return true;
+        }
     }
-    // About unit rms.
-    return d * 0.45;
-}
-
-// Red's, green's and blue's rays for a pixel's ray: moved by the turbulence, and spread apart towards the zenith.
-fn nbShimmered(ray: vec3f) -> array<vec3f, 3> {
-    let w = nbParams.shimmer;
-    var up = vec3f(0.0, 0.0, 1.0) - ray.z * ray;
-    up = select(vec3f(0.0, 1.0, 0.0), normalize(up), length(up) > 1e-5);
-    let right = cross(ray, up);
-    let alt = asin(clamp(ray.z, -1.0, 1.0));
-    let q = vec2f(atan2(ray.x, ray.y) * cos(alt), alt) * (206265.0 / 20.0);
-    let d = nbTurbulence(q, w.y) * w.x;
-    let moved = normalize(ray + right * d.x + up * d.y);
-    let spread = w.z;
-    return array<vec3f, 3>(
-        normalize(moved - up * spread * 0.0045),
-        moved,
-        normalize(moved + up * spread * 0.0065),
-    );
+    let n = normalize(nbAlong(ray, nbEnter(ray, sinA)));
+    return abs(dot(n, p.sunDirection)) < NB_TERMINATOR_BAND;
 }
 
 // The disc over a pixel: the mean of the rays through it where the disc may reach, nothing elsewhere. Their light is
@@ -437,38 +549,22 @@ fn nbPixel(pixel: vec2f, size: vec2u) -> NbMoon {
     let pixelAngle = length(nbPixelRay(pixel + vec2f(1.0, 0.0), size) - center);
     // The refraction moves the disc by up to a degree and squeezes it: tested on the bent ray, with room for both.
     let reach = nbParams.angularRadius * 1.3 + 3.0 * pixelAngle;
-    if (acos(clamp(dot(nbUnbend(center), nbParams.direction), -1.0, 1.0)) > reach) {
+    if (nbRayOf(nbUnbend(center)).angle > reach) {
         return NbMoon(vec3f(0.0), 0.0, vec3f(0.0));
     }
     var count = NB_SAMPLES;
-    if (NB_TERMINATOR_SAMPLES > NB_SAMPLES && (nbParams.flags & NB_FLAG_RELIEF) != 0u && nbNearTerminator(center)) {
+    if (NB_TERMINATOR_SAMPLES > NB_SAMPLES && (nbParams.flags & NB_FLAG_RELIEF) != 0u && nbNearTerminator(center, pixelAngle)) {
         count = NB_TERMINATOR_SAMPLES;
     }
     let sampleAngle = pixelAngle * inverseSqrt(f32(count));
     var luminance = vec3f(0.0);
     var coverage = 0.0;
     var reference = vec3f(0.0);
-    let shimmer = (nbParams.flags & NB_FLAG_SHIMMER) != 0u;
     for (var i = 0u; i < count; i = i + 1u) {
         let offset = select(nbR2(i), vec2f(0.0), count == 1u);
         let ray = nbPixelRay(pixel + offset, size);
-        if (shimmer) {
-            // Each channel along its own ray where the air spreads them apart, one ray for all where it does not.
-            let rays = nbShimmered(ray);
-            let spread = length(rays[2] - rays[0]);
-            if (spread < 0.25 * sampleAngle) {
-                let moon = nbMoon(rays[1], sampleAngle, pixelAngle);
-                luminance = luminance + moon.luminance * moon.coverage;
-                coverage = coverage + moon.coverage;
-                reference = reference + moon.reference * moon.coverage;
-            } else {
-                let r = nbMoon(rays[0], sampleAngle, pixelAngle);
-                let g = nbMoon(rays[1], sampleAngle, pixelAngle);
-                let b = nbMoon(rays[2], sampleAngle, pixelAngle);
-                luminance = luminance + vec3f(r.luminance.r * r.coverage, g.luminance.g * g.coverage, b.luminance.b * b.coverage);
-                coverage = coverage + g.coverage;
-                reference = reference + vec3f(r.reference.r * r.coverage, g.reference.g * g.coverage, b.reference.b * b.coverage);
-            }
+        // The ground hides whatever is below the horizon.
+        if (ray.z < nbParams.horizonZ) {
             continue;
         }
         let moon = nbMoon(ray, sampleAngle, pixelAngle);
@@ -480,18 +576,13 @@ fn nbPixel(pixel: vec2f, size: vec2u) -> NbMoon {
     return NbMoon(luminance / n, coverage / n, reference / n);
 }
 
-@compute @workgroup_size(8, 8, 1)
-fn nbCompose(@builtin(global_invocation_id) id: vec3u) {
-    let size = nbOutputSize();
-    if (id.x >= size.x || id.y >= size.y) {
-        return;
-    }
-    // The disc's light, premultiplied by how much of the pixel it covers.
-    let moon = nbPixel(vec2f(id.xy) + 0.5, size);
-    var color = moon.luminance;
-    var alpha = moon.coverage;
+// The disc's light, premultiplied, at a pixel made what the target shows: over the background where there is one, as the
+// eye sees it at night if asked, exposed, tone mapped and dithered, or left linear.
+fn nbFinish(luminance: vec3f, coverage: f32, pixel: vec2u) -> vec4f {
+    var color = luminance;
+    var alpha = coverage;
     if (NB_BACKGROUND) {
-        color = color + textureLoad(nbBackground, vec2i(id.xy), 0).rgb;
+        color = color + textureLoad(nbBackground, vec2i(pixel), 0).rgb;
         alpha = 1.0;
         if (NB_NIGHT_VISION) {
             color = hdNightVision(color);
@@ -501,9 +592,26 @@ fn nbCompose(@builtin(global_invocation_id) id: vec3u) {
     if (NB_TONE_MAP != 0u) {
         color = nbToneMap(color);
         if (NB_DITHER) {
-            color = clamp(hdDither(color, id.xy, 255.0), vec3f(0.0), hdEncodeSrgbExtended(vec3f(NB_HEADROOM), NB_HEADROOM));
+            color = clamp(hdDither(color, pixel, 255.0), vec3f(0.0), hdEncodeSrgbExtended(vec3f(NB_HEADROOM), NB_HEADROOM));
         }
     }
+    return vec4f(color, alpha);
+}
+
+@compute @workgroup_size(8, 8, 1)
+fn nbCompose(@builtin(global_invocation_id) id: vec3u) {
+    let size = nbOutputSize();
+    if (id.x >= size.x || id.y >= size.y) {
+        return;
+    }
+    // The disc's light, premultiplied by how much of the pixel it covers.
+    let moon = nbPixel(vec2f(id.xy) + 0.5, size);
+    if (NB_LAYER) {
+        nbOutputStore(id.xy, vec4f(moon.luminance, moon.coverage));
+        return;
+    }
+    let finished = nbFinish(moon.luminance, moon.coverage, id.xy);
+    var color = finished.rgb;
     // Striped where the disc is off the law it is compared with by more than a third of a stop, as a camera stripes
     // what clips: red where it is brighter, blue where darker, in four steps of opacity, from a third of a stop, two
     // thirds, one and two stops off; and only where either is bright enough to tell.
@@ -523,5 +631,5 @@ fn nbCompose(@builtin(global_invocation_id) id: vec3u) {
             }
         }
     }
-    nbOutputStore(id.xy, vec4f(color, alpha));
+    nbOutputStore(id.xy, vec4f(color, finished.a));
 }

@@ -28,10 +28,11 @@ import Globe from "../../components/nachtgestirn/Globe.astro";
 import Moon from "../../components/nachtgestirn/Moon.astro";
 import MoonView from "../../components/sternzeit/MoonView.astro";
 import Laws from "../../components/nachtgestirn/Laws.astro";
-import Lobes from "../../components/nachtgestirn/Lobes.astro";
 import Phases from "../../components/nachtgestirn/Phases.astro";
 import Maps from "../../components/nachtgestirn/Maps.astro";
 import Surface from "../../components/nachtgestirn/Surface.astro";
+import SoftShadows from "../../components/nachtgestirn/SoftShadows.astro";
+import Shimmer from "../../components/nachtgestirn/Shimmer.astro";
 import Sampling from "../../components/nachtgestirn/Sampling.astro";
 import Color from "../../components/nachtgestirn/Color.astro";
 import Distance from "../../components/nachtgestirn/Distance.astro";
@@ -70,7 +71,7 @@ follows.
     try={{
         label: "New Year's Eve 2028",
         set: "date=2028-12-31T17:00Z&lat=52.52&lon=13.405&h=1",
-        text: "a total lunar eclipse over Berlin: the Moon 16° up in the east-northeast, copper in Earth's umbra, two hours after sunset. Slide the time back an hour and a half to watch the shadow's edge cross the disc.",
+        text: "a total eclipse over Berlin, the Moon copper in Earth's umbra.",
     }}
 />
 
@@ -123,16 +124,13 @@ it stays a stop off the measured Moon, like Lambert's. No metallic-roughness mat
 light scattered back towards the Sun. Oren and Nayar's rough surface, the law a renderer reaches for when
 Lambert's limb looks wrong, brightens the limb towards full Moon with the shadows its facets throw on each other, and
 gets the full Moon nearly flat; it has no surge, and its half Moon still fades into the terminator. Hapke's keeps the
-lit part flat to its edge and bright up to the terminator. None of this is a matter of taste: the Moon's brightness over the month is
+lit part flat to its edge and bright up to the terminator. Why shows best from the side, under the discs: where each
+law sends the light that falls on a patch of surface, and how much of it reaches you depends on where the Sun stands
+over the patch and on where you stand. None of this is a matter of taste: the Moon's brightness over the month is
 measured, and a renderer with the wrong law is off by stops.
 
 <Laws />
 <Controls height={false} />
-
-Why they differ shows best from the side (<Fig id="lobes" />): where each law sends the light that falls on a patch
-of surface.
-
-<Lobes />
 
 <Fig id="phases" /> runs the two nearest laws, Oren-Nayar's and Hapke's, from full Moon to new, a disc every 15° of phase angle, as small as the Moon stands
 in the sky, plain discs without the map by default, and adds the light up over every rendered disc, the number a light meter
@@ -176,7 +174,7 @@ sternzeit nor the figure follow yet.
     try={{
         label: "A day and a half after new moon",
         set: "date=2026-11-10T18:00Z",
-        text: "a thin crescent low in the twilight, its night side faint in the earthshine.",
+        text: "a thin crescent, its night side in earthshine.",
     }}
 />
 <Controls height={false} />
@@ -222,7 +220,7 @@ eye sees: crater floors in darkness under lit rims, and peaks beyond the termina
 nachtgestirn ships the heights instead, 16 bits a texel in two bytes of a WebP, and derives the slopes from them on the
 GPU as the maps are loaded. Heights are a surface the pass can march through. A normal map is not.
 
-<Fig id="surface" /> shows the three stages on a close-up of the terminator. The shadows come from a march: from every
+<Fig id="surface" /> shows the three stages on a close-up of the terminator, and a fourth, the relief displaced. The shadows come from a march: from every
 point the pass walks towards the Sun along the great circle, 24 steps, each a quarter farther than the last, from three
 quarters of a texel out to some 450 km on the 4K map, as far as a mountain's shadow runs with the Sun a degree up, and
 keeps the highest the terrain rises above the point's horizontal. What is left of the Sun is the share of its half
@@ -230,20 +228,43 @@ degree above that horizon; the terrain is read from a coarser level of the map t
 between two. Near the rim or peak that casts it, that horizon changes fast from point to point and the shadow's edge is
 sharp; farther off slowly, and the penumbra widens, the contact hardening a renderer of soft shadows looks for, here by
 the Sun's own size. The march runs only where the Sun stands less than 25° over the surface, as no crater rim hides a
-Sun higher than that, and is skipped elsewhere, which is most of the disc.
+Sun higher than that, and is skipped elsewhere, which is most of the disc. It runs once, not for every pixel and frame:
+into a shadow map of that band around the terminator, as fine as the disc on screen needs, kept while the Sun and the
+view stay where they are. The Sun crosses the Moon's sky at half a degree an hour, so in a sky one map outlives many
+frames, and a disc under 128 pixels, the Moon as a sky shows it, takes no shadows at all.
+
+Shading a smooth sphere by the relief's slopes, what a normal map does, holds while the terrain faces you. Near the limb
+it fails: you look across the terrain at a slant, the near rims hide the floors behind them, and the limb itself is the
+profile of the mountains standing on it, up to 11 km over the mean radius, a few pixels on a disc that fills a
+screen. Shaded, a slope turned away from you shows anyway, as a black dash. From a disc of 1024 pixels on, the pass
+marches every ray near the limb through the heights and shades the terrain where the ray meets it, so the near rims hide
+what lies behind them and the limb shows its mountains (<Fig id="globe" />, and the last close-up of <Fig id="surface" />).
 
 <Surface />
 <Controls height={false} />
 
-What the relief and its shadows give is sharper than a pixel, and one sample per pixel aliases on it
-(<Fig id="sampling" />): the crater rims break into stair steps, and as the terminator moves they crawl. The pass
-takes 8 samples of every pixel on and around the disc, spread by a low-discrepancy sequence, 32 along the terminator,
-where a crater rim turns from lit to dark within a texel, and averages their light as a sensor does; `samples` and
-`terminatorSamples` set both. The maps are read over the whole pixel's footprint whatever the count, so the samples
-sharpen the shading and the shadows' edges and leave the maps to the filtering. Towards the poles the
+The Sun's half degree is what makes the shadows soft, and the share of its disc costs the march nothing it would not
+do anyway. What it buys is small: a penumbra is a hundredth of the shadow's length, 0.85 km for a shadow 90 km long, a
+3 km rim with the Sun 2° up, and 0.85 km is a pixel of a disc 4096 pixels across. Smaller discs show it only on the
+longest shadows, if at all, so the pass casts with a point Sun below `softShadowsFrom`, 4096 pixels by default, and the
+shadow map holds one less thing that changes. <Fig id="soft-shadows" /> puts the two side by side, far closer in than
+any sky shows the Moon.
+
+<SoftShadows />
+<Controls height={false} />
+
+What the relief and its shadows give is sharper than a pixel, and one sample per pixel could alias on it. It
+hardly does: the maps are read over the whole pixel's footprint, and the shadows from their
+map, filtered too, so one sample through each pixel's center comes close to 64. The pass takes one, and four along the
+terminator, where a crater rim still turns from lit to dark within a pixel, and along a displaced limb, spread by a
+low-discrepancy sequence and their light averaged as a sensor does; `samples` and `terminatorSamples` set both. One trap
+lies in the plain geometry: the angle between a ray and the Moon's center, taken from their dot product, which sits
+within a hundred-thousandth of 1, keeps only some five digits in the GPU's 32-bit floats, steps of a third of a percent
+of the radius, stairs a few pixels wide on a large disc. The pass takes it from the two directions' difference instead,
+which keeps all seven. Towards the poles the
 map's parallels crowd the texels together east to west, and at the limb the slant stretches a ray's footprint along the
 line of sight up to fifty times; a plain mip level takes the longer of the two and blurs what the other axis still
-resolves, so the maps are filtered anisotropically over the footprint's two axes, and the slopes are averaged in the
+resolves, so the maps are filtered anisotropically over the footprint's two axes (<Fig id="sampling" />), and the slopes are averaged in the
 mips as slopes, not derived again. The poles come out as sharp as the center. Step the moment a day at a time in
 <Fig id="moon" /> and the face stays put while the terminator sweeps across it, Crisium on the right throughout,
 nodding in and out with the libration. With the shadows off the terminator goes soft, with the relief off smooth; with
@@ -330,7 +351,7 @@ dust. The figure's light meter follows the shadow: as the umbra swallows the dis
 copper shows, which is what the eye does too.
 
 <Fig id="eclipse-row" /> runs the Moon through the next eclipse from the umbra's first contact to its last, each
-disc metered on its own, or all at the one exposure the umbra needs, where the sunlit part of the disc is burned out:
+disc metered on its own, or all at the uneclipsed Moon's exposure, where the copper is barely there:
 the shadow's edge is a soft ramp, the Sun's disc setting behind Earth as seen from the Moon, and the copper inside it
 is twelve to sixteen stops below the sunlight, deeper towards the axis. The curves under the discs are the table, the light along a line out from the
 axis, as the pass reads it. The timeline above the row holds the eclipses of twelve years either side of the chosen
@@ -361,6 +382,18 @@ dunstkreis bends them for the sun disc: `refractionTable` asks any refraction yo
 own, how far the air bends a ray at 32 apparent altitudes over where the disc shows, and the pass turns each ray down
 by it before it meets the sphere. Seen from orbit, where a ray grazing the planet crosses the air twice and dips deep
 into it, the same table squeezes the setting Moon to a quarter of its height, as astronauts photograph it.
+
+The air does not hold still either. Its turbulence moves the image about and makes it boil, the
+<Term of="Seeing">seeing</Term>, some half an arcsecond to an arcsecond overhead on a fair night, and more the more
+air the light crosses. The pass takes that air from the same optical depth it dims the Moon by: the column towards the
+Moon over the zenith's from sea level, so a Moon on the horizon looks through some forty columns and one seen from a
+mountain through fewer. The image moves with the square root of the column, the turbulence's cells shrink with it, and
+the air's dispersion, which bends blue more than red, lifts the blue image over the red by a hundredth of the
+refraction, tens of arcseconds on the horizon (<Fig id="shimmer" />). `shimmer` sets the seeing and the clock, and
+`motion` and `boiling` weigh the larger cells, which move patches of the image as a whole, and the smaller.
+
+<Shimmer />
+<Controls height={false} />
 
 The Moon lights the air as the Sun does, at a four hundred thousandth of the light: some 0.3 lux above the air at full
 Moon, which `moonIlluminance` gives. The sky by moonlight is the day's sky at that share, blue, with the aureole of the

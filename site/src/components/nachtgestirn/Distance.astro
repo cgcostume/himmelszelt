@@ -2,6 +2,7 @@
 import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
+import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
 
@@ -15,7 +16,12 @@ const { id = "near-far" } = Astro.props;
 <figure class="tiles-figure" id={id} data-distance>
     <div class="tiles-panel as-seen">
         <canvas aria-label="The Moon at apogee, at the chosen moment and at perigee, rendered with WebGPU"></canvas>
-        <p class="vis-credit footnote tiles-credit">Rendered with WebGPU</p>
+        <span class="tiles-start">
+            <span class="tiles-hint footnote">Rendered with WebGPU</span>
+        </span>
+        <span class="view-buttons tiles-end">
+            <Rays />
+        </span>
         <svg class="tiles-overlay" data-field="lines" aria-hidden="true"></svg>
     </div>
     <ul class="tiles-labels" style="grid-template-columns: 1fr 1fr 1fr">
@@ -30,7 +36,7 @@ const { id = "near-far" } = Astro.props;
         with its distance and its angular diameter in arcminutes. The dashed lines carry the apogee disc's edges and the
         perigee disc's across all three, the arrows their diameters. The slider runs from new moon to new moon.
         <Try label="The supermoon of November 2034" set="date=2034-11-25T22:00Z" fig={id}>
-            a full Moon within hours of a close perigee, the middle disc as large as the right one.
+            a full Moon at perigee, the middle disc as large as the right.
         </Try>
     </figcaption>
 </figure>

@@ -39,12 +39,12 @@ async function acquire(): Promise<{ device?: GPUDevice; adapterName?: string; er
     const requirements = skyRequirements({ format: "rgba8unorm" }, adapter);
     // Timestamps around a pass, for the figures that show what a pass costs, where the GPU gives them.
     if (adapter.features.has("timestamp-query")) requirements.requiredFeatures.push("timestamp-query");
-    // As large a texture as the GPU takes, up to 16384, for nachtgestirn's finest maps.
+    // As large a texture as the GPU takes, up to 16384, for the largest maps and environments.
     requirements.requiredLimits.maxTextureDimension2D = Math.max(
         requirements.requiredLimits.maxTextureDimension2D ?? 8192,
         Math.min(adapter.limits.maxTextureDimension2D, 16384),
     );
-    // And a buffer to stage such a map in on its way to the GPU: 16384 by 8192 texels are 512 MB.
+    // And as large a buffer, up to a gigabyte, to stage such a texture in on its way to the GPU.
     requirements.requiredLimits.maxBufferSize = Math.max(
         requirements.requiredLimits.maxBufferSize ?? 268_435_456,
         Math.min(adapter.limits.maxBufferSize, 1 << 30),

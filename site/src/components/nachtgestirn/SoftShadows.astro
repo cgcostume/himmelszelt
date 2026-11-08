@@ -1,0 +1,56 @@
+---
+import Icon from "../Icon.astro";
+import Term from "../Term.astro";
+import Try from "../Try.astro";
+import "../sternzeit/sternzeit.css";
+import Rays from "./Rays.astro";
+import "./nachtgestirn.css";
+import Resolutions from "../Resolutions.astro";
+import LunationSlider from "../sternzeit/LunationSlider.astro";
+import { STRIP_RESOLUTIONS } from "./resolution-options";
+
+/** The disc with a close-up of the terminator marked, and the close-up's shadows cast by a point Sun and by the real one. */
+interface Props {
+    id?: string;
+}
+const { id = "soft-shadows" } = Astro.props;
+---
+
+<figure class="tiles-figure wide" id={id} data-soft-shadows>
+    <div class="tiles-panel as-seen split" style="--count: 3">
+        <canvas aria-label="The Moon, and a close-up of its terminator with the shadows of a point Sun and of the Sun's half degree, rendered with WebGPU"></canvas>
+        <svg class="tiles-overlay" data-field="marker" aria-hidden="true"></svg>
+        <span class="tiles-start">
+            <Resolutions options={STRIP_RESOLUTIONS} chosen="large" />
+            <span class="tiles-hint footnote">Rendered with WebGPU</span>
+        </span>
+        <span class="view-buttons tiles-end">
+            <Rays />
+            <button type="button" class="view-icon" data-field="download" title="Download the disc and the two close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+        </span>
+    </div>
+    <ul class="tiles-labels" style="grid-template-columns: repeat(3, 1fr)">
+        <li><span class="tiles-name">the disc</span> <span class="tiles-value">the close-up marked</span></li>
+        <li><span class="tiles-name">a point Sun</span> <span class="tiles-value">every edge hard</span></li>
+        <li><span class="tiles-name">the Sun's half degree</span> <span class="tiles-value">penumbrae widening off the rims</span></li>
+    </ul>
+    <LunationSlider />
+    <p class="view-status" data-field="note"></p>
+    <figcaption class="figure-caption">
+        Soft shadows on a close-up of the <Term of="Terminator">terminator</Term>, a twenty-fourth of the disc
+        across, the disc's size it stands for on the line above: the whole disc at the chosen moment, metered, with the close-up marked, and the close-up twice, a stop more open
+        for the low Sun. Its shadows cast by a point, every edge as sharp as the shadow map, and by the Sun's half degree,
+        each edge sharp near the rim or peak that casts it and widening into a penumbra as the shadow runs on, a
+        hundredth of its length. Only the longest shadows show it below a disc of 4096 pixels, so the pass casts with a
+        point below that. The slider runs from new moon to new moon.
+        <Try label="Five days after new moon" set="date=2026-11-14T18:00Z" fig={id}>
+            the long shadows of the southern highlands, their tips gone soft.
+        </Try>
+    </figcaption>
+</figure>
+
+<script>
+    import { softShadowsFigure } from "./softshadows";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-soft-shadows]")) softShadowsFigure(root);
+</script>

@@ -32,8 +32,8 @@ export {
 export type { LoadMoonMapsOptions, MoonMapFiles, MoonMaps, MoonMapsOptions } from "./maps.js";
 export { createMoonMaps, loadMoonMaps, MOON_COLOR, MOON_MAPS } from "./maps.js";
 
-export type { EarthShadow, EncodeOptions, MapFilter, MoonParams, MoonPass, MoonPassOptions } from "./moon.js";
-export { createMoonPass, PARAMS_SIZE, paramsData } from "./moon.js";
+export type { EarthShadow, EncodeOptions, MapFilter, MoonParams, MoonPass, MoonPassOptions, Shimmer } from "./moon.js";
+export { createMoonPass, PARAMS_SIZE, paramsData, shimmerScales } from "./moon.js";
 
 export type { RefractedSunlightOptions } from "./umbra.js";
 export { refractedSunlight, typicalUmbra, umbraLightAt, UMBRA_SAMPLES } from "./umbra.js";
