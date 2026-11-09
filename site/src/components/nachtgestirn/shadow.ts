@@ -177,7 +177,7 @@ export function shadowFigure(root: HTMLElement) {
             shadows: true,
             earthshine: true,
             eclipse: true,
-            law: "hapke",
+            law: "hapke2012",
             nightVision: false,
         }));
         labels.forEach((label, i) => {
@@ -261,7 +261,7 @@ export function shadowFigure(root: HTMLElement) {
                 shadows: true,
                 earthshine: true,
                 eclipse: true,
-                law: "hapke",
+                law: "hapke2012",
                 nightVision: false,
             }),
         );

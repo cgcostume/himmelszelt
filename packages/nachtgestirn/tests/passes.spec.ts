@@ -195,7 +195,7 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
     expect(rows[2]).toBeLessThan(0.6);
 
     // At the quarters the disc averages close to what the meter's phase law says, a tenth of the full Moon: 0.84 of
-    // it, Hapke's law after Jensen et al. falling a quarter of a stop faster than Allen's.
+    // it under Hapke's law of 1963 after Jensen et al., falling a quarter of a stop faster than Allen's.
     const mean = (pixels: Float32Array) => {
         let [sum, covered] = [0, 0];
         for (let i = 0; i < size * size; i++) {
@@ -204,9 +204,20 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
         }
         return sum / covered;
     };
-    const quarter = mean(await render([1, 0, 0], 0)) / mean(full);
+    pass.update({ law: "hapke" });
+    const full1963 = await render([0, -1, 0], 0);
+    const quarter = mean(await render([1, 0, 0], 0)) / mean(full1963);
     expect(quarter / phaseLaw(90)).toBeGreaterThan(0.8);
     expect(quarter / phaseLaw(90)).toBeLessThan(0.9);
+
+    // Hapke's 2012 model, the default: its full Moon as bright at the center as the albedo says, and its quarter a third
+    // of a stop under Allen's, as the site's copy of the law integrates it over the disc (0.81).
+    pass.update({ law: "hapke2012" });
+    const full2012 = full;
+    expect(at(full2012, 32, 32) / expected).toBeCloseTo(1, 1);
+    const quarter2012 = mean(await render([1, 0, 0], 0)) / mean(full2012);
+    expect(quarter2012 / phaseLaw(90)).toBeGreaterThan(0.76);
+    expect(quarter2012 / phaseLaw(90)).toBeLessThan(0.86);
 
     for (const resource of [target, staging]) resource.destroy();
     pass.destroy();

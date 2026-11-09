@@ -85,27 +85,82 @@ fn nbOrenNayar(mu0: f32, mu: f32, g: f32) -> f32 {
     return mu0 * (a + b * cosAzimuth * alpha * tanBeta) / NB_PI;
 }
 
-// The metallic-roughness surface of a PBR renderer at its best for the Moon: a dielectric of roughness 1, Burley's
-// diffuse, as Disney's and Unreal's materials have it, which lifts a rough surface towards its rim, under a GGX lobe
-// with Smith's shadowing and Schlick's Fresnel. The half vector's cosines from the three angles alone: the Sun and
-// the viewer are the phase angle apart. It still has no backscatter, which no metallic-roughness material can.
-fn nbMetallicRoughness(mu0: f32, mu: f32, g: f32) -> f32 {
-    const roughness = 1.0;
-    const f0 = 0.04;
-    let alpha = roughness * roughness;
+// Hapke's model as his 2012 book has it, with Sato et al.'s 2014 parameters for the Moon from LRO's wide angle camera,
+// the near side's medians at 566 nm: the single scattering albedo w, a two-lobed Henyey-Greenstein phase function
+// (b, c), the shadow hiding surge (amplitude BS0, width HS), multiple scattering through Chandrasekhar's H function in
+// Hapke's 2002 approximation, and the shadows of a surface rough by a mean slope of 23.657° (Hapke 1984). Coherent
+// backscatter and porosity are held off, as in the fit. Everything that depends on the parameters alone is folded into
+// constants; a call costs five exp, two log and an acos.
+const NB_H12_W = 0.3231;
+const NB_H12_B = 0.2366;
+const NB_H12_C = 0.3344;
+const NB_H12_BS0 = 1.75;
+const NB_H12_HS = 0.05309;
+const NB_H12_TAN = 0.43807450;
+// chi = 1 / sqrt(1 + pi tan^2), and the factors of E1 = exp(-2 / (pi tan) cot y) and E2 = exp(-1 / (pi tan^2) cot^2 y).
+const NB_H12_CHI = 0.78985375;
+const NB_H12_E1 = 1.45322263;
+const NB_H12_E2 = 1.65864783;
+// r0 = (1 - gamma) / (1 + gamma), gamma = sqrt(1 - w).
+const NB_H12_R0 = 0.09724960;
+// One over the radiance factor at normal incidence and emission, so that point reflects like a Lambert surface.
+const NB_H12_NORM = 5.35742953;
+
+fn nbH12H(x: f32) -> f32 {
+    let y = max(x, 1e-4);
+    return 1.0 / (1.0 - NB_H12_W * y * (NB_H12_R0 + (1.0 - 2.0 * NB_H12_R0 * y) * 0.5 * log((1.0 + y) / y)));
+}
+
+// E1 and E2 of an angle from its cosine and sine; both 0 straight on.
+fn nbH12E(cosY: f32, sinY: f32) -> vec2f {
+    if (sinY < 1e-4) {
+        return vec2f(0.0);
+    }
+    let cotY = cosY / sinY;
+    return vec2f(exp(-NB_H12_E1 * cotY), exp(-NB_H12_E2 * cotY * cotY));
+}
+
+fn nbHapke2012(mu0: f32, mu: f32, g: f32) -> f32 {
+    if (mu <= 0.0) {
+        return 0.0;
+    }
     let cosG = cos(g);
-    let nh = (mu0 + mu) / max(sqrt(2.0 + 2.0 * cosG), 1e-4);
-    let vh = sqrt(max((1.0 + cosG) / 2.0, 0.0));
-    let a2 = alpha * alpha;
-    let dd = nh * nh * (a2 - 1.0) + 1.0;
-    let d = a2 / (NB_PI * dd * dd);
-    let k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
-    let gs = (mu0 / (mu0 * (1.0 - k) + k)) * (mu / max(mu * (1.0 - k) + k, 1e-4));
-    let fresnel = f0 + (1.0 - f0) * pow(1.0 - vh, 5.0);
-    let specular = d * gs * fresnel / max(4.0 * mu0 * mu, 1e-4);
-    let f90 = 0.5 + 2.0 * roughness * vh * vh;
-    let diffuse = (1.0 + (f90 - 1.0) * pow(1.0 - mu0, 5.0)) * (1.0 + (f90 - 1.0) * pow(1.0 - mu, 5.0)) / NB_PI;
-    return mu0 * (diffuse + specular);
+    let sinI = sqrt(max(1.0 - mu0 * mu0, 0.0));
+    let sinE = sqrt(max(1.0 - mu * mu, 0.0));
+    let ei = nbH12E(mu0, sinI);
+    let ee = nbH12E(mu, sinE);
+    // The azimuth between the planes of incidence and emission, psi, and what the shadows make of it.
+    let cosPsi = select(1.0, clamp((cosG - mu0 * mu) / max(sinI * sinE, 1e-6), -1.0, 1.0), sinI * sinE > 1e-6);
+    let psi = acos(cosPsi) / NB_PI;
+    let half2 = 0.5 - 0.5 * cosPsi;
+    let f = exp(-2.0 * sqrt(half2 / max(1.0 - half2, 1e-6)));
+    let etaI = NB_H12_CHI * (mu0 + sinI * NB_H12_TAN * ei.y / (2.0 - ei.x));
+    let etaE = NB_H12_CHI * (mu + sinE * NB_H12_TAN * ee.y / (2.0 - ee.x));
+    // The rough surface's effective cosines, and its shadows, S, from whichever of the two angles is larger.
+    var mu0e: f32;
+    var mue: f32;
+    var shadow: f32;
+    if (mu0 >= mu) {
+        let d = 2.0 - ee.x - psi * ei.x;
+        mu0e = NB_H12_CHI * (mu0 + sinI * NB_H12_TAN * (cosPsi * ee.y + half2 * ei.y) / d);
+        mue = NB_H12_CHI * (mu + sinE * NB_H12_TAN * (ee.y - half2 * ei.y) / d);
+        shadow = mue / etaE * mu0 / etaI * NB_H12_CHI / (1.0 - f + f * NB_H12_CHI * mu0 / etaI);
+    } else {
+        let d = 2.0 - ei.x - psi * ee.x;
+        mu0e = NB_H12_CHI * (mu0 + sinI * NB_H12_TAN * (ei.y - half2 * ee.y) / d);
+        mue = NB_H12_CHI * (mu + sinE * NB_H12_TAN * (cosPsi * ei.y + half2 * ee.y) / d);
+        shadow = mue / etaE * mu0 / etaI * NB_H12_CHI / (1.0 - f + f * NB_H12_CHI * mu / etaE);
+    }
+    let b2 = NB_H12_B * NB_H12_B;
+    let back = 1.0 - 2.0 * NB_H12_B * cosG + b2;
+    let forth = 1.0 + 2.0 * NB_H12_B * cosG + b2;
+    let p = (1.0 - b2) * (0.5 * (1.0 + NB_H12_C) / (back * sqrt(back)) + 0.5 * (1.0 - NB_H12_C) / (forth * sqrt(forth)));
+    // tan(g / 2) from the cosine.
+    let tanHalf = sqrt(max(1.0 - cosG, 0.0) / max(1.0 + cosG, 1e-6));
+    let surge = 1.0 / (1.0 + tanHalf / NB_H12_HS);
+    let multiple = nbH12H(mu0e) * nbH12H(mue) - 1.0;
+    let radiance = NB_H12_W * 0.25 * mu0e / max(mu0e + mue, 1e-6) * (p * (1.0 + NB_H12_BS0 * surge) + multiple) * shadow;
+    return max(radiance, 0.0) * NB_H12_NORM / NB_PI;
 }
 
 fn nbReflectance(law: u32, mu0: f32, mu: f32, g: f32) -> f32 {
@@ -119,7 +174,7 @@ fn nbReflectance(law: u32, mu0: f32, mu: f32, g: f32) -> f32 {
         return nbOrenNayar(mu0, max(mu, 0.0), g);
     }
     if (law == 3u) {
-        return nbMetallicRoughness(mu0, max(mu, 0.0), g);
+        return nbHapke2012(mu0, max(mu, 0.0), g);
     }
     return nbHapke(mu0, max(mu, 0.0), g);
 }

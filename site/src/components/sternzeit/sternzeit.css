@@ -737,9 +737,11 @@ g.eclipse-corona {
 .moon-view {
     margin: 0;
 }
-/* As wide as the column, its height set by the script (see moonview.js) so the disc keeps its size. */
+/* As wide as the column, its height set by the script (see moonview.js) so the disc keeps its size. A sky as seen, it has
+   no frame, as the WebGPU panels have none. */
 .moon-panel > svg {
     aspect-ratio: auto;
+    border: 0;
 }
 /* The Moon's switches in the top left corner, opposite the download. */
 .moon-view > .view-buttons:not(.svg-download) {
@@ -860,6 +862,9 @@ g.eclipse-corona {
     color: var(--text);
     transition: color 0.15s;
 }
+.view-icon[hidden] {
+    display: none;
+}
 .view-icon::before {
     content: "";
     position: absolute;
@@ -935,6 +940,33 @@ g.eclipse-corona {
     width: 14px;
     height: 14px;
     stroke-width: 1;
+}
+/* The supersampling switch's "MSAA" runs on from its "4×", across the switch's gap (see Rays.astro). */
+.rays-long {
+    margin-left: -4px;
+}
+/* A switch named in words that turns into its icon where there is no room for them (see Globe.astro). */
+.icon-when-narrow > .icon {
+    display: none;
+}
+@media (max-width: 40rem) {
+    .icon-when-narrow {
+        justify-content: center;
+        width: 28px;
+        padding: 0;
+    }
+    .icon-when-narrow > .switch-text {
+        display: none;
+    }
+    .icon-when-narrow > .icon {
+        display: block;
+        width: 16px;
+        height: 16px;
+    }
+    /* The supersampling switch says "4×" alone (see Rays.astro). */
+    .rays-long {
+        display: none;
+    }
 }
 /* Nothing but an icon: square. */
 .button-square {

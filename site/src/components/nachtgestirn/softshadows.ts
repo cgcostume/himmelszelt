@@ -56,7 +56,7 @@ export function softShadowsFigure(root: HTMLElement) {
             shadows: true,
             earthshine: true,
             eclipse: false,
-            law: "hapke",
+            law: "hapke2012",
             nightVision: false,
         };
         // The close-ups a stop more open than the disc's meter, for the low Sun at the terminator.

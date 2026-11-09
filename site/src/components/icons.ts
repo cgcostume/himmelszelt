@@ -33,6 +33,12 @@ export const ICONS = {
     /** The Moon textured: its disc with three of its craters, filled while on. */
     moonMap:
         '<circle cx="8" cy="8" r="6"/><circle class="fill-on" cx="6" cy="6.4" r="1.5"/><circle class="fill-on" cx="10.3" cy="9.2" r="1.2"/><circle class="fill-on" cx="6.6" cy="10.7" r="0.8"/>',
+    /** The relief: a mountain and its neighbor against the ground. */
+    relief: '<path d="M1.5 12.5 5.5 6l2.2 3.2L10.5 4.5l4 8z"/>',
+    /** The shadows the relief casts: a peak and its shadow running off along the ground. */
+    shadows: '<path d="M1.5 12.5 6 4.5l3.5 8z"/><path class="solid" d="M6 4.5l8.5 8h-5z"/>',
+    /** The relief displaced: a mountain standing up from the curved limb. */
+    displace: '<path d="M1.5 14a14 14 0 0 1 13 0"/><path d="M4.6 12.6 7.8 5.5l3.4 7.1"/>',
     /** The view kept on the Moon: the same brackets round the theme toggle's crescent (see Base.astro). */
     moonLock: `${BRACKETS}<path class="solid" d="M7.115 3.943A4 4 0 1 0 11.485 10.257 4 4 0 0 1 7.115 3.943z"/>`,
     /** Back and on in time, each stepping its way on hover. */

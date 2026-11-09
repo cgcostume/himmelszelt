@@ -32,7 +32,7 @@ export function colorFigure(root: HTMLElement) {
             shadows: true,
             earthshine: true,
             eclipse: false,
-            law: "hapke",
+            law: "hapke2012",
             mapColor: MODES[i] ?? "tinted",
             nightVision: false,
         }));

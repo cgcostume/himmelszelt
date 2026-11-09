@@ -53,3 +53,19 @@
     width: calc(var(--progress, 0) * 100%);
     background: var(--overlay-ink);
 }
+/* Where there is no room for the row, only the chosen resolution shows; pressed, it opens the others under it, a
+   dropdown over the figure (see Resolutions.astro). */
+@media (max-width: 40rem) {
+    .env-resolutions {
+        position: relative;
+        grid-template-columns: auto;
+    }
+    .env-resolutions:not([data-open]) > .env-resolution:not([aria-pressed="true"]) {
+        display: none;
+    }
+    /* Open, it takes no more room than closed: the others hang over the figure, not pushing what follows. */
+    .env-resolutions[data-open] {
+        z-index: 6;
+        margin-bottom: calc((1 - var(--count, 4)) * 28px);
+    }
+}

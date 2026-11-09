@@ -9,8 +9,10 @@ const DEG = Math.PI / 180;
 // The librations' reach, in degrees of longitude and latitude: what Earth ever sees, some 59% of the Moon.
 const REACH = { longitude: 7.9, latitude: 6.7 };
 // What the librations ever show: a point within a quarter turn of the mean sub-Earth point, and as far again past it as
-// the librations reach towards it, the ellipse's support in that direction.
-const reachTowards = (psi: number) => Math.hypot(REACH.longitude * Math.cos(psi), REACH.latitude * Math.sin(psi)) * DEG;
+// the librations reach towards it. Longitude and latitude swing over different months, so over the years every pair
+// within reach comes round: the support of a rectangle, not an ellipse, or a limb at both near their ends crosses it.
+const reachTowards = (psi: number) =>
+    (REACH.longitude * Math.abs(Math.cos(psi)) + REACH.latitude * Math.abs(Math.sin(psi))) * DEG;
 // The edge of it, as longitude and latitude, from the south pole's side round the east and back, and round the west.
 function everEdge(east: boolean) {
     const points: [number, number][] = [];

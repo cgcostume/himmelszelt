@@ -150,10 +150,11 @@ export interface MoonParams {
     albedoMap: boolean;
     relief: boolean;
     shadows: boolean;
-    /** The reflectance law: Hapke's lunar law after Jensen et al. 2001, or Lambert's, Oren-Nayar's or a PBR renderer's
-     *  metallic-roughness dielectric, to see what they get wrong: a limb darkened like a ball's, a half Moon that fades
-     *  into its terminator, a sheen at the limb. */
-    law: "hapke" | "lambert" | "orenNayar" | "metallicRoughness";
+    /** The reflectance law: Hapke's 2012 model with Sato et al.'s 2014 parameters, shadow hiding, multiple scattering
+     *  and roughness, the default, which follows the measured Moon (ROLO) within a fifth of a stop; Hapke's lunar law
+     *  of 1963 after Jensen et al. 2001, as osgHimmel had it; or Lambert's or Oren-Nayar's, to see what they get wrong:
+     *  a limb darkened like a ball's, a half Moon that fades into its terminator. */
+    law: "hapke" | "hapke2012" | "lambert" | "orenNayar";
     /** How the color map is read: tinted to the Moon's own color, the default; as published, the map's own, nearly
      *  neutral color; or as gray, its luminance alone, the way most renderers use it. */
     mapColor: "tinted" | "untinted" | "gray";
@@ -221,7 +222,7 @@ const TONE_CURVES: Record<string, number> = { neutral: 1, agx: 2, aces: 3, clip:
 export const PARAMS_SIZE = 912 + UMBRA_SAMPLES * 16 + 32 + 48 + 16;
 const UMBRA_OFFSET = 912 / 4;
 const DEFAULT_UMBRA = typicalUmbra();
-const LAW_INDEX: Record<MoonParams["law"], number> = { hapke: 0, lambert: 1, orenNayar: 2, metallicRoughness: 3 };
+const LAW_INDEX: Record<MoonParams["law"], number> = { hapke: 0, lambert: 1, orenNayar: 2, hapke2012: 3 };
 
 const DEFAULTS: MoonParams = {
     direction: [0, 0, 1],
@@ -239,7 +240,7 @@ const DEFAULTS: MoonParams = {
     albedoMap: true,
     relief: true,
     shadows: true,
-    law: "hapke",
+    law: "hapke2012",
     mapColor: "tinted",
     compare: null,
     eclipse: null,

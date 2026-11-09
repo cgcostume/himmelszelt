@@ -41,7 +41,7 @@ export function distanceFigure(root: HTMLElement) {
             shadows: true,
             earthshine: true,
             eclipse: true,
-            law: "hapke",
+            law: "hapke2012",
             nightVision: false,
         }));
         labels.forEach((label, i) => {

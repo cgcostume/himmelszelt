@@ -1,53 +1,30 @@
 ---
-import Icon from "../Icon.astro";
 import Term from "../Term.astro";
+import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
-import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
 
-/** A strip of Moons from full to new under each law, small as seen from Earth, and the light of each over the phase angle. */
+/** The light of the whole disc over the phase angle under each law, against the Moon's measured light. */
 interface Props {
     id?: string;
 }
 const { id = "phases" } = Astro.props;
 ---
 
-<figure class="tiles-figure wide" id={id} data-phases>
-    <div class="tiles-panel as-seen strips">
-        <svg class="tiles-overlay strips-overlay" aria-hidden="true"></svg>
-        <canvas class="strips-canvas" aria-label="The Moon from full to new under Oren-Nayar's law and Hapke's, rendered with WebGPU"></canvas>
-        <ul class="strip-names" aria-hidden="true">
-            <li>Oren-Nayar</li>
-            <li>Hapke</li>
-        </ul>
-        <span class="tiles-start">
-            <span class="view-buttons">
-                <button type="button" class="view-icon" data-field="map" aria-pressed="false" title="NASA's maps at their smallest, color and relief, as small discs need; off, plain discs of the law alone" aria-label="Maps"><Icon name="moonMap" /></button>
-                <button type="button" class="view-icon" data-field="day" aria-pressed="false" title="The same discs over a plain daytime sky, exposed for the sky: the pale Moon by day" aria-label="By day"><Icon name="day" /></button>
-            </span>
-            <span class="tiles-hint footnote">Rendered with WebGPU</span>
-        </span>
-        <span class="tiles-ends">
-            <span class="view-buttons">
-                <Rays />
-                <button type="button" class="view-icon" data-field="metered" aria-pressed="false" title="Expose each disc by a light meter on its lit part, as a photograph of the Moon is, rather than all at the full Moon's exposure" aria-label="Metered"><Icon name="meter" /></button>
-            </span>
-            <span class="view-buttons">
-                <button type="button" class="view-icon" data-field="download" title="Download the strips and the plot as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
-            </span>
-        </span>
-    </div>
-    <div class="tiles-plot">
-        <svg aria-hidden="true"></svg>
+<figure class="plot-figure" id={id} data-phases>
+    <div class="tiles-plot" data-export="phase-law" data-export-timeless>
+        <svg style="height: 220px" role="img" aria-label="The light of the whole disc over the phase angle under four reflectance laws, and the Moon's as measured by ROLO and by Allen"></svg>
     </div>
     <figcaption class="figure-caption">
-        The Moon from full to new, a disc every 15° of <Term of="Phase angle">phase angle</Term>, under Oren and
-        Nayar's law, the best a rough diffuse surface does, and Hapke's, each a plain disc of the law alone, or with the smallest maps, the night side in earthshine, at the full Moon's exposure, from Earth's center with north up, the Sun to the
-        right: as large on the page as the Moon stands in the sky at arm's length. Below, the light the whole disc sends
-        to the viewer over the phase angle, in stops below a full Moon, each disc above its own angle: both laws,
-        read from the rendered discs themselves, and the Moon as measured, Allen's phase law, dashed. The measured Moon has no strip: the measurement is of the whole
-        disc's light, not of how it is spread over the disc. By day the sky is the strips' ground. Point at the strips or the plot: the column under the pointer takes the pointer's angle, continuously
-        across its span, and the plot reads each law's light there, else at the line marked now, the real Moon's phase angle at the chosen moment, marked over the strips too.
+        The light the whole disc sends to the viewer over the <Term of="Phase angle">phase angle</Term>, in stops below
+        a full Moon, under the four laws, each a plain disc of the law alone, and the Moon as measured: the ROLO model,
+        dashed, from 1.55° to 97°, and Allen's older phase law, dotted. The measurement is of the whole disc's light,
+        not of how it is spread over the disc, so this is where the laws can be checked against the Moon itself. The readouts stand at the line marked now, the real
+        Moon's phase angle at the chosen moment.
+        <Try label="First quarter" set="date=2026-11-17T12:00Z" fig={id}>
+            Hapke's half Moon of 2012 is a sixth of a stop over ROLO's, his of 1963 a quarter, Lambert's more than one and
+            a half stops.
+        </Try>
     </figcaption>
 </figure>
 

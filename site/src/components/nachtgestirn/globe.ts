@@ -109,7 +109,7 @@ export function globeFigure(root: HTMLElement) {
             displacementFrom: pressed(displace) ? 0 : Number.POSITIVE_INFINITY,
             earthshine: true,
             eclipse: false,
-            law: "hapke",
+            law: "hapke2012",
             nightVision: false,
         }));
         const onFar = root.querySelector("[data-field=far]")?.getAttribute("aria-pressed") === "true";

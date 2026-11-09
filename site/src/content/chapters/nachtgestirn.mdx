@@ -7,6 +7,11 @@ draft: true
 references:
     - hapke1963
     - hapke1966
+    - hapke2002
+    - hapke2012
+    - hapke1984
+    - sato2014
+    - kieffer2005
     - jensen2001
     - vandehulst1980
     - nssdc
@@ -19,8 +24,6 @@ references:
     - mueller2012thesis
     - ciechanowski2024
     - oren1994
-    - burley2012
-    - karis2013
     - smith2010
     - fried1966
     - sarazin1990
@@ -36,6 +39,7 @@ import Globe from "../../components/nachtgestirn/Globe.astro";
 import Moon from "../../components/nachtgestirn/Moon.astro";
 import MoonView from "../../components/sternzeit/MoonView.astro";
 import Laws from "../../components/nachtgestirn/Laws.astro";
+import Lobes from "../../components/nachtgestirn/Lobes.astro";
 import Phases from "../../components/nachtgestirn/Phases.astro";
 import Maps from "../../components/nachtgestirn/Maps.astro";
 import Surface from "../../components/nachtgestirn/Surface.astro";
@@ -51,19 +55,19 @@ This chapter is being written. The figures are live, the text still settles.
 <Globe />
 <Controls height={false} />
 
-Look at a full Moon and it is a coin, not a ball: as bright at its very edge as in its middle, with no shading to
-round it off. A sphere lit from behind the viewer should darken towards its rim, and every planet a renderer shades
-with the usual cosine does. The Moon does not, because its surface is dust: light that reaches a grain at a slant
-leaves it at the same slant, through the same thin layer of other grains, and the two slants cancel. nachtgestirn
-draws the Moon that way: its disc along every pixel's ray, shaded by the lunar reflectance law of Bruce Hapke
-<Cite id="hapke1963" /> as Jensen and colleagues used it in their night sky model <Cite id="jensen2001" />, over NASA's
+Look at a full Moon and it is a coin, not a ball: as bright at its very edge as in its middle, with no shading to round
+it off. A sphere lit from behind the viewer should darken towards its rim, and every planet a renderer shades with the
+usual cosine does. The Moon does not, because its surface is dust: light that reaches a grain at a slant leaves it at
+the same slant, through the same thin layer of other grains, and the two slants cancel. nachtgestirn draws the Moon that
+way: its disc along every pixel's ray, shaded by Bruce Hapke's model of a powdered surface in its modern form
+<Cite id="hapke2012" />, with the parameters Sato and colleagues fitted to the Moon <Cite id="sato2014" />, over NASA's
 maps of its color and its relief <Cite id="svs4720" />, lit by the Sun and by <Term of="Earthshine">earthshine</Term>,
 and darkened and reddened in Earth's shadow during a lunar eclipse. Where the Moon is, how large, how it is turned and
 where the Sun is from it come from [sternzeit](../sternzeit/); the sky it is drawn over, and the air in front of it,
 from [dunstkreis](../dunstkreis/). osgHimmel did the same with a cube map and a few hand-set intensities
-<Cite id="mueller2012thesis" />; here the light is in lux and the disc in cd/m², so the Moon exposes like the sky
-around it. The chapter keeps to what a renderer needs; for the Moon itself, its orbit, its tides, its light and its
-soil, explored at length in interactive figures, Bartosz Ciechanowski's page on it is the one to read
+<Cite id="mueller2012thesis" />; here the light is in lux and the disc in cd/m², so the Moon exposes like the sky around
+it. The chapter keeps to what a renderer needs; for the Moon itself, its orbit, its tides, its light and its soil,
+explored at length in interactive figures, Bartosz Ciechanowski's page on it is the one to read
 <Cite id="ciechanowski2024" />.
 
 For a developer: TypeScript and WGSL, one WebGPU compute pass, no dependency on any other package at runtime. It takes
@@ -107,51 +111,66 @@ sixth of what it reflects face on. The Moon's surface is a powder, and a powder 
 layer of grains: what a slant costs on the way in, it gives back on the way out. The
 <Term of="Lommel-Seeliger law">Lommel-Seeliger law</Term> says it in one fraction, the cosine of the light's angle over
 the sum of the cosines of the light's and the viewer's angles, and at full Moon, where the two angles are the same
-everywhere on the disc, the fraction is a half at the center and a half at the rim. The Moon is flat.
+everywhere on the disc, the fraction is a half at the center and a half at the rim. The Moon is flat. Seen from the
+side, with the light that falls on a patch of surface spread over the directions it leaves in (<Fig id="lobes" />), a
+Lambert patch sends the most straight up whatever the Sun does, and a powder sends the most straight back at the Sun.
+
+<Lobes />
+
+Nobody has shown this better than Bartosz Ciechanowski. On
+[his page on the Moon](https://ciechanow.ski/moon/#lunar-brightness) a ball of lunar soil flattens into a disc as you
+swing the light behind you, a field of grains hides its shadows one by one, and two grains send their light back in
+step <Cite id="ciechanowski2024" />. Go and play with it; this chapter only takes what it shows to a renderer.
 
 Hapke's lunar law adds what a powder does near opposition, with the Sun behind the viewer: every grain hides its own
 shadow, and the surface brightens by the <Term of="Opposition surge">opposition surge</Term>, a factor 2 at a
 <Term of="Phase angle">phase angle</Term> of 0 that is gone by 90° <Cite id="hapke1963" />, and a little forward
-scattering, which keeps a thin crescent a rim of light towards the Sun. Jensen and colleagues brought the law into
-rendering <Cite id="jensen2001" />; osgHimmel used it with a scattering term from Hapke's second paper
-<Cite id="hapke1966" />, which makes the quarters a stop too bright, and nachtgestirn keeps Jensen's. The law is
-scaled so that a point seen and lit straight on reflects its <Term of="Normal albedo">normal albedo</Term> as a
-Lambert surface would: the full Moon, of <Term of="Geometric albedo">geometric albedo</Term> 0.12
-<Cite id="nssdc" />, in the 128,000 lux of the Sun above the air, is a flat disc of some 4,900 cd/m², a sunlit rock,
-to be exposed like a landscape at noon. By the Moon's phase law a quarter Moon gives a tenth of that, not half
-<Cite id="cox2000" />: the <Term of="Illuminated fraction">illuminated fraction</Term> is half, but every crater throws
-a shadow, and the surge is gone. The figure's light meter follows that law and exposes the lit part a stop brighter
-than mid gray, as a photographer does.
+scattering, which keeps a thin crescent a rim of light towards the Sun. Light scattered between grains adds to the surge
+as well, in step on its way back, the coherent backscatter Hapke added to his law decades later <Cite id="hapke2002" />;
+the law here lumps both into one surge, fitted to the Moon's light. Jensen and colleagues brought the law into rendering
+<Cite id="jensen2001" />; osgHimmel used it with a scattering term from Hapke's second paper <Cite id="hapke1966" />,
+which makes the quarters a stop too bright, and nachtgestirn keeps Jensen's for its law of 1963. The law is scaled so
+that a point seen and lit straight on reflects its <Term of="Normal albedo">normal albedo</Term> as a Lambert surface
+would: the full Moon, of <Term of="Geometric albedo">geometric albedo</Term> 0.12 <Cite id="nssdc" />, in the 128,000
+lux of the Sun above the air, is a flat disc of some 4,900 cd/m², a sunlit rock, to be exposed like a landscape at noon.
 
-Four laws side by side (<Fig id="laws" />), from the farthest off the measured Moon to the nearest, show what that
-means for a disc. Lambert's, the cosine of the Sun's angle and nothing else, the term every renderer starts from,
-rounds the full Moon into a ball with a dark rim and lets a half Moon fade into its terminator. The metallic-roughness
-surface every PBR renderer ships does no better at its best, a dielectric of roughness 1 with Burley's diffuse, as
-Disney's and Unreal's materials have it <Cite id="burley2012" /> <Cite id="karis2013" />: the limb of a full Moon comes up to a third of the center, and over the month
-it stays a stop off the measured Moon, like Lambert's. No metallic-roughness material can do more, it has no term for
-light scattered back towards the Sun. Oren and Nayar's rough surface <Cite id="oren1994" />, the law a renderer reaches for when
-Lambert's limb looks wrong, brightens the limb towards full Moon with the shadows its facets throw on each other, and
-gets the full Moon nearly flat; it has no surge, and its half Moon still fades into the terminator. Hapke's keeps the
-lit part flat to its edge and bright up to the terminator. Why shows best from the side, under the discs: where each
-law sends the light that falls on a patch of surface, and how much of it reaches you depends on where the Sun stands
-over the patch and on where you stand. None of this is a matter of taste: the Moon's brightness over the month is
-measured, and a renderer with the wrong law is off by stops.
+By the Moon's phase law a quarter Moon gives a tenth of that, not half <Cite id="cox2000" />: the
+<Term of="Illuminated fraction">illuminated fraction</Term> is half, but every crater throws a shadow, and the surge is
+gone. The figures' light meter follows that law and exposes the lit part a stop brighter than mid gray, as a
+photographer does. We never see the surge in full: the Moon passes above or below Earth's shadow most months, and the
+phase angle at full Moon stays a few degrees.
+
+Hapke kept working on the law for half a century. Its modern form <Cite id="hapke2012" /> gives the grains a phase
+function of two lobes, one back towards the Sun and one onwards, adds the light scattered many times between them, and
+shades the surface by the shadows of its slopes, a mean slope of some 24° <Cite id="hapke1984" />. Sato and colleagues
+fitted it to some 66,000 images of the Moon from the wide angle camera of the Lunar Reconnaissance Orbiter, tile by tile
+<Cite id="sato2014" />. nachtgestirn draws the Moon by it, with the near side's median parameters at 566 nm, no slower
+than by the old law, which it keeps as a choice.
+
+The phase law is measured for the whole disc, so that is where a reflectance law can be checked (<Fig id="phases" />).
+The best measurement is the US Geological Survey's Robotic Lunar Observatory, over a thousand nights fitted to a percent
+between phase angles of 1.55° and 97° <Cite id="kieffer2005" />: its surge is steeper than Allen's law has it, and its
+quarter Moon gives a fifteenth of the full. A Lambert sphere gives two thirds of a flat disc's light at full and a third
+of its own full at a quarter, and its half Moon comes out three times too bright. Hapke's law of 1963 comes out a
+quarter to two fifths of a stop too bright, its surge too broad. His model of 2012 follows the measurement within a
+fifth of a stop all the way, from full to 97°; beyond, where only Allen's law is left, its crescents fall a stop under
+by 150°. None of this is a matter of taste: a renderer with the wrong law is off by stops.
+
+<Phases />
+<Controls height={false} />
+
+On the disc (<Fig id="laws" />), Lambert's law, the cosine of the Sun's angle and nothing else, the term every renderer
+starts from, rounds the full Moon into a ball with a dark rim and lets a half Moon fade into its terminator. Oren and
+Nayar's rough surface <Cite id="oren1994" />, the law a renderer reaches for when Lambert's limb looks wrong, brightens
+the limb towards full Moon with the shadows its facets throw on each other, and gets the full Moon nearly flat; it has
+no surge, its half Moon comes out some two and a half times too bright, and it still fades into the terminator. Both of
+Hapke's keep the full Moon flat to its edge. At the quarters they part: the law of 1963 stays bright up to the
+terminator, the model of 2012, its slopes shading each other, fades into it. Switch the discs to the day and the Moon
+does not change, the sky behind it does: the night side vanishes into a sky as bright as itself, and the lit part shows
+pale, the daytime Moon, with nothing done to the Moon.
 
 <Laws />
 <Controls height={false} />
-
-<Fig id="phases" /> runs the two nearest laws, Oren-Nayar's and Hapke's, from full Moon to new, a disc every 15° of phase angle, as small as the Moon stands
-in the sky, plain discs without the map by default, and adds the light up over every rendered disc, the number a light meter
-sees, read back from the pass itself. A Lambert sphere gives two thirds of
-a flat disc's light at full and a third of its own full at a quarter; the Moon, measured, gives a tenth, and Hapke's
-law follows it within a quarter of a stop from full to a thin crescent, the surge included. Oren-Nayar's half
-Moon comes out more than twice too bright, as Lambert's and the PBR one do, and its crescents fade too slowly. Switch the strips to the day and the
-Moon does not change, the sky in front of it does: the night side vanishes into a sky as bright as itself, and the lit
-part shows pale, the daytime Moon, with nothing done to the Moon. We never see the surge in full: the Moon passes
-above or below Earth's shadow most months, and the phase angle at full Moon stays a few degrees. The one time the Moon
-stands exactly opposite the Sun is when Earth's shadow falls on it.
-
-<Phases />
 
 ## The face we see
 
@@ -168,17 +187,18 @@ grid rather than a map, puts in the same place.
 <Fig id="moon-face" /> lays the two over each other: sternzeit's view of the Moon, [its figure](../sternzeit/#moon-view), with its grid, axis and arrow to the
 Sun, and behind it the Moon from the maps, turned by the same three angles. The grid's center is the point of the
 Moon's face that looks at you, its meridian of 0° the one the map is centered on, and both move together as the
-libration nods the face. Lock it to the Moon frame and the air goes: seen from Earth's center, with its north up, the
-disc is the one the overlay has always drawn. The libration is the month's; over a night the Moon's face turns a
+libration nods the face. The view stays locked to the Moon, seen from Earth's center with its north up and no air in
+front; the Moon in the sky, through the air, is at the top of the chapter (<Fig id="moon" />) and
+[through the air](#through-the-air). The libration is the month's; over a night the Moon's face turns a
 little more, by up to a degree, as Earth's turning carries you from one side of its center to the other, which neither
 sternzeit nor the figure follow yet.
 
 <MoonView
-    locked
+    lockedOnly
     id="moon-face"
     textured="on"
     annotations
-    caption="sternzeit's view of the Moon, as nachtgestirn draws it: NASA's maps under Hapke's law, the night side in earthshine, the air in front dimming, reddening and lifting it, over dunstkreis' sky, with sternzeit's grid, axis and arrow to the Sun on top, shifted by the libration. Zenith up, from the place; locked to the Moon frame, its north up and seen from Earth's center, where there is no air. The slider runs from new moon to new moon, the full moon in the middle."
+    caption="sternzeit's view of the Moon, as nachtgestirn draws it: NASA's maps under Hapke's law, the night side in earthshine, with sternzeit's grid, axis and arrow to the Sun on top, shifted by the libration. Its north up, seen from Earth's center, where there is no air; in the corner whether the Moon is above the horizon at the chosen place. The slider runs from new moon to new moon, the full moon in the middle."
     try={{
         label: "A day and a half after new moon",
         set: "date=2026-11-10T18:00Z",
@@ -430,13 +450,14 @@ meters on the Moon, or by day on the sky, whichever is brighter.
 ## The people behind the numbers
 
 Bruce Hapke worked out the photometric function of a powdered surface in 1963 and improved its scattering term in 1966
-<Cite id="hapke1963" /> <Cite id="hapke1966" />; the full Moon's flatness and the opposition surge are his. Henrik Wann
-Jensen and his colleagues put that law, with earthshine and the night sky's other lights, into a renderer in 2001
+<Cite id="hapke1963" /> <Cite id="hapke1966" />, and kept refining it for half a century, to the model of his book of
+2012 <Cite id="hapke2012" />; the full Moon's flatness and the opposition surge are his. Henrik Wann Jensen and his
+colleagues put that law, with earthshine and the night sky's other lights, into a renderer in 2001
 <Cite id="jensen2001" />, the paper osgHimmel's Moon followed. Hendrik van de Hulst's phase function of a scattering
-sphere, from his book on multiple scattering of 1980 <Cite id="vandehulst1980" />, is where the earthshine's
-dependence on Earth's phase comes from. František Link, at the Ondřejov observatory, worked out from the 1930s on how
-Earth's air lights its own shadow, ring by ring, and gathered it in his book of 1969 <Cite id="link1969" />; the
-umbra's table is his integral over dunstkreis' air. Theodore Yapo and Barbara Cutler traced photons through that air
-for their eclipse renderings of 2009 <Cite id="yapo2009" />, the reference the thesis' hand-set colors were fitted
-against. The maps are Ernie Wright's, of NASA's Scientific Visualization Studio, who
-assembled the CGI Moon Kit in 2019 and remade its color map in December 2025 <Cite id="svs4720" />.
+sphere, from his book on multiple scattering of 1980 <Cite id="vandehulst1980" />, is where the earthshine's dependence
+on Earth's phase comes from. František Link, at the Ondřejov observatory, worked out from the 1930s on how Earth's air
+lights its own shadow, ring by ring, and gathered it in his book of 1969 <Cite id="link1969" />; the umbra's table is
+his integral over dunstkreis' air. Theodore Yapo and Barbara Cutler traced photons through that air for their eclipse
+renderings of 2009 <Cite id="yapo2009" />, the reference the thesis' hand-set colors were fitted against. The maps are
+Ernie Wright's, of NASA's Scientific Visualization Studio, who assembled the CGI Moon Kit in 2019 and remade its color
+map in December 2025 <Cite id="svs4720" />.

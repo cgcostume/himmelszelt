@@ -219,7 +219,7 @@ export function shimmerFigure(root: HTMLElement) {
             shadows: true,
             earthshine: true,
             eclipse: false,
-            law: "hapke",
+            law: "hapke2012",
             nightVision: false,
             air: true,
             up,

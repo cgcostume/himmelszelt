@@ -3,8 +3,8 @@
 The Moon for a WebGPU sky, as it looks tonight: one compute pass draws its disc along every pixel's ray, over your sky,
 into a texture you own. Its phase comes from the Sun's direction, its face is turned by the libration and the position
 angle of its axis, its night side glows in earthshine, and in Earth's shadow it darkens and reddens as it does in a
-lunar eclipse. The surface is shaded by Hapke's lunar reflectance law, the one Jensen et al. used in their night sky
-model, over NASA's maps of the Moon's color and relief. It creates no device, canvas or context, and depends on no
+lunar eclipse. The surface is shaded by Hapke's model of a powdered surface in its 2012 form, with Sato et al.'s
+2014 parameters for the Moon, over NASA's maps of the Moon's color and relief. It creates no device, canvas or context, and depends on no
 other package at runtime: the astronomy comes in as directions and angles, from
 [`@himmelszelt/sternzeit`](../sternzeit) on the himmelszelt site, the sky in cd/m² from
 [`@himmelszelt/dunstkreis`](../dunstkreis).
@@ -15,10 +15,11 @@ other package at runtime: the astronomy comes in as directions and angles, from
 
 - **The disc**, antialiased at its limb, as a sphere at the Moon's apparent angular diameter, so its size follows the
   month and the hour, and hidden below the horizon you name.
-- **The light**: the Sun's illuminance at the Moon in lux times the surface's reflectance. Hapke's law (Lommel-Seeliger
-  with an opposition surge and a little forward scattering, after Jensen et al. 2001) keeps the full Moon as bright at
-  its edge as in its middle, where Lambert's law, Oren-Nayar's and a PBR renderer's metallic-roughness dielectric, offered to compare,
-  darken the limb like a ball's and let a half Moon fade into its terminator. A
+- **The light**: the Sun's illuminance at the Moon in lux times the surface's reflectance. Hapke's 2012 model with Sato
+  et al.'s 2014 parameters (a two-lobed phase function, a shadow hiding surge, multiple scattering and the shadows of a
+  rough surface) follows the measured Moon (ROLO, Kieffer & Stone 2005) within a fifth of a stop from full to 97°, and
+  keeps the full Moon as bright at its edge as in its middle. Hapke's law of 1963 after Jensen et al. 2001
+  (`law: "hapke"`), as osgHimmel had it, Lambert's and Oren-Nayar's are offered to compare. A
   point seen straight on at opposition reflects its normal albedo like a Lambert surface, so a full Moon of geometric
   albedo 0.12 in 128,000 lux is some 4,900 cd/m² before the air, as measured.
 - **Earthshine**, Earth's illuminance at the Moon in lux: `earthshineIlluminance` gives it from Earth's phase as the

@@ -22,3 +22,26 @@ const { options, chosen } = Astro.props;
     ))}
     <span class="env-progress" aria-hidden="true"><span></span></span>
 </span>
+
+<script>
+    // Where the row collapses to the chosen resolution, pressing it opens the others under it, and choosing one, or
+    // pressing anywhere else, closes them again. The figure itself hears every choice as before.
+    const narrow = window.matchMedia("(max-width: 40rem)");
+    for (const group of document.querySelectorAll<HTMLElement>(".env-resolutions")) {
+        group.addEventListener(
+            "click",
+            (event) => {
+                const button = (event.target as Element).closest<HTMLElement>("[data-resolution]");
+                if (!button || !narrow.matches) return;
+                if (button.getAttribute("aria-pressed") === "true" && !group.hasAttribute("data-open")) {
+                    event.stopImmediatePropagation();
+                    group.setAttribute("data-open", "");
+                } else group.removeAttribute("data-open");
+            },
+            { capture: true },
+        );
+        document.addEventListener("pointerdown", (event) => {
+            if (!group.contains(event.target as Node)) group.removeAttribute("data-open");
+        });
+    }
+</script>

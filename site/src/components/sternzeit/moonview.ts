@@ -96,7 +96,7 @@ export function moonView(view: HTMLElement, options: MoonViewOptions = {}) {
     const opticalButton = find('[data-field="opticalLibration"]', view);
     // Off leaves only the physical libration, the Moon's own wobble, well below a pixel here.
     let optical = opticalButton.getAttribute("aria-pressed") !== "false";
-    const cornerRowPx = () => CORNER_PX + lockButton.offsetHeight / 2;
+    const cornerRowPx = () => CORNER_PX + opticalButton.offsetHeight / 2;
     let behind: MoonViewBehind | null = options.behind ?? null;
 
     function render() {
@@ -229,15 +229,22 @@ export function moonView(view: HTMLElement, options: MoonViewOptions = {}) {
 
         // The visible horizon, below the Moon by its apparent altitude over it, at the disc's own scale (so it only shows
         // within a few tenths of a degree); the ground beneath veils what it hides.
+        // In the bottom right corner, level with the switch in the bottom left one, or over the readouts there.
+        const corner = {
+            x: halfWidth - CORNER_PX * unitsPerPx,
+            y: halfHeight - cornerRowPx() * unitsPerPx - (besides ? 0 : 2.5 * line),
+        };
+        const cornerCls = "figure-note figure-anchor-end";
+        const altitude = precise.earth.apparentAltitude(horizontal.altitude, state);
         if (!locked) {
-            const horizon = precise.earth.apparentAltitude(horizontal.altitude, state) * DEG * UNITS_PER_RADIAN;
-            // In the bottom right corner, level with the switch in the bottom left one, or over the readouts there.
-            const x = halfWidth - CORNER_PX * unitsPerPx;
-            const y = halfHeight - cornerRowPx() * unitsPerPx - (besides ? 0 : 2.5 * line);
-            const cls = "figure-note figure-anchor-end";
+            const horizon = altitude * DEG * UNITS_PER_RADIAN;
             // Drawn behind, the ground is the renderer's: only the note that the whole view is below the horizon.
-            if (!behind) svg += veiledHorizon(horizon, halfHeight, unitsPerPx, halfWidth, { x, y, cls });
-            else if (horizon <= -halfHeight) svg += svgText(x, y, "below the horizon", cls);
+            if (!behind)
+                svg += veiledHorizon(horizon, halfHeight, unitsPerPx, halfWidth, { ...corner, cls: cornerCls });
+            else if (horizon <= -halfHeight) svg += svgText(corner.x, corner.y, "below the horizon", cornerCls);
+        } else {
+            // Locked, there is no horizon to draw: only whether the Moon is up at the place.
+            svg += svgText(corner.x, corner.y, altitude > 0 ? "above the horizon" : "below the horizon", cornerCls);
         }
 
         // The readouts, each beside what it measures: the tilt by its arc, the size under the disc, the libration and the

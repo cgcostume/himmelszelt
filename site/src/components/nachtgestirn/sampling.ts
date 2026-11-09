@@ -94,7 +94,7 @@ export function samplingFigure(root: HTMLElement) {
             displacementFrom: pressed(relief) && pressed(displace) ? 0 : Number.POSITIVE_INFINITY,
             earthshine: true,
             eclipse: false,
-            law: "hapke",
+            law: "hapke2012",
             nightVision: false,
         };
         // The disc at its size, metered, as the pass reads its maps; the close-ups at theirs.

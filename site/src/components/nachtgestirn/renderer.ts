@@ -301,9 +301,9 @@ export interface MoonFrame {
     shadows: boolean;
     earthshine: boolean;
     eclipse: boolean;
-    law: "hapke" | "lambert" | "orenNayar" | "metallicRoughness";
+    law: "hapke" | "hapke2012" | "lambert" | "orenNayar";
     /** A law to hold the disc against, its pixels striped where they are a third of a stop off it. */
-    compare?: "hapke" | "lambert" | "orenNayar" | "metallicRoughness" | null;
+    compare?: "hapke" | "hapke2012" | "lambert" | "orenNayar" | null;
     /** The color map tinted to the Moon's color, as published, or as gray; tinted by default. */
     mapColor?: "tinted" | "untinted" | "gray";
     /** As the eye sees it at night, rather than a camera. */

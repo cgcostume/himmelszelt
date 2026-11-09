@@ -6,65 +6,58 @@ import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
 
-/** Lambert's law, a PBR renderer's, Oren-Nayar's and Hapke's: the Moon under each, and a patch of it from the side. */
+/** Lambert's law, Oren-Nayar's and Hapke's of 1963 and 2012: the Moon under each, and how far its light is off the Moon's. */
 interface Props {
     id?: string;
 }
 const { id = "laws" } = Astro.props;
 const LAWS = [
-    ["lambert", "Lambert", "a matte ball"],
-    ["metallicRoughness", "PBR", "a rough dielectric"],
-    ["orenNayar", "Oren-Nayar", "a rough ball"],
-    ["hapke", "Hapke", "a powder, the reference"],
+    ["lambert", "Lambert"],
+    ["orenNayar", "Oren-Nayar"],
+    ["hapke", "Hapke 1963"],
+    ["hapke2012", "Hapke 2012"],
 ] as const;
 ---
 
 <figure class="tiles-figure wide" id={id} data-laws>
     <div class="tiles-panel as-seen">
-        <canvas aria-label="The Moon shaded by Lambert's law, a PBR renderer's metallic-roughness, Oren-Nayar's and Hapke's, rendered with WebGPU" title="Drag to carry yourself around the Moon, the Sun staying put; double click to come back to Earth"></canvas>
+        <canvas aria-label="The Moon shaded by Lambert's law, Oren-Nayar's, Hapke's of 1963 and Hapke's of 2012, rendered with WebGPU" title="Drag to carry yourself around the Moon, the Sun staying put; double click to come back to Earth"></canvas>
+        <ul class="tiles-labels disc-labels">
+            {LAWS.map(([law, name]) => (
+                <li><span class={`tiles-name law-${law}`}>{name}</span> <span class="tiles-value" data-off={law}></span></li>
+            ))}
+        </ul>
         <span class="tiles-start">
             <span class="view-buttons">
                 <button type="button" class="view-icon" data-field="map" aria-pressed="false" title="NASA's maps, color and relief; off, plain discs of the law alone" aria-label="Maps"><Icon name="moonMap" /></button>
-                <button type="button" class="view-icon" data-field="deviation" aria-pressed="false" title="Stripe where each disc is more than a third of a stop off Hapke's law, which follows the measured Moon: red where brighter, blue where darker" aria-label="Deviation"><Icon name="clipped" /></button>
+                <button type="button" class="view-icon" data-field="day" aria-pressed="false" title="The same discs over a plain daytime sky, exposed for the sky: the pale Moon by day" aria-label="By day"><Icon name="day" /></button>
+                <button type="button" class="view-icon" data-field="deviation" aria-pressed="false" title="Stripe where each disc is more than a third of a stop off Hapke's model of 2012, the nearest to the measured Moon: red where brighter, blue where darker" aria-label="Deviation"><Icon name="clipped" /></button>
             </span>
-            <span class="tiles-hint footnote">Drag the discs to go around the Moon, the Sun in a side view to move it. Rendered with WebGPU</span>
+            <span class="tiles-hint footnote">Drag the discs to go around the Moon. Rendered with WebGPU</span>
         </span>
         <span class="tiles-ends">
             <span class="view-buttons">
                 <Rays />
-                <button type="button" class="view-icon" data-field="metered" aria-pressed="true" title="Expose each disc by a light meter on its lit part, as a photograph of the Moon is, rather than all four at the full Moon's exposure" aria-label="Metered"><Icon name="meter" /></button>
+                <button type="button" class="view-icon" data-field="metered" aria-pressed="true" title="Expose all four discs alike by a light meter on the measured Moon's lit part, as a photograph of the Moon is, rather than at the full Moon's exposure" aria-label="Metered"><Icon name="meter" /></button>
             </span>
             <span class="view-buttons">
-                <button type="button" class="view-icon" data-field="download" title="Download the discs and the side views as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+                <button type="button" class="view-icon" data-field="download" title="Download the discs as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
             </span>
         </span>
     </div>
-    <div class="lobes-row">
-        {LAWS.map(([law, name]) => (
-            <div class="lobes-panel">
-                <svg data-law={law} role="img" aria-label={`The light a patch of surface sends to each side under ${name}'s law`}></svg>
-            </div>
-        ))}
-    </div>
-    <ul class="tiles-labels" style="grid-template-columns: repeat(4, 1fr)">
-        {LAWS.map(([law, name, what]) => (
-            <li><span class={`tiles-name law-${law}`}>{name}</span> <span class="tiles-value">{what}</span></li>
-        ))}
-    </ul>
     <LunationSlider />
-    <p class="view-status"><span data-field="note"></span><br /><span data-field="lobes"></span></p>
+    <p class="view-status"><span data-field="note"></span></p>
     <figcaption class="figure-caption">
-        The Moon at the chosen moment under four reflectance laws, the farthest from the measured Moon first: Lambert's,
-        a PBR renderer's metallic-roughness dielectric at roughness 1 with Burley's diffuse, Oren and Nayar's, and
-        Hapke's lunar law. Above, each disc from Earth's center with north up, metered on its lit part or all four at
-        the full Moon's exposure, plain or with NASA's maps, and at a switch striped where it is more than a third of a stop off Hapke's,
-        red brighter, blue darker. Below, a patch of the surface from the side, its normal up, the Sun to drag around it, and
-        around the patch the light it sends to each direction in that plane, the dashed half circle a Lambert surface
-        lit from straight above. Lambert darkens the limb like a matte ball, the PBR surface hardly less; Oren-Nayar leans back
-        towards the light but has no surge; Hapke throws the most straight back and keeps the full Moon's limb as bright
-        as its middle. The slider runs from new moon to new moon.
+        The Moon at the chosen moment under the four laws of the side views above, from Earth's center with north up, all four exposed alike,
+        metered on the measured Moon's lit part or at the full Moon's exposure, plain or with NASA's maps, over the night
+        or a plain daytime sky. Under each disc, how far the light of the whole disc is off the measured Moon's at this
+        phase angle, in stops, as in the plot above: ROLO's up to 97°, Allen's beyond. At a switch each disc is striped
+        where it is more than a third of a stop off Hapke's of 2012, red brighter, blue darker: a comparison with the nearest law, not with the Moon,
+        whose light is measured for the whole disc only. Lambert darkens the limb like a matte ball; Oren-Nayar leans
+        back towards the light but has no surge; both of Hapke's keep the full Moon's limb as bright as its middle. The
+        slider runs from new moon to new moon.
         <Try label="First quarter" set="date=2026-11-17T12:00Z" fig={id}>
-            only Hapke's half Moon stays bright up to the terminator, as the Moon does.
+            Hapke's half Moon of 1963 stays bright up to the terminator, his half Moon of 2012 fades into it.
         </Try>
     </figcaption>
 </figure>

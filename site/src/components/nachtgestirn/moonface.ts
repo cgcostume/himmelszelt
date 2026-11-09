@@ -81,7 +81,7 @@ export function attachMoonFace(view: HTMLElement, controller: MoonViewController
             nightVision: false,
             earthshine: true,
             eclipse: true,
-            law: "hapke",
+            law: "hapke2012",
         });
     }
 

@@ -1,0 +1,43 @@
+---
+import "../sternzeit/sternzeit.css";
+import "./nachtgestirn.css";
+
+/** Lambert's law, Oren-Nayar's and Hapke's of 1963 and 2012 from the side: where each sends the light falling on a patch. */
+interface Props {
+    id?: string;
+}
+const { id = "lobes" } = Astro.props;
+const LAWS = [
+    ["lambert", "Lambert", "a matte ball"],
+    ["orenNayar", "Oren-Nayar", "a rough ball"],
+    ["hapke", "Hapke 1963", "a powder"],
+    ["hapke2012", "Hapke 2012", "a rough powder"],
+] as const;
+---
+
+<figure class="lobes-figure" id={id} data-lobes>
+    <div class="lobes-row" data-export="reflectance" data-export-timeless>
+        {LAWS.map(([law, name, what]) => (
+            <div class="lobes-panel">
+                <svg data-law={law} role="img" aria-label={`The light a patch of surface sends to each side under ${name}'s law`}></svg>
+                <p class="lobes-label"><span class={`tiles-name law-${law}`}>{name}</span> <span class="tiles-value">{what}</span></p>
+            </div>
+        ))}
+    </div>
+    <p class="view-status"><span data-field="lobes"></span></p>
+    <figcaption class="figure-caption">
+        A patch of the Moon's surface from the side under four reflectance laws: Lambert's, Oren and Nayar's with a
+        roughness of 0.5 rad, Hapke's lunar law of 1963 as Jensen and colleagues use it, and his model of 2012 with Sato
+        and colleagues' parameters for the Moon. The patch's normal points up, the arrow points to the Sun, and the shape around the
+        patch is how much light it sends to each direction in that plane, all four on one scale;
+        the dashed half circle is a Lambert surface lit from straight above. Lambert's sends the most straight up
+        whatever the Sun does, Oren-Nayar's leans back towards the Sun, and both of Hapke's throw the most straight back
+        at it.
+    </figcaption>
+</figure>
+
+<script>
+    import { lobesFigure } from "./lobes";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-lobes]")) lobesFigure(root);
+</script>

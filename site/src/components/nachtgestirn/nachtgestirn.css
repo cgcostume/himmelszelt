@@ -101,6 +101,8 @@
 }
 .tiles-labels .tiles-name {
     display: block;
+}
+.tiles-labels .tiles-name:not([class*="law-"]) {
     color: var(--accent);
 }
 .tiles-labels .tiles-value {
@@ -124,10 +126,12 @@
     vector-effect: non-scaling-stroke;
 }
 /* The reflectance laws, each in its color wherever it is named: the Moon's own law in the accent. */
-.tiles-figure {
+.tiles-figure,
+.lobes-figure,
+.plot-figure {
     --law-lambert: var(--text);
     --law-orenNayar: oklch(0.66 0.15 300);
-    --law-metallicRoughness: oklch(0.62 0.14 150);
+    --law-hapke2012: oklch(0.74 0.14 65);
     --law-hapke: var(--accent);
 }
 .law-lambert {
@@ -136,15 +140,15 @@
 .law-orenNayar {
     color: var(--law-orenNayar);
 }
-.law-metallicRoughness {
-    color: var(--law-metallicRoughness);
+.law-hapke2012 {
+    color: var(--law-hapke2012);
 }
-.plot-line-metallicRoughness,
-.plot-dot-metallicRoughness {
-    stroke: var(--law-metallicRoughness);
+.plot-line-hapke2012,
+.plot-dot-hapke2012 {
+    stroke: var(--law-hapke2012);
 }
-.plot-label-metallicRoughness {
-    fill: var(--law-metallicRoughness);
+.plot-label-hapke2012 {
+    fill: var(--law-hapke2012);
 }
 .law-hapke {
     color: var(--law-hapke);
@@ -182,6 +186,18 @@
     stroke-dasharray: 4 3;
     stroke-width: 1.2;
 }
+/* Allen's older phase law, dotted and muted under ROLO's measurement, which ends at 97°. */
+.plot-line-allen {
+    stroke: var(--muted);
+    stroke-dasharray: 1 3;
+    stroke-width: 1.2;
+}
+.plot-label-rolo {
+    fill: var(--text);
+}
+.plot-label-allen {
+    fill: var(--muted);
+}
 /* The shadow's light per channel, in the channel's own hue, muted. */
 .plot-line-red {
     stroke: oklch(0.62 0.19 25);
@@ -212,38 +228,6 @@
     stroke: var(--text);
     stroke-width: 3;
     stroke-linecap: butt;
-}
-/* The strips of small Moons, one law a row, named in a column of 64 px left of the discs (NAMES_PX in phases.ts). */
-/* As much black above the strips as below, clear of the switches, and each law's name in the middle of its row. */
-.tiles-panel.strips {
-    padding-block: 3.25rem;
-    background: #000;
-}
-/* On the dark panels the laws' colors are the dark theme's, resolved there rather than on the page. */
-.tiles-panel.as-seen {
-    --law-lambert: var(--text);
-    --law-hapke: var(--accent);
-}
-.tiles-panel > .strips-canvas {
-    width: calc(100% - 64px);
-    margin-left: 64px;
-}
-.strip-names {
-    position: absolute;
-    inset: 3.25rem auto 3.25rem 0;
-    display: flex;
-    flex-direction: column;
-    width: 64px;
-    margin: 0;
-    padding: 0 0 0 0.5rem;
-    font-size: var(--text-meta);
-    list-style: none;
-    pointer-events: none;
-}
-.strip-names > li {
-    display: flex;
-    flex: 1;
-    align-items: center;
 }
 /* The switches over a panel, at its top left, as over the other figures' scenes. */
 .tiles-panel > .view-buttons:not(.eclipse-jump) {
@@ -361,6 +345,15 @@
     align-items: flex-start;
     pointer-events: none;
 }
+/* Where the switches do not fit in one row, they take a second, and the hint makes way. */
+@media (max-width: 40rem) {
+    .tiles-panel > .tiles-start {
+        flex-wrap: wrap;
+    }
+    .tiles-panel > .tiles-start > .tiles-hint {
+        display: none;
+    }
+}
 /* Clear of the buttons at the top right: the antialiasing switch, the download besides, the full screen too. */
 .tiles-panel:has(> .tiles-ends) > .tiles-start {
     right: 112px;
@@ -421,65 +414,70 @@
     height: 100%;
 }
 
-/* The phases figure names its laws on their curves, in the ink, the Moon's own law in the accent. */
-.tiles-figure[data-phases] .plot-line:not(.plot-line-measured, .plot-line-hapke) {
-    stroke: var(--text);
-}
-.tiles-figure[data-phases] :is(.plot-label-lambert, .plot-label-metallicRoughness, .plot-label-orenNayar) {
-    fill: var(--text);
-}
-/* By day the sky the discs stand in is the strips' ground, the names on it in an ink that reads on it; the plot stays as it is. */
-.tiles-figure[data-day] .tiles-panel.strips {
-    --text: oklch(0.24 0.03 250);
-    --muted: oklch(0.34 0.03 250);
-    color: var(--text);
-    background: var(--sky-bg, #8fb4e0);
-}
-.tiles-figure[data-day][data-sky-dark] .tiles-panel.strips {
-    --text: oklch(0.96 0.01 250);
-    --muted: oklch(0.86 0.02 250);
-}
-
-/* The phases' cursor and now: a line through the plot, the column framed over the strips, now dashed in the accent. */
-.tiles-figure[data-phases] :is(.plot-cursor, .strips-cursor) {
+/* The phase law plot: the cursor a line through it, now dashed in the accent, each law's dot in its color. */
+[data-phases] .plot-cursor {
     stroke: var(--text);
     stroke-width: 1;
     opacity: 0.6;
 }
-.tiles-figure[data-phases] .plot-column {
+[data-phases] .plot-dot {
+    fill: var(--bg);
+}
+[data-phases] .plot-dot-lambert {
+    stroke: var(--law-lambert);
+}
+[data-phases] .plot-dot-hapke2012 {
+    stroke: var(--law-hapke2012);
+}
+[data-phases] .plot-dot-orenNayar {
+    stroke: var(--law-orenNayar);
+}
+[data-phases] .plot-dot-rolo {
     stroke: var(--text);
-    stroke-width: 1;
-    opacity: 0.12;
 }
-.tiles-figure[data-phases] .plot-dot {
-    fill: var(--text);
+[data-phases] .plot-dot-allen {
+    stroke: var(--muted);
 }
-.tiles-figure[data-phases] .plot-now {
+[data-phases] .plot-now {
     stroke: var(--accent);
     stroke-width: 1.2;
     stroke-dasharray: 3 3;
 }
-.tiles-figure[data-phases] .plot-now-label {
+[data-phases] .plot-now-label {
     fill: var(--accent);
     text-anchor: middle;
 }
-.tiles-figure[data-phases] .strips-now-line {
-    stroke: var(--accent);
-    stroke-width: 1.2;
-    stroke-dasharray: 3 3;
-}
-.tiles-figure[data-phases] .strips-now {
-    fill: var(--accent);
-}
-.tiles-figure[data-phases] .strips-overlay {
-    z-index: 1;
-}
-.tiles-figure[data-phases] :is(.tiles-panel, .tiles-plot) {
+[data-phases] .tiles-plot {
+    position: relative;
     cursor: crosshair;
 }
+.plot-figure,
+.lobes-figure {
+    margin: 1.5rem 0;
+}
 
-/* The laws' patches from the side, under their discs, four in a row, two on a phone; the light dragged in any. */
+/* Each disc named at its foot, over the canvas, with how far its light is off the measured Moon's; two by two on a phone. */
+.disc-labels {
+    position: absolute;
+    inset: 0;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 1fr;
+    margin: 0;
+    pointer-events: none;
+}
+.disc-labels > li {
+    align-self: end;
+    padding-bottom: 0.35rem;
+}
+@media (max-width: 40rem) {
+    .disc-labels {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* The laws' patches from the side, four in a row, two on a phone; the light dragged in any. */
 .lobes-row {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 0.75rem;
@@ -488,7 +486,23 @@
 @media (max-width: 40rem) {
     .lobes-row {
         grid-template-columns: repeat(2, 1fr);
+        row-gap: 1rem;
     }
+}
+/* Each law named under its side view, muted like a readout, the name over what it stands for. */
+.lobes-label {
+    margin: 0.35rem 0 0;
+    overflow: hidden;
+    font-size: var(--text-meta);
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lobes-label .tiles-name {
+    display: block;
+}
+.lobes-label .tiles-value {
+    color: var(--muted);
 }
 .lobes-panel > svg {
     display: block;
@@ -520,9 +534,15 @@
     stroke: var(--muted);
     stroke-width: 1.2;
 }
+.lobe-normal-tip {
+    fill: var(--muted);
+}
 .lobe-light {
     stroke: var(--text);
     stroke-width: 1.6;
+}
+.lobe-light-tip {
+    fill: var(--text);
 }
 .lobe-sun {
     cursor: grab;

@@ -172,7 +172,7 @@ export function moonFigure(root: HTMLElement) {
             shadows: pressed("shadows"),
             earthshine: pressed("earthshine"),
             eclipse: pressed("eclipse"),
-            law: "hapke",
+            law: "hapke2012",
             nightVision: false,
             shimmer: pressed("shimmer") ? { time: performance.now() / 1000, dispersion: 1 } : null,
             ...rays(),

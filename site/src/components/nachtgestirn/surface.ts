@@ -108,7 +108,7 @@ export function surfaceFigure(root: HTMLElement) {
             toneMap: display.toneCurve as ToneCurveName,
             earthshine: true,
             eclipse: false,
-            law: "hapke" as const,
+            law: "hapke2012" as const,
             nightVision: false,
             albedo: albedo.getAttribute("aria-pressed") === "true",
         };

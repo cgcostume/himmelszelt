@@ -1,18 +1,24 @@
-import { moonEV100, type Vec3 } from "@himmelszelt/nachtgestirn";
+import { ev100ForLuminance, moonEV100, type Vec3 } from "@himmelszelt/nachtgestirn";
 import { find } from "../dom";
 import { display, onDisplay, onTables, gpu as shared, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { onChange, state } from "../sternzeit/state";
-import { lobesFigure } from "./lobes";
+import { discLight, LAWS, type Law } from "./lobes";
+import { measured, roloHolds } from "./measured";
 import { moonAt, type ToneCurveName } from "./renderer";
 import { saveFigure } from "./snapshot";
 import { createTiles } from "./tiles";
 
 const PI = Math.PI;
 const DEG = PI / 180;
-export type Law = "lambert" | "orenNayar" | "metallicRoughness" | "hapke";
-/** The laws in the order the figures show them: by their distance from the measured Moon, the farthest first. */
-export const LAWS: readonly Law[] = ["lambert", "metallicRoughness", "orenNayar", "hapke"];
+/** A plain daytime sky behind the discs, in cd/m²: a clear blue some way from the Sun. */
+export const DAY_SKY: readonly [number, number, number] = [2600, 4000, 6500];
+// The tiles a fifth taller than wide, room under each disc for its name and readout; on a phone more, for the switches
+// over the top row.
+const TILE_ASPECT = 1.2;
+const NARROW_TILE_ASPECT = 1.3;
+
+export { LAWS, type Law } from "./lobes";
 
 // A rotation about `axis` by `angle` radians, as a column major 3 x 3 matrix, and its use.
 export function rotation(axis: Vec3, angle: number): Float32Array {
@@ -112,13 +118,15 @@ export function lawsFigure(root: HTMLElement) {
     const metered = find("[data-field=metered]", root);
     const mapped = find("[data-field=map]", root);
     const deviation = find("[data-field=deviation]", root);
+    const day = find("[data-field=day]", root);
+    const offs = [...root.querySelectorAll<HTMLElement>("[data-off]")];
     const pressed = (button: HTMLElement) => button.getAttribute("aria-pressed") === "true";
     const requestRender = onDemand(render, root);
+    const narrow = window.matchMedia("(max-width: 40rem)");
     // How far the viewer has been dragged around the Moon: about its north axis, and up or down over it, in radians.
     const orbit = { yaw: 0, pitch: 0 };
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
-    lobesFigure(root);
 
     function render() {
         const table = tables();
@@ -126,15 +134,27 @@ export function lawsFigure(root: HTMLElement) {
         const real = moonAt(state.jd, state, table.luts.model);
         const m = orbit.yaw === 0 && orbit.pitch === 0 ? real : orbited(real, orbit.yaw, orbit.pitch);
         const width = root.clientWidth || 600;
-        const tilePx = Math.round((width / LAWS.length) * Math.min(window.devicePixelRatio || 1, 2));
-        // All at the full Moon's exposure whatever the phase, so the light seen is the light each law gives: a quarter
-        // Moon darker than a full one, and Lambert's disc darker than Hapke's.
-        const perDisc = pressed(metered);
+        // Two by two on a phone, as the side views under them.
+        const columns = narrow.matches ? 2 : LAWS.length;
+        const tilePx = Math.round((width / columns) * Math.min(window.devicePixelRatio || 1, 2));
+        // One exposure for all four, so the light seen is the light each law gives: Lambert's disc darker than Hapke's.
+        // Metered on the measured Moon's lit part, or the full Moon's whatever the phase, a quarter Moon then darker.
+        const meter = pressed(metered);
         const withMap = pressed(mapped);
         // Held against Hapke's law, which follows the measured Moon within a quarter of a stop over the month.
-        const compare = pressed(deviation) ? ("hapke" as const) : null;
-        const ev100 = perDisc ? null : moonEV100(0, 1);
-        tiles?.draw({ count: LAWS.length, width: tilePx, degreesAcross: m.geocentricDiameter * 1.4 }, (i) => ({
+        const compare = pressed(deviation) ? ("hapke2012" as const) : null;
+        // By day the sky sets the exposure where it is brighter than the Moon, still one for all four.
+        const byDay = pressed(day);
+        const moonEV = meter ? moonEV100(m.phaseAngle, m.lit) : moonEV100(0, 1);
+        const sky = 0.2126 * DAY_SKY[0] + 0.7152 * DAY_SKY[1] + 0.0722 * DAY_SKY[2];
+        const ev100 = byDay ? Math.max(moonEV, ev100ForLuminance(sky)) : moonEV;
+        const layout = {
+            count: columns,
+            rows: LAWS.length / columns,
+            width: tilePx,
+            height: Math.round(tilePx * (narrow.matches ? NARROW_TILE_ASPECT : TILE_ASPECT)),
+        };
+        tiles?.draw({ ...layout, degreesAcross: m.geocentricDiameter * 1.4 }, (i) => ({
             moon: m,
             luts: table.luts,
             toneMap: display.toneCurve as ToneCurveName,
@@ -146,22 +166,28 @@ export function lawsFigure(root: HTMLElement) {
             compare,
             earthshine: true,
             eclipse: false,
-            law: LAWS[i] ?? "hapke",
+            law: LAWS[i] ?? "hapke2012",
             nightVision: false,
+            ...(byDay ? { background: DAY_SKY } : {}),
         }));
+        // Each law's light of the whole disc against the measured Moon's at this phase angle, plain discs, in stops:
+        // against ROLO up to 97°, against Allen's law beyond, said so.
+        const moon = measured(m.phaseAngle);
+        const by = roloHolds(m.phaseAngle) ? "" : ", Allen";
+        for (const element of offs) {
+            const off = Math.log2(Math.max(discLight(element.dataset.off as Law, m.phaseAngle * DEG), 1e-9) / moon);
+            element.textContent = `${off >= 0 ? "+" : ""}${off.toFixed(1)} stops${by}`;
+        }
         const where =
             orbit.yaw === 0 && orbit.pitch === 0
                 ? "from Earth"
                 : `${(Math.abs(orbit.yaw) / DEG).toFixed(0)}° ${orbit.yaw > 0 ? "east" : "west"} and ${(Math.abs(orbit.pitch) / DEG).toFixed(0)}° ${orbit.pitch > 0 ? "over" : "under"} Earth's line of sight`;
-        note.textContent = `seen ${where}: phase angle ${m.phaseAngle.toFixed(1)}°, ${(m.lit * 100).toFixed(0)}% lit, ${perDisc ? "each disc metered on its lit part" : "all four at the full Moon's exposure"}`;
+        note.textContent = `seen ${where}: phase angle ${m.phaseAngle.toFixed(1)}°, ${(m.lit * 100).toFixed(0)}% lit`;
     }
 
-    // The discs as drawn, and the side views and names under them, in one PNG.
+    // The discs as drawn, with their names, in one PNG.
     find("[data-field=download]", root).addEventListener("click", () =>
-        saveFigure(root, canvas, render, {
-            svgs: root.querySelectorAll<SVGSVGElement>("svg[data-law]"),
-            texts: root.querySelectorAll<HTMLElement>(".tiles-labels .tiles-name"),
-        }),
+        saveFigure(root, canvas, render, { texts: root.querySelectorAll<HTMLElement>(".disc-labels .tiles-name") }),
     );
 
     // Dragging carries the viewer around the Moon; a double click brings it back to Earth.
@@ -188,7 +214,7 @@ export function lawsFigure(root: HTMLElement) {
     };
     canvas.addEventListener("pointerup", release);
     canvas.addEventListener("pointercancel", release);
-    for (const button of [metered, mapped, deviation]) {
+    for (const button of [metered, mapped, deviation, day]) {
         button.addEventListener("click", () => {
             button.setAttribute("aria-pressed", String(!pressed(button)));
             requestRender();

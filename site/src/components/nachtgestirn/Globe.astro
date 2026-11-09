@@ -26,9 +26,9 @@ const { id = "globe" } = Astro.props;
                     <button type="button" class="view-toggle" data-field="far" aria-pressed="false" title="The far side, which Earth never sees: the Moon turned half round, the Sun staying where it is; turning it lets go">far side</button>
                 </span>
                 <span class="view-buttons">
-                    <button type="button" class="view-toggle" data-field="relief" aria-pressed="true" title="The relief from LOLA's heights, shading the surface; off, the smooth sphere under the color map alone">relief</button>
-                    <button type="button" class="view-toggle" data-field="shadows" aria-pressed="true" title="The shadows the relief casts, marched through the heights towards the Sun">shadows</button>
-                    <button type="button" class="view-toggle" data-field="displace" aria-pressed="true" title="The relief displaced, not only shaded: each ray near the limb marched through the heights, so the limb shows its mountains and near rims hide what lies behind them; off, the slopes shade a smooth sphere, as the pass does for a disc under 1024 pixels">displaced</button>
+                    <button type="button" class="view-toggle icon-when-narrow" data-field="relief" aria-label="relief" aria-pressed="true" title="The relief from LOLA's heights, shading the surface; off, the smooth sphere under the color map alone"><span class="switch-text">relief</span><Icon name="relief" /></button>
+                    <button type="button" class="view-toggle icon-when-narrow" data-field="shadows" aria-label="shadows" aria-pressed="true" title="The shadows the relief casts, marched through the heights towards the Sun"><span class="switch-text">shadows</span><Icon name="shadows" /></button>
+                    <button type="button" class="view-toggle icon-when-narrow" data-field="displace" aria-label="displaced" aria-pressed="true" title="The relief displaced, not only shaded: each ray near the limb marched through the heights, so the limb shows its mountains and near rims hide what lies behind them; off, the slopes shade a smooth sphere, as the pass does for a disc under 1024 pixels"><span class="switch-text">displaced</span><Icon name="displace" /></button>
                 </span>
                 <span class="tiles-hint footnote">Drag to turn, shift-drag to move, scroll to zoom. Rendered with WebGPU</span>
             </span>

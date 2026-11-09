@@ -5,6 +5,8 @@ interface Props {
     pressed?: boolean;
 }
 const { label = "4×MSAA", pressed = true } = Astro.props;
+// "4×" stays on small screens, the rest of the label goes (see .rays-long).
+const [short, long] = label.startsWith("4×") ? ["4×", label.slice(2)] : [label, ""];
 ---
 
-<button type="button" class="view-toggle" data-field="rays" aria-pressed={pressed ? "true" : "false"} title="Four rays through each pixel, their light averaged, which smooths what the maps' filters leave of edges sharper than a pixel; off, one through its center">{label}</button>
+<button type="button" class="view-toggle" data-field="rays" aria-pressed={pressed ? "true" : "false"} title="Four rays through each pixel, their light averaged, which smooths what the maps' filters leave of edges sharper than a pixel; off, one through its center" aria-label={label}>{short}{long && <span class="rays-long">{long}</span>}</button>
