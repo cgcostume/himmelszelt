@@ -23,7 +23,7 @@ const { id = "sampling" } = Astro.props;
         <canvas aria-label="The Moon with a close-up of its limb near the south pole marked, and the close-up with its maps read by the nearest texel, bilinear, trilinear and anisotropic, rendered with WebGPU"></canvas>
         <svg class="tiles-overlay" data-field="marker" aria-hidden="true"></svg>
         <span class="tiles-start">
-            <Resolutions options={STRIP_RESOLUTIONS} chosen="large" />
+            <Resolutions options={STRIP_RESOLUTIONS} chosen="4k" />
             <span class="view-buttons">
                 <button type="button" class="view-toggle" data-field="albedo" aria-pressed="true" title="NASA's color map of the Moon; off, a uniform surface of the Moon's albedo, so the relief and its shadows show alone">albedo</button>
                 <button type="button" class="view-toggle" data-field="relief" aria-pressed="true" title="The relief from LOLA's heights, shading the surface; off, the smooth sphere under the color map alone">relief</button>

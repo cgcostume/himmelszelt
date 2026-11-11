@@ -25,17 +25,20 @@ fn ngShadows(@builtin(global_invocation_id) id: vec3u) {
     // The terrain's height there, read as coarse as the map's texels are wide, from the strip where it lies in one.
     let inStrip = ngInDetail(point);
     let level = max(log2(max(texelAngle * ngParams.moonRadiusKm / ngReliefTexelKm(inStrip), 1e-4)), 0.0);
-    let height = ngHeightAt(point, level, inStrip);
+    let height = ngHeightAt(point, level, inStrip, NG_SPLINE_SHADOWS);
 
-    // The share of the Sun's disc above the terrain, and a point Sun's, 0 or 1.
-    let lit = ngSunAboveTerrain(point, toSun, height, level, inStrip);
+    // The share of the Sun's disc above the terrain: soft by its half degree, or a point's, all or nothing.
+    let sunRadius = max(ngParams.shadowWindow.w, 1e-7);
+    let lit = ngDiscAboveTerrain(point, toSun, height, level, inStrip, sunRadius);
 
     // The rays of a disc that is not displaced meet the smooth sphere: near the limb a point the terrain in front hides
     // from the viewer is seen anyway. Its shadow is then the hidden part of the occluder's, which near full Moon, the Sun
     // at the viewer's back, the eye would not see: where the viewer cannot see the point, it takes no shadow.
     let toViewer = ngParams.orientation * -ngParams.direction;
-    let shaded = min(lit.x, lit.y) < 1.0;
-    let seen = select(1.0, ngAboveTerrain(point, toViewer, height, level, inStrip, ngParams.sunAngularRadius), shaded);
+    var seen = 1.0;
+    if (lit < 1.0) {
+        seen = ngDiscAboveTerrain(point, toViewer, height, level, inStrip, ngParams.sunAngularRadius);
+    }
 
-    ngOutputStore(id.xy, vec4f(mix(vec2f(1.0), lit, seen), 0.0, 1.0));
+    ngOutputStore(id.xy, vec4f(mix(1.0, lit, seen), 0.0, 0.0, 1.0));
 }

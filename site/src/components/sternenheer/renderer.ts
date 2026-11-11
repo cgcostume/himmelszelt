@@ -141,7 +141,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
     let airFor = "";
     let air: AirTable | null = null;
 
-    sharedMoonMaps ??= loadMoonMaps(device, MOON_MAPS.small);
+    sharedMoonMaps ??= loadMoonMaps(device, MOON_MAPS["512"]);
     sharedMoonMaps.then((loaded) => {
         moonMaps = loaded;
         moonPass?.pass.destroy();
@@ -194,7 +194,14 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
     function buildMoon(key: string, { toneMap, nightVision }: StarsFrame) {
         if (moonBuilding === key) return;
         moonBuilding = key;
-        createMoonPass(device, { format: SDR, toneMap, maps: moonMaps, nightVision, samples: 4 }).then((pass) => {
+        createMoonPass(device, {
+            format: SDR,
+            toneMap,
+            background: true,
+            maps: moonMaps,
+            nightVision,
+            samples: 4,
+        }).then((pass) => {
             if (moonBuilding !== key) return pass.destroy();
             moonPass?.pass.destroy();
             moonPass = { pass, key };

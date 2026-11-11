@@ -18,9 +18,9 @@ other package at runtime: the astronomy comes in as directions and angles, from
 - **The light**: the Sun's illuminance at the Moon in lux times the surface's reflectance. Hapke's 2012 model with Sato
   et al.'s 2014 parameters (a two-lobed phase function, a shadow hiding surge, multiple scattering and the shadows of a
   rough surface) follows the measured Moon (ROLO, Kieffer & Stone 2005) within a fifth of a stop from full to 97°, and
-  keeps the full Moon as bright at its edge as in its middle. Hapke's law of 1963 after Jensen et al. 2001
-  (`law: "hapke"`), as osgHimmel had it, Lambert's and Oren-Nayar's are offered to compare. A
-  point seen straight on at opposition reflects its normal albedo like a Lambert surface, so a full Moon of geometric
+  keeps the full Moon as bright at its edge as in its middle. The law is a WGSL snippet of its own, one function,
+  `ngReflectance`, and `reflectance` on the pass takes another in its place: `wgsl.hapke1963`, Hapke's law of 1963
+  after Jensen et al. 2001, as osgHimmel had it, or one of your own. A point seen straight on at opposition reflects its normal albedo like a Lambert surface, so a full Moon of geometric
   albedo 0.12 in 128,000 lux is some 4,900 cd/m² before the air, as measured.
 - **Earthshine**, Earth's illuminance at the Moon in lux: `earthshineIlluminance` gives it from Earth's phase as the
   Moon sees it, some 13 lux for a full Earth, a ten thousandth of the Sun.
@@ -54,8 +54,6 @@ other package at runtime: the astronomy comes in as directions and angles, from
   the cells shrinking with it, blue lifted over red by a hundredth of the refraction. `shimmerScales` gives the numbers.
 - **Night vision**: `nightVision` on the pass turns the composed Moon and sky into what the eye sees, helldunkel's
   blue shift for the rods: the moonlit sky blue, the disc, far brighter, as it is.
-- **A comparison**: `compare` holds the disc against another law and stripes the pixels more than a third of a
-  stop off it, red where brighter, blue where darker, as a camera stripes what clips.
 - **The color**: the map scaled to normal albedo and tinted to the Moon's own color, B-V 0.92, its variations kept;
   `mapColor` reads it as published or as gray instead.
 - **Cheap**: one ray per pixel by default (`samples`), four along the terminator and a displaced limb
@@ -71,18 +69,18 @@ other package at runtime: the astronomy comes in as directions and angles, from
 
 ## The maps
 
-`pnpm maps <outDir>` makes them from NASA's [CGI Moon Kit](https://svs.gsfc.nasa.gov/4720): the color map of
-December 2025, from the LROC wide angle camera's Hapke-normalized mosaic, as WebP, and a height map from the LOLA
-elevation map at 64 texels per degree, LOLA's 16-bit half meters in a lossless WebP's red and green, each 4096, 1024
-and 512 texels around. The package ships them in `maps/`, as `MOON_MAPS.large` (11.5 MB), `medium` (840 KB) and
-`small` (230 KB), resolved by `new URL(..., import.meta.url)`, which bundlers copy along: a disc shows a map
-`mapWidthFor(pixels)`, π times its width, at one texel per pixel, so `small` does up to a disc of some 160 pixels,
-`medium` to some 330. All equirectangular, centered on 0° longitude, east to the right, north up; the pass reads them
-that way, the heights turned on the GPU into heights and slopes with mip levels. The color map is balanced to look
-right, not to measure, and nearly neutral: `createMoonMaps` takes the near side's mean color the script prints, scales
-the map to normal albedo, so the drawn disc averages the geometric albedo, and tints it to `MOON_COLOR`, the Moon's
-B-V of 0.92, a warm gray; `MOON_MAPS` carries the mean along. `loadMoonMaps` loads `MOON_MAPS.large` by default, or any
-set laid out the same way.
+`pnpm maps <outDir>` makes them from NASA's [CGI Moon Kit](https://svs.gsfc.nasa.gov/4720): the color map of December
+2025, from the LROC wide angle camera's Hapke-normalized mosaic, as WebP, and a height map from the LOLA elevation map
+at 64 texels per degree, LOLA's 16-bit half meters in a lossless WebP's red and green, each 4096, 2048, 1024 and 512
+texels around. The package ships them in `maps/`, as `MOON_MAPS["4k"]` (11.5 MB), `"2k"` (3.1 MB), `"1k"` (840 KB) and
+`"512"` (230 KB), resolved by `new URL(..., import.meta.url)`, which bundlers copy along: a disc shows a map
+`mapWidthFor(pixels)`, π times its width, at one texel per pixel, so `"512"` does up to a disc of some 160 pixels,
+`"1k"` to some 330, `"2k"` to some 650. All equirectangular, centered on 0° longitude, east to the right, north up; the
+pass reads them that way, the heights turned on the GPU into heights and slopes with mip levels. The color map is
+balanced to look right, not to measure, and nearly neutral: `createMoonMaps` takes the near side's mean color the script
+prints, scales the map to normal albedo, so the drawn disc averages the geometric albedo, and tints it to `MOON_COLOR`,
+the Moon's B-V of 0.92, a warm gray; `MOON_MAPS` carries the mean along. `loadMoonMaps` loads `MOON_MAPS["4k"]` by
+default, or any set laid out the same way.
 
 ## Use
 
@@ -96,8 +94,9 @@ import {
     moonOrientation,
 } from "@himmelszelt/nachtgestirn";
 
-const maps = await loadMoonMaps(device, MOON_MAPS.medium);
-const pass = await createMoonPass(device, { format: "rgba8unorm", maps });
+const maps = await loadMoonMaps(device, MOON_MAPS["1k"]);
+// The Moon alone, linear and premultiplied, into an rgba16float target, for your compositor.
+const pass = await createMoonPass(device, { maps });
 
 // Per frame, from your astronomy (here sternzeit's, time and observer as its functions take them):
 pass.update({
@@ -114,14 +113,17 @@ pass.update({
     inverseViewProjection, // as dunstkreis' sky pass takes it
     ev100: moonEV100(moon.phaseAngle(jde), moon.illuminatedFraction(jde)), // a sunlit rock, some 14 at full Moon
 });
-pass.encode(encoder, target, { background: skyInCdPerM2 });
+pass.encode(encoder, target);
 ```
 
 Directions are ENU, x east, y north, z up, as in every himmelszelt package; a y-up engine converts with `(x, z, -y)`.
-With `background: false` the pass writes the Moon alone, premultiplied, its coverage of each pixel in alpha, for a
-renderer that composites itself; with `toneMap: false` it writes the exposed luminance, linear. Add the Moon to the
-sky, don't lay it over: the sky's light is the air's, in front of the Moon, so it stays. Only what lies behind the
-Moon, the stars, is covered, times one minus alpha.
+By default the pass writes the Moon alone, its exposed light linear and premultiplied, its coverage of each pixel in
+alpha. Add the Moon to the sky, don't lay it over: the sky's light is the air's, in front of the Moon, so it stays.
+Only what lies behind the Moon, the stars, is covered, times one minus alpha. With `background: true` the pass does it
+itself, over a sky in cd/m² (`pass.encode(encoder, target, { background })`), and with `toneMap: "neutral"` and an
+rgba8unorm target it shows on a canvas by itself. What a frame leaves out, the pass leaves out of its shader: a
+pipeline is made for each set of features a frame draws, in the background, the one for every frame drawing until it
+is ready.
 
 ## Tests
 

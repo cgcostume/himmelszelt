@@ -53,7 +53,7 @@ export function photoFigure(root: HTMLElement) {
     if (!tiles) noGpu(canvas);
     pair.style.setProperty("--photo-cut", `${CUT * 100}%`);
     // The finest maps the GPU holds: the 8K where it takes textures that wide, else the 4K.
-    const finest = (shared.device?.limits.maxTextureDimension2D ?? 0) >= 8192 ? "8k" : "large";
+    const finest = (shared.device?.limits.maxTextureDimension2D ?? 0) >= 8192 ? "8k" : "4k";
     const resolution = mapResolutions(root, finest, requestRender);
     const stage = find("[data-field=stage]", root);
     const fullscreen = find("[data-field=fullscreen]", root);

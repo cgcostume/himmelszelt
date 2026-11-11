@@ -12,19 +12,24 @@ import { planShadows, type ShadowWindow, shadowsHold } from "./shadows.js";
 import { typicalUmbra, UMBRA_SAMPLES } from "./umbra.js";
 import * as wgsl from "./wgsl/index.js";
 
+/**
+ * How a Moon pass is made. Everything has a default: `createMoonPass(device, { maps })` draws the Moon alone, linear
+ * and premultiplied with its coverage in alpha, into an rgba16float target, for a renderer that composites, tone maps
+ * and encodes the whole frame itself.
+ */
 export interface MoonPassOptions {
-    /** Format of the target `encode` writes, with `STORAGE_BINDING` usage: rgba8unorm for a display, bgra8unorm with
-     *  "bgra8unorm-storage", rgba16float or rgba32float for linear output or an HDR canvas. */
-    format: GPUTextureFormat;
-    /** Tone map for a display, as dunstkreis' sky pass: "neutral" by default, "agx", "aces", "clip"; `false` writes the
-     *  exposed luminance, linear. */
+    /** Format of the target `encode` writes, with `STORAGE_BINDING` usage: rgba16float by default, rgba32float, or
+     *  rgba8unorm for a display, bgra8unorm with "bgra8unorm-storage", with `toneMap`. */
+    format?: GPUTextureFormat;
+    /** Tone map for a display, as dunstkreis' sky pass: "neutral", "agx", "aces", "clip"; false by default, the exposed
+     *  luminance, linear. */
     toneMap?: ToneCurve | false;
     /** How many times SDR white an HDR display shows, 1 by default. */
     headroom?: number;
     /** Dither the tone mapped output against banding, by default for an 8-bit target only. */
     dither?: boolean;
-    /** Whether `encode` composes over a background in cd/m², true by default. Without, it writes the Moon alone,
-     *  premultiplied, with its coverage of each pixel in alpha, for a renderer that composites itself. */
+    /** Whether `encode` composes over a background in cd/m², false by default: the Moon alone, premultiplied, with its
+     *  coverage of each pixel in alpha, for a renderer that composites itself. */
     background?: boolean;
     /** The Moon's maps, from `createMoonMaps`; without, a uniform disc of the geometric albedo. */
     maps?: MoonMaps | null;
@@ -60,6 +65,11 @@ export interface MoonPassOptions {
      *  its levels; "anisotropic", the default, up to sixteen taps along the footprint, and by a cubic B-spline where the
      *  maps are magnified. */
     filter?: MapFilter;
+    /** The reflectance law, as WGSL that defines `fn ngReflectance(mu0: f32, mu: f32, cosG: f32) -> f32`: luminance over
+     *  the illuminance arriving along the light, for normal albedo 1, from the cosines of the angles of incidence,
+     *  emission and phase. By default `wgsl.reflectance`, Hapke's 2012 model with Sato et al.'s 2014 lunar parameters,
+     *  which follows the measured Moon within a fifth of a stop. Another law to compare it with is a snippet of its own. */
+    reflectance?: string;
 }
 
 export type MapFilter = "nearest" | "bilinear" | "trilinear" | "anisotropic";
@@ -150,23 +160,11 @@ export interface MoonParams {
     albedoMap: boolean;
     relief: boolean;
     shadows: boolean;
-    /** The reflectance law: Hapke's 2012 model with Sato et al.'s 2014 parameters, shadow hiding, multiple scattering
-     *  and roughness, the default, which follows the measured Moon (ROLO) within a fifth of a stop; Hapke's lunar law
-     *  of 1963 after Jensen et al. 2001, as osgHimmel had it; or Lambert's or Oren-Nayar's, to see what they get wrong:
-     *  a limb darkened like a ball's, a half Moon that fades into its terminator. */
-    law: "hapke" | "hapke2012" | "lambert" | "orenNayar";
     /** How the color map is read: tinted to the Moon's own color, the default; as published, the map's own, nearly
      *  neutral color; or as gray, its luminance alone, the way most renderers use it. */
     mapColor: "tinted" | "untinted" | "gray";
-    /** A law to hold the disc against, or null: where the two differ by more than a third of a stop the pixel is
-     *  striped, red where `law` is brighter, blue where darker, as a camera stripes what clips, in four steps of
-     *  opacity from a third of a stop, two thirds, one and two stops off. For figures. */
-    compare: MoonParams["law"] | null;
-    /** Draw a point Sun's hard shadows and hold them against the Sun's half degree, false by default: striped as
-     *  `compare` stripes where they are brighter or darker than the soft shadows, the penumbrae a point Sun misses.
-     *  The same march finds both. With `compare` both at once. For figures. */
-    compareShadows: boolean;
-    /** Earth's shadow on the Moon, null for none. */
+    /** Earth's shadow on the Moon, null for none. The pass draws it only while the Moon touches the penumbra, and
+     *  leaves it out of the pipeline otherwise. */
     eclipse: EarthShadow | null;
     /** The Sun's angular diameter in degrees, for the penumbra's width. About 0.53. */
     sunAngularDiameter: number;
@@ -209,6 +207,7 @@ export interface MoonPass {
 }
 
 const DEG = Math.PI / 180;
+const LUMINANCE = [0.2126, 0.7152, 0.0722];
 // The Moon alone for the shimmer to move about: its light, linear, and its coverage.
 const LAYER_FORMAT: GPUTextureFormat = "rgba16float";
 
@@ -216,17 +215,17 @@ const LAYER_FORMAT: GPUTextureFormat = "rgba16float";
 // between the relief's texels, where the march from each of the map's texels starts, and would show their stairs.
 const SHADOW_SUBTEXELS = 4;
 
-/** The shadow map's format: the share of the Sun's disc a texel sees, and a point Sun's, filtered when read. */
+/** The shadow map's format: the share of the Sun's disc a texel sees, in red, filtered when read. */
 const SHADOW_FORMAT: GPUTextureFormat = "rgba8unorm";
 const EIGHT_BIT = ["rgba8unorm", "bgra8unorm"];
 const TONE_CURVES: Record<string, number> = { neutral: 1, agx: 2, aces: 3, clip: 4 };
-/** Byte size of NgParams in params.wgsl: a mat4x4, a mat3x3 of three padded columns, twelve vec4-sized rows, the
- *  refraction table's eight, the albedo's tint and the table's transmittances, a vec4 each, the umbra's table, the
- *  detail strip, the shimmer and the shadow map's window. */
-export const PARAMS_SIZE = 912 + UMBRA_SAMPLES * 16 + 32 + 48 + 16;
-const UMBRA_OFFSET = 912 / 4;
+/** Byte size of NgParams in params.wgsl: 25 rows of 16 bytes. */
+export const PARAMS_SIZE = 400;
+/** Byte size of NgTables in params.wgsl: the bends four to a row, the air's transmittances and the umbra's table. */
+export const TABLES_SIZE = (REFRACTION_SAMPLES / 4 + REFRACTION_SAMPLES + UMBRA_SAMPLES) * 16;
 const DEFAULT_UMBRA = typicalUmbra();
-const LAW_INDEX: Record<MoonParams["law"], number> = { hapke: 0, lambert: 1, orenNayar: 2, hapke2012: 3 };
+/** The flags of NgParams, as params.wgsl names them NG_FLAG_*. */
+const FLAG = { color: 1, relief: 2, shadows: 4, displace: 8, earthshine: 16, air: 32, eclipse: 64 } as const;
 
 const DEFAULTS: MoonParams = {
     direction: [0, 0, 1],
@@ -244,10 +243,7 @@ const DEFAULTS: MoonParams = {
     albedoMap: true,
     relief: true,
     shadows: true,
-    law: "hapke2012",
     mapColor: "tinted",
-    compare: null,
-    compareShadows: false,
     eclipse: null,
     sunAngularDiameter: 0.533,
     refraction: null,
@@ -262,109 +258,128 @@ export interface MoonDetail {
     displace: boolean;
 }
 
+/** Whether the Moon touches Earth's penumbra, with a little room: the eclipse is drawn only then. */
+function inPenumbra({ axis, moonCenterKm, penumbraKm }: EarthShadow) {
+    const along = moonCenterKm[0] * axis[0] + moonCenterKm[1] * axis[1] + moonCenterKm[2] * axis[2];
+    const across = Math.hypot(...moonCenterKm.map((c, i) => c - along * (axis[i] ?? 0)));
+    return along > 0 && across < 1.02 * (penumbraKm + MOON_RADIUS_KM);
+}
+
 /** Packs `params` as NgParams, for a consumer's own pipeline as much as for the pass: without `detail`, no shadows and
  *  no displacement, which need the pass' shadow map and its view of the disc. */
 export function paramsData(params: MoonParams, maps: MoonMaps | null, detail?: MoonDetail): ArrayBuffer {
     const data = new ArrayBuffer(PARAMS_SIZE);
     const f = new Float32Array(data);
     const u = new Uint32Array(data);
+
+    // The camera and the Moon.
     f.set(params.inverseViewProjection, 0);
     for (let col = 0; col < 3; col++) f.set(params.orientation.subarray(col * 3, col * 3 + 3), 16 + col * 4);
     f.set(params.direction, 28);
     f[31] = (params.angularDiameter / 2) * DEG;
+
+    // The light: Earth's center from the Moon's, the observer on Earth's surface straight above it, unless given.
     f.set(params.sunDirection, 32);
     f[35] = params.sunIlluminance;
-    f.set(params.transmittance, 36);
+    const [dx, dy, dz] = params.direction;
+    const d = params.distanceKm;
+    const earth = params.earthDirection ?? [-dx * d, -dy * d, -dz * d - EARTH_RADIUS_KM];
+    const earthLength = Math.hypot(...earth);
+    f.set(
+        earth.map((c) => c / earthLength),
+        36,
+    );
     f[39] = params.earthshine;
-    const { eclipse } = params;
-    f.set(eclipse?.axis ?? [0, 0, -1], 40);
+    f.set(params.transmittance, 40);
     f[43] = params.projectionDistance;
-    f.set(eclipse?.moonCenterKm ?? [0, 0, 384_400], 44);
-    f[47] = eclipse?.umbraKm ?? 0;
-    f[48] = eclipse?.penumbraKm ?? 0;
-    f[49] = (params.sunAngularDiameter / 2) * DEG;
-    f[50] = EARTH_RADIUS_KM;
-    f[51] = MOON_RADIUS_KM;
-    f[52] = 1 / (1.2 * 2 ** params.ev100);
-    // The table's horizon, where the air's rays end on the ground, if it is higher than the one given.
-    f[53] = Math.max(params.horizonZ, params.refraction ? Math.sin(params.refraction.horizon) : -1);
-    f[54] = maps?.albedoScale ?? 1;
-    f[55] = 0.12;
+
+    // The exposure, the horizon, the table's own where it is higher than the one given, and the radii.
+    const { refraction, eclipse, shimmer } = params;
+    f[44] = 1 / (1.2 * 2 ** params.ev100);
+    f[45] = Math.max(params.horizonZ, refraction ? Math.sin(refraction.horizon) : -1);
+    f[46] = MOON_RADIUS_KM;
+    f[47] = (params.sunAngularDiameter / 2) * DEG;
+
+    // The color map made normal albedo: scaled, and tinted to the Moon's color, as published, or gray.
+    const scale = maps?.albedoScale ?? 1;
+    const tint = params.mapColor === "tinted" ? (maps?.albedoTint ?? [1, 1, 1]) : [1, 1, 1];
+    for (let col = 0; col < 3; col++) {
+        for (let row = 0; row < 3; row++) {
+            const gray = (LUMINANCE[col] ?? 0) * scale;
+            f[48 + col * 4 + row] = params.mapColor === "gray" ? gray : row === col ? scale * (tint[row] ?? 1) : 0;
+        }
+    }
+    f[60] = 0.12;
+
+    // What the frame draws.
     const relief = params.relief && maps?.relief;
-    const air = params.refraction?.transmittances;
-    u[56] =
-        (params.albedoMap && maps ? 1 : 0) |
-        (relief ? 2 : 0) |
-        (eclipse ? 4 : 0) |
-        (relief && params.shadows && detail?.shadows ? 8 : 0) |
-        (air ? 16 : 0) |
-        (params.mapColor === "gray" ? 32 : 0) |
-        (params.mapColor === "untinted" ? 64 : 0) |
-        (params.compare ? 128 : 0) |
-        (params.shimmer ? 256 : 0) |
-        (relief && detail?.displace ? 512 : 0) |
-        (params.compareShadows ? 1024 : 0);
-    u[57] = LAW_INDEX[params.law];
-    u[99] = params.compare ? LAW_INDEX[params.compare] : 0;
-    f[58] = eclipse?.umbraLight ?? 1;
-    const { refraction } = params;
-    f[59] = refraction?.step ?? 0;
-    f[63] = refraction?.from ?? 0;
-    if (refraction) f.set(refraction.bends.subarray(0, REFRACTION_SAMPLES), 64);
-    f.set(maps?.albedoTint ?? [1, 1, 1], 96);
-    if (air) for (let i = 0; i < REFRACTION_SAMPLES; i++) f.set(air.subarray(i * 3, i * 3 + 3), 100 + i * 4);
-    f.set((eclipse?.refracted ?? DEFAULT_UMBRA).subarray(0, UMBRA_SAMPLES * 4), UMBRA_OFFSET);
-    f.set(maps?.detail?.region ?? [0, 0, 0, 0], UMBRA_OFFSET + UMBRA_SAMPLES * 4);
-    const { shimmer } = params;
+    u[61] =
+        (params.albedoMap && maps ? FLAG.color : 0) |
+        (relief ? FLAG.relief : 0) |
+        (relief && params.shadows && detail?.shadows ? FLAG.shadows : 0) |
+        (relief && detail?.displace ? FLAG.displace : 0) |
+        (params.earthshine > 0 ? FLAG.earthshine : 0) |
+        (refraction ? FLAG.air : 0) |
+        (eclipse && inPenumbra(eclipse) ? FLAG.eclipse : 0);
+
+    // The shadow map's window, and the detail strip.
+    const window = detail?.shadows;
+    if (window) {
+        f.set([...window.sun, window.texel, ...window.east, window.longitude], 64);
+        f.set([window.theta, window.width, window.height, (window.sunDiameter / 2) * DEG], 72);
+    }
+    f.set(maps?.detail?.region ?? [0, 0, 0, 0], 76);
+
+    // Earth's shadow, and the air's table.
+    f.set(eclipse?.axis ?? [0, 0, -1], 80);
+    f[83] = eclipse?.umbraLight ?? 1;
+    f.set(eclipse?.moonCenterKm ?? [0, 0, 384_400], 84);
+    f[87] = eclipse?.penumbraKm ?? 0;
+    f[88] = EARTH_RADIUS_KM;
+    f[89] = refraction?.from ?? 0;
+    f[90] = refraction?.step ?? 1;
+
+    // The shimmer: Kasten and Young's airmass and Bennett's refraction at the Moon's apparent altitude, where not given.
     if (shimmer) {
-        // Kasten and Young's airmass, Bennett's refraction, at the Moon's apparent altitude, where not given.
         const h = (Math.asin(Math.max(-1, Math.min(1, params.direction[2]))) * 180) / Math.PI;
         const airmass =
             1 / (Math.max(Math.sin((h * Math.PI) / 180), 0) + 0.50572 * Math.max(h + 6.07995, 0.1) ** -1.6364);
         const bennett =
             ((1 / Math.tan(((Math.max(h, -1) + 7.31 / (Math.max(h, -1) + 4.4)) * Math.PI) / 180)) * Math.PI) / 10_800;
         const { tilt, cell, drift } = shimmerScales(shimmer, shimmer.airColumn ?? airmass);
-        f.set(
-            [tilt, shimmer.time, (shimmer.bend ?? bennett) * shimmer.dispersion, cell],
-            UMBRA_OFFSET + UMBRA_SAMPLES * 4 + 4,
-        );
-        f.set([shimmer.motion ?? 1, shimmer.boiling ?? 1, drift], UMBRA_OFFSET + UMBRA_SAMPLES * 4 + 20);
+        f.set([tilt, shimmer.time, (shimmer.bend ?? bennett) * shimmer.dispersion, cell], 92);
+        f.set([shimmer.motion ?? 1, shimmer.boiling ?? 1, drift], 96);
     }
-    const window = detail?.shadows;
-    if (window) {
-        const at = UMBRA_OFFSET + UMBRA_SAMPLES * 4 + 8;
-        f.set(
-            [
-                ...window.sun,
-                window.texel,
-                ...window.east,
-                window.longitude,
-                window.theta,
-                window.width,
-                window.height,
-                (window.sunDiameter / 2) * DEG,
-            ],
-            at,
-        );
+    return data;
+}
+
+/** Packs the tables of `params` as NgTables: the air's bends and transmittances, the latter `transmittance` where the
+ *  table has none, and the umbra's light. */
+export function tablesData(params: MoonParams): ArrayBuffer {
+    const data = new ArrayBuffer(TABLES_SIZE);
+    const f = new Float32Array(data);
+    const { refraction, eclipse } = params;
+    const transmittances = REFRACTION_SAMPLES / 4;
+    if (refraction) {
+        f.set(refraction.bends.subarray(0, REFRACTION_SAMPLES), 0);
+        for (let i = 0; i < REFRACTION_SAMPLES; i++) {
+            const through = refraction.transmittances?.subarray(i * 3, i * 3 + 3) ?? params.transmittance;
+            f.set(through, (transmittances + i) * 4);
+        }
     }
-    // Earth's center from the Moon's, the observer on Earth's surface straight above it, unless given.
-    const [dx, dy, dz] = params.direction;
-    const d = params.distanceKm;
-    const earth = params.earthDirection ?? [-dx * d, -dy * d, -dz * d - EARTH_RADIUS_KM];
-    const length = Math.hypot(earth[0] ?? 0, earth[1] ?? 0, earth[2] ?? 0);
     f.set(
-        earth.map((c) => c / length),
-        60,
+        (eclipse?.refracted ?? DEFAULT_UMBRA).subarray(0, UMBRA_SAMPLES * 4),
+        (transmittances + REFRACTION_SAMPLES) * 4,
     );
     return data;
 }
 
-export async function createMoonPass(device: GPUDevice, options: MoonPassOptions): Promise<MoonPass> {
+export async function createMoonPass(device: GPUDevice, options: MoonPassOptions = {}): Promise<MoonPass> {
     const {
-        format,
-        toneMap = "neutral",
+        format = "rgba16float",
+        toneMap = false,
         headroom = 1,
-        background = true,
+        background = false,
         maps = null,
         samples = 1,
         terminatorSamples = 4,
@@ -374,15 +389,19 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         displacementFrom = 1024,
         softShadowsFrom = 4096,
         shadowMapTexels = 4_194_304,
+        reflectance = wgsl.reflectance,
     } = options;
     if (!(Number.isInteger(samples) && samples >= 1)) throw new Error(`nachtgestirn: ${samples} rays per pixel`);
     if (!Number.isInteger(terminatorSamples)) throw new Error(`nachtgestirn: ${terminatorSamples} rays per pixel`);
     const dither = options.dither ?? (toneMap !== false && EIGHT_BIT.includes(format));
+    if (toneMap === false && EIGHT_BIT.includes(format)) {
+        console.warn(`nachtgestirn: linear light into ${format} clips and bands; set toneMap, or take rgba16float`);
+    }
     const storable = ["rgba8unorm", "rgba16float", "rgba32float"].includes(format);
     if (!storable && !(format === "bgra8unorm" && device.features.has("bgra8unorm-storage"))) {
         throw new Error(`nachtgestirn: the pass writes ${format} as a storage texture, which this device cannot`);
     }
-    const shared = [wgsl.params, wgsl.camera, wgsl.surface, wgsl.tonemap, wgsl.vision, wgsl.moon];
+    const shared = [wgsl.params, wgsl.surface, reflectance, wgsl.camera, wgsl.tonemap, wgsl.vision, wgsl.moon];
     const constants = {
         NG_TONE_MAP: toneMap === false ? 0 : (TONE_CURVES[toneMap] ?? 1),
         NG_HEADROOM: headroom,
@@ -392,6 +411,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         NG_TERMINATOR_SAMPLES: Math.max(terminatorSamples, samples),
         NG_NIGHT_VISION: nightVision ? 1 : 0,
         NG_MAP_BSPLINE: filter === "anisotropic" ? 1 : 0,
+        NG_DETAIL: maps?.detail ? 1 : 0,
     };
     // One layout for the inputs, which the Moon pass and the shadow map's share, and one for each one's output.
     const texture = (binding: number, sampleType: GPUTextureSampleType = "float"): GPUBindGroupLayoutEntry => ({
@@ -399,19 +419,30 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         visibility: GPUShaderStage.COMPUTE,
         texture: { sampleType },
     });
+    const uniformAt = (binding: number): GPUBindGroupLayoutEntry => ({
+        binding,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: "uniform" },
+    });
+    const samplerAt = (binding: number): GPUBindGroupLayoutEntry => ({
+        binding,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: {},
+    });
     const inputs = device.createBindGroupLayout({
         label: "nachtgestirn:inputs",
         entries: [
-            { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: "uniform" } },
-            texture(1),
+            uniformAt(0),
+            uniformAt(1),
             texture(2),
-            { binding: 3, visibility: GPUShaderStage.COMPUTE, sampler: { type: "filtering" } },
-            texture(4, "unfilterable-float"),
+            texture(3),
+            samplerAt(4),
             texture(5),
             texture(6),
             texture(7),
-            texture(8),
-            { binding: 9, visibility: GPUShaderStage.COMPUTE, sampler: { type: "filtering" } },
+            texture(8, "unfilterable-float"),
+            texture(9),
+            samplerAt(10),
         ],
     });
     const outputOf = (target: GPUTextureFormat) =>
@@ -457,6 +488,19 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         size: PARAMS_SIZE,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
+    // The tables, written only when they change: with the air towards the Moon, or an eclipse's umbra.
+    const tables = device.createBuffer({
+        label: "nachtgestirn:tables",
+        size: TABLES_SIZE,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    let tablesWritten = new Float32Array(0);
+    const writeTables = () => {
+        const next = new Float32Array(tablesData(params));
+        if (next.length === tablesWritten.length && next.every((v, i) => v === tablesWritten[i])) return;
+        device.queue.writeBuffer(tables, 0, next);
+        tablesWritten = next;
+    };
     // Bound where there is no map, no background or no shadow map: the bindings stay in the layout whatever the flags.
     const blank = device.createTexture({
         label: "nachtgestirn:blank",
@@ -515,27 +559,19 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
             options.onReady?.();
         });
     };
-    // Pipelines fixed to a frame's flags and laws, the rest left out, made in the background the first time a frame asks
-    // for them; until one is ready, the pipeline for everything draws.
+    // Pipelines fixed to a frame's flags, what they leave out left out of the shader, made in the background the first
+    // time a frame asks for them; until one is ready, the pipeline for every frame draws.
     const fixed = new Map<string, Awaited<ReturnType<typeof pipelineOf>> | null>();
     const fixedFor = (moonLayer: boolean, data: ArrayBuffer) => {
-        const [flags = 0, law = 0, compareLaw = 0] = [56, 57, 99].map((i) => new Uint32Array(data)[i]);
-        const key = `${moonLayer} ${flags} ${law} ${compareLaw}`;
+        const flags = new Uint32Array(data)[61] ?? 0;
+        const key = `${moonLayer} ${flags}`;
         if (!fixed.has(key)) {
             fixed.set(key, null);
-            const overrides = {
-                NG_FIXED: 1,
-                NG_FIXED_FLAGS: flags,
-                NG_FIXED_LAW: law,
-                NG_FIXED_COMPARE_LAW: compareLaw,
-            };
             const [target, label] = moonLayer
                 ? [LAYER_FORMAT, "nachtgestirn:moonLayer"]
                 : [format, "nachtgestirn:moon"];
-            pipelineOf(target, shared.join("\n"), "ngCompose", label, {
-                ...overrides,
-                NG_LAYER: moonLayer ? 1 : 0,
-            }).then(
+            const overrides = { NG_FIXED: 1, NG_FIXED_FLAGS: flags, NG_LAYER: moonLayer ? 1 : 0 };
+            pipelineOf(target, shared.join("\n"), "ngCompose", label, overrides).then(
                 (made) => fixed.set(key, made),
                 () => {},
             );
@@ -549,11 +585,13 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
     let shadowMap: GPUTexture | null = null;
     let made: ShadowWindow | null = null;
     device.queue.writeBuffer(uniform, 0, paramsData(params, maps, detail));
+    writeTables();
 
     return {
         update(patch) {
             Object.assign(params, patch);
             device.queue.writeBuffer(uniform, 0, paramsData(params, maps, detail));
+            writeTables();
         },
         encode(encoder, target, encodeOptions = {}) {
             // What the view asks of the relief: shadows from a size on, from a map kept while it serves, and displacement.
@@ -596,15 +634,16 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
                     layout: inputs,
                     entries: [
                         { binding: 0, resource: { buffer: uniform } },
-                        { binding: 1, resource: (maps?.color ?? blank).createView() },
-                        { binding: 2, resource: (relief ?? blank).createView() },
-                        { binding: 3, resource: sampler },
-                        { binding: 4, resource: (encodeOptions.background ?? noBackground).createView() },
+                        { binding: 1, resource: { buffer: tables } },
+                        { binding: 2, resource: (maps?.color ?? blank).createView() },
+                        { binding: 3, resource: (relief ?? blank).createView() },
+                        { binding: 4, resource: sampler },
                         { binding: 5, resource: (maps?.detail?.color ?? blank).createView() },
                         { binding: 6, resource: (maps?.detail?.relief ?? blank).createView() },
                         { binding: 7, resource: shadows.createView() },
-                        { binding: 8, resource: moonLayer.createView() },
-                        { binding: 9, resource: layerSampler },
+                        { binding: 8, resource: (encodeOptions.background ?? noBackground).createView() },
+                        { binding: 9, resource: moonLayer.createView() },
+                        { binding: 10, resource: layerSampler },
                     ],
                 });
             if (remake && shadowPass && shadowMap && made) {
@@ -667,6 +706,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         },
         destroy() {
             uniform.destroy();
+            tables.destroy();
             blank.destroy();
             noBackground.destroy();
             shadowMap?.destroy();

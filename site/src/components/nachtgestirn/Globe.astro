@@ -21,7 +21,7 @@ const { id = "globe" } = Astro.props;
         <div class="tiles-panel as-seen globe-panel">
             <canvas aria-label="The Moon at the chosen moment, lit by the Sun and by earthshine, to turn and zoom, rendered with WebGPU" title="Drag to turn the Moon, shift and drag to move the view, scroll to zoom; double click to see it from Earth again"></canvas>
             <span class="tiles-start">
-                <Resolutions options={WHOLE_RESOLUTIONS} chosen="large" />
+                <Resolutions options={WHOLE_RESOLUTIONS} chosen="4k" />
                 <span class="view-buttons">
                     <button type="button" class="view-icon" data-field="lock" aria-pressed="true" title="Seen from Earth: turns the Moon back to the face Earth sees; turning it lets go" aria-label="Moon lock"><Icon name="moonLock" /></button>
                     <button type="button" class="view-toggle" data-field="far" aria-pressed="false" title="The far side, which Earth never sees: the Moon turned half round, the Sun staying where it is; turning it lets go">far side</button>

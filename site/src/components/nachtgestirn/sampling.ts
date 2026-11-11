@@ -48,7 +48,7 @@ export function samplingFigure(root: HTMLElement) {
     const requestRender = onDemand(render, root);
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
-    const resolution = mapResolutions(root, "large", requestRender);
+    const resolution = mapResolutions(root, "4k", requestRender);
     const relief = find("[data-field=relief]", root);
     const shadows = find("[data-field=shadows]", root);
     const displace = find("[data-field=displace]", root);

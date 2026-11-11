@@ -20,7 +20,7 @@ const { id = "surface" } = Astro.props;
     <div class="tiles-panel as-seen split" style="--count: 5">
         <canvas aria-label="The Moon, and a close-up of its terminator drawn from the color map alone, with the relief, with the relief's shadows, and with the relief displaced, rendered with WebGPU"></canvas>
         <span class="tiles-start">
-            <Resolutions options={STRIP_RESOLUTIONS} chosen="large" />
+            <Resolutions options={STRIP_RESOLUTIONS} chosen="4k" />
             <span class="view-buttons"><button type="button" class="view-toggle" data-field="albedo" aria-pressed="true" title="NASA's color map of the Moon; off, a uniform surface of the Moon's albedo, so the relief and its shadows show alone">albedo</button></span>
             <span class="tiles-hint footnote">Rendered with WebGPU</span>
         </span>

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Makes the Moon's maps for a renderer from NASA's CGI Moon Kit (svs.gsfc.nasa.gov/4720): the color map of December
 // 2025, from the LROC WAC Hapke-normalized mosaic, and a height map from the LOLA elevation map at 64 pixels per
-// degree, each 4096, 1024 and 512 texels around (`mapWidthFor` says which a disc needs). Equirectangular, centered on
-// 0° longitude, east to the right, north up. Rerunnable: `node scripts/maps.mjs <outDir> [--cache <dir>]`. Needs
-// ImageMagick 7 (`magick`) with TIFF and WebP, and a few GB of memory for the elevation map. Downloads some 565 MB once
-// into the cache. Prints the near side's mean color, which `createMoonMaps` takes as `meanColor`, so that the drawn
-// disc averages the Moon's geometric albedo and color.
+// degree, each 4096, 2048, 1024 and 512 texels around (`mapWidthFor` says which a disc needs). Equirectangular,
+// centered on 0° longitude, east to the right, north up. Rerunnable: `node scripts/maps.mjs <outDir> [--cache <dir>]`.
+// Needs ImageMagick 7 (`magick`) with TIFF and WebP, and a few GB of memory for the elevation map. Downloads some 565
+// MB once into the cache. Prints the near side's mean color, which `createMoonMaps` takes as `meanColor`, so that the
+// drawn disc averages the Moon's geometric albedo and color.
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -15,6 +15,7 @@ const COLOR = "lroc_color_16bit_srgb_4k.tif";
 const DEM = "ldem_64_uint.tif";
 const SIZES = [
     ["4k", 4096],
+    ["2k", 2048],
     ["1k", 1024],
     ["512", 512],
 ];
@@ -128,8 +129,8 @@ writeFileSync(
 Made by \`pnpm --filter @himmelszelt/nachtgestirn maps\` from NASA's CGI Moon Kit (https://svs.gsfc.nasa.gov/4720),
 credit NASA's Scientific Visualization Studio: the color map of December 2025, from the LROC WAC Hapke-normalized
 mosaic, and a height map from the LOLA elevation map at 64 pixels per degree, LOLA's 16-bit half meters offset by
-20,000 over the mean radius of 1737.4 km, red the high byte and green the low one. Each 4096, 1024 and 512 texels
-around, equirectangular, centered on 0° longitude, east to the right, north up. Near side mean color, linear,
+20,000 over the mean radius of 1737.4 km, red the high byte and green the low one. Each 4096, 2048, 1024 and 512
+texels around, equirectangular, centered on 0° longitude, east to the right, north up. Near side mean color, linear,
 ${meanText}.
 `,
 );

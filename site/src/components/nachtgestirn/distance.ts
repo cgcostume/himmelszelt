@@ -35,7 +35,7 @@ export function distanceFigure(root: HTMLElement) {
             luts: table.luts,
             toneMap: display.toneCurve as ToneCurveName,
             // The 1K maps whatever the discs' size: the smallest ones "auto" picks for them look soft.
-            maps: "medium",
+            maps: "1k",
             ev100: null,
             albedo: true,
             relief: true,

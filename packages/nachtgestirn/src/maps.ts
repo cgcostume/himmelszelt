@@ -166,24 +166,31 @@ const SHIPPED = { meanReflectance: 0.396, meanColor: [0.4125, 0.3924, 0.3828] as
 
 /**
  * The maps the package ships, made by `pnpm maps` from NASA's CGI Moon Kit: the color map and the heights from LOLA's
- * 64 texels per degree, 512, 1024 or 4096 texels around, `small` 230 KB, for a disc up to some 160 pixels across,
- * `medium` 840 KB, up to some 330, `large` 11.5 MB, for zooming in (see `mapWidthFor`). Resolved next to the package's
- * own files, which bundlers that know `new URL(..., import.meta.url)` copy along.
+ * 64 texels per degree, by how many texels around: "512", 230 KB, for a disc up to 163 pixels across, "1k", 840 KB, up
+ * to 326, "2k", 3.1 MB, up to 652, and "4k", 11.5 MB, beyond, each as far as it gives a texel to a pixel at the disc's
+ * middle (`mapWidthFor`). Resolved next to the package's own files, which bundlers that know
+ * `new URL(..., import.meta.url)` copy along.
  */
-export const MOON_MAPS: { small: MoonMapFiles; medium: MoonMapFiles; large: MoonMapFiles } = {
-    small: {
+export const MOON_MAPS: Record<"512" | "1k" | "2k" | "4k", MoonMapFiles> = {
+    "512": {
         color: new URL("../maps/moon-color-512.webp", import.meta.url),
         heights: new URL("../maps/moon-height-512.webp", import.meta.url),
         width: 512,
         ...SHIPPED,
     },
-    medium: {
+    "1k": {
         color: new URL("../maps/moon-color-1k.webp", import.meta.url),
         heights: new URL("../maps/moon-height-1k.webp", import.meta.url),
         width: 1024,
         ...SHIPPED,
     },
-    large: {
+    "2k": {
+        color: new URL("../maps/moon-color-2k.webp", import.meta.url),
+        heights: new URL("../maps/moon-height-2k.webp", import.meta.url),
+        width: 2048,
+        ...SHIPPED,
+    },
+    "4k": {
         color: new URL("../maps/moon-color-4k.webp", import.meta.url),
         heights: new URL("../maps/moon-height-4k.webp", import.meta.url),
         width: 4096,
@@ -193,12 +200,12 @@ export const MOON_MAPS: { small: MoonMapFiles; medium: MoonMapFiles; large: Moon
 
 /**
  * Fetches and decodes a set of maps, as a browser does, and uploads them: `createMoonMaps` with the images. The
- * package's own large set by default. `onProgress` hears how many bytes of all the files have come, of how many, once
+ * package's own 4K set by default. `onProgress` hears how many bytes of all the files have come, of how many, once
  * every file has said its size.
  */
 export async function loadMoonMaps(
     device: GPUDevice,
-    files: MoonMapFiles = MOON_MAPS.large,
+    files: MoonMapFiles = MOON_MAPS["4k"],
     options: LoadMoonMapsOptions = {},
 ): Promise<MoonMaps> {
     const { onProgress, ...rest } = options;
@@ -304,7 +311,7 @@ function decodeRelief(
         compute(
             device,
             "nachtgestirn:relief",
-            [wgsl.moonOutput("rgba16float"), wgsl.params, wgsl.surface, wgsl.relief].join("\n"),
+            [wgsl.moonOutput("rgba16float"), wgsl.surface, wgsl.relief].join("\n"),
             "ngRelief",
             constants,
         ),
@@ -320,7 +327,7 @@ function buildMips(device: GPUDevice, texture: GPUTexture, format: GPUTextureFor
         compute(
             device,
             "nachtgestirn:mips",
-            [wgsl.moonOutput(format), wgsl.params, wgsl.surface, wgsl.mips].join("\n"),
+            [wgsl.moonOutput(format), wgsl.surface, wgsl.mips].join("\n"),
             "ngDownsample",
             { NG_MIP_SRGB: srgb ? 1 : 0 },
         ),

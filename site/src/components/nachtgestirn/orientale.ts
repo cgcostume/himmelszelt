@@ -76,7 +76,7 @@ export function orientaleFigure(root: HTMLElement) {
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
     // The basin lies in the 8K strip of the southern highlands, where the GPU takes textures that wide.
-    const maps = (gpu.device?.limits.maxTextureDimension2D ?? 0) >= 8192 ? "8k-strip" : "large";
+    const maps = (gpu.device?.limits.maxTextureDimension2D ?? 0) >= 8192 ? "8k-strip" : "4k";
 
     function render() {
         const table = tables();

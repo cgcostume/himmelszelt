@@ -22,58 +22,66 @@ fn ngEncodeBc1(@builtin(global_invocation_id) id: vec3u) {
     if (id.x >= blocks.x || id.y >= blocks.y) {
         return;
     }
-    let stride = (blocks.x * 8u + 255u) / 256u * 32u;
+
+    // The block's sixteen texels, their box and their mean.
     var texels: array<vec3f, 16>;
-    var lo = vec3f(1.0);
-    var hi = vec3f(0.0);
+    var low = vec3f(1.0);
+    var high = vec3f(0.0);
     var mean = vec3f(0.0);
     for (var i = 0u; i < 16u; i = i + 1u) {
-        let t = textureLoad(ngBlockSource, min(id.xy * 4u + vec2u(i & 3u, i >> 2u), size - 1u), 0).rgb;
-        texels[i] = t;
-        lo = min(lo, t);
-        hi = max(hi, t);
-        mean = mean + t / 16.0;
+        let texel = textureLoad(ngBlockSource, min(id.xy * 4u + vec2u(i & 3u, i >> 2u), size - 1u), 0).rgb;
+        texels[i] = texel;
+        low = min(low, texel);
+        high = max(high, texel);
+        mean = mean + texel / 16.0;
     }
+
     // The box's diagonal turned to follow the texels: red or blue falling as green rises runs the other way.
-    var along = vec3f(0.0);
+    var withGreen = vec3f(0.0);
     for (var i = 0u; i < 16u; i = i + 1u) {
-        let d = texels[i] - mean;
-        along = along + d * d.g;
+        let offset = texels[i] - mean;
+        withGreen = withGreen + offset * offset.g;
     }
-    var a = hi;
-    var b = lo;
-    if (along.r < 0.0) {
-        a.r = lo.r;
-        b.r = hi.r;
+    var first = high;
+    var second = low;
+    if (withGreen.r < 0.0) {
+        first.r = low.r;
+        second.r = high.r;
     }
-    if (along.b < 0.0) {
-        a.b = lo.b;
-        b.b = hi.b;
+    if (withGreen.b < 0.0) {
+        first.b = low.b;
+        second.b = high.b;
     }
-    let inset = (a - b) / 16.0;
-    var c0 = ngPack565(a - inset);
-    var c1 = ngPack565(b + inset);
-    // The first color the larger, for the four-color mode.
-    if (c0 < c1) {
-        let swap = c0;
-        c0 = c1;
-        c1 = swap;
+
+    // Its ends, inset by a sixteenth, in 5:6:5: the larger first, for the four-color mode.
+    let inset = (first - second) / 16.0;
+    var color0 = ngPack565(first - inset);
+    var color1 = ngPack565(second + inset);
+    if (color0 < color1) {
+        let swap = color0;
+        color0 = color1;
+        color1 = swap;
     }
-    let at = id.y * stride + id.x;
-    if (c0 == c1) {
-        ngBlocks[at] = vec2u(c0 | (c1 << 16u), 0u);
+    // Rows of blocks padded to 256 bytes, 32 blocks of 8, for the copy into the texture.
+    let stride = (blocks.x * 8u + 255u) / 256u * 32u;
+    let block = id.y * stride + id.x;
+    let ends = color0 | (color1 << 16u);
+    if (color0 == color1) {
+        ngBlocks[block] = vec2u(ends, 0u);
         return;
     }
-    let e0 = ngUnpack565(c0);
-    let e1 = ngUnpack565(c1);
-    let palette = array<vec3f, 4>(e0, e1, mix(e0, e1, 1.0 / 3.0), mix(e0, e1, 2.0 / 3.0));
+
+    // Each texel the nearest of the four colors on the line between the ends, two bits each.
+    let end0 = ngUnpack565(color0);
+    let end1 = ngUnpack565(color1);
+    let palette = array<vec3f, 4>(end0, end1, mix(end0, end1, 1.0 / 3.0), mix(end0, end1, 2.0 / 3.0));
     var indices = 0u;
     for (var i = 0u; i < 16u; i = i + 1u) {
         var best = 0u;
         var nearest = 1e9;
         for (var k = 0u; k < 4u; k = k + 1u) {
-            let d = texels[i] - palette[k];
-            let distance = dot(d, d);
+            let offset = texels[i] - palette[k];
+            let distance = dot(offset, offset);
             if (distance < nearest) {
                 nearest = distance;
                 best = k;
@@ -81,5 +89,5 @@ fn ngEncodeBc1(@builtin(global_invocation_id) id: vec3u) {
         }
         indices = indices | (best << (2u * i));
     }
-    ngBlocks[at] = vec2u(c0 | (c1 << 16u), indices);
+    ngBlocks[block] = vec2u(ends, indices);
 }

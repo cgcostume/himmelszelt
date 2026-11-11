@@ -27,7 +27,7 @@ export function softShadowsFigure(root: HTMLElement) {
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
     // The 8K strip where the GPU takes textures that wide, else the 4K.
-    const finest = (gpu.device?.limits.maxTextureDimension2D ?? 0) >= 8192 ? "8k-strip" : "large";
+    const finest = (gpu.device?.limits.maxTextureDimension2D ?? 0) >= 8192 ? "8k-strip" : "4k";
     const resolution = mapResolutions(root, finest, requestRender);
 
     // The color map, or a uniform albedo for the relief alone; and the hard shadows striped where they are off the soft.

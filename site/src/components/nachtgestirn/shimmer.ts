@@ -90,7 +90,7 @@ export function shimmerFigure(root: HTMLElement) {
     const requestRender = onDemand(render, root);
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
-    const resolution = mapResolutions(root, "large", requestRender);
+    const resolution = mapResolutions(root, "4k", requestRender);
     const pressed = (button: Element) => button.getAttribute("aria-pressed") === "true";
     const parts = [...root.querySelectorAll<HTMLElement>("[data-part]")];
     const r0s = [...root.querySelectorAll<HTMLElement>("[data-r0]")];

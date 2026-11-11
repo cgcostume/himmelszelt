@@ -5,10 +5,10 @@ type Choice = Exclude<MapSize, "auto">;
 
 /** What each set is called in a figure's status line. */
 export const RESOLUTION_NAMES: Record<Choice, string> = {
-    small: "512 maps",
-    medium: "1K maps",
-    large: "4K maps",
+    "512": "512 maps",
+    "1k": "1K maps",
     "2k": "2K maps",
+    "4k": "4K maps",
     "8k": "8K maps",
     "8k-strip": "8K strip over the 4K maps",
 };

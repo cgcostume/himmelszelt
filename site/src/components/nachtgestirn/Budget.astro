@@ -3,10 +3,11 @@ import "../sternzeit/sternzeit.css";
 import "./nachtgestirn.css";
 
 /**
- * What the pass costs and what its defaults miss, for discs just under each of its thresholds: its defaults against
- * everything switched on, the large maps, shadows, displacement and soft shadows. Measured with timestamp queries in
- * Chromium 153 over Vulkan on an AMD Radeon RX 7900 XT, a 1920 by 1080 target, a waxing gibbous Moon, medians of 101
- * frames; the error from both drawn linear, per pixel the disc covers, against everything on.
+ * What the pass costs and what its defaults miss, a disc for each size of the maps, as large as it gets before they
+ * give less than a texel to a pixel at its middle: its defaults against everything switched on with the next finer
+ * maps, shadows, displacement and soft shadows. Measured with timestamp queries in Chromium 153 over Vulkan on an AMD
+ * Radeon RX 7900 XT, a 1920 by 1080 target, a waxing gibbous Moon, medians of 2,000 frames after 100 to warm up; the
+ * error from both drawn linear, per pixel the disc covers, against everything on.
  */
 interface Props {
     id?: string;
@@ -25,65 +26,65 @@ const ROWS: {
     off: number;
 }[] = [
     {
-        disc: 64,
-        view: "15°",
-        defaults: "small maps, no shadows",
-        ms: [0.049, 0.093],
+        disc: 162,
+        view: "6.1°",
+        defaults: "512 maps, hard shadows, against 1K",
+        ms: [0.052, 0.143],
         mb: [
-            [0.7, 0.087, 1.4, 0],
-            [44.7, 5.6, 89.5, 0.07],
+            [0.7, 0.087, 1.4, 0.13],
+            [2.8, 0.35, 5.6, 0.13],
         ],
-        off: 1.59,
+        off: 1.17,
     },
     {
-        disc: 127,
-        view: "7.8°",
-        defaults: "small maps, no shadows",
-        ms: [0.05, 0.136],
-        mb: [
-            [0.7, 0.087, 1.4, 0],
-            [44.7, 5.6, 89.5, 0.13],
-        ],
-        off: 1.52,
-    },
-    {
-        disc: 256,
-        view: "3.9°",
-        defaults: "medium maps, hard shadows",
-        ms: [0.061, 0.255],
+        disc: 325,
+        view: "3.1°",
+        defaults: "1K maps, hard shadows, against 2K",
+        ms: [0.067, 0.254],
         mb: [
             [2.8, 0.35, 5.6, 0.52],
-            [44.7, 5.6, 89.5, 0.52],
+            [11.2, 1.4, 22.4, 0.52],
         ],
-        off: 1.19,
+        off: 1.07,
     },
     {
-        disc: 1023,
-        view: "1°",
-        defaults: "large maps, hard shadows",
-        ms: [0.213, 0.897],
+        disc: 651,
+        view: "1.5°",
+        defaults: "2K maps, hard shadows, against 4K",
+        ms: [0.121, 0.379],
         mb: [
-            [44.7, 5.6, 89.5, 6.3],
-            [44.7, 5.6, 89.5, 6.3],
+            [11.2, 1.4, 22.4, 1.57],
+            [44.7, 5.6, 89.5, 1.57],
         ],
-        off: 1.53,
+        off: 1.4,
     },
     {
-        disc: 4095,
-        view: "0.24°",
-        defaults: "large maps, displaced",
-        ms: [1.06, 1.06],
+        disc: 1303,
+        view: "0.76°",
+        defaults: "4K maps, displaced, against 8K",
+        ms: [0.686, 0.665],
         mb: [
-            [44.7, 5.6, 89.5, 5.5],
-            [44.7, 5.6, 89.5, 5.5],
+            [44.7, 5.6, 89.5, 6.29],
+            [179, 22.4, 357.9, 6.29],
         ],
-        off: 0.21,
+        off: 0.64,
+    },
+    {
+        disc: 2607,
+        view: "0.38°",
+        defaults: "4K maps, displaced, against 8K",
+        ms: [0.947, 0.831],
+        mb: [
+            [44.7, 5.6, 89.5, 9.44],
+            [179, 22.4, 357.9, 9.44],
+        ],
+        off: 3.33,
     },
 ];
 const PARTS = ["color map", "relief", "shadow map"] as const;
 const CONFIGS = ["the defaults", "everything on"] as const;
 // Each panel's axis: its end and the step of its grid.
-const AXES = { ms: [1.25, 0.25], mb: [180, 50], off: [2, 0.5] } as const;
+const AXES = { ms: [1, 0.25], mb: [600, 100], off: [3.5, 1] } as const;
 type Axis = keyof typeof AXES;
 const pct = (v: number, axis: Axis) => `${((100 * v) / AXES[axis][0]).toFixed(3)}%`;
 const ticks = (axis: Axis) =>
@@ -91,10 +92,13 @@ const ticks = (axis: Axis) =>
 const grid = (axis: Axis) => `--grid: ${(100 * AXES[axis][1]) / AXES[axis][0]}%`;
 const ms = (v: number) => (v < 1 ? v.toFixed(2) : v.toFixed(1));
 const mb = (v: number) => (v < 10 ? v.toFixed(1) : v.toFixed(0));
-// The bar's parts: the color map as BC1, the relief, the shadow map, and what BC1 saves, outlined at the end.
-const parts = ([color, bc1, relief, shadowMap]: Memory) => [bc1, relief, shadowMap, color - bc1];
-const total = ([color, bc1, relief, shadowMap]: Memory, compressed: boolean) =>
-    (compressed ? bc1 : color) + relief + shadowMap;
+// The bar's parts and their colors: the defaults' color map as BC1 and what BC1 saves of it outlined next to it, or
+// everything on's color map whole, as its reference is drawn; the relief and the shadow map.
+const parts = ([color, bc1, relief, shadowMap]: Memory, compressed: boolean) =>
+    compressed ? [bc1, color - bc1, relief, shadowMap] : [color, 0, relief, shadowMap];
+const PART_OF = [0, 0, 1, 2];
+// The whole, the color map as it is, as the pass takes it by default.
+const total = ([color, , relief, shadowMap]: Memory) => color + relief + shadowMap;
 ---
 
 <figure class="budget-figure wide" id={id}>
@@ -102,13 +106,13 @@ const total = ([color, bc1, relief, shadowMap]: Memory, compressed: boolean) =>
         <span><i class="budget-swatch budget-defaults"></i>the defaults</span>
         <span><i class="budget-swatch"></i>everything on</span>
         {PARTS.map((part, i) => <span><i class={`budget-swatch budget-part-${i}`}></i>{part}</span>)}
-        <span><i class="budget-swatch budget-part-0 budget-saved"></i>saved by BC1 colors</span>
+        <span><i class="budget-swatch budget-part-0 budget-saved"></i>BC1 would save</span>
     </div>
-    <div class="budget-grid" role="img" aria-label="Bar charts of the time a frame takes, the GPU memory, and the share of pixels the defaults draw off, for discs of 64 to 4,095 pixels">
+    <div class="budget-grid" role="img" aria-label="Bar charts of the time a frame takes, the GPU memory, and the share of pixels the defaults draw off, for discs of 162 to 2,607 pixels">
         <span></span>
         <span class="budget-head note">time a frame, ms</span>
         <span class="budget-head note">GPU memory, MB</span>
-        <span class="budget-head note">pixels a third of a stop off, %</span>
+        <span class="budget-head note">pixels 1/3 stop off, %</span>
         {ROWS.map((row) => (
             <>
                 <span class="budget-size">
@@ -125,11 +129,11 @@ const total = ([color, bc1, relief, shadowMap]: Memory, compressed: boolean) =>
                 </span>
                 <span class="budget-cell" style={grid("mb")} data-label="GPU memory, MB">
                     {row.mb.map((m, c) => (
-                        <span class="budget-line" title={`${CONFIGS[c]}: color map ${m[0]} MB, as BC1 ${m[1]}, relief ${m[2]}, shadow map ${m[3]}`}>
-                            {parts(m).map((v, i) => v > 0 && (
-                                <i class:list={["budget-bar", `budget-part-${i % 3}`, i === 3 && "budget-saved", c === 0 && i < 3 && "budget-defaults"]} style={`width: ${pct(v, "mb")}`}></i>
+                        <span class="budget-line" title={c === 0 ? `the defaults: color map ${m[0]} MB, as BC1 ${m[1]}, relief ${m[2]}, shadow map ${m[3]}` : `everything on: color map ${m[0]} MB, relief ${m[2]}, shadow map ${m[3]}`}>
+                            {parts(m, c === 0).map((v, i) => v > 0 && (
+                                <i class:list={["budget-bar", `budget-part-${PART_OF[i]}`, i === 1 && "budget-saved", c === 0 && i !== 1 && "budget-defaults"]} style={`width: ${pct(v, "mb")}`}></i>
                             ))}
-                            <span class="budget-value">{mb(total(m, false))} · {mb(total(m, true))}</span>
+                            <span class="budget-value">{mb(total(m))}</span>
                         </span>
                     ))}
                 </span>
@@ -149,13 +153,15 @@ const total = ([color, bc1, relief, shadowMap]: Memory, compressed: boolean) =>
         ))}
     </div>
     <figcaption class="figure-caption">
-        The cost of nachtgestirn's Moon and what its defaults leave out, for discs from a Moon in a wide sky to one
-        filling the view, each just under a size where the pass switches on more: the time on the GPU a frame takes and
-        the GPU memory of the maps and the shadow map, with the pass' defaults, hatched, what they draw each disc with
-        under its size, and with everything on, solid, the large maps, shadows, displacement and soft shadows; the memory
-        with the color map as it is and as BC1, the two numbers, outlined what BC1 saves; and the share of the disc's
-        pixels the defaults draw more than a third of a stop off from everything on. BC1 colors cost no time and draw no
-        pixel that far off. A view of 1920 by 1080 pixels, as many degrees wide as under each disc, the Moon waxing
-        gibbous; an AMD Radeon RX 7900 XT in Chromium, medians of 101 frames.
+        The cost of nachtgestirn's Moon and what its defaults leave out, a disc for each size of the maps, 512 to 8K
+        texels across, as large as it gets before its maps give less than a texel to a pixel at its middle, π times the
+        disc's pixels: the time on the GPU a frame takes and the GPU memory of the maps and the shadow map, with the
+        pass' defaults, hatched, what they draw each disc with, and with everything on, solid, the next finer maps,
+        shadows, displacement and soft shadows; outlined next to the defaults' color map what BC1 would save of it; and
+        the share of the disc's pixels the defaults draw more than a third of a stop off from everything on. BC1 colors
+        cost no time and draw no pixel that far off. The 8K maps are this site's, the rest ship with the package: past
+        4K the defaults keep the 4K maps, magnified. A view of 1920 by 1080 pixels, as many degrees wide as under each
+        disc, the Moon waxing gibbous; an AMD Radeon RX 7900 XT in Chromium, medians of 2,000 frames after 100 to warm
+        up.
     </figcaption>
 </figure>

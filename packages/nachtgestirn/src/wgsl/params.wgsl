@@ -1,94 +1,97 @@
-// What the Moon pass takes per frame. A struct only, no binding: the pass binds it where it likes. Directions ENU
-// (x east, y north, z up) and unit length, lengths in km, light in lux, luminance in cd/m².
+// What the Moon pass takes. Structs only, no binding: the pass binds them where it likes. Directions ENU (x east,
+// y north, z up) and unit length, lengths in km, angles in radians, light in lux, luminance in cd/m².
 
+// What changes from frame to frame.
 struct NgParams {
-    // Turns pixels back into rays, as dunstkreis' sky pass: column major, no translation.
+    // The camera: turns pixels back into rays, as dunstkreis' sky pass, column major, no translation.
     inverseViewProjection: mat4x4f,
-    // Turns a direction in the observer's frame into the Moon's own, selenographic: x towards 0° longitude, y towards
-    // 90° east, z towards the north pole. From `moonOrientation`.
+
+    // The Moon: turns a direction in the observer's frame into the Moon's own, selenographic, from `moonOrientation`:
+    // x towards 0° longitude, y towards 90° east, z towards the north pole. Towards its center as it shows, and its
+    // apparent angular radius.
     orientation: mat3x3f,
-    // Towards the Moon's center as it shows, and its apparent angular radius in radians.
     direction: vec3f,
     angularRadius: f32,
-    // From the Moon's center towards the Sun, and the Sun's illuminance at the Moon in lux.
+
+    // The light: from the Moon's center towards the Sun, and the Sun's illuminance at the Moon; towards Earth's center,
+    // where earthshine comes from, and Earth's illuminance at the Moon.
     sunDirection: vec3f,
     sunIlluminance: f32,
-    // What the air lets through along the line of sight, per channel, and Earth's illuminance at the Moon in lux.
-    transmittance: vec3f,
+    earthDirection: vec3f,
     earthshine: f32,
-    // Earth's shadow: its axis, away from the Sun, through Earth's center, and the bend of the projection.
-    shadowAxis: vec3f,
+
+    // What the air lets through along the line of sight, per channel, where the air's table does not say it per ray;
+    // and the bend of the projection, as dunstkreis' sky pass.
+    transmittance: vec3f,
     projectionDistance: f32,
-    // The Moon's center from Earth's center, in km, and the umbra's radius there.
-    moonCenterKm: vec3f,
-    umbraKm: f32,
-    penumbraKm: f32,
-    sunAngularRadius: f32,
-    earthRadiusKm: f32,
-    moonRadiusKm: f32,
-    // What luminance is multiplied by, 1 / (1.2 * 2^EV100), and below which z of a ray the Moon is hidden.
+
+    // What luminance is multiplied by, 1 / (1.2 * 2^EV100); below which z of a ray the ground hides the Moon; the
+    // Moon's radius; and the Sun's angular radius.
     exposure: f32,
     horizonZ: f32,
-    // What the color map is multiplied by to read as normal albedo, and the albedo without a map; per channel, below.
-    albedoScale: f32,
+    moonRadiusKm: f32,
+    sunAngularRadius: f32,
+
+    // The color map, decoded, made normal albedo per channel: its scale, and the Moon's tint, or gray. Without a map
+    // the disc is `albedo` all over.
+    albedoMatrix: mat3x3f,
     albedo: f32,
-    // 1 the color map, 2 the relief, 4 the eclipse, 8 the relief's shadows from the shadow map, 16 the table's
-    // transmittances, 32 the color map as gray, its luminance alone, 64 the map's own color, untinted, 128 the comparison
-    // with `compareLaw`, 256 the air's shimmer, 512 the relief displaced where it shows, not only shaded, 1024 a point
-    // Sun's hard shadows drawn and compared with the Sun's disc's soft ones.
+
+    // What the frame draws, NG_FLAG_*.
     flags: u32,
-    // The reflectance law: 0 Hapke's lunar law after Jensen et al., 1 Lambert's, 2 Oren-Nayar's, 3 Hapke's 2012 model.
-    law: u32,
-    // How strong the umbra's refracted light is, 1 for a typical eclipse.
-    umbraLight: f32,
-    // The refraction table's spacing in apparent altitude, in radians: 0 for no table, the rays taken as they are.
-    refractionStep: f32,
-    // From the Moon's center towards Earth's, where earthshine comes from: a degree off the view at most.
-    earthDirection: vec3f,
-    // The apparent altitude of the table's first entry, in radians.
-    refractionFrom: f32,
-    // How far the air bends a ray down, in radians, at NG_REFRACTION_SAMPLES apparent altitudes over the disc's band,
-    // from `refractionFrom` on by `refractionStep`.
-    refraction: array<vec4f, 8>,
-    // What the color map is multiplied by per channel besides `albedoScale`: from its own mean color to the Moon's.
-    albedoTint: vec3f,
-    // With NG_FLAG_COMPARE, the law the disc is held against, numbered as `law`: where the two differ by more than a
-    // third of a stop, the pixel is striped, red where `law` is brighter, blue where darker.
-    compareLaw: u32,
-    // What the air lets through at each of the refraction table's entries, per channel, with NG_FLAG_AIR.
-    airTransmittance: array<vec4f, 32>,
-    // The sunlight Earth's air bends into its shadow, as a share of the sunlight per channel, at NG_UMBRA_SAMPLES
-    // distances from the shadow's axis, from the axis to the penumbra's edge.
-    umbraTable: array<vec4f, 64>,
-    // Where the detail strip lies in the whole maps' uv, west, north, east and south edges; east not past west for none.
-    detailRegion: vec4f,
-    // The air's shimmer, with NG_FLAG_SHIMMER: the image's rms wander in radians, the time in seconds the turbulence
-    // has drifted by, and how far the air spreads green from red and blue, in radians of refraction.
-    shimmer: vec4f,
-    // The shadow map, with NG_FLAG_SHADOWS, from `shadow.comp.wgsl`: the Sun's direction in the Moon's frame it was
-    // made for, and a texel's angle on the unit sphere; the axis its longitudes about the Sun count from, and the first
-    // longitude of its window; the window's first angle from the subsolar point, its width and height in texels, and
-    // the Sun's angular radius it casts with, 0 a point.
+
+    // The shadow map, from `shadow.comp.wgsl`: the Sun's direction in the Moon's frame it was made for, and a texel's
+    // angle on the unit sphere; the axis its longitudes about the Sun count from, and the first longitude of its
+    // window; the window's first angle from the subsolar point, its width and height in texels, and the Sun's angular
+    // radius it casts with, 0 a point.
     shadowSun: vec4f,
     shadowEast: vec4f,
     shadowWindow: vec4f,
-    // The shimmer's parts, weighed: its larger cells, which move patches of the image as a whole, and its smaller,
-    // which make it boil within them; and how fast the wind carries the cells across the sky, in radians a second.
+
+    // Where the detail strip lies in the whole maps' uv: its west, north, east and south edges.
+    detailRegion: vec4f,
+
+    // Earth's shadow, with NG_FLAG_ECLIPSE: its axis, away from the Sun, and how bright the light Earth's air bends
+    // into it, 1 for a typical eclipse; the Moon's center from Earth's, and the penumbra's radius there; Earth's radius.
+    shadowAxis: vec3f,
+    umbraLight: f32,
+    moonCenterKm: vec3f,
+    penumbraKm: f32,
+    earthRadiusKm: f32,
+
+    // The air's table, with NG_FLAG_AIR: the apparent altitude of its first entry, and the step between them.
+    refractionFrom: f32,
+    refractionStep: f32,
+
+    // The air's shimmer, for `shimmer.comp.wgsl`: the image's rms wander, the time in seconds the turbulence has
+    // drifted by, how far the air spreads green from red and blue, and the finest cell on the sky; how much its larger
+    // cells move patches of the image as a whole and its smaller make it boil within them, and how fast the wind
+    // carries them across the sky, in radians a second.
+    shimmer: vec4f,
     shimmerParts: vec4f,
 }
 
-const NG_UMBRA_SAMPLES: u32 = 64u;
+// What changes only with the air towards the Moon or with an eclipse: written when it changes.
+struct NgTables {
+    // How far the air bends a ray down, at NG_REFRACTION_SAMPLES apparent altitudes from `refractionFrom` on by
+    // `refractionStep`, four to a vector; and what it lets through at each, per channel.
+    bends: array<vec4f, 8>,
+    airTransmittance: array<vec4f, 32>,
+
+    // The sunlight Earth's air bends into its shadow, as a share of the sunlight per channel, at NG_UMBRA_SAMPLES
+    // distances from the shadow's axis, from the axis to the penumbra's edge.
+    umbra: array<vec4f, 64>,
+}
 
 const NG_REFRACTION_SAMPLES: u32 = 32u;
+const NG_UMBRA_SAMPLES: u32 = 64u;
 
+// What a frame draws: the color map, the relief from the heights, the shadows it casts, the relief displaced where it
+// shows rather than only shaded, earthshine, the air's bending and dimming per ray, and Earth's shadow.
 const NG_FLAG_COLOR: u32 = 1u;
 const NG_FLAG_RELIEF: u32 = 2u;
-const NG_FLAG_ECLIPSE: u32 = 4u;
-const NG_FLAG_SHADOWS: u32 = 8u;
-const NG_FLAG_AIR: u32 = 16u;
-const NG_FLAG_GRAY: u32 = 32u;
-const NG_FLAG_UNTINTED: u32 = 64u;
-const NG_FLAG_COMPARE: u32 = 128u;
-const NG_FLAG_SHIMMER: u32 = 256u;
-const NG_FLAG_DISPLACE: u32 = 512u;
-const NG_FLAG_COMPARE_SHADOWS: u32 = 1024u;
+const NG_FLAG_SHADOWS: u32 = 4u;
+const NG_FLAG_DISPLACE: u32 = 8u;
+const NG_FLAG_EARTHSHINE: u32 = 16u;
+const NG_FLAG_AIR: u32 = 32u;
+const NG_FLAG_ECLIPSE: u32 = 64u;

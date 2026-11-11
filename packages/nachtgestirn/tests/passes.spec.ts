@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { PARAMS_SIZE, paramsData } from "../dist/index.js";
+import { PARAMS_SIZE, paramsData, TABLES_SIZE, tablesData } from "../dist/index.js";
 import { moonOrientation, phaseLaw, type RefractionTable, refractionTable } from "../src/orientation.js";
 import { moonOutput } from "../src/wgsl/output.js";
 import { compileWgsl, gpuDevice } from "./gpu.js";
@@ -24,13 +24,16 @@ function wgslSource(name: string): string {
 }
 
 // Each pass with exactly the fragments its header names, so none grows a dependency it does not declare.
+// The Moon pass takes any law that defines `ngReflectance`: Hapke's of 2012, or of 1963.
+const MOON = ["params", "surface", "reflectance", "camera", "tonemap", "vision", "moon"];
 const PASSES: Record<string, readonly string[]> = {
-    moon: ["params", "camera", "surface", "tonemap", "vision", "moon"],
-    mips: ["params", "surface", "mips"],
+    moon: MOON,
+    "moon with Hapke's law of 1963": MOON.map((name) => (name === "reflectance" ? "hapke1963" : name)),
+    mips: ["surface", "mips"],
     bc1: ["bc1"],
-    relief: ["params", "surface", "relief"],
-    shadow: ["params", "camera", "surface", "tonemap", "vision", "moon", "shadow"],
-    shimmer: ["params", "camera", "surface", "tonemap", "vision", "moon", "shimmer"],
+    relief: ["surface", "relief"],
+    shadow: [...MOON, "shadow"],
+    shimmer: [...MOON, "shimmer"],
 };
 
 for (const [name, fragments] of Object.entries(PASSES)) {
@@ -43,53 +46,54 @@ for (const [name, fragments] of Object.entries(PASSES)) {
     });
 }
 
-test("the params pack to the uniform's size with the flags where the shader reads them", () => {
-    const data = paramsData(
-        {
+test("the params and tables pack to the uniforms' sizes with the flags where the shader reads them", () => {
+    const params = {
+        direction: [0, 1, 0],
+        angularDiameter: 0.5,
+        sunDirection: [1, 0, 0],
+        sunIlluminance: 128_000,
+        earthshine: 10,
+        orientation: moonOrientation({
             direction: [0, 1, 0],
-            angularDiameter: 0.5,
-            sunDirection: [1, 0, 0],
-            sunIlluminance: 128_000,
-            earthshine: 10,
-            orientation: moonOrientation({
-                direction: [0, 1, 0],
-                libration: { longitude: 0, latitude: 0 },
-                positionAngleOfAxis: 0,
-                parallacticAngle: 0,
-            }),
-            transmittance: [1, 1, 1],
-            inverseViewProjection: new Float32Array(16),
-            projectionDistance: 0,
-            ev100: 15,
-            horizonZ: -1,
-            albedoMap: true,
-            relief: true,
-            shadows: true,
-            law: "lambert",
-            mapColor: "tinted",
-            compare: null,
-            compareShadows: false,
-            earthDirection: null,
-            shimmer: null,
-            eclipse: { axis: [0, 0, -1], moonCenterKm: [0, 0, 384_400], umbraKm: 4600, penumbraKm: 8200 },
-            sunAngularDiameter: 0.533,
-            refraction: refractionTable([0, 1, 0], 0.5, () => 0.5),
-            distanceKm: 384_400,
-        },
-        null,
-    );
+            libration: { longitude: 0, latitude: 0 },
+            positionAngleOfAxis: 0,
+            parallacticAngle: 0,
+        }),
+        transmittance: [1, 1, 1],
+        inverseViewProjection: new Float32Array(16),
+        projectionDistance: 0,
+        ev100: 15,
+        horizonZ: -1,
+        albedoMap: true,
+        relief: true,
+        shadows: true,
+        mapColor: "tinted" as const,
+        earthDirection: null,
+        shimmer: null,
+        // The Moon in the middle of Earth's shadow.
+        eclipse: { axis: [0, 0, 1], moonCenterKm: [0, 0, 384_400], umbraKm: 4600, penumbraKm: 8200 },
+        sunAngularDiameter: 0.533,
+        refraction: refractionTable([0, 1, 0], 0.5, () => 0.5),
+        distanceKm: 384_400,
+    } satisfies Parameters<typeof paramsData>[0];
+    const data = paramsData(params, null);
     expect(data.byteLength).toBe(PARAMS_SIZE);
     const u = new Uint32Array(data);
     const f = new Float32Array(data);
-    // No maps: neither map flag, the eclipse alone; Lambert's law; the umbra's radius where the shader reads it.
-    expect(u[56]).toBe(4);
-    expect(u[57]).toBe(1);
-    expect(f[47]).toBe(4600);
-    expect(f[52]).toBeCloseTo(1 / (1.2 * 2 ** 15), 9);
-    // The refraction table, and Earth's center from the Moon due north on the horizon: south, a degree below.
-    expect(f[64]).toBeCloseTo(0.5 * (Math.PI / 180), 6);
-    expect(f[61]).toBeCloseTo(-1, 3);
-    expect(f[62]).toBeCloseTo(-6371 / 384_400, 3);
+    // No maps: neither map flag; earthshine, the air and the eclipse; the penumbra's radius where the shader reads it.
+    expect(u[61]).toBe(16 | 32 | 64);
+    expect(f[87]).toBe(8200);
+    expect(f[44]).toBeCloseTo(1 / (1.2 * 2 ** 15), 9);
+    // Earth's center from the Moon due north on the horizon: south, a degree below.
+    expect(f[37]).toBeCloseTo(-1, 3);
+    expect(f[38]).toBeCloseTo(-6371 / 384_400, 3);
+    // Away from Earth's shadow the eclipse is left out.
+    const away = paramsData({ ...params, eclipse: { ...params.eclipse, moonCenterKm: [30_000, 0, 384_400] } }, null);
+    expect(new Uint32Array(away)[61]).toBe(16 | 32);
+    // The air's table: its bends first.
+    const tables = tablesData(params);
+    expect(tables.byteLength).toBe(TABLES_SIZE);
+    expect(new Float32Array(tables)[0]).toBeCloseTo(0.5 * (Math.PI / 180), 6);
 });
 
 /**
@@ -101,9 +105,10 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
     const device = await gpuDevice();
     test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
     if (!device) return;
-    const { createMoonPass } = await import("../dist/index.js");
+    const { createMoonPass, wgsl } = await import("../dist/index.js");
     const size = 64;
-    const pass = await createMoonPass(device, { format: "rgba32float", toneMap: false, background: false });
+    // The defaults: the Moon alone, linear, premultiplied.
+    const pass = await createMoonPass(device, { format: "rgba32float" });
     const target = device.createTexture({
         size: [size, size],
         format: "rgba32float",
@@ -121,8 +126,9 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
         sunDirection: [number, number, number],
         earthshine: number,
         refraction: RefractionTable | null = null,
+        through = pass,
     ) => {
-        pass.update({
+        through.update({
             refraction,
             direction: [0, 1, 0],
             angularDiameter,
@@ -132,7 +138,7 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
             ev100: -Math.log2(1.2),
         });
         const encoder = device.createCommandEncoder();
-        pass.encode(encoder, target);
+        through.encode(encoder, target);
         encoder.copyTextureToBuffer({ texture: target }, { buffer: staging, bytesPerRow: size * 16 }, [size, size]);
         device.queue.submit([encoder.finish()]);
         await staging.mapAsync(GPUMapMode.READ);
@@ -197,7 +203,8 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
     expect(rows[2]).toBeLessThan(0.6);
 
     // At the quarters the disc averages close to what the meter's phase law says, a tenth of the full Moon: 0.84 of
-    // it under Hapke's law of 1963 after Jensen et al., falling a quarter of a stop faster than Allen's.
+    // it under Hapke's law of 1963 after Jensen et al., falling a quarter of a stop faster than Allen's, a law that
+    // takes the default's place as a snippet of its own.
     const mean = (pixels: Float32Array) => {
         let [sum, covered] = [0, 0];
         for (let i = 0; i < size * size; i++) {
@@ -206,15 +213,15 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
         }
         return sum / covered;
     };
-    pass.update({ law: "hapke" });
-    const full1963 = await render([0, -1, 0], 0);
-    const quarter = mean(await render([1, 0, 0], 0)) / mean(full1963);
+    const pass1963 = await createMoonPass(device, { format: "rgba32float", reflectance: wgsl.hapke1963 });
+    const full1963 = await render([0, -1, 0], 0, null, pass1963);
+    const quarter = mean(await render([1, 0, 0], 0, null, pass1963)) / mean(full1963);
+    pass1963.destroy();
     expect(quarter / phaseLaw(90)).toBeGreaterThan(0.8);
     expect(quarter / phaseLaw(90)).toBeLessThan(0.9);
 
     // Hapke's 2012 model, the default: its full Moon as bright at the center as the albedo says, and its quarter a third
     // of a stop under Allen's, as the site's copy of the law integrates it over the disc (0.81).
-    pass.update({ law: "hapke2012" });
     const full2012 = full;
     expect(at(full2012, 32, 32) / expected).toBeCloseTo(1, 1);
     const quarter2012 = mean(await render([1, 0, 0], 0)) / mean(full2012);
@@ -231,7 +238,7 @@ test("the pass compiles with night vision", async () => {
     if (!device) return;
     const { createMoonPass } = await import("../dist/index.js");
     device.pushErrorScope("validation");
-    const pass = await createMoonPass(device, { format: "rgba16float", nightVision: true });
+    const pass = await createMoonPass(device, { background: true, toneMap: "neutral", nightVision: true });
     expect(await device.popErrorScope()).toBeNull();
     pass.destroy();
 });

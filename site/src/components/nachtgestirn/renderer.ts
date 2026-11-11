@@ -24,6 +24,7 @@ import {
     refractedSunlight,
     refractionTable,
     SUN_ILLUMINANCE,
+    wgsl,
 } from "@himmelszelt/nachtgestirn";
 import {
     apparentSiderealTime,
@@ -36,6 +37,9 @@ import {
     sun,
 } from "@himmelszelt/sternzeit";
 import { quality, SDR } from "../dunstkreis/atmosphere";
+import lambert from "./laws/lambert.wgsl";
+import orenNayar from "./laws/oren-nayar.wgsl";
+import stripes from "./stripes.comp.wgsl";
 
 /** No lower than this does the meter open for the umbra: EV100 4 exposes the umbra's edge, some 2 cd/m², as mid gray,
  *  and its deep red middle stays dark, as the eye and a camera see a total eclipse. */
@@ -48,22 +52,21 @@ export type ToneCurveName = "neutral" | "agx" | "aces" | "clip";
 /** Which of nachtgestirn's maps: "auto" the smallest that shows the disc at a texel per pixel, never a smaller one
  *  than before. */
 export type MapSize = "auto" | keyof typeof MOON_MAPS | FineMaps;
-const SIZES = ["small", "medium", "large"] as const;
+const SIZES = ["512", "1k", "2k", "4k"] as const;
 
-// The maps the package does not ship, made by its `maps-hq.mjs` and hosted with the site: the whole Moon at 2K, between
-// the package's 1K and 4K, and at 8K, and a strip of the southern highlands at 8K over the shipped 4K.
+// The maps the package does not ship, made by its `maps-hq.mjs` and hosted with the site: the whole Moon at 8K, and a
+// strip of the southern highlands at 8K over the shipped 4K.
 const HQ = `${import.meta.env.BASE_URL.replace(/\/?$/, "/")}moon/`;
 const STRIPS = {
     "8k": { x: 1638, y: 2298, width: 4916, height: 934, mapWidth: 8192 },
 };
 const region = ({ x, y, width, height, mapWidth }: (typeof STRIPS)["8k"]) =>
     [x / mapWidth, (2 * y) / mapWidth, (x + width) / mapWidth, (2 * (y + height)) / mapWidth] as const;
-const SHIPPED = { meanReflectance: MOON_MAPS.large.meanReflectance, meanColor: MOON_MAPS.large.meanColor };
+const SHIPPED = { meanReflectance: MOON_MAPS["4k"].meanReflectance, meanColor: MOON_MAPS["4k"].meanColor };
 export const FINE_MAPS = {
-    "2k": { color: `${HQ}moon-color-2k.webp`, heights: `${HQ}moon-height-2k.webp`, width: 2048, ...SHIPPED },
     "8k": { color: `${HQ}moon-color-8k.webp`, heights: `${HQ}moon-height-8k.webp`, width: 8192, ...SHIPPED },
     "8k-strip": {
-        ...MOON_MAPS.large,
+        ...MOON_MAPS["4k"],
         detail: {
             color: `${HQ}moon-color-8k-strip.webp`,
             heights: `${HQ}moon-height-8k-strip.webp`,
@@ -74,10 +77,10 @@ export const FINE_MAPS = {
 export type FineMaps = keyof typeof FINE_MAPS;
 /** The widest texture each set needs, for whether the GPU takes it. */
 export const MAPS_TEXELS: Record<keyof typeof MOON_MAPS | FineMaps, number> = {
-    small: 512,
-    medium: 1024,
-    large: 4096,
+    "512": 512,
+    "1k": 1024,
     "2k": 2048,
+    "4k": 4096,
     "8k": 8192,
     "8k-strip": STRIPS["8k"].width,
 };
@@ -278,6 +281,15 @@ function sharedMaps(device: GPUDevice, size: Exclude<MapSize, "auto">) {
     return maps;
 }
 
+export type Law = "hapke" | "hapke2012" | "lambert" | "orenNayar";
+/** Each law's WGSL, defining `ngReflectance` for the pass: the package's own for Hapke's two, the site's for the rest. */
+const LAW_WGSL: Record<Law, string> = {
+    hapke2012: wgsl.reflectance,
+    hapke: wgsl.hapke1963,
+    lambert,
+    orenNayar,
+};
+
 /** One frame: the Moon, the view and the switches. */
 export interface MoonFrame {
     moon: MoonAt;
@@ -304,9 +316,11 @@ export interface MoonFrame {
     shadows: boolean;
     earthshine: boolean;
     eclipse: boolean;
-    law: "hapke" | "hapke2012" | "lambert" | "orenNayar";
+    /** The reflectance law, each its own snippet of WGSL in the pass: Hapke's of 2012, the package's, or the ones it is
+     *  held against. */
+    law: Law;
     /** A law to hold the disc against, its pixels striped where they are a third of a stop off it. */
-    compare?: "hapke" | "hapke2012" | "lambert" | "orenNayar" | null;
+    compare?: Law | null;
     /** A point Sun's hard shadows, striped where they are a third of a stop off the Sun's disc's soft ones. */
     compareShadows?: boolean;
     /** The color map tinted to the Moon's color, as published, or as gray; tinted by default. */
@@ -381,7 +395,8 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             requestRender();
         });
     }
-    function buildMoon(key: string, frame: MoonFrame) {
+    // A pass for a frame, or for its Moon alone, linear, to compare.
+    function buildMoon(key: string, frame: MoonFrame, alone: boolean) {
         if (moonBuilding.has(key)) return;
         moonBuilding.add(key);
         const {
@@ -396,11 +411,11 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
         } = frame;
         const filter = frame.filter ?? "anisotropic";
         createMoonPass(device, {
-            format,
-            headroom,
-            toneMap: toneMap === "linear" ? false : toneMap,
+            ...(alone
+                ? { format: "rgba16float" }
+                : { format, headroom, toneMap: toneMap === "linear" ? false : toneMap, background: true, nightVision }),
             maps,
-            nightVision,
+            reflectance: LAW_WGSL[frame.law],
             ...(samples === undefined ? {} : { samples }),
             ...(terminatorSamples === undefined ? {} : { terminatorSamples }),
             ...(displacementFrom === undefined ? {} : { displacementFrom }),
@@ -431,154 +446,237 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
         });
     }
 
+    // The intermediate textures of a comparison: the finished frame, and the two lights it is striped by.
+    let comparing: { finished: GPUTexture; shown: GPUTexture; reference: GPUTexture } | null = null;
+    let stripePass: { pipeline: GPUComputePipeline; format: GPUTextureFormat } | null = null;
+    let stripeBuilding = "";
+    function buildStripes(format: GPUTextureFormat) {
+        if (stripeBuilding === format) return;
+        stripeBuilding = format;
+        const code = [wgsl.moonOutput(format), stripes].join("\n");
+        device
+            .createComputePipelineAsync({
+                label: "sternwarte:stripes",
+                layout: "auto",
+                compute: {
+                    module: device.createShaderModule({ label: "sternwarte:stripes", code }),
+                    entryPoint: "stripe",
+                },
+            })
+            .then((pipeline) => {
+                stripePass = { pipeline, format };
+                requestRender();
+            });
+    }
+
+    /** `frame` striped where its light is a third of a stop off the law or the soft shadows it is held against. */
+    function compared(target: GPUTexture, frame: MoonFrame) {
+        const format = frame.format ?? SDR;
+        if (stripePass?.format !== format) {
+            buildStripes(format);
+            return null;
+        }
+        const { width, height } = target;
+        if (!comparing || comparing.finished.width !== width || comparing.finished.height !== height) {
+            for (const texture of Object.values(comparing ?? {})) texture.destroy();
+            const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING;
+            const make = (label: string, textureFormat: GPUTextureFormat) =>
+                device.createTexture({ label, size: [width, height], format: textureFormat, usage });
+            comparing = {
+                finished: make("sternwarte:compareFinished", format),
+                shown: make("sternwarte:compareShown", "rgba16float"),
+                reference: make("sternwarte:compareReference", "rgba16float"),
+            };
+        }
+        // A point Sun's hard shadows against the Sun's disc's soft ones, or the law against the other law.
+        const shown: MoonFrame = frame.compareShadows
+            ? { ...frame, softShadowsFrom: Number.POSITIVE_INFINITY }
+            : { ...frame, compare: null };
+        const reference: MoonFrame = frame.compareShadows
+            ? { ...frame, softShadowsFrom: 0 }
+            : { ...frame, law: frame.compare ?? frame.law };
+        const drawn = render(comparing.finished, shown, false);
+        if (!drawn || !render(comparing.shown, shown, true) || !render(comparing.reference, reference, true))
+            return null;
+        const encoder = device.createCommandEncoder({ label: "sternwarte:stripes" });
+        const pass = encoder.beginComputePass({ label: "sternwarte:stripes" });
+        pass.setPipeline(stripePass.pipeline);
+        pass.setBindGroup(
+            0,
+            device.createBindGroup({
+                layout: stripePass.pipeline.getBindGroupLayout(0),
+                entries: [comparing.finished, comparing.shown, comparing.reference].map((texture, binding) => ({
+                    binding,
+                    resource: texture.createView(),
+                })),
+            }),
+        );
+        pass.setBindGroup(
+            1,
+            device.createBindGroup({
+                layout: stripePass.pipeline.getBindGroupLayout(1),
+                entries: [{ binding: 0, resource: target.createView() }],
+            }),
+        );
+        pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
+        pass.end();
+        device.queue.submit([encoder.finish()]);
+        return drawn;
+    }
+
+    /** Draws `frame` into `target`, or its Moon `alone`, linear, without the sky; null while a pass is being made. */
+    function render(target: GPUTexture, frame: MoonFrame, alone: boolean) {
+        const { moon: m, luts, width, height } = frame;
+        const grid = frame.grid ?? false;
+        if (!sky || sky.luts !== luts || sky.grid !== grid) {
+            buildSky(luts, grid);
+            if (!sky || sky.luts !== luts) return null;
+        }
+        // The maps asked for, or the smallest that shows the disc sharply, but never smaller than the ones bound.
+        const needed = SIZES.find((size) => (MOON_MAPS[size].width ?? 0) >= mapWidthFor(frame.discPixels)) ?? "4k";
+        const kept = Math.max(0, SIZES.indexOf(mapsBound as (typeof SIZES)[number]));
+        // Finer maps once bound stay bound for "auto" too.
+        const size =
+            frame.maps !== "auto"
+                ? frame.maps
+                : mapsBound in FINE_MAPS
+                  ? (mapsBound as FineMaps)
+                  : (SIZES[Math.max(SIZES.indexOf(needed), kept)] ?? "4k");
+        loadMaps(size);
+        const key = `${alone} ${frame.law} ${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.nightVision} ${frame.format ?? SDR} ${frame.headroom ?? 1} ${frame.samples} ${frame.terminatorSamples} ${frame.displacementFrom} ${frame.softShadowsFrom} ${frame.filter ?? "anisotropic"}`;
+        const moonPass = moonPasses.get(key);
+        if (!moonPass) {
+            buildMoon(key, frame, alone);
+            return null;
+        }
+        if (!background || background.width !== width || background.height !== height) {
+            background?.destroy();
+            background = device.createTexture({
+                label: "sternwarte:moonBackground",
+                size: [width, height],
+                format: "rgba32float",
+                usage:
+                    GPUTextureUsage.STORAGE_BINDING |
+                    GPUTextureUsage.TEXTURE_BINDING |
+                    GPUTextureUsage.RENDER_ATTACHMENT,
+            });
+        }
+
+        // The air towards the Moon, per ray of its disc in the table, and at its center for the meter.
+        const airOnDisc = frame.air && frame.airOnDisc !== false;
+        const refraction = airOnDisc ? refractionTable(m.trueDirection, m.angularDiameter, m.bend, m.through) : null;
+        // Traced only where there is air: the tiles have none.
+        const center = airOnDisc
+            ? m.through((Math.asin(Math.min(Math.max(m.direction[2], -1), 1)) * 180) / Math.PI)
+            : null;
+        const through = airOnDisc ? (center ? (center[0] + center[1] + center[2]) / 3 : 0) : 1;
+        // Metered on the lit part of the disc outside the umbra, opening up as the umbra swallows it but no further
+        // than the umbra's own exposure, or on the sky around it where that is brighter, so neither burns out.
+        const outsideUmbra = frame.eclipse ? Math.max(1 - Math.max(m.shadow.umbralMagnitude, 0), 1e-4) : 1;
+        const metered = Math.max(
+            moonEV100(m.phaseAngle, m.lit, Math.max(through, 1e-3) * outsideUmbra),
+            frame.eclipse && m.shadow.umbralMagnitude > 0 ? UMBRA_EV100 : Number.NEGATIVE_INFINITY,
+            frame.air ? skyEV100 : Number.NEGATIVE_INFINITY,
+            // A plain background, a daytime sky behind the tiles, is metered too, so it does not burn out.
+            !frame.air && frame.background
+                ? ev100ForLuminance(luminanceOf(frame.background))
+                : Number.NEGATIVE_INFINITY,
+        );
+        // Held to the slider's range: below the horizon the air lets nothing through, and the meter would run away.
+        const ev100 = frame.ev100 ?? Math.min(Math.max(Math.round(metered * 10) / 10, -6), 20);
+
+        const started = performance.now();
+        const view = {
+            inverseViewProjection: frame.inverseViewProjection,
+            projectionDistance: frame.projectionDistance,
+        };
+        sky.pass.update({
+            ...view,
+            sunDirection: m.sunDirection,
+            sunAngularDiameter: m.sunAngularDiameter,
+            observerHeightM: m.heightM,
+            pixelRatio: frame.pixelRatio,
+            ev100: UNIT_EV100,
+            // The grid in an eighth of what the Moon's pass exposes as white: mixed into the linear light, before the
+            // tone curve and the encoding, it shows about as faint as dunstkreis' sky mixes it into the encoded image.
+            gridInk: (1.2 * 2 ** ev100) / 8,
+            autoExposureKeys: [],
+            // Metered for the figure's own exposure, down into the night, where the Moon sets it.
+            autoExposureRange: [-6, 20],
+            // The sky by moonlight, dimmed in Earth's shadow as the disc is.
+            moonDirection: m.trueDirection,
+            moonIlluminance: moonIlluminance(m.phaseAngle, m.distanceKm) * outsideUmbra,
+        });
+        moonPass.update({
+            ...view,
+            direction: m.trueDirection,
+            angularDiameter: frame.air ? m.angularDiameter : m.geocentricDiameter,
+            sunDirection: m.moonSunDirection,
+            sunIlluminance: SUN_ILLUMINANCE,
+            earthshine: frame.earthshine ? m.earthshine : 0,
+            orientation: m.orientation,
+            ev100,
+            horizonZ: frame.air ? horizonZ(m.heightM, m.model.planet.groundRadiusKm) : -1,
+            albedoMap: frame.albedo,
+            relief: frame.relief,
+            shadows: frame.shadows,
+            mapColor: frame.mapColor ?? "tinted",
+            eclipse: frame.eclipse ? m.earthShadow : null,
+            sunAngularDiameter: m.sunAngularDiameter,
+            refraction,
+            // From the observer, an Earth radius nearer when the Moon is overhead.
+            distanceKm: m.distanceKm - m.model.planet.groundRadiusKm * m.trueDirection[2],
+            // Where a figure carried the viewer away from Earth, Earth where it has gone.
+            earthDirection: (m as MoonAt & { earthDirection?: Vec3 }).earthDirection ?? null,
+            // Only through the air, measured in its zenith column from sea level.
+            shimmer: airOnDisc && frame.shimmer ? shimmerThrough(m, frame.shimmer) : null,
+        });
+        const encoder = device.createCommandEncoder({ label: "sternwarte:moon" });
+        if (alone) {
+            moonPass.encode(encoder, target);
+            device.queue.submit([encoder.finish()]);
+            return { ev100, through, passesMs: performance.now() - started };
+        }
+        if (frame.air) {
+            sky.pass.encode(encoder, background);
+        } else {
+            const [r, g, b] = frame.background ?? [0, 0, 0];
+            encoder
+                .beginRenderPass({
+                    colorAttachments: [
+                        {
+                            view: background.createView(),
+                            loadOp: "clear",
+                            storeOp: "store",
+                            clearValue: { r, g, b, a: 1 },
+                        },
+                    ],
+                })
+                .end();
+        }
+        moonPass.encode(encoder, target, { background });
+        device.queue.submit([encoder.finish()]);
+        const passesMs = performance.now() - started;
+        const skyKey = `${m.jd},${m.trueDirection.join(",")},${m.heightM}`;
+        if (frame.air && skyKey !== skyMeteredFor) {
+            skyMeteredFor = skyKey;
+            const { pass } = sky;
+            pass.meteredEV100().then((value) => {
+                if (sky?.pass !== pass || Math.abs(value - skyEV100) < 0.05) return;
+                skyEV100 = value;
+                if (frame.ev100 === null) requestRender();
+            });
+        }
+        return { ev100, through, passesMs };
+    }
+
     return {
         /** What the drawings depend on besides the frame: the maps bound. */
         bound: () => mapsBound,
         /** Draws `frame` into `target`; null while a pass is still being made, which calls `requestRender` when done. */
         draw(target: GPUTexture, frame: MoonFrame) {
-            const { moon: m, luts, width, height } = frame;
-            const grid = frame.grid ?? false;
-            if (!sky || sky.luts !== luts || sky.grid !== grid) {
-                buildSky(luts, grid);
-                if (!sky || sky.luts !== luts) return null;
-            }
-            // The maps asked for, or the smallest that shows the disc sharply, but never smaller than the ones bound.
-            const needed =
-                SIZES.find((size) => (MOON_MAPS[size].width ?? 0) >= mapWidthFor(frame.discPixels)) ?? "large";
-            const kept = Math.max(0, SIZES.indexOf(mapsBound as (typeof SIZES)[number]));
-            // Finer maps once bound stay bound for "auto" too.
-            const size =
-                frame.maps !== "auto"
-                    ? frame.maps
-                    : mapsBound in FINE_MAPS
-                      ? (mapsBound as FineMaps)
-                      : (SIZES[Math.max(SIZES.indexOf(needed), kept)] ?? "large");
-            loadMaps(size);
-            const key = `${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.nightVision} ${frame.format ?? SDR} ${frame.headroom ?? 1} ${frame.samples} ${frame.terminatorSamples} ${frame.displacementFrom} ${frame.softShadowsFrom} ${frame.filter ?? "anisotropic"}`;
-            const moonPass = moonPasses.get(key);
-            if (!moonPass) {
-                buildMoon(key, frame);
-                return null;
-            }
-            if (!background || background.width !== width || background.height !== height) {
-                background?.destroy();
-                background = device.createTexture({
-                    label: "sternwarte:moonBackground",
-                    size: [width, height],
-                    format: "rgba32float",
-                    usage:
-                        GPUTextureUsage.STORAGE_BINDING |
-                        GPUTextureUsage.TEXTURE_BINDING |
-                        GPUTextureUsage.RENDER_ATTACHMENT,
-                });
-            }
-
-            // The air towards the Moon, per ray of its disc in the table, and at its center for the meter.
-            const airOnDisc = frame.air && frame.airOnDisc !== false;
-            const refraction = airOnDisc
-                ? refractionTable(m.trueDirection, m.angularDiameter, m.bend, m.through)
-                : null;
-            // Traced only where there is air: the tiles have none.
-            const center = airOnDisc
-                ? m.through((Math.asin(Math.min(Math.max(m.direction[2], -1), 1)) * 180) / Math.PI)
-                : null;
-            const through = airOnDisc ? (center ? (center[0] + center[1] + center[2]) / 3 : 0) : 1;
-            // Metered on the lit part of the disc outside the umbra, opening up as the umbra swallows it but no further
-            // than the umbra's own exposure, or on the sky around it where that is brighter, so neither burns out.
-            const outsideUmbra = frame.eclipse ? Math.max(1 - Math.max(m.shadow.umbralMagnitude, 0), 1e-4) : 1;
-            const metered = Math.max(
-                moonEV100(m.phaseAngle, m.lit, Math.max(through, 1e-3) * outsideUmbra),
-                frame.eclipse && m.shadow.umbralMagnitude > 0 ? UMBRA_EV100 : Number.NEGATIVE_INFINITY,
-                frame.air ? skyEV100 : Number.NEGATIVE_INFINITY,
-                // A plain background, a daytime sky behind the tiles, is metered too, so it does not burn out.
-                !frame.air && frame.background
-                    ? ev100ForLuminance(luminanceOf(frame.background))
-                    : Number.NEGATIVE_INFINITY,
-            );
-            // Held to the slider's range: below the horizon the air lets nothing through, and the meter would run away.
-            const ev100 = frame.ev100 ?? Math.min(Math.max(Math.round(metered * 10) / 10, -6), 20);
-
-            const started = performance.now();
-            const view = {
-                inverseViewProjection: frame.inverseViewProjection,
-                projectionDistance: frame.projectionDistance,
-            };
-            sky.pass.update({
-                ...view,
-                sunDirection: m.sunDirection,
-                sunAngularDiameter: m.sunAngularDiameter,
-                observerHeightM: m.heightM,
-                pixelRatio: frame.pixelRatio,
-                ev100: UNIT_EV100,
-                // The grid in an eighth of what the Moon's pass exposes as white: mixed into the linear light, before the
-                // tone curve and the encoding, it shows about as faint as dunstkreis' sky mixes it into the encoded image.
-                gridInk: (1.2 * 2 ** ev100) / 8,
-                autoExposureKeys: [],
-                // Metered for the figure's own exposure, down into the night, where the Moon sets it.
-                autoExposureRange: [-6, 20],
-                // The sky by moonlight, dimmed in Earth's shadow as the disc is.
-                moonDirection: m.trueDirection,
-                moonIlluminance: moonIlluminance(m.phaseAngle, m.distanceKm) * outsideUmbra,
-            });
-            moonPass.update({
-                ...view,
-                direction: m.trueDirection,
-                angularDiameter: frame.air ? m.angularDiameter : m.geocentricDiameter,
-                sunDirection: m.moonSunDirection,
-                sunIlluminance: SUN_ILLUMINANCE,
-                earthshine: frame.earthshine ? m.earthshine : 0,
-                orientation: m.orientation,
-                ev100,
-                horizonZ: frame.air ? horizonZ(m.heightM, m.model.planet.groundRadiusKm) : -1,
-                albedoMap: frame.albedo,
-                relief: frame.relief,
-                shadows: frame.shadows,
-                law: frame.law,
-                mapColor: frame.mapColor ?? "tinted",
-                compare: frame.compare ?? null,
-                compareShadows: frame.compareShadows ?? false,
-                eclipse: frame.eclipse ? m.earthShadow : null,
-                sunAngularDiameter: m.sunAngularDiameter,
-                refraction,
-                // From the observer, an Earth radius nearer when the Moon is overhead.
-                distanceKm: m.distanceKm - m.model.planet.groundRadiusKm * m.trueDirection[2],
-                // Where a figure carried the viewer away from Earth, Earth where it has gone.
-                earthDirection: (m as MoonAt & { earthDirection?: Vec3 }).earthDirection ?? null,
-                // Only through the air, measured in its zenith column from sea level.
-                shimmer: airOnDisc && frame.shimmer ? shimmerThrough(m, frame.shimmer) : null,
-            });
-            const encoder = device.createCommandEncoder({ label: "sternwarte:moon" });
-            if (frame.air) {
-                sky.pass.encode(encoder, background);
-            } else {
-                const [r, g, b] = frame.background ?? [0, 0, 0];
-                encoder
-                    .beginRenderPass({
-                        colorAttachments: [
-                            {
-                                view: background.createView(),
-                                loadOp: "clear",
-                                storeOp: "store",
-                                clearValue: { r, g, b, a: 1 },
-                            },
-                        ],
-                    })
-                    .end();
-            }
-            moonPass.encode(encoder, target, { background });
-            device.queue.submit([encoder.finish()]);
-            const passesMs = performance.now() - started;
-            const skyKey = `${m.jd},${m.trueDirection.join(",")},${m.heightM}`;
-            if (frame.air && skyKey !== skyMeteredFor) {
-                skyMeteredFor = skyKey;
-                const { pass } = sky;
-                pass.meteredEV100().then((value) => {
-                    if (sky?.pass !== pass || Math.abs(value - skyEV100) < 0.05) return;
-                    skyEV100 = value;
-                    if (frame.ev100 === null) requestRender();
-                });
-            }
-            return { ev100, through, passesMs };
+            if (!frame.compare && !frame.compareShadows) return render(target, frame, false);
+            return compared(target, frame);
         },
     };
 }

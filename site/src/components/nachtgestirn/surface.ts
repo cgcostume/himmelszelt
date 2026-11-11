@@ -64,7 +64,7 @@ export function surfaceFigure(root: HTMLElement) {
     const requestRender = onDemand(render, root);
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
-    const resolution = mapResolutions(root, "large", requestRender);
+    const resolution = mapResolutions(root, "4k", requestRender);
 
     // The color map, or a uniform albedo for the relief alone.
     const albedo = find("[data-field=albedo]", root);

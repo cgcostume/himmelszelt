@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Makes the Moon's maps beyond what the package ships, for a site to host: the whole Moon at 2048 texels around, between
-// the package's 1K and 4K, and at 8192, with a strip at 8192 from 52° to 11° south and 108° west to 108° east, where a
-// close-up of the terminator in the southern highlands looks. Same sources, layout and packing as `maps.mjs`. 16K was
-// tried and dropped: it shows nothing 8K does not. A strip's place is in its file name and in `strips.json`, in texels of
-// the whole map at its size. `--only 2k` or `--only 8k` makes one of them. Rerunnable:
-// `node scripts/maps-hq.mjs <outDir> [--cache <dir>]`; downloads some 1.8 GB once into the cache.
+// Makes the Moon's maps beyond what the package ships, for a site to host: the whole Moon at 8192 texels around, with a
+// strip at 8192 from 52° to 11° south and 108° west to 108° east, where a close-up of the terminator in the southern
+// highlands looks. Same sources, layout and packing as `maps.mjs`, which makes the 2048 texels and less. 16K was tried
+// and dropped: it shows nothing 8K does not. A strip's place is in its file name and in `strips.json`, in texels of the
+// whole map at its size. Rerunnable: `node scripts/maps-hq.mjs <outDir> [--cache <dir>]`; downloads some 1.8 GB once
+// into the cache.
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -78,33 +78,9 @@ function packHeights(gray, size, file) {
 const grayOut = ["-endian", "LSB", "-depth", "16", "gray:-"];
 const colorOut = (file) => ["-depth", "8", "-quality", "88", "-define", "webp:method=6", join(out, file)];
 
-const only = args.includes("--only") ? args[args.indexOf("--only") + 1] : null;
 const dem = download(DEM);
-// The whole Moon at 2K, from the 4K color averaged down in linear light, as `maps.mjs` makes its smaller ones.
-if (!only || only === "2k") {
-    const color = download("lroc_color_16bit_srgb_4k.tif");
-    const file = "moon-color-2k.webp";
-    magick([
-        color,
-        "-colorspace",
-        "RGB",
-        "-filter",
-        "Box",
-        "-resize",
-        "2048x1024!",
-        "-colorspace",
-        "sRGB",
-        ...colorOut(file),
-    ]);
-    wrote(file);
-    packHeights(
-        magick([dem, "-filter", "Box", "-resize", "2048x1024!", ...grayOut]),
-        { width: 2048, height: 1024 },
-        "moon-height-2k.webp",
-    );
-}
 const strips = {};
-for (const [name, width] of only && only !== "8k" ? [] : [["8k", 8192]]) {
+for (const [name, width] of [["8k", 8192]]) {
     const color = download(`lroc_color_16bit_srgb_${name}.tif`);
     const whole = `moon-color-${name}.webp`;
     magick([color, ...colorOut(whole)]);

@@ -125,7 +125,7 @@ export function mapsFigure(root: HTMLElement) {
     const heights = find<HTMLCanvasElement>("[data-field=heights]", root);
     const note = find("[data-field=note]", root);
     const seen = [...root.querySelectorAll<HTMLCanvasElement>("[data-field=seen]")];
-    const files = MOON_MAPS.medium;
+    const files = MOON_MAPS["1k"];
     let texels = "";
     const requestRender = onDemand(() => {
         const libration = moon.librations(julianEphemerisDay(fromJulianDay(state.jd)));

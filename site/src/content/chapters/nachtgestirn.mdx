@@ -103,7 +103,7 @@ import {
 } from "@himmelszelt/nachtgestirn";
 import { fromDate, julianEphemerisDay, moon } from "@himmelszelt/sternzeit";
 
-const maps = await loadMoonMaps(device, MOON_MAPS.medium);
+const maps = await loadMoonMaps(device, MOON_MAPS["1k"]);
 const pass = await createMoonPass(device, { format: "rgba8unorm", maps });
 
 // Per frame, from where you stand: where the Moon is, how large, how lit,
@@ -230,7 +230,9 @@ function of two lobes, one back towards the Sun and one onwards, adds the light 
 shades the surface by the shadows of its slopes, a mean slope of some 24° <Cite id="hapke1984" />. Sato and colleagues
 fitted it to some 66,000 images of the Moon from the wide angle camera of the Lunar Reconnaissance Orbiter, tile by tile
 <Cite id="sato2014" />. nachtgestirn draws the Moon by it, with the near side's median parameters at 566 nm, no slower
-than by the law of 1963, which `law: "hapke"` keeps as a choice.
+than by the law of 1963. The law is a snippet of WGSL of its own, a single function, `ngReflectance`, and the pass takes
+another in its place, `reflectance`: the package ships the law of 1963 as `wgsl.hapke1963`, and the figures here hold
+Lambert's and Oren and Nayar's against it the same way, without either in the shader the pass draws by.
 
 Which law is right is not a matter of taste, because the Moon's light has been measured: the US Geological Survey's
 Robotic Lunar Observatory fitted over a thousand nights to a percent between phase angles of 1.55° and 97°
@@ -278,10 +280,10 @@ color from the Lunar Reconnaissance Orbiter's wide angle camera, over 100,000 im
 it, into one mosaic, remade in December 2025 with more of the source's color and range, and the heights from the
 orbiter's laser altimeter, which timed a laser pulse to the ground billions of times. Both are laid out with 0°
 longitude in the middle and east to the right, so a point's longitude and latitude read straight off them, with no
-mirroring, which osgHimmel's cube map needed <Cite id="mueller2012vmv" />. The package ships both at 512, 1024 and 4096
-texels around, `MOON_MAPS.small`, `medium` and `large`. A disc shows a map π times its width in pixels at one texel per
-pixel, so the 230 KB set does for a disc up to some 160 pixels across, the 840 KB one to some 330, and the 11.5 MB one
-is for zooming in; `mapWidthFor` picks the size for a disc.
+mirroring, which osgHimmel's cube map needed <Cite id="mueller2012vmv" />. The package ships both at 512, 1024, 2048 and
+4096 texels around, `MOON_MAPS["512"]` to `MOON_MAPS["4k"]`. A disc shows a map π times its width in pixels at one texel
+per pixel, so the 230 KB set does for a disc up to some 160 pixels across, the 840 KB one to some 330, the 3.1 MB one to
+some 650, and the 11.5 MB one is for zooming in; `mapWidthFor` picks the size for a disc.
 
 <Maps />
 <Controls height={false} />
@@ -537,33 +539,37 @@ pass.update({ earthshine, refraction, eclipse, ev100 });
 pass.encode(encoder, target, { background: skyTexture });
 ```
 
-The same pass draws more than the Moon in a sky. With `background` off it writes the disc alone with its coverage in
-alpha, for your own compositor, and with `toneMap: false` into an rgba16float target its exposed light, linear and
-premultiplied, for a renderer that blends the Moon into its own HDR frame and tone maps, blooms and encodes the whole
-at the end. By default the pass tone maps by helldunkel's neutral curve, so that it shows on an 8-bit canvas by
-itself. Zoomed in and out of the air, it is the globe at the top, which saves what it shows as
-a PNG at the size of the 8K maps, a print of the Moon tonight. Turned half round it is the far side, which Earth never
-sees. With `earthDirection` the viewer need not be on Earth: the Moon from orbit, or from Mars, with Earth's
-glow on the side that faces Earth. sternzeit's [month of Moons](../sternzeit/#a-month-of-moons) with these discs in
-place of its drawn ones is a moon calendar with Crisium in its right place. And with another pair of maps, Hapke's law
-draws any dusty, airless ball the same way, Mercury or Ceres, which is what it was written for.
+The same pass draws more than the Moon in a sky. By default it writes the disc alone into an rgba16float target, its
+exposed light linear and premultiplied, its coverage in alpha, for a renderer that blends the Moon into its own HDR
+frame and tone maps, blooms and encodes the whole at the end. With `background` it composes the Moon over a sky in cd/m²
+itself, and with `toneMap` it tone maps by one of helldunkel's curves, so that it shows on an 8-bit canvas by itself, as
+in the figures here. What a frame leaves out, the pass leaves out of its shader: the eclipse until the Moon touches
+Earth's penumbra, the air's table without one, earthshine where none is asked for. Zoomed in and out of the air, it is
+the globe at the top, which saves what it shows as a PNG at the size of the 8K maps, a print of the Moon tonight. Turned
+half round it is the far side, which Earth never sees. With `earthDirection` the viewer need not be on Earth: the Moon
+from orbit, or from Mars, with Earth's glow on the side that faces Earth. sternzeit's [month of
+Moons](../sternzeit/#a-month-of-moons) with these discs in place of its drawn ones is a moon calendar with Crisium in
+its right place. And with another pair of maps, Hapke's law draws any dusty, airless ball the same way, Mercury or
+Ceres, which is what it was written for.
 
 ## Cheap and full
 
-The Moon as a sky shows it, a disc of a dozen to a few hundred pixels, needs little of the above, and the pass
-switches the rest on by the disc's size on screen. Under 128 pixels across it casts no shadows and needs no shadow map,
+The Moon as a sky shows it, a disc of a dozen to a few hundred pixels, needs little of the above, and the pass switches
+the rest on by the disc's size on screen. Under 128 pixels across it casts no shadows and needs no shadow map,
 `shadowsFrom`; under 1024 it shades the relief on a smooth sphere instead of displacing it, `displacementFrom`; under
 4096 the Sun is a point, `softShadowsFrom`. Every threshold takes a number of pixels, 0 for always and Infinity for
-never. The maps follow the same size, `MOON_MAPS.small` for a disc to some 160 pixels, `medium` to 330. One ray per
-pixel does for the disc, `samples`, since the maps are read over the whole pixel's footprint and the shadows from
-their map, filtered too; along the terminator, where a crater rim turns from lit to dark within a pixel, and along a
-displaced limb, the pass takes four, `terminatorSamples`, spread by a low-discrepancy sequence and averaged as a sensor
-does. The umbra's table can be `typicalUmbra` instead of the integral, the shimmer null, and `law: "hapke"` the law of
-1963, which costs the same and is a quarter of a stop too bright at the quarters. Everything on, a disc takes up to
-four times as long and still under a millisecond, but the large maps' 134 MB where 2 do; what the defaults leave
-out shows on one or two in a hundred of the disc's pixels, most of them crater rims along the terminator drawn a pixel
-off where the relief is not displaced (<Fig id="budget" />). With `compress` the maps encode the color map as BC1 on
-the GPU, where it has "texture-compression-bc", an eighth of its memory, 39 MB less for the large maps, for colors a
+never. The maps follow the same size, `MOON_MAPS["512"]` for a disc to some 160 pixels, `"1k"` to 330, `"2k"` to 650,
+each until it gives less than a texel to a pixel at the disc's middle, where its width falls under π times the disc's
+pixels across, `mapWidthFor`. One ray per pixel does for the disc, `samples`, since the maps are read over the whole
+pixel's footprint and the shadows from their map, filtered too; along the terminator, where a crater rim turns from lit
+to dark within a pixel, and along a displaced limb, the pass takes four, `terminatorSamples`, spread by a
+low-discrepancy sequence and averaged as a sensor does. The umbra's table can be `typicalUmbra` instead of the integral,
+the shimmer null, and the law `wgsl.hapke1963`, which costs the same and is a quarter of a stop too bright at the
+quarters. Everything on, with the next finer maps, a disc takes up to four times as long and still under a millisecond,
+and four times the memory; what the defaults leave out shows on about one in a hundred of the disc's pixels, most of
+them crater rims along the terminator drawn a pixel off where the relief is not displaced, and on three in a hundred of
+a disc too large for the package's 4K maps (<Fig id="budget" />). With `compress` the maps encode the color map as BC1
+on the GPU, where it has "texture-compression-bc", an eighth of its memory, 39 MB less for the large maps, for colors a
 hundredth of a stop off; the relief stays as it is, since the shadows are marched through its heights.
 
 <Budget />
