@@ -25,6 +25,7 @@ references:
 import Cite from "../../components/Cite.astro";
 import Controls from "../../components/sternzeit/Controls.astro";
 import Fig from "../../components/Fig.astro";
+import Term from "../../components/Term.astro";
 import Sky from "../../components/dunstkreis/Sky.astro";
 import Environments from "../../components/environment/Environments.astro";
 import Banding from "../../components/helldunkel/Banding.astro";
@@ -85,11 +86,12 @@ blur between white and black comes out too dark.
 
 ## High dynamic range
 
-An image's numbers span far more than a screen does. Eight bits of sRGB hold 11.7 stops, each twice the light of the last,
-and a sunny HDRI holds many more from its darkest place to the Sun. That number is no choice but the transfer curve's: the
-first step above black is 1/255 on its linear toe of slope 12.92, so log₂(255 × 12.92). Eight bits stored linearly would
-hold 8 stops. How many of them a screen really shows is up to the screen and the room, as the darkest steps drown in its
-black. Exposure slides that window along the stops, and whatever falls out at either end is gone.
+An image's numbers span far more than a screen does. Eight bits of sRGB hold 11.7 <Term of="Stop">stops</Term>, each
+twice the light of the last, and a sunny HDRI holds many more from its darkest place to the Sun. That number is no
+choice but the transfer curve's: the first step above black is 1/255 on its linear toe of slope 12.92, so
+log₂(255 × 12.92). Eight bits stored linearly would hold 8 stops. How many of them a screen really shows is up to the
+screen and the room, as the darkest steps drown in its black. Exposure slides that window along the stops, and whatever
+falls out at either end is gone.
 
 Nothing fixes how bright the top of the window shows, as a display decides that: sRGB's reference white is 80 cd/m²
 <Cite id="iec1999" />, and HDR video settled on 203 for the same white <Cite id="bt2408" />.

@@ -179,7 +179,8 @@ struct NbMoon {
     // The disc's luminance along the ray, in cd/m², and how much of the pixel it covers.
     luminance: vec3f,
     coverage: f32,
-    // The luminance under `compareLaw`, with NB_FLAG_COMPARE.
+    // The luminance to hold it against: under `compareLaw` with NB_FLAG_COMPARE, with the Sun's disc's soft shadows
+    // where NB_FLAG_COMPARE_SHADOWS draws a point Sun's hard ones, or both.
     reference: vec3f,
 }
 
@@ -236,18 +237,33 @@ const NB_SHADOW_GROWTH: f32 = 1.26;
 // horizontal, and the share of the Sun's disc above it. Near what casts it that angle changes fast and the shadow's
 // edge is sharp; far from it slowly, and the penumbra widens with the distance, as the Sun's half degree makes it.
 // `up` the point's direction and `sun` the Sun's, in the Moon's frame; `height` its height in km; `lod` its level.
-// The Sun's size the shadow map's, a point for a small disc.
-fn nbSunAboveTerrain(up: vec3f, sun: vec3f, height: f32, lod: f32, fine: bool) -> f32 {
-    return nbAboveTerrain(up, sun, height, lod, fine, max(nbParams.shadowWindow.w, 1e-7));
+// The Sun's size the shadow map's, a point for a small disc. Its share, and a point Sun's, 0 or 1, to compare.
+fn nbSunAboveTerrain(up: vec3f, sun: vec3f, height: f32, lod: f32, fine: bool) -> vec2f {
+    let radius = max(nbParams.shadowWindow.w, 1e-7);
+    let horizon = nbHorizon(up, sun, height, lod, fine, radius);
+    return vec2f(nbDiscAbove(horizon, radius), select(0.0, 1.0, horizon.y < horizon.x));
 }
 
 // The same for any direction, a disc of `radius` around it: the Sun's, or the viewer's, a point.
 fn nbAboveTerrain(up: vec3f, sun: vec3f, height: f32, lod: f32, fine: bool, radius: f32) -> f32 {
+    return nbDiscAbove(nbHorizon(up, sun, height, lod, fine, radius), radius);
+}
+
+// The share of a disc of `radius` above the terrain, from `nbHorizon`: above a line through it, the line x radii below
+// its center.
+fn nbDiscAbove(horizon: vec2f, radius: f32) -> f32 {
+    let x = clamp((horizon.x - horizon.y) / radius, -1.0, 1.0);
+    return 0.5 + (x * sqrt(1.0 - x * x) + asin(x)) / NB_PI;
+}
+
+// The elevation of a direction over a point's horizontal and the terrain's highest towards it, in radians: the march
+// stops once the terrain stands `radius` above the direction, where nothing of a disc that wide is left.
+fn nbHorizon(up: vec3f, sun: vec3f, height: f32, lod: f32, fine: bool, radius: f32) -> vec2f {
     let p = nbParams;
     let elevation = asin(clamp(dot(sun, up), -1.0, 1.0));
     let along = sun - dot(sun, up) * up;
     if (elevation > NB_SHADOW_ELEVATION || length(along) < 1e-6) {
-        return 1.0;
+        return vec2f(elevation, -0.5 * NB_PI);
     }
     let toward = normalize(along);
     let texelKm = nbReliefTexelKm(fine);
@@ -263,12 +279,10 @@ fn nbAboveTerrain(up: vec3f, sun: vec3f, height: f32, lod: f32, fine: bool, radi
         let to = (p.moonRadiusKm + h) * q - origin;
         horizon = max(horizon, atan2(dot(to, up), dot(to, toward)));
         if (horizon > elevation + radius) {
-            return 0.0;
+            break;
         }
     }
-    // The share of a disc above a line through it, the line x radii below its center.
-    let x = clamp((elevation - horizon) / radius, -1.0, 1.0);
-    return 0.5 + (x * sqrt(1.0 - x * x) + asin(x)) / NB_PI;
+    return vec2f(elevation, horizon);
 }
 
 // The band the shadow map covers, as angles from the subsolar point: from where the Sun stands too high for any slope to
@@ -286,20 +300,20 @@ fn nbBandAt(body: vec3f) -> vec2f {
     return vec2f(longitude - floor(longitude / (2.0 * NB_PI)) * 2.0 * NB_PI, acos(clamp(dot(body, s), -1.0, 1.0)));
 }
 
-// The share of the Sun's disc a point sees above the terrain, from the shadow map: lit before the band, dark past it,
-// and outside the window, which holds only what the view shows, lit on the day side.
-fn nbShadowAt(body: vec3f) -> f32 {
+// The share of the Sun's disc a point sees above the terrain, from the shadow map, and a point Sun's: lit before the
+// band, dark past it, and outside the window, which holds only what the view shows, lit on the day side.
+fn nbShadowAt(body: vec3f) -> vec2f {
     let p = nbParams;
     let band = nbBandAt(body);
     if (band.y < NB_BAND_FROM) {
-        return 1.0;
+        return vec2f(1.0);
     }
     if (band.y > NB_BAND_TO) {
-        return 0.0;
+        return vec2f(0.0);
     }
     let texel = vec2f(band.x, band.y - p.shadowWindow.x) / p.shadowSun.w;
     if (texel.x > p.shadowWindow.y || texel.y < 0.0 || texel.y > p.shadowWindow.z) {
-        return select(0.0, 1.0, band.y < NB_PI / 2.0);
+        return vec2f(select(0.0, 1.0, band.y < NB_PI / 2.0));
     }
     // Between the four nearest texels, by hand: the map is larger than its window, rounded up, and a sampler would mix in
     // the texels past its edges. The whole ring wraps around, a window stops at its edges.
@@ -315,10 +329,10 @@ fn nbShadowAt(body: vec3f) -> f32 {
         xs = clamp(xs, vec2i(0), vec2i(size.x - 1));
     }
     let ys = clamp(vec2i(first.y, first.y + 1), vec2i(0), vec2i(size.y - 1));
-    let a = textureLoad(nbShadowMap, vec2i(xs.x, ys.x), 0).r;
-    let b = textureLoad(nbShadowMap, vec2i(xs.y, ys.x), 0).r;
-    let c = textureLoad(nbShadowMap, vec2i(xs.x, ys.y), 0).r;
-    let d = textureLoad(nbShadowMap, vec2i(xs.y, ys.y), 0).r;
+    let a = textureLoad(nbShadowMap, vec2i(xs.x, ys.x), 0).rg;
+    let b = textureLoad(nbShadowMap, vec2i(xs.y, ys.x), 0).rg;
+    let c = textureLoad(nbShadowMap, vec2i(xs.x, ys.y), 0).rg;
+    let d = textureLoad(nbShadowMap, vec2i(xs.y, ys.y), 0).rg;
     return mix(mix(a, b, t.x), mix(c, d, t.x), t.y);
 }
 
@@ -485,25 +499,33 @@ fn nbMoon(view: vec3f, sampleAngle: f32, pixelAngle: f32) -> NbMoon {
     }
     let mu0 = dot(shading, s);
     let muView = dot(shading, -v);
-    // What reaches the point of the sunlight: the terrain's shadows and Earth's.
+    // What reaches the point of the sunlight: the terrain's shadows and Earth's; and under a point Sun, to compare.
     var shade = vec3f(1.0);
+    var hard = vec3f(1.0);
     if ((p.flags & NB_FLAG_SHADOWS) != 0u && mu0 > 0.0) {
-        shade = shade * nbShadowAt(body);
+        let terrain = nbShadowAt(body);
+        shade = shade * terrain.x;
+        hard = hard * terrain.y;
     }
     if ((p.flags & NB_FLAG_ECLIPSE) != 0u && mu0 > 0.0) {
-        shade = shade * nbShadow(p, p.moonCenterKm + n * p.moonRadiusKm);
+        let earth = nbShadow(p, p.moonCenterKm + n * p.moonRadiusKm);
+        shade = shade * earth;
+        hard = hard * earth;
     }
     // Earthshine comes from Earth's center, which the Moon sees up to a degree off the observer: near opposition.
     let e = p.earthDirection;
     let ge = acos(clamp(dot(e, -v), -1.0, 1.0));
     let mu0e = dot(shading, e);
     let through = albedo * nbTransmittance(view);
-    let lit = p.sunIlluminance * nbReflectance(p.law, mu0, muView, g) * shade;
+    // With NB_FLAG_COMPARE_SHADOWS the point Sun's hard shadows are drawn, held against the Sun's disc.
+    let pointSun = (p.flags & NB_FLAG_COMPARE_SHADOWS) != 0u;
+    let lit = p.sunIlluminance * nbReflectance(p.law, mu0, muView, g) * select(shade, hard, pointSun);
     let luminance = through * (lit + p.earthshine * nbReflectance(p.law, mu0e, muView, ge));
     var reference = vec3f(0.0);
-    if ((p.flags & NB_FLAG_COMPARE) != 0u) {
-        let litReference = p.sunIlluminance * nbReflectance(p.compareLaw, mu0, muView, g) * shade;
-        reference = through * (litReference + p.earthshine * nbReflectance(p.compareLaw, mu0e, muView, ge));
+    if ((p.flags & (NB_FLAG_COMPARE | NB_FLAG_COMPARE_SHADOWS)) != 0u) {
+        let law = select(p.law, p.compareLaw, (p.flags & NB_FLAG_COMPARE) != 0u);
+        let litReference = p.sunIlluminance * nbReflectance(law, mu0, muView, g) * shade;
+        reference = through * (litReference + p.earthshine * nbReflectance(law, mu0e, muView, ge));
     }
     return NbMoon(luminance, coverage, reference);
 }
@@ -612,10 +634,11 @@ fn nbCompose(@builtin(global_invocation_id) id: vec3u) {
     }
     let finished = nbFinish(moon.luminance, moon.coverage, id.xy);
     var color = finished.rgb;
-    // Striped where the disc is off the law it is compared with by more than a third of a stop, as a camera stripes
-    // what clips: red where it is brighter, blue where darker, in four steps of opacity, from a third of a stop, two
-    // thirds, one and two stops off; and only where either is bright enough to tell.
-    if ((nbParams.flags & NB_FLAG_COMPARE) != 0u && moon.coverage > 0.5 && (id.x + id.y) % 6u < 3u) {
+    // Striped where the disc is off the law or the soft shadows it is compared with by more than a third of a stop, as a
+    // camera stripes what clips: red where it is brighter, blue where darker, in four steps of opacity, from a third of a
+    // stop, two thirds, one and two stops off; and only where either is bright enough to tell.
+    let compared = (nbParams.flags & (NB_FLAG_COMPARE | NB_FLAG_COMPARE_SHADOWS)) != 0u;
+    if (compared && moon.coverage > 0.5 && (id.x + id.y) % 6u < 3u) {
         let weights = vec3f(0.2126, 0.7152, 0.0722);
         let shown = dot(moon.luminance, weights);
         let reference = dot(moon.reference, weights);

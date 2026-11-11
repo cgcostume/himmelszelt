@@ -1,0 +1,60 @@
+---
+import Term from "../Term.astro";
+import "../sternzeit/sternzeit.css";
+import "./nachtgestirn.css";
+
+/** A full Moon rising in the east over dunstkreis' sky, its disc above the air and through it, side by side. */
+interface Props {
+    id?: string;
+}
+const { id = "rising" } = Astro.props;
+---
+
+<figure class="tiles-figure" id={id} data-rising>
+    <div class="tiles-panel as-seen">
+        <canvas aria-label="A full Moon rising, drawn as if there were no air in front of it and through the air, rendered with WebGPU"></canvas>
+        <span class="tiles-start">
+            <span class="tiles-hint footnote">Rendered with WebGPU</span>
+        </span>
+    </div>
+    <ul class="tiles-labels" style="grid-template-columns: 1fr 1fr">
+        <li><span class="tiles-name">above the air</span> <span class="tiles-value">where it truly stands</span></li>
+        <li><span class="tiles-name">through the air</span> <span class="tiles-value" data-field="air"></span></li>
+    </ul>
+    <label class="figure-slider" title="How high the Moon's center truly stands over the horizon, before the air lifts it">
+        <span class="note">Altitude</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="altitude" min="-1" max="10" step="0.05" value="0.3" aria-label="The Moon's true altitude over the horizon" />
+            <span class="figure-slider-scale" aria-hidden="true">
+                <span class="figure-slider-mark" style="left: 9.09%">horizon</span>
+                <span class="figure-slider-mark" style="left: 100%">10°</span>
+            </span>
+        </span>
+        <output data-field="altitudeValue"></output>
+    </label>
+    <label class="figure-slider" title="How high the observer stands, from the ground to the space station's orbit">
+        <span class="note">Observer</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="height" min="0" max="5.61" step="0.01" value="0" aria-label="The observer's height, on a scale of powers of ten" />
+            <span class="figure-slider-scale" aria-hidden="true">
+                <span class="figure-slider-mark" style="left: 0%">1 m</span>
+                <span class="figure-slider-mark" style="left: 53.5%">1 km</span>
+                <span class="figure-slider-mark" style="left: 100%">orbit</span>
+            </span>
+        </span>
+        <output data-field="heightValue"></output>
+    </label>
+    <p class="view-status" data-field="note"></p>
+    <figcaption class="figure-caption">
+        A full Moon rising due east over dunstkreis' sky, the Sun just set opposite: its disc as if there were no air in
+        front of it, and through the air, dimmed, reddened and lifted by <Term of="Atmospheric refraction">refraction</Term>,
+        its lower limb more than its upper. The altitude is the center's true one over the horizon, which sinks below
+        the level as the observer climbs.
+    </figcaption>
+</figure>
+
+<script>
+    import { risingFigure } from "./rising";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-rising]")) risingFigure(root);
+</script>

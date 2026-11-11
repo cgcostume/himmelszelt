@@ -162,6 +162,10 @@ export interface MoonParams {
      *  striped, red where `law` is brighter, blue where darker, as a camera stripes what clips, in four steps of
      *  opacity from a third of a stop, two thirds, one and two stops off. For figures. */
     compare: MoonParams["law"] | null;
+    /** Draw a point Sun's hard shadows and hold them against the Sun's half degree, false by default: striped as
+     *  `compare` stripes where they are brighter or darker than the soft shadows, the penumbrae a point Sun misses.
+     *  The same march finds both. With `compare` both at once. For figures. */
+    compareShadows: boolean;
     /** Earth's shadow on the Moon, null for none. */
     eclipse: EarthShadow | null;
     /** The Sun's angular diameter in degrees, for the penumbra's width. About 0.53. */
@@ -212,7 +216,7 @@ const LAYER_FORMAT: GPUTextureFormat = "rgba16float";
 // between the relief's texels, where the march from each of the map's texels starts, and would show their stairs.
 const SHADOW_SUBTEXELS = 4;
 
-/** The shadow map's format: a share of the Sun's disc a texel, filtered when read. */
+/** The shadow map's format: the share of the Sun's disc a texel sees, and a point Sun's, filtered when read. */
 const SHADOW_FORMAT: GPUTextureFormat = "rgba8unorm";
 const EIGHT_BIT = ["rgba8unorm", "bgra8unorm"];
 const TONE_CURVES: Record<string, number> = { neutral: 1, agx: 2, aces: 3, clip: 4 };
@@ -243,6 +247,7 @@ const DEFAULTS: MoonParams = {
     law: "hapke2012",
     mapColor: "tinted",
     compare: null,
+    compareShadows: false,
     eclipse: null,
     sunAngularDiameter: 0.533,
     refraction: null,
@@ -297,7 +302,8 @@ export function paramsData(params: MoonParams, maps: MoonMaps | null, detail?: M
         (params.mapColor === "untinted" ? 64 : 0) |
         (params.compare ? 128 : 0) |
         (params.shimmer ? 256 : 0) |
-        (relief && detail?.displace ? 512 : 0);
+        (relief && detail?.displace ? 512 : 0) |
+        (params.compareShadows ? 1024 : 0);
     u[57] = LAW_INDEX[params.law];
     u[99] = params.compare ? LAW_INDEX[params.compare] : 0;
     f[58] = eclipse?.umbraLight ?? 1;

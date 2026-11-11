@@ -27,6 +27,7 @@ function wgslSource(name: string): string {
 const PASSES: Record<string, readonly string[]> = {
     moon: ["params", "camera", "surface", "tonemap", "vision", "moon"],
     mips: ["params", "surface", "mips"],
+    bc1: ["bc1"],
     relief: ["params", "surface", "relief"],
     shadow: ["params", "camera", "surface", "tonemap", "vision", "moon", "shadow"],
     shimmer: ["params", "camera", "surface", "tonemap", "vision", "moon", "shimmer"],
@@ -67,6 +68,7 @@ test("the params pack to the uniform's size with the flags where the shader read
             law: "lambert",
             mapColor: "tinted",
             compare: null,
+            compareShadows: false,
             earthDirection: null,
             shimmer: null,
             eclipse: { axis: [0, 0, -1], moonCenterKm: [0, 0, 384_400], umbraKm: 4600, penumbraKm: 8200 },

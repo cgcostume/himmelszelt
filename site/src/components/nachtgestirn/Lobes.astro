@@ -15,7 +15,7 @@ const LAWS = [
 ] as const;
 ---
 
-<figure class="lobes-figure" id={id} data-lobes>
+<figure class="lobes-figure wide" id={id} data-lobes>
     <div class="lobes-row" data-export="reflectance" data-export-timeless>
         {LAWS.map(([law, name, what]) => (
             <div class="lobes-panel">
@@ -24,15 +24,23 @@ const LAWS = [
             </div>
         ))}
     </div>
+    <label class="figure-slider" title="Where the Sun stands over the patch: drag, or drag the Sun in a panel">
+        <span class="note">Sun</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="sunAngle" min="-90" max="90" step="1" value="-40" aria-label="The Sun's angle from the normal" />
+            <span class="figure-slider-scale" aria-hidden="true">
+                <span class="figure-slider-mark" style="left: 0%">left</span>
+                <span class="figure-slider-mark" style="left: 50%">overhead</span>
+                <span class="figure-slider-mark" style="left: 100%">right</span>
+            </span>
+        </span>
+        <output data-field="sunAngleValue"></output>
+    </label>
     <p class="view-status"><span data-field="lobes"></span></p>
     <figcaption class="figure-caption">
-        A patch of the Moon's surface from the side under four reflectance laws: Lambert's, Oren and Nayar's with a
-        roughness of 0.5 rad, Hapke's lunar law of 1963 as Jensen and colleagues use it, and his model of 2012 with Sato
-        and colleagues' parameters for the Moon. The patch's normal points up, the arrow points to the Sun, and the shape around the
-        patch is how much light it sends to each direction in that plane, all four on one scale;
-        the dashed half circle is a Lambert surface lit from straight above. Lambert's sends the most straight up
-        whatever the Sun does, Oren-Nayar's leans back towards the Sun, and both of Hapke's throw the most straight back
-        at it.
+        A patch of the Moon's surface from the side under four reflectance laws, its normal up, the arrow to the Sun:
+        the shape around the patch is how much light it sends each way in that plane, all four on one scale, the dashed
+        half circle a Lambert surface lit from straight above.
     </figcaption>
 </figure>
 

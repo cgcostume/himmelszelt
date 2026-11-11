@@ -50,18 +50,23 @@
     pointer-events: none;
 }
 /* A wide figure breaks out of the column, centered on it; its caption and status keep to the column. */
-.tiles-figure.wide {
+.tiles-figure.wide,
+.lobes-figure.wide {
     margin-left: calc(50% - var(--wide-width) / 2);
 }
 @media (max-width: 48rem) {
-    .tiles-figure.wide {
+    .tiles-figure.wide,
+    .lobes-figure.wide {
         width: auto;
         margin-left: 0;
     }
 }
 .tiles-figure.wide > .figure-caption,
 .tiles-figure.wide > .view-status,
-.tiles-figure.wide > .figure-slider {
+.tiles-figure.wide > .figure-slider,
+.lobes-figure.wide > .figure-caption,
+.lobes-figure.wide > .view-status,
+.lobes-figure.wide > .figure-slider {
     max-width: calc(var(--measure) - 3rem);
     margin-inline: auto;
 }
@@ -447,13 +452,36 @@
     fill: var(--accent);
     text-anchor: middle;
 }
+/* The lunation slider's phase discs under the phase plot's axis. */
+.plot-phase {
+    fill: var(--muted);
+}
+.plot-phase .phase-outline {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1;
+}
 [data-phases] .tiles-plot {
     position: relative;
     cursor: crosshair;
 }
+/* The download button inside the plot's top right corner, where no curve runs, below the line marked now. */
+[data-phases] .tiles-plot > .svg-download {
+    top: 30px;
+    right: 16px;
+}
 .plot-figure,
 .lobes-figure {
     margin: 1.5rem 0;
+}
+/* The rising Moon's two sliders, their values right aligned in one width, so both rails stay put and line up. */
+[data-rising] .figure-slider > output {
+    min-width: 7ch;
+    text-align: right;
+}
+/* A slider without a scale under it stands as far off the caption as one with. */
+.plot-figure > .figure-slider:not(:has(.figure-slider-scale)) {
+    margin-bottom: 1.25rem;
 }
 
 /* Each disc named at its foot, over the canvas, with how far its light is off the measured Moon's; two by two on a phone. */
@@ -707,4 +735,306 @@
     fill: none;
     stroke: var(--text);
     stroke-width: 1;
+}
+
+/* A photograph with nachtgestirn's Moon laid over it, in a square that keeps its size whatever the photograph: both cut
+   to a circle a little wider than the disc, the canvas clipped to the right of a split line, the marks over both; in
+   full screen the square as large as the screen holds it, centered. */
+.photo-compare {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    cursor: ew-resize;
+    touch-action: pan-y;
+}
+.photo-disc {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: #000;
+    clip-path: circle(var(--photo-cut, 45%) at 50% 50%);
+}
+.tiles-figure .tiles-panel .photo-disc > img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    max-width: none;
+    transform-origin: 0 0;
+}
+.tiles-figure .tiles-panel .photo-disc > canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.photo-marks {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+.photo-marks .photo-cut {
+    fill: none;
+    stroke: rgb(255 255 255 / 0.35);
+    stroke-width: 1;
+}
+.photo-marks .photo-split-line {
+    stroke: rgb(255 255 255 / 0.8);
+    stroke-width: 1.5;
+}
+.photo-marks .photo-mark {
+    fill: none;
+    stroke: rgb(255 210 120 / 0.9);
+    stroke-width: 1.5;
+}
+.photo-marks .photo-mark-label,
+.photo-marks .photo-north {
+    fill: rgb(255 255 255 / 0.85);
+    font-size: 11px;
+    paint-order: stroke;
+    stroke: rgb(0 0 0 / 0.7);
+    stroke-width: 3px;
+}
+.photo-marks .photo-north {
+    text-anchor: middle;
+}
+.photo-marks .photo-north-tick {
+    stroke: rgb(255 255 255 / 0.7);
+    stroke-width: 1.5;
+}
+.photo-stage:fullscreen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0;
+    background: #000;
+}
+.photo-stage:fullscreen > .photo-compare {
+    width: min(100vw, 100vh);
+}
+/* The photographs to compare, one row of square thumbnails under the figure, as the environments' gallery has them. */
+.environments-gallery.photo-gallery {
+    grid-template-columns: repeat(var(--count), 1fr);
+    max-width: calc(var(--count) * 7rem);
+}
+/* The phase plot's band beyond ROLO's measurement, and the half lit disc at 90°. */
+[data-phases] .plot-band {
+    fill: color-mix(in oklab, var(--text), transparent 94%);
+}
+[data-phases] .plot-band-label {
+    fill: var(--muted);
+}
+[data-phases] .plot-quarter {
+    stroke: var(--muted);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+}
+
+/* The craters figure: a field to search the Moon's names, the places found as buttons beside it, the one found ringed. */
+.crater-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    margin: 0.75rem 0 0;
+}
+.crater-controls input[type="search"] {
+    flex: 0 1 14rem;
+    min-width: 0;
+    height: 28px;
+    padding: 0 0.5rem;
+    border: 1px solid color-mix(in oklab, var(--text), transparent 70%);
+    border-radius: var(--radius-small);
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: var(--text-small);
+}
+.crater-matches {
+    display: contents;
+}
+.crater-ring {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    vector-effect: non-scaling-stroke;
+}
+.tiles-overlay .crater-label {
+    fill: var(--accent);
+}
+.tiles-overlay .crater-neighbor {
+    fill: oklch(0.92 0 0 / 0.6);
+}
+
+/* The cost figure: per disc size a row of bars across three panels, each with its own axis; the defaults hatched,
+   everything on solid, the memory stacked by what holds it. Labeled cards on a phone. */
+.budget-figure {
+    --budget-0: oklch(0.66 0.12 245);
+    --budget-1: oklch(0.67 0.14 70);
+    --budget-2: oklch(0.62 0.15 300);
+    --budget-ink: var(--muted);
+}
+:root[data-theme="light"] .budget-figure {
+    --budget-0: oklch(0.58 0.13 245);
+    --budget-1: oklch(0.64 0.14 68);
+    --budget-2: oklch(0.52 0.17 300);
+}
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) .budget-figure {
+        --budget-0: oklch(0.58 0.13 245);
+        --budget-1: oklch(0.64 0.14 68);
+        --budget-2: oklch(0.52 0.17 300);
+    }
+}
+.budget-figure.wide > .figure-caption {
+    max-width: calc(var(--measure) - 3rem);
+    margin-inline: auto;
+}
+.budget-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 1.2rem;
+    margin-bottom: 0.75rem;
+}
+.budget-swatch {
+    display: inline-block;
+    width: 0.8rem;
+    height: 0.8rem;
+    margin-right: 0.4rem;
+    vertical-align: -0.1rem;
+    border-radius: 2px;
+    background: var(--budget-ink);
+}
+.budget-grid {
+    display: grid;
+    grid-template-columns: max-content repeat(3, 1fr);
+    gap: 0 1.5rem;
+    margin-bottom: 1.25rem;
+}
+.budget-head {
+    padding-bottom: 0.3rem;
+}
+.budget-size {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0.4rem 0;
+    font-size: var(--text-meta);
+    border-top: var(--border);
+}
+.budget-cell {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    padding: 0.4rem 0;
+    margin-right: 2.2rem;
+    border-top: var(--border);
+    background: repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px var(--grid));
+}
+.budget-line {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 0.75rem;
+}
+.budget-bar {
+    flex: none;
+    height: 100%;
+    min-width: 1px;
+    background: var(--budget-ink);
+}
+.budget-line > .budget-bar:last-of-type {
+    border-radius: 0 4px 4px 0;
+}
+.budget-part-0 {
+    background: var(--budget-0);
+}
+.budget-part-1 {
+    background: var(--budget-1);
+}
+.budget-part-2 {
+    background: var(--budget-2);
+}
+/* The defaults hatched in their own color: stripes over the panel's background, so the color stays the part's. */
+.budget-defaults {
+    background: repeating-linear-gradient(135deg, var(--budget-fill, var(--budget-ink)) 0 2px, transparent 2px 4.5px);
+    box-shadow: inset 0 0 0 1px var(--budget-fill, var(--budget-ink));
+}
+.budget-defaults.budget-part-0 {
+    --budget-fill: var(--budget-0);
+}
+.budget-defaults.budget-part-1 {
+    --budget-fill: var(--budget-1);
+}
+.budget-defaults.budget-part-2 {
+    --budget-fill: var(--budget-2);
+}
+.budget-value {
+    margin-left: 0.3rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    white-space: nowrap;
+}
+/* The cells and axes short of their column by a value's width, which the last bar's value runs into. */
+.budget-axis {
+    position: relative;
+    height: 1.2rem;
+    margin-right: 2.2rem;
+    border-top: var(--border);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+}
+.budget-axis > span {
+    position: absolute;
+    top: 0.2rem;
+    transform: translateX(-50%);
+}
+.budget-axis > span:first-child {
+    transform: none;
+}
+@media (max-width: 48rem) {
+    .budget-figure.wide {
+        width: auto;
+        margin-left: 0;
+    }
+    .budget-grid {
+        grid-template-columns: 1fr;
+    }
+    .budget-head,
+    .budget-axis,
+    .budget-grid > span:empty {
+        display: none;
+    }
+    .budget-size {
+        flex-direction: row;
+        justify-content: flex-start;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+    .budget-cell {
+        border-top: 0;
+        background-position: 0 1.1rem;
+        background-repeat: no-repeat;
+        padding: 0.25rem 0;
+    }
+    .budget-cell::before {
+        content: attr(data-label);
+        font-size: 0.7rem;
+        color: var(--muted);
+    }
+}
+/* What BC1 saves of the color map: its outline alone, at the bar's end. */
+.budget-bar.budget-saved,
+.budget-swatch.budget-saved {
+    background: none;
+    box-shadow: inset 0 0 0 1px var(--budget-0);
+}
+/* What the defaults draw a disc with, under its size. */
+.budget-defaults-note {
+    font-size: 0.7rem;
 }

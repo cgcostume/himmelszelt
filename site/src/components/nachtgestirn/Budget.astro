@@ -1,0 +1,161 @@
+---
+import "../sternzeit/sternzeit.css";
+import "./nachtgestirn.css";
+
+/**
+ * What the pass costs and what its defaults miss, for discs just under each of its thresholds: its defaults against
+ * everything switched on, the large maps, shadows, displacement and soft shadows. Measured with timestamp queries in
+ * Chromium 153 over Vulkan on an AMD Radeon RX 7900 XT, a 1920 by 1080 target, a waxing gibbous Moon, medians of 101
+ * frames; the error from both drawn linear, per pixel the disc covers, against everything on.
+ */
+interface Props {
+    id?: string;
+}
+const { id = "budget" } = Astro.props;
+
+type Memory = [color: number, colorBc1: number, relief: number, shadowMap: number];
+// Per disc: its size, the view's width, what the defaults draw it with, the milliseconds a frame takes and the memory in MB, the color map's as it is and
+// as BC1, with the defaults and with everything on, and the share of the disc's pixels the defaults draw more than a third of a stop off, in percent.
+const ROWS: {
+    disc: number;
+    view: string;
+    defaults: string;
+    ms: [number, number];
+    mb: [Memory, Memory];
+    off: number;
+}[] = [
+    {
+        disc: 64,
+        view: "15°",
+        defaults: "small maps, no shadows",
+        ms: [0.069, 0.112],
+        mb: [
+            [0.7, 0.087, 1.4, 0],
+            [44.7, 5.6, 89.5, 0.07],
+        ],
+        off: 1.59,
+    },
+    {
+        disc: 127,
+        view: "7.8°",
+        defaults: "small maps, no shadows",
+        ms: [0.088, 0.171],
+        mb: [
+            [0.7, 0.087, 1.4, 0],
+            [44.7, 5.6, 89.5, 0.13],
+        ],
+        off: 1.51,
+    },
+    {
+        disc: 256,
+        view: "3.9°",
+        defaults: "medium maps, hard shadows",
+        ms: [0.189, 0.365],
+        mb: [
+            [2.8, 0.35, 5.6, 0.52],
+            [44.7, 5.6, 89.5, 0.52],
+        ],
+        off: 1.18,
+    },
+    {
+        disc: 1023,
+        view: "1°",
+        defaults: "large maps, hard shadows",
+        ms: [1.59, 2.24],
+        mb: [
+            [44.7, 5.6, 89.5, 6.3],
+            [44.7, 5.6, 89.5, 6.3],
+        ],
+        off: 1.53,
+    },
+    {
+        disc: 4095,
+        view: "0.24°",
+        defaults: "large maps, displaced",
+        ms: [3.22, 3.25],
+        mb: [
+            [44.7, 5.6, 89.5, 5.5],
+            [44.7, 5.6, 89.5, 5.5],
+        ],
+        off: 0.21,
+    },
+];
+const PARTS = ["color map", "relief", "shadow map"] as const;
+const CONFIGS = ["the defaults", "everything on"] as const;
+// Each panel's axis: its end and the step of its grid.
+const AXES = { ms: [3.5, 1], mb: [180, 50], off: [2, 0.5] } as const;
+type Axis = keyof typeof AXES;
+const pct = (v: number, axis: Axis) => `${((100 * v) / AXES[axis][0]).toFixed(3)}%`;
+const ticks = (axis: Axis) =>
+    Array.from({ length: Math.floor(AXES[axis][0] / AXES[axis][1]) + 1 }, (_, i) => i * AXES[axis][1]);
+const grid = (axis: Axis) => `--grid: ${(100 * AXES[axis][1]) / AXES[axis][0]}%`;
+const ms = (v: number) => (v < 1 ? v.toFixed(2) : v.toFixed(1));
+const mb = (v: number) => (v < 10 ? v.toFixed(1) : v.toFixed(0));
+// The bar's parts: the color map as BC1, the relief, the shadow map, and what BC1 saves, outlined at the end.
+const parts = ([color, bc1, relief, shadowMap]: Memory) => [bc1, relief, shadowMap, color - bc1];
+const total = ([color, bc1, relief, shadowMap]: Memory, compressed: boolean) =>
+    (compressed ? bc1 : color) + relief + shadowMap;
+---
+
+<figure class="budget-figure wide" id={id}>
+    <div class="budget-legend note" aria-hidden="true">
+        <span><i class="budget-swatch budget-defaults"></i>the defaults</span>
+        <span><i class="budget-swatch"></i>everything on</span>
+        {PARTS.map((part, i) => <span><i class={`budget-swatch budget-part-${i}`}></i>{part}</span>)}
+        <span><i class="budget-swatch budget-part-0 budget-saved"></i>saved by BC1 colors</span>
+    </div>
+    <div class="budget-grid" role="img" aria-label="Bar charts of the time a frame takes, the GPU memory, and the share of pixels the defaults draw off, for discs of 64 to 4,095 pixels">
+        <span></span>
+        <span class="budget-head note">time a frame, ms</span>
+        <span class="budget-head note">GPU memory, MB</span>
+        <span class="budget-head note">pixels a third of a stop off, %</span>
+        {ROWS.map((row) => (
+            <>
+                <span class="budget-size">
+                    <span>{row.disc.toLocaleString("en-US")} pixels <span class="note">in {row.view}</span></span>
+                    <span class="budget-defaults-note note">{row.defaults}</span>
+                </span>
+                <span class="budget-cell" style={grid("ms")} data-label="time a frame, ms">
+                    {row.ms.map((v, c) => (
+                        <span class="budget-line" title={`${CONFIGS[c]}: ${v} ms`}>
+                            <i class:list={["budget-bar", c === 0 && "budget-defaults"]} style={`width: ${pct(v, "ms")}`}></i>
+                            <span class="budget-value">{ms(v)}</span>
+                        </span>
+                    ))}
+                </span>
+                <span class="budget-cell" style={grid("mb")} data-label="GPU memory, MB">
+                    {row.mb.map((m, c) => (
+                        <span class="budget-line" title={`${CONFIGS[c]}: color map ${m[0]} MB, as BC1 ${m[1]}, relief ${m[2]}, shadow map ${m[3]}`}>
+                            {parts(m).map((v, i) => v > 0 && (
+                                <i class:list={["budget-bar", `budget-part-${i % 3}`, i === 3 && "budget-saved", c === 0 && i < 3 && "budget-defaults"]} style={`width: ${pct(v, "mb")}`}></i>
+                            ))}
+                            <span class="budget-value">{mb(total(m, false))} · {mb(total(m, true))}</span>
+                        </span>
+                    ))}
+                </span>
+                <span class="budget-cell" style={grid("off")} data-label="pixels a third of a stop off, %">
+                    <span class="budget-line" title={`the defaults: ${row.off}% of the disc's pixels`}>
+                        <i class="budget-bar budget-defaults" style={`width: ${pct(row.off, "off")}`}></i>
+                        <span class="budget-value">{row.off.toFixed(1)}</span>
+                    </span>
+                </span>
+            </>
+        ))}
+        <span></span>
+        {(["ms", "mb", "off"] as const).map((axis) => (
+            <span class="budget-axis note" aria-hidden="true">
+                {ticks(axis).map((t) => <span style={`left: ${pct(t, axis)}`}>{t}</span>)}
+            </span>
+        ))}
+    </div>
+    <figcaption class="figure-caption">
+        The cost of nachtgestirn's Moon and what its defaults leave out, for discs from a Moon in a wide sky to one
+        filling the view, each just under a size where the pass switches on more: the time on the GPU a frame takes and
+        the GPU memory of the maps and the shadow map, with the pass' defaults, hatched, what they draw each disc with
+        under its size, and with everything on, solid, the large maps, shadows, displacement and soft shadows; the memory
+        with the color map as it is and as BC1, the two numbers, outlined what BC1 saves; and the share of the disc's
+        pixels the defaults draw more than a third of a stop off from everything on. BC1 colors cost no time and draw no
+        pixel that far off. A view of 1920 by 1080 pixels, as many degrees wide as under each disc, the Moon waxing
+        gibbous; an AMD Radeon RX 7900 XT in Chromium, medians of 101 frames.
+    </figcaption>
+</figure>

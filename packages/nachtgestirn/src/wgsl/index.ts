@@ -6,6 +6,7 @@
  * `camera` is dunstkreis' and `tonemap` and `vision` helldunkel's, bundled at build time: one source, nothing else to
  * install.
  */
+import bc1 from "./bc1.comp.wgsl";
 import mips from "./mips.comp.wgsl";
 import moon from "./moon.comp.wgsl";
 import params from "./params.wgsl";
@@ -17,4 +18,4 @@ import surface from "./surface.wgsl";
 export { camera } from "@himmelszelt/dunstkreis/wgsl";
 export { tonemap, vision } from "@himmelszelt/helldunkel/wgsl";
 export { moonOutput } from "./output.js";
-export { mips, moon, params, relief, shadow, shimmer, surface };
+export { bc1, mips, moon, params, relief, shadow, shimmer, surface };

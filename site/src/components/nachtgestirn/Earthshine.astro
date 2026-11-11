@@ -1,0 +1,53 @@
+---
+import Term from "../Term.astro";
+import Try from "../Try.astro";
+import "../sternzeit/sternzeit.css";
+import "./nachtgestirn.css";
+import LunationSlider from "../sternzeit/LunationSlider.astro";
+
+/** The Moon without earthshine and with it, at one exposure a slider opens up past the sunlit part's. */
+interface Props {
+    id?: string;
+}
+const { id = "earthshine-crescent" } = Astro.props;
+---
+
+<figure class="tiles-figure" id={id} data-earthshine>
+    <div class="tiles-panel as-seen">
+        <canvas aria-label="The Moon without earthshine and with it, rendered with WebGPU"></canvas>
+        <span class="tiles-start">
+            <span class="tiles-hint footnote">Rendered with WebGPU</span>
+        </span>
+    </div>
+    <ul class="tiles-labels" style="grid-template-columns: 1fr 1fr">
+        <li><span class="tiles-name">without earthshine</span> <span class="tiles-value">the night side a hole</span></li>
+        <li><span class="tiles-name">with earthshine</span> <span class="tiles-value" data-field="lux"></span></li>
+    </ul>
+    <label class="figure-slider" title="How many stops more light the exposure lets in than a photograph metered on the sunlit part">
+        <span class="note">Exposure</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="stops" min="0" max="16" step="0.5" value="9" aria-label="Stops more open than the sunlit part's exposure" />
+            <span class="figure-slider-scale" aria-hidden="true">
+                <span class="figure-slider-mark" style="left: 0%">the sunlit part</span>
+                <span class="figure-slider-mark" style="left: 100%">16 stops more</span>
+            </span>
+        </span>
+        <output data-field="stopsValue"></output>
+    </label>
+    <LunationSlider />
+    <p class="view-status" data-field="note"></p>
+    <figcaption class="figure-caption">
+        The Moon at the chosen moment from Earth's center, north up, without <Term of="Earthshine">earthshine</Term> and
+        with it, both at the exposure the upper slider sets, in stops more open than a photograph metered on the sunlit
+        part.
+        <Try label="Three days after new moon" set="date=2026-11-12T18:00Z" fig={id}>
+            at nine stops the night side shows its maria in the earthshine, and the crescent itself is burnt out to white.
+        </Try>
+    </figcaption>
+</figure>
+
+<script>
+    import { earthshineFigure } from "./earthshine";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-earthshine]")) earthshineFigure(root);
+</script>

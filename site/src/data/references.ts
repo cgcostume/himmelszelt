@@ -513,6 +513,14 @@ export const references: Record<string, Reference> = {
         url: "https://doi.org/10.1002/2013JE004580",
         note: "Hapke's parameters fitted tile by tile to LRO's wide angle camera; nachtgestirn takes the near side's medians at 566 nm from the published maps.",
     },
+    schaefer1991: {
+        authors: "Bradley E. Schaefer",
+        title: "Length of the Lunar Crescent",
+        venue: "Quarterly Journal of the Royal Astronomical Society 32",
+        year: 1991,
+        url: "https://ui.adsabs.harvard.edu/abs/1991QJRAS..32..265S",
+        note: "Why the thinnest crescents look short and vanish within some 7° of the Sun, Danjon's limit: the eye and the twilight rather than the relief.",
+    },
     kieffer2005: {
         authors: "Hugh H. Kieffer, Thomas C. Stone",
         title: "The Spectral Irradiance of the Moon",

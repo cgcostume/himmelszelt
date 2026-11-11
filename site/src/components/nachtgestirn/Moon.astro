@@ -12,7 +12,8 @@ import Rays from "./Rays.astro";
 /**
  * The Moon figure: nachtgestirn's disc over dunstkreis' sky in cd/m², composed and tone mapped by the Moon pass, in the
  * shared frame, the view kept on the Moon and zoomed in on it, everything on: Hapke's law, the maps, the relief, the
- * shadows, the earthshine, the eclipse and the air's shimmer. Its options switch them off and set the exposure.
+ * shadows, the earthshine, the eclipse, the air and its shimmer. Its options switch what composes the picture, not the
+ * disc, and set the exposure.
  */
 interface Props {
     id?: string;
@@ -21,59 +22,10 @@ interface Props {
 }
 const {
     id = "moon",
-    caption = "The Moon at the chosen moment and place over dunstkreis' sky: its phase from the Sun's direction, its face turned by the libration and the position angle of its axis, its night side in earthshine, and Earth's shadow on it during an eclipse. The compass directions on the horizon. The view keeps to the Moon; drag to let go, scroll to see the sky around it.",
+    caption = "The Moon at the chosen moment and place over dunstkreis' sky, through its air: lit by the Sun and by earthshine, in Earth's shadow during an eclipse, exposed for its lit part or for the sky, whichever is brighter. The compass directions on the horizon. Drag to let go of the Moon, scroll to see the sky around it.",
     try: experiment,
 } = Astro.props;
 
-const MAPS = {
-    name: "maps",
-    label: "Map size",
-    title: "Which of nachtgestirn's maps the disc is drawn from, the color map's width: auto takes the smallest that gives a texel per pixel, 512 (230 KB) is sharp up to a disc of some 160 pixels, 1K (840 KB) to some 330, 4K (11.5 MB) when zoomed in",
-    options: [
-        ["auto", "auto"],
-        ["small", "512"],
-        ["medium", "1K"],
-        ["large", "4K"],
-    ],
-    checked: "auto",
-};
-// The pass' choices that are made by the disc's size unless given: from 1024 and 4096 pixels across.
-const DISPLACE = {
-    name: "displace",
-    label: "Displacement",
-    heading: "displaced",
-    title: "The relief displaced, not only shaded: each ray near the limb marched through the heights, so the limb shows its mountains and near rims hide what lies behind them. Auto from a disc of 1024 pixels, as the pass does; off, the slopes shade a smooth sphere",
-    options: [
-        ["auto", "auto"],
-        ["on", "on"],
-        ["off", "off"],
-    ],
-    checked: "auto",
-};
-const SOFT = {
-    name: "soft",
-    label: "Soft shadows",
-    heading: "soft",
-    title: "The shadows cast by the Sun's half degree, soft as they run on from the rim or peak that casts them, rather than by a point. Auto from a disc of 4096 pixels, as the pass does: below that, only the longest shadows show it",
-    options: [
-        ["auto", "auto"],
-        ["on", "on"],
-        ["off", "off"],
-    ],
-    checked: "auto",
-};
-const FILTER = {
-    name: "filter",
-    label: "Map filter",
-    title: "How the pass reads its maps: the nearest texel, the four nearest, between two levels too, or up to sixteen taps along the pixel's footprint and a cubic B-spline where a texel covers several pixels, as the pass does",
-    options: [
-        ["nearest", "nearest"],
-        ["bilinear", "bilinear"],
-        ["trilinear", "trilinear"],
-        ["anisotropic", "anisotropic"],
-    ],
-    checked: "anisotropic",
-};
 const TONE = {
     name: "tone",
     label: "Tone curve",
@@ -97,21 +49,12 @@ const TONE = {
             <OptionGroup name="exposure">
                 <label class="sky-ev">EV<sub>100</sub> <input data-field="exposure" type="range" min="-20" max="6" step="0.1" value="-14" title="Brighter to the right: a lower EV lets in more light" /> <output data-field="ev" /></label>
             </OptionGroup>
-            <OptionGroup name="maps">
-                <button type="button" class="view-toggle" data-field="albedo" aria-pressed="true" title="NASA's color map of the Moon, from the Lunar Reconnaissance Orbiter's wide angle camera; off, a uniform disc of the Moon's geometric albedo">albedo</button>
-                <Choice figure={id} {...MAPS} />
-                <Choice figure={id} {...FILTER} />
-            </OptionGroup>
-            <OptionGroup name="relief">
-                <button type="button" class="view-toggle" data-field="relief" aria-pressed="true" title="The relief from the Lunar Orbiter Laser Altimeter's elevation map: craters and mountains catch the light along the terminator">relief</button>
-                <button type="button" class="view-toggle" data-field="shadows" aria-pressed="true" title="The shadows the relief casts, marched through the heights towards the Sun, once into a map around the terminator">shadows</button>
-                <Choice figure={id} {...DISPLACE} />
-                <Choice figure={id} {...SOFT} />
-            </OptionGroup>
             <OptionGroup name="light">
                 <button type="button" class="view-toggle" data-field="earthshine" aria-pressed="true" title="Earthshine, sunlight reflected by Earth onto the Moon's night side: a full Earth lights it with some 13 lux">earthshine</button>
                 <button type="button" class="view-toggle" data-field="eclipse" aria-pressed="true" title="Earth's shadow on the Moon during a lunar eclipse: the penumbra's dimming, the umbra's copper, and the turquoise rim ozone leaves">eclipse</button>
+                <button type="button" class="view-toggle" data-field="airDisc" aria-pressed="true" title="The air in front of the Moon: it dims and reddens the disc, more the lower it stands, and bends its rays, so a rising Moon shows squeezed; off, the Moon as it is above the air, the sky behind it unchanged">air</button>
                 <button type="button" class="view-toggle" data-field="shimmer" aria-pressed="true" title="The air's shimmer: turbulence moves the image about, half an arcsecond at the zenith, growing with the air the light crosses from where you stand, some 3 arcseconds on the horizon and none above the air, and the air spreads the colors, blue lifted more than red, near the horizon some tens of arcseconds. It moves, so the figure draws on while it is on">shimmer</button>
+                <button type="button" class="view-toggle" data-field="night" aria-pressed="false" title="As the eye sees it at night rather than a camera: below some 4 cd/m² the rods take over, colors fade and shift towards blue; the disc, far brighter, keeps its color">night vision</button>
             </OptionGroup>
             <OptionGroup name="HDR (× SDR white)">
                 <Hdr figure={id} />

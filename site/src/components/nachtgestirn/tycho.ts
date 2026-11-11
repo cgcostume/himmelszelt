@@ -1,10 +1,13 @@
-import { drawSvg, SUN_SYMBOL, sunGlow, sunRays, svgText, THUMB_RADIUS } from "../sternzeit/figure";
-import { apply, dot, transpose } from "./laws";
+import { fromSelenographic, selenographicPoint, surfaceCircle, type Vec3 } from "@himmelszelt/nachtgestirn";
+import { drawSvg, escapeText, SUN_SYMBOL, sunGlow, sunRays, svgText, THUMB_RADIUS } from "../sternzeit/figure";
+import { apply, dot } from "./laws";
 import type { MoonAt } from "./renderer";
 import { TYCHO } from "./tycho-profile";
 
 const DEG = Math.PI / 180;
 const MOON_KM = 1737.4;
+// Tycho's diameter, after the IAU's Gazetteer of Planetary Nomenclature.
+const TYCHO_KM = 85.3;
 // The slice: this many km either side of Tycho's middle, its heights this many times as tall, and room above for the
 // Sun's rays and below for the names, in px.
 const HALF_KM = 100;
@@ -50,17 +53,16 @@ export function tychoMark(
     radius: number,
     least = 0,
 ) {
-    // A point of the Moon at a latitude and longitude, in the observer's frame, and where it shows, or null behind.
-    const at = (latitude: number, longitude: number): Point | null => {
-        const [la, lo] = [latitude * DEG, longitude * DEG];
-        const body: [number, number, number] = [Math.cos(la) * Math.cos(lo), Math.cos(la) * Math.sin(lo), Math.sin(la)];
-        const n = apply(transpose(m.orientation), body);
+    // A direction on the Moon in the observer's frame, and where it shows, or null behind.
+    const shown = (n: Vec3): Point | null => {
         if (dot(n, frame.toward as [number, number, number]) < 0) return null;
         return [
             center[0] + dot(n, frame.right as [number, number, number]) * radius,
             center[1] - dot(n, frame.up as [number, number, number]) * radius,
         ];
     };
+    const at = (latitude: number, longitude: number) =>
+        shown(fromSelenographic(m.orientation, selenographicPoint(longitude, latitude)));
     const { latitude, longitude } = TYCHO;
     const middle = at(latitude, longitude);
     if (!middle) return "";
@@ -73,12 +75,10 @@ export function tychoMark(
         const d = points.map((p, i) => (p ? `${i && points[i - 1] ? "L" : "M"}${f(p[0])} ${f(p[1])}` : "")).join("");
         return d ? `<path d="${d}" class="${cls}"/>` : "";
     };
-    // The crater's rim, some 43 km out, and the slice along the parallel, as far either way as it is drawn.
-    const r = 43 / MOON_KM / DEG;
-    const rim = Array.from({ length: 33 }, (_, i) => {
-        const a = (i / 32) * 2 * Math.PI;
-        return at(latitude + r * Math.sin(a), longitude + (r * Math.cos(a)) / Math.cos(latitude * DEG));
-    });
+    // The crater's rim, a circle on the sphere 85 km across, closed, and the slice along the parallel, as far either way
+    // as it is drawn.
+    const circle = surfaceCircle(m, longitude, latitude, TYCHO_KM, 32).map(shown);
+    const rim = [...circle, circle[0] ?? null];
     const across = HALF_KM / (MOON_KM * Math.cos(latitude * DEG)) / DEG;
     const slice = Array.from({ length: 9 }, (_, i) => at(latitude, longitude + across * (i / 4 - 1)));
     const size = (points: (Point | null)[]) =>
@@ -424,7 +424,9 @@ export function tychoSlice(
                     `${Math.round(one.share * 100)}% of the Sun's disc above it`;
         }
         out += `<circle cx="${f(p[0])}" cy="${f(p[1])}" r="${THUMB_RADIUS}" class="figure-thumb"/>`;
-        drawSvg(svg, out, 1);
+        // The hint as the drawing's title, the tooltip over all of it.
+        const hint = svg.dataset.hint ? `<title>${escapeText(svg.dataset.hint)}</title>` : "";
+        drawSvg(svg, hint + out, 1);
         if (note) note.textContent = readout;
         if (name) name.textContent = `Tycho, ${2 * HALF_KM} km across, heights ×${TALLER}`;
         geometry.width = width;

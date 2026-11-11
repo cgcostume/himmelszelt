@@ -35,6 +35,9 @@ export { createMoonMaps, loadMoonMaps, MOON_COLOR, MOON_MAPS } from "./maps.js";
 export type { EarthShadow, EncodeOptions, MapFilter, MoonParams, MoonPass, MoonPassOptions, Shimmer } from "./moon.js";
 export { createMoonPass, PARAMS_SIZE, paramsData, shimmerScales } from "./moon.js";
 
+export type { SurfacePoint } from "./surface.js";
+export { fromSelenographic, selenographicPoint, surfaceCircle, surfacePoint } from "./surface.js";
+
 export type { RefractedSunlightOptions } from "./umbra.js";
 export { refractedSunlight, typicalUmbra, umbraLightAt, UMBRA_SAMPLES } from "./umbra.js";
 

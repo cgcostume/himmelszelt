@@ -34,7 +34,8 @@ export function distanceFigure(root: HTMLElement) {
             moon: { ...m, geocentricDiameter: diameterAt(distances[i] ?? m.distanceKm) },
             luts: table.luts,
             toneMap: display.toneCurve as ToneCurveName,
-            maps: "auto",
+            // The 1K maps whatever the discs' size: the smallest ones "auto" picks for them look soft.
+            maps: "medium",
             ev100: null,
             albedo: true,
             relief: true,

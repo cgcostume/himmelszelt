@@ -34,7 +34,8 @@ struct NbParams {
     albedo: f32,
     // 1 the color map, 2 the relief, 4 the eclipse, 8 the relief's shadows from the shadow map, 16 the table's
     // transmittances, 32 the color map as gray, its luminance alone, 64 the map's own color, untinted, 128 the comparison
-    // with `compareLaw`, 256 the air's shimmer, 512 the relief displaced where it shows, not only shaded.
+    // with `compareLaw`, 256 the air's shimmer, 512 the relief displaced where it shows, not only shaded, 1024 a point
+    // Sun's hard shadows drawn and compared with the Sun's disc's soft ones.
     flags: u32,
     // The reflectance law: 0 Hapke's lunar law after Jensen et al., 1 Lambert's, 2 Oren-Nayar's, 3 a PBR
     // renderer's metallic-roughness dielectric, Burley's diffuse at roughness 1, to compare.
@@ -91,3 +92,4 @@ const NB_FLAG_UNTINTED: u32 = 64u;
 const NB_FLAG_COMPARE: u32 = 128u;
 const NB_FLAG_SHIMMER: u32 = 256u;
 const NB_FLAG_DISPLACE: u32 = 512u;
+const NB_FLAG_COMPARE_SHADOWS: u32 = 1024u;

@@ -1,3 +1,4 @@
+import { paintRange } from "../range";
 import { drawSvg, SUN_SYMBOL, sunGlow, sunRays } from "../sternzeit/figure";
 
 export type Law = "lambert" | "orenNayar" | "hapke" | "hapke2012";
@@ -141,7 +142,9 @@ const REACH = 88;
 export function lobesFigure(root: HTMLElement) {
     const panels = [...root.querySelectorAll<SVGSVGElement>("svg[data-law]")];
     const note = root.querySelector<HTMLElement>("[data-field=lobes]");
-    let light = -40 * DEG;
+    const slider = root.querySelector<HTMLInputElement>("[data-field=sunAngle]");
+    const sliderValue = root.querySelector<HTMLElement>("[data-field=sunAngleValue]");
+    let light = (Number(slider?.value ?? -40) || -40) * DEG;
     const toward = (angle: number, r: number) => [ORIGIN.x + Math.sin(angle) * r, ORIGIN.y - Math.cos(angle) * r];
 
     // The Sun as the figures draw it as a symbol, its size in screen pixels whatever the panel's width.
@@ -190,16 +193,30 @@ export function lobesFigure(root: HTMLElement) {
             svg += sun(lx ?? 0, ly ?? 0, unitsPerPx);
             drawSvg(panel, svg, 1);
         }
+        const degrees = Math.round(light / DEG);
         if (note)
-            note.textContent = `side views: the Sun ${Math.abs(light / DEG).toFixed(0)}° ${light < 0 ? "left" : "right"} of the normal`;
+            note.textContent =
+                degrees === 0
+                    ? "side views: the Sun straight over the patch"
+                    : `side views: the Sun ${Math.abs(degrees)}° ${degrees < 0 ? "left" : "right"} of the normal`;
+        if (slider && Number(slider.value) !== degrees) {
+            slider.value = String(degrees);
+            paintRange(slider);
+        }
+        if (sliderValue) sliderValue.textContent = `${degrees < 0 ? "\u2212" : ""}${Math.abs(degrees)}°`;
     }
+
+    slider?.addEventListener("input", () => {
+        light = Number(slider.value) * DEG;
+        draw();
+    });
 
     for (const panel of panels) {
         const set = (event: PointerEvent) => {
             const box = panel.getBoundingClientRect();
             const x = ((event.clientX - box.left) / box.width) * W - ORIGIN.x;
             const y = ORIGIN.y - ((event.clientY - box.top) / box.height) * H;
-            light = Math.max(-88 * DEG, Math.min(88 * DEG, Math.atan2(x, Math.max(y, 0.001))));
+            light = Math.max(-90 * DEG, Math.min(90 * DEG, Math.atan2(x, Math.max(y, 0.001))));
             draw();
         };
         panel.addEventListener("pointerdown", (event) => {

@@ -1,6 +1,6 @@
 import { moonEV100 } from "@himmelszelt/nachtgestirn";
 import { find } from "../dom";
-import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
+import { display, gpu, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { drawSvg } from "../sternzeit/figure";
 import { onChange, state } from "../sternzeit/state";
@@ -26,14 +26,19 @@ export function softShadowsFigure(root: HTMLElement) {
     const requestRender = onDemand(render, root);
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
-    const resolution = mapResolutions(root, "large", requestRender);
+    // The 8K strip where the GPU takes textures that wide, else the 4K.
+    const finest = (gpu.device?.limits.maxTextureDimension2D ?? 0) >= 8192 ? "8k-strip" : "large";
+    const resolution = mapResolutions(root, finest, requestRender);
 
-    // The color map, or a uniform albedo for the relief alone.
+    // The color map, or a uniform albedo for the relief alone; and the hard shadows striped where they are off the soft.
     const albedo = find("[data-field=albedo]", root);
-    albedo.addEventListener("click", () => {
-        albedo.setAttribute("aria-pressed", String(albedo.getAttribute("aria-pressed") !== "true"));
-        requestRender();
-    });
+    const deviation = find("[data-field=deviation]", root);
+    for (const button of [albedo, deviation]) {
+        button.addEventListener("click", () => {
+            button.setAttribute("aria-pressed", String(button.getAttribute("aria-pressed") !== "true"));
+            requestRender();
+        });
+    }
 
     function render() {
         const table = tables();
@@ -61,7 +66,12 @@ export function softShadowsFigure(root: HTMLElement) {
         };
         // The close-ups a stop more open than the disc's meter, for the low Sun at the terminator.
         const close = { ...common, ev100: moonEV100(m.phaseAngle, m.lit) - 1, offset, degreesAcross: closeup };
-        const frames: TileFrame[] = [common, { ...close, moon: { ...m, sunAngularDiameter: POINT_SUN } }, close];
+        // The point Sun's from the same march as the soft ones, striped where it is off them, or from a point alone.
+        const point: TileFrame =
+            deviation.getAttribute("aria-pressed") === "true"
+                ? { ...close, compareShadows: true }
+                : { ...close, moon: { ...m, sunAngularDiameter: POINT_SUN } };
+        const frames: TileFrame[] = [common, point, close];
         tiles?.draw({ count: 3, width: tilePx, degreesAcross: overview }, (i) => frames[i] ?? (frames[0] as TileFrame));
         marker.setAttribute("viewBox", `0 0 ${width} ${tileCss}`);
         const scale = tileCss / overview;

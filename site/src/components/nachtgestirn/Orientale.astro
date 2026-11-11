@@ -1,0 +1,52 @@
+---
+import "../sternzeit/sternzeit.css";
+import "./nachtgestirn.css";
+
+/** Mare Orientale turned from where Earth sees it, on the limb, to face on, closing in on its rings. */
+interface Props {
+    id?: string;
+}
+const { id = "orientale" } = Astro.props;
+---
+
+<figure class="tiles-figure" id={id} data-orientale>
+    <div class="tiles-panel as-seen">
+        <canvas aria-label="Mare Orientale, turned from the limb to face on, rendered with WebGPU"></canvas>
+        <span class="tiles-start">
+            <span class="tiles-hint footnote">Rendered with WebGPU</span>
+        </span>
+    </div>
+    <label class="figure-slider" title="From the limb, as Earth sees the basin at the chosen moment, to straight over it">
+        <span class="note">Turn</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="turn" min="0" max="100" step="0.5" value="100" aria-label="How far the Moon is turned to face the basin" />
+            <span class="figure-slider-scale" aria-hidden="true">
+                <span class="figure-slider-mark" style="left: 0%">from Earth</span>
+                <span class="figure-slider-mark" style="left: 100%">face on</span>
+            </span>
+        </span>
+        <output data-field="turnValue"></output>
+    </label>
+    <label class="figure-slider" title="How high the Sun stands over the basin's middle, from the east">
+        <span class="note">Sun</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="sun" min="1" max="60" step="0.5" value="12" aria-label="The Sun's height over the basin, in degrees" />
+            <span class="figure-slider-scale" aria-hidden="true">
+                <span class="figure-slider-mark" style="left: 0%">rising</span>
+                <span class="figure-slider-mark" style="left: 100%">60°</span>
+            </span>
+        </span>
+        <output data-field="sunValue"></output>
+    </label>
+    <p class="view-status" data-field="note"></p>
+    <figcaption class="figure-caption">
+        Mare Orientale turned from the limb, where Earth sees it, to face on, the view closing in on its rings as it
+        turns, the Moon's north up; lit from the east at the Sun's height the lower slider sets.
+    </figcaption>
+</figure>
+
+<script>
+    import { orientaleFigure } from "./orientale";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-orientale]")) orientaleFigure(root);
+</script>

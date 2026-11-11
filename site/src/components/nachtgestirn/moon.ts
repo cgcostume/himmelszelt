@@ -1,4 +1,3 @@
-import type { MapFilter } from "@himmelszelt/nachtgestirn";
 import { find } from "../dom";
 import {
     bindHdr,
@@ -20,20 +19,9 @@ import { paintRange } from "../range";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
 import { raysOf } from "./rays";
-import {
-    createMoonRenderer,
-    inverseViewProjection,
-    type MapSize,
-    moonAt,
-    onUmbraTable,
-    type ToneCurveName,
-} from "./renderer";
+import { createMoonRenderer, inverseViewProjection, moonAt, onUmbraTable, type ToneCurveName } from "./renderer";
 
 const DEG = Math.PI / 180;
-// A switch of the pass that is made by the disc's size: from how many pixels across, the pass' own threshold for auto.
-const SIZES: Record<string, number | undefined> = { on: 0, off: Number.POSITIVE_INFINITY };
-// The image's rms wander through one zenith's column of air, in arcseconds: a camera lens on a fair night, the tilt
-// 0.42 lambda/D (D/r0)^(5/6) for D 5 cm and r0 10 cm at 500 nm.
 
 /**
  * The Moon figure on `root`, a `figure[data-moon]`: dunstkreis' sky in cd/m² into a float texture, nachtgestirn's
@@ -160,20 +148,17 @@ export function moonFigure(root: HTMLElement) {
             pixelRatio: dpr,
             grid: marks() === 2,
             discPixels: ((angularDiameter * DEG) / camera.fov) * height,
-            maps: (choice("maps") || "auto") as MapSize,
-            filter: (choice("filter") || "anisotropic") as MapFilter,
-            // Auto as the pass decides by the disc's size, or always, or never.
-            displacementFrom: SIZES[choice("displace")],
-            softShadowsFrom: SIZES[choice("soft")],
+            maps: "auto",
             air: true,
+            airOnDisc: pressed("airDisc"),
             ev100: pressed("auto") ? null : evOfSlider(),
-            albedo: pressed("albedo"),
-            relief: pressed("relief"),
-            shadows: pressed("shadows"),
+            albedo: true,
+            relief: true,
+            shadows: true,
             earthshine: pressed("earthshine"),
             eclipse: pressed("eclipse"),
             law: "hapke2012",
-            nightVision: false,
+            nightVision: pressed("night"),
             shimmer: pressed("shimmer") ? { time: performance.now() / 1000, dispersion: 1 } : null,
             ...rays(),
         });
@@ -223,20 +208,7 @@ export function moonFigure(root: HTMLElement) {
         onUmbraTable(requestRender);
         new ResizeObserver(requestRender).observe(canvas);
         maybe("exposure")?.addEventListener("input", requestRender);
-        for (const name of ["maps", "filter", "displace", "soft"])
-            for (const input of root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-${name}"]`))
-                input.addEventListener("change", requestRender);
-        for (const name of [
-            "shimmer",
-            "auto",
-            "lock",
-            "sunLock",
-            "albedo",
-            "relief",
-            "shadows",
-            "earthshine",
-            "eclipse",
-        ]) {
+        for (const name of ["shimmer", "auto", "lock", "sunLock", "airDisc", "night", "earthshine", "eclipse"]) {
             maybe(name)?.addEventListener("click", () => {
                 const on = !pressed(name);
                 field(name).setAttribute("aria-pressed", String(on));

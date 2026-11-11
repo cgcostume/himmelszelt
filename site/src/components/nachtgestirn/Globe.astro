@@ -2,6 +2,7 @@
 import Icon from "../Icon.astro";
 import Resolutions from "../Resolutions.astro";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
+import Try from "../Try.astro";
 import "../dunstkreis/dunstkreis.css";
 import "../sternzeit/sternzeit.css";
 import Rays from "./Rays.astro";
@@ -42,15 +43,12 @@ const { id = "globe" } = Astro.props;
     </div>
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        The Moon at the chosen moment, out of the air and away from Earth: Hapke's lunar law over NASA's color and
-        LOLA's heights, the relief shading the surface and casting its shadows, the Sun where it stands, and the night
-        side lit by earthshine where it faces Earth. Drag to carry yourself around the Moon, the Sun and Earth staying
-        where they are, onto the far side, which Earth never sees, or behind the Moon into a crescent; scroll to zoom
-        in where the cursor is, or out until the Moon is small, in until a texel of the 8K maps is four pixels wide; shift and drag to move the view, never so far the Moon leaves it;
-        the lock or a double click turns it back to the face Earth sees, the far side switch half round. The maps can be had at 1K and 4K, as the package
-        ships them, and at 2K and 8K. The relief is displaced, not only shaded, so the limb shows its mountains; the switch shows it shaded on a smooth
-        sphere instead, as the pass draws a disc under 1024 pixels. Its shadows are marched once into a map for the Sun
-        where it stands, soft from a disc of 4096 pixels on. Every pixel is the mean of four rays, or with the switch of one. The slider runs from new moon to new moon.
+        The Moon at the chosen moment, out of the air and away from Earth: Hapke's law over NASA's color and LOLA's
+        heights, the relief shading the surface and casting its shadows, the Sun where it stands, the night side in
+        earthshine where it faces Earth. Drag to rotate.
+        <Try label="Full Moon" set="date=2026-11-24T14:00Z" fig={id}>
+            a disc flat to its rim, the terminator pushed out to the limb.
+        </Try>
     </figcaption>
 </figure>
 

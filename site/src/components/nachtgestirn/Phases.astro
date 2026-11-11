@@ -13,17 +13,24 @@ const { id = "phases" } = Astro.props;
 
 <figure class="plot-figure" id={id} data-phases>
     <div class="tiles-plot" data-export="phase-law" data-export-timeless>
-        <svg style="height: 220px" role="img" aria-label="The light of the whole disc over the phase angle under four reflectance laws, and the Moon's as measured by ROLO and by Allen"></svg>
+        <svg style="height: 306px" role="img" aria-label="The light of the whole disc over the phase angle under three reflectance laws, and the Moon's as measured by ROLO and by Allen"></svg>
     </div>
+    <label class="figure-slider" title="The phase angle the readouts stand at: drag, or hover the plot; the chosen moment's Moon until touched">
+        <span class="note">Phase angle</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="phaseAngle" min="0" max="180" step="1" value="0" aria-label="Phase angle" />
+        </span>
+        <output data-field="phaseAngleValue"></output>
+    </label>
     <figcaption class="figure-caption">
-        The light the whole disc sends to the viewer over the <Term of="Phase angle">phase angle</Term>, in stops below
-        a full Moon, under the four laws, each a plain disc of the law alone, and the Moon as measured: the ROLO model,
-        dashed, from 1.55° to 97°, and Allen's older phase law, dotted. The measurement is of the whole disc's light,
-        not of how it is spread over the disc, so this is where the laws can be checked against the Moon itself. The readouts stand at the line marked now, the real
-        Moon's phase angle at the chosen moment.
-        <Try label="First quarter" set="date=2026-11-17T12:00Z" fig={id}>
-            Hapke's half Moon of 2012 is a sixth of a stop over ROLO's, his of 1963 a quarter, Lambert's more than one and
-            a half stops.
+        The light of the whole disc over the <Term of="Phase angle">phase angle</Term>, in{" "}
+        <Term of="Stop">stops</Term> below a full Moon: the three laws as plain discs, and the Moon as measured, the
+        ROLO model dashed from 1.55° to 97°, Allen's phase law dotted, alone in the shaded band beyond ROLO's last
+        angle. Sunlight only, without earthshine. The dotted lines mark the half lit disc at 90° and Danjon's limit at
+        173°, the readouts and the disc under the axis stand at the slider's phase angle, the line marked now is the
+        Moon's at the chosen moment.
+        <Try label="A day after new moon" set="date=2026-11-10T12:00Z" fig={id}>
+            Hapke 2012 three stops under Allen, its slopes shading each other.
         </Try>
     </figcaption>
 </figure>

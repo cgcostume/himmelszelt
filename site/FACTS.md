@@ -243,11 +243,15 @@ confirmed yet.
 | First quarter, November 17, 2026: Hapke 2012 a sixth of a stop over ROLO, 1963 a quarter, Lambert more than one and a half | Fig. phases, Try | lib | phase angle 89.7°: +0.15, +0.23, +1.69 | ok | 2026-11-09 |
 | Coherent backscatter added by Hapke in 2002 | Sunlight on dust | src | Hapke 2002, Icarus 157, 523-534; crossref | ok | 2026-11-09 |
 | Ciechanowski's Moon: soil sphere flattening, grains hiding shadows, two grains in step | Sunlight on dust | web | ciechanow.ski/moon/#lunar-brightness | ok | 2026-11-09 |
+| Danjon's limit: the eye loses the crescent within some 7° of the Sun, phase angle 173°; Danjon blamed the relief, later work the twilight's glare | Sunlight on dust | src | Schaefer 1991 QJRAS 32, 265 (ADS abstract); the-moon.us Danjon Limit; Fatoohi et al. 1998 revise to 7.5° | ok | 2026-11-10 |
+| Hapke 2012 a stop under Allen by 150°, through −14 stops by 168°; Allen's law never reaches zero | Sunlight on dust | lib | `discLight` with 48 and 400 samples alike: −8.92 vs Allen −7.87 at 150°, −13.87 at 168°, −14.89 at 170°; Allen −11.5 at 178° | ok | 2026-11-10 |
 | First quarter, November 17, 2026: Hapke within a quarter stop, Lambert more than a stop over | Fig. phases, Try | lib | `discLight` against `phaseLaw` at 90°: Hapke -0.24, Lambert +1.22 | ok | 2026-11-09 |
 | Perigee 33.5′ against apogee 29.4′, 14% wider; a third more light | Near and far | lib | 2 asin(1737.1 / 356,500) and / 406,700; (406,700 / 356,500)^2 = 1.30 | ok | 2026-11-04 |
 | Overhead an Earth radius nearer, almost 2% wider; the rising Moon 1.7% smaller | Near and far, glossary | derived | 6,371 / 384,400 = 1.66%; sternzeit's caption says the same | ok | 2026-11-04 |
 | Over a night the face turns by up to a degree, which sternzeit does not follow | The face we see | derived | diurnal libration: asin(6,371 / 384,400) = 0.95°; `moon.librations` is geocentric | ok | 2026-11-04 |
 | The umbra twelve to seventeen stops below the sunlight | Earth's shadow | lib | the model's 1e-5 at the axis = -16.6 stops, 3.2e-4 at the edge = -11.6 | ok | 2026-11-04 |
+| Everything on, a small disc twice the time, under half a millisecond, 134 MB where 2 do; defaults off on 1 or 2 in 100 pixels, mostly rims along the terminator a pixel off without displacement | Cheap and full, Figure (budget) | lib | Chromium 153, Vulkan, RX 7900 XT, 1920x1080, gibbous, medians of 101 frames, two runs within 3%; defaults vs large maps with shadowsFrom, displacementFrom, softShadowsFrom 0: 64 px 0.069 vs 0.112 ms, 2.1 vs 134.3 MB; 127: 0.088 vs 0.171; 256: 0.189 vs 0.365, 8.9 vs 134.7 MB; 1023: 1.59 vs 2.24; 4095: 3.22 vs 3.25. Pixels over 1/3 stop off, linear, coverage > 0.5, floor 1% of the 95th percentile: 1.59, 1.51, 1.18, 1.53, 0.21%; displacement alone brings 64 px to 0.34%, 1023 to 0.08%; error maps show rim pairs along the terminator and the limb | ok | 2026-11-11 |
+| compress: BC1 color map an eighth of its memory, 39 MB less for the large maps, a hundredth of a stop off; no time, no pixel a third of a stop off | Cheap and full, Figure (budget) | lib | same setup, loadMoonMaps compress: color 44.74 to 5.59 MB (large), 0.70 to 0.087 (small), 2.80 to 0.35 (medium); frame times within noise (2.24 vs 2.20 ms at 1023); everything on with BC1 vs without: mean 0.008 to 0.014 stops, p99 0.05 to 0.07, none over 1/3; OKLab x100 mean 0.22 to 0.33, p99 1.1 to 1.4 | ok | 2026-11-11 |
 | Ciechanowski's Moon, December 17, 2024 | Opening, references | web | ciechanow.ski/archives | ok | 2026-11-04 |
 
 ### Experiments in the captions
@@ -259,6 +263,9 @@ confirmed yet.
 | First quarter, November 17, 2026, 12:00 UTC: Lambert a third of its full, Hapke a tenth | Fig. laws, Try | lib | phase angle 89.7°, lit 0.502; curves -2.2 (Lambert, -1.7 of its own full) and -3.7 stops | ok | 2026-11-04 |
 | The supermoon of November 25, 2034, 22:00 UTC: a full Moon within hours of a close perigee | Fig. near-far, Try | lib | `moon.distance` 356,448 km, phase angle 4.8° | ok | 2026-11-04 |
 | New Year's Eve 2028, 17:00 UTC: the Moon's center halfway in from the umbra's edge; in the umbra 16:09 to 19:35 local | Fig. eclipse-row, Try | lib | axis offset 2,135 km of 4,601; the figure's bisection on `umbralMagnitude` | ok | 2026-11-04 |
+| Mare Orientale: "Eastern Sea", on the western limb since the IAU's 1961 switch to the astronauts' east and west | The Eastern Sea | web | en.wikipedia.org/wiki/Mare_Orientale; Gazetteer origin "Eastern sea." | ok | 2026-11-10 |
+| Youngest of the great basins, younger than Imbrium's 3.85 billion years | The Eastern Sea | web | en.wikipedia.org/wiki/Mare_Orientale (not dated directly; younger than Imbrium, ~3.85 Ga) | ok | 2026-11-10 |
+| Three rings, the outer Montes Cordillera some 960 km across, the mare a third as wide | The Eastern Sea | src | Gazetteer: Montes Cordillera 963.5 km, Mare Orientale 294.2 km; Wikipedia gives 930 km for the ring | ok | 2026-11-10 |
 
 ## sternenheer
 

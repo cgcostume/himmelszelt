@@ -31,7 +31,7 @@ const LAWS = [
             <span class="view-buttons">
                 <button type="button" class="view-icon" data-field="map" aria-pressed="false" title="NASA's maps, color and relief; off, plain discs of the law alone" aria-label="Maps"><Icon name="moonMap" /></button>
                 <button type="button" class="view-icon" data-field="day" aria-pressed="false" title="The same discs over a plain daytime sky, exposed for the sky: the pale Moon by day" aria-label="By day"><Icon name="day" /></button>
-                <button type="button" class="view-icon" data-field="deviation" aria-pressed="false" title="Stripe where each disc is more than a third of a stop off Hapke's model of 2012, the nearest to the measured Moon: red where brighter, blue where darker" aria-label="Deviation"><Icon name="clipped" /></button>
+                <button type="button" class="view-icon" data-field="deviation" aria-pressed="true" title="Stripe where each disc is more than a third of a stop off Hapke's model of 2012, the nearest to the measured Moon: red where brighter, blue where darker" aria-label="Deviation"><Icon name="clipped" /></button>
             </span>
             <span class="tiles-hint footnote">Drag the discs to go around the Moon. Rendered with WebGPU</span>
         </span>
@@ -48,14 +48,9 @@ const LAWS = [
     <LunationSlider />
     <p class="view-status"><span data-field="note"></span></p>
     <figcaption class="figure-caption">
-        The Moon at the chosen moment under the four laws of the side views above, from Earth's center with north up, all four exposed alike,
-        metered on the measured Moon's lit part or at the full Moon's exposure, plain or with NASA's maps, over the night
-        or a plain daytime sky. Under each disc, how far the light of the whole disc is off the measured Moon's at this
-        phase angle, in stops, as in the plot above: ROLO's up to 97°, Allen's beyond. At a switch each disc is striped
-        where it is more than a third of a stop off Hapke's of 2012, red brighter, blue darker: a comparison with the nearest law, not with the Moon,
-        whose light is measured for the whole disc only. Lambert darkens the limb like a matte ball; Oren-Nayar leans
-        back towards the light but has no surge; both of Hapke's keep the full Moon's limb as bright as its middle. The
-        slider runs from new moon to new moon.
+        The Moon at the chosen moment under the four laws of the side views, from Earth's center with north up, all
+        four exposed alike. Under each disc, how far the whole disc's light is off the measured Moon's, in stops. Striped,
+        at a switch, where a disc is more than a third of a stop off Hapke's model of 2012: red brighter, blue darker.
         <Try label="First quarter" set="date=2026-11-17T12:00Z" fig={id}>
             Hapke's half Moon of 1963 stays bright up to the terminator, his half Moon of 2012 fades into it.
         </Try>

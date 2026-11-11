@@ -19,11 +19,13 @@ fn nbShadows(@builtin(global_invocation_id) id: vec3u) {
     let fine = nbInDetail(body);
     let level = max(log2(max(texel * p.moonRadiusKm / nbReliefTexelKm(fine), 1e-4)), 0.0);
     let height = nbHeightAt(body, level, fine);
-    let sunShare = nbSunAboveTerrain(body, s, height, level, fine);
+    // The share of the Sun's disc above the terrain, and a point Sun's.
+    let sun = nbSunAboveTerrain(body, s, height, level, fine);
     // The rays of a disc that is not displaced meet the smooth sphere: near the limb a point the terrain in front hides
     // from the viewer is seen anyway. Its shadow is then the hidden part of the occluder's, which near full Moon, the Sun
     // at the viewer's back, the eye would not see: where the viewer cannot see the point, it takes no shadow.
     let viewer = p.orientation * -p.direction;
-    let seen = select(1.0, nbAboveTerrain(body, viewer, height, level, fine, p.sunAngularRadius), sunShare < 1.0);
-    nbOutputStore(id.xy, vec4f(mix(1.0, sunShare, seen)));
+    let hidden = min(sun.x, sun.y) < 1.0;
+    let seen = select(1.0, nbAboveTerrain(body, viewer, height, level, fine, p.sunAngularRadius), hidden);
+    nbOutputStore(id.xy, vec4f(mix(vec2f(1.0), sun, seen), 0.0, 1.0));
 }

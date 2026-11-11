@@ -48,17 +48,9 @@ const { id = "sampling" } = Astro.props;
     <LunationSlider />
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        The maps' filters on the limb near the Moon's south pole: the disc at the chosen moment, metered, with the
-        close-up marked, and the close-up four times, one ray through each pixel's center, or with the switch four,
-        which hides much of the first two filters' noise. The nearest texel of the full size map, in noise where many
-        texels fall into a pixel; bilinear, between the four nearest, still noisy; trilinear, between the two nearest of
-        the map's levels too, quiet but blurred towards the limb, where the slant stretches a pixel's footprint across
-        the map and one round level has to cover all of it; and anisotropic, up to sixteen trilinear taps along that
-        footprint, sharp and quiet, as the pass reads its maps. Where the map is magnified, a texel over several
-        pixels, the pass takes a cubic B-spline instead, so the texels do not show as stairs along the rims; zoom in
-        all the way in <Fig id="globe" /> to see it. The <Term of="Terminator">terminator</Term> runs near the poles all
-        month, so the relief there is all long shadows, and the close-up leans along the limb from the pole towards the
-        Sun. The slider runs from new moon to new moon.
+        The maps' filters on the limb near the Moon's south pole: the disc at the chosen moment with the close-up
+        marked, and the close-up four times, the nearest texel, bilinear, trilinear and anisotropic, as the pass reads its
+        maps; one ray through each pixel's center, or four at the switch.
         <Try label="Five days after new moon" set="date=2026-11-14T18:00Z" fig={id}>
             step the time an hour at a time, the first two tiles crawl.
         </Try>

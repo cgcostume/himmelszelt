@@ -25,7 +25,8 @@ export function colorFigure(root: HTMLElement) {
             moon: m,
             luts: table.luts,
             toneMap: display.toneCurve as ToneCurveName,
-            maps: "auto",
+            // The 4K maps whatever the discs' size, so the color's detail holds up close.
+            maps: "large",
             ev100: null,
             albedo: true,
             relief: true,

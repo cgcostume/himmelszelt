@@ -224,9 +224,10 @@ export function createTiles(canvas: HTMLCanvasElement, requestRender: () => void
             let complete = true;
             for (let i = 0; i < count * rows; i++) {
                 const f = frame(i);
+                // The figure's switch for the rays, unless the frame sets its own.
                 const tile = {
-                    ...f,
                     ...rays(),
+                    ...f,
                     format,
                     headroom,
                     ...view(f.moon, f.degreesAcross ?? degreesAcross, tileW, tileW / tileH, f.offset, f.air, f.up),

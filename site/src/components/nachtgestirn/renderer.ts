@@ -294,6 +294,9 @@ export interface MoonFrame {
     maps: MapSize;
     /** The sky behind, the air's dimming and bending and the horizon; without, the Moon from Earth's center, in black. */
     air: boolean;
+    /** Whether the air acts on the disc too, true by default: its dimming, its bending and its shimmer. Off, the Moon
+     *  shows as above the air, over the same sky. */
+    airOnDisc?: boolean;
     /** Null to meter: the Moon's lit part, or the sky around it where that is brighter. */
     ev100: number | null;
     albedo: boolean;
@@ -304,6 +307,8 @@ export interface MoonFrame {
     law: "hapke" | "hapke2012" | "lambert" | "orenNayar";
     /** A law to hold the disc against, its pixels striped where they are a third of a stop off it. */
     compare?: "hapke" | "hapke2012" | "lambert" | "orenNayar" | null;
+    /** A point Sun's hard shadows, striped where they are a third of a stop off the Sun's disc's soft ones. */
+    compareShadows?: boolean;
     /** The color map tinted to the Moon's color, as published, or as gray; tinted by default. */
     mapColor?: "tinted" | "untinted" | "gray";
     /** As the eye sees it at night, rather than a camera. */
@@ -469,14 +474,15 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             }
 
             // The air towards the Moon, per ray of its disc in the table, and at its center for the meter.
-            const refraction = frame.air
+            const airOnDisc = frame.air && frame.airOnDisc !== false;
+            const refraction = airOnDisc
                 ? refractionTable(m.trueDirection, m.angularDiameter, m.bend, m.through)
                 : null;
             // Traced only where there is air: the tiles have none.
-            const center = frame.air
+            const center = airOnDisc
                 ? m.through((Math.asin(Math.min(Math.max(m.direction[2], -1), 1)) * 180) / Math.PI)
                 : null;
-            const through = frame.air ? (center ? (center[0] + center[1] + center[2]) / 3 : 0) : 1;
+            const through = airOnDisc ? (center ? (center[0] + center[1] + center[2]) / 3 : 0) : 1;
             // Metered on the lit part of the disc outside the umbra, opening up as the umbra swallows it but no further
             // than the umbra's own exposure, or on the sky around it where that is brighter, so neither burns out.
             const outsideUmbra = frame.eclipse ? Math.max(1 - Math.max(m.shadow.umbralMagnitude, 0), 1e-4) : 1;
@@ -530,6 +536,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                 law: frame.law,
                 mapColor: frame.mapColor ?? "tinted",
                 compare: frame.compare ?? null,
+                compareShadows: frame.compareShadows ?? false,
                 eclipse: frame.eclipse ? m.earthShadow : null,
                 sunAngularDiameter: m.sunAngularDiameter,
                 refraction,
@@ -538,7 +545,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                 // Where a figure carried the viewer away from Earth, Earth where it has gone.
                 earthDirection: (m as MoonAt & { earthDirection?: Vec3 }).earthDirection ?? null,
                 // Only through the air, measured in its zenith column from sea level.
-                shimmer: frame.air && frame.shimmer ? shimmerThrough(m, frame.shimmer) : null,
+                shimmer: airOnDisc && frame.shimmer ? shimmerThrough(m, frame.shimmer) : null,
             });
             const encoder = device.createCommandEncoder({ label: "sternwarte:moon" });
             if (frame.air) {
