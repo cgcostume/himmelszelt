@@ -195,7 +195,7 @@ export interface RefractionTable {
     transmittances?: Float32Array;
 }
 
-/** The entries of a `RefractionTable`, `NB_REFRACTION_SAMPLES` in params.wgsl. */
+/** The entries of a `RefractionTable`, `NG_REFRACTION_SAMPLES` in params.wgsl. */
 export const REFRACTION_SAMPLES = 32;
 
 /**

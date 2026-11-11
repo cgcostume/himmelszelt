@@ -299,13 +299,13 @@ function decodeRelief(
     region: readonly [number, number, number, number] = [0, 0, 1, 1],
 ) {
     const [west, north, east, south] = region;
-    const constants = { NB_RELIEF_NORTH: north, NB_RELIEF_SPAN_U: east - west, NB_RELIEF_SPAN_V: south - north };
+    const constants = { NG_RELIEF_NORTH: north, NG_RELIEF_SPAN_U: east - west, NG_RELIEF_SPAN_V: south - north };
     const pipe = pipeline(device, `relief ${region.join(" ")}`, () =>
         compute(
             device,
             "nachtgestirn:relief",
             [wgsl.moonOutput("rgba16float"), wgsl.params, wgsl.surface, wgsl.relief].join("\n"),
-            "nbRelief",
+            "ngRelief",
             constants,
         ),
     );
@@ -321,8 +321,8 @@ function buildMips(device: GPUDevice, texture: GPUTexture, format: GPUTextureFor
             device,
             "nachtgestirn:mips",
             [wgsl.moonOutput(format), wgsl.params, wgsl.surface, wgsl.mips].join("\n"),
-            "nbDownsample",
-            { NB_MIP_SRGB: srgb ? 1 : 0 },
+            "ngDownsample",
+            { NG_MIP_SRGB: srgb ? 1 : 0 },
         ),
     );
     const encoder = device.createCommandEncoder({ label: "nachtgestirn:mips" });
@@ -338,7 +338,7 @@ function buildMips(device: GPUDevice, texture: GPUTexture, format: GPUTextureFor
 
 /** The color map with its levels as BC1, encoded on the GPU level by level; the uncompressed one destroyed. */
 function compressBc1(device: GPUDevice, texture: GPUTexture): GPUTexture {
-    const pipe = pipeline(device, "bc1", () => compute(device, "nachtgestirn:bc1", wgsl.bc1, "nbEncodeBc1"));
+    const pipe = pipeline(device, "bc1", () => compute(device, "nachtgestirn:bc1", wgsl.bc1, "ngEncodeBc1"));
     const compressed = device.createTexture({
         label: texture.label,
         size: [texture.width, texture.height],

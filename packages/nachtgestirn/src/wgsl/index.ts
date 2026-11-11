@@ -1,7 +1,7 @@
 /**
  * The WGSL layer, exported as plain strings so a consumer can compose these snippets into their own shaders instead of
  * using this package's pass. `params` and `surface` are binding-free; the `.comp.wgsl` passes declare their bindings
- * at group 0 and take their output from `moonOutput(format)` at group 1. Every identifier is prefixed `nb`/`NB_`.
+ * at group 0 and take their output from `moonOutput(format)` at group 1. Every identifier is prefixed `ng`/`NG_`, for nachtgestirn.
  *
  * `camera` is dunstkreis' and `tonemap` and `vision` helldunkel's, bundled at build time: one source, nothing else to
  * install.

@@ -220,7 +220,7 @@ const SHADOW_SUBTEXELS = 4;
 const SHADOW_FORMAT: GPUTextureFormat = "rgba8unorm";
 const EIGHT_BIT = ["rgba8unorm", "bgra8unorm"];
 const TONE_CURVES: Record<string, number> = { neutral: 1, agx: 2, aces: 3, clip: 4 };
-/** Byte size of NbParams in params.wgsl: a mat4x4, a mat3x3 of three padded columns, twelve vec4-sized rows, the
+/** Byte size of NgParams in params.wgsl: a mat4x4, a mat3x3 of three padded columns, twelve vec4-sized rows, the
  *  refraction table's eight, the albedo's tint and the table's transmittances, a vec4 each, the umbra's table, the
  *  detail strip, the shimmer and the shadow map's window. */
 export const PARAMS_SIZE = 912 + UMBRA_SAMPLES * 16 + 32 + 48 + 16;
@@ -262,7 +262,7 @@ export interface MoonDetail {
     displace: boolean;
 }
 
-/** Packs `params` as NbParams, for a consumer's own pipeline as much as for the pass: without `detail`, no shadows and
+/** Packs `params` as NgParams, for a consumer's own pipeline as much as for the pass: without `detail`, no shadows and
  *  no displacement, which need the pass' shadow map and its view of the disc. */
 export function paramsData(params: MoonParams, maps: MoonMaps | null, detail?: MoonDetail): ArrayBuffer {
     const data = new ArrayBuffer(PARAMS_SIZE);
@@ -384,14 +384,14 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
     }
     const shared = [wgsl.params, wgsl.camera, wgsl.surface, wgsl.tonemap, wgsl.vision, wgsl.moon];
     const constants = {
-        NB_TONE_MAP: toneMap === false ? 0 : (TONE_CURVES[toneMap] ?? 1),
-        NB_HEADROOM: headroom,
-        NB_DITHER: dither ? 1 : 0,
-        NB_BACKGROUND: background ? 1 : 0,
-        NB_SAMPLES: samples,
-        NB_TERMINATOR_SAMPLES: Math.max(terminatorSamples, samples),
-        NB_NIGHT_VISION: nightVision ? 1 : 0,
-        NB_MAP_BSPLINE: filter === "anisotropic" ? 1 : 0,
+        NG_TONE_MAP: toneMap === false ? 0 : (TONE_CURVES[toneMap] ?? 1),
+        NG_HEADROOM: headroom,
+        NG_DITHER: dither ? 1 : 0,
+        NG_BACKGROUND: background ? 1 : 0,
+        NG_SAMPLES: samples,
+        NG_TERMINATOR_SAMPLES: Math.max(terminatorSamples, samples),
+        NG_NIGHT_VISION: nightVision ? 1 : 0,
+        NG_MAP_BSPLINE: filter === "anisotropic" ? 1 : 0,
     };
     // One layout for the inputs, which the Moon pass and the shadow map's share, and one for each one's output.
     const texture = (binding: number, sampleType: GPUTextureSampleType = "float"): GPUBindGroupLayoutEntry => ({
@@ -447,9 +447,9 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
     };
     const relief = maps?.relief ?? null;
     const [compose, shadowPass] = await Promise.all([
-        pipelineOf(format, shared.join("\n"), "nbCompose", "nachtgestirn:moon"),
+        pipelineOf(format, shared.join("\n"), "ngCompose", "nachtgestirn:moon"),
         relief && Number.isFinite(shadowsFrom)
-            ? pipelineOf(SHADOW_FORMAT, [...shared, wgsl.shadow].join("\n"), "nbShadows", "nachtgestirn:shadows")
+            ? pipelineOf(SHADOW_FORMAT, [...shared, wgsl.shadow].join("\n"), "ngShadows", "nachtgestirn:shadows")
             : null,
     ]);
     const uniform = device.createBuffer({
@@ -508,8 +508,8 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         if (shimmerAsked) return;
         shimmerAsked = true;
         Promise.all([
-            pipelineOf(LAYER_FORMAT, shared.join("\n"), "nbCompose", "nachtgestirn:moonLayer", { NB_LAYER: 1 }),
-            pipelineOf(format, [...shared, wgsl.shimmer].join("\n"), "nbShimmer", "nachtgestirn:shimmer"),
+            pipelineOf(LAYER_FORMAT, shared.join("\n"), "ngCompose", "nachtgestirn:moonLayer", { NG_LAYER: 1 }),
+            pipelineOf(format, [...shared, wgsl.shimmer].join("\n"), "ngShimmer", "nachtgestirn:shimmer"),
         ]).then(([layer, post]) => {
             shimmerPasses = { layer, post };
             options.onReady?.();
@@ -524,17 +524,17 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         if (!fixed.has(key)) {
             fixed.set(key, null);
             const overrides = {
-                NB_FIXED: 1,
-                NB_FIXED_FLAGS: flags,
-                NB_FIXED_LAW: law,
-                NB_FIXED_COMPARE_LAW: compareLaw,
+                NG_FIXED: 1,
+                NG_FIXED_FLAGS: flags,
+                NG_FIXED_LAW: law,
+                NG_FIXED_COMPARE_LAW: compareLaw,
             };
             const [target, label] = moonLayer
                 ? [LAYER_FORMAT, "nachtgestirn:moonLayer"]
                 : [format, "nachtgestirn:moon"];
-            pipelineOf(target, shared.join("\n"), "nbCompose", label, {
+            pipelineOf(target, shared.join("\n"), "ngCompose", label, {
                 ...overrides,
-                NB_LAYER: moonLayer ? 1 : 0,
+                NG_LAYER: moonLayer ? 1 : 0,
             }).then(
                 (made) => fixed.set(key, made),
                 () => {},

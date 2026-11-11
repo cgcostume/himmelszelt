@@ -196,7 +196,7 @@ confirmed yet.
 |---|---|---|---|---|---|
 | Lambert reflects a slant of 80° at a sixth of face on | Sunlight on dust | derived | cos 80° = 0.174 | ok | 2026-11-04 |
 | Lommel-Seeliger at full Moon: a half at the center and at the rim | Sunlight on dust | derived | mu0 / (mu0 + mu) with mu0 = mu | ok | 2026-11-04 |
-| Opposition surge a factor 2 at 0, gone by 90° | Sunlight on dust | src, lib | Hapke's B(g, 0.6) as Jensen et al. 2001; `nbRetrodirective` | ok | 2026-11-04 |
+| Opposition surge a factor 2 at 0, gone by 90° | Sunlight on dust | src, lib | Hapke's B(g, 0.6) as Jensen et al. 2001; `ngRetrodirective` | ok | 2026-11-04 |
 | osgHimmel's scattering term makes the quarters a stop too bright | Sunlight on dust | derived | Hapke66's S at 90°: 0.477 against Jensen's 0.418, times the same LS integral: 0.18 vs 0.077 of full, about 1.2 stops | ok | 2026-11-04 |
 | Geometric albedo 0.12, Earth's 0.367 | Sunlight on dust, Earthshine, glossary | src | NASA fact sheets | ok | 2026-11-04 |
 | Full Moon some 4,900 cd/m² before the air | Sunlight on dust | lib | `meanLuminance(0)` = 4,889 | ok | 2026-11-04 |
@@ -226,9 +226,9 @@ confirmed yet.
 | Full Moon exposes around 14, looney 11 | Through the air | lib | `ev100ForLuminance(4889)` - 1 = 14.3, 13.8 through 71 % air; f/11 at 1/100 s is EV100 log2(121 · 100) = 13.6 | ok | 2026-11-04 |
 | Hapke 1963 and 1966, Jensen et al. 2001, van de Hulst 1980 | People | src | the references | ok | 2026-11-04 |
 | A Lambert sphere gives two thirds of a flat disc's light at full, a third of its own full at a quarter | Sunlight on dust | derived | disc integral of mu0 / pi: 2/3 at g = 0; (sin g + (pi - g) cos g) / pi = 1 / pi at 90° | ok | 2026-11-04 |
-| Hapke's law within a quarter of a stop of Allen's law from full to a thin crescent | Sunlight on dust, Fig. laws | lib | disc integral of `nbHapke` against `phaseLaw`: 0.01 at 5°, 0.13 at 60°, 0.24 at 90°, 0.21 at 120°, 0.20 at 150°, 0.43 at 170° | ok | 2026-11-04 |
+| Hapke's law within a quarter of a stop of Allen's law from full to a thin crescent | Sunlight on dust, Fig. laws | lib | disc integral of `ngHapke` against `phaseLaw`: 0.01 at 5°, 0.13 at 60°, 0.24 at 90°, 0.21 at 120°, 0.20 at 150°, 0.43 at 170° | ok | 2026-11-04 |
 | Lambert's half Moon more than twice too bright | Sunlight on dust | derived | Lambert 2.24 stops below full against 3.46 measured: 2.3 times | ok | 2026-11-04 |
-| Oren-Nayar's half Moon nearly twice too bright | Sunlight on dust | lib | disc integral of `nbOrenNayar` (lobes.ts `discLight`) against `phaseLaw` at 90°: +0.87 stops, 1.8 times | ok | 2026-11-09 |
+| Oren-Nayar's half Moon nearly twice too bright | Sunlight on dust | lib | disc integral of `ngOrenNayar` (lobes.ts `discLight`) against `phaseLaw` at 90°: +0.87 stops, 1.8 times | ok | 2026-11-09 |
 | Hapke 2012 model: two-lobed phase function, multiple scattering, roughness of some 24° | Sunlight on dust | src | Hapke 2012 book; Hapke 1984 (roughness); Sato 2014 fixed theta 23.657° (PDS WAC_HAPKEPARAMMAP readme) | ok | 2026-11-09 |
 | Sato et al. fitted some 66,000 WAC images, tile by tile | Sunlight on dust | src | PDS readme: ~66,000 WAC observations, 1° tiles | ok | 2026-11-09 |
 | Near side medians at 566 nm: w 0.3231, b 0.2366, c 0.3344, BS0 1.75, hS 0.05309; Bc0 0, phi 1 fixed | surface.wgsl, lobes.ts | src | WAC_HAPKEPARAMMAP_7BAND.IMG, band 4, |lon| < 90°, median | ok | 2026-11-09 |

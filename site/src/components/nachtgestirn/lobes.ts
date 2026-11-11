@@ -35,7 +35,7 @@ function orenNayar(mu0: number, mu: number, g: number) {
     const tanBeta = Math.min(sin0 / Math.max(mu0, 1e-4), sinV / Math.max(mu, 1e-4));
     return (mu0 * (a + b * cosAzimuth * alpha * tanBeta)) / PI;
 }
-// Hapke's 2012 model with Sato et al.'s 2014 lunar parameters, as nbHapke2012 has it.
+// Hapke's 2012 model with Sato et al.'s 2014 lunar parameters, as ngHapke2012 has it.
 const H12 = { w: 0.3231, b: 0.2366, c: 0.3344, bs0: 1.75, hs: 0.05309, tan: Math.tan((23.657 * PI) / 180) };
 const H12_CHI = 1 / Math.sqrt(1 + PI * H12.tan * H12.tan);
 const H12_GAMMA = Math.sqrt(1 - H12.w);

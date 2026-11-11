@@ -8,7 +8,7 @@ import {
     type Vec3,
 } from "./orientation.js";
 
-/** The band the shadow map covers, as angles from the subsolar point: NB_BAND_FROM and NB_BAND_TO in moon.comp.wgsl. */
+/** The band the shadow map covers, as angles from the subsolar point: NG_BAND_FROM and NG_BAND_TO in moon.comp.wgsl. */
 const BAND_FROM = Math.PI / 2 - 0.45;
 const BAND_TO = Math.PI / 2 + 0.12;
 /** Rays across the view in each direction, to find what of the Moon it shows. */
@@ -86,7 +86,7 @@ function projectRay(m: Float32Array, x: number, y: number, d: number): Vec3 {
     ];
 }
 
-// The pass' nbUnbend: the ray as it left the air.
+// The pass' ngUnbend: the ray as it left the air.
 function unbend(view: Vec3, table: RefractionTable | null): Vec3 {
     const horizontal = Math.hypot(view[0], view[1]);
     if (!table || table.step <= 0 || horizontal < 1e-6) return view;

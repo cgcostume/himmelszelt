@@ -36,7 +36,7 @@ function bisect(a: number, b: number, test: (jd: number) => boolean) {
 }
 
 /** The share of the Sun's disc Earth leaves uncovered, seen from a point `axisKm` from the shadow's axis, as
- *  surface.wgsl's nbShadow has it before the air's light is added. */
+ *  surface.wgsl's ngShadow has it before the air's light is added. */
 export function directSunlight(axisKm: number, distanceKm: number, sunAngularRadius: number) {
     const earthRadius = Math.asin(Math.min(EARTH_RADIUS_KM / distanceKm, 1));
     const separation = Math.atan(axisKm / distanceKm);

@@ -1,7 +1,7 @@
 // What the Moon pass takes per frame. A struct only, no binding: the pass binds it where it likes. Directions ENU
 // (x east, y north, z up) and unit length, lengths in km, light in lux, luminance in cd/m².
 
-struct NbParams {
+struct NgParams {
     // Turns pixels back into rays, as dunstkreis' sky pass: column major, no translation.
     inverseViewProjection: mat4x4f,
     // Turns a direction in the observer's frame into the Moon's own, selenographic: x towards 0° longitude, y towards
@@ -47,25 +47,25 @@ struct NbParams {
     earthDirection: vec3f,
     // The apparent altitude of the table's first entry, in radians.
     refractionFrom: f32,
-    // How far the air bends a ray down, in radians, at NB_REFRACTION_SAMPLES apparent altitudes over the disc's band,
+    // How far the air bends a ray down, in radians, at NG_REFRACTION_SAMPLES apparent altitudes over the disc's band,
     // from `refractionFrom` on by `refractionStep`.
     refraction: array<vec4f, 8>,
     // What the color map is multiplied by per channel besides `albedoScale`: from its own mean color to the Moon's.
     albedoTint: vec3f,
-    // With NB_FLAG_COMPARE, the law the disc is held against, numbered as `law`: where the two differ by more than a
+    // With NG_FLAG_COMPARE, the law the disc is held against, numbered as `law`: where the two differ by more than a
     // third of a stop, the pixel is striped, red where `law` is brighter, blue where darker.
     compareLaw: u32,
-    // What the air lets through at each of the refraction table's entries, per channel, with NB_FLAG_AIR.
+    // What the air lets through at each of the refraction table's entries, per channel, with NG_FLAG_AIR.
     airTransmittance: array<vec4f, 32>,
-    // The sunlight Earth's air bends into its shadow, as a share of the sunlight per channel, at NB_UMBRA_SAMPLES
+    // The sunlight Earth's air bends into its shadow, as a share of the sunlight per channel, at NG_UMBRA_SAMPLES
     // distances from the shadow's axis, from the axis to the penumbra's edge.
     umbraTable: array<vec4f, 64>,
     // Where the detail strip lies in the whole maps' uv, west, north, east and south edges; east not past west for none.
     detailRegion: vec4f,
-    // The air's shimmer, with NB_FLAG_SHIMMER: the image's rms wander in radians, the time in seconds the turbulence
+    // The air's shimmer, with NG_FLAG_SHIMMER: the image's rms wander in radians, the time in seconds the turbulence
     // has drifted by, and how far the air spreads green from red and blue, in radians of refraction.
     shimmer: vec4f,
-    // The shadow map, with NB_FLAG_SHADOWS, from `shadow.comp.wgsl`: the Sun's direction in the Moon's frame it was
+    // The shadow map, with NG_FLAG_SHADOWS, from `shadow.comp.wgsl`: the Sun's direction in the Moon's frame it was
     // made for, and a texel's angle on the unit sphere; the axis its longitudes about the Sun count from, and the first
     // longitude of its window; the window's first angle from the subsolar point, its width and height in texels, and
     // the Sun's angular radius it casts with, 0 a point.
@@ -77,18 +77,18 @@ struct NbParams {
     shimmerParts: vec4f,
 }
 
-const NB_UMBRA_SAMPLES: u32 = 64u;
+const NG_UMBRA_SAMPLES: u32 = 64u;
 
-const NB_REFRACTION_SAMPLES: u32 = 32u;
+const NG_REFRACTION_SAMPLES: u32 = 32u;
 
-const NB_FLAG_COLOR: u32 = 1u;
-const NB_FLAG_RELIEF: u32 = 2u;
-const NB_FLAG_ECLIPSE: u32 = 4u;
-const NB_FLAG_SHADOWS: u32 = 8u;
-const NB_FLAG_AIR: u32 = 16u;
-const NB_FLAG_GRAY: u32 = 32u;
-const NB_FLAG_UNTINTED: u32 = 64u;
-const NB_FLAG_COMPARE: u32 = 128u;
-const NB_FLAG_SHIMMER: u32 = 256u;
-const NB_FLAG_DISPLACE: u32 = 512u;
-const NB_FLAG_COMPARE_SHADOWS: u32 = 1024u;
+const NG_FLAG_COLOR: u32 = 1u;
+const NG_FLAG_RELIEF: u32 = 2u;
+const NG_FLAG_ECLIPSE: u32 = 4u;
+const NG_FLAG_SHADOWS: u32 = 8u;
+const NG_FLAG_AIR: u32 = 16u;
+const NG_FLAG_GRAY: u32 = 32u;
+const NG_FLAG_UNTINTED: u32 = 64u;
+const NG_FLAG_COMPARE: u32 = 128u;
+const NG_FLAG_SHIMMER: u32 = 256u;
+const NG_FLAG_DISPLACE: u32 = 512u;
+const NG_FLAG_COMPARE_SHADOWS: u32 = 1024u;

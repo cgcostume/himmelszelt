@@ -8,7 +8,7 @@
 
 import { EARTH_RADIUS_KM, type Vec3 } from "./orientation.js";
 
-/** Entries of the umbra's table, from the shadow's axis to the penumbra's edge: NB_UMBRA_SAMPLES in params.wgsl. */
+/** Entries of the umbra's table, from the shadow's axis to the penumbra's edge: NG_UMBRA_SAMPLES in params.wgsl. */
 export const UMBRA_SAMPLES = 64;
 
 export interface RefractedSunlightOptions {

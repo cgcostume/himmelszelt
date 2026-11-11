@@ -3,21 +3,21 @@
 // between them. The endpoints are the texels' box along their main direction, inset by a sixteenth of its span (van
 // Waveren 2006), the sRGB-encoded values matched as they are. Needs nothing else.
 
-@group(0) @binding(0) var nbBlockSource: texture_2d<f32>;
-@group(0) @binding(1) var<storage, read_write> nbBlocks: array<vec2u>;
+@group(0) @binding(0) var ngBlockSource: texture_2d<f32>;
+@group(0) @binding(1) var<storage, read_write> ngBlocks: array<vec2u>;
 
-fn nbPack565(c: vec3f) -> u32 {
+fn ngPack565(c: vec3f) -> u32 {
     let q = vec3u(round(saturate(c) * vec3f(31.0, 63.0, 31.0)));
     return (q.r << 11u) | (q.g << 5u) | q.b;
 }
 
-fn nbUnpack565(v: u32) -> vec3f {
+fn ngUnpack565(v: u32) -> vec3f {
     return vec3f(f32((v >> 11u) & 31u) / 31.0, f32((v >> 5u) & 63u) / 63.0, f32(v & 31u) / 31.0);
 }
 
 @compute @workgroup_size(8, 8, 1)
-fn nbEncodeBc1(@builtin(global_invocation_id) id: vec3u) {
-    let size = textureDimensions(nbBlockSource);
+fn ngEncodeBc1(@builtin(global_invocation_id) id: vec3u) {
+    let size = textureDimensions(ngBlockSource);
     let blocks = (size + 3u) / 4u;
     if (id.x >= blocks.x || id.y >= blocks.y) {
         return;
@@ -28,7 +28,7 @@ fn nbEncodeBc1(@builtin(global_invocation_id) id: vec3u) {
     var hi = vec3f(0.0);
     var mean = vec3f(0.0);
     for (var i = 0u; i < 16u; i = i + 1u) {
-        let t = textureLoad(nbBlockSource, min(id.xy * 4u + vec2u(i & 3u, i >> 2u), size - 1u), 0).rgb;
+        let t = textureLoad(ngBlockSource, min(id.xy * 4u + vec2u(i & 3u, i >> 2u), size - 1u), 0).rgb;
         texels[i] = t;
         lo = min(lo, t);
         hi = max(hi, t);
@@ -51,8 +51,8 @@ fn nbEncodeBc1(@builtin(global_invocation_id) id: vec3u) {
         b.b = hi.b;
     }
     let inset = (a - b) / 16.0;
-    var c0 = nbPack565(a - inset);
-    var c1 = nbPack565(b + inset);
+    var c0 = ngPack565(a - inset);
+    var c1 = ngPack565(b + inset);
     // The first color the larger, for the four-color mode.
     if (c0 < c1) {
         let swap = c0;
@@ -61,11 +61,11 @@ fn nbEncodeBc1(@builtin(global_invocation_id) id: vec3u) {
     }
     let at = id.y * stride + id.x;
     if (c0 == c1) {
-        nbBlocks[at] = vec2u(c0 | (c1 << 16u), 0u);
+        ngBlocks[at] = vec2u(c0 | (c1 << 16u), 0u);
         return;
     }
-    let e0 = nbUnpack565(c0);
-    let e1 = nbUnpack565(c1);
+    let e0 = ngUnpack565(c0);
+    let e1 = ngUnpack565(c1);
     let palette = array<vec3f, 4>(e0, e1, mix(e0, e1, 1.0 / 3.0), mix(e0, e1, 2.0 / 3.0));
     var indices = 0u;
     for (var i = 0u; i < 16u; i = i + 1u) {
@@ -81,5 +81,5 @@ fn nbEncodeBc1(@builtin(global_invocation_id) id: vec3u) {
         }
         indices = indices | (best << (2u * i));
     }
-    nbBlocks[at] = vec2u(c0 | (c1 << 16u), indices);
+    ngBlocks[at] = vec2u(c0 | (c1 << 16u), indices);
 }
