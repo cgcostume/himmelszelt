@@ -4,6 +4,9 @@
 // as the Moon pass would, over the background, exposed and tone mapped. The ground and the sky behind the Moon stay
 // put. Requires `moon.comp.wgsl` with all it requires, and the output binding from `moonOutput` for the target's format.
 
+// The layer read between its texels, clamped at its edges.
+@group(0) @binding(9) var nbLayerSampler: sampler;
+
 // Turbulence tilts the light arriving, and the image wanders: by an rms angle that grows with the air crossed as the
 // Fried parameter shrinks, r0 ~ airmass^-3/5, the tilt ~ r0^-5/6. How far apart on the sky two points still wander
 // together is the lens' width over the distance to the turbulence, which grows with the air crossed too: some
@@ -76,15 +79,7 @@ fn nbShimmered(ray: vec3f, pixelAngle: f32) -> array<vec3f, 4> {
 
 // The layer at a point in pixels, between its four nearest, clamped at its edges.
 fn nbLayerAt(position: vec2f) -> vec4f {
-    let size = vec2i(textureDimensions(nbLayer));
-    let p = position - 0.5;
-    let base = vec2i(floor(p));
-    let t = p - floor(p);
-    let a = textureLoad(nbLayer, clamp(base, vec2i(0), size - 1), 0);
-    let b = textureLoad(nbLayer, clamp(base + vec2i(1, 0), vec2i(0), size - 1), 0);
-    let c = textureLoad(nbLayer, clamp(base + vec2i(0, 1), vec2i(0), size - 1), 0);
-    let d = textureLoad(nbLayer, clamp(base + vec2i(1, 1), vec2i(0), size - 1), 0);
-    return mix(mix(a, b, t.x), mix(c, d, t.x), t.y);
+    return textureSampleLevel(nbLayer, nbLayerSampler, position / vec2f(textureDimensions(nbLayer)), 0.0);
 }
 
 // The layer around a point blurred by a Gaussian of `sigma` pixels: NB_BLUR_TAPS of equal weight on a golden spiral,
@@ -111,14 +106,19 @@ fn nbShimmer(@builtin(global_invocation_id) id: vec3u) {
     }
     let pixel = vec2f(id.xy) + 0.5;
     let ray = nbPixelRay(pixel, size);
+    // A ray moved on the sky is a point moved on the target, through the target's axes there, a pixel each.
+    let across = nbPixelRay(pixel + vec2f(1.0, 0.0), size) - ray;
+    let down = nbPixelRay(pixel + vec2f(0.0, 1.0), size) - ray;
+    let pixelAngle = length(across);
+    // As far as the layer holds the Moon, and the air moves it and blurs it, its waves together at most ten times its
+    // rms tilt, and spreads its colors.
+    let w = nbParams.shimmer;
+    let parts = nbParams.shimmerParts;
+    let reach = nbParams.angularRadius * 1.3 + 4.0 * pixelAngle + 10.0 * w.x * max(parts.x, parts.y) + 0.01 * w.z;
     var luminance = vec3f(0.0);
     var coverage = 0.0;
     // The ground hides the Moon below the horizon, wherever the air moved it from.
-    if (ray.z >= nbParams.horizonZ) {
-        // A ray moved on the sky is a point moved on the target, through the target's axes there, a pixel each.
-        let across = nbPixelRay(pixel + vec2f(1.0, 0.0), size) - ray;
-        let down = nbPixelRay(pixel + vec2f(0.0, 1.0), size) - ray;
-        let pixelAngle = length(across);
+    if (ray.z >= nbParams.horizonZ && nbRayOf(nbUnbend(ray)).angle < reach) {
         let rays = nbShimmered(ray, pixelAngle);
         let sigma = rays[3].x / pixelAngle;
         var read: array<vec4f, 3>;

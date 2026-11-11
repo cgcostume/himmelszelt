@@ -6,26 +6,36 @@
 
 @compute @workgroup_size(8, 8, 1)
 fn nbShadows(@builtin(global_invocation_id) id: vec3u) {
-    let p = nbParams;
-    if (f32(id.x) >= p.shadowWindow.y || f32(id.y) >= p.shadowWindow.z) {
+    if (f32(id.x) >= nbParams.shadowWindow.y || f32(id.y) >= nbParams.shadowWindow.z) {
         return;
     }
-    let texel = p.shadowSun.w;
-    let s = p.shadowSun.xyz;
-    let east = p.shadowEast.xyz;
-    let longitude = p.shadowEast.w + (f32(id.x) + 0.5) * texel;
-    let theta = p.shadowWindow.x + (f32(id.y) + 0.5) * texel;
-    let body = s * cos(theta) + (east * cos(longitude) + cross(s, east) * sin(longitude)) * sin(theta);
-    let fine = nbInDetail(body);
-    let level = max(log2(max(texel * p.moonRadiusKm / nbReliefTexelKm(fine), 1e-4)), 0.0);
-    let height = nbHeightAt(body, level, fine);
-    // The share of the Sun's disc above the terrain, and a point Sun's.
-    let sun = nbSunAboveTerrain(body, s, height, level, fine);
+
+    // The map's frame, in the Moon's own: the pole towards the Sun, and two axes around it, longitude 0 and 90°.
+    let toSun = nbParams.shadowSun.xyz;
+    let axisX = nbParams.shadowEast.xyz;
+    let axisY = cross(toSun, axisX);
+    // The texel's middle in that frame: its longitude about the Sun, and its angle from the subsolar point.
+    let texelAngle = nbParams.shadowSun.w;
+    let longitude = nbParams.shadowEast.w + (f32(id.x) + 0.5) * texelAngle;
+    let fromSubsolar = nbParams.shadowWindow.x + (f32(id.y) + 0.5) * texelAngle;
+    // Its point on the Moon's unit sphere, in the Moon's frame.
+    let around = axisX * cos(longitude) + axisY * sin(longitude);
+    let point = toSun * cos(fromSubsolar) + around * sin(fromSubsolar);
+
+    // The terrain's height there, read as coarse as the map's texels are wide, from the strip where it lies in one.
+    let inStrip = nbInDetail(point);
+    let level = max(log2(max(texelAngle * nbParams.moonRadiusKm / nbReliefTexelKm(inStrip), 1e-4)), 0.0);
+    let height = nbHeightAt(point, level, inStrip);
+
+    // The share of the Sun's disc above the terrain, and a point Sun's, 0 or 1.
+    let lit = nbSunAboveTerrain(point, toSun, height, level, inStrip);
+
     // The rays of a disc that is not displaced meet the smooth sphere: near the limb a point the terrain in front hides
     // from the viewer is seen anyway. Its shadow is then the hidden part of the occluder's, which near full Moon, the Sun
     // at the viewer's back, the eye would not see: where the viewer cannot see the point, it takes no shadow.
-    let viewer = p.orientation * -p.direction;
-    let hidden = min(sun.x, sun.y) < 1.0;
-    let seen = select(1.0, nbAboveTerrain(body, viewer, height, level, fine, p.sunAngularRadius), hidden);
-    nbOutputStore(id.xy, vec4f(mix(vec2f(1.0), sun, seen), 0.0, 1.0));
+    let toViewer = nbParams.orientation * -nbParams.direction;
+    let shaded = min(lit.x, lit.y) < 1.0;
+    let seen = select(1.0, nbAboveTerrain(point, toViewer, height, level, inStrip, nbParams.sunAngularRadius), shaded);
+
+    nbOutputStore(id.xy, vec4f(mix(vec2f(1.0), lit, seen), 0.0, 1.0));
 }

@@ -37,8 +37,7 @@ struct NbParams {
     // with `compareLaw`, 256 the air's shimmer, 512 the relief displaced where it shows, not only shaded, 1024 a point
     // Sun's hard shadows drawn and compared with the Sun's disc's soft ones.
     flags: u32,
-    // The reflectance law: 0 Hapke's lunar law after Jensen et al., 1 Lambert's, 2 Oren-Nayar's, 3 a PBR
-    // renderer's metallic-roughness dielectric, Burley's diffuse at roughness 1, to compare.
+    // The reflectance law: 0 Hapke's lunar law after Jensen et al., 1 Lambert's, 2 Oren-Nayar's, 3 Hapke's 2012 model.
     law: u32,
     // How strong the umbra's refracted light is, 1 for a typical eclipse.
     umbraLight: f32,

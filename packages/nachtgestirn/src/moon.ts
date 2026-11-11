@@ -411,6 +411,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
             texture(6),
             texture(7),
             texture(8),
+            { binding: 9, visibility: GPUShaderStage.COMPUTE, sampler: { type: "filtering" } },
         ],
     });
     const outputOf = (target: GPUTextureFormat) =>
@@ -469,6 +470,12 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         format: "rgba16float",
         usage: GPUTextureUsage.TEXTURE_BINDING,
     });
+    // The layer read between its texels, clamped at its edges, by the shimmer.
+    const layerSampler = device.createSampler({
+        label: "nachtgestirn:layer",
+        magFilter: "linear",
+        minFilter: "linear",
+    });
     const linear = filter !== "nearest";
     const sampler =
         maps && filter === "anisotropic"
@@ -507,6 +514,33 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
             shimmerPasses = { layer, post };
             options.onReady?.();
         });
+    };
+    // Pipelines fixed to a frame's flags and laws, the rest left out, made in the background the first time a frame asks
+    // for them; until one is ready, the pipeline for everything draws.
+    const fixed = new Map<string, Awaited<ReturnType<typeof pipelineOf>> | null>();
+    const fixedFor = (moonLayer: boolean, data: ArrayBuffer) => {
+        const [flags = 0, law = 0, compareLaw = 0] = [56, 57, 99].map((i) => new Uint32Array(data)[i]);
+        const key = `${moonLayer} ${flags} ${law} ${compareLaw}`;
+        if (!fixed.has(key)) {
+            fixed.set(key, null);
+            const overrides = {
+                NB_FIXED: 1,
+                NB_FIXED_FLAGS: flags,
+                NB_FIXED_LAW: law,
+                NB_FIXED_COMPARE_LAW: compareLaw,
+            };
+            const [target, label] = moonLayer
+                ? [LAYER_FORMAT, "nachtgestirn:moonLayer"]
+                : [format, "nachtgestirn:moon"];
+            pipelineOf(target, shared.join("\n"), "nbCompose", label, {
+                ...overrides,
+                NB_LAYER: moonLayer ? 1 : 0,
+            }).then(
+                (made) => fixed.set(key, made),
+                () => {},
+            );
+        }
+        return fixed.get(key) ?? null;
     };
     let layer: GPUTexture | null = null;
     const params: MoonParams = { ...DEFAULTS };
@@ -554,7 +588,8 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
                 shadows: window ? made : null,
                 displace: Boolean(wanted && plan && plan.discPixels >= displacementFrom),
             };
-            device.queue.writeBuffer(uniform, 0, paramsData(params, maps, detail));
+            const data = paramsData(params, maps, detail);
+            device.queue.writeBuffer(uniform, 0, data);
             // The shadow map's own pass writes it, so binds the blank in its place; the layer only the shimmer's reads.
             const groupWith = (shadows: GPUTexture, moonLayer: GPUTexture = blank) =>
                 device.createBindGroup({
@@ -569,6 +604,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
                         { binding: 6, resource: (maps?.detail?.relief ?? blank).createView() },
                         { binding: 7, resource: shadows.createView() },
                         { binding: 8, resource: moonLayer.createView() },
+                        { binding: 9, resource: layerSampler },
                     ],
                 });
             if (remake && shadowPass && shadowMap && made) {
@@ -598,7 +634,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
                 });
             }
             // The Moon into the target, or alone into the layer for the shimmer to move about and finish.
-            const first = shimmering ? shimmering.layer : compose;
+            const first = fixedFor(Boolean(shimmering), data) ?? (shimmering ? shimmering.layer : compose);
             const pass = encoder.beginComputePass({
                 label: "nachtgestirn:moon",
                 ...(encodeOptions.timestampWrites ? { timestampWrites: encodeOptions.timestampWrites } : {}),

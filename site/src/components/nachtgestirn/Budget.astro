@@ -28,7 +28,7 @@ const ROWS: {
         disc: 64,
         view: "15°",
         defaults: "small maps, no shadows",
-        ms: [0.069, 0.112],
+        ms: [0.049, 0.093],
         mb: [
             [0.7, 0.087, 1.4, 0],
             [44.7, 5.6, 89.5, 0.07],
@@ -39,29 +39,29 @@ const ROWS: {
         disc: 127,
         view: "7.8°",
         defaults: "small maps, no shadows",
-        ms: [0.088, 0.171],
+        ms: [0.05, 0.136],
         mb: [
             [0.7, 0.087, 1.4, 0],
             [44.7, 5.6, 89.5, 0.13],
         ],
-        off: 1.51,
+        off: 1.52,
     },
     {
         disc: 256,
         view: "3.9°",
         defaults: "medium maps, hard shadows",
-        ms: [0.189, 0.365],
+        ms: [0.061, 0.255],
         mb: [
             [2.8, 0.35, 5.6, 0.52],
             [44.7, 5.6, 89.5, 0.52],
         ],
-        off: 1.18,
+        off: 1.19,
     },
     {
         disc: 1023,
         view: "1°",
         defaults: "large maps, hard shadows",
-        ms: [1.59, 2.24],
+        ms: [0.213, 0.897],
         mb: [
             [44.7, 5.6, 89.5, 6.3],
             [44.7, 5.6, 89.5, 6.3],
@@ -72,7 +72,7 @@ const ROWS: {
         disc: 4095,
         view: "0.24°",
         defaults: "large maps, displaced",
-        ms: [3.22, 3.25],
+        ms: [1.06, 1.06],
         mb: [
             [44.7, 5.6, 89.5, 5.5],
             [44.7, 5.6, 89.5, 5.5],
@@ -83,7 +83,7 @@ const ROWS: {
 const PARTS = ["color map", "relief", "shadow map"] as const;
 const CONFIGS = ["the defaults", "everything on"] as const;
 // Each panel's axis: its end and the step of its grid.
-const AXES = { ms: [3.5, 1], mb: [180, 50], off: [2, 0.5] } as const;
+const AXES = { ms: [1.25, 0.25], mb: [180, 50], off: [2, 0.5] } as const;
 type Axis = keyof typeof AXES;
 const pct = (v: number, axis: Axis) => `${((100 * v) / AXES[axis][0]).toFixed(3)}%`;
 const ticks = (axis: Axis) =>
