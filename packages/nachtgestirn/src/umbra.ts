@@ -15,8 +15,9 @@ export interface RefractedSunlightOptions {
     /** How far the air turns a ray that grazes the ground `heightKm` up, in radians, over its whole way through: twice
      *  what an observer there sees a body on the horizon lifted by. About 0.02 at sea level, a tenth of that 20 km up. */
     deflection: (heightKm: number) => number;
-    /** What the air lets through of sunlight along that whole way, per channel of linear sRGB: the square of what an
-     *  observer at `heightKm` sees a body on the horizon dimmed by. */
+    /** What the air lets through of sunlight along that whole way, per channel of linear sRGB: what an observer at
+     *  `heightKm` sees a body on the horizon dimmed by, through twice the air (dunstkreis' `airTransmittance` with
+     *  `passes` 2). Not the square of that color: squared per channel, the umbra comes out greener. */
     transmittance: (heightKm: number) => Vec3;
     /** The umbra's and the penumbra's radii at the Moon's distance, in km, `eclipse.lunar` of `@himmelszelt/sternzeit`:
      *  the table runs from the axis to the penumbra's edge. */

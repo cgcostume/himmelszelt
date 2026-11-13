@@ -4,8 +4,9 @@ import "../sternzeit/export";
 import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { drawSvg } from "../sternzeit/figure";
-import { onChange, state } from "../sternzeit/state";
+import { ownMoment } from "../sternzeit/lunation";
 import { apply, cross, dot, noGpu, transpose } from "./laws";
+import { ANY_PLACE, julianDayOf } from "./place";
 import { type MoonAt, moonAt, type ToneCurveName } from "./renderer";
 import { mapResolutions, RESOLUTION_NAMES } from "./resolutions";
 import { saveFigure } from "./snapshot";
@@ -23,6 +24,9 @@ const INTO_THE_LIGHT = 5;
 // The disc and its four close-ups.
 const COUNT = 5;
 const f = (n: number) => n.toFixed(1);
+
+// Sunrise over Tycho: the eastern rim's shadow across the floor, the central peak's top in the light.
+const START = julianDayOf("2026-11-18T06:00Z");
 
 /**
  * Where the close-up looks, off the disc's center, right and up, in degrees of sky: the point of the terminator at
@@ -62,6 +66,7 @@ export function surfaceFigure(root: HTMLElement) {
     const marker = find<SVGSVGElement>("[data-field=marker]", root);
     const note = find("[data-field=note]", root);
     const requestRender = onDemand(render, root);
+    const moment = ownMoment(root, START, requestRender);
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
     const resolution = mapResolutions(root, "4k", requestRender);
@@ -93,7 +98,7 @@ export function surfaceFigure(root: HTMLElement) {
     function render() {
         const table = tables();
         if (!table) return;
-        const m = moonAt(state.jd, state, table.luts.model);
+        const m = moonAt(moment.jd(), ANY_PLACE, table.luts.model);
         const width = root.clientWidth || 600;
         const tileCss = width / COUNT;
         const tilePx = Math.round(tileCss * Math.min(window.devicePixelRatio || 1, 2));
@@ -159,7 +164,6 @@ export function surfaceFigure(root: HTMLElement) {
         }),
     );
 
-    onChange(requestRender);
     onTables(requestRender);
     onDisplay(requestRender);
     new ResizeObserver(requestRender).observe(root);

@@ -274,6 +274,8 @@ export function liftedDirection(trueDirection: Vec3, bend: (apparentAltitude: nu
         return b === null ? Number.NEGATIVE_INFINITY : a - b;
     };
     let [low, high] = [altitude, Math.min(altitude + 3, 90)];
+    // Far below the horizon no ray in reach gets out: widen the search until one does, or the body would show 3° up.
+    while (lowered(high) === Number.NEGATIVE_INFINITY && high < 90) [low, high] = [high, Math.min(high + 3, 90)];
     for (let i = 0; i < 40; i++) {
         const middle = (low + high) / 2;
         if (lowered(middle) < altitude) low = middle;

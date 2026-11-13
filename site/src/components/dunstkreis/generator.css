@@ -87,7 +87,7 @@
     width: 8rem;
     aspect-ratio: 2 / 1;
     overflow: hidden;
-    border-radius: 2px;
+    border-radius: var(--radius-small);
 }
 .generator-thumb canvas {
     width: 100%;

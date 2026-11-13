@@ -20,7 +20,7 @@ const LAWS = [
 ---
 
 <figure class="tiles-figure wide" id={id} data-laws>
-    <div class="tiles-panel as-seen">
+    <div class="tiles-panel as-seen split">
         <canvas aria-label="The Moon shaded by Lambert's law, Oren-Nayar's, Hapke's of 1963 and Hapke's of 2012, rendered with WebGPU" title="Drag to carry yourself around the Moon, the Sun staying put; double click to come back to Earth"></canvas>
         <ul class="tiles-labels disc-labels">
             {LAWS.map(([law, name]) => (
@@ -46,7 +46,6 @@ const LAWS = [
         </span>
     </div>
     <LunationSlider />
-    <p class="view-status"><span data-field="note"></span></p>
     <figcaption class="figure-caption">
         The Moon at the chosen moment under the four laws of the side views, from Earth's center with north up, all
         four exposed alike. Under each disc, how far the whole disc's light is off the measured Moon's, in stops. Striped,

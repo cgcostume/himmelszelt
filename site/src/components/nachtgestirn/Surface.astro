@@ -1,7 +1,6 @@
 ---
 import Icon from "../Icon.astro";
 import Term from "../Term.astro";
-import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
 import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
@@ -52,20 +51,14 @@ const { id = "surface" } = Astro.props;
         </span>
     </div>
     <p class="view-status tycho-note" data-field="sliceNote"></p>
-    <LunationSlider />
+    <LunationSlider own />
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        The relief along the <Term of="Terminator">terminator</Term> from the 4K maps: the disc at the chosen moment
-        with the close-up marked, and the close-up four times, a stop more open: the color map on a smooth sphere, with
+        The relief along the <Term of="Terminator">terminator</Term> from the 4K maps: the disc at the moment its slider
+        sets, with the close-up marked, and the close-up four times, a stop more open: the color map on a smooth sphere, with
         the relief shaded, with its shadows, and displaced. The close-up keeps to Tycho's latitude, 43° south. Under it, a
         slice through Tycho from west to east, the heights four times as tall: each texel's normal, how much of the Sun it
         sees, bright as far as it is lit and dark in shadow, and one point's march towards the Sun drawn out.
-        <Try label="Sunrise over Tycho" set="date=2026-11-18T06:00Z" fig={id}>
-            in the slice, the eastern rim's shadow across the floor, the central peak's top in the light.
-        </Try>
-        <Try label="Sunset over Tycho" set="date=2026-12-02T06:00Z" fig={id}>
-            the light from the west, the western rim's shadow reaching for the peak.
-        </Try>
     </figcaption>
 </figure>
 

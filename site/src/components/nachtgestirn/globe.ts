@@ -86,7 +86,7 @@ export function globeFigure(root: HTMLElement) {
     function render() {
         const table = tables();
         if (!table) return;
-        const real = moonAt(state.jd, state, table.luts.model);
+        const real = moonAt(state.jd, { ...state, geocentric: true }, table.luts.model);
         view.zoom = Math.min(view.zoom, zoomMax());
         const m = view.yaw === 0 && view.pitch === 0 ? real : orbited(real, view.yaw, view.pitch);
         const ratio = Math.min(window.devicePixelRatio || 1, 2);

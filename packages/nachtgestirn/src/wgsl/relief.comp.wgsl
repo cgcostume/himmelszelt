@@ -1,5 +1,6 @@
 // Turns a packed height map into the relief the Moon pass reads, at its full size: the height in km over the mean
-// radius, and its slopes towards east and north, km per km, from the neighbours, wrapping around in longitude. The
+// radius, its slopes towards east and north, km per km, from the neighbours, wrapping around in longitude, and the
+// height again in alpha, where the smaller levels keep the highest instead of the mean. The
 // packed map holds LOLA's 16-bit half meters, offset by 20,000, red the high byte and green the low one. The smaller
 // levels are its mean, from `mips.comp.wgsl`. Requires `surface.wgsl` and the output binding from `moonOutput`.
 
@@ -38,5 +39,5 @@ fn ngRelief(@builtin(global_invocation_id) id: vec3u) {
     let north = ngPackedHeight(texel - vec2i(0, 1), size) - ngPackedHeight(texel + vec2i(0, 1), size);
 
     let height = ngPackedHeight(texel, size);
-    ngOutputStore(id.xy, vec4f(height, east / (2.0 * eastKm), north / (2.0 * northKm), 0.0));
+    ngOutputStore(id.xy, vec4f(height, east / (2.0 * eastKm), north / (2.0 * northKm), height));
 }

@@ -11,15 +11,16 @@ const { id = "rising" } = Astro.props;
 ---
 
 <figure class="tiles-figure" id={id} data-rising>
-    <div class="tiles-panel as-seen">
-        <canvas aria-label="A full Moon rising, drawn as if there were no air in front of it and through the air, rendered with WebGPU"></canvas>
+    <div class="tiles-panel as-seen split" style="--count: 2">
+        <canvas aria-label="A full Moon rising through the air, its rays straight and bent by refraction, rendered with WebGPU"></canvas>
+        <svg class="tiles-overlay" data-field="outline" aria-hidden="true"></svg>
         <span class="tiles-start">
             <span class="tiles-hint footnote">Rendered with WebGPU</span>
         </span>
     </div>
     <ul class="tiles-labels" style="grid-template-columns: 1fr 1fr">
-        <li><span class="tiles-name">above the air</span> <span class="tiles-value">where it truly stands</span></li>
-        <li><span class="tiles-name">through the air</span> <span class="tiles-value" data-field="air"></span></li>
+        <li><span class="tiles-name">straight through the air</span> <span class="tiles-value" data-field="above"></span></li>
+        <li><span class="tiles-name">bent by the air</span> <span class="tiles-value" data-field="air"></span></li>
     </ul>
     <label class="figure-slider" title="How high the Moon's center truly stands over the horizon, before the air lifts it">
         <span class="note">Altitude</span>
@@ -46,10 +47,11 @@ const { id = "rising" } = Astro.props;
     </label>
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        A full Moon rising due east over dunstkreis' sky, the Sun just set opposite: its disc as if there were no air in
-        front of it, and through the air, dimmed, reddened and lifted by <Term of="Atmospheric refraction">refraction</Term>,
-        its lower limb more than its upper. The altitude is the center's true one over the horizon, which sinks below
-        the level as the observer climbs.
+        A full Moon rising due east over dunstkreis' sky, the Sun just set opposite, through the air twice: as if its
+        rays went straight, dimmed and reddened but where it truly stands, and as they go, bent by{" "}
+        <Term of="Atmospheric refraction">refraction</Term>, its lower limb lifted more than its upper, where it truly
+        stands dashed. Both at one exposure, metered on the bent disc. The altitude is the center's true one over the
+        horizon, which sinks below the level as the observer climbs.
     </figcaption>
 </figure>
 

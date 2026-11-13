@@ -55,7 +55,8 @@ Set `refractivity: 0` to turn it off, which means recomputing the tables and mak
 the straight march (`DK_REFRACTION` off), which skips the bending's two exponentials per step and aims each step once. `airRefractivity(temperatureC, pressureHPa)`
 gives the value for other air, and `apparentDirection` traces where a body shows on the CPU, `refractionAngle` how far
 a ray seen at an apparent altitude bends, and `airTransmittance` what the air lets through along it, per channel, the
-CPU twin of the transmittance table, for the Moon's disc or a planet. Feed the true sun direction: an already
+CPU twin of the transmittance table, for the Moon's disc or a planet; with `passes` 2, sunlight grazing the ground in and
+out again, as into Earth's shadow, its spectrum dimmed twice before it becomes a color. Feed the true sun direction: an already
 refracted one would be lifted twice.
 
 ## Units, exposure and tone mapping

@@ -387,6 +387,10 @@ tbody tr:hover {
     stroke: var(--bg);
     stroke-width: 3;
 }
+/* On a split line, which is broken around it instead. */
+.figure-thumb.split-thumb {
+    stroke: none;
+}
 .figure-sun {
     fill: var(--sun-fill);
     stroke: var(--sun-edge);
@@ -1139,7 +1143,7 @@ g.eclipse-corona {
 }
 /* A second slider stands off the first and its scale. */
 .figure-slider + .figure-slider {
-    margin-top: 1.25rem;
+    margin-top: 0.75rem;
 }
 .figure-slider-rail {
     flex: 1;

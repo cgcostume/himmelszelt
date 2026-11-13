@@ -1,0 +1,64 @@
+---
+import Cite from "../Cite.astro";
+import Term from "../Term.astro";
+import "../sternzeit/sternzeit.css";
+import "./nachtgestirn.css";
+import { ECLIPSE_PHOTOS, ev100Of } from "./eclipse-photos";
+import Rays from "./Rays.astro";
+
+/** Four photographs of the lunar eclipse of February 21, 2008, each split with nachtgestirn's Moon for its moment, its
+ *  place and its exposure. */
+interface Props {
+    id?: string;
+}
+const { id = "photo-eclipse" } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+const time = (date: string) => date.slice(11, 16);
+---
+
+<figure class="tiles-figure wide" id={id} data-eclipse-photos>
+    <div class="tiles-panel as-seen split" data-field="strip" style="--count: 16">
+        <canvas aria-label="nachtgestirn's Moon at sixteen moments from the umbra's first contact to its last, rendered with WebGPU"></canvas>
+        <svg class="tiles-overlay" data-field="stripMarks" aria-hidden="true"></svg>
+    </div>
+    <p class="view-status" data-field="stripNote"></p>
+    <div class="tiles-panel as-seen split eclipse-photos" style="cursor: ew-resize; touch-action: pan-y">
+        <canvas aria-label="nachtgestirn's Moon for each photograph's moment, place and exposure, rendered with WebGPU"></canvas>
+        {ECLIPSE_PHOTOS.map((photo) => (
+            <div class="eclipse-photo">
+                <img src={`${base}eclipse-2008/${photo.file}`} alt={`A photograph of the lunar eclipse of February 21, 2008, at ${time(photo.date)} UTC`} decoding="async" draggable="false" />
+                <span class="eclipse-photo-line"></span>
+            </div>
+        ))}
+        <svg class="tiles-overlay" data-field="knobs" aria-hidden="true"></svg>
+        <span class="tiles-ends">
+            <span class="view-buttons"><Rays /></span>
+        </span>
+    </div>
+    <ul class="tiles-labels eclipse-labels">
+        {ECLIPSE_PHOTOS.map((photo) => (
+            <li><span class="tiles-name">{time(photo.date)} UTC, {photo.label}</span> <span class="tiles-value">{photo.seconds} s, EV<sub>100</sub> {ev100Of(photo.seconds).toFixed(1)}</span></li>
+        ))}
+    </ul>
+    <label class="figure-slider split-slider" title="Where the line between the photographs and nachtgestirn's Moons runs">
+        <span class="note">nachtgestirn</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="split" min="0" max="100" step="0.5" value="50" aria-label="Where the split runs, from all nachtgestirn to all photograph" />
+        </span>
+        <span class="note">photograph</span>
+    </label>
+    <figcaption class="figure-caption">
+        The lunar eclipse of February 21, 2008, photographed from Clifton Park, New York, left of each line, and right of
+        it nachtgestirn's Moon for the photograph's moment and place, in Earth's <Term of="Umbra">umbra</Term> as the
+        pass integrates its light, at the photograph's own exposure: the telescope's f/12.1 at ISO 800 for the seconds
+        given. Over them the whole eclipse, the umbra's first contact to its last, each Moon exposed for itself, the
+        photographs' moments marked. Raw frames decoded to sRGB without the camera's white balance, so the colors can be
+        compared; the pass' tone curve is none. Photographs © Theodore Yapo and Barbara Cutler, from their paper <Cite id="yapo2009" />.
+    </figcaption>
+</figure>
+
+<script>
+    import { eclipsePhotosFigure } from "./eclipsephotos";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-eclipse-photos]")) eclipsePhotosFigure(root);
+</script>

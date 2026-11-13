@@ -2,7 +2,6 @@
 import Icon from "../Icon.astro";
 import Resolutions from "../Resolutions.astro";
 import "../sternzeit/sternzeit.css";
-import "../environment/environments.css";
 import "./nachtgestirn.css";
 import { PHOTOS } from "./photo-options";
 import Rays from "./Rays.astro";
@@ -17,57 +16,51 @@ const first = PHOTOS[0];
 ---
 
 <figure class="tiles-figure" id={id} data-photo>
-    <div class="tiles-panel as-seen photo-stage" data-field="stage">
-        <div class="photo-compare" style="--photo-aspect: 1">
-            <div class="photo-disc">
-                <img src={first?.src} alt="A photograph of the Moon" crossorigin="anonymous" decoding="async" />
-                <canvas aria-label="nachtgestirn's Moon for the photograph's moment and place, rendered with WebGPU"></canvas>
+    <div class="photo-full" data-field="full" style={`--count: ${PHOTOS.length}`}>
+        <div class="tiles-panel as-seen photo-stage" data-field="stage">
+            <div class="photo-compare" style="--photo-aspect: 1">
+                <div class="photo-disc">
+                    <img src={first?.src} alt="A photograph of the Moon" crossorigin="anonymous" decoding="async" draggable="false" />
+                    <canvas aria-label="nachtgestirn's Moon for the photograph's moment and place, rendered with WebGPU"></canvas>
+                </div>
+                <svg class="photo-marks" data-field="marks" aria-hidden="true"></svg>
             </div>
-            <svg class="photo-marks" data-field="marks" aria-hidden="true"></svg>
+            <span class="tiles-start">
+                <Resolutions options={WHOLE_RESOLUTIONS} chosen="8k" />
+            </span>
+            <span class="photo-note" data-field="note"></span>
+            <span class="tiles-ends">
+                <span class="view-buttons">
+                    <Rays />
+                    <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
+                </span>
+            </span>
         </div>
-        <span class="tiles-start">
-            <Resolutions options={WHOLE_RESOLUTIONS} chosen="8k" />
-            <span class="tiles-hint footnote">photograph left, nachtgestirn right</span>
-        </span>
-        <span class="tiles-ends">
-            <span class="view-buttons">
-                <Rays />
-                <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
+        <label class="figure-slider split-slider" title="Where the line between the photograph and nachtgestirn's Moon runs">
+            <span class="note">nachtgestirn</span>
+            <span class="figure-slider-rail">
+                <input type="range" data-field="split" min="0" max="100" step="0.5" value="50" aria-label="Where the split runs, from all nachtgestirn to all photograph" />
             </span>
-        </span>
+            <span class="note">photograph</span>
+        </label>
+        <div class="photo-picker">
+            <p class="photo-credit" data-field="credit" aria-live="polite"></p>
+            <div class="photo-tabs" role="group" aria-label="Photographs">
+                {PHOTOS.map((photo, i) => (
+                    <button type="button" class="photo-tab" data-pick={i} aria-pressed={i === 0 ? "true" : "false"} title={`${photo.label}: ${photo.when}, ${photo.where}, by ${photo.author}, ${photo.license}`} aria-label={photo.label}>
+                        <img src={photo.thumb} alt="" loading="lazy" crossorigin="anonymous" style={`object-position: ${photo.center[0] * 100}% ${photo.center[1] * 100}%`} />
+                    </button>
+                ))}
+            </div>
+        </div>
     </div>
-    <div class="environments-gallery photo-gallery" style={`--count: ${PHOTOS.length}`} role="group" aria-label="Photographs">
-        {PHOTOS.map((photo, i) => (
-            <button type="button" class="environments-thumb" data-pick={i} aria-pressed={i === 0 ? "true" : "false"} title={`${photo.when}, ${photo.where}, by ${photo.author}`}>
-                <img src={photo.thumb} alt="" loading="lazy" crossorigin="anonymous" style={`object-position: ${photo.center[0] * 100}% ${photo.center[1] * 100}%`} />
-                <span>{photo.label}</span>
-            </button>
-        ))}
-    </div>
-    <label class="figure-slider" title="Where the line between the photograph and nachtgestirn's Moon runs">
-        <span class="note">Split</span>
-        <span class="figure-slider-rail">
-            <input type="range" data-field="split" min="0" max="100" step="0.5" value="50" aria-label="Where the split runs, from all nachtgestirn to all photograph" />
-            <span class="figure-slider-scale" aria-hidden="true">
-                <span class="figure-slider-mark" style="left: 0%">nachtgestirn</span>
-                <span class="figure-slider-mark" style="left: 100%">photograph</span>
-            </span>
-        </span>
-        <output data-field="splitValue"></output>
-    </label>
-    <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        Photographs of the Moon left of the line, and right of it nachtgestirn's Moon for each photograph's moment and
-        place, cut to the disc: the photograph scaled, moved and turned until its disc lies on nachtgestirn's, the sky's
-        north up, or by day the zenith. The rings mark craters and maria where nachtgestirn puts them. The maria, the
-        craters, the libration and the terminator are to compare; the color and the contrast are the camera's and its
-        processing, and the mosaics and the photograph through an eyepiece are a little distorted. Photographs from
-        Wikimedia Commons:{" "}
-        {PHOTOS.map((photo, i) => (
-            <>
-                <a href={photo.page}>{photo.author}</a>, {photo.when}, {photo.where}, <a href={photo.licenseUrl}>{photo.license}</a>{i < PHOTOS.length - 1 ? "; " : "."}
-            </>
-        ))}
+        Photographs of the Moon left of the line, and right of it nachtgestirn's Moon for each photograph's
+        moment and place, through the air. The photograph keeps its own orientation and is scaled and moved until
+        several hundred craters and ridges found in both lie on nachtgestirn's, which is turned to match; the sky's
+        north, or by day the zenith, is marked at the limb, and past the disc the photograph fades into its sky. The maria, the craters, the libration and the terminator are to
+        compare; the color and the contrast are the camera's and its processing, and the mosaics and the photograph
+        through an eyepiece are a little distorted. Photographs from Wikimedia Commons, each credited over its tab.
     </figcaption>
 </figure>
 

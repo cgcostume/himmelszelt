@@ -45,7 +45,7 @@ export function attachMoonFace(view: HTMLElement, controller: MoonViewController
         const width = Math.max(1, Math.round(frame.widthPx * dpr));
         const height = Math.max(1, Math.round(frame.heightPx * dpr));
         if (canvas.width !== width || canvas.height !== height) Object.assign(canvas, { width, height });
-        const m = moonAt(state.jd, state, table.luts.model, frame.libration);
+        const m = moonAt(state.jd, { ...state, geocentric: true }, table.luts.model, frame.libration);
         // Locked, the Moon from Earth's center, where there is no air; else where it shows from the place.
         const air = !frame.locked;
         const center: Vec3 = air ? m.direction : m.trueDirection;

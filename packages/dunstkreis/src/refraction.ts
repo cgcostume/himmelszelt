@@ -138,11 +138,15 @@ export function refractionAngle(
  * up, per channel of linear sRGB: the light of a body there, the Moon's or a planet's, dimmed and reddened, traced along
  * the same bent path as `refractionAngle`, so it agrees with the transmittance table the sky is drawn from. `null` for a
  * ray that ends on the ground. The CPU twin of the table's lookup, for a few rays per frame without a round trip.
+ * `passes` is how often the light crosses that air: 2 for sunlight grazing the ground at `observerHeightM`, in through
+ * the air and out again, as into Earth's shadow. It multiplies the optical depth before the spectrum becomes a color,
+ * which squaring the color would not do: a channel as wide as sRGB's would come out several percent greener.
  */
 export function airTransmittance(
     model: AtmosphereModel,
     observerHeightM: number,
     apparentAltitude: number,
+    passes = 1,
 ): [number, number, number] | null {
     const ray = traceSeen(model, observerHeightM, apparentAltitude);
     if (ray === null) return null;
@@ -150,7 +154,7 @@ export function airTransmittance(
     const rgb = (spectrum: readonly number[]) =>
         toRgb.map((row) => row.reduce((sum, m, j) => sum + m * (spectrum[j] ?? 0), 0));
     const sun = rgb(model.solarSpectrum);
-    const through = rgb(model.solarSpectrum.map((s, k) => s * Math.exp(-(ray.depth[k] ?? 0))));
+    const through = rgb(model.solarSpectrum.map((s, k) => s * Math.exp(-passes * (ray.depth[k] ?? 0))));
     return through.map((c, i) => Math.max(c, 0) / Math.max(sun[i] ?? 1, 1e-12)) as [number, number, number];
 }
 

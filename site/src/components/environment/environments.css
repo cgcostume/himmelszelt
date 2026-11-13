@@ -28,7 +28,8 @@
     width: 100%;
     aspect-ratio: 1;
     object-fit: cover;
-    border-radius: 2px;
+    /* Concentric with the button's corner, its padding in. */
+    border-radius: calc(var(--radius-small) - 2px);
 }
 @media (max-width: 40rem) {
     .environments-gallery {

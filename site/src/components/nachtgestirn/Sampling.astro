@@ -2,7 +2,6 @@
 import Fig from "../Fig.astro";
 import Icon from "../Icon.astro";
 import Term from "../Term.astro";
-import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
 import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
@@ -45,15 +44,12 @@ const { id = "sampling" } = Astro.props;
             <li><span class="tiles-name">{name}</span> <span class="tiles-value">{what}</span></li>
         ))}
     </ul>
-    <LunationSlider />
+    <LunationSlider own />
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        The maps' filters on the limb near the Moon's south pole: the disc at the chosen moment with the close-up
-        marked, and the close-up four times, the nearest texel, bilinear, trilinear and anisotropic, as the pass reads its
+        The maps' filters on the limb near the Moon's south pole: the disc at the moment its slider sets, with
+        the close-up marked, and the close-up four times, the nearest texel, bilinear, trilinear and anisotropic, as the pass reads its
         maps; one ray through each pixel's center, or four at the switch.
-        <Try label="Five days after new moon" set="date=2026-11-14T18:00Z" fig={id}>
-            step the time an hour at a time, the first two tiles crawl.
-        </Try>
     </figcaption>
 </figure>
 

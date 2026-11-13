@@ -42,8 +42,9 @@ other package at runtime: the astronomy comes in as directions and angles, from
   the distance from what casts it, contact hardening by the Sun's own size. `shadows` turns them off. The march runs
   once into a shadow map of the band around the terminator, as fine as the disc on screen needs, the whole ring or
   the part the view shows, kept while the Sun and the view stay put; a disc under `shadowsFrom` pixels, 128 by
-  default, the Moon as a sky shows it, takes no shadows and needs no map. Below `softShadowsFrom` pixels, 4096 by
-  default, the Sun casts as a point: a penumbra is a hundredth of the shadow's length, under a pixel on a smaller disc.
+  default, the Moon as a sky shows it, takes no shadows and needs no map. The shadows are soft by the Sun's half degree
+  at no measurable cost, since the march takes the same steps; `softShadowsFrom`, 0 by default, casts with a point Sun
+  below that many pixels.
   Where the view magnifies the relief, the map is up to four times finer than its texels, so no edge shows their stairs.
 - **Displaced**: from a disc of `displacementFrom` pixels on, 1024 by default, the rays near the limb are marched
   through the heights and the terrain shaded where they meet it, so the limb shows its mountains and near rims hide
@@ -105,8 +106,8 @@ pass.update({
     sunDirection: moon.sunDirection(time, observer),
     orientation: moonOrientation({
         direction: moon.direction(time, observer),
-        libration: moon.librations(jde),
-        positionAngleOfAxis: moon.positionAngleOfAxis(jde),
+        libration: moon.topocentricLibrations(time, observer),
+        positionAngleOfAxis: moon.topocentricPositionAngleOfAxis(time, observer),
         parallacticAngle: moon.parallacticAngle(time, observer),
     }),
     earthshine: earthshineIlluminance(180 - moon.phaseAngle(jde), moon.distance(jde)),

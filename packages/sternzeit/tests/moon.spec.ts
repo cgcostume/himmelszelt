@@ -47,6 +47,71 @@ test("moon librations and positionAngleOfAxis match Meeus' worked example 53.a",
     expect(precise.moon.positionAngleOfAxis(JDE)).toBeCloseTo(15.08, 2);
 });
 
+// The diurnal libration checked against the geometry itself: the Moon turned in space as from Earth's center, by l, b
+// and P, then the face turned to the observer read off it.
+test("moon.topocentricLibrations and topocentricPositionAngleOfAxis agree with the Moon's frame seen from the observer", () => {
+    const D = Math.PI / 180;
+    const unit = (a: number, d: number) => [
+        Math.cos(d * D) * Math.cos(a * D),
+        Math.cos(d * D) * Math.sin(a * D),
+        Math.sin(d * D),
+    ];
+    const dot = (a: number[], b: number[]) => a.reduce((s, v, i) => s + v * (b[i] ?? 0), 0);
+    const cross = ([a0 = 0, a1 = 0, a2 = 0]: number[], [b0 = 0, b1 = 0, b2 = 0]: number[]) => [
+        a1 * b2 - a2 * b1,
+        a2 * b0 - a0 * b2,
+        a0 * b1 - a1 * b0,
+    ];
+    const norm = (v: number[]) => v.map((x) => x / Math.hypot(...v));
+    const sky = (d: number[]) => {
+        const east = norm(cross([0, 0, 1], d));
+        return { east, north: cross(d, east) };
+    };
+    let largest = 0;
+    for (const [date, latitude, longitude] of [
+        ["2012-10-21T18:27:24Z", 47.64, 6.87],
+        ["2024-05-15T01:17:13Z", 32.85, -97.38],
+        ["2010-10-23T04:21:13Z", 34.7, -86.75],
+        ["2026-03-03T22:00:00Z", -33.9, 151.2],
+        ["2026-11-12T06:00:00Z", 64.1, -21.9],
+    ] as const) {
+        const time = precise.fromDate(new Date(date));
+        const obs = { latitude, longitude };
+        const jde = precise.julianEphemerisDay(time);
+        const { longitude: l, latitude: b } = precise.moon.librations(jde);
+        const P = precise.moon.positionAngleOfAxis(jde);
+        const geo = precise.moon.apparentPosition(jde);
+        const g = unit(geo.rightAscension, geo.declination);
+        const { east, north } = sky(g);
+        const pole = g.map(
+            (v, i) =>
+                -Math.sin(b * D) * v +
+                Math.cos(b * D) * (Math.cos(P * D) * (north[i] ?? 0) + Math.sin(P * D) * (east[i] ?? 0)),
+        );
+        const h = norm(g.map((v, i) => -v - Math.sin(b * D) * (pole[i] ?? 0)));
+        const e = cross(pole, h);
+        const X = h.map((v, i) => Math.cos(l * D) * v - Math.sin(l * D) * (e[i] ?? 0));
+        const Y = h.map((v, i) => Math.sin(l * D) * v + Math.cos(l * D) * (e[i] ?? 0));
+        const topo = precise.moon.topocentricPosition(time, obs);
+        const s = unit(topo.rightAscension, topo.declination).map((v) => -v);
+        const seen = sky(s.map((v) => -v));
+        const expected = {
+            longitude: Math.atan2(dot(s, Y), dot(s, X)) / D,
+            latitude: Math.asin(dot(s, pole)) / D,
+            P: Math.atan2(dot(pole, seen.east), dot(pole, seen.north)) / D,
+        };
+        const ours = precise.moon.topocentricLibrations(time, obs);
+        const oursP = precise.moon.topocentricPositionAngleOfAxis(time, obs);
+        expect(Math.abs(ours.longitude - expected.longitude)).toBeLessThan(0.005);
+        expect(Math.abs(ours.latitude - expected.latitude)).toBeLessThan(0.005);
+        expect(Math.abs(oursP - expected.P)).toBeLessThan(0.005);
+        largest = Math.max(largest, Math.hypot(ours.longitude - l, ours.latitude - b));
+    }
+    // The diurnal libration itself is there, up to the parallax.
+    expect(largest).toBeGreaterThan(0.5);
+    expect(largest).toBeLessThan(1.0);
+});
+
 test("approx.moon.position roughly agrees with the precise result", () => {
     const preciseEcl = precise.moon.position(JDE);
     const approxEcl = approx.moon.position(JDE);

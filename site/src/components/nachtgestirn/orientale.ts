@@ -10,8 +10,9 @@ import { find } from "../dom";
 import { display, gpu, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
-import { onChange, state } from "../sternzeit/state";
+import { ownMoment } from "../sternzeit/lunation";
 import { noGpu } from "./laws";
+import { ANY_PLACE, julianDayOf } from "./place";
 import { type MoonAt, moonAt, type ToneCurveName } from "./renderer";
 import { createTiles, type TileFrame, tileFrame } from "./tiles";
 
@@ -19,12 +20,19 @@ import { createTiles, type TileFrame, tileFrame } from "./tiles";
 // some 960 km across, with room around it, as a share of the Moon's diameter.
 const ORIENTALE = { longitude: -94.67, latitude: -19.87 };
 const FACE_ON = 1250 / (2 * MOON_RADIUS_KM);
-const WHOLE = 1.2;
+const WHOLE = 1.7;
 const ASPECT = 0.75;
 const DEG = Math.PI / 180;
 const dot = (a: readonly number[], b: readonly number[]) => a.reduce((sum, v, i) => sum + v * (b[i] ?? 0), 0);
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 const MIDDLE = selenographicPoint(ORIENTALE.longitude, ORIENTALE.latitude);
+// The libration at its farthest west for the year, 7.9°: the basin as far into view as Earth sees it.
+const START = julianDayOf("2026-12-18T06:00Z");
+// The Sun's height over the basin, from its east: from Earth's view past straight over it, 60° up in the west, so the
+// Moon shows a crescent lit at the basin's limb; face on, low in the east, so the rings cast.
+const SUN_FROM_EARTH = 120;
+const SUN_FACE_ON = 12;
+
 /**
  * The Moon `real` turned `t` of the way from Earth's view of it to face Orientale, its north up, the Sun `elevation`
  * degrees over the basin from its east: the libration's longitude and latitude moved to the basin's, which is how
@@ -66,13 +74,12 @@ function turned(real: MoonAt, t: number, elevation: number): MoonAt {
     };
 }
 
-/** The Orientale figure on `root`: the basin turned from the limb to face on, the view closing in on it. */
+/** The Orientale figure on `root`: the basin turned from the limb to face on, the view closing in on it, the Sun sinking. */
 export function orientaleFigure(root: HTMLElement) {
     const canvas = find<HTMLCanvasElement>("canvas", root);
     const turn = find<HTMLInputElement>("[data-field=turn]", root);
-    const sun = find<HTMLInputElement>("[data-field=sun]", root);
-    const note = find("[data-field=note]", root);
     const requestRender = onDemand(render, root);
+    const moment = ownMoment(root, START, requestRender);
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
     // The basin lies in the 8K strip of the southern highlands, where the GPU takes textures that wide.
@@ -82,15 +89,12 @@ export function orientaleFigure(root: HTMLElement) {
         const table = tables();
         if (!table) return;
         const t = Number(turn.value) / 100;
-        const elevation = Number(sun.value);
-        find("[data-field=turnValue]", root).textContent = `${(t * 100).toFixed(0)}%`;
-        find("[data-field=sunValue]", root).textContent = `${elevation.toFixed(0)}°`;
-        paintRange(turn);
-        paintRange(sun);
-        const real = moonAt(state.jd, state, table.luts.model);
-        // Turned and closed in together, eased in and out, the zoom on a log scale; the view's middle following the basin
-        // as it comes round the limb, so it stays in view while the view narrows.
+        const real = moonAt(moment.jd(), ANY_PLACE, table.luts.model);
+        // Turned, closed in and the Sun lowered together, eased in and out, the zoom on a log scale; the view's middle
+        // following the basin as it comes round the limb, so it stays in view while the view narrows.
         const eased = t * t * (3 - 2 * t);
+        const elevation = mix(SUN_FROM_EARTH, SUN_FACE_ON, eased);
+        paintRange(turn);
         const m = turned(real, eased, elevation);
         const across = m.geocentricDiameter * WHOLE * (FACE_ON / WHOLE) ** eased;
         const view = tileFrame(m);
@@ -123,18 +127,9 @@ export function orientaleFigure(root: HTMLElement) {
             { count: 1, width: tilePx, height: Math.round(tilePx * ASPECT), degreesAcross: across },
             () => frame,
         );
-        const ew = real.libration.longitude >= 0 ? "E" : "W";
-        note.textContent =
-            t === 0
-                ? `from Earth at the chosen moment, the libration ${Math.abs(real.libration.longitude).toFixed(1)}° ${ew}: the basin on the western limb`
-                : t === 1
-                  ? `face on, ${((across / m.geocentricDiameter) * 2 * MOON_RADIUS_KM).toFixed(0)} km across the view: the outer ring, Montes Cordillera, some 960 km, the dark sea 294 km`
-                  : `turned ${(t * 100).toFixed(0)}% of the way from Earth's view to face on`;
     }
 
     turn.addEventListener("input", requestRender);
-    sun.addEventListener("input", requestRender);
-    onChange(requestRender);
     onTables(requestRender);
     onDisplay(requestRender);
     new ResizeObserver(requestRender).observe(root);

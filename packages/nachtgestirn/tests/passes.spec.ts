@@ -148,6 +148,10 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
     };
     const at = (pixels: Float32Array, x: number, y: number) => pixels[(y * size + x) * 4] ?? 0;
     const alpha = (pixels: Float32Array, x: number, y: number) => pixels[(y * size + x) * 4 + 3] ?? 0;
+    const luminance = (pixels: Float32Array, x: number, y: number) => {
+        const i = (y * size + x) * 4;
+        return 0.2126 * (pixels[i] ?? 0) + 0.7152 * (pixels[i + 1] ?? 0) + 0.0722 * (pixels[i + 2] ?? 0);
+    };
 
     // The Sun from behind the viewer, the Moon full: a Lambert disc of albedo 0.12 in 128,000 lux.
     const full = await render([0, -1, 0], 0);
@@ -161,9 +165,10 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
     expect(alpha(full, 32, 32)).toBe(1);
     expect(alpha(full, 1, 1)).toBe(0);
 
-    // The Sun behind the Moon: its disc dark but for a full Earth's 13 lux.
+    // The Sun behind the Moon: its disc dark but for a full Earth's 13 lux, bluer than sunlight, as bright.
     const dark = await render([0, 1, 0], 13);
-    const night = at(dark, 32, 32);
+    const night = luminance(dark, 32, 32);
+    expect(dark[(32 * size + 32) * 4 + 2] ?? 0).toBeGreaterThan(at(dark, 32, 32));
     expect(night).toBeGreaterThan(0);
     expect(night).toBeLessThan(expected * 2e-4);
     expect(night).toBeCloseTo((0.12 * 13) / Math.PI, 1);

@@ -5,9 +5,10 @@ import "./nachtgestirn.css";
 /**
  * What the pass costs and what its defaults miss, a disc for each size of the maps, as large as it gets before they
  * give less than a texel to a pixel at its middle: its defaults against everything switched on with the next finer
- * maps, shadows, displacement and soft shadows. Measured with timestamp queries in Chromium 153 over Vulkan on an AMD
- * Radeon RX 7900 XT, a 1920 by 1080 target, a waxing gibbous Moon, medians of 2,000 frames after 100 to warm up; the
- * error from both drawn linear, per pixel the disc covers, against everything on.
+ * maps, shadows and displacement. Measured with timestamp queries in Chromium 153 over Vulkan on an AMD Radeon RX 7900
+ * XT, a 1920 by 1080 target, a waxing gibbous Moon, medians of 2,000 frames after 100 to warm up; the error from both
+ * drawn linear, per pixel the disc covers, against everything on. Measured while the defaults still cast hard shadows,
+ * which cost the same and move the error by under a tenth of a percentage point.
  */
 interface Props {
     id?: string;
@@ -28,7 +29,7 @@ const ROWS: {
     {
         disc: 162,
         view: "6.1°",
-        defaults: "512 maps, hard shadows, against 1K",
+        defaults: "512 maps, against 1K",
         ms: [0.052, 0.143],
         mb: [
             [0.7, 0.087, 1.4, 0.13],
@@ -39,7 +40,7 @@ const ROWS: {
     {
         disc: 325,
         view: "3.1°",
-        defaults: "1K maps, hard shadows, against 2K",
+        defaults: "1K maps, against 2K",
         ms: [0.067, 0.254],
         mb: [
             [2.8, 0.35, 5.6, 0.52],
@@ -50,7 +51,7 @@ const ROWS: {
     {
         disc: 651,
         view: "1.5°",
-        defaults: "2K maps, hard shadows, against 4K",
+        defaults: "2K maps, against 4K",
         ms: [0.121, 0.379],
         mb: [
             [11.2, 1.4, 22.4, 1.57],
@@ -84,7 +85,8 @@ const ROWS: {
 const PARTS = ["color map", "relief", "shadow map"] as const;
 const CONFIGS = ["the defaults", "everything on"] as const;
 // Each panel's axis: its end and the step of its grid.
-const AXES = { ms: [1, 0.25], mb: [600, 100], off: [3.5, 1] } as const;
+// Each axis a little past its longest bar, so the bar's value fits in its own panel and the panels stand close.
+const AXES = { ms: [1.25, 0.25], mb: [600, 100], off: [4.5, 1] } as const;
 type Axis = keyof typeof AXES;
 const pct = (v: number, axis: Axis) => `${((100 * v) / AXES[axis][0]).toFixed(3)}%`;
 const ticks = (axis: Axis) =>
@@ -106,7 +108,7 @@ const total = ([color, , relief, shadowMap]: Memory) => color + relief + shadowM
         <span><i class="budget-swatch budget-defaults"></i>the defaults</span>
         <span><i class="budget-swatch"></i>everything on</span>
         {PARTS.map((part, i) => <span><i class={`budget-swatch budget-part-${i}`}></i>{part}</span>)}
-        <span><i class="budget-swatch budget-part-0 budget-saved"></i>BC1 would save</span>
+        <span><i class="budget-swatch budget-part-0 budget-saved"></i>BC1 saves</span>
     </div>
     <div class="budget-grid" role="img" aria-label="Bar charts of the time a frame takes, the GPU memory, and the share of pixels the defaults draw off, for discs of 162 to 2,607 pixels">
         <span></span>
@@ -157,7 +159,7 @@ const total = ([color, , relief, shadowMap]: Memory) => color + relief + shadowM
         texels across, as large as it gets before its maps give less than a texel to a pixel at its middle, π times the
         disc's pixels: the time on the GPU a frame takes and the GPU memory of the maps and the shadow map, with the
         pass' defaults, hatched, what they draw each disc with, and with everything on, solid, the next finer maps,
-        shadows, displacement and soft shadows; outlined next to the defaults' color map what BC1 would save of it; and
+        shadows and displacement; outlined next to the defaults' color map what BC1 saves of it; and
         the share of the disc's pixels the defaults draw more than a third of a stop off from everything on. BC1 colors
         cost no time and draw no pixel that far off. The 8K maps are this site's, the rest ship with the package: past
         4K the defaults keep the 4K maps, magnified. A view of 1920 by 1080 pixels, as many degrees wide as under each

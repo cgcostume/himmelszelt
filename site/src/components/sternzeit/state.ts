@@ -86,7 +86,7 @@ export function julianDayNow() {
 
 // A moment and a place passed in a link: `jd` (a Julian Day, UT) or `date` (anything a JavaScript Date reads, such as
 // 2026-08-12T18:29Z), and `lat`, `lon` and `h` (meters), each optional. Returns the patch, or null if there is none.
-function fromSearch(search: string): Partial<State> | null {
+export function fromSearch(search: string): Partial<State> | null {
     const params = new URLSearchParams(search);
     const patch: Partial<State> = {};
     const number = (key: string) => (params.has(key) ? Number(params.get(key)) : Number.NaN);
@@ -110,6 +110,8 @@ if (state.live) state.jd = julianDayNow();
 // A link's moment and place win over the stored ones, once: the address drops them again, so a reload keeps whatever
 // was changed since.
 const linked = fromSearch(location.search);
+/** The moment a link opened the page with, and the figure it pointed to, for a figure with a moment of its own. */
+export const linkedOnLoad = linked?.jd === undefined ? null : { jd: linked.jd, hash: location.hash };
 if (linked) {
     Object.assign(state, linked);
     placeOnEarth();

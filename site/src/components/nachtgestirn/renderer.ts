@@ -47,6 +47,8 @@ export const UMBRA_EV100 = 4;
 const luminanceOf = ([r, g, b]: readonly [number, number, number]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 // The sky pass writes cd/m² when its exposure is 1: EV100 of -log2(1.2).
 const UNIT_EV100 = -Math.log2(1.2);
+// What the sky view behind a Moon depends on, to meter each sky once.
+const skyKeyOf = (m: MoonAt) => `${m.jd},${m.trueDirection.join(",")},${m.heightM}`;
 
 export type ToneCurveName = "neutral" | "agx" | "aces" | "clip";
 /** Which of nachtgestirn's maps: "auto" the smallest that shows the disc at a texel per pixel, never a smaller one
@@ -128,10 +130,10 @@ function airAt(model: AtmosphereModel, h: number) {
     grazing.set(model, byHeight);
     let found = byHeight.get(h);
     if (!found) {
-        const t = airTransmittance(model, h * 1000, 0) ?? [1, 1, 1];
         found = {
             deflection: 2 * (refractionAngle(model, h * 1000, 0) ?? 0) * (Math.PI / 180),
-            transmittance: [t[0] * t[0], t[1] * t[1], t[2] * t[2]],
+            // In and out again, the spectrum's depth doubled before it becomes a color.
+            transmittance: airTransmittance(model, h * 1000, 0, 2) ?? [1, 1, 1],
         };
         byHeight.set(h, found);
     }
@@ -184,7 +186,7 @@ export function umbraTable(model: AtmosphereModel, umbraKm: number, penumbraKm: 
  */
 export function moonAt(
     jd: number,
-    observer: { latitude: number; longitude: number; heightM: number },
+    observer: { latitude: number; longitude: number; heightM: number; geocentric?: boolean },
     model: AtmosphereModel,
     libration?: Libration,
 ) {
@@ -192,24 +194,32 @@ export function moonAt(
     const jde = julianEphemerisDay(time);
     const heightM = clampObserverHeight(observer.heightM);
     const sunDirection = sun.direction(time, observer);
-    const trueDirection = moon.direction(time, observer);
+    // From Earth's center, for the figures that need no place: no parallax and no diurnal libration, so the face holds
+    // still over a day. The place then only orients the sky's frame.
+    const geocentric = observer.geocentric === true;
+    const centerHorizontal = equatorialToHorizontal(moon.apparentPosition(jde), apparentSiderealTime(time), observer);
+    const fromCenter = horizontalToDirection(centerHorizontal);
+    const trueDirection = geocentric ? fromCenter : moon.direction(time, observer);
     // The same air the sky is traced through bends every ray to the Moon, and lifts where it shows.
     const bend = (altitude: number) => refractionAngle(model, heightM, altitude);
     // And dims and reddens it, the lower limb more than the upper near the horizon.
     const through = (altitude: number) => airTransmittance(model, heightM, altitude);
     const phaseAngle = moon.phaseAngle(jde);
     const lit = moon.illuminatedFraction(jde);
-    const positionAngleOfAxis = moon.positionAngleOfAxis(jde);
+    // The face as the observer sees it, an Earth radius off the line to Earth's center, the diurnal libration included;
+    // from Earth's center, as the ephemeris gives it.
+    const positionAngleOfAxis = geocentric
+        ? moon.positionAngleOfAxis(jde)
+        : moon.topocentricPositionAngleOfAxis(time, observer);
     const parallacticAngle = moon.parallacticAngle(time, observer);
-    const turned = libration ?? moon.librations(jde);
+    const turned = libration ?? (geocentric ? moon.librations(jde) : moon.topocentricLibrations(time, observer));
     const distanceKm = moon.distance(jde);
     // Earth's shadow, with the Moon's center seen from Earth's center: the eclipse is geocentric.
     const shadow = eclipse.lunar(jde);
     let earthShadow: EarthShadow | null = null;
     if (shadow.penumbralMagnitude > 0) {
         const refracted = umbraTable(model, shadow.umbraRadiusKm, shadow.penumbraRadiusKm, distanceKm);
-        const geocentric = equatorialToHorizontal(moon.apparentPosition(jde), apparentSiderealTime(time), observer);
-        const center = horizontalToDirection(geocentric);
+        const center = fromCenter;
         earthShadow = {
             axis: [-sunDirection[0], -sunDirection[1], -sunDirection[2]],
             moonCenterKm: [center[0] * distanceKm, center[1] * distanceKm, center[2] * distanceKm],
@@ -226,13 +236,16 @@ export function moonAt(
         model,
         sunDirection,
         sunAngularDiameter: sun.apparentAngularDiameter(jde),
-        horizontal: moon.horizontalPosition(time, observer),
+        horizontal: geocentric ? centerHorizontal : moon.horizontalPosition(time, observer),
+        geocentric,
         trueDirection,
         bend,
         through,
         direction: liftedDirection(trueDirection, bend),
         /** From the observer, and from Earth's center. */
-        angularDiameter: moon.topocentricAngularDiameter(time, observer),
+        angularDiameter: geocentric
+            ? moon.apparentAngularDiameter(jde)
+            : moon.topocentricAngularDiameter(time, observer),
         geocentricDiameter: moon.apparentAngularDiameter(jde),
         phaseAngle,
         lit,
@@ -321,8 +334,6 @@ export interface MoonFrame {
     law: Law;
     /** A law to hold the disc against, its pixels striped where they are a third of a stop off it. */
     compare?: Law | null;
-    /** A point Sun's hard shadows, striped where they are a third of a stop off the Sun's disc's soft ones. */
-    compareShadows?: boolean;
     /** The color map tinted to the Moon's color, as published, or as gray; tinted by default. */
     mapColor?: "tinted" | "untinted" | "gray";
     /** As the eye sees it at night, rather than a camera. */
@@ -336,7 +347,7 @@ export interface MoonFrame {
     /** From how many pixels across the disc the relief is displaced, the pass' 1024 unless given: 0 always, Infinity
      *  never. The pass is made anew. */
     displacementFrom?: number;
-    /** From how many pixels across the disc the shadows are soft, the pass' 4096 unless given: 0 always, Infinity
+    /** From how many pixels across the disc the shadows are soft, the pass' 0 unless given: 0 always, Infinity
      *  never. The pass is made anew. */
     softShadowsFrom?: number;
     /** The target's format and how many times SDR white it shows, `displayOutput`: SDR, 1 by default. */
@@ -368,9 +379,10 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     let mapsBound = "";
     let mapsWanted = "";
     let background: GPUTexture | null = null;
-    // dunstkreis' meter on the sky, read back whenever the sky view may have been rebuilt: by day the sky sets the exposure.
-    let skyEV100 = Number.NEGATIVE_INFINITY;
-    let skyMeteredFor = "";
+    // dunstkreis' meter on the sky, read back once per sky the tiles show, as several tiles may show different ones: by
+    // day the sky sets the exposure.
+    const skyMeters = new Map<string, number>();
+    const skyMetering = new Set<string>();
 
     function buildSky(luts: AtmosphereLUTs, grid: boolean) {
         const wanted = `${grid}`;
@@ -391,7 +403,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             sky?.pass.destroy();
             sky = { pass, luts, grid };
             skyBuilding = null;
-            skyMeteredFor = "";
+            skyMeters.clear();
             requestRender();
         });
     }
@@ -446,13 +458,13 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
         });
     }
 
-    // The intermediate textures of a comparison: the finished frame, and the two lights it is striped by.
+    // The intermediate textures of a comparison: the finished frame, and the lights it is striped by.
     let comparing: { finished: GPUTexture; shown: GPUTexture; reference: GPUTexture } | null = null;
-    let stripePass: { pipeline: GPUComputePipeline; format: GPUTextureFormat } | null = null;
-    let stripeBuilding = "";
+    const stripePasses = new Map<string, GPUComputePipeline>();
+    const stripeBuilding = new Set<string>();
     function buildStripes(format: GPUTextureFormat) {
-        if (stripeBuilding === format) return;
-        stripeBuilding = format;
+        if (stripeBuilding.has(format)) return;
+        stripeBuilding.add(format);
         const code = [wgsl.moonOutput(format), stripes].join("\n");
         device
             .createComputePipelineAsync({
@@ -464,15 +476,16 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                 },
             })
             .then((pipeline) => {
-                stripePass = { pipeline, format };
+                stripePasses.set(format, pipeline);
                 requestRender();
             });
     }
 
-    /** `frame` striped where its light is a third of a stop off the law or the soft shadows it is held against. */
+    /** `frame` striped where its light is a third of a stop off the law it is held against. */
     function compared(target: GPUTexture, frame: MoonFrame) {
         const format = frame.format ?? SDR;
-        if (stripePass?.format !== format) {
+        const pipeline = stripePasses.get(format);
+        if (!pipeline) {
             buildStripes(format);
             return null;
         }
@@ -488,23 +501,18 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                 reference: make("sternwarte:compareReference", "rgba16float"),
             };
         }
-        // A point Sun's hard shadows against the Sun's disc's soft ones, or the law against the other law.
-        const shown: MoonFrame = frame.compareShadows
-            ? { ...frame, softShadowsFrom: Number.POSITIVE_INFINITY }
-            : { ...frame, compare: null };
-        const reference: MoonFrame = frame.compareShadows
-            ? { ...frame, softShadowsFrom: 0 }
-            : { ...frame, law: frame.compare ?? frame.law };
+        const shown: MoonFrame = { ...frame, compare: null };
+        const reference: MoonFrame = { ...frame, law: frame.compare ?? frame.law };
         const drawn = render(comparing.finished, shown, false);
         if (!drawn || !render(comparing.shown, shown, true) || !render(comparing.reference, reference, true))
             return null;
         const encoder = device.createCommandEncoder({ label: "sternwarte:stripes" });
         const pass = encoder.beginComputePass({ label: "sternwarte:stripes" });
-        pass.setPipeline(stripePass.pipeline);
+        pass.setPipeline(pipeline);
         pass.setBindGroup(
             0,
             device.createBindGroup({
-                layout: stripePass.pipeline.getBindGroupLayout(0),
+                layout: pipeline.getBindGroupLayout(0),
                 entries: [comparing.finished, comparing.shown, comparing.reference].map((texture, binding) => ({
                     binding,
                     resource: texture.createView(),
@@ -514,7 +522,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
         pass.setBindGroup(
             1,
             device.createBindGroup({
-                layout: stripePass.pipeline.getBindGroupLayout(1),
+                layout: pipeline.getBindGroupLayout(1),
                 entries: [{ binding: 0, resource: target.createView() }],
             }),
         );
@@ -576,7 +584,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
         const metered = Math.max(
             moonEV100(m.phaseAngle, m.lit, Math.max(through, 1e-3) * outsideUmbra),
             frame.eclipse && m.shadow.umbralMagnitude > 0 ? UMBRA_EV100 : Number.NEGATIVE_INFINITY,
-            frame.air ? skyEV100 : Number.NEGATIVE_INFINITY,
+            frame.air ? (skyMeters.get(skyKeyOf(m)) ?? Number.NEGATIVE_INFINITY) : Number.NEGATIVE_INFINITY,
             // A plain background, a daytime sky behind the tiles, is metered too, so it does not burn out.
             !frame.air && frame.background
                 ? ev100ForLuminance(luminanceOf(frame.background))
@@ -625,7 +633,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             sunAngularDiameter: m.sunAngularDiameter,
             refraction,
             // From the observer, an Earth radius nearer when the Moon is overhead.
-            distanceKm: m.distanceKm - m.model.planet.groundRadiusKm * m.trueDirection[2],
+            distanceKm: m.geocentric ? m.distanceKm : m.distanceKm - m.model.planet.groundRadiusKm * m.trueDirection[2],
             // Where a figure carried the viewer away from Earth, Earth where it has gone.
             earthDirection: (m as MoonAt & { earthDirection?: Vec3 }).earthDirection ?? null,
             // Only through the air, measured in its zenith column from sea level.
@@ -657,13 +665,15 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
         moonPass.encode(encoder, target, { background });
         device.queue.submit([encoder.finish()]);
         const passesMs = performance.now() - started;
-        const skyKey = `${m.jd},${m.trueDirection.join(",")},${m.heightM}`;
-        if (frame.air && skyKey !== skyMeteredFor) {
-            skyMeteredFor = skyKey;
+        const skyKey = skyKeyOf(m);
+        if (frame.air && !skyMeters.has(skyKey) && !skyMetering.has(skyKey)) {
+            skyMetering.add(skyKey);
             const { pass } = sky;
             pass.meteredEV100().then((value) => {
-                if (sky?.pass !== pass || Math.abs(value - skyEV100) < 0.05) return;
-                skyEV100 = value;
+                skyMetering.delete(skyKey);
+                if (sky?.pass !== pass) return;
+                if (skyMeters.size > 64) skyMeters.clear();
+                skyMeters.set(skyKey, value);
                 if (frame.ev100 === null) requestRender();
             });
         }
@@ -675,7 +685,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
         bound: () => mapsBound,
         /** Draws `frame` into `target`; null while a pass is still being made, which calls `requestRender` when done. */
         draw(target: GPUTexture, frame: MoonFrame) {
-            if (!frame.compare && !frame.compareShadows) return render(target, frame, false);
+            if (!frame.compare) return render(target, frame, false);
             return compared(target, frame);
         },
     };

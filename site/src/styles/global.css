@@ -1026,6 +1026,25 @@ svg text {
     font-size: var(--text-meta);
     color: var(--muted);
 }
+/* A figure's parts under its view at one rhythm: its sliders half a line apart, three quarters of one between two, its
+   readout muted, a footnote to the view, and the caption as far below whatever ends the figure as sternzeit's scenes
+   keep it, which pad it themselves, whatever margin the part above brings. An empty readout or row of names takes no
+   room. */
+figure > :has(+ .figure-caption) {
+    margin-bottom: 0;
+}
+figure:not(.scene-frame) > .figure-caption {
+    margin-top: 0.75rem;
+}
+.view-status {
+    color: var(--muted);
+}
+.view-status:empty,
+.view-status:has(> *):not(:has(> :not(:empty))),
+.tiles-labels:empty,
+.tiles-labels:has(> *):not(:has(> :not(:empty))) {
+    display: none;
+}
 .figure-caption::before {
     counter-increment: figure;
     content: "Figure\a0" counter(figure) ". ";

@@ -3,9 +3,10 @@ import { find } from "../dom";
 import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { drawSvg } from "../sternzeit/figure";
-import { onChange, state } from "../sternzeit/state";
+import { ownMoment } from "../sternzeit/lunation";
 import { FILTERS } from "./filters";
 import { apply, noGpu, transpose } from "./laws";
+import { ANY_PLACE, julianDayOf } from "./place";
 import { type MoonAt, moonAt, type ToneCurveName } from "./renderer";
 import { mapResolutions, RESOLUTION_NAMES } from "./resolutions";
 import { saveFigure } from "./snapshot";
@@ -16,6 +17,9 @@ import { createTiles, type TileFrame, tileFrame } from "./tiles";
 const SHARE = 1 / 8;
 const OUT = 0.94;
 const TOWARDS_THE_LIGHT = 0.3;
+
+// Five days after new moon, the south pole on the lit limb.
+const START = julianDayOf("2026-11-14T18:00Z");
 
 /**
  * Where the close-up looks off the disc's center, right and up, in degrees of sky: at the limb, near the south pole.
@@ -46,6 +50,7 @@ export function samplingFigure(root: HTMLElement) {
     const note = find("[data-field=note]", root);
     const marker = find<SVGSVGElement>("[data-field=marker]", root);
     const requestRender = onDemand(render, root);
+    const moment = ownMoment(root, START, requestRender);
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
     const resolution = mapResolutions(root, "4k", requestRender);
@@ -73,7 +78,7 @@ export function samplingFigure(root: HTMLElement) {
     function render() {
         const table = tables();
         if (!table) return;
-        const m = moonAt(state.jd, state, table.luts.model);
+        const m = moonAt(moment.jd(), ANY_PLACE, table.luts.model);
         const width = root.clientWidth || 600;
         const count = FILTERS.length + 1;
         const tileCss = width / count;
@@ -123,7 +128,6 @@ export function samplingFigure(root: HTMLElement) {
         }),
     );
 
-    onChange(requestRender);
     onTables(requestRender);
     onDisplay(requestRender);
     new ResizeObserver(requestRender).observe(root);

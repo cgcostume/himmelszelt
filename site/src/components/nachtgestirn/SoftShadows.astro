@@ -1,5 +1,4 @@
 ---
-import Icon from "../Icon.astro";
 import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
@@ -8,43 +7,42 @@ import Resolutions from "../Resolutions.astro";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
 import { STRIP_RESOLUTIONS } from "./resolution-options";
 
-/** The disc with a close-up of the terminator marked, and the close-up's shadows cast by a point Sun and by the real one. */
+/** The disc with a close-up of the terminator marked, and the close-up split: a point Sun on the relief as it lies on the
+ *  sphere left of a line, and as the pass draws it right of it, the real Sun's soft shadows on the displaced relief. */
 interface Props {
     id?: string;
 }
 const { id = "soft-shadows" } = Astro.props;
 ---
 
-<figure class="tiles-figure wide" id={id} data-soft-shadows>
-    <div class="tiles-panel as-seen split" style="--count: 3">
-        <canvas aria-label="The Moon, and a close-up of its terminator with the shadows of a point Sun and of the Sun's half degree, rendered with WebGPU"></canvas>
+<figure class="tiles-figure" id={id} data-soft-shadows>
+    <div class="tiles-panel as-seen split" style="--count: 2">
+        <canvas aria-label="The Moon, and a close-up of its terminator lit by a point Sun on the undisplaced relief, rendered with WebGPU"></canvas>
+        <canvas class="detail-full" data-field="full" aria-label="The close-up as the pass draws it, the Sun's half degree on the displaced relief, rendered with WebGPU"></canvas>
         <svg class="tiles-overlay" data-field="marker" aria-hidden="true"></svg>
         <span class="tiles-start">
             <Resolutions options={STRIP_RESOLUTIONS} chosen="8k-strip" />
-            <span class="view-buttons"><button type="button" class="view-icon" data-field="deviation" aria-pressed="true" title="Stripe the point Sun's close-up where its hard shadows are more than a third of a stop off the Sun's half degree: red where brighter, blue where darker" aria-label="Deviation"><Icon name="clipped" /></button></span>
             <span class="view-buttons"><button type="button" class="view-toggle" data-field="albedo" aria-pressed="false" title="NASA's color map of the Moon; off, a uniform surface of the Moon's albedo, so the relief and its shadows show alone">albedo</button></span>
-            <span class="tiles-hint footnote">Rendered with WebGPU</span>
-        </span>
-        <span class="tiles-ends">
-            <span class="view-buttons">
-                <button type="button" class="view-icon" data-field="download" title="Download the disc and the two close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
-            </span>
         </span>
     </div>
-    <ul class="tiles-labels" style="grid-template-columns: repeat(3, 1fr)">
-        <li><span class="tiles-name">the disc</span> <span class="tiles-value">the close-up marked</span></li>
-        <li><span class="tiles-name">a point Sun</span> <span class="tiles-value">every edge hard</span></li>
-        <li><span class="tiles-name">the Sun's half degree</span> <span class="tiles-value">penumbrae widening off the rims</span></li>
-    </ul>
-    <LunationSlider />
+    <label class="figure-slider split-slider" title="Where the line between the cheap close-up and the full one runs">
+        <span class="note">point Sun, on the sphere</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="split" min="0" max="100" step="0.5" value="50" aria-label="Where the split runs, from all the full close-up to all the cheap one" />
+        </span>
+        <span class="note">the Sun's half degree, displaced</span>
+    </label>
+    <LunationSlider own />
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        Soft shadows on a close-up of the <Term of="Terminator">terminator</Term>, a sixteenth of the disc across: the
-        disc at the chosen moment with the close-up marked, and the close-up twice, a stop more open, its shadows cast by
-        a point Sun and by the Sun's half degree. Striped, at a switch, where the point Sun's shadows are more than a third
-        of a stop off the soft ones: red brighter, blue darker.
-        <Try label="Five days after new moon" set="date=2026-11-14T18:00Z" fig={id}>
-            the long shadows of the southern highlands, their tips gone soft.
+        Soft shadows and displacement on a close-up of the <Term of="Terminator">terminator</Term>, a sixteenth of the disc
+        across: the disc at the moment its slider sets, with the close-up marked, and the close-up a stop more open, split
+        by a line the slider or a drag moves. Left of it a point Sun lights the relief as it lies on the sphere, shading it
+        and casting hard shadows on it; right of it, as the pass draws it, the Sun's half degree casts soft shadows on the
+        relief displaced.
+        <Try label="Two days after new moon" set="date=2026-11-11T12:00Z" fig={id}>
+            the close-up at the limb, the relief seen from the side: the point Sun's peaks hang sharp in the night,
+            displaced they stand up as mountains, and their tops fade, the Sun's disc only partly over their horizon.
         </Try>
     </figcaption>
 </figure>

@@ -4,23 +4,24 @@ import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { morph } from "../dunstkreis/skyframe";
 import { onDemand } from "../frame";
 import { drawSvg, moonSymbol, svgText, THUMB_RADIUS } from "../sternzeit/figure";
-import { onChange, state } from "../sternzeit/state";
 import { apply, cross, dot, multiply, noGpu, normalize, rotation, transpose } from "./laws";
+import { julianDayOf } from "./place";
 import { type MoonAt, moonAt, shimmerThrough, type ToneCurveName } from "./renderer";
 import { mapResolutions } from "./resolutions";
 import { createTiles } from "./tiles";
 
 const DEG = Math.PI / 180;
 const ARCSEC = 206_265;
-// The close-up: this share of the disc across, its middle this far from the disc's center, at the lower or upper limb.
-const SHARE = 0.5;
-const DOWN = 0.35;
-// Where the Moon stands when the moment has it below the horizon, in degrees.
-const LOW = 4;
+// Two Moons side by side from Potsdam: 12.1 days after the new moon, waxing, by day, and 16.4 days, waning, at dusk.
+const MOMENTS = [julianDayOf("2026-11-21T09:26Z"), julianDayOf("2026-11-25T16:01Z")];
+const PLACE = { latitude: 52.3920607, longitude: 13.0925765, heightM: 1 };
+// Each close-up, square: this share of the disc across, the lower or upper limb this share of the way in from its edge.
+const SHARE = 0.25;
+const LIMB = 0.25;
+// Where the Moons stand at first, in degrees: lower, the day sky near the horizon outshines the waxing one.
+const LOW = 15;
 // The lens the air is seen through, in meters: a telephoto's.
 const APERTURE = 0.1;
-// The close-up's width over its height, and the side view's under it.
-const ASPECT = 2;
 // The side view as dunstkreis' sunlight through the air draws it, not to scale: the planet half as wide, the air four
 // times as thick, in km, a band of it a scale height, as many km across right of the zenith; the zenith this far in
 // from the left, room for the heights' names and a Moon past it, and room above the air's top and below the observer
@@ -54,7 +55,9 @@ function apparentHorizon(bend: (apparent: number) => number | null, heightM: num
     }
     return high;
 }
-// How far the close-up zooms out and in, by the wheel, and each notch's step.
+// How far the close-up zooms out and in, by the wheel, and each notch's step; it starts a little out, more of the limb
+// in view.
+const ZOOM_START = 0.8;
 const ZOOM_LEAST = 0.1;
 const ZOOM_MOST = 4;
 const ZOOM_STEP = 1.15;
@@ -122,7 +125,7 @@ export function shimmerFigure(root: HTMLElement) {
         requestRender();
     });
     // The close-up zoomed in by the wheel, a double click back.
-    let zoom = 1;
+    let zoom = ZOOM_START;
     canvas.addEventListener(
         "wheel",
         (event) => {
@@ -133,7 +136,7 @@ export function shimmerFigure(root: HTMLElement) {
         { passive: false },
     );
     canvas.addEventListener("dblclick", () => {
-        zoom = 1;
+        zoom = ZOOM_START;
         requestRender();
     });
     // The horizon from the observer's height, traced once a height, and how low the Moon may go.
@@ -162,9 +165,9 @@ export function shimmerFigure(root: HTMLElement) {
         const real = -Math.acos(Math.max(-1, Math.min(1, 1 - share * (1 - Math.cos(h))))) / DEG;
         return angle > 90 ? 180 - real : real;
     };
-    // The Moon's apparent altitude set by a drag in the side view, or null for where it stands at the moment.
+    // The Moons' apparent altitude set by a drag in the side view, or null for `LOW`.
     let chosen: number | null = null;
-    // The observer's height set by a drag in the side view, in meters, or null for the page's.
+    // The observer's height set by a drag in the side view, in meters, or null for the place's.
     let chosenHeight: number | null = null;
 
     function render() {
@@ -173,31 +176,16 @@ export function shimmerFigure(root: HTMLElement) {
         const now = performance.now();
         if (pressed(play)) clock += (now - last) / 1000;
         last = now;
-        const real = moonAt(state.jd, { ...state, heightM: chosenHeight ?? state.heightM }, table.luts.model);
-        const realAltitude = Math.asin(Math.max(-1, Math.min(1, real.direction[2]))) / DEG;
-        const heightM = chosenHeight ?? state.heightM;
+        const heightM = chosenHeight ?? PLACE.heightM;
+        const reals = MOMENTS.map((jd) => moonAt(jd, { ...PLACE, heightM }, table.luts.model));
+        const real = reals[0] as MoonAt;
         if (horizon.heightM !== heightM || horizon.model !== table.luts.model) {
             horizon = { heightM, model: table.luts.model, altitude: apparentHorizon(real.bend, heightM) };
         }
         lowest = horizon.altitude + real.angularDiameter * ABOVE_THE_HORIZON;
-        const altitude = Math.max(
-            lowest,
-            Math.min(180 - lowest, chosen ?? (realAltitude > lowest ? realAltitude : LOW)),
-        );
-        const m = atAltitude(real, altitude);
-        // The close-up's up: towards the zenith, turning on past it as the Moon goes over, so the view does not flip.
-        // It looks at the lower limb, or the upper where only that is lit; the Moon's phase as it shows from that up.
-        const level = normalize([real.trueDirection[0], real.trueDirection[1], 0]);
-        const turn = Math.atan2(m.direction[2], dot(m.direction, level));
-        const up = normalize([-level[0] * Math.sin(turn), -level[1] * Math.sin(turn), Math.cos(turn)]);
-        const right = cross(m.direction, up);
-        const sun = m.moonSunDirection;
-        const litAbove = dot(sun, up) > 0;
-        const width = canvas.parentElement?.clientWidth || 400;
-        const tilePx = Math.round(width * Math.min(window.devicePixelRatio || 1, 2));
-        const across = (m.angularDiameter * SHARE) / zoom;
-        // How much the refraction squeezes the disc up and down: its lower limb lifted more than its upper.
+        const altitude = Math.max(lowest, Math.min(180 - lowest, chosen ?? LOW));
         const elevation = altitude > 90 ? 180 - altitude : altitude;
+        // How much the refraction squeezes the disc up and down: its lower limb lifted more than its upper.
         const slope = ((real.bend(elevation + 0.05) ?? 0) - (real.bend(elevation - 0.05) ?? 0)) / 0.1;
         const squeezed = 1 / (1 - slope);
         const shimmer = {
@@ -208,25 +196,46 @@ export function shimmerFigure(root: HTMLElement) {
             motion: part("motion") ? 1 : 0,
             boiling: part("boiling") ? 1 : 0,
         };
-        tiles?.draw({ count: 1, width: tilePx, height: Math.round(tilePx / ASPECT), degreesAcross: across }, () => ({
-            moon: m,
-            luts: table.luts,
-            toneMap: display.toneCurve as ToneCurveName,
-            maps: resolution(),
-            ev100: null,
-            albedo: true,
-            relief: true,
-            shadows: true,
-            earthshine: true,
-            eclipse: false,
-            law: "hapke2012",
-            nightVision: false,
-            air: true,
-            up,
-            // At the limb as the air squeezes the disc up and down, zoomed out the whole disc in the middle.
-            offset: [0, (litAbove ? 1 : -1) * m.angularDiameter * DOWN * squeezed * Math.min(1, zoom)] as const,
-            shimmer,
-        }));
+        // Each Moon at the same altitude at its own azimuth. The close-up's up: towards the zenith, turning on past it as
+        // the Moon goes over, so the view does not flip. It looks at the lower limb, or the upper where only that is
+        // lit; the Moon's phase as it shows from that up.
+        const views = reals.map((r) => {
+            const m = atAltitude(r, altitude);
+            const level = normalize([r.trueDirection[0], r.trueDirection[1], 0]);
+            const turn = Math.atan2(m.direction[2], dot(m.direction, level));
+            const up = normalize([-level[0] * Math.sin(turn), -level[1] * Math.sin(turn), Math.cos(turn)]);
+            return { m, up, right: cross(m.direction, up), litAbove: dot(m.moonSunDirection, up) > 0 };
+        });
+        const width = (canvas.parentElement?.clientWidth || 800) / MOMENTS.length;
+        const tilePx = Math.round(width * Math.min(window.devicePixelRatio || 1, 2));
+        const across = (real.angularDiameter * SHARE) / zoom;
+        tiles?.draw({ count: views.length, width: tilePx, degreesAcross: across }, (i) => {
+            const { m, up, litAbove } = views[i] ?? (views[0] as (typeof views)[number]);
+            return {
+                moon: m,
+                luts: table.luts,
+                toneMap: display.toneCurve as ToneCurveName,
+                maps: resolution(),
+                ev100: null,
+                albedo: true,
+                relief: true,
+                shadows: true,
+                earthshine: true,
+                eclipse: false,
+                law: "hapke2012",
+                nightVision: false,
+                air: true,
+                up,
+                // The limb where the air squeezes the disc to, zoomed out the whole disc in the middle.
+                offset: [
+                    0,
+                    (litAbove ? 1 : -1) * Math.max(0, (m.angularDiameter * squeezed) / 2 - across * (0.5 - LIMB)),
+                ] as const,
+                shimmer,
+            };
+        });
+        const { m, up, right } = views[0] as (typeof views)[number];
+        const sun = m.moonSunDirection;
         const { airColumn, bend } = shimmerThrough(m, shimmer);
         renderCut(altitude, airColumn, m.heightM, m.lit, dot(sun, right), -dot(sun, up), m.earthshine);
         const { tilt, cell: finest } = shimmerScales(shimmer, airColumn);
@@ -234,7 +243,7 @@ export function shimmerFigure(root: HTMLElement) {
         const fringe = bend * 0.0114 * ARCSEC;
         note.textContent =
             `the Moon ${Math.abs(elevation).toFixed(1)}° ${elevation < 0 ? "below the level" : "up"}` +
-            `${altitude > 90 ? ", past the zenith" : chosen === null && realAltitude > lowest ? ", where it stands" : ""}: ` +
+            `${altitude > 90 ? ", past the zenith" : ""}: ` +
             `through ${airColumn.toFixed(1)} zenith columns of air · the image moves ${rms.toFixed(1)}″ rms · ` +
             `cells from ${cell.toFixed(1)}″ · blue over red by ${fringe.toFixed(1)}″`;
         if (pressed(play)) requestRender();
@@ -387,14 +396,13 @@ export function shimmerFigure(root: HTMLElement) {
     };
     cut.addEventListener("pointerup", release);
     cut.addEventListener("pointercancel", release);
-    // A double click puts the Moon and the observer back where the page has them.
+    // A double click puts the Moons and the observer back where they started.
     cut.addEventListener("dblclick", () => {
         chosen = null;
         chosenHeight = null;
         requestRender();
     });
 
-    onChange(requestRender);
     onTables(requestRender);
     onDisplay(requestRender);
     new ResizeObserver(requestRender).observe(root);

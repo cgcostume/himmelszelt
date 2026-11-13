@@ -1,12 +1,11 @@
 ---
 import Icon from "../Icon.astro";
 import Term from "../Term.astro";
-import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
 import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
 
-/** The Moon through Earth's shadow: the eclipses around the chosen moment, the next one across a row of discs, and the shadow's light by the radius. */
+/** The Moon through Earth's shadow: one lunar eclipse, the eclipses around it to choose another, and the shown one across a row of discs. */
 interface Props {
     id?: string;
 }
@@ -38,30 +37,23 @@ const { id = "eclipse-row" } = Astro.props;
         </span>
         <output data-field="offsetValue"></output>
     </label>
-    <div class="shadow-timeline" title="The lunar eclipses of twelve years either side of the one shown, a bar each as tall as the eclipse is deep: click one to go there">
-        <svg data-field="timeline" aria-label="The lunar eclipses of the years around the chosen moment"></svg>
+    <div class="shadow-timeline" title="The lunar eclipses of twelve years either side of the one shown, a bar each as tall as the umbral magnitude: past the dashed line the Moon is wholly in the umbra. Click one to show it">
+        <svg data-field="timeline" aria-label="The lunar eclipses of the years around the one shown"></svg>
     </div>
-    <div class="tiles-panel as-seen">
+    <div class="tiles-panel as-seen split" style="--count: 7">
         <canvas data-field="row" aria-label="The Moon at seven moments of a lunar eclipse, rendered with WebGPU"></canvas>
     </div>
     <ul class="tiles-labels" style="grid-template-columns: repeat(7, 1fr)">
         <li></li><li></li><li></li><li></li><li></li><li></li><li></li>
     </ul>
-    <div class="tiles-plot">
-        <svg aria-hidden="true"></svg>
-    </div>
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        Through Earth's shadow, the next lunar eclipse after the chosen moment, from Earth's center with north up:
-        (a) the Moon at the slider's moment, the edges of the <Term of="Umbra">umbra</Term> and the{" "}
-        <Term of="Penumbra">penumbra</Term> drawn over it; (b) the lunar eclipses of twelve years either side, a bar as
-        tall as each is deep, the total ones in the accent, the chosen moment a line; (c) seven moments from the Moon's
-        first contact with the umbra to its last, each metered on its own, or all at the uneclipsed Moon's exposure;
-        (d) what of the sunlight reaches the Moon by the distance from the shadow's axis, red, green and blue, in stops,
-        the bar the Moon's own width.
-        <Try label="New Year's Eve 2028, Berlin" set="date=2028-12-31T17:00Z&lat=52.52&lon=13.405&h=1" fig={id}>
-            a total eclipse, the Moon halfway in from the umbra's edge.
-        </Try>
+        Through Earth's shadow, from Earth's center with north up: (a) the Moon at the slider's moment of the eclipse
+        shown, the edges of the <Term of="Umbra">umbra</Term> and the <Term of="Penumbra">penumbra</Term> drawn over
+        it, the umbra's solid and the penumbra's dashed, also while the Moon is still clear of them; (b) the lunar eclipses of twelve years either side, a bar each as tall as the
+        umbral <Term of="Eclipse magnitude">magnitude</Term>, past the dashed line total, the one shown in the accent;
+        (c) seven moments from the Moon's first contact with the umbra to its last, each metered on its own, or all at
+        the uneclipsed Moon's exposure.
     </figcaption>
 </figure>
 

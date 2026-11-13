@@ -154,27 +154,33 @@ fn ngNormalAt(point: vec3f, footprint: NgFootprint) -> vec3f {
 // above it. The shadows are marched through a smooth terrain wherever the finest level is read, so their edges do not
 // follow the creases: below half a level. The displaced relief only where it is magnified: below level 0.
 const NG_SPLINE_SHADOWS: f32 = 0.5;
+// Where a shadow is cast from between a coarse texel's mean height and its highest: the march follows a line, the texel
+// is a square, and its highest point mostly lies off the line. Halfway matches the share of shadow photographs show
+// along the terminator.
+override NG_PEAK_SHARE: f32 = 0.5;
 const NG_SPLINE_DISPLACED: f32 = 0.0;
 
-fn ngHeightIn(map: texture_2d<f32>, uv: vec2f, level: f32, splineBelow: f32) -> f32 {
+fn ngHeightIn(map: texture_2d<f32>, uv: vec2f, level: f32, splineBelow: f32, highest: bool) -> f32 {
     if (level < splineBelow) {
         return ngSampleBicubic(map, uv).x;
     }
-    return textureSampleLevel(map, ngMapSampler, uv, max(level, 0.0)).x;
+    let texel = textureSampleLevel(map, ngMapSampler, uv, max(level, 0.0));
+    return select(texel.x, mix(texel.x, texel.w, NG_PEAK_SHARE), highest);
 }
 
 // The height at a point in km at a level, the strip's where `inStrip`; past the strip the whole relief's, its level
-// turned to the whole relief's.
-fn ngHeightAt(point: vec3f, level: f32, inStrip: bool, splineBelow: f32) -> f32 {
+// turned to the whole relief's. `highest` reads the highest the terrain rises within a texel of the level instead of
+// its mean: what casts a shadow.
+fn ngHeightAt(point: vec3f, level: f32, inStrip: bool, splineBelow: f32, highest: bool) -> f32 {
     let uv = ngMapUv(ngSelenographic(point));
     if (inStrip) {
         let stripUv = ngDetailUv(uv);
         if (stripUv.x >= 0.0) {
-            return ngHeightIn(ngDetailRelief, stripUv, level, splineBelow);
+            return ngHeightIn(ngDetailRelief, stripUv, level, splineBelow, highest);
         }
-        return ngHeightIn(ngReliefMap, uv, level - ngDetailLevels(), splineBelow);
+        return ngHeightIn(ngReliefMap, uv, level - ngDetailLevels(), splineBelow, highest);
     }
-    return ngHeightIn(ngReliefMap, uv, level, splineBelow);
+    return ngHeightIn(ngReliefMap, uv, level, splineBelow, highest);
 }
 
 // A texel of the relief along the equator, in km, the strip's where `inStrip`.
@@ -280,13 +286,16 @@ fn ngDiscAboveTerrain(up: vec3f, toward: vec3f, height: f32, level: f32, inStrip
     // is left above it.
     let enough = tan(elevation + radius);
     var slope = -1e30;
-    var distanceKm = 0.75 * texelKm;
+    // From a texel of the point's own level on: nearer, a step would read the point's own coarse texel, whose highest
+    // stands over the mean the point sits at, and a small disc would shadow itself all along the terminator.
+    var distanceKm = 0.75 * texelKm * exp2(max(level, 0.0));
     for (var step = 0u; step < NG_SHADOW_STEPS && slope <= enough; step = step + 1u) {
         let angle = distanceKm / ngParams.moonRadiusKm;
         let there = up * cos(angle) + ahead * sin(angle);
-        // Read as coarse as the steps are apart, so no peak falls between two of them.
+        // Read as coarse as the steps are apart, so no peak falls between two of them, and the highest within a texel
+        // of that level, so no peak is averaged away either.
         let levelThere = max(level, log2(distanceKm * 0.3 / texelKm));
-        let heightThere = ngHeightAt(there, levelThere, inStrip, NG_SPLINE_SHADOWS);
+        let heightThere = ngHeightAt(there, levelThere, inStrip, NG_SPLINE_SHADOWS, true);
         let toThere = (ngParams.moonRadiusKm + heightThere) * there - origin;
         slope = max(slope, dot(toThere, up) / dot(toThere, ahead));
         distanceKm = distanceKm * NG_SHADOW_GROWTH;
@@ -413,7 +422,7 @@ fn ngAboveRelief(at: vec3f, sinA: f32, kmToUnits: f32, level: f32) -> f32 {
     let radius = length(at);
     let point = ngParams.orientation * (at / radius);
     let inStrip = ngInDetail(point);
-    let height = ngHeightAt(point, select(level, level + ngDetailLevels(), inStrip), inStrip, NG_SPLINE_DISPLACED);
+    let height = ngHeightAt(point, select(level, level + ngDetailLevels(), inStrip), inStrip, NG_SPLINE_DISPLACED, false);
     return radius - (sinA + height * kmToUnits);
 }
 
@@ -528,14 +537,20 @@ fn ngMoon(view: vec3f, ray: NgRay, hit: vec4f, pixelAngle: f32) -> NgMoon {
         sunlight = sunlight * ngEarthShadow(ngParams.moonCenterKm + outward * ngParams.moonRadiusKm);
     }
 
-    // Earthshine, from Earth's center, which the Moon sees up to a degree off the observer: near opposition.
+    // Earthshine, from Earth's center, which the Moon sees up to a degree off the observer: near opposition. Bluer
+    // than sunlight, as Earth's air and oceans make it.
     var light = sunlight;
     if (ngHas(NG_FLAG_EARTHSHINE)) {
         let earth = ngParams.earthDirection;
-        light = light + ngParams.earthshine * ngReflectance(dot(normal, earth), muView, dot(earth, toViewer));
+        let reflected = ngReflectance(dot(normal, earth), muView, dot(earth, toViewer));
+        light = light + NG_EARTHLIGHT * (ngParams.earthshine * reflected);
     }
     return NgMoon(albedo * ngTransmittance(view) * light, hit.w);
 }
+
+// Earthlight's color over sunlight's in linear sRGB, of luminance 1: the earthlit night side measured 0.15 magnitudes
+// bluer in B-V than the sunlit day side (Thejll et al. 2014), as a power law in wavelength through the channels.
+const NG_EARTHLIGHT: vec3f = vec3f(0.943, 1.005, 1.115);
 
 // A pixel -------------------------------------------------------------------------------------------------------------
 

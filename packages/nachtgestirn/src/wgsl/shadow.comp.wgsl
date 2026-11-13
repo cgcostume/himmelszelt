@@ -25,7 +25,7 @@ fn ngShadows(@builtin(global_invocation_id) id: vec3u) {
     // The terrain's height there, read as coarse as the map's texels are wide, from the strip where it lies in one.
     let inStrip = ngInDetail(point);
     let level = max(log2(max(texelAngle * ngParams.moonRadiusKm / ngReliefTexelKm(inStrip), 1e-4)), 0.0);
-    let height = ngHeightAt(point, level, inStrip, NG_SPLINE_SHADOWS);
+    let height = ngHeightAt(point, level, inStrip, NG_SPLINE_SHADOWS, false);
 
     // The share of the Sun's disc above the terrain: soft by its half degree, or a point's, all or nothing.
     let sunRadius = max(ngParams.shadowWindow.w, 1e-7);

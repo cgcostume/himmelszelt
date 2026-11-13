@@ -114,7 +114,6 @@ export function noGpu(canvas: HTMLCanvasElement) {
  */
 export function lawsFigure(root: HTMLElement) {
     const canvas = find<HTMLCanvasElement>("canvas", root);
-    const note = find("[data-field=note]", root);
     const metered = find("[data-field=metered]", root);
     const mapped = find("[data-field=map]", root);
     const deviation = find("[data-field=deviation]", root);
@@ -131,7 +130,7 @@ export function lawsFigure(root: HTMLElement) {
     function render() {
         const table = tables();
         if (!table) return;
-        const real = moonAt(state.jd, state, table.luts.model);
+        const real = moonAt(state.jd, { ...state, geocentric: true }, table.luts.model);
         const m = orbit.yaw === 0 && orbit.pitch === 0 ? real : orbited(real, orbit.yaw, orbit.pitch);
         const width = root.clientWidth || 600;
         // Two by two on a phone, as the side views under them.
@@ -148,6 +147,8 @@ export function lawsFigure(root: HTMLElement) {
         const moonEV = meter ? moonEV100(m.phaseAngle, m.lit) : moonEV100(0, 1);
         const sky = 0.2126 * DAY_SKY[0] + 0.7152 * DAY_SKY[1] + 0.0722 * DAY_SKY[2];
         const ev100 = byDay ? Math.max(moonEV, ev100ForLuminance(sky)) : moonEV;
+        canvas.parentElement?.style.setProperty("--count", String(columns));
+        canvas.parentElement?.style.setProperty("--rows", String(LAWS.length / columns));
         const layout = {
             count: columns,
             rows: LAWS.length / columns,
@@ -178,11 +179,6 @@ export function lawsFigure(root: HTMLElement) {
             const off = Math.log2(Math.max(discLight(element.dataset.off as Law, m.phaseAngle * DEG), 1e-9) / moon);
             element.textContent = `${off >= 0 ? "+" : ""}${off.toFixed(1)} stops${by}`;
         }
-        const where =
-            orbit.yaw === 0 && orbit.pitch === 0
-                ? "from Earth"
-                : `${(Math.abs(orbit.yaw) / DEG).toFixed(0)}° ${orbit.yaw > 0 ? "east" : "west"} and ${(Math.abs(orbit.pitch) / DEG).toFixed(0)}° ${orbit.pitch > 0 ? "over" : "under"} Earth's line of sight`;
-        note.textContent = `seen ${where}: phase angle ${m.phaseAngle.toFixed(1)}°, ${(m.lit * 100).toFixed(0)}% lit`;
     }
 
     // The discs as drawn, with their names, in one PNG.

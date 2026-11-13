@@ -50,10 +50,9 @@ export interface MoonPassOptions {
      *  through the heights near the limb, so the limb shows its mountains and the terrain hides what lies behind it,
      *  rather than only shading a smooth sphere. Infinity for never. */
     displacementFrom?: number;
-    /** From how many pixels across the disc the shadows are soft, 4096 by default: the share of the Sun's half degree
-     *  above the terrain, so an edge is sharp near the rim that casts it and widens farther off. Below, the Sun is a
-     *  point. A penumbra is the shadow's length times the Sun's 0.0093 radians: 0.85 km, a pixel of a 4096 pixel disc,
-     *  for a shadow 90 km long, a 3 km rim with the Sun 2° up. Smaller discs see no difference. 0 for always. */
+    /** From how many pixels across the disc the shadows are soft, 0 by default, always: the share of the Sun's half
+     *  degree above the terrain, so an edge is sharp near the rim that casts it and widens farther off. Below, the Sun
+     *  is a point. It costs the march nothing measurable, as it marches the same steps either way. Infinity for never. */
     softShadowsFrom?: number;
     /** The most texels the shadow map may hold, 4,194,304 by default, four bytes each: the texel coarsens past it. */
     shadowMapTexels?: number;
@@ -139,7 +138,8 @@ export interface MoonParams {
     sunDirection: Vec3;
     /** The Sun's illuminance at the Moon, in lux, 128,000 by default. */
     sunIlluminance: number;
-    /** Earth's illuminance at the Moon, in lux, from `earthshineIlluminance`; 0 by default, no earthshine. */
+    /** Earth's illuminance at the Moon, in lux, from `earthshineIlluminance`, drawn a little bluer than sunlight; 0 by
+     *  default, no earthshine. */
     earthshine: number;
     /** The rotation from ENU into the Moon's own frame, from `moonOrientation`: which part of its face shows, and how
      *  it is turned. By default the Moon's 0° meridian faces the viewer with its north up. */
@@ -387,7 +387,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         filter = "anisotropic",
         shadowsFrom = 128,
         displacementFrom = 1024,
-        softShadowsFrom = 4096,
+        softShadowsFrom = 0,
         shadowMapTexels = 4_194_304,
         reflectance = wgsl.reflectance,
     } = options;

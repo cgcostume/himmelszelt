@@ -1,7 +1,7 @@
 import { earth } from "@himmelszelt/sternzeit";
 import { expect, test } from "@playwright/test";
-import { DEFAULT_ATMOSPHERE_MODEL } from "../src/model.js";
-import { airRefractivity, apparentDirection, refractionAngle } from "../src/refraction.js";
+import { DEFAULT_ATMOSPHERE_MODEL, RGB_ATMOSPHERE_MODEL } from "../src/model.js";
+import { airRefractivity, airTransmittance, apparentDirection, refractionAngle } from "../src/refraction.js";
 
 const model = DEFAULT_ATMOSPHERE_MODEL;
 const GROUND_M = 0.001;
@@ -79,4 +79,19 @@ test("a body hidden behind the planet is returned as it is", () => {
     const a = (-30 * Math.PI) / 180;
     const hidden: [number, number, number] = [0.6 * Math.cos(a), 0.8 * Math.cos(a), Math.sin(a)];
     expect(apparentDirection(hidden, model, GROUND_M)).toEqual(hidden);
+});
+
+test("two passes double the optical depth before the color, which squaring the color does not", () => {
+    // Sunlight grazing the ground 10 km up, in and out again, as into Earth's shadow.
+    const once = (m = model) => airTransmittance(m, 10_000, 0) as number[];
+    const twice = (m = model) => airTransmittance(m, 10_000, 0, 2) as number[];
+    // With the three sampled wavelengths taken as R, G and B, a channel is one wavelength, and the two agree.
+    once(RGB_ATMOSPHERE_MODEL).forEach((t, c) => {
+        expect(Math.abs((twice(RGB_ATMOSPHERE_MODEL)[c] ?? 0) / (t * t) - 1)).toBeLessThan(1e-9);
+    });
+    // Fitted from four wavelengths, a channel spans many, and the squared color comes out greener than the spectrum's.
+    const [r1, g1] = once();
+    const [r2, g2] = twice();
+    expect(((g1 ?? 0) / (r1 ?? 1)) ** 2 / ((g2 ?? 0) / (r2 ?? 1))).toBeGreaterThan(1.03);
+    expect(airTransmittance(model, 100, 30, 1)).toEqual(airTransmittance(model, 100, 30));
 });

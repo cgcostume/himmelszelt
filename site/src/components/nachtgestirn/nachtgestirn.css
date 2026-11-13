@@ -99,18 +99,25 @@
     text-align: center;
     list-style: none;
 }
+/* Name and value on one line, told apart by their colors; in a row of tiles too narrow for that, one over the other in
+   every tile alike. */
 .tiles-labels > li {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    container-type: inline-size;
+    text-wrap: balance;
 }
-.tiles-labels .tiles-name {
-    display: block;
+@container (max-width: 10rem) {
+    .tiles-labels .tiles-name {
+        display: block;
+    }
+    .tiles-labels .tiles-value {
+        margin-left: 0;
+    }
 }
 .tiles-labels .tiles-name:not([class*="law-"]) {
     color: var(--accent);
 }
 .tiles-labels .tiles-value {
+    margin-left: 0.2em;
     color: var(--muted);
 }
 /* A plot under the tiles: the phase curves, or the shadow's light, as the ΔT strip. */
@@ -247,22 +254,42 @@
     text-align: center;
 }
 
-/* A row of tiles split by a line of the page's background between them, `--count` tiles wide. The page's
-   background is taken on the figure, outside the dark panel, which has its own. */
+/* Tiles split by lines of the page's background between them, both ways, `--count` tiles wide and `--rows` high; the
+   last lines fall outside. The page's background is taken on the figure, outside the dark panel, which has its own. */
 .tiles-figure {
     --page-bg: var(--bg);
+    --tiles-gap: 2px;
 }
 .tiles-panel.split::after {
     content: "";
     position: absolute;
-    inset: 0 -1px 0 0;
+    inset: 0 calc(-1 * var(--tiles-gap)) calc(-1 * var(--tiles-gap)) 0;
     background:
-        linear-gradient(to right, transparent calc(100% - 1px), var(--page-bg) 0) 0 0 / calc(100% / var(--count)) 100%;
+        linear-gradient(to right, transparent calc(100% - var(--tiles-gap)), var(--page-bg) 0) 0 0 /
+        calc(100% / var(--count, 1)) 100%,
+        linear-gradient(to bottom, transparent calc(100% - var(--tiles-gap)), var(--page-bg) 0) 0 0 / 100%
+        calc(100% / var(--rows, 1));
     pointer-events: none;
 }
-/* Lines and marks drawn over a row of tiles, in an SVG the panel's size. */
+/* A close-up split by a line: a second canvas over the right tile, shown right of the line, which a drag moves. */
+.tiles-panel > canvas.detail-full {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 50%;
+    height: 100%;
+    cursor: ew-resize;
+    touch-action: pan-y;
+}
+.tiles-overlay .detail-split-line {
+    stroke: var(--line);
+    stroke-width: 1.5;
+}
+/* Lines and marks drawn over a row of tiles, in an SVG the panel's size, over the lines parting the tiles too, so a
+   thumb on a tile's edge shows whole. */
 .tiles-overlay {
     position: absolute;
+    z-index: 1;
     inset: 0;
     width: 100%;
     height: 100%;
@@ -271,22 +298,27 @@
 .tiles-overlay .figure-note {
     fill: oklch(0.92 0 0 / 0.9);
 }
-/* Lines laid over the Moon: the shadow's edges, the discs' edges at apogee and perigee, all in one style. */
-.figure-outline,
-.shadow-outline {
+/* Lines laid over the Moon: the shadow's edges, where a disc truly stands, all in one style. */
+.figure-outline {
     fill: none;
     stroke: oklch(0.92 0 0 / 0.8);
     stroke-width: 1.2;
     stroke-dasharray: 5 4;
     vector-effect: non-scaling-stroke;
 }
-.distance-arrow {
-    stroke: oklch(0.92 0 0 / 0.85);
-    stroke-width: 1;
+/* Earth's shadow over the eclipsed Moon: the umbra's edge solid, the penumbra's, softer in the sky, dashed and fainter. */
+.shadow-umbra,
+.shadow-penumbra {
+    fill: none;
+    stroke-width: 1.2;
     vector-effect: non-scaling-stroke;
 }
-.distance-arrow-head {
-    fill: oklch(0.92 0 0 / 0.85);
+.shadow-umbra {
+    stroke: oklch(0.92 0 0 / 0.55);
+}
+.shadow-penumbra {
+    stroke: oklch(0.92 0 0 / 0.35);
+    stroke-dasharray: 4 4;
 }
 .surface-marker {
     fill: none;
@@ -302,40 +334,89 @@
 .tiles-panel.shadow-big > canvas {
     aspect-ratio: 2 / 1;
 }
-/* The eclipses around the chosen moment: a bar each, clickable, the shown one and the total ones in the accent. */
+/* The eclipses around the shown one: a bar each as tall as the eclipse is deep, clickable, the shown one in the
+   accent with its date over it, and a dashed line where a bar reaches total. */
 .shadow-timeline {
     margin: 0.5rem 0 0.75rem;
 }
 .shadow-timeline > svg {
     display: block;
     width: 100%;
-    height: 54px;
+    height: 76px;
     overflow: visible;
 }
 .timeline-eclipse {
     cursor: pointer;
 }
 .timeline-eclipse > line {
-    stroke: var(--text);
+    stroke: var(--muted);
     stroke-width: 2.5;
     stroke-linecap: butt;
 }
-.timeline-total > line {
-    stroke: var(--accent);
-}
-.timeline-shown > line {
-    stroke-width: 5;
-}
 .timeline-eclipse:hover > line {
+    stroke: var(--text);
+    stroke-width: 4;
+}
+.timeline-eclipse.timeline-shown > line,
+.timeline-shown:hover > line {
     stroke: var(--accent);
     stroke-width: 5;
 }
 .timeline-hit {
     fill: transparent;
 }
-.timeline-edge {
-    fill: var(--text);
-    opacity: 0.06;
+.timeline-total-line {
+    stroke: var(--muted);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    vector-effect: non-scaling-stroke;
+}
+.timeline-label {
+    fill: var(--accent);
+    dominant-baseline: middle;
+}
+.timeline-label:not(.figure-anchor-start, .figure-anchor-end) {
+    text-anchor: middle;
+}
+.timeline-pointer {
+    fill: var(--accent);
+}
+
+/* The light in Earth's shadow: a plot, strips of its color under it, and the Moon's disc laid over both. */
+.umbra-light {
+    position: relative;
+    margin-top: 1rem;
+}
+.umbra-light > svg[data-field="plot"] {
+    display: block;
+    width: 100%;
+    height: 196px;
+    overflow: visible;
+}
+.umbra-light > canvas[data-field="strips"] {
+    display: block;
+    margin-top: 10px;
+}
+.umbra-light-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+.umbra-light-moon {
+    fill: var(--accent);
+    fill-opacity: 0.12;
+    stroke: var(--accent);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+.umbra-light-center {
+    stroke: var(--accent);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    vector-effect: non-scaling-stroke;
 }
 
 /* The maps' resolutions and the switches for the relief at the top left, each a group of its own, the resolutions first. */
@@ -478,10 +559,6 @@
 [data-rising] .figure-slider > output {
     min-width: 7ch;
     text-align: right;
-}
-/* A slider without a scale under it stands as far off the caption as one with. */
-.plot-figure > .figure-slider:not(:has(.figure-slider-scale)) {
-    margin-bottom: 1.25rem;
 }
 
 /* Each disc named at its foot, over the canvas, with how far its light is off the measured Moon's; two by two on a phone. */
@@ -650,11 +727,6 @@
     stroke-width: 1;
     stroke-dasharray: 2 3;
 }
-.tycho-steepest-arc {
-    fill: none;
-    stroke: var(--muted);
-    stroke-width: 1;
-}
 /* The slice through Tycho under the surface figure: the surface as lit as it sees the Sun, its normals, one point's march. */
 .tycho-slice {
     display: block;
@@ -722,24 +794,10 @@
     stroke-width: 0.5;
     opacity: 0.3;
 }
-.tycho-level {
-    stroke: var(--muted);
-    stroke-width: 0.75;
-}
-.tycho-horizon-arc {
-    fill: none;
-    stroke: var(--accent);
-    stroke-width: 1;
-}
-.tycho-sun-arc {
-    fill: none;
-    stroke: var(--text);
-    stroke-width: 1;
-}
 
-/* A photograph with nachtgestirn's Moon laid over it, in a square that keeps its size whatever the photograph: both cut
-   to a circle a little wider than the disc, the canvas clipped to the right of a split line, the marks over both; in
-   full screen the square as large as the screen holds it, centered. */
+/* A photograph with nachtgestirn's Moon laid over it, in a square that keeps its size whatever the photograph: the
+   photograph faded into its sky past the disc, the canvas clipped to the right of a split line, the marks over both; in
+   full screen the stage fills the screen over the gallery, the disc in its middle. */
 .photo-compare {
     position: relative;
     width: 100%;
@@ -752,7 +810,6 @@
     inset: 0;
     overflow: hidden;
     background: #000;
-    clip-path: circle(var(--photo-cut, 45%) at 50% 50%);
 }
 .tiles-figure .tiles-panel .photo-disc > img {
     position: absolute;
@@ -776,21 +833,25 @@
     overflow: visible;
     pointer-events: none;
 }
-.photo-marks .photo-cut {
-    fill: none;
-    stroke: rgb(255 255 255 / 0.35);
-    stroke-width: 1;
-}
 .photo-marks .photo-split-line {
-    stroke: rgb(255 255 255 / 0.8);
+    stroke: var(--line);
     stroke-width: 1.5;
 }
-.photo-marks .photo-mark {
-    fill: none;
-    stroke: rgb(255 210 120 / 0.9);
-    stroke-width: 1.5;
+/* The moment, the place and what nachtgestirn computed for them, muted along the stage's foot. */
+.photo-note {
+    position: absolute;
+    right: 10px;
+    bottom: 8px;
+    left: 10px;
+    z-index: 5;
+    color: var(--muted);
+    opacity: 0.7;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    text-align: right;
+    text-wrap: pretty;
+    pointer-events: none;
 }
-.photo-marks .photo-mark-label,
 .photo-marks .photo-north {
     fill: rgb(255 255 255 / 0.85);
     font-size: 11px;
@@ -805,20 +866,136 @@
     stroke: rgb(255 255 255 / 0.7);
     stroke-width: 1.5;
 }
-.photo-stage:fullscreen {
+.photo-full:fullscreen {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    border-radius: 0;
+    padding-bottom: 0.5rem;
     background: #000;
+    color-scheme: dark;
+    color: white;
+    --text: white;
+    --muted: #aaa;
+    --surface: oklch(0.22 0.015 267);
+    --line: oklch(0.289 0.021 266);
+    /* The gap around the slider's thumb, in what lies behind it. */
+    --bg: #000;
 }
-.photo-stage:fullscreen > .photo-compare {
-    width: min(100vw, 100vh);
+.photo-full:fullscreen > .photo-stage {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    border-radius: 0;
 }
-/* The photographs to compare, one row of square thumbnails under the figure, as the environments' gallery has them. */
-.environments-gallery.photo-gallery {
+.photo-full:fullscreen .photo-compare {
+    height: 100%;
+    aspect-ratio: auto;
+}
+/* Its thumbnails size themselves by the gallery's width, which a centered column would otherwise shrink to nothing. */
+/* The photographs to compare as tabs under the figure, without names: the chosen one rises into the bar over them,
+   which credits it, its corners into the bar rounded out, and the bar's own corner square where the tab joins it there;
+   in full screen under the stage, as wide as the tabs need. */
+.photo-picker {
+    --tab: color-mix(in oklab, var(--surface), var(--line) 70%);
+    margin: 0.5rem 0;
+}
+.photo-full:fullscreen > :is(.photo-picker, .figure-slider) {
+    width: min(calc(100% - 2rem), calc(var(--count) * 7rem));
+    flex: none;
+}
+.photo-credit {
+    margin: 0;
+    padding: 0.4rem 0.75rem;
+    border-radius: var(--radius-button);
+    background: var(--tab);
+    color: var(--muted);
+    font-size: var(--text-small);
+    line-height: 1.4;
+}
+.photo-credit a {
+    color: inherit;
+}
+.photo-credit-name {
+    color: var(--text);
+}
+.photo-picker:has(.photo-tab:first-child[aria-pressed="true"]) .photo-credit {
+    border-bottom-left-radius: 0;
+}
+.photo-picker:has(.photo-tab:last-child[aria-pressed="true"]) .photo-credit {
+    border-bottom-right-radius: 0;
+}
+.photo-tabs {
+    display: grid;
     grid-template-columns: repeat(var(--count), 1fr);
-    max-width: calc(var(--count) * 7rem);
+    align-items: start;
+    gap: 4px;
+}
+.photo-tab {
+    position: relative;
+    display: block;
+    min-width: 0;
+    height: auto;
+    margin-top: 6px;
+    padding: 4px;
+    border: none;
+    border-radius: 0 0 var(--radius-button) var(--radius-button);
+    background: none;
+    cursor: pointer;
+    filter: brightness(0.7) saturate(0.6);
+    transition: filter 0.15s;
+}
+.photo-full .photo-tabs .photo-tab > img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    /* Concentric with the tab's corner, its padding in. */
+    border-radius: calc(var(--radius-button) - 4px);
+}
+.photo-tab:hover,
+.photo-tab:focus-visible {
+    filter: none;
+}
+.photo-tab:focus-visible {
+    outline: none;
+}
+.photo-tab:focus-visible:not([aria-pressed="true"]) img {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+.photo-tab[aria-pressed="true"] {
+    margin-top: 0;
+    padding-top: 10px;
+    background: var(--tab);
+    filter: none;
+}
+.photo-tab[aria-pressed="true"]::before,
+.photo-tab[aria-pressed="true"]::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: var(--radius-button);
+    height: var(--radius-button);
+}
+.photo-tab[aria-pressed="true"]::before {
+    right: 100%;
+    background: radial-gradient(
+        circle at 0 100%,
+        transparent calc(var(--radius-button) - 0.5px),
+        var(--tab) var(--radius-button)
+    );
+}
+.photo-tab[aria-pressed="true"]::after {
+    left: 100%;
+    background: radial-gradient(
+        circle at 100% 100%,
+        transparent calc(var(--radius-button) - 0.5px),
+        var(--tab) var(--radius-button)
+    );
+}
+.photo-tab:first-child::before,
+.photo-tab:last-child::after {
+    display: none;
 }
 /* The phase plot's band beyond ROLO's measurement, and the half lit disc at 90°. */
 [data-phases] .plot-band {
@@ -896,6 +1073,7 @@
 .budget-legend {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: 0.3rem 1.2rem;
     margin-bottom: 0.75rem;
 }
@@ -905,7 +1083,7 @@
     height: 0.8rem;
     margin-right: 0.4rem;
     vertical-align: -0.1rem;
-    border-radius: 2px;
+    border-radius: var(--radius-small);
     background: var(--budget-ink);
 }
 .budget-grid {
@@ -932,7 +1110,6 @@
     justify-content: center;
     gap: 3px;
     padding: 0.4rem 0;
-    margin-right: 2.2rem;
     border-top: var(--border);
     background: repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px var(--grid));
 }
@@ -949,7 +1126,7 @@
     background: var(--budget-ink);
 }
 .budget-line > .budget-bar:last-of-type {
-    border-radius: 0 4px 4px 0;
+    border-radius: 0 var(--radius-small) var(--radius-small) 0;
 }
 .budget-part-0 {
     background: var(--budget-0);
@@ -981,11 +1158,9 @@
     color: var(--muted);
     white-space: nowrap;
 }
-/* The cells and axes short of their column by a value's width, which the last bar's value runs into. */
 .budget-axis {
     position: relative;
     height: 1.2rem;
-    margin-right: 2.2rem;
     border-top: var(--border);
     font-family: var(--font-mono);
     font-size: 0.7rem;
@@ -1038,4 +1213,57 @@
 /* What the defaults draw a disc with, under its size. */
 .budget-defaults-note {
     font-size: 0.7rem;
+}
+
+/* The eclipse photographs: each over its tile, transformed onto its disc, shown left of the split line; a row of four,
+   two by two on a phone, the tiles parted by lines of the page's background both ways. */
+.eclipse-photo {
+    position: absolute;
+    top: calc(var(--row, 0) * 100% / var(--rows, 1));
+    left: calc(var(--col, 0) * 100% / var(--count, 4));
+    width: calc(100% / var(--count, 4));
+    height: calc(100% / var(--rows, 1));
+    overflow: hidden;
+    pointer-events: none;
+    clip-path: inset(0 calc(100% - var(--split, 50%) - 0.75px) 0 0);
+}
+.tiles-panel.eclipse-photos .eclipse-photo > img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    max-width: none;
+    transform-origin: 0 0;
+}
+/* On the split, broken around the thumb halfway down, as far as THUMB_GAP in figure.ts; the gray of a slider's empty
+   rail, the thumb alone in the accent. */
+.eclipse-photo-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--split, 50%) - 0.75px);
+    width: 1.5px;
+    background: linear-gradient(
+        var(--line) calc(50% - 10.5px),
+        transparent 0,
+        transparent calc(50% + 10.5px),
+        var(--line) 0
+    );
+}
+/* The split's slider out of sight, the line and its thumb dragged on the picture instead; still there for the keyboard
+   and a screen reader. */
+.split-slider {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+.eclipse-labels {
+    grid-template-columns: repeat(4, 1fr);
+}
+@media (max-width: 40rem) {
+    .eclipse-labels {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }

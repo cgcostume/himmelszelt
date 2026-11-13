@@ -1,0 +1,46 @@
+---
+import Term from "../Term.astro";
+import "../sternzeit/sternzeit.css";
+import "./nachtgestirn.css";
+
+/** The light in Earth's shadow by the distance from its axis: a plot in stops and strips of its color at four
+ *  exposures, the Moon's disc laid across both where a slider puts its center. */
+interface Props {
+    id?: string;
+}
+const { id = "umbra-light" } = Astro.props;
+---
+
+<figure class="tiles-figure" id={id} data-umbra-light>
+    <div class="umbra-light">
+        <svg data-field="plot" aria-label="What of the sunlight reaches the Moon by the distance from the shadow's axis, red, green and blue, in stops"></svg>
+        <canvas data-field="strips" aria-label="The shadow's light by the distance from its axis, as a surface lit by it shows at four exposures"></canvas>
+        <svg data-field="overlay" class="umbra-light-overlay" aria-hidden="true"></svg>
+    </div>
+    <label class="figure-slider" title="How far the Moon's center stands from the shadow's axis, as sternzeit's eclipse.lunar gives it in axisOffsetKm">
+        <span class="note">The Moon</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="offset" min="0" max="9000" step="10" value="3400" aria-label="The Moon's center from the shadow's axis, in km" />
+            <span class="figure-slider-scale" aria-hidden="true">
+                <span class="figure-slider-mark" style="left: 0%">on the axis</span>
+                <span class="figure-slider-mark" style="left: 100%">9,000 km</span>
+            </span>
+        </span>
+        <output data-field="offsetValue"></output>
+    </label>
+    <p class="view-status" data-field="note"></p>
+    <figcaption class="figure-caption">
+        The light in Earth's shadow by the distance from its axis, at the Moon's distance on New Year's Eve 2028: above,
+        what of the sunlight reaches the Moon, red, green and blue, in stops, dotted where darker than the plot reaches
+        or, for blue so deep in the shadow, none at all in sRGB, the edges of the{" "}
+        <Term of="Umbra">umbra</Term> and the <Term of="Penumbra">penumbra</Term> dashed; under it, the same light on a
+        white surface at four exposures, from the sunlit Moon's to thirteen stops more open. The band is the Moon's disc
+        where the slider puts its center.
+    </figcaption>
+</figure>
+
+<script>
+    import { umbraLightFigure } from "./umbralight";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-umbra-light]")) umbraLightFigure(root);
+</script>

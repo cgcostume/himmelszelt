@@ -103,7 +103,9 @@ Root scripts: `pnpm dev` (site at http://localhost:4321/), `pnpm build`, `pnpm t
   programmatic compiler API, which TypeScript 7 (native) does not ship yet.
 - **MIT license**, no NOTICE/BSD-carryover needed. The user is the sole author/rights-holder of
   the original osgHimmel work (his own thesis, not employer-commissioned), so relicensing is his
-  call.
+  call. All code is MIT (libraries, site code, the chapters' code examples); the chapters' prose, the figures' captions
+  and the figures themselves are CC BY 4.0; material by others keeps its own terms. `site/LICENSE.md` spells it out:
+  list any new third-party asset there.
 
 ## Working conventions
 

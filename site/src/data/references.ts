@@ -64,6 +64,15 @@ export const references: Record<string, Reference> = {
         url: "https://doi.org/10.1007/978-3-642-86475-9",
         note: "The theory of the umbra's light: sunlight refracted around Earth by its atmosphere, ring by ring.",
     },
+    thejll2014: {
+        authors:
+            "Peter Thejll, Chris Flynn, Hans Gleisner, Torben Andersen, Ana Ulla, Mette Owner-Petersen, Ahmad Darudi, Henriette Schwarz",
+        title: "The colour of the dark side of the Moon",
+        venue: "Astronomy & Astrophysics 563, A38",
+        year: 2014,
+        url: "https://doi.org/10.1051/0004-6361/201322776",
+        note: "The earthlit night side measured 0.15 magnitudes bluer in B-V than the sunlit day side; earthlight's B-V 0.44.",
+    },
     yapo2009: {
         authors: "Theodore C. Yapo, Barbara Cutler",
         title: "Rendering Lunar Eclipses",

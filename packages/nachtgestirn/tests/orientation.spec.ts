@@ -154,7 +154,8 @@ test("the lifted direction follows the bend and runs on smoothly below the horiz
     };
     expect(altitude(10)).toBeCloseTo(10 + (bennett(altitude(10)) ?? 0), 4);
     // Lifted some 0.6° near the horizon; below the last ray it keeps its lift and sinks at the true rate.
-    const steps = Array.from({ length: 21 }, (_, i) => altitude(-1.5 + i * 0.1));
+    // From far below, where no ray within 3° of the body gets out, too: the rising Moon must not jump back.
+    const steps = Array.from({ length: 81 }, (_, i) => altitude(-7.5 + i * 0.1));
     for (let i = 1; i < steps.length; i++) {
         expect((steps[i] ?? 0) - (steps[i - 1] ?? 0)).toBeGreaterThan(0.04);
         expect((steps[i] ?? 0) - (steps[i - 1] ?? 0)).toBeLessThan(0.11);

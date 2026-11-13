@@ -3,10 +3,14 @@ import { find } from "../dom";
 import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
-import { onChange, state } from "../sternzeit/state";
+import { ownMoment } from "../sternzeit/lunation";
 import { noGpu } from "./laws";
+import { ANY_PLACE, julianDayOf } from "./place";
 import { moonAt, type ToneCurveName } from "./renderer";
 import { createTiles, type TileFrame } from "./tiles";
+
+// Three days after new moon, a crescent in a nearly full Earth's light.
+const START = julianDayOf("2026-11-12T18:00Z");
 
 /** The earthshine figure on `root`: the Moon without earthshine and with it, at an exposure opened up past the crescent's. */
 export function earthshineFigure(root: HTMLElement) {
@@ -16,13 +20,14 @@ export function earthshineFigure(root: HTMLElement) {
     const lux = find("[data-field=lux]", root);
     const note = find("[data-field=note]", root);
     const requestRender = onDemand(render, root);
+    const moment = ownMoment(root, START, requestRender);
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
 
     function render() {
         const table = tables();
         if (!table) return;
-        const m = moonAt(state.jd, state, table.luts.model);
+        const m = moonAt(moment.jd(), ANY_PLACE, table.luts.model);
         const stops = Number(slider.value);
         stopsValue.textContent = `+${stops.toFixed(1)}`;
         paintRange(slider);
@@ -53,7 +58,6 @@ export function earthshineFigure(root: HTMLElement) {
     }
 
     slider.addEventListener("input", requestRender);
-    onChange(requestRender);
     onTables(requestRender);
     onDisplay(requestRender);
     new ResizeObserver(requestRender).observe(root);

@@ -552,6 +552,77 @@ function axisAngle(V: number, inclination: number, obliquity: number, pos: Equat
     );
 }
 
+/** The libration and the axis' position angle as the observer sees them, from Earth's center's, per Meeus ch. 53. */
+function topocentric(
+    { longitude: l, latitude: b }: MoonLibration,
+    P: number,
+    pos: EquatorialCoords,
+    parallax: number,
+    siderealTime: number,
+    observer: Observer,
+): MoonLibration & { positionAngleOfAxis: number } {
+    const la = observer.latitude * DEG_TO_RAD;
+    const de = pos.declination * DEG_TO_RAD;
+    const H = (siderealTime + observer.longitude - pos.rightAscension) * DEG_TO_RAD;
+    const Q = parallactic(pos, siderealTime, observer);
+    const z = Math.acos(Math.sin(de) * Math.sin(la) + Math.cos(de) * Math.cos(la) * Math.cos(H));
+    // The parallax at the Moon's zenith distance, the 0.0084 sin 2z for Earth's flattening.
+    const pi = parallax * (Math.sin(z) + 0.0084 * Math.sin(2 * z));
+    const QP = (Q - P) * DEG_TO_RAD;
+    const dl = (-pi * Math.sin(QP)) / Math.cos(b * DEG_TO_RAD);
+    const db = pi * Math.cos(QP);
+    const dP = dl * Math.sin((b + db) * DEG_TO_RAD) - pi * Math.sin(Q * DEG_TO_RAD) * Math.tan(de);
+    return { longitude: wrap180(l + dl), latitude: b + db, positionAngleOfAxis: P + dP };
+}
+
+/**
+ * Topocentric librations, per Meeus ch. 53: which part of the Moon's face is turned towards the observer rather than
+ * Earth's center. Standing an Earth radius off the line between the two centers, the observer looks around the Moon by
+ * up to its parallax, some 0.95°, and back over a day as Earth turns: the diurnal libration.
+ */
+export function topocentricLibrations(time: AstronomicalTime, observer: Observer): MoonLibration {
+    const { longitude, latitude } = topocentricAxis(time, observer, false);
+    return { longitude, latitude };
+}
+
+/** Approximation of {@link topocentricLibrations}, from the approximate chain. */
+export function topocentricLibrationsApprox(time: AstronomicalTime, observer: Observer): MoonLibration {
+    const { longitude, latitude } = topocentricAxis(time, observer, true);
+    return { longitude, latitude };
+}
+
+/** The position angle of the Moon's axis as the observer sees it, in degrees, per Meeus ch. 53: P turned by the diurnal
+ *  libration, by up to some 0.5°. */
+export function topocentricPositionAngleOfAxis(time: AstronomicalTime, observer: Observer): number {
+    return topocentricAxis(time, observer, false).positionAngleOfAxis;
+}
+
+/** Approximation of {@link topocentricPositionAngleOfAxis}, from the approximate chain. */
+export function topocentricPositionAngleOfAxisApprox(time: AstronomicalTime, observer: Observer): number {
+    return topocentricAxis(time, observer, true).positionAngleOfAxis;
+}
+
+function topocentricAxis(time: AstronomicalTime, observer: Observer, approx: boolean) {
+    const t = julianEphemerisDay(time);
+    return approx
+        ? topocentric(
+              librationsApprox(t),
+              positionAngleOfAxisApprox(t),
+              apparentPositionApprox(t),
+              equatorialHorizontalParallaxApprox(t),
+              apparentSiderealTimeApprox(time),
+              observer,
+          )
+        : topocentric(
+              librations(t),
+              positionAngleOfAxis(t),
+              apparentPosition(t),
+              equatorialHorizontalParallax(t),
+              apparentSiderealTime(time),
+              observer,
+          );
+}
+
 /** Geocentric elongation of the Moon from the Sun (ψ), in degrees, per Meeus 48.2. */
 function elongation(moonPosition: EquatorialCoords, sunPosition: EquatorialCoords): number {
     const { rightAscension: a, declination: d } = moonPosition;

@@ -4,7 +4,7 @@
     "private": true,
     "description": "The himmelszelt website: one chapter per @himmelszelt/* library, explaining, showcasing and making it explorable.",
     "type": "module",
-    "license": "MIT",
+    "license": "SEE LICENSE IN LICENSE.md",
     "scripts": {
         "dev": "astro dev",
         "build": "astro build",

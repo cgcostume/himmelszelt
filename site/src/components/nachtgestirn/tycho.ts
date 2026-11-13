@@ -147,7 +147,8 @@ export function tychoSlice(
     function draw(m: MoonAt) {
         last = m;
         const width = svg.clientWidth || 800;
-        // The Sun from Tycho, in its plane: its elevation over the middle's horizontal and from the east or the west.
+        // The Sun from Tycho, in the slice's plane: its direction cast into the plane from west to east through the
+        // middle, which is what shades a profile along it, so it swings through the zenith at noon instead of jumping.
         const up: [number, number, number] = [
             Math.cos(TYCHO.latitude * DEG) * Math.cos(TYCHO.longitude * DEG),
             Math.cos(TYCHO.latitude * DEG) * Math.sin(TYCHO.longitude * DEG),
@@ -155,9 +156,11 @@ export function tychoSlice(
         ];
         const east: [number, number, number] = [-Math.sin(TYCHO.longitude * DEG), Math.cos(TYCHO.longitude * DEG), 0];
         const sunOnMoon = apply(m.orientation, m.moonSunDirection);
-        const elevation = Math.asin(Math.max(-1, Math.min(1, dot(sunOnMoon, up))));
-        const side = dot(sunOnMoon, east) >= 0 ? 1 : -1;
-        const sun: Point = [side * Math.cos(elevation), Math.sin(elevation)];
+        const [se, su] = [dot(sunOnMoon, east), dot(sunOnMoon, up)];
+        const side = se >= 0 ? 1 : -1;
+        const sun: Point = [se / (Math.hypot(se, su) || 1), su / (Math.hypot(se, su) || 1)];
+        // Over the middle's horizontal, towards the side the Sun is on: 90° at noon.
+        const elevation = Math.atan2(su, Math.abs(se));
         const radius = (m.sunAngularDiameter / 2) * DEG;
 
         // How much of the Sun's disc the point at `s` sees above the terrain, and its march: the steps, the highest.
@@ -378,40 +381,12 @@ export function tychoSlice(
                     out += `<line x1="${f(p[0])}" y1="${f(p[1])}" x2="${f(ex)}" y2="${f(ey)}" class="tycho-horizon"/>`;
                 }
             }
-            {
-                // The decision, two angles over the point's horizontal towards the Sun: the terrain's horizon and the
-                // Sun's; the Sun above the horizon lights the point, by the share of its disc above it. Above the steepest
-                // slope there is no march: no rim or peak stands higher over a point, so nothing can hide the Sun.
-                const u = upAt(s0);
-                const level: Point = [side * u[1] * scale, side * u[0] * TALLER * scale];
-                const flat = Math.atan2(level[1], level[0]);
-                const screen = (angle: number) => {
-                    const [x, y] = shownAngle(angle);
-                    return Math.atan2(y, x);
-                };
-                // The point's own horizontal is turned from the middle's by its arc, towards the Sun east of it.
-                const tilt = (s0 / MOON_KM) * side;
-                const arc = (to: number, r: number, cls: string) => {
-                    const a = screen(to - tilt);
-                    // The short way round from the horizontal, which towards the west lies near ±180°.
-                    const turn = Math.atan2(Math.sin(a - flat), Math.cos(a - flat));
-                    const points = Array.from({ length: 13 }, (_, k) => {
-                        const t = flat + (turn * k) / 12;
-                        return `${f(p[0] + Math.cos(t) * r)} ${f(p[1] + Math.sin(t) * r)}`;
-                    });
-                    const arcs = `<path d="M${points.join("L")}" class="${cls}"/>`;
-                    return arcs;
-                };
-                out += `<line x1="${f(p[0])}" y1="${f(p[1])}" x2="${f(p[0] + Math.cos(flat) * 70)}" y2="${f(p[1] + Math.sin(flat) * 70)}" class="tycho-level"/>`;
-                if (shadowed && one.steps.length) out += arc(one.horizon, 44, "tycho-horizon-arc");
-                if (shadowed && one.own > STEEPEST) {
-                    const a = screen(STEEPEST - tilt);
-                    out += `<line x1="${f(p[0])}" y1="${f(p[1])}" x2="${f(p[0] + Math.cos(a) * 110)}" y2="${f(p[1] + Math.sin(a) * 110)}" class="tycho-steepest"/>`;
-                    out += arc(STEEPEST, 44, "tycho-steepest-arc");
-                }
-                // Short of the Sun's symbol where its ray ends close by, so the name stays clear of it.
-                const sunR = Math.max(30, Math.min(64, Math.hypot(end[0] - p[0], end[1] - p[1]) - SUN_ROOM_PX - 16));
-                out += arc(one.own, sunR, "tycho-sun-arc");
+            // Above the steepest slope there is no march: no rim or peak stands higher over a point, so nothing can hide
+            // the Sun. The point's own horizontal is turned from the middle's by its arc, towards the Sun east of it.
+            if (shadowed && one.own > STEEPEST) {
+                const [x, y] = shownAngle(STEEPEST - (s0 / MOON_KM) * side);
+                const a = Math.atan2(y, x);
+                out += `<line x1="${f(p[0])}" y1="${f(p[1])}" x2="${f(p[0] + Math.cos(a) * 110)}" y2="${f(p[1] + Math.sin(a) * 110)}" class="tycho-steepest"/>`;
             }
             const where =
                 Math.abs(s0) < 0.5 ? "the middle" : `${Math.abs(s0).toFixed(0)} km ${s0 > 0 ? "east" : "west"}`;

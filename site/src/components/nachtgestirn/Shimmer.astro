@@ -3,7 +3,6 @@ import Icon from "../Icon.astro";
 import Term from "../Term.astro";
 import "../sternzeit/sternzeit.css";
 import Resolutions from "../Resolutions.astro";
-import LunationSlider from "../sternzeit/LunationSlider.astro";
 import Rays from "./Rays.astro";
 import { WHOLE_RESOLUTIONS } from "./resolution-options";
 import "./nachtgestirn.css";
@@ -19,8 +18,8 @@ const R0S = ["5", "10", "20"];
 
 <figure class="tiles-figure wide" id={id} data-shimmer>
     <div class="shimmer-row">
-        <div class="tiles-panel as-seen">
-            <canvas aria-label="The Moon's lower limb through the air, shimmering, rendered with WebGPU"></canvas>
+        <div class="tiles-panel as-seen split" style="--count: 2">
+            <canvas aria-label="The Moon's lower limb through the air, shimmering, waxing and waning, rendered with WebGPU"></canvas>
             <span class="tiles-start">
                 <Resolutions options={WHOLE_RESOLUTIONS} chosen="4k" />
                 <span class="view-buttons">
@@ -39,16 +38,16 @@ const R0S = ["5", "10", "20"];
                 <button type="button" class="view-icon" data-field="play" aria-pressed="true" title="Let the air drift on, or hold it" aria-label="Pause"><Icon name="play" /></button>
             </span>
         </div>
-        <div class="shimmer-cut" title="Drag the observer up and down, the Moon from one horizon over the zenith to the other; double click for where the page has them">
+        <div class="shimmer-cut" title="Drag the observer up and down, the Moon from one horizon over the zenith to the other; double click for where they started">
             <svg data-field="cut" role="img" aria-label="The air between the observer and the Moon from the side: the path the light takes through it, and how much of it"></svg>
         </div>
     </div>
-    <LunationSlider />
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        The air's shimmer on the Moon's lower limb, and from the side the air its light crosses, in zenith columns of
-        air from sea level; the drawing is not to scale, the planet half as wide and the air four times as thick. r₀ is
-        Fried's parameter, how steady the air is through one column. Drag to move the observer and the Moon.
+        The air's shimmer on the Moon's lower limb from Potsdam, 12.1 days after the new moon, waxing, by day on November
+        21, 2026, and 16.4 days, waning, at dusk on November 25, both at the same altitude, and from the side the air their
+        light crosses, in zenith columns of air from sea level; the drawing is not to scale, the planet half as wide and the air four times as thick. r₀ is
+        Fried's parameter, how steady the air is through one column. Drag to move the observer and the Moons.
     </figcaption>
 </figure>
 

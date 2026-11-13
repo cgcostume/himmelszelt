@@ -88,6 +88,19 @@ export const SUN_SYMBOL = { radius: 8.5, gap: 5, length: 8.5, rays: 8 };
 
 /** A point to drag in a drawn figure, as a slider's thumb: its radius in screen pixels, with `figure-thumb`. */
 export const THUMB_RADIUS = 7.5;
+/** How far a split line stops short of its thumb's center: the thumb without a ring, a gap as wide as one instead. */
+export const THUMB_GAP = THUMB_RADIUS + 3;
+
+/** A vertical split line at `x` from `top` to `bottom`, broken around a thumb at `y`, and the thumb: the SVG of both. */
+export function splitLine(x: number, top: number, bottom: number, y: number, lineClass: string) {
+    const [a, b, c, d] = [top, y - THUMB_GAP, y + THUMB_GAP, bottom].map((v) => v.toFixed(1));
+    const px = x.toFixed(1);
+    return (
+        `<line x1="${px}" y1="${a}" x2="${px}" y2="${b}" class="${lineClass}"/>` +
+        `<line x1="${px}" y1="${c}" x2="${px}" y2="${d}" class="${lineClass}"/>` +
+        `<circle cx="${px}" cy="${y.toFixed(1)}" r="${THUMB_RADIUS}" class="figure-thumb split-thumb"/>`
+    );
+}
 
 /** The arrowheads in the 3D scenes, flat triangles the same size in screen pixels in every one of them. */
 export const ARROWHEAD_PX = { length: 12, halfWidth: 4.5 };
