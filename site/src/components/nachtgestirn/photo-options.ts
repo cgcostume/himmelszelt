@@ -24,6 +24,9 @@ export interface Photo {
     place: { latitude: number; longitude: number; heightM: number };
     /** Through the air and over the sky, for a photograph taken by day or low over the horizon; else the Moon alone. */
     air?: boolean;
+    /** The unsharp mask that gives nachtgestirn's Moon the photograph's sharpness, fitted by `scripts/photo-sharpen.mjs`:
+     *  the blur's radius as a fraction of the disc's, and how much of the difference is added. */
+    sharpen: { radius: number; amount: number };
     /** What the caption says of it: the moment and the place in words, the author and the license. */
     when: string;
     where: string;
@@ -50,6 +53,7 @@ export const PHOTOS: readonly Photo[] = [
         center: [0.4334, 0.2939],
         radius: 0.4423,
         turn: -54.95,
+        sharpen: { radius: 0.00794, amount: 0.5 },
         // The 3840 pixel wide rendition of a mosaic of 21 stacked tiles 6500 wide, turned as it stood in the sky; the moment
         // as its name gives it, 21:21 Central European Summer Time.
         date: "2020-04-26T19:21:00Z",
@@ -70,6 +74,7 @@ export const PHOTOS: readonly Photo[] = [
         center: [0.1351, 0.4989],
         radius: 0.7739,
         turn: -5.12,
+        sharpen: { radius: 0.00132, amount: 1.25 },
         // The 3840 pixel wide rendition of a mosaic of 34 stacked tiles 4211 wide, colored from a refractor's frames; the
         // moment as its name gives it, 21:45 Central European Summer Time.
         date: "2020-03-31T19:45:00Z",
@@ -90,6 +95,7 @@ export const PHOTOS: readonly Photo[] = [
         center: [0.4346, 0.4953],
         radius: 0.3436,
         turn: 2.44,
+        sharpen: { radius: 0.00794, amount: 0.5 },
         // The moment as the file's name gives it in UTC, the camera's clock in Central Daylight Time agreeing; the place
         // from its GPS. Through an 80 mm refractor and a wide eyepiece, nine minutes before sunset.
         date: "2024-05-15T01:17:13Z",
@@ -104,7 +110,7 @@ export const PHOTOS: readonly Photo[] = [
     {
         label: "gibbous, at dusk, 2015",
         page: "https://commons.wikimedia.org/wiki/File:Ksi%C4%99%C5%BCyc_Leszno_25.07.2015.JPG",
-        // The original, 2862 pixels wide, 1.2 MB.
+        // The original, 2862 pixels wide, 1.1 MiB.
         src: "https://upload.wikimedia.org/wikipedia/commons/6/62/Ksi%C4%99%C5%BCyc_Leszno_25.07.2015.JPG",
         thumb: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Ksi%C4%99%C5%BCyc_Leszno_25.07.2015.JPG/330px-Ksi%C4%99%C5%BCyc_Leszno_25.07.2015.JPG",
         width: 2862,
@@ -112,6 +118,7 @@ export const PHOTOS: readonly Photo[] = [
         center: [0.4625, 0.4932],
         radius: 0.279,
         turn: 2.06,
+        sharpen: { radius: 0, amount: 0 },
         // The camera's clock, 20:57:34 on July 25, 2015, read as Central European Summer Time, some seven minutes after
         // sunset; the place from its GPS. A superzoom camera at its longest, 1/25 s.
         date: "2015-07-25T18:57:34Z",
@@ -126,7 +133,7 @@ export const PHOTOS: readonly Photo[] = [
     {
         label: "gibbous, 2012",
         page: "https://commons.wikimedia.org/wiki/File:2012-10-25_20-41-01-waxing-gibbous-moon.jpg",
-        // The 3840 pixel wide rendition of a mosaic 5456 wide, 1.5 MB.
+        // The 3840 pixel wide rendition of a mosaic 5456 wide, 1.4 MiB.
         src: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/2012-10-25_20-41-01-waxing-gibbous-moon.jpg/3840px-2012-10-25_20-41-01-waxing-gibbous-moon.jpg",
         thumb: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/2012-10-25_20-41-01-waxing-gibbous-moon.jpg/330px-2012-10-25_20-41-01-waxing-gibbous-moon.jpg",
         width: 3840,
@@ -134,6 +141,7 @@ export const PHOTOS: readonly Photo[] = [
         center: [0.425, 0.5005],
         radius: 0.4974,
         turn: 16.31,
+        sharpen: { radius: 0, amount: 0 },
         // The camera's clock, 20:41:01 on October 25, 2012, read as Central European Summer Time; the place from its GPS.
         date: "2012-10-25T18:41:01Z",
         place: { latitude: 47.64087, longitude: 6.86515, heightM: 365 },
@@ -146,7 +154,7 @@ export const PHOTOS: readonly Photo[] = [
     {
         label: "full, 2010",
         page: "https://commons.wikimedia.org/wiki/File:FullMoon2010.jpg",
-        // The original, 2.1 MB, so the photograph holds up in full screen too.
+        // The original, 2.0 MiB, so the photograph holds up in full screen too.
         src: "https://upload.wikimedia.org/wikipedia/commons/e/e1/FullMoon2010.jpg",
         thumb: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/FullMoon2010.jpg/330px-FullMoon2010.jpg",
         width: 2580,
@@ -154,6 +162,7 @@ export const PHOTOS: readonly Photo[] = [
         center: [0.5019, 0.5099],
         radius: 0.4152,
         turn: 6.01,
+        sharpen: { radius: 0.00198, amount: 2.75 },
         // The camera's clock, 23:21:13 on October 22, 2010, read as Central Daylight Time.
         date: "2010-10-23T04:21:13Z",
         place: { latitude: 34.699, longitude: -86.748, heightM: 200 },
@@ -173,6 +182,7 @@ export const PHOTOS: readonly Photo[] = [
         center: [0.8166, 0.4982],
         radius: 0.6588,
         turn: 4.59,
+        sharpen: { radius: 0.00132, amount: 1 },
         // The 3840 pixel wide rendition of a mosaic of 31 stacked tiles 4245 wide, colored from a refractor's frames; the
         // moment as its name gives it, 04:51 Central European Summer Time.
         date: "2020-09-11T02:51:00Z",

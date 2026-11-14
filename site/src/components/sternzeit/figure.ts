@@ -50,6 +50,10 @@ export function stripMoment(x: number, y: number, top: number, bottom: number, c
     return `<line x1="${px}" y1="${top}" x2="${px}" y2="${bottom}" class="strip-moment ${cls}"/><circle cx="${px}" cy="${py}" r="3" class="strip-moment-dot ${cls}"/>`;
 }
 
+/** The Moon's distance at its nearest and farthest, in km, which the dashed circles show the disc at. */
+export const PERIGEE_KM = 356_500;
+export const APOGEE_KM = 406_700;
+
 export function svgText(x: number, y: number, text: string | number, cls: string) {
     return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" class="${cls}">${escapeText(text)}</text>`;
 }

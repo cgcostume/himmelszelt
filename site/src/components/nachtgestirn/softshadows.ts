@@ -1,6 +1,7 @@
 import { moonEV100 } from "@himmelszelt/nachtgestirn";
 import { find } from "../dom";
 import { display, gpu, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
+import { figureInfo } from "../figure-info";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { drawSvg, splitLine } from "../sternzeit/figure";
@@ -9,6 +10,7 @@ import { noGpu } from "./laws";
 import { ANY_PLACE, julianDayOf } from "./place";
 import { moonAt, type ToneCurveName } from "./renderer";
 import { mapResolutions, RESOLUTION_NAMES } from "./resolutions";
+import { saveFigure } from "./snapshot";
 import { CLOSEUP_LATITUDE, closeupOffset } from "./surface";
 import { createTiles, type TileFrame } from "./tiles";
 
@@ -35,14 +37,20 @@ export function softShadowsFigure(root: HTMLElement) {
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
     const fullTiles = createTiles(fullCanvas, requestRender);
-    // The 8K strip where the GPU takes textures that wide, else the 4K.
-    const finest = (gpu.device?.limits.maxTextureDimension2D ?? 0) >= 8192 ? "8k-strip" : "4k";
+    // The 8K maps where the GPU takes textures that wide, else the 4K.
+    const finest = (gpu.device?.limits.maxTextureDimension2D ?? 0) >= 8192 ? "8k" : "4k";
     const resolution = mapResolutions(root, finest, requestRender);
 
     // The color map, or a uniform albedo for the relief alone.
     const albedo = find("[data-field=albedo]", root);
     albedo.addEventListener("click", () => {
         albedo.setAttribute("aria-pressed", String(albedo.getAttribute("aria-pressed") !== "true"));
+        requestRender();
+    });
+
+    const roughness = find("[data-field=roughness]", root);
+    roughness.addEventListener("click", () => {
+        roughness.setAttribute("aria-pressed", String(roughness.getAttribute("aria-pressed") !== "true"));
         requestRender();
     });
 
@@ -77,6 +85,7 @@ export function softShadowsFigure(root: HTMLElement) {
             albedo: albedo.getAttribute("aria-pressed") === "true",
             relief: true,
             shadows: true,
+            roughness: roughness.getAttribute("aria-pressed") === "true",
             earthshine: true,
             eclipse: false,
             law: "hapke2012",
@@ -120,6 +129,10 @@ export function softShadowsFigure(root: HTMLElement) {
     panel.addEventListener("pointermove", (event) => {
         if (panel.hasPointerCapture(event.pointerId)) drag(event);
     });
+    find("[data-field=download]", root).addEventListener("click", () =>
+        saveFigure(root, canvas, render, { svgs: [marker], overlays: [fullCanvas] }),
+    );
+    figureInfo(root);
     onTables(requestRender);
     onDisplay(requestRender);
     new ResizeObserver(requestRender).observe(root);

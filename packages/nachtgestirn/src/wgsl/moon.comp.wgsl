@@ -19,6 +19,9 @@
 @group(0) @binding(8) var ngBackground: texture_2d<f32>;
 // The Moon alone, linear and premultiplied, as the layer pass wrote it: what `shimmer.comp.wgsl` moves about.
 @group(0) @binding(9) var ngLayer: texture_2d<f32>;
+// How rough the ground is below the relief's texels, with NG_FLAG_ROUGHNESS: red the median slope over 57 m in tenths of
+// a degree, green the Hurst exponent, 0.5 to 1 (see maps.ts).
+@group(0) @binding(11) var ngRoughnessMap: texture_2d<f32>;
 
 // What the pipeline is made with --------------------------------------------------------------------------------------
 
@@ -143,11 +146,104 @@ fn ngAlbedoAt(point: vec3f, footprint: NgFootprint) -> vec3f {
     return ngParams.albedoMatrix * ngSrgbToLinear(encoded);
 }
 
-// The surface's normal at a point, in the Moon's frame: the relief's slope tilts it from the sphere's.
+// The roughness below the relief ---------------------------------------------------------------------------------------
+
+// A lattice point's gradient, each component in [-1, 1]: Jarzynski and Olano's pcg3d.
+fn ngLatticeGradient(cell: vec3i) -> vec3f {
+    var v = vec3u(cell) * 1664525u + 1013904223u;
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    v ^= v >> vec3u(16u);
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    return vec3f(v) * (2.0 / 4294967296.0) - 1.0;
+}
+
+// Gradient noise's gradient at `p`, analytically, after Quílez: the quintic fade's derivative included, so it is the
+// true slope of the noise and continuous across the cells.
+fn ngNoiseGradient(p: vec3f) -> vec3f {
+    let i = vec3i(floor(p));
+    let f = p - floor(p);
+    let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    let du = 30.0 * f * f * (f * (f - 2.0) + 1.0);
+    let ga = ngLatticeGradient(i);
+    let gb = ngLatticeGradient(i + vec3i(1, 0, 0));
+    let gc = ngLatticeGradient(i + vec3i(0, 1, 0));
+    let gd = ngLatticeGradient(i + vec3i(1, 1, 0));
+    let ge = ngLatticeGradient(i + vec3i(0, 0, 1));
+    let gf = ngLatticeGradient(i + vec3i(1, 0, 1));
+    let gg = ngLatticeGradient(i + vec3i(0, 1, 1));
+    let gh = ngLatticeGradient(i + vec3i(1, 1, 1));
+    let va = dot(ga, f);
+    let vb = dot(gb, f - vec3f(1.0, 0.0, 0.0));
+    let vc = dot(gc, f - vec3f(0.0, 1.0, 0.0));
+    let vd = dot(gd, f - vec3f(1.0, 1.0, 0.0));
+    let ve = dot(ge, f - vec3f(0.0, 0.0, 1.0));
+    let vf = dot(gf, f - vec3f(1.0, 0.0, 1.0));
+    let vg = dot(gg, f - vec3f(0.0, 1.0, 1.0));
+    let vh = dot(gh, f - vec3f(1.0, 1.0, 1.0));
+    let k4 = -va + vb + vc - vd + ve - vf - vg + vh;
+    return ga + u.x * (gb - ga) + u.y * (gc - ga) + u.z * (ge - ga) + u.x * u.y * (ga - gb - gc + gd) +
+        u.y * u.z * (ga - gc - ge + gg) + u.z * u.x * (ga - gb - ge + gf) +
+        u.x * u.y * u.z * (-ga + gb + gc - gd + ge - gf - gg + gh) +
+        du * (vec3f(vb - va, vc - va, ve - va) + u.yzx * vec3f(va - vb - vc + vd, va - vc - ve + vg, va - vb - ve + vf) +
+            u.zxy * vec3f(va - vb - ve + vf, va - vb - vc + vd, va - vc - ve + vg) + u.yzx * u.zxy * k4);
+}
+
+// The RMS of one component of the noise's gradient, measured over many points: what makes it a slope of a given RMS.
+const NG_NOISE_SLOPE_RMS: f32 = 0.498;
+// At most this many octaves below the relief's texels, each half the last: 64 times finer, 21 m at the 4K maps.
+const NG_ROUGHNESS_OCTAVES: i32 = 6;
+// Half the slopes LOLA's statistics give: the noise is Gaussian and casts no shadows, where the ground's roughness lies
+// mostly in craters and their shadows, and at full strength it reads as grain no photograph shows.
+override NG_ROUGHNESS_STRENGTH: f32 = 0.5;
+
+// The slopes the relief does not resolve at a point, as a vector along the surface pointing uphill, km per km: octaves
+// of noise from the relief's own scale, two texels, the baseline its slopes are taken over, down to the pixel's,
+// each as steep as the ground's statistics add at its scale. Rosenburg et al. 2011 give the median slope over 57 m and
+// how it grows towards smaller scales, s(d) = s57 (d / 57 m)^(H - 1); an octave from d to d/2 adds the variance
+// s(d/2)^2 - s(d)^2, so that all of them together make up what the map leaves out down to the pixel. One component of
+// the slope has an RMS of tan(median) / 0.6745, as for a normal distribution.
+fn ngRoughnessSlope(point: vec3f, footprint: NgFootprint) -> vec3f {
+    let rough = textureSampleLevel(ngRoughnessMap, ngMapSampler, ngMapUv(ngSelenographic(point)), 0.0).rg;
+    let rms57 = tan(rough.r * 25.5 * NG_PI / 180.0) / 0.6745;
+    let hurst = 0.5 + 0.5 * rough.g;
+    let radius = ngParams.moonRadiusKm;
+    // The pixel's footprint on the ground, the mean of its two widths, in km.
+    let pixelKm = sqrt(length(footprint.across) * length(footprint.along)) * radius;
+    var scale = 2.0 * ngReliefTexelKm(ngInDetail(point));
+    var resolved = rms57 * pow(scale / 0.057, hurst - 1.0);
+    var slope = vec3f(0.0);
+    for (var octave = 0; octave < NG_ROUGHNESS_OCTAVES; octave++) {
+        let finer = 0.5 * scale;
+        // Whole while the octave's cells span four pixels, faded out as they shrink to two: finer the pixel aliases.
+        let weight = clamp(log2(finer / pixelKm), 0.0, 1.0);
+        if (weight <= 0.0) {
+            break;
+        }
+        let rms = rms57 * pow(finer / 0.057, hurst - 1.0);
+        let added = sqrt(max(rms * rms - resolved * resolved, 0.0));
+        resolved = rms;
+        // A cell of the noise as wide as the octave's coarser end, each octave shifted so they do not line up.
+        let gradient = ngNoiseGradient(point * (radius / scale) + vec3f(f32(octave) * 17.31));
+        slope += (gradient - dot(gradient, point) * point) * (added * weight * NG_ROUGHNESS_STRENGTH / NG_NOISE_SLOPE_RMS);
+        scale = finer;
+    }
+    return slope;
+}
+
+// The surface's normal at a point, in the Moon's frame: the relief's slope tilts it from the sphere's, and with
+// NG_FLAG_ROUGHNESS the slopes below the relief's texels too.
 fn ngNormalAt(point: vec3f, footprint: NgFootprint) -> vec3f {
     let relief = ngSampleMap(ngReliefMap, ngDetailRelief, point, footprint);
     let local = ngLocal(point);
-    return normalize(point - relief.y * local.east - relief.z * local.north);
+    var normal = point - relief.y * local.east - relief.z * local.north;
+    if (ngHas(NG_FLAG_ROUGHNESS)) {
+        normal -= ngRoughnessSlope(point, footprint);
+    }
+    return normalize(normal);
 }
 
 // The relief's height at a level: by the B-spline below `splineBelow`, smooth across the texels' creases, bilinearly
@@ -499,8 +595,8 @@ struct NgMoon {
 }
 
 // One ray's light: `view` as seen and `ray` as it left the air, `hit` where it meets the Moon, as a direction from its
-// center, and how much it covers, and `pixelAngle` the pixel's width, which the maps are filtered over: the rays resolve
-// the shading and the shadows' edges, the filtering the maps, so more rays sharpen the one and never alias the other.
+// center, and how much it covers, and `pixelAngle` the width the maps are filtered over: a ray's share of the pixel, so
+// the rays together filter over the pixel once, and finer slopes than it, the roughness', are resolved and averaged.
 fn ngMoon(view: vec3f, ray: NgRay, hit: vec4f, pixelAngle: f32) -> NgMoon {
     if (hit.w <= 0.0) {
         return NgMoon(vec3f(0.0), 0.0);
@@ -632,7 +728,7 @@ fn ngPixel(pixel: vec2f, size: vec2u) -> NgMoon {
         if (view.z < ngParams.horizonZ) {
             continue;
         }
-        let moon = ngMoon(view, ray, hit, pixelAngle);
+        let moon = ngMoon(view, ray, hit, sampleAngle);
         luminance = luminance + moon.luminance * moon.coverage;
         coverage = coverage + moon.coverage;
     }

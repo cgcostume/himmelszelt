@@ -1,15 +1,14 @@
 ---
+import CopyInfo from "../CopyInfo.astro";
 import Icon from "../Icon.astro";
-import Resolutions from "../Resolutions.astro";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
-import Try from "../Try.astro";
+import Term from "../Term.astro";
 import "../dunstkreis/dunstkreis.css";
 import "../sternzeit/sternzeit.css";
-import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
-import { WHOLE_RESOLUTIONS } from "./resolution-options";
 
-/** The Moon large, as a ball to turn and zoom: Hapke's law over NASA's maps, lit by the Sun and by earthshine. */
+/** The Moon large, as a ball to turn and zoom: Hapke's law over NASA's maps, lit by the Sun and by earthshine, drawn with what
+ *  the pass' defaults pick for its size on screen; its view copied as a link and JSON. */
 interface Props {
     id?: string;
 }
@@ -21,34 +20,23 @@ const { id = "globe" } = Astro.props;
         <div class="tiles-panel as-seen globe-panel">
             <canvas aria-label="The Moon at the chosen moment, lit by the Sun and by earthshine, to turn and zoom, rendered with WebGPU" title="Drag to turn the Moon, shift and drag to move the view, scroll to zoom; double click to see it from Earth again"></canvas>
             <span class="tiles-start">
-                <Resolutions options={WHOLE_RESOLUTIONS} chosen="4k" />
                 <span class="view-buttons">
                     <button type="button" class="view-icon" data-field="lock" aria-pressed="true" title="Seen from Earth: turns the Moon back to the face Earth sees; turning it lets go" aria-label="Moon lock"><Icon name="moonLock" /></button>
                     <button type="button" class="view-toggle" data-field="far" aria-pressed="false" title="The far side, which Earth never sees: the Moon turned half round, the Sun staying where it is; turning it lets go">far side</button>
                 </span>
-                <span class="view-buttons">
-                    <button type="button" class="view-toggle icon-when-narrow" data-field="relief" aria-label="relief" aria-pressed="true" title="The relief from LOLA's heights, shading the surface; off, the smooth sphere under the color map alone"><span class="switch-text">relief</span><Icon name="relief" /></button>
-                    <button type="button" class="view-toggle icon-when-narrow" data-field="shadows" aria-label="shadows" aria-pressed="true" title="The shadows the relief casts, marched through the heights towards the Sun"><span class="switch-text">shadows</span><Icon name="shadows" /></button>
-                    <button type="button" class="view-toggle icon-when-narrow" data-field="displace" aria-label="displaced" aria-pressed="true" title="The relief displaced, not only shaded: each ray near the limb marched through the heights, so the limb shows its mountains and near rims hide what lies behind them; off, the slopes shade a smooth sphere, as the pass does for a disc under 1024 pixels"><span class="switch-text">displaced</span><Icon name="displace" /></button>
-                </span>
                 <span class="tiles-hint footnote">Drag to turn, shift-drag to move, scroll to zoom. Rendered with WebGPU</span>
             </span>
             <span class="view-buttons globe-end">
-                <Rays />
                 <button type="button" class="view-icon" data-field="download" title="Download the Moon as shown, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+                <CopyInfo />
                 <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
             </span>
         </div>
         <LunationSlider class="sky-time" />
     </div>
-    <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        The Moon at the chosen moment, out of the air and away from Earth: Hapke's law over NASA's color and LOLA's
-        heights, the relief shading the surface and casting its shadows, the Sun where it stands, the night side in
-        earthshine where it faces Earth. Drag to rotate.
-        <Try label="Full Moon" set="date=2026-11-24T14:00Z" fig={id}>
-            a disc flat to its rim, the terminator pushed out to the limb.
-        </Try>
+        The Moon at the chosen moment, as it would look from space: its colors, its mountains and craters lit by the Sun
+        and casting their shadows, and its night side faintly lit by the Earth, in <Term of="Earthshine">earthshine</Term>.
     </figcaption>
 </figure>
 

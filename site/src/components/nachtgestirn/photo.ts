@@ -2,13 +2,17 @@ import { viewFrame } from "@himmelszelt/nachtgestirn";
 import { fromDate, julianDayUT } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
 import { display, onDisplay, onTables, gpu as shared, tables } from "../dunstkreis/atmosphere";
+import { save } from "../dunstkreis/download";
+import { figureInfo } from "../figure-info";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
-import { drawSvg, splitLine, svgText } from "../sternzeit/figure";
+import { drawSvg, selenographic, splitLine, svgText, toScreen, visibleRuns } from "../sternzeit/figure";
+import { linkedSearch } from "../sternzeit/state";
 import { noGpu } from "./laws";
 import { PHOTOS, type Photo } from "./photo-options";
 import { type MoonAt, moonAt, onUmbraTable, type ToneCurveName } from "./renderer";
 import { mapResolutions, RESOLUTION_NAMES } from "./resolutions";
+import { standaloneSvg } from "./snapshot";
 import { createTiles, type TileFrame } from "./tiles";
 
 // The disc's radius as a share of the stage's shorter side; past a little more than it the photograph fades into its sky.
@@ -40,10 +44,11 @@ function viewOf(m: MoonAt, photo: Photo) {
 }
 
 /** Where the photograph fades into its sky, in radii of its disc: from a little past the limb to 1.3, or to just inside
- *  its nearest edge where that comes sooner, so the frame's edge never shows. */
+ *  its nearest edge where that comes sooner, so the frame's edge never shows; never inside the limb, though, for a
+ *  mosaic whose frame cuts the disc itself, where the frame's edge runs through a sky as black as the ground. */
 function fadeOf(p: Photo) {
     const [cx, cy, r] = [p.center[0] * p.width, p.center[1] * p.height, p.radius * p.width];
-    const end = Math.min(1.3, Math.min(cx, p.width - cx, cy, p.height - cy) / r - 0.01);
+    const end = Math.max(1.04, Math.min(1.3, Math.min(cx, p.width - cx, cy, p.height - cy) / r - 0.01));
     return [Math.min(1.06, end - 0.05), end] as const;
 }
 
@@ -94,6 +99,37 @@ export function photoFigure(root: HTMLElement) {
     // The finest maps the GPU holds: the 8K where it takes textures that wide, else the 4K.
     const finest = (shared.device?.limits.maxTextureDimension2D ?? 0) >= 8192 ? "8k" : "4k";
     const resolution = mapResolutions(root, finest, requestRender);
+    const roughness = find("[data-field=roughness]", root);
+    roughness.addEventListener("click", () => {
+        roughness.setAttribute("aria-pressed", String(roughness.getAttribute("aria-pressed") !== "true"));
+        requestRender();
+    });
+    const sharpen = find("[data-field=sharpen]", root);
+    sharpen.addEventListener("click", () => {
+        sharpen.setAttribute("aria-pressed", String(sharpen.getAttribute("aria-pressed") !== "true"));
+        requestRender();
+    });
+    const grid = find("[data-field=annotations]", root);
+    grid.addEventListener("click", () => {
+        grid.setAttribute("aria-pressed", String(grid.getAttribute("aria-pressed") !== "true"));
+        split();
+    });
+    const [blur, composite] = [find("feGaussianBlur", root), find("feComposite", root)];
+    const bounds = [...root.querySelectorAll("feMorphology")];
+    // The photograph's unsharp mask over the canvas, as wide on the screen as on the disc, or none. Held within the
+    // neighborhood's darkest and brightest, as far as the blur reaches, so it rings no dark halo into the sky at the limb.
+    function sharpenAs(p: Photo, w: number, h: number) {
+        if (sharpen.getAttribute("aria-pressed") !== "true") {
+            canvas.style.filter = "";
+            return;
+        }
+        const sigma = p.sharpen.radius * DISC * Math.min(w, h);
+        blur.setAttribute("stdDeviation", sigma.toFixed(2));
+        for (const b of bounds) b.setAttribute("radius", String(Math.max(1, Math.ceil(2 * sigma))));
+        composite.setAttribute("k2", String(1 + p.sharpen.amount));
+        composite.setAttribute("k3", String(-p.sharpen.amount));
+        canvas.style.filter = `url(#${root.id}-sharpen)`;
+    }
     // Full screen takes the gallery along, so another photograph is a click away there too.
     const full = find("[data-field=full]", root);
     const fullscreen = find("[data-field=fullscreen]", root);
@@ -154,16 +190,40 @@ export function photoFigure(root: HTMLElement) {
         disc.style.backgroundColor = skyOf(img, photo());
     });
 
-    // The split line and the up mark, over both.
+    // The face figure's grid every 30°, the limb, the Moon's north and the center of its face, turned as the photograph is.
+    function gridOf(m: MoonAt, p: Photo, c: number, cy: number, r: number) {
+        const { longitude: l, latitude: b } = m.libration;
+        // The Moon's north counterclockwise from the screen's up: the photograph's turn from the sky's north, or with
+        // the air from the zenith, and the axis' position angle from there.
+        const tilt = p.turn + m.positionAngleOfAxis - (p.air ? m.parallacticAngle : 0);
+        const line = (points: readonly (readonly number[])[], cls: string) =>
+            `<polyline points="${points.map(([x, y]) => `${f(c + x)},${f(cy + y)}`).join(" ")}" class="${cls}"/>`;
+        let svg = "";
+        for (let lon = -180; lon < 180; lon += 30) {
+            const meridian = Array.from({ length: 37 }, (_, i) => selenographic(lon, -90 + i * 5, l, b));
+            for (const run of visibleRuns(meridian, tilt, r))
+                svg += line(run, lon ? "moon-grid" : "moon-grid moon-grid-main");
+        }
+        for (let lat = -60; lat <= 60; lat += 30) {
+            const parallel = Array.from({ length: 73 }, (_, i) => selenographic(-180 + i * 5, lat, l, b));
+            for (const run of visibleRuns(parallel, tilt, r))
+                svg += line(run, lat ? "moon-grid" : "moon-grid moon-grid-main");
+        }
+        const [nx, ny] = toScreen([0, 1], tilt, 1);
+        svg += `<line x1="${f(c + nx * r)}" y1="${f(cy + ny * r)}" x2="${f(c + nx * r * 1.06)}" y2="${f(cy + ny * r * 1.06)}" class="moon-axis"/>`;
+        svg += svgText(c + nx * r * 1.1, cy + ny * r * 1.1, "N", "photo-north");
+        svg += `<circle cx="${f(c)}" cy="${f(cy)}" r="${f(r)}" class="moon-limb"/>`;
+        return `<g class="photo-grid">${svg}<circle cx="${f(c)}" cy="${f(cy)}" r="2" class="moon-center"/></g>`;
+    }
+
+    // The split line and the up mark, over both, and the grid where asked for.
+    let shown: MoonAt | null = null;
     function drawMarks(p: Photo, w: number, h: number) {
         const at = Number(slider.value) / 100;
         const [c, cy, r] = [w / 2, h / 2, DISC * Math.min(w, h)];
+        let svg = shown && grid.getAttribute("aria-pressed") === "true" ? gridOf(shown, p, c, cy, r) : "";
         // The split line, but not at either end, where one side shows alone; a slider's thumb on it to drag.
-        let svg = at > 0 && at < 1 ? splitLine(at * w, 0, h, cy, "photo-split-line") : "";
-        // Where the sky's north is, or by day the zenith, just off the disc: the photograph's turn away from up.
-        const [nx, ny] = [-Math.sin(p.turn * DEG), -Math.cos(p.turn * DEG)];
-        svg += `<line x1="${f(c + nx * r * 1.03)}" y1="${f(cy + ny * r * 1.03)}" x2="${f(c + nx * r * 1.08)}" y2="${f(cy + ny * r * 1.08)}" class="photo-north-tick"/>`;
-        svg += svgText(c + nx * r * 1.13, cy + ny * r * 1.13, p.air ? "zenith" : "N", "photo-north");
+        svg += at > 0 && at < 1 ? splitLine(at * w, 0, h, cy, "photo-split-line") : "";
         marks.setAttribute("viewBox", `0 0 ${w} ${h}`);
         drawSvg(marks, svg, 1);
         canvas.style.clipPath = `inset(0 0 0 ${at * 100}%)`;
@@ -177,6 +237,8 @@ export function photoFigure(root: HTMLElement) {
         if (drawn) drawMarks(photo(), ...stage());
     }
 
+    // The Moon as the last frame drew it, for the copy.
+    let seen: Record<string, unknown> = {};
     function render() {
         const table = tables();
         if (!table) return;
@@ -196,6 +258,7 @@ export function photoFigure(root: HTMLElement) {
             albedo: true,
             relief: true,
             shadows: true,
+            roughness: roughness.getAttribute("aria-pressed") === "true",
             earthshine: true,
             eclipse: false,
             law: "hapke2012",
@@ -215,8 +278,16 @@ export function photoFigure(root: HTMLElement) {
             () => frame,
         );
         placePhoto(p, w, h);
+        sharpenAs(p, w, h);
+        shown = m;
         drawn = true;
         drawMarks(p, w, h);
+        seen = {
+            altitudeDeg: m.horizontal.altitude,
+            phaseAngle: m.phaseAngle,
+            libration: { longitudeDeg: m.libration.longitude, latitudeDeg: m.libration.latitude },
+            degreesAcross,
+        };
         const ew = m.libration.longitude >= 0 ? "E" : "W";
         const ns = m.libration.latitude >= 0 ? "N" : "S";
         const { latitude, longitude } = p.place;
@@ -228,6 +299,81 @@ export function photoFigure(root: HTMLElement) {
             `${Math.abs(m.libration.latitude).toFixed(1)}° ${ns} · ${p.air ? "the zenith" : "north"} ` +
             `${Math.abs(p.turn).toFixed(1)}° ${p.turn >= 0 ? "left" : "right"} of up in the photograph · the ${RESOLUTION_NAMES[resolution()]}`;
     }
+
+    // The copy: the photograph's own moment and place in place of the page's, and its source, author and license.
+    figureInfo(
+        root,
+        () => {
+            const { label, thumb: _, ...p } = photo();
+            const jd = julianDayUT(fromDate(new Date(p.date)));
+            return {
+                utc: new Date(p.date).toISOString(),
+                julianDay: jd,
+                latitude: p.place.latitude,
+                longitude: p.place.longitude,
+                heightM: p.place.heightM,
+                photograph: { label, ...p },
+                moon: seen,
+            };
+        },
+        () => `${location.origin}${location.pathname}?photo=${chosen}#${root.id}`,
+    );
+    // A link copied from here opens the same photograph.
+    const linked = Number(linkedSearch.get("photo"));
+    if (location.hash === `#${root.id}` && Number.isInteger(linked) && PHOTOS[linked]) pick(linked);
+
+    // The comparison as shown, as PNG: the photograph faded into its sky, nachtgestirn's Moon right of the split, sharpened
+    // as on the page, and the marks over both. The canvas is drawn just before it is copied: WebGPU keeps it only for that task.
+    async function download() {
+        const p = photo();
+        const [w, h] = stage();
+        const ratio = window.devicePixelRatio || 1;
+        const canvasOf = () =>
+            Object.assign(document.createElement("canvas"), {
+                width: Math.round(w * ratio),
+                height: Math.round(h * ratio),
+            });
+        const out = canvasOf();
+        const layer = canvasOf();
+        const context = out.getContext("2d");
+        const faded = layer.getContext("2d");
+        if (!context || !faded) return;
+        context.scale(ratio, ratio);
+        context.fillStyle = getComputedStyle(disc).backgroundColor;
+        context.fillRect(0, 0, w, h);
+        const scale = (DISC * Math.min(w, h)) / (p.radius * p.width);
+        const [cx, cy, r] = [p.center[0] * p.width, p.center[1] * p.height, p.radius * p.width];
+        const [from, to] = fadeOf(p);
+        faded.scale(ratio, ratio);
+        faded.translate(w / 2, h / 2);
+        faded.scale(scale, scale);
+        faded.translate(-cx, -cy);
+        faded.drawImage(img, 0, 0, p.width, p.height);
+        const fade = faded.createRadialGradient(cx, cy, r * from, cx, cy, r * to);
+        fade.addColorStop(0, "#000");
+        fade.addColorStop(1, "transparent");
+        faded.globalCompositeOperation = "destination-in";
+        faded.fillStyle = fade;
+        faded.fillRect(0, 0, p.width, p.height);
+        context.drawImage(layer, 0, 0, w, h);
+        const marksImage = new Image();
+        marksImage.src = URL.createObjectURL(new Blob([standaloneSvg(marks, w, h)], { type: "image/svg+xml" }));
+        await marksImage.decode();
+        const at = Number(slider.value) / 100;
+        render();
+        context.save();
+        context.beginPath();
+        context.rect(at * w, 0, w - at * w, h);
+        context.clip();
+        context.filter = canvas.style.filter || "none";
+        context.drawImage(canvas, 0, 0, w, h);
+        context.restore();
+        context.drawImage(marksImage, 0, 0, w, h);
+        URL.revokeObjectURL(marksImage.src);
+        const name = p.label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        out.toBlob((blob) => save(blob, `himmelszelt-${root.id}-${name}.png`), "image/png");
+    }
+    find("[data-field=download]", root).addEventListener("click", download);
 
     slider.addEventListener("input", split);
     // The line dragged on the picture itself, which full screen needs, as the slider is outside it.

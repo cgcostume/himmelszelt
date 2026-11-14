@@ -262,5 +262,124 @@ export function createTiles(canvas: HTMLCanvasElement, requestRender: () => void
             if (!complete) return null;
             return results;
         },
+        /**
+         * Times the Moon's pass for `f`, viewed as `draw` views a tile `width` by `height` pixels, offscreen: `warmup`
+         * frames to bring the GPU's clocks up, then `frames` timed, submitted in batches one ahead of the one awaited,
+         * so the GPU never idles between them. On the GPU where it has timestamp queries (Chromium rounds each to
+         * 0.1 ms, which the mean of many evens out), else from submitting to done. The mean of the middle 80 percent,
+         * and the 10th and 90th percentiles; null when no pass came. `progress` gets the phase and how far it is.
+         */
+        async measure(
+            width: number,
+            height: number,
+            degreesAcross: number,
+            f: TileFrame,
+            progress?: (phase: "warmup" | "measure" | "summary", done: number) => void,
+            warmup = 100,
+            frames = 1000,
+        ) {
+            const { format, headroom } = displayOutput();
+            const target = device.createTexture({
+                label: "sternwarte:moonMeasure",
+                size: [width, height],
+                format,
+                usage: GPUTextureUsage.STORAGE_BINDING,
+            });
+            const tile = {
+                ...f,
+                format,
+                headroom,
+                ...view(f.moon, degreesAcross, width, width / height, f.offset, f.air, f.up),
+                width,
+                height,
+                projectionDistance: 0,
+                pixelRatio: 1,
+                air: f.air ?? false,
+            };
+            const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+            try {
+                let ready = false;
+                for (let i = 0; i < 400 && !ready; i++) {
+                    // Drawn, and with the maps asked for, not the ones bound while those still come.
+                    ready =
+                        renderer.draw(target, tile) !== null &&
+                        (f.maps === "auto" || renderer.bound().startsWith(`${f.maps} `));
+                    await device.queue.onSubmittedWorkDone();
+                    if (!ready) await wait(50);
+                }
+                if (!ready) return null;
+                const BATCH = 50;
+                // Each batch drawn, then the one before awaited, so one is always queued behind the GPU's.
+                async function batched(count: number, draw: (i: number) => void, phase: "warmup" | "measure") {
+                    let pending: Promise<undefined> | null = null;
+                    for (let start = 0; start < count; start += BATCH) {
+                        for (let i = start; i < Math.min(count, start + BATCH); i++) draw(i);
+                        const done = device.queue.onSubmittedWorkDone();
+                        if (pending) await pending;
+                        progress?.(phase, start / count);
+                        pending = done;
+                    }
+                    await pending;
+                    progress?.(phase, 1);
+                }
+                await batched(warmup, () => renderer.draw(target, tile), "warmup");
+                const times: number[] = [];
+                const gpu = device.features.has("timestamp-query");
+                if (gpu) {
+                    const querySet = device.createQuerySet({ type: "timestamp", count: 2 * frames });
+                    const size = 16 * frames;
+                    const resolved = device.createBuffer({
+                        size,
+                        usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+                    });
+                    const read = device.createBuffer({
+                        size,
+                        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+                    });
+                    await batched(
+                        frames,
+                        (i) =>
+                            renderer.draw(target, {
+                                ...tile,
+                                timestamps: {
+                                    querySet,
+                                    beginningOfPassWriteIndex: 2 * i,
+                                    endOfPassWriteIndex: 2 * i + 1,
+                                },
+                            }),
+                        "measure",
+                    );
+                    progress?.("summary", 0);
+                    const encoder = device.createCommandEncoder({ label: "sternwarte:moonMeasureResolve" });
+                    encoder.resolveQuerySet(querySet, 0, 2 * frames, resolved, 0);
+                    encoder.copyBufferToBuffer(resolved, 0, read, 0, size);
+                    device.queue.submit([encoder.finish()]);
+                    await read.mapAsync(GPUMapMode.READ);
+                    const ns = new BigInt64Array(read.getMappedRange());
+                    for (let i = 0; i < frames; i++)
+                        times.push(Number((ns[2 * i + 1] ?? 0n) - (ns[2 * i] ?? 0n)) / 1e6);
+                    read.destroy();
+                    resolved.destroy();
+                    querySet.destroy();
+                } else {
+                    for (let i = 0; i < frames; i++) {
+                        const started = performance.now();
+                        renderer.draw(target, tile);
+                        await device.queue.onSubmittedWorkDone();
+                        times.push(performance.now() - started);
+                        if (i % BATCH === 0) progress?.("measure", i / frames);
+                    }
+                    progress?.("summary", 0);
+                }
+                times.sort((a, b) => a - b);
+                const at = (q: number) => times[Math.min(frames - 1, Math.floor(q * frames))] ?? 0;
+                const middle = times.slice(Math.floor(0.1 * frames), Math.ceil(0.9 * frames));
+                const ms = middle.reduce((sum, t) => sum + t, 0) / Math.max(1, middle.length);
+                progress?.("summary", 1);
+                return { ms, spread: [at(0.1), at(0.9)] as [number, number], frames, gpu };
+            } finally {
+                target.destroy();
+            }
+        },
     };
 }

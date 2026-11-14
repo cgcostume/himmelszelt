@@ -38,7 +38,8 @@
         "typecheck": "tsc --noEmit",
         "test": "pnpm build && playwright test",
         "test:gpu": "pnpm build && NACHTGESTIRN_GPU=1 playwright test",
-        "maps": "node scripts/maps.mjs maps"
+        "maps": "node scripts/maps.mjs maps",
+        "roughness": "node scripts/roughness.mjs maps"
     },
     "devDependencies": {
         "@himmelszelt/dunstkreis": "workspace:*",

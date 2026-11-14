@@ -20,7 +20,7 @@ const BOTTOM = -18;
 // The plot, then the strips under it: their exposures in stops over the sunlit Moon's, and their sizes in CSS px.
 const PLOT = { height: 196, top: 28, bottom: 22, left: 44, right: 8 };
 // The last as open as the deep umbra needs to show its color unclipped, some 14 stops under the sunlit Moon.
-const STOPS = [0, 5, 10, 13];
+const STOPS = [0, 6, 13];
 const STRIP = { gap: 10, height: 20, between: 3 };
 // A white surface in full sunlight exposed a little under white, so it still shows as a surface.
 const SUNLIT = 0.75;
@@ -33,7 +33,7 @@ const encode = (v: number) => {
 
 /**
  * The umbra light figure on `root`: what of the sunlight reaches the Moon by the distance from the shadow's axis, the
- * Sun's disc Earth leaves plus what its air bends in, as a plot in stops and as strips at four exposures, with the
+ * Sun's disc Earth leaves plus what its air bends in, as a plot in stops and as strips at three exposures, with the
  * Moon's disc laid across both. Follows no moment: the slider stands for sternzeit's `axisOffsetKm`.
  */
 export function umbraLightFigure(root: HTMLElement) {

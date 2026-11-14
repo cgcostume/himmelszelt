@@ -95,3 +95,4 @@ const NG_FLAG_DISPLACE: u32 = 8u;
 const NG_FLAG_EARTHSHINE: u32 = 16u;
 const NG_FLAG_AIR: u32 = 32u;
 const NG_FLAG_ECLIPSE: u32 = 64u;
+const NG_FLAG_ROUGHNESS: u32 = 128u;

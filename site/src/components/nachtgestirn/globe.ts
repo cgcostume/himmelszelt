@@ -1,12 +1,20 @@
-import { moonEV100 } from "@himmelszelt/nachtgestirn";
+import { mapWidthFor, moonEV100 } from "@himmelszelt/nachtgestirn";
 import { find } from "../dom";
-import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
+import { display, gpu, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { save } from "../dunstkreis/download";
+import { figureInfo } from "../figure-info";
 import { onDemand } from "../frame";
-import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
+import {
+    linkedOnLoad,
+    linkedSearch,
+    momentAndPlace,
+    momentLink,
+    momentStamp,
+    onChange,
+    state,
+} from "../sternzeit/state";
 import { noGpu, orbited } from "./laws";
-import { moonAt, type ToneCurveName } from "./renderer";
-import { mapResolutions, RESOLUTION_NAMES } from "./resolutions";
+import { MAPS_TEXELS, type MapSize, moonAt, type ToneCurveName } from "./renderer";
 import { createTiles } from "./tiles";
 
 const DEG = Math.PI / 180;
@@ -27,7 +35,6 @@ const TURN_MS = 450;
  */
 export function globeFigure(root: HTMLElement) {
     const canvas = find<HTMLCanvasElement>("canvas", root);
-    const note = find("[data-field=note]", root);
     const requestRender = onDemand(render, root);
     // The zoom, and where the middle of the view is off the disc's center, right and up, in disc radii.
     const view = { yaw: 0, pitch: 0, zoom: ZOOM_START, x: 0, y: 0 };
@@ -62,26 +69,19 @@ export function globeFigure(root: HTMLElement) {
     };
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
-    const resolution = mapResolutions(root, "4k", requestRender);
-    const relief = find("[data-field=relief]", root);
-    const shadows = find("[data-field=shadows]", root);
-    const displace = find("[data-field=displace]", root);
-    const pressed = (button: HTMLElement) => button.getAttribute("aria-pressed") === "true";
-    for (const button of [relief, shadows, displace]) {
-        button.addEventListener("click", () => {
-            button.setAttribute("aria-pressed", String(!pressed(button)));
-            // Without the relief there is nothing to cast shadows or to displace.
-            shadows.toggleAttribute("disabled", !pressed(relief));
-            displace.toggleAttribute("disabled", !pressed(relief));
-            requestRender();
-        });
-    }
+    // The site's 8K maps where the GPU holds them, for a disc too large for the package's.
+    const finest = (gpu.device?.limits.maxTextureDimension2D ?? 8192) >= MAPS_TEXELS["8k"] ? "8k" : "4k";
     // Where the view's middle may lie off the disc's center, in disc radii: so far that some of the disc stays in view.
     const keepInView = () => {
         const [w, h] = across();
         view.x = Math.max(-(w * 0.35 + 1), Math.min(w * 0.35 + 1, view.x));
         view.y = Math.max(-(h * 0.35 + 1), Math.min(h * 0.35 + 1, view.y));
     };
+
+    // What the view shows in words, for the corner of a downloaded image.
+    let status = "";
+    // The parameters the last frame was drawn with, for the copy.
+    let drawn: Record<string, unknown> = {};
 
     function render() {
         const table = tables();
@@ -94,31 +94,46 @@ export function globeFigure(root: HTMLElement) {
         const width = Math.round((full ? panel.clientWidth : root.clientWidth || 600) * ratio);
         const height = full ? Math.round(panel.clientHeight * ratio) : Math.round(width / ASPECT);
         const radius = m.geocentricDiameter / 2;
-        tiles?.draw({ count: 1, width, height, degreesAcross: across()[0] * radius }, () => ({
-            offset: [view.x * radius, view.y * radius] as const,
-            moon: m,
+        // Drawn as the pass' defaults draw a disc of this size: the smallest maps that give a texel to a pixel, shadows
+        // and displacement from the pass' own thresholds, and the roughness below the texels once the finest run out.
+        const texelsNeeded = mapWidthFor((2 * width) / across()[0]);
+        const maps: MapSize = texelsNeeded > MAPS_TEXELS["4k"] ? finest : "auto";
+        const frame = {
             luts: table.luts,
             toneMap: display.toneCurve as ToneCurveName,
-            maps: resolution(),
+            maps,
             // Set by the phase as the eye sees it lit, not metered from the image: no meter to lag a frame behind.
             ev100: moonEV100(m.phaseAngle, m.lit),
             albedo: true,
-            relief: pressed(relief),
-            shadows: pressed(relief) && pressed(shadows),
-            // Displaced at every size, or never: the pass' own threshold left aside, so the two can be compared.
-            displacementFrom: pressed(displace) ? 0 : Number.POSITIVE_INFINITY,
+            relief: true,
+            shadows: true,
+            roughness: texelsNeeded > MAPS_TEXELS[finest],
             earthshine: true,
             eclipse: false,
-            law: "hapke2012",
+            law: "hapke2012" as const,
             nightVision: false,
+        };
+        tiles?.draw({ count: 1, width, height, degreesAcross: across()[0] * radius }, () => ({
+            offset: [view.x * radius, view.y * radius] as const,
+            moon: m,
+            ...frame,
         }));
+        const { luts: _, ...parameters } = frame;
+        drawn = {
+            ...parameters,
+            width,
+            height,
+            degreesAcross: across()[0] * radius,
+            phaseAngle: m.phaseAngle,
+            lit: m.lit,
+        };
         const onFar = root.querySelector("[data-field=far]")?.getAttribute("aria-pressed") === "true";
         const where = onFar
             ? "from the far side, half round from Earth"
             : view.yaw === 0 && view.pitch === 0
               ? "from Earth"
               : `${(Math.abs(view.yaw) / DEG).toFixed(0)}° ${view.yaw > 0 ? "east" : "west"} and ${(Math.abs(view.pitch) / DEG).toFixed(0)}° ${view.pitch > 0 ? "over" : "under"} Earth's line of sight`;
-        note.textContent = `seen ${where}, ${view.zoom.toFixed(1)}× zoom: phase angle ${m.phaseAngle.toFixed(1)}°, ${(m.lit * 100).toFixed(0)}% lit, the ${RESOLUTION_NAMES[resolution()]}, exposed for the lit part`;
+        status = `seen ${where}, ${view.zoom.toFixed(1)}× zoom: phase angle ${m.phaseAngle.toFixed(1)}°, ${(m.lit * 100).toFixed(0)}% lit, exposed for the lit part`;
     }
 
     // The lock, pressed while the Moon shows the face Earth sees, and the far side, half round from it: a press turns
@@ -218,9 +233,31 @@ export function globeFigure(root: HTMLElement) {
             fillStyle: "rgb(255 255 255 / 0.85)",
             textBaseline: "bottom",
         });
-        context.fillText(`${momentAndPlace()}, ${note.textContent ?? ""}`, 8 * scale, copy.height - 6 * scale);
+        context.fillText(`${momentAndPlace()}, ${status}`, 8 * scale, copy.height - 6 * scale);
         copy.toBlob((blob) => save(blob, `himmelszelt-${root.id}-${momentStamp()}.png`), "image/png");
     });
+    // The view as a link that opens it again, and every parameter the frame was drawn with.
+    const round = (value: number, digits: number) => Number(value.toFixed(digits));
+    const shown = () => ({
+        yawDeg: round(view.yaw / DEG, 3),
+        pitchDeg: round(view.pitch / DEG, 3),
+        zoom: round(view.zoom, 4),
+        x: round(view.x, 4),
+        y: round(view.y, 4),
+    });
+    figureInfo(
+        root,
+        () => ({ seen: status, view: shown(), ...drawn }),
+        () => momentLink(root.id, { view: Object.values(shown()).join(",") }),
+    );
+    // A link copied from here opens the view again: its angles, zoom and offset.
+    if (linkedOnLoad?.hash === `#${root.id}`) {
+        const [yaw, pitch, zoom, x, y] = (linkedSearch.get("view") ?? "").split(",").map(Number);
+        if ([yaw, pitch, zoom, x, y].every(Number.isFinite)) {
+            Object.assign(view, { yaw: yaw * DEG, pitch: pitch * DEG, zoom, x, y });
+            if (yaw !== 0 || pitch !== 0) locked(null);
+        }
+    }
     fullscreen.addEventListener("click", () =>
         document.fullscreenElement ? document.exitFullscreen() : stage.requestFullscreen(),
     );

@@ -72,13 +72,15 @@
 }
 /* The discs that can be turned: a hand, and no scrolling of the page while they are dragged on a touch screen. */
 .tiles-figure[data-laws] canvas,
-.tiles-figure[data-globe] canvas {
+.tiles-figure[data-globe] canvas,
+.config-figure .config-preview canvas {
     cursor: grab;
     touch-action: none;
     user-select: none;
 }
 .tiles-figure[data-laws] canvas.dragging,
-.tiles-figure[data-globe] canvas.dragging {
+.tiles-figure[data-globe] canvas.dragging,
+.config-figure .config-preview canvas.dragging {
     cursor: grabbing;
 }
 /* Switches in the status line under the tiles, in the line's flow. */
@@ -472,6 +474,14 @@
     white-space: nowrap;
     text-overflow: ellipsis;
 }
+/* Alone, without switches before it, as far from the top as from the side: the box trimmed to the capitals and the
+   baseline, so the gap above the letters is the one beside them. */
+.tiles-start > .tiles-hint:only-child {
+    height: auto;
+    padding: 4px;
+    line-height: 1;
+    text-box: trim-both cap alphabetic;
+}
 /* Groups of buttons at the top right side by side: the antialiasing and the meter, the download apart. */
 .tiles-panel > .tiles-ends {
     position: absolute;
@@ -805,6 +815,12 @@
     cursor: ew-resize;
     touch-action: pan-y;
 }
+.photo-filter {
+    position: absolute;
+    width: 0;
+    height: 0;
+}
+
 .photo-disc {
     position: absolute;
     inset: 0;
@@ -862,9 +878,9 @@
 .photo-marks .photo-north {
     text-anchor: middle;
 }
-.photo-marks .photo-north-tick {
-    stroke: rgb(255 255 255 / 0.7);
-    stroke-width: 1.5;
+/* The face figure's annotations, faint, so the Moon under them stays the thing to look at. */
+.photo-marks .photo-grid {
+    opacity: 0.45;
 }
 .photo-full:fullscreen {
     display: flex;
@@ -1266,4 +1282,183 @@
     .eclipse-labels {
         grid-template-columns: repeat(2, 1fr);
     }
+}
+
+/* The configurator: the disc's size on top, the preview beside the switches, the costs as the budget's bars. */
+.config-figure {
+    margin: 1.5rem 0;
+    --budget-0: oklch(0.66 0.12 245);
+    --budget-1: oklch(0.67 0.14 70);
+    --budget-2: oklch(0.62 0.15 300);
+    --budget-3: oklch(0.66 0.12 155);
+    --budget-ink: var(--muted);
+}
+:root[data-theme="light"] .config-figure {
+    --budget-0: oklch(0.58 0.13 245);
+    --budget-1: oklch(0.64 0.14 68);
+    --budget-2: oklch(0.52 0.17 300);
+    --budget-3: oklch(0.55 0.13 155);
+}
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) .config-figure {
+        --budget-0: oklch(0.58 0.13 245);
+        --budget-1: oklch(0.64 0.14 68);
+        --budget-2: oklch(0.52 0.17 300);
+        --budget-3: oklch(0.55 0.13 155);
+    }
+}
+.budget-part-3 {
+    background: var(--budget-3);
+}
+.config-figure .view-buttons > .view-toggle {
+    position: static;
+}
+/* The disc's size at the preview's foot, over the canvas. */
+.config-disc-note {
+    position: absolute;
+    left: 10px;
+    bottom: 8px;
+    color: rgb(255 255 255 / 0.7);
+    font-family: var(--font-mono);
+    pointer-events: none;
+}
+.config-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+.config-preview {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: var(--radius-canvas);
+}
+.config-preview > canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+/* The hint at the top left, as over the other figures' canvases, clear of the copy button. */
+.config-preview > .tiles-start {
+    position: absolute;
+    top: 6px;
+    right: 52px;
+    left: 6px;
+    z-index: 5;
+    display: flex;
+    pointer-events: none;
+}
+.config-ends {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 5;
+}
+.config-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+.config-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.config-row > .view-buttons {
+    flex: none;
+}
+.config-actions {
+    flex-direction: column;
+    align-items: start;
+    gap: 0.4rem;
+    margin-top: auto;
+}
+/* The size's own maps underlined, and a switch set other than the defaults would marked by a dot. */
+.config-figure [data-maps][data-recommended] {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+.config-figure [data-tech][data-differs]::after {
+    content: "";
+    width: 5px;
+    height: 5px;
+    margin-left: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+/* The measure's progress, a hairline along the button's foot, ticks where the warm-up and the summing up begin. */
+.config-figure [data-field="measure"] {
+    position: relative;
+    overflow: hidden;
+}
+.config-progress {
+    display: none;
+    position: absolute;
+    inset: auto 0 0;
+    height: 3px;
+    background:
+        linear-gradient(var(--accent), var(--accent)) 0 0 / calc(var(--progress, 0) * 100%) 100% no-repeat,
+        linear-gradient(
+            to right,
+            transparent 10%,
+            var(--muted) 10% calc(10% + 1px),
+            transparent 0 90%,
+            var(--muted) 90% calc(90% + 1px),
+            transparent 0
+        ),
+        var(--line);
+}
+.config-figure [data-measuring] > .config-progress {
+    display: block;
+}
+.config-costs {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0 1.5rem;
+}
+.config-cost-name {
+    display: flex;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-top: var(--border);
+}
+.config-code {
+    position: relative;
+}
+.config-code pre {
+    margin: 0;
+    padding: 0.75rem 1rem;
+    overflow-x: auto;
+    border-radius: var(--radius-canvas);
+    background: var(--surface);
+    font-size: var(--text-small);
+}
+.config-code > .copy-info {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+}
+@media (max-width: 48rem) {
+    .config-main {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Mare Orientale in full screen: the picture as large as the screen leaves above its slider, over black. */
+.orientale-full:fullscreen {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: black;
+}
+.orientale-full:fullscreen > .tiles-panel {
+    flex: 1;
+    min-height: 0;
+}
+.orientale-full:fullscreen > .tiles-panel > canvas {
+    width: 100%;
+    height: 100%;
 }

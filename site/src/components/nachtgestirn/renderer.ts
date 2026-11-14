@@ -16,7 +16,9 @@ import {
     horizonZ,
     liftedDirection,
     loadMoonMaps,
+    loadMoonRoughness,
     MOON_MAPS,
+    MOON_ROUGHNESS,
     mapWidthFor,
     moonEV100,
     moonIlluminance,
@@ -56,25 +58,14 @@ export type ToneCurveName = "neutral" | "agx" | "aces" | "clip";
 export type MapSize = "auto" | keyof typeof MOON_MAPS | FineMaps;
 const SIZES = ["512", "1k", "2k", "4k"] as const;
 
-// The maps the package does not ship, made by its `maps-hq.mjs` and hosted with the site: the whole Moon at 8K, and a
-// strip of the southern highlands at 8K over the shipped 4K.
+// The maps the package does not ship, made by its `maps-hq.mjs` and hosted with the site: the whole Moon at 8K.
 const HQ = `${import.meta.env.BASE_URL.replace(/\/?$/, "/")}moon/`;
-const STRIPS = {
-    "8k": { x: 1638, y: 2298, width: 4916, height: 934, mapWidth: 8192 },
+const SHIPPED = {
+    meanReflectance: MOON_MAPS["4k"].meanReflectance,
+    meanColor: MOON_MAPS["4k"].meanColor,
 };
-const region = ({ x, y, width, height, mapWidth }: (typeof STRIPS)["8k"]) =>
-    [x / mapWidth, (2 * y) / mapWidth, (x + width) / mapWidth, (2 * (y + height)) / mapWidth] as const;
-const SHIPPED = { meanReflectance: MOON_MAPS["4k"].meanReflectance, meanColor: MOON_MAPS["4k"].meanColor };
 export const FINE_MAPS = {
     "8k": { color: `${HQ}moon-color-8k.webp`, heights: `${HQ}moon-height-8k.webp`, width: 8192, ...SHIPPED },
-    "8k-strip": {
-        ...MOON_MAPS["4k"],
-        detail: {
-            color: `${HQ}moon-color-8k-strip.webp`,
-            heights: `${HQ}moon-height-8k-strip.webp`,
-            region: region(STRIPS["8k"]),
-        },
-    },
 } satisfies Record<string, MoonMapFiles>;
 export type FineMaps = keyof typeof FINE_MAPS;
 /** The widest texture each set needs, for whether the GPU takes it. */
@@ -84,7 +75,6 @@ export const MAPS_TEXELS: Record<keyof typeof MOON_MAPS | FineMaps, number> = {
     "2k": 2048,
     "4k": 4096,
     "8k": 8192,
-    "8k-strip": STRIPS["8k"].width,
 };
 
 // The air's green optical depth at the zenith from sea level, per model: what the shimmer measures a ray's column in.
@@ -270,6 +260,25 @@ export function moonAt(
 }
 export type MoonAt = ReturnType<typeof moonAt>;
 
+// The roughness maps, optional, once per page and only once a figure draws the roughness: as fine as the maps, up to the
+// 4K, beyond which Rosenburg's statistics hold no more.
+const ROUGHNESS_FOR: Record<string, keyof typeof MOON_ROUGHNESS> = { "512": "1k", "1k": "1k", "2k": "2k" };
+const roughnessLoading = new Map<string, Promise<GPUTexture>>();
+const roughnessLoaded = new Map<string, GPUTexture>();
+function sharedRoughness(device: GPUDevice, maps: string, ready: () => void) {
+    const size = ROUGHNESS_FOR[maps] ?? "4k";
+    const loaded = roughnessLoaded.get(size);
+    if (loaded) return loaded;
+    let loading = roughnessLoading.get(size);
+    if (!loading) {
+        loading = loadMoonRoughness(device, MOON_ROUGHNESS[size]);
+        roughnessLoading.set(size, loading);
+        loading.then((texture) => roughnessLoaded.set(size, texture));
+    }
+    loading.then(ready);
+    return null;
+}
+
 // The maps once per page, however many figures draw the Moon.
 const loadedMaps = new Map<string, Promise<MoonMaps>>();
 function sharedMaps(device: GPUDevice, size: Exclude<MapSize, "auto">) {
@@ -327,6 +336,8 @@ export interface MoonFrame {
     albedo: boolean;
     relief: boolean;
     shadows: boolean;
+    /** The slopes below the relief's texels from Rosenburg's LOLA statistics, where a pixel is finer: false by default. */
+    roughness?: boolean;
     earthshine: boolean;
     eclipse: boolean;
     /** The reflectance law, each its own snippet of WGSL in the pass: Hapke's of 2012, the package's, or the ones it is
@@ -350,6 +361,10 @@ export interface MoonFrame {
     /** From how many pixels across the disc the shadows are soft, the pass' 0 unless given: 0 always, Infinity
      *  never. The pass is made anew. */
     softShadowsFrom?: number;
+    /** From how many pixels across the disc the relief casts shadows, the pass' 128 unless given. The pass is made anew. */
+    shadowsFrom?: number;
+    /** Timestamps around the Moon's pass, for timing it on the GPU. */
+    timestamps?: GPUComputePassTimestampWrites;
     /** The target's format and how many times SDR white it shows, `displayOutput`: SDR, 1 by default. */
     format?: GPUTextureFormat;
     headroom?: number;
@@ -383,6 +398,9 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     // day the sky sets the exposure.
     const skyMeters = new Map<string, number>();
     const skyMetering = new Set<string>();
+    // The last sky metered, held while the next is read back: a moment that moves on would meter the Moon alone in
+    // between, and with the Moon down, its light gone, the exposure would flash open for a frame.
+    let lastSky = Number.NEGATIVE_INFINITY;
 
     function buildSky(luts: AtmosphereLUTs, grid: boolean) {
         const wanted = `${grid}`;
@@ -420,6 +438,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             terminatorSamples,
             displacementFrom,
             softShadowsFrom,
+            shadowsFrom,
         } = frame;
         const filter = frame.filter ?? "anisotropic";
         createMoonPass(device, {
@@ -432,6 +451,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             ...(terminatorSamples === undefined ? {} : { terminatorSamples }),
             ...(displacementFrom === undefined ? {} : { displacementFrom }),
             ...(softShadowsFrom === undefined ? {} : { softShadowsFrom }),
+            ...(shadowsFrom === undefined ? {} : { shadowsFrom }),
             filter,
             onReady: requestRender,
         }).then((pass) => {
@@ -551,7 +571,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                   ? (mapsBound as FineMaps)
                   : (SIZES[Math.max(SIZES.indexOf(needed), kept)] ?? "4k");
         loadMaps(size);
-        const key = `${alone} ${frame.law} ${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.nightVision} ${frame.format ?? SDR} ${frame.headroom ?? 1} ${frame.samples} ${frame.terminatorSamples} ${frame.displacementFrom} ${frame.softShadowsFrom} ${frame.filter ?? "anisotropic"}`;
+        const key = `${alone} ${frame.law} ${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.nightVision} ${frame.format ?? SDR} ${frame.headroom ?? 1} ${frame.samples} ${frame.terminatorSamples} ${frame.displacementFrom} ${frame.softShadowsFrom} ${frame.shadowsFrom} ${frame.filter ?? "anisotropic"}`;
         const moonPass = moonPasses.get(key);
         if (!moonPass) {
             buildMoon(key, frame, alone);
@@ -581,15 +601,17 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
         // Metered on the lit part of the disc outside the umbra, opening up as the umbra swallows it but no further
         // than the umbra's own exposure, or on the sky around it where that is brighter, so neither burns out.
         const outsideUmbra = frame.eclipse ? Math.max(1 - Math.max(m.shadow.umbralMagnitude, 0), 1e-4) : 1;
-        const metered = Math.max(
+        const disc = Math.max(
             moonEV100(m.phaseAngle, m.lit, Math.max(through, 1e-3) * outsideUmbra),
             frame.eclipse && m.shadow.umbralMagnitude > 0 ? UMBRA_EV100 : Number.NEGATIVE_INFINITY,
-            frame.air ? (skyMeters.get(skyKeyOf(m)) ?? Number.NEGATIVE_INFINITY) : Number.NEGATIVE_INFINITY,
-            // A plain background, a daytime sky behind the tiles, is metered too, so it does not burn out.
-            !frame.air && frame.background
-                ? ev100ForLuminance(luminanceOf(frame.background))
-                : Number.NEGATIVE_INFINITY,
         );
+        // The sky lies in front of the disc, so the two add up: a plain background, a daytime sky behind the tiles, too.
+        const behind = frame.air
+            ? (skyMeters.get(skyKeyOf(m)) ?? lastSky)
+            : frame.background
+              ? ev100ForLuminance(luminanceOf(frame.background))
+              : Number.NEGATIVE_INFINITY;
+        const metered = Math.log2(2 ** disc + 2 ** behind);
         // Held to the slider's range: below the horizon the air lets nothing through, and the meter would run away.
         const ev100 = frame.ev100 ?? Math.min(Math.max(Math.round(metered * 10) / 10, -6), 20);
 
@@ -615,6 +637,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             moonDirection: m.trueDirection,
             moonIlluminance: moonIlluminance(m.phaseAngle, m.distanceKm) * outsideUmbra,
         });
+        moonPass.setRoughness(frame.roughness && maps ? sharedRoughness(device, mapsBound, requestRender) : null);
         moonPass.update({
             ...view,
             direction: m.trueDirection,
@@ -628,6 +651,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             albedoMap: frame.albedo,
             relief: frame.relief,
             shadows: frame.shadows,
+            roughness: frame.roughness ?? false,
             mapColor: frame.mapColor ?? "tinted",
             eclipse: frame.eclipse ? m.earthShadow : null,
             sunAngularDiameter: m.sunAngularDiameter,
@@ -641,7 +665,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
         });
         const encoder = device.createCommandEncoder({ label: "sternwarte:moon" });
         if (alone) {
-            moonPass.encode(encoder, target);
+            moonPass.encode(encoder, target, frame.timestamps ? { timestampWrites: frame.timestamps } : {});
             device.queue.submit([encoder.finish()]);
             return { ev100, through, passesMs: performance.now() - started };
         }
@@ -662,7 +686,10 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                 })
                 .end();
         }
-        moonPass.encode(encoder, target, { background });
+        moonPass.encode(encoder, target, {
+            background,
+            ...(frame.timestamps ? { timestampWrites: frame.timestamps } : {}),
+        });
         device.queue.submit([encoder.finish()]);
         const passesMs = performance.now() - started;
         const skyKey = skyKeyOf(m);
@@ -674,6 +701,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                 if (sky?.pass !== pass) return;
                 if (skyMeters.size > 64) skyMeters.clear();
                 skyMeters.set(skyKey, value);
+                lastSky = value;
                 if (frame.ev100 === null) requestRender();
             });
         }
@@ -681,8 +709,8 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     }
 
     return {
-        /** What the drawings depend on besides the frame: the maps bound. */
-        bound: () => mapsBound,
+        /** What the drawings depend on besides the frame: the maps bound, and the roughness maps loaded. */
+        bound: () => `${mapsBound} ${roughnessLoaded.size}`,
         /** Draws `frame` into `target`; null while a pass is still being made, which calls `requestRender` when done. */
         draw(target: GPUTexture, frame: MoonFrame) {
             if (!frame.compare) return render(target, frame, false);

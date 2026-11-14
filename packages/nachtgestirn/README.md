@@ -73,8 +73,8 @@ other package at runtime: the astronomy comes in as directions and angles, from
 `pnpm maps <outDir>` makes them from NASA's [CGI Moon Kit](https://svs.gsfc.nasa.gov/4720): the color map of December
 2025, from the LROC wide angle camera's Hapke-normalized mosaic, as WebP, and a height map from the LOLA elevation map
 at 64 texels per degree, LOLA's 16-bit half meters in a lossless WebP's red and green, each 4096, 2048, 1024 and 512
-texels around. The package ships them in `maps/`, as `MOON_MAPS["4k"]` (11.5 MB), `"2k"` (3.1 MB), `"1k"` (840 KB) and
-`"512"` (230 KB), resolved by `new URL(..., import.meta.url)`, which bundlers copy along: a disc shows a map
+texels around. The package ships them in `maps/`, as `MOON_MAPS["4k"]` (11.0 MiB), `"2k"` (3.0 MiB), `"1k"` (818 KiB) and
+`"512"` (225 KiB), resolved by `new URL(..., import.meta.url)`, which bundlers copy along: a disc shows a map
 `mapWidthFor(pixels)`, π times its width, at one texel per pixel, so `"512"` does up to a disc of some 160 pixels,
 `"1k"` to some 330, `"2k"` to some 650. All equirectangular, centered on 0° longitude, east to the right, north up; the
 pass reads them that way, the heights turned on the GPU into heights and slopes with mip levels. The color map is

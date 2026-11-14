@@ -1,4 +1,5 @@
 ---
+import Icon from "../Icon.astro";
 import "../sternzeit/sternzeit.css";
 import "./nachtgestirn.css";
 
@@ -11,10 +12,15 @@ const { id = "orientale" } = Astro.props;
 ---
 
 <figure class="tiles-figure" id={id} data-orientale>
+    <div class="orientale-full" data-field="full">
     <div class="tiles-panel as-seen">
-        <canvas aria-label="Mare Orientale, turned from the limb to face on, rendered with WebGPU"></canvas>
+        <svg class="photo-filter" aria-hidden="true"><filter id={`${id}-sharpen`} color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="0.75" result="blur" /><feComposite in="SourceGraphic" in2="blur" operator="arithmetic" k1="0" k2="1.6" k3="-0.6" k4="0" result="sharp" /><feMorphology in="SourceGraphic" operator="erode" radius="2" result="low" /><feMorphology in="SourceGraphic" operator="dilate" radius="2" result="high" /><feBlend in="sharp" in2="low" mode="lighten" result="floor" /><feBlend in="floor" in2="high" mode="darken" /></filter></svg>
+        <canvas aria-label="Mare Orientale, turned from the limb to face on, rendered with WebGPU" style={`filter: url(#${id}-sharpen)`}></canvas>
         <span class="tiles-start">
             <span class="tiles-hint footnote">Rendered with WebGPU</span>
+        </span>
+        <span class="tiles-ends">
+            <span class="view-buttons"><button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button></span>
         </span>
     </div>
     <label class="figure-slider" title="From the limb, as Earth sees the basin with the libration at its farthest west and the Sun high in its west, to straight over it in a low Sun">
@@ -24,6 +30,7 @@ const { id = "orientale" } = Astro.props;
         </span>
         <span class="note">face on</span>
     </label>
+    </div>
     <figcaption class="figure-caption">
         Mare Orientale turned from the limb, where Earth sees it, to face on, closing in on its rings, the Moon's north
         up, the Sun passing over it as it turns, from 60° in its west to 12° in its east, where the rings cast their

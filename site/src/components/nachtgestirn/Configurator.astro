@@ -1,0 +1,82 @@
+---
+import CopyInfo from "../CopyInfo.astro";
+import Fig from "../Fig.astro";
+import Icon from "../Icon.astro";
+import LunationSlider from "../sternzeit/LunationSlider.astro";
+import "../sternzeit/sternzeit.css";
+import "./nachtgestirn.css";
+
+/** The pass configured for a disc's size: the package's thresholds as switches, a preview one pixel to a pixel, and
+ *  what it costs, from Figure 18's measures and, on request, this GPU's. */
+interface Props {
+    id?: string;
+}
+const { id = "configurator" } = Astro.props;
+const MAPS = ["512", "1k", "2k", "4k", "8k"] as const;
+const NAMES: Record<string, string> = { "512": "512", "1k": "1K", "2k": "2K", "4k": "4K", "8k": "8K" };
+const TECHNIQUES = [
+    ["shadows", "shadows", "The relief's shadows, marched into a shadow map around the terminator"],
+    ["soft", "soft", "The shadows softened by the Sun's half degree"],
+    ["displace", "displace", "The relief displaced, so the limb shows its mountains"],
+    [
+        "rays",
+        "4×MSAA",
+        "Four rays through every pixel, not only along the terminator and a displaced limb, as the other figures' 4×MSAA switch",
+    ],
+    ["roughness", "rough", "The slopes below the maps' texels, from Rosenburg's LOLA statistics"],
+    ["compress", "BC1", "The color map compressed to BC1 on the GPU; counted below, drawn uncompressed here"],
+] as const;
+---
+
+<figure class="config-figure" id={id} data-configurator>
+    <div class="config-main">
+        <div class="config-preview as-seen">
+            <canvas aria-label="nachtgestirn's Moon as configured, one pixel of the canvas to a pixel of the screen, rendered with WebGPU"></canvas>
+            <span class="tiles-start"><span class="tiles-hint footnote">Rendered with WebGPU</span></span>
+            <span class="view-buttons config-ends"><CopyInfo /></span>
+            <output class="config-disc-note footnote" data-field="discValue" title="How many pixels across the disc: turn the mouse wheel over the Moon"></output>
+        </div>
+        <div class="config-settings">
+            <div class="config-row">
+                <span class="view-buttons">
+                    {MAPS.map((maps) => (
+                        <button type="button" class="view-toggle" data-maps={maps} aria-pressed="false" title={`The ${NAMES[maps]} maps${maps === "8k" ? ", this site's, not in the package" : ""}`}>{NAMES[maps]}</button>
+                    ))}
+                </span>
+            </div>
+            {TECHNIQUES.map(([tech, label, title]) => (
+                <div class="config-row">
+                    <span class="view-buttons"><button type="button" class="view-toggle" data-tech={tech} aria-pressed="false" title={title}>{label}</button></span>
+                </div>
+            ))}
+            <div class="config-row config-actions">
+                <span class="view-buttons"><button type="button" class="view-toggle" data-field="recommended" title="Back to what the package's defaults draw this disc with">recommended</button></span>
+                <span class="view-buttons"><button type="button" class="view-toggle" data-field="measure" title="Time the Moon's pass as set at 1920 by 1080 on this GPU: 200 frames to warm up, then 1,000 timed, the mean of the middle 80 percent, with the 10th and 90th percentiles">measure on this GPU<span class="config-progress" aria-hidden="true"></span></button></span>
+            </div>
+        </div>
+    </div>
+    <LunationSlider own />
+    <div class="budget-legend note" aria-hidden="true">
+        <span><i class="budget-swatch budget-defaults"></i>the defaults</span>
+        <span><i class="budget-swatch"></i>everything on</span>
+        <span><i class="budget-swatch budget-part-0"></i>color map</span>
+        <span><i class="budget-swatch budget-part-1"></i>relief</span>
+        <span><i class="budget-swatch budget-part-2"></i>shadow map</span>
+        <span><i class="budget-swatch budget-part-3"></i>roughness</span>
+    </div>
+    <div class="config-costs" data-field="costs"></div>
+    <div class="config-code">
+        <div data-field="code"></div>
+        <button type="button" class="view-icon copy-info" data-field="copyCode" title="Copy the code" aria-label="Copy the code"><Icon name="copy" /></button>
+    </div>
+    <figcaption class="figure-caption">
+        nachtgestirn's pass set up for a disc of a given size, the disc one pixel to a pixel, and what it costs: the time
+        a frame takes as measured in <Fig id="budget" />, hatched the defaults, solid everything on, and in blue this GPU's.
+    </figcaption>
+</figure>
+
+<script>
+    import { configuratorFigure } from "./configurator";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-configurator]")) configuratorFigure(root);
+</script>

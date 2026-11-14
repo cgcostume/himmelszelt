@@ -3,7 +3,7 @@ import Term from "../Term.astro";
 import "../sternzeit/sternzeit.css";
 import "./nachtgestirn.css";
 
-/** The light in Earth's shadow by the distance from its axis: a plot in stops and strips of its color at four
+/** The light in Earth's shadow by the distance from its axis: a plot in stops and strips of its color at three
  *  exposures, the Moon's disc laid across both where a slider puts its center. */
 interface Props {
     id?: string;
@@ -14,7 +14,7 @@ const { id = "umbra-light" } = Astro.props;
 <figure class="tiles-figure" id={id} data-umbra-light>
     <div class="umbra-light">
         <svg data-field="plot" aria-label="What of the sunlight reaches the Moon by the distance from the shadow's axis, red, green and blue, in stops"></svg>
-        <canvas data-field="strips" aria-label="The shadow's light by the distance from its axis, as a surface lit by it shows at four exposures"></canvas>
+        <canvas data-field="strips" aria-label="The shadow's light by the distance from its axis, as a surface lit by it shows at three exposures"></canvas>
         <svg data-field="overlay" class="umbra-light-overlay" aria-hidden="true"></svg>
     </div>
     <label class="figure-slider" title="How far the Moon's center stands from the shadow's axis, as sternzeit's eclipse.lunar gives it in axisOffsetKm">
@@ -31,11 +31,10 @@ const { id = "umbra-light" } = Astro.props;
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
         The light in Earth's shadow by the distance from its axis, at the Moon's distance on New Year's Eve 2028: above,
-        what of the sunlight reaches the Moon, red, green and blue, in stops, dotted where darker than the plot reaches
-        or, for blue so deep in the shadow, none at all in sRGB, the edges of the{" "}
-        <Term of="Umbra">umbra</Term> and the <Term of="Penumbra">penumbra</Term> dashed; under it, the same light on a
-        white surface at four exposures, from the sunlit Moon's to thirteen stops more open. The band is the Moon's disc
-        where the slider puts its center.
+        how much of the sunlight's red, green and blue arrives, in stops, dotted where darker than the plot reaches or
+        none at all, the edges of the <Term of="Umbra">umbra</Term> and the <Term of="Penumbra">penumbra</Term> dashed;
+        under it, the same light on a white surface at three
+        exposures, the sunlit Moon's and six and thirteen stops more open. The band is the Moon's disc.
     </figcaption>
 </figure>
 

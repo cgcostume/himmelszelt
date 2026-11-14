@@ -1,6 +1,6 @@
 // Tycho from west to east through its middle, 43.31° S 11.36° W: LOLA heights over the mean radius of 1737.4 km, in
 // meters, a texel of the site's 8K strip apart along the parallel, 601 of them centered on the crater, read bilinearly
-// from moon-height-8k-strip.webp. A one-off extraction; the strip is made by the package's maps-hq.mjs.
+// from the 8K heights, as the package's maps-hq.mjs made them. A one-off extraction.
 export const TYCHO = {
     latitude: -43.31,
     longitude: -11.36,

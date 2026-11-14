@@ -2,9 +2,11 @@ import * as precise from "@himmelszelt/sternzeit";
 import { find } from "../dom";
 import { onDemand } from "../frame";
 import {
+    APOGEE_KM,
     drawSvg,
     EARTHSHINE_MAX,
     escapeText,
+    PERIGEE_KM,
     selenographic,
     sunInViewFrame,
     svgText,
@@ -13,15 +15,13 @@ import {
     visibleRuns,
 } from "./figure";
 import { arrowAround, offPanelArrowSvg } from "./offpanel";
+import { drawParallax } from "./parallax";
 import { ephemerisDay, onChange, state } from "./state";
 import "./export";
 
 const DEG = precise.DEG_TO_RAD;
 // The Moon's disc at perigee gets this radius in the 200 x 200 viewBox; smaller at any other distance.
 const PERIGEE_RADIUS = 72;
-/** The Moon's distance at its nearest and farthest, in km, which the dashed circles show the disc at. */
-export const PERIGEE_KM = 356_500;
-export const APOGEE_KM = 406_700;
 /** The disc's angular radius at a distance in km, in radians. */
 export const radiusAt = (km: number) => Math.asin(precise.moon.MEAN_RADIUS_KM / km);
 const UNITS_PER_RADIAN = PERIGEE_RADIUS / radiusAt(PERIGEE_KM);
@@ -98,8 +98,20 @@ export function moonView(view: HTMLElement, options: MoonViewOptions = {}) {
     let optical = opticalButton.getAttribute("aria-pressed") !== "false";
     const cornerRowPx = () => CORNER_PX + opticalButton.offsetHeight / 2;
     let behind: MoonViewBehind | null = options.behind ?? null;
+    // The parallax sketch beside the view, if its figure has one, and its switch between Earth's center and the place.
+    const sketch = view.closest("figure")?.querySelector<SVGSVGElement>(".parallax-sketch") ?? null;
+    const sides = [...(view.closest("figure")?.querySelectorAll<HTMLElement>("[data-parallax-from]") ?? [])];
+    // From the place, but still north up and out of the air: the size, the libration and the axis as seen from there.
+    let fromPlace = false;
+    const showLocked = () => {
+        lockButton.setAttribute("aria-pressed", String(locked));
+        for (const side of sides) {
+            side.setAttribute("aria-pressed", String((side.dataset.parallaxFrom === "place") === fromPlace));
+        }
+    };
 
     function render() {
+        const topocentric = !locked || fromPlace;
         const { jd } = state;
         const width = svgEl.parentElement?.clientWidth || 416;
         const besides = (width * BASE_UNITS_PER_PX) / 2 >= SIDE + READOUT_WIDTH_PX * BASE_UNITS_PER_PX;
@@ -116,17 +128,28 @@ export function moonView(view: HTMLElement, options: MoonViewOptions = {}) {
         const halfHeight = besides ? Math.max(100, firstRow + 2 * line, (MIN_HEIGHT_PX / 2) * unitsPerPx) : halfWidth;
         svgEl.style.height = `${f((2 * halfHeight) / unitsPerPx)}px`;
         svgEl.setAttribute("viewBox", `${f(-halfWidth)} ${f(-halfHeight)} ${f(2 * halfWidth)} ${f(2 * halfHeight)}`);
+        if (sketch) {
+            sketch.parentElement?.style.setProperty("--moon-height", svgEl.style.height);
+            drawParallax(sketch, !fromPlace);
+        }
         const time = precise.fromJulianDay(jd);
-        // Locked to the Moon, its size from Earth's center; unlocked, the observer's, larger with the Moon high in the sky.
-        const diameter = locked
+        // From Earth's center, or from the place, larger with the Moon high in the sky.
+        const diameter = !topocentric
             ? precise.moon.apparentAngularDiameter(ephemerisDay(jd))
             : precise.moon.topocentricAngularDiameter(time, state);
         const radius = (diameter / 2) * DEG * UNITS_PER_RADIAN;
-        const total = precise.moon.librations(ephemerisDay(jd));
+        // From the place: the diurnal libration too, the Moon seen from an Earth radius off its center, which
+        // turns its face by up to a degree over the day.
+        const total =
+            !topocentric || !optical
+                ? precise.moon.librations(ephemerisDay(jd))
+                : precise.moon.topocentricLibrations(time, state);
         const opticalPart = optical ? { longitude: 0, latitude: 0 } : precise.moon.opticalLibrations(ephemerisDay(jd));
         const l = total.longitude - opticalPart.longitude;
         const b = total.latitude - opticalPart.latitude;
-        const axis = precise.moon.positionAngleOfAxis(ephemerisDay(jd));
+        const axis = !topocentric
+            ? precise.moon.positionAngleOfAxis(ephemerisDay(jd))
+            : precise.moon.topocentricPositionAngleOfAxis(time, state);
         const parallactic = precise.moon.parallacticAngle(time, state);
         const horizontal = precise.moon.horizontalPosition(time, state);
         const earthshine = precise.moon.earthshine(ephemerisDay(jd));
@@ -290,9 +313,17 @@ export function moonView(view: HTMLElement, options: MoonViewOptions = {}) {
 
     lockButton.addEventListener("click", () => {
         locked = !locked;
-        lockButton.setAttribute("aria-pressed", String(locked));
+        showLocked();
         render();
     });
+    for (const side of sides) {
+        side.addEventListener("click", () => {
+            fromPlace = side.dataset.parallaxFrom === "place";
+            showLocked();
+            render();
+        });
+    }
+    showLocked();
 
     opticalButton.addEventListener("click", () => {
         optical = !optical;
@@ -304,6 +335,7 @@ export function moonView(view: HTMLElement, options: MoonViewOptions = {}) {
     onChange(requestRender);
     // Its text keeps the page's small size in screen pixels, so a resized panel redraws.
     new ResizeObserver(requestRender).observe(svgEl);
+    if (sketch) new ResizeObserver(requestRender).observe(sketch);
     render();
     return {
         requestRender,

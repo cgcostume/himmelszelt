@@ -747,12 +747,163 @@ g.eclipse-corona {
     aspect-ratio: auto;
     border: 0;
 }
+/* Beside the Moon, as the analemma beside the sun path diagram: Earth and the Moon with the lines to it from Earth's
+   center and from the place, in a framed panel of its own in the page's theme, its switch in its top left corner and
+   its caption under it (see parallax.ts); under the Moon, lying, where the column is narrow. */
+.moon-pair {
+    display: grid;
+    gap: 1.5rem;
+}
+/* Wide enough, in the right margin of the site's width, placed and sized as the analemma beside the sun path diagram
+   and the locked views beside the armillary sphere: as wide, as far in from the wide figure's edge. The Moon and its
+   slider give up what the margin lacks. */
+@media (min-width: 72rem) {
+    /* A container for the column's width, below the figure: on it, it would scope the counters that number figures. */
+    .moon-pair {
+        position: relative;
+        container-type: inline-size;
+        --wide-width: min(var(--wide), 100vw - 3rem);
+        --panel-width: calc(0.38 * min(80vh, var(--wide-width) * 9 / 16));
+        --margin-room: calc((var(--wide-width) - 100cqw) / 2 - 1.5rem);
+    }
+    .moon-pair > .moon-view,
+    .moon-pair > [data-lunation] {
+        margin-right: max(0px, var(--panel-width) + 1.25rem - var(--margin-room));
+    }
+    /* Sketch and caption as tall as the Moon (see moonview.ts), the sketch taking what its caption leaves. */
+    .parallax-panel {
+        position: absolute;
+        top: 0;
+        right: calc(-1 * var(--margin-room));
+        width: var(--panel-width);
+        height: var(--moon-height, auto);
+        display: flex;
+        flex-direction: column;
+    }
+    .parallax-panel > .parallax-sketch {
+        flex: 1;
+        min-height: 0;
+        aspect-ratio: auto;
+    }
+}
+.parallax-sketch {
+    display: block;
+    width: 100%;
+    aspect-ratio: 2 / 5;
+    border: var(--border);
+    border-radius: var(--radius-canvas);
+    background: var(--bg);
+}
+.parallax-panel > .analemma-caption {
+    display: block;
+    margin-top: 0.4em;
+}
+@media (max-width: 72rem) {
+    .parallax-panel {
+        position: relative;
+    }
+    /* Under the sketch, the lunation closing the figure as everywhere else. */
+    .moon-pair > [data-lunation] {
+        order: 1;
+    }
+    .parallax-sketch {
+        aspect-ratio: 4 / 3;
+    }
+}
+.parallax-earth {
+    fill: color-mix(in oklab, var(--muted) 18%, transparent);
+    stroke: var(--muted);
+    stroke-width: 1;
+}
+.parallax-moon {
+    fill: color-mix(in oklab, var(--text) 25%, transparent);
+    stroke: var(--text);
+    stroke-width: 1;
+}
+.parallax-horizon {
+    stroke: var(--muted);
+    stroke-width: 1;
+}
+.parallax-ray {
+    stroke: var(--muted);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+}
+.parallax-ray.on {
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    stroke-dasharray: none;
+}
+.parallax-ray.below {
+    opacity: 0.5;
+}
+.parallax-ray.dot {
+    fill: var(--muted);
+    stroke: none;
+}
+.parallax-ray.on.dot {
+    fill: var(--accent);
+}
+.parallax-grid {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 0.75;
+}
+.parallax-grid.back {
+    opacity: 0.25;
+}
+/* The meridians quieter than the equator and the place's parallel: a hint of the turning, not a peeled orange. */
+.parallax-grid.meridian {
+    opacity: 0.35;
+}
+.parallax-grid.meridian.back {
+    opacity: 0.1;
+}
+.parallax-grid.equator {
+    stroke-width: 1;
+}
+.parallax-grid.parallel {
+    stroke: var(--accent);
+    stroke-dasharray: 2 2;
+    opacity: 0.8;
+}
+.parallax-grid.parallel.back {
+    opacity: 0.3;
+}
+.parallax-axis {
+    stroke: var(--muted);
+    stroke-width: 1;
+}
+.parallax-axis.inner {
+    stroke-dasharray: 2 2;
+    opacity: 0.6;
+}
+.parallax-axis.back {
+    opacity: 0.3;
+}
+.parallax-label {
+    fill: var(--muted);
+}
+.parallax-ray.dot.back {
+    opacity: 0.45;
+}
+.parallax-break {
+    stroke: var(--muted);
+    stroke-width: 1;
+}
+.parallax-tick {
+    stroke: var(--muted);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+}
 /* The Moon's switches in the top left corner, opposite the download. */
-.moon-view > .view-buttons:not(.svg-download) {
+.moon-bar {
     position: absolute;
     top: 6px;
     left: 6px;
     z-index: 5;
+    display: flex;
+    gap: 6px;
 }
 .moon-reference {
     fill: none;
@@ -868,6 +1019,20 @@ g.eclipse-corona {
 }
 .view-icon[hidden] {
     display: none;
+}
+/* Once a view is copied, a word under its button says so, for a moment. */
+.copy-info[data-copied]::after {
+    content: "copied";
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    padding: 2px 6px;
+    border-radius: var(--radius-button);
+    background: var(--overlay-solid);
+    color: var(--overlay-ink);
+    font-size: var(--text-small);
+    white-space: nowrap;
+    pointer-events: none;
 }
 .view-icon::before {
     content: "";
@@ -986,6 +1151,10 @@ g.eclipse-corona {
     top: 6px;
     left: 6px;
     z-index: 5;
+}
+/* The parallax figure's switch between Earth's center and the place, in the Moon's own row of buttons. */
+.view-buttons > .view-toggle {
+    position: static;
 }
 /* A scene's switches in the top left corner, the credit line after them. The bar lets a drag through to the scene. */
 .scene-bar {

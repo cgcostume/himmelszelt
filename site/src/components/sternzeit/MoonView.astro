@@ -1,4 +1,5 @@
 ---
+import CopyInfo from "../CopyInfo.astro";
 import Icon from "../Icon.astro";
 import Term from "../Term.astro";
 import Try from "../Try.astro";
@@ -19,28 +20,49 @@ interface Props {
     try?: { label: string; set: string; text: string };
     /** Whether the view starts locked to the Moon; by default unless textured from the start. */
     locked?: boolean;
+    /** A sketch beside the Moon: Earth and the Moon, the line to it from Earth's center and from the place. */
+    parallax?: boolean;
     /** Locked to the Moon for good, without the switch: where another figure shows the Moon in the sky. */
     lockedOnly?: boolean;
 }
 const { id = "moon-view", textured = "toggle", annotations = false, caption, try: experiment } = Astro.props;
-const lockedOnly = Astro.props.lockedOnly ?? false;
+const parallax = Astro.props.parallax ?? false;
+// With the sketch, the switch beside it picks Earth's center or the place, north up and out of the air either way.
+const lockedOnly = (Astro.props.lockedOnly ?? false) || parallax;
 const locked = lockedOnly || (Astro.props.locked ?? textured !== "on");
 ---
 
 <figure class="moon-figure" id={id} data-moon-view data-textured={textured}>
-    <div class={`moon-view as-seen${textured === "on" ? " textured" : ""}`} data-export="moon">
-        <span class="view-buttons">
-            <button type="button" class="view-icon" data-field="lockMoon" hidden={lockedOnly} aria-pressed={locked ? "true" : "false"} title="Lock the view to the Moon itself: north up, seen from Earth's center, without the air" aria-label="Moon frame"><Icon name="moonLock" /></button>
-            <button type="button" class="view-icon" data-field="opticalLibration" aria-pressed="true" title="The tilt of the Moon's axis against its orbit and its uneven speed along it let us see a little around its edges" aria-label="Optical libration"><Icon name="libration" /></button>
-            <button type="button" class="view-icon" data-field="textured" aria-pressed={textured === "on" ? "true" : "false"} title="The Moon as nachtgestirn renders it, NASA's maps under Hapke's law over dunstkreis' sky, in place of the diagram's disc. Rendered with WebGPU" aria-label="Textured Moon"><Icon name="moonMap" /></button>
-            {annotations && <button type="button" class="view-icon" data-field="annotations" aria-pressed="true" title="sternzeit's annotations over the Moon: its grid, axis, the arrow to the Sun and the readouts" aria-label="Annotations"><Icon name="labels" /></button>}
-        </span>
-        <div class="moon-panel">
-            <canvas aria-label="The Moon as seen from the chosen place, rendered with WebGPU" hidden></canvas>
-            <svg viewBox="-100 -100 200 200" aria-hidden="true"></svg>
+    <div class={parallax ? "moon-pair" : "moon-single"}>
+        <div class={`moon-view as-seen${textured === "on" ? " textured" : ""}`} data-export="moon">
+            <span class="moon-bar">
+                <span class="view-buttons">
+                    <button type="button" class="view-icon" data-field="lockMoon" hidden={lockedOnly} aria-pressed={locked ? "true" : "false"} title="Lock the view to the Moon itself: north up, seen from Earth's center, without the air" aria-label="Moon frame"><Icon name="moonLock" /></button>
+                    <button type="button" class="view-icon" data-field="opticalLibration" aria-pressed="true" title="The tilt of the Moon's axis against its orbit and its uneven speed along it let us see a little around its edges" aria-label="Optical libration"><Icon name="libration" /></button>
+                    <button type="button" class="view-icon" data-field="textured" aria-pressed={textured === "on" ? "true" : "false"} title="The Moon as nachtgestirn renders it, NASA's maps under Hapke's law over dunstkreis' sky, in place of the diagram's disc. Rendered with WebGPU" aria-label="Textured Moon"><Icon name="moonMap" /></button>
+                    <CopyInfo besideDownload />
+                    {annotations && <button type="button" class="view-icon" data-field="annotations" aria-pressed="true" title="sternzeit's annotations over the Moon: its grid, axis, the arrow to the Sun and the readouts" aria-label="Annotations"><Icon name="labels" /></button>}
+                </span>
+                {parallax && (
+                    <span class="view-buttons">
+                        <button type="button" class="view-toggle" data-parallax-from="center" aria-pressed="true" title="Geocentric: the Moon from Earth's center, without the daily wobble">geocentric</button>
+                        <button type="button" class="view-toggle" data-parallax-from="place" aria-pressed="false" title="Topocentric: the Moon from the chosen place, still north up and out of the air, larger when high and turned a little over the day">topocentric</button>
+                    </span>
+                )}
+            </span>
+            <div class="moon-panel">
+                <canvas aria-label="The Moon as seen from the chosen place, rendered with WebGPU" hidden></canvas>
+                <svg viewBox="-100 -100 200 200" aria-hidden="true"></svg>
+            </div>
         </div>
+        <LunationSlider />
+        {parallax && (
+            <div class="parallax-panel" data-export="parallax">
+                <svg class="parallax-sketch" aria-hidden="true"></svg>
+                <span class="analemma-caption"><span class="subfigure-title">parallax</span>: geocentric and topocentric, seen square to the Moon's orbit</span>
+            </div>
+        )}
     </div>
-    <LunationSlider />
     <figcaption class="figure-caption">
         {caption ? (
             <Fragment>
@@ -48,26 +70,43 @@ const locked = lockedOnly || (Astro.props.locked ?? textured !== "on");
                 {experiment && <Try label={experiment.label} set={experiment.set} fig={id}>{experiment.text}</Try>}
             </Fragment>
         ) : (
+            parallax ? (
+            <Fragment>
+            The Moon, <Term of="Geocentric">geocentric</Term> or topocentric, its north pole (N) up: lit by the Sun, its night side in{" "}
+            <Term of="Earthshine">earthshine</Term>, the grid shifted by the <Term of="Libration">libration</Term>, the
+            dashed circles its size at <Term of="Apogee">apogee</Term> and <Term of="Perigee">perigee</Term>. (a) Seen square to
+            the Moon's orbit, Earth's axis tilts towards the Moon or away from it over the month, and the place circles it
+            over the day, seeing the Moon lower by the <Term of="Parallax">parallax</Term> and, with it high, up to an
+            Earth radius closer; Earth and Moon true to each other, the Moon between perigee and apogee, the distance squeezed.
+            <Try label="A day and a half after new moon" set="date=2026-11-10T18:00Z" fig={id}>
+                the night side at its bluest, lit by a nearly full Earth.
+            </Try>
+            </Fragment>
+            ) : (
             <Fragment>
             The Moon as seen from the chosen place, its north pole (N) up: lit by the Sun, its night side in{" "}
             <Term of="Earthshine">earthshine</Term> (bluer when stronger), the arrow pointing to the Sun. The grid is the
             Moon's own, shifted by the <Term of="Libration">libration</Term>, the dashed circles its size at{" "}
             <Term of="Apogee">apogee</Term> and <Term of="Perigee">perigee</Term>. Magnified, disc and horizon true to each
-            other. Unlocked from the moon frame, the zenith is up (dashed), the arc is the turn of the north pole against
-            it, and the size is the one seen from the place: almost 2% more with the Moon high in the sky than on the
-            horizon, as you are then an Earth radius closer. Textured, the disc is the one{" "}
+            other.{" "}
+            Unlocked from the moon frame, the zenith is up (dashed), the arc is the turn of the north pole against it,
+            and the size is the one seen from the place: almost 2% more with the Moon high in the sky than on the
+            horizon, as you are then an Earth radius closer.{" "}
+            Textured, the disc is the one{" "}
             <a href="../nachtgestirn/">nachtgestirn</a> renders from NASA's maps, over the sky. The slider runs from new moon to new moon, the full moon in the middle, its marks the
             true phases.
             <Try label="A day and a half after new moon" set="date=2026-11-10T18:00Z" fig={id}>
                 the night side at its bluest, lit by a nearly full Earth.
             </Try>
             </Fragment>
+            )
         )}
     </figcaption>
 </figure>
 
 <script>
     import { find } from "../dom";
+    import { figureInfo } from "../figure-info";
     import { moonView } from "./moonview";
 
     for (const root of document.querySelectorAll<HTMLElement>("figure[data-moon-view]")) {
@@ -96,6 +135,10 @@ const locked = lockedOnly || (Astro.props.locked ?? textured !== "on");
             apply();
         });
         if (pressed()) apply();
+        // The readouts in the diagram go along with the copy.
+        figureInfo(root, () => ({
+            readouts: [...view.querySelectorAll("svg text")].map((text) => text.textContent?.trim()).filter(Boolean),
+        }));
         const annotations = view.querySelector('[data-field="annotations"]');
         annotations?.addEventListener("click", () => {
             const shown = annotations.getAttribute("aria-pressed") !== "true";

@@ -114,7 +114,6 @@ export function noGpu(canvas: HTMLCanvasElement) {
  */
 export function lawsFigure(root: HTMLElement) {
     const canvas = find<HTMLCanvasElement>("canvas", root);
-    const metered = find("[data-field=metered]", root);
     const mapped = find("[data-field=map]", root);
     const deviation = find("[data-field=deviation]", root);
     const day = find("[data-field=day]", root);
@@ -137,14 +136,13 @@ export function lawsFigure(root: HTMLElement) {
         const columns = narrow.matches ? 2 : LAWS.length;
         const tilePx = Math.round((width / columns) * Math.min(window.devicePixelRatio || 1, 2));
         // One exposure for all four, so the light seen is the light each law gives: Lambert's disc darker than Hapke's.
-        // Metered on the measured Moon's lit part, or the full Moon's whatever the phase, a quarter Moon then darker.
-        const meter = pressed(metered);
+        // Metered on the measured Moon's lit part, as a photograph of the Moon is.
         const withMap = pressed(mapped);
         // Held against Hapke's law, which follows the measured Moon within a quarter of a stop over the month.
         const compare = pressed(deviation) ? ("hapke2012" as const) : null;
         // By day the sky sets the exposure where it is brighter than the Moon, still one for all four.
         const byDay = pressed(day);
-        const moonEV = meter ? moonEV100(m.phaseAngle, m.lit) : moonEV100(0, 1);
+        const moonEV = moonEV100(m.phaseAngle, m.lit);
         const sky = 0.2126 * DAY_SKY[0] + 0.7152 * DAY_SKY[1] + 0.0722 * DAY_SKY[2];
         const ev100 = byDay ? Math.max(moonEV, ev100ForLuminance(sky)) : moonEV;
         canvas.parentElement?.style.setProperty("--count", String(columns));
@@ -210,7 +208,7 @@ export function lawsFigure(root: HTMLElement) {
     };
     canvas.addEventListener("pointerup", release);
     canvas.addEventListener("pointercancel", release);
-    for (const button of [metered, mapped, deviation, day]) {
+    for (const button of [mapped, deviation, day]) {
         button.addEventListener("click", () => {
             button.setAttribute("aria-pressed", String(!pressed(button)));
             requestRender();

@@ -600,6 +600,15 @@ export const references: Record<string, Reference> = {
         url: "https://svs.gsfc.nasa.gov/4720",
         note: "The color map of December 2025 and the elevation map the Moon's maps are made from.",
     },
+    rosenburg2011: {
+        authors:
+            "M. A. Rosenburg, O. Aharonson, J. W. Head, M. A. Kreslavsky, E. Mazarico, G. A. Neumann, D. E. Smith, M. H. Torrence, M. T. Zuber",
+        title: "Global surface slopes and roughness of the Moon from the Lunar Orbiter Laser Altimeter",
+        venue: "Journal of Geophysical Research: Planets 116, E02001",
+        year: 2011,
+        url: "https://doi.org/10.1029/2010JE003716",
+        note: "The median slope over 57 m and the Hurst exponent the roughness map is made from, from LOLA's tracks.",
+    },
     oren1994: {
         authors: "Michael Oren, Shree K. Nayar",
         title: "Generalization of Lambert's Reflectance Model",

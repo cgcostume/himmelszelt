@@ -36,6 +36,16 @@ export default defineConfig({
     },
     vite: {
         plugins: [wgsl],
+        // Shiki's pieces for the code built in the page (code.ts), bundled up front: found late, a dev server serves 504s.
+        optimizeDeps: {
+            include: [
+                "shiki/core",
+                "shiki/engine/javascript",
+                "shiki/langs/typescript.mjs",
+                "shiki/themes/github-light.mjs",
+                "shiki/themes/github-dark.mjs",
+            ],
+        },
         // The site always shows the libraries' current source, no package build needed in between.
         resolve: {
             alias: [

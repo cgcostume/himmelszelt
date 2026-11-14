@@ -82,8 +82,8 @@ export function orientaleFigure(root: HTMLElement) {
     const moment = ownMoment(root, START, requestRender);
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
-    // The basin lies in the 8K strip of the southern highlands, where the GPU takes textures that wide.
-    const maps = (gpu.device?.limits.maxTextureDimension2D ?? 0) >= 8192 ? "8k-strip" : "4k";
+    // The 8K maps where the GPU takes textures that wide, else the 4K.
+    const maps = (gpu.device?.limits.maxTextureDimension2D ?? 0) >= 8192 ? "8k" : "4k";
 
     function render() {
         const table = tables();
@@ -103,8 +103,13 @@ export function orientaleFigure(root: HTMLElement) {
         // Following ahead of the zoom, so the basin nears the middle before the view is narrow.
         const follow = 1 - (1 - eased) ** 2;
         const offset = [dot(basin, view.right) * radius * follow, dot(basin, view.up) * radius * follow] as const;
-        const width = root.clientWidth || 600;
-        const tilePx = Math.round(width * Math.min(window.devicePixelRatio || 1, 2));
+        // In full screen as tall as the screen leaves, the same height of sky, wider.
+        const isFull = document.fullscreenElement === full;
+        const panel = canvas.parentElement as HTMLElement;
+        const width = (isFull ? panel.clientWidth : root.clientWidth) || 600;
+        const height = isFull ? panel.clientHeight || width * ASPECT : width * ASPECT;
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        const tilePx = Math.round(width * ratio);
         const frame: TileFrame = {
             moon: m,
             luts: table.luts,
@@ -124,11 +129,25 @@ export function orientaleFigure(root: HTMLElement) {
             offset,
         };
         tiles?.draw(
-            { count: 1, width: tilePx, height: Math.round(tilePx * ASPECT), degreesAcross: across },
+            {
+                count: 1,
+                width: tilePx,
+                height: Math.round(height * ratio),
+                degreesAcross: (across * ASPECT * width) / height,
+            },
             () => frame,
         );
     }
 
+    const full = find("[data-field=full]", root);
+    const fullscreen = find("[data-field=fullscreen]", root);
+    fullscreen.addEventListener("click", () =>
+        document.fullscreenElement ? document.exitFullscreen() : full.requestFullscreen(),
+    );
+    document.addEventListener("fullscreenchange", () => {
+        fullscreen.setAttribute("aria-pressed", String(document.fullscreenElement === full));
+        requestRender();
+    });
     turn.addEventListener("input", requestRender);
     onTables(requestRender);
     onDisplay(requestRender);

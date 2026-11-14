@@ -36,7 +36,8 @@ export function standaloneSvg(svg: SVGSVGElement, width: number, height: number)
 /**
  * Saves a figure of tiles as PNG: its WebGPU `canvas` as `render` draws it, at the canvas' own resolution, and around it
  * the page's `svgs` and `texts` where they stand, over the page's ground, the moment and the place in the top left
- * corner, `grounds` filled with their own background first, a panel wider than its canvas. `render` has to draw the
+ * corner, `grounds` filled with their own background first, a panel wider than its canvas, and `overlays`, canvases
+ * over it, as far as their clip path's left inset shows them. `render` has to draw the
  * canvas before it returns: a WebGPU canvas keeps its picture only for that task.
  */
 export async function saveFigure(
@@ -47,7 +48,13 @@ export async function saveFigure(
         grounds = [],
         svgs = [],
         texts = [],
-    }: { grounds?: Iterable<HTMLElement>; svgs?: Iterable<SVGSVGElement>; texts?: Iterable<HTMLElement> } = {},
+        overlays = [],
+    }: {
+        grounds?: Iterable<HTMLElement>;
+        svgs?: Iterable<SVGSVGElement>;
+        texts?: Iterable<HTMLElement>;
+        overlays?: Iterable<HTMLCanvasElement>;
+    } = {},
 ) {
     render();
     const scale = canvas.width / (canvas.clientWidth || 1);
@@ -77,6 +84,27 @@ export async function saveFigure(
         context.fillRect(...at(box), box.width * scale, box.height * scale);
     }
     context.drawImage(canvas, ...at(frame));
+    for (const overlay of overlays) {
+        const box = overlay.getBoundingClientRect();
+        const cut =
+            Number.parseFloat(
+                /inset\(0(?:px)? 0(?:px)? 0(?:px)? ([\d.]+)%\)/.exec(overlay.style.clipPath)?.[1] ?? "0",
+            ) / 100;
+        const [x, y] = at(box);
+        const from = cut * overlay.width;
+        if (from < overlay.width)
+            context.drawImage(
+                overlay,
+                from,
+                0,
+                overlay.width - from,
+                overlay.height,
+                x + cut * box.width * scale,
+                y,
+                (1 - cut) * box.width * scale,
+                box.height * scale,
+            );
+    }
     await Promise.all(
         parts.map(async (svg) => {
             const box = svg.getBoundingClientRect();

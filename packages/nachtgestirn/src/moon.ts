@@ -33,6 +33,8 @@ export interface MoonPassOptions {
     background?: boolean;
     /** The Moon's maps, from `createMoonMaps`; without, a uniform disc of the geometric albedo. */
     maps?: MoonMaps | null;
+    /** A roughness map, from `loadMoonRoughness`, or null, none, by default; `setRoughness` sets it later. */
+    roughness?: GPUTexture | null;
     /** Called when what the pass makes only once it is asked for is ready, the shimmer's pipelines: a frame to draw
      *  again. Until then it draws without the shimmer. */
     onReady?: () => void;
@@ -160,6 +162,10 @@ export interface MoonParams {
     albedoMap: boolean;
     relief: boolean;
     shadows: boolean;
+    /** With the relief and a roughness map, the slopes it does not resolve where a pixel is finer than its texels:
+     *  octaves of noise as steep as Rosenburg et al. 2011's LOLA statistics say the ground is at each scale. False by
+     *  default. */
+    roughness: boolean;
     /** How the color map is read: tinted to the Moon's own color, the default; as published, the map's own, nearly
      *  neutral color; or as gray, its luminance alone, the way most renderers use it. */
     mapColor: "tinted" | "untinted" | "gray";
@@ -203,6 +209,8 @@ export interface MoonPass {
     update(params: Partial<MoonParams>): void;
     /** Records the Moon into `target`, which needs `STORAGE_BINDING` usage and the pass' format. */
     encode(encoder: GPUCommandEncoder, target: GPUTexture, options?: EncodeOptions): void;
+    /** Binds a roughness map, from `loadMoonRoughness`, or null for none; the caller owns it. */
+    setRoughness(texture: GPUTexture | null): void;
     destroy(): void;
 }
 
@@ -225,7 +233,16 @@ export const PARAMS_SIZE = 400;
 export const TABLES_SIZE = (REFRACTION_SAMPLES / 4 + REFRACTION_SAMPLES + UMBRA_SAMPLES) * 16;
 const DEFAULT_UMBRA = typicalUmbra();
 /** The flags of NgParams, as params.wgsl names them NG_FLAG_*. */
-const FLAG = { color: 1, relief: 2, shadows: 4, displace: 8, earthshine: 16, air: 32, eclipse: 64 } as const;
+const FLAG = {
+    color: 1,
+    relief: 2,
+    shadows: 4,
+    displace: 8,
+    earthshine: 16,
+    air: 32,
+    eclipse: 64,
+    roughness: 128,
+} as const;
 
 const DEFAULTS: MoonParams = {
     direction: [0, 0, 1],
@@ -243,6 +260,7 @@ const DEFAULTS: MoonParams = {
     albedoMap: true,
     relief: true,
     shadows: true,
+    roughness: false,
     mapColor: "tinted",
     eclipse: null,
     sunAngularDiameter: 0.533,
@@ -256,6 +274,8 @@ const DEFAULTS: MoonParams = {
 export interface MoonDetail {
     shadows: ShadowWindow | null;
     displace: boolean;
+    /** Whether a roughness map is bound. */
+    roughness?: boolean;
 }
 
 /** Whether the Moon touches Earth's penumbra, with a little room: the eclipse is drawn only then. */
@@ -320,7 +340,8 @@ export function paramsData(params: MoonParams, maps: MoonMaps | null, detail?: M
         (relief && detail?.displace ? FLAG.displace : 0) |
         (params.earthshine > 0 ? FLAG.earthshine : 0) |
         (refraction ? FLAG.air : 0) |
-        (eclipse && inPenumbra(eclipse) ? FLAG.eclipse : 0);
+        (eclipse && inPenumbra(eclipse) ? FLAG.eclipse : 0) |
+        (relief && params.roughness && detail?.roughness ? FLAG.roughness : 0);
 
     // The shadow map's window, and the detail strip.
     const window = detail?.shadows;
@@ -381,6 +402,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         headroom = 1,
         background = false,
         maps = null,
+        roughness = null,
         samples = 1,
         terminatorSamples = 4,
         nightVision = false,
@@ -443,6 +465,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
             texture(8, "unfilterable-float"),
             texture(9),
             samplerAt(10),
+            texture(11),
         ],
     });
     const outputOf = (target: GPUTextureFormat) =>
@@ -580,7 +603,8 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
     };
     let layer: GPUTexture | null = null;
     const params: MoonParams = { ...DEFAULTS };
-    let detail: MoonDetail = { shadows: null, displace: false };
+    let roughnessMap = roughness;
+    let detail: MoonDetail = { shadows: null, displace: false, roughness: roughnessMap !== null };
     // The shadow map and the window it was made for.
     let shadowMap: GPUTexture | null = null;
     let made: ShadowWindow | null = null;
@@ -592,6 +616,11 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
             Object.assign(params, patch);
             device.queue.writeBuffer(uniform, 0, paramsData(params, maps, detail));
             writeTables();
+        },
+        setRoughness(texture) {
+            roughnessMap = texture;
+            detail = { ...detail, roughness: texture !== null };
+            device.queue.writeBuffer(uniform, 0, paramsData(params, maps, detail));
         },
         encode(encoder, target, encodeOptions = {}) {
             // What the view asks of the relief: shadows from a size on, from a map kept while it serves, and displacement.
@@ -625,6 +654,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
             detail = {
                 shadows: window ? made : null,
                 displace: Boolean(wanted && plan && plan.discPixels >= displacementFrom),
+                roughness: roughnessMap !== null,
             };
             const data = paramsData(params, maps, detail);
             device.queue.writeBuffer(uniform, 0, data);
@@ -644,6 +674,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
                         { binding: 8, resource: (encodeOptions.background ?? noBackground).createView() },
                         { binding: 9, resource: moonLayer.createView() },
                         { binding: 10, resource: layerSampler },
+                        { binding: 11, resource: (roughnessMap ?? blank).createView() },
                     ],
                 });
             if (remake && shadowPass && shadowMap && made) {

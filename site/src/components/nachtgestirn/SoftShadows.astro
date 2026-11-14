@@ -1,11 +1,13 @@
 ---
+import CopyInfo from "../CopyInfo.astro";
+import Icon from "../Icon.astro";
 import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
 import "./nachtgestirn.css";
 import Resolutions from "../Resolutions.astro";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
-import { STRIP_RESOLUTIONS } from "./resolution-options";
+import { WHOLE_RESOLUTIONS } from "./resolution-options";
 
 /** The disc with a close-up of the terminator marked, and the close-up split: a point Sun on the relief as it lies on the
  *  sphere left of a line, and as the pass draws it right of it, the real Sun's soft shadows on the displaced relief. */
@@ -21,8 +23,14 @@ const { id = "soft-shadows" } = Astro.props;
         <canvas class="detail-full" data-field="full" aria-label="The close-up as the pass draws it, the Sun's half degree on the displaced relief, rendered with WebGPU"></canvas>
         <svg class="tiles-overlay" data-field="marker" aria-hidden="true"></svg>
         <span class="tiles-start">
-            <Resolutions options={STRIP_RESOLUTIONS} chosen="8k-strip" />
-            <span class="view-buttons"><button type="button" class="view-toggle" data-field="albedo" aria-pressed="false" title="NASA's color map of the Moon; off, a uniform surface of the Moon's albedo, so the relief and its shadows show alone">albedo</button></span>
+            <Resolutions options={WHOLE_RESOLUTIONS} chosen="8k" />
+            <span class="view-buttons"><button type="button" class="view-toggle" data-field="albedo" aria-pressed="false" title="NASA's color map of the Moon; off, a uniform surface of the Moon's albedo, so the relief and its shadows show alone">albedo</button><button type="button" class="view-toggle" data-field="roughness" aria-pressed="false" title="The slopes below the maps' texels, where a pixel is finer, as in the close-ups: octaves of noise as steep as LOLA's statistics of the ground say it is at each scale">rough</button></span>
+        </span>
+        <span class="tiles-ends">
+            <span class="view-buttons">
+                <button type="button" class="view-icon" data-field="download" title="Download the disc and both close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+                <CopyInfo />
+            </span>
         </span>
     </div>
     <label class="figure-slider split-slider" title="Where the line between the cheap close-up and the full one runs">
@@ -35,14 +43,12 @@ const { id = "soft-shadows" } = Astro.props;
     <LunationSlider own />
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        Soft shadows and displacement on a close-up of the <Term of="Terminator">terminator</Term>, a sixteenth of the disc
-        across: the disc at the moment its slider sets, with the close-up marked, and the close-up a stop more open, split
-        by a line the slider or a drag moves. Left of it a point Sun lights the relief as it lies on the sphere, shading it
-        and casting hard shadows on it; right of it, as the pass draws it, the Sun's half degree casts soft shadows on the
-        relief displaced.
+        Soft shadows and displacement on a close-up of the <Term of="Terminator">terminator</Term>, a sixteenth of the
+        disc across and a stop more open. Left of the line, a point Sun casts hard shadows on the relief as it lies on the
+        sphere; right of it, as the pass draws it, the Sun's half degree casts soft shadows on the relief displaced.
         <Try label="Two days after new moon" set="date=2026-11-11T12:00Z" fig={id}>
-            the close-up at the limb, the relief seen from the side: the point Sun's peaks hang sharp in the night,
-            displaced they stand up as mountains, and their tops fade, the Sun's disc only partly over their horizon.
+            the close-up at the limb: displaced, the peaks stand up as mountains, and their tops fade, the Sun's disc only
+            partly over their horizon.
         </Try>
     </figcaption>
 </figure>

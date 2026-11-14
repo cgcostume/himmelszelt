@@ -67,6 +67,7 @@ test("the params and tables pack to the uniforms' sizes with the flags where the
         albedoMap: true,
         relief: true,
         shadows: true,
+        roughness: false,
         mapColor: "tinted" as const,
         earthDirection: null,
         shimmer: null,

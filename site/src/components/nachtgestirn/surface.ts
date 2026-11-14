@@ -1,5 +1,6 @@
 import { moonEV100, type Vec3 } from "@himmelszelt/nachtgestirn";
 import { find } from "../dom";
+import { figureInfo } from "../figure-info";
 import "../sternzeit/export";
 import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
@@ -157,6 +158,7 @@ export function surfaceFigure(root: HTMLElement) {
     }
 
     // The tiles as drawn, the marker and the names under them, in one PNG.
+    figureInfo(root);
     find("[data-field=download]", root).addEventListener("click", () =>
         saveFigure(root, canvas, render, {
             svgs: [marker],

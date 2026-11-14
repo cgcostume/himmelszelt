@@ -37,7 +37,7 @@ any chapter text, caption, glossary entry or code example. When this file and st
   the unlit Moon as a hole). This is where the text earns its keep with developers.
 - **Invite the reader to try something** in a figure, and say what they will see: "Raise the height to 10 km, and the
   horizon sinks by more than 3°", "Step the moment a day at a time, and sidereal time gains almost a degree". The
-  captions add one experiment each, a click away (see Figures and tables).
+  captions add one experiment where it shows something worth seeing, a click away (see Figures and tables).
 - **People, briefly.** The sources are people: a closing section ("The people behind the numbers") gives every source
   a library function rests on a sentence or two of who they were and ties them to that function. The authors' own
   papers are cited, but their authors not portrayed.
@@ -162,17 +162,19 @@ can, or goes.
   sentence starting with it. Never type a number.
 - A figure or table sits right after the paragraph holding its first reference, never before it; a later reference is
   fine anywhere. A paragraph that needs a figure but would not otherwise mention it gets the reference anyway.
-- Every figure that follows the moment and the place, and every table, gets `<Controls />` under it; a static diagram
-  (the coordinate pipeline) gets none.
+- Every figure that follows the moment and the place, and every table, gets `<Controls />` under it, folded; a static
+  diagram (the coordinate pipeline) gets none. Neither does a figure that follows the moment alone and carries a
+  lunation slider (most of nachtgestirn's): there the controls sit under the chapter's first figure and under those
+  that need a place.
 - **Captions**: what the figure is first, as a noun phrase ("A sun path diagram: ..."), then how to read it (colors,
   dashes, arrows), subfigures as "(a) ... (b) ...", then scale ("Symbols, not to scale", "Magnified, discs and horizon
   true to each other"), then credits. Not how to use it: hovering, clicking and tapping are left to be found, the cursor
   hints at them. The one exception is a scene that turns, whose credit line starts with "Drag to rotate." "The chosen
   place" and "the chosen moment" for whatever the controls are set to.
-- **One experiment per figure** that follows the moment and the place, last in its caption, as `<Try>`: a link that
-  sets a moment and a place, named by what it sets ("Tromsø", "The year 1000"), then what the figure shows there, one
-  sentence, true and checked ("the Sun never sets from May 18 to July 24"). Something worth seeing, not a tour of the
-  controls. The link is the page's address with `date` (anything a JavaScript Date reads) or `jd`, and `lat`, `lon`
+- **An experiment per figure**, preferably, where the figure follows the moment and the place and one is worth
+  seeing; none rather than a filler. Last in its caption, as `<Try>`: a link that sets a moment and a place, named by
+  what it sets ("Tromsø", "The year 1000"), then what the figure shows there, one sentence, true and checked ("the Sun
+  never sets from May 18 to July 24"). Something worth seeing, not a tour of the controls. The link is the page's address with `date` (anything a JavaScript Date reads) or `jd`, and `lat`, `lon`
   and `h`; it works from outside the page as well.
 - Figures render on demand, never in a continuous loop (the one exception: the corona in the eclipse figure turns
   while it shows and is in view), and are built so the later Tafeln can lift them out (colors

@@ -1,4 +1,5 @@
 ---
+import CopyInfo from "../CopyInfo.astro";
 import Icon from "../Icon.astro";
 import Resolutions from "../Resolutions.astro";
 import "../sternzeit/sternzeit.css";
@@ -21,17 +22,27 @@ const first = PHOTOS[0];
             <div class="photo-compare" style="--photo-aspect: 1">
                 <div class="photo-disc">
                     <img src={first?.src} alt="A photograph of the Moon" crossorigin="anonymous" decoding="async" draggable="false" />
+                    <svg class="photo-filter" aria-hidden="true"><filter id={`${id}-sharpen`} color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="1" result="blur" /><feComposite in="SourceGraphic" in2="blur" operator="arithmetic" k1="0" k2="2" k3="-1" k4="0" result="sharp" /><feMorphology in="SourceGraphic" operator="erode" radius="2" result="low" /><feMorphology in="SourceGraphic" operator="dilate" radius="2" result="high" /><feBlend in="sharp" in2="low" mode="lighten" result="floor" /><feBlend in="floor" in2="high" mode="darken" /></filter></svg>
                     <canvas aria-label="nachtgestirn's Moon for the photograph's moment and place, rendered with WebGPU"></canvas>
                 </div>
                 <svg class="photo-marks" data-field="marks" aria-hidden="true"></svg>
             </div>
             <span class="tiles-start">
                 <Resolutions options={WHOLE_RESOLUTIONS} chosen="8k" />
+                <span class="view-buttons">
+                    <button type="button" class="view-icon" data-field="annotations" aria-pressed="false" title="The face figure's annotations over the Moon: its grid every 30°, its limb, its north and the point of its face nearest the observer" aria-label="Annotations"><Icon name="labels" /></button>
+                </span>
+                <span class="view-buttons">
+                    <button type="button" class="view-toggle" data-field="roughness" aria-pressed="false" title="The slopes below the maps' texels, where a pixel is finer, as in full screen on a large screen: octaves of noise as steep as LOLA's statistics of the ground say it is at each scale">rough</button>
+                    <button type="button" class="view-toggle" data-field="sharpen" aria-pressed="true" title="An unsharp mask over nachtgestirn's Moon as strong as the photograph's own processing, fitted to each photograph: sharpened, as photographs of the Moon mostly are, the comparison is fair">sharpen</button>
+                </span>
             </span>
             <span class="photo-note" data-field="note"></span>
             <span class="tiles-ends">
                 <span class="view-buttons">
                     <Rays />
+                    <button type="button" class="view-icon" data-field="download" title="Download the comparison as shown, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+                    <CopyInfo />
                     <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
                 </span>
             </span>
@@ -55,12 +66,11 @@ const first = PHOTOS[0];
         </div>
     </div>
     <figcaption class="figure-caption">
-        Photographs of the Moon left of the line, and right of it nachtgestirn's Moon for each photograph's
-        moment and place, through the air. The photograph keeps its own orientation and is scaled and moved until
-        several hundred craters and ridges found in both lie on nachtgestirn's, which is turned to match; the sky's
-        north, or by day the zenith, is marked at the limb, and past the disc the photograph fades into its sky. The maria, the craters, the libration and the terminator are to
-        compare; the color and the contrast are the camera's and its processing, and the mosaics and the photograph
-        through an eyepiece are a little distorted. Photographs from Wikimedia Commons, each credited over its tab.
+        Photographs of the Moon left of the line, and right of it nachtgestirn's Moon for each photograph's moment and
+        place, through the air. nachtgestirn's Moon is turned to the photograph, which is scaled and moved until several
+        hundred craters found in both lie on each other. The maria, the craters, the libration and the terminator are to
+        compare; the color and the contrast are the camera's. Photographs from Wikimedia Commons, each credited over its
+        tab.
     </figcaption>
 </figure>
 

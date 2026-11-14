@@ -1,7 +1,8 @@
-import { MOON_MAPS } from "@himmelszelt/nachtgestirn";
+import { MOON_MAPS, MOON_ROUGHNESS } from "@himmelszelt/nachtgestirn";
 import { fromJulianDay, julianEphemerisDay, moon } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
 import { save } from "../dunstkreis/download";
+import { figureInfo } from "../figure-info";
 import { onDemand } from "../frame";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
 
@@ -123,9 +124,11 @@ function drawSeen(canvas: HTMLCanvasElement, subEarth: { longitude: number; lati
 export function mapsFigure(root: HTMLElement) {
     const color = find<HTMLImageElement>("[data-field=color]", root);
     const heights = find<HTMLCanvasElement>("[data-field=heights]", root);
+    const roughness = find<HTMLCanvasElement>("[data-field=roughness]", root);
     const note = find("[data-field=note]", root);
     const seen = [...root.querySelectorAll<HTMLCanvasElement>("[data-field=seen]")];
-    const files = MOON_MAPS["1k"];
+    // As wide as the figure on most screens.
+    const files = MOON_MAPS["2k"];
     let texels = "";
     const requestRender = onDemand(() => {
         const libration = moon.librations(julianEphemerisDay(fromJulianDay(state.jd)));
@@ -167,21 +170,42 @@ export function mapsFigure(root: HTMLElement) {
         requestRender();
     };
     image.src = files.heights ? String(files.heights) : "";
-    // One map at a time, the color or the heights.
+    // The roughness map's median slope over 57 m, red in tenths of a degree, as gray from flat to 15°.
+    const rough = new Image();
+    rough.crossOrigin = "anonymous";
+    rough.onload = () => {
+        const { width, height } = rough;
+        Object.assign(roughness, { width, height });
+        const context = roughness.getContext("2d");
+        if (!context) return;
+        context.drawImage(rough, 0, 0);
+        const pixels = context.getImageData(0, 0, width, height);
+        const { data } = pixels;
+        for (let i = 0; i < width * height; i++) {
+            const g = Math.round(Math.min((data[i * 4] ?? 0) / 150, 1) * 255);
+            data[i * 4] = g;
+            data[i * 4 + 1] = g;
+            data[i * 4 + 2] = g;
+            data[i * 4 + 3] = 255;
+        }
+        context.putImageData(pixels, 0, 0);
+    };
+    rough.src = String(MOON_ROUGHNESS["2k"]);
+    // One map at a time, the color, the heights or the roughness.
     const choices = [...root.querySelectorAll<HTMLButtonElement>("[data-map]")];
     for (const choice of choices)
         choice.addEventListener("click", () => {
             for (const other of choices) other.setAttribute("aria-pressed", String(other === choice));
             color.hidden = choice.dataset.map !== "color";
             heights.hidden = choice.dataset.map !== "heights";
+            roughness.hidden = choice.dataset.map !== "roughness";
             requestRender();
         });
     // The map shown at its own size, what Earth sees over it, the moment and the place in a corner.
+    figureInfo(root);
     find("[data-field=download]", root).addEventListener("click", () => {
-        const map = color.hidden ? heights : color;
-        const [width, height] = color.hidden
-            ? [heights.width, heights.height]
-            : [color.naturalWidth, color.naturalHeight];
+        const map = !color.hidden ? color : roughness.hidden ? heights : roughness;
+        const [width, height] = map === color ? [color.naturalWidth, color.naturalHeight] : [map.width, map.height];
         const copy = Object.assign(document.createElement("canvas"), { width, height });
         const context = copy.getContext("2d");
         if (!context || !width) return;
@@ -193,7 +217,7 @@ export function mapsFigure(root: HTMLElement) {
             textBaseline: "bottom",
         });
         context.fillText(momentAndPlace(), width / 100, height - height / 100);
-        const which = color.hidden ? "heights" : "color";
+        const which = map === color ? "color" : map === heights ? "heights" : "roughness";
         copy.toBlob((blob) => save(blob, `himmelszelt-${root.id}-${which}-${momentStamp()}.png`), "image/png");
     });
     onChange(requestRender);

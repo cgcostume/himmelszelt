@@ -4,7 +4,6 @@ import Term from "../Term.astro";
 import "../sternzeit/sternzeit.css";
 import "./nachtgestirn.css";
 import { ECLIPSE_PHOTOS, ev100Of } from "./eclipse-photos";
-import Rays from "./Rays.astro";
 
 /** Four photographs of the lunar eclipse of February 21, 2008, each split with nachtgestirn's Moon for its moment, its
  *  place and its exposure. */
@@ -31,9 +30,7 @@ const time = (date: string) => date.slice(11, 16);
             </div>
         ))}
         <svg class="tiles-overlay" data-field="knobs" aria-hidden="true"></svg>
-        <span class="tiles-ends">
-            <span class="view-buttons"><Rays /></span>
-        </span>
+        
     </div>
     <ul class="tiles-labels eclipse-labels">
         {ECLIPSE_PHOTOS.map((photo) => (
@@ -49,11 +46,10 @@ const time = (date: string) => date.slice(11, 16);
     </label>
     <figcaption class="figure-caption">
         The lunar eclipse of February 21, 2008, photographed from Clifton Park, New York, left of each line, and right of
-        it nachtgestirn's Moon for the photograph's moment and place, in Earth's <Term of="Umbra">umbra</Term> as the
-        pass integrates its light, at the photograph's own exposure: the telescope's f/12.1 at ISO 800 for the seconds
-        given. Over them the whole eclipse, the umbra's first contact to its last, each Moon exposed for itself, the
-        photographs' moments marked. Raw frames decoded to sRGB without the camera's white balance, so the colors can be
-        compared; the pass' tone curve is none. Photographs © Theodore Yapo and Barbara Cutler, from their paper <Cite id="yapo2009" />.
+        it nachtgestirn's Moon for the photograph's moment and place, in Earth's <Term of="Umbra">umbra</Term>, at the
+        photograph's own exposure: f/12.1 at ISO 800 for the seconds given. Over them the whole eclipse, each Moon exposed
+        for itself, the photographs' moments marked. Raw frames decoded without the camera's white balance, so the colors
+        can be compared. Photographs © Theodore Yapo and Barbara Cutler, from their paper <Cite id="yapo2009" />.
     </figcaption>
 </figure>
 

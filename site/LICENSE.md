@@ -33,5 +33,6 @@ credited where the site shows it.
 | `public/images/sunrise-2015-07-30-iss.webp` | NASA, ISS044-E-025484, Scott Kelly | public domain |
 | `public/images/glossary-astrolabe.webp` | The Metropolitan Museum of Art, Open Access | CC0 |
 | `public/moon/` | NASA's Scientific Visualization Studio, CGI Moon Kit | public domain |
+| nachtgestirn's `moon-roughness-1k.webp`, `-2k`, `-4k` | Rosenburg et al. (2011), LRO LOLA slope and Hurst exponent maps, NASA PDS Geosciences Node | public domain |
 
 The photographs the figures load from Wikimedia Commons are licensed as credited under each.

@@ -50,7 +50,7 @@ export interface MoonMapsOptions {
      *  close-up sharper than a whole map the GPU could hold. */
     detail?: { color: ImageBitmap; heights: ImageBitmap; region: readonly [number, number, number, number] };
     /** Compress the color map to BC1 on the GPU, where the device has "texture-compression-bc", as desktop GPUs do: an
-     *  eighth of its memory, 44.7 MB down to 5.6 for the large maps, for colors a hundredth of a stop off. Off by
+     *  eighth of its memory, 42.7 MiB down to 5.3 for the large maps, for colors a hundredth of a stop off. Off by
      *  default. The relief stays as it is: the shadows are marched through its heights. */
     compress?: boolean;
 }
@@ -162,12 +162,15 @@ export interface LoadMoonMapsOptions extends Omit<MoonMapsOptions, "color" | "he
 }
 
 // The near side's mean, as `pnpm maps` printed it for the shipped maps.
-const SHIPPED = { meanReflectance: 0.396, meanColor: [0.4125, 0.3924, 0.3828] as Vec3 };
+const SHIPPED = {
+    meanReflectance: 0.396,
+    meanColor: [0.4125, 0.3924, 0.3828] as Vec3,
+};
 
 /**
  * The maps the package ships, made by `pnpm maps` from NASA's CGI Moon Kit: the color map and the heights from LOLA's
- * 64 texels per degree, by how many texels around: "512", 230 KB, for a disc up to 163 pixels across, "1k", 840 KB, up
- * to 326, "2k", 3.1 MB, up to 652, and "4k", 11.5 MB, beyond, each as far as it gives a texel to a pixel at the disc's
+ * 64 texels per degree, by how many texels around: "512", 225 KiB, for a disc up to 163 pixels across, "1k", 818 KiB, up
+ * to 326, "2k", 3.0 MiB, up to 652, and "4k", 11.0 MiB, beyond, each as far as it gives a texel to a pixel at the disc's
  * middle (`mapWidthFor`). Resolved next to the package's own files, which bundlers that know
  * `new URL(..., import.meta.url)` copy along.
  */
@@ -396,4 +399,42 @@ function compressBc1(device: GPUDevice, texture: GPUTexture): GPUTexture {
     blocks.destroy();
     texture.destroy();
     return compressed;
+}
+
+/**
+ * The roughness maps the package ships, made by `pnpm roughness` from Rosenburg et al. 2011's LOLA maps: red the median
+ * slope over 57 m in tenths of a degree, green the Hurst exponent from 57 m to 2.7 km, 0.5 to 1 over 0 to 255. Optional,
+ * for a pass that draws the slopes below the relief's texels: "1k", 0.7 MiB, "2k", 2.5 MiB, and "4k", 7.7 MiB, beyond which
+ * the source holds no more. They only set how steep the noise is, so a smaller one than the color map serves.
+ */
+export const MOON_ROUGHNESS: Record<"1k" | "2k" | "4k", URL> = {
+    "1k": new URL("../maps/moon-roughness-1k.webp", import.meta.url),
+    "2k": new URL("../maps/moon-roughness-2k.webp", import.meta.url),
+    "4k": new URL("../maps/moon-roughness-4k.webp", import.meta.url),
+};
+
+/** Uploads a roughness map, decoded without color conversion or premultiplied alpha, for `MoonPass.setRoughness`. */
+export function createMoonRoughness(device: GPUDevice, image: ImageBitmap): GPUTexture {
+    const texture = device.createTexture({
+        label: "nachtgestirn:roughness",
+        size: [image.width, image.height],
+        format: "rgba8unorm",
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    device.queue.copyExternalImageToTexture({ source: image }, { texture }, [image.width, image.height]);
+    return texture;
+}
+
+/** Fetches, decodes and uploads a roughness map, the package's 1K by default: `createMoonRoughness` with the image. */
+export async function loadMoonRoughness(
+    device: GPUDevice,
+    url: string | URL = MOON_ROUGHNESS["1k"],
+): Promise<GPUTexture> {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`nachtgestirn: ${url} gave ${response.status}`);
+    const image = await createImageBitmap(await response.blob(), {
+        colorSpaceConversion: "none",
+        premultiplyAlpha: "none",
+    });
+    return createMoonRoughness(device, image);
 }

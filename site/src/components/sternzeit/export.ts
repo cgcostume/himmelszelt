@@ -1,8 +1,10 @@
 // A download button on every figure panel marked `data-export="<name>"`: its SVGs (and HTML labels marked
 // `data-export-text`) composed into one standalone SVG file, styles inlined, so it opens anywhere as it looks here.
 // Nested panels (the locked views over the armillary sphere, the analemma over the sun path) are exported on their
-// own, not twice. Each file is signed with the moment and place it shows, unless marked `data-export-timeless`.
+// own, not twice. Each file is signed with the moment and place it shows, unless marked `data-export-timeless`. Beside
+// each download a button that copies the figure's view (figure-info.ts).
 
+import { figureInfo } from "../figure-info";
 import { icon } from "../icons";
 import { momentAndPlace, momentStamp } from "./state";
 
@@ -240,9 +242,24 @@ for (const root of document.querySelectorAll<HTMLElement>("[data-export]")) {
         download(root);
     });
     button.addEventListener("pointerdown", (event) => event.stopPropagation());
-    if (row) row.append(button);
+    // A figure's copy button, to the right of the download; one made here for a figure that has none.
+    const figure = root.closest<HTMLElement>("figure") ?? root;
+    let copy = root.querySelector<HTMLElement>("[data-beside-download]");
+    if (!copy && !figure.querySelector("[data-field=copyInfo]")) {
+        copy = Object.assign(document.createElement("button"), {
+            type: "button",
+            className: `${row ? "button-xs button-square" : "view-icon"} copy-info`,
+            title: "Copy this view: a link to it, its caption and every setting it shows, as JSON",
+            innerHTML: icon("copy"),
+        });
+        copy.dataset.field = "copyInfo";
+        copy.setAttribute("aria-label", "Copy this view");
+        copy.addEventListener("pointerdown", (event) => event.stopPropagation());
+    }
+    if (row) row.append(button, ...(copy ? [copy] : []));
     else {
-        group.append(button);
+        group.append(button, ...(copy ? [copy] : []));
         root.append(group);
     }
+    if (copy && !copy.hasAttribute("data-beside-download")) figureInfo(figure);
 }

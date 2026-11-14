@@ -1,5 +1,6 @@
 ---
 import Cite from "../Cite.astro";
+import CopyInfo from "../CopyInfo.astro";
 import Icon from "../Icon.astro";
 import "../sternzeit/sternzeit.css";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
@@ -16,22 +17,24 @@ const { id = "maps" } = Astro.props;
     <div class="maps-panel as-seen">
         <img data-field="color" alt="NASA's color map of the Moon, an equirectangular mosaic from the Lunar Reconnaissance Orbiter's wide angle camera" />
         <canvas data-field="heights" aria-label="The Moon's heights from the Lunar Orbiter Laser Altimeter, as gray, low to high" hidden></canvas>
+        <canvas data-field="roughness" aria-label="How steep the Moon's ground is over 57 m, from the Lunar Orbiter Laser Altimeter's tracks, as gray, smooth to rough" hidden></canvas>
         <canvas class="maps-seen" data-field="seen" aria-hidden="true"></canvas>
         <span class="view-buttons">
             <button type="button" class="view-toggle" data-map="color" aria-pressed="true" title="The color map, the surface's albedo">albedo</button>
             <button type="button" class="view-toggle" data-map="heights" aria-pressed="false" title="The heights, as gray from the lowest ground to the highest">heights</button>
+            <button type="button" class="view-toggle" data-map="roughness" aria-pressed="false" title="The roughness, the median slope over 57 m as gray, from flat to 15° and steeper, which the pass adds below the texels where a pixel is finer">roughness</button>
         </span>
         <span class="view-buttons maps-end">
             <button type="button" class="view-icon" data-field="download" title="Download the map shown, with what Earth sees, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+            <CopyInfo />
         </span>
     </div>
     <LunationSlider />
-    <p class="view-status" data-field="note"></p>
+    <p class="view-status" data-field="note" hidden></p>
     <figcaption class="figure-caption">
-        nachtgestirn's two maps at their middle size, laid out flat with 0° longitude in the middle, north up and east
-        to the right: the color as NASA balanced it, or the heights as gray from the lowest ground to the highest. Inside
-        the line, what Earth sees at the chosen moment; hatched what is turned away, densely what no libration ever shows.
-        Both from the CGI Moon Kit <Cite id="svs4720" />.
+        nachtgestirn's maps laid out flat, NASA's color or the heights in gray, from the CGI Moon Kit <Cite id="svs4720" />, or
+        the roughness below them, the median slope over 57 m from LOLA's tracks <Cite id="rosenburg2011" />.
+        Inside the line what Earth sees at the chosen moment, hatched what it does not, densely what it never sees.
     </figcaption>
 </figure>
 

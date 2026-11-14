@@ -110,6 +110,8 @@ if (state.live) state.jd = julianDayNow();
 // A link's moment and place win over the stored ones, once: the address drops them again, so a reload keeps whatever
 // was changed since.
 const linked = fromSearch(location.search);
+/** The query the page opened with, before the address drops it: for a figure that reads more of its state from a link. */
+export const linkedSearch = new URLSearchParams(location.search);
 /** The moment a link opened the page with, and the figure it pointed to, for a figure with a moment of its own. */
 export const linkedOnLoad = linked?.jd === undefined ? null : { jd: linked.jd, hash: location.hash };
 if (linked) {
@@ -141,6 +143,18 @@ export function momentAndPlace() {
         `${Math.abs(value).toFixed(3)}° ${value < 0 ? negative : positive}`;
     const place = `${angle(state.latitude, "N", "S")}, ${angle(state.longitude, "E", "W")}`;
     return `${utc} UTC, ${place}, ${Math.round(state.heightM)} m`;
+}
+
+/** A link to this page at its moment and place, `extra` added to the query, scrolled to the element `id`. */
+export function momentLink(id: string, extra: Record<string, string> = {}) {
+    const query = new URLSearchParams({
+        jd: state.jd.toFixed(7),
+        lat: state.latitude.toFixed(6),
+        lon: state.longitude.toFixed(6),
+        h: String(Math.round(state.heightM)),
+        ...extra,
+    });
+    return `${location.origin}${location.pathname}?${String(query).replaceAll("%2C", ",")}#${id}`;
 }
 
 /** The page's moment as part of a file name, e.g. "2026-04-06T1805Z". */
