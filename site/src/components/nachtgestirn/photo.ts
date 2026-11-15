@@ -52,13 +52,13 @@ function fadeOf(p: Photo) {
     return [Math.min(1.06, end - 0.05), end] as const;
 }
 
-/** The photograph's sky around its disc, as an sRGB color, for what it fades into: the middle of a ring where the fade
- *  ends, so the photograph's own sky there runs on into it. */
+/** The photograph's sky around its disc, as sRGB colors every 15° clockwise from up, for what it fades into: the middle
+ *  of each sector of a ring where the fade ends, so the photograph's own sky there runs on into it, gradient and all. */
 function skyOf(img: HTMLImageElement, p: Photo) {
-    const size = 160;
+    const [size, sectors] = [256, 24];
     const canvas = Object.assign(document.createElement("canvas"), { width: size, height: size });
     const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context || !img.naturalWidth) return "#000";
+    if (!context || !img.naturalWidth) return ["#000"];
     try {
         context.drawImage(img, 0, 0, size, size);
         const pixels = context.getImageData(0, 0, size, size).data;
@@ -66,21 +66,24 @@ function skyOf(img: HTMLImageElement, p: Photo) {
         const [sx, sy] = [p.width / size, p.height / size];
         const [cx, cy, r] = [p.center[0] * p.width, p.center[1] * p.height, p.radius * p.width];
         const end = fadeOf(p)[1];
-        const ring: number[][] = [];
+        const rings: number[][][] = Array.from({ length: sectors }, () => []);
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
-                const d = Math.hypot((x + 0.5) * sx - cx, (y + 0.5) * sy - cy);
+                const [dx, dy] = [(x + 0.5) * sx - cx, (y + 0.5) * sy - cy];
+                const d = Math.hypot(dx, dy);
                 if (d < r * (end - 0.04) || d > r * (end + 0.04)) continue;
                 const i = (y * size + x) * 4;
-                ring.push([pixels[i] ?? 0, pixels[i + 1] ?? 0, pixels[i + 2] ?? 0]);
+                const k = Math.floor(((Math.atan2(dx, -dy) / (2 * Math.PI) + 1) % 1) * sectors) % sectors;
+                rings[k]?.push([pixels[i] ?? 0, pixels[i + 1] ?? 0, pixels[i + 2] ?? 0]);
             }
         }
-        if (!ring.length) return "#000";
-        ring.sort((u, v) => (u[0] ?? 0) + (u[1] ?? 0) + (u[2] ?? 0) - ((v[0] ?? 0) + (v[1] ?? 0) + (v[2] ?? 0)));
-        const middle = ring[Math.floor(ring.length / 2)] ?? [0, 0, 0];
-        return `rgb(${middle.join(" ")})`;
+        const sum = (u: number[]) => (u[0] ?? 0) + (u[1] ?? 0) + (u[2] ?? 0);
+        const middle = (ring: number[][]) => ring.sort((u, v) => sum(u) - sum(v))[Math.floor(ring.length / 2)];
+        const all = middle(rings.flat());
+        if (!all) return ["#000"];
+        return rings.map((ring) => `rgb(${(middle(ring) ?? all).join(" ")})`);
     } catch {
-        return "#000";
+        return ["#000"];
     }
 }
 
@@ -186,8 +189,11 @@ export function photoFigure(root: HTMLElement) {
             webkitMaskImage: fade,
         });
     }
+    let sky = ["#000"];
     img.addEventListener("load", () => {
-        disc.style.backgroundColor = skyOf(img, photo());
+        sky = skyOf(img, photo());
+        const stops = [...sky, sky[0]].map((c, k) => `${c} ${(k * 360) / sky.length}deg`);
+        disc.style.background = `conic-gradient(from ${180 / sky.length}deg, ${stops.join(", ")})`;
     });
 
     // The face figure's grid every 30°, the limb, the Moon's north and the center of its face, turned as the photograph is.
@@ -262,7 +268,7 @@ export function photoFigure(root: HTMLElement) {
             earthshine: true,
             eclipse: false,
             law: "hapke2012",
-            nightVision: false,
+            darkAdapted: false,
             // Everything at its finest, whatever the disc's size: the relief displaced, the shadows soft, the maps
             // read along the footprint; the rays per pixel are the 4×MSAA switch's.
             displacementFrom: 0,
@@ -339,7 +345,9 @@ export function photoFigure(root: HTMLElement) {
         const faded = layer.getContext("2d");
         if (!context || !faded) return;
         context.scale(ratio, ratio);
-        context.fillStyle = getComputedStyle(disc).backgroundColor;
+        const around = context.createConicGradient(Math.PI / sky.length - Math.PI / 2, w / 2, h / 2);
+        for (const [k, c] of [...sky, sky[0] ?? "#000"].entries()) around.addColorStop(k / sky.length, c);
+        context.fillStyle = around;
         context.fillRect(0, 0, w, h);
         const scale = (DISC * Math.min(w, h)) / (p.radius * p.width);
         const [cx, cy, r] = [p.center[0] * p.width, p.center[1] * p.height, p.radius * p.width];

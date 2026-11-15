@@ -1,7 +1,9 @@
 ---
 import "../sternzeit/sternzeit.css";
 import "../dunstkreis/dunstkreis.css";
+import { CONSTELLATIONS } from "@himmelszelt/sternenheer";
 import Choice from "../dunstkreis/Choice.astro";
+import Hdr from "../dunstkreis/Hdr.astro";
 import OptionGroup from "../dunstkreis/OptionGroup.astro";
 import SkyFrame from "../dunstkreis/SkyFrame.astro";
 import Try from "../Try.astro";
@@ -9,8 +11,7 @@ import Try from "../Try.astro";
 /**
  * The stars figure: sternenheer's stars and Milky Way over dunstkreis' sky in cd/m², nachtgestirn's Moon over them,
  * composed and tone mapped by the Moon pass, in the shared frame, a wide view towards the south. Its options switch the
- * stars, the Milky Way, the air, the twinkling, the eye's veil and night vision, the Moon, and set the exposure and the
- * faintest magnitude drawn.
+ * stars, the Milky Way, the air, the twinkling, the halo and the eye at night, the Moon, and set the exposure.
  */
 interface Props {
     id?: string;
@@ -26,7 +27,7 @@ const {
 const MAPS = {
     name: "maps",
     label: "Milky Way map",
-    title: "Which of sternenheer's maps of the Milky Way is drawn: 2K (490 KB), a texel ten arcminutes, or 4K (2.6 MB) for zooming in",
+    title: "Which of sternenheer's maps of the Milky Way is drawn: 2K (810 KB), a texel ten arcminutes, or 4K (4 MB) for zooming in",
     options: [
         ["small", "2K"],
         ["large", "4K"],
@@ -58,18 +59,29 @@ const TONE = {
             </OptionGroup>
             <OptionGroup name="sky">
                 <button type="button" class="view-toggle" data-field="stars" aria-pressed="true" title="The 9,093 stars of the Yale Bright Star Catalogue, each at its light in lux">stars</button>
+                <button type="button" class="view-toggle" data-field="faint" aria-pressed="true" title="The 108,883 stars of the Hipparcos catalogue the bright star catalog does not hold, to magnitude 12 or so: what a pair of binoculars shows">faint stars</button>
                 <button type="button" class="view-toggle" data-field="milkyway" aria-pressed="true" title="The Milky Way, the light of the stars too faint for the catalog, from NASA's Deep Star Maps of Gaia's stars, calibrated to the integrated starlight">Milky Way</button>
                 <button type="button" class="view-toggle" data-field="moon" aria-pressed="true" title="nachtgestirn's Moon, lighting the sky and hiding the stars behind its disc, lit or not">Moon</button>
                 <Choice figure={id} {...MAPS} />
-                <label class="sky-ev">mag <input data-field="magnitude" type="range" min="-1.5" max="8" step="0.1" value="8" title="The faintest magnitude drawn: 6.5 is the naked eye's limit under a dark sky, the catalog ends at 7.1" /> <output data-field="magnitudeValue">8</output></label>
+            </OptionGroup>
+            <OptionGroup name="constellations">
+                <button type="button" class="view-toggle" data-field="lines" aria-pressed="false" title="The constellations' lines, a hint between the stars that stops short of each of them">lines</button>
+                <select class="stars-constellations" data-field="constellations" aria-label="Which constellations" title="Which constellations to draw the lines of">
+                    <option value="all">all 88</option>
+                    <option value="zodiac">the zodiac</option>
+                    {CONSTELLATIONS.map(([abbreviation, name]) => <option value={abbreviation}>{name}</option>)}
+                </select>
             </OptionGroup>
             <OptionGroup name="air">
                 <button type="button" class="view-toggle" data-field="air" aria-pressed="true" title="The air: every star lifted by the refraction, dimmed and reddened by the extinction, and the sky's own light in front; off, the stars from space, over black">air</button>
                 <button type="button" class="view-toggle" data-field="twinkle" aria-pressed="false" title="The twinkling: each star's light flickers by the air's turbulence, more near the horizon, where its colors come apart. Runs on while pressed">twinkle</button>
             </OptionGroup>
             <OptionGroup name="eye">
-                <button type="button" class="view-toggle" data-field="glare" aria-pressed="true" title="Your eye's veil around a bright star on the screen, CIE's glare equation: Sirius throws a halo a degree wide">glare</button>
-                <button type="button" class="view-toggle" data-field="eye" aria-pressed="false" title="As the eye sees it at night rather than a camera: below some 4 cd/m² the rods take over, colors fade and shift towards blue">night vision</button>
+                <button type="button" class="view-toggle" data-field="glare" aria-pressed="true" title="The halo around a bright star: the light its core cannot show, spread over 1 / r², wider the brighter the star">glare</button>
+                <button type="button" class="view-toggle" data-field="eye" aria-pressed="true" title="As the dark-adapted eye sees the night rather than a camera: below some 4 cd/m² the rods take over from the cones, colors fade and what is left shifts towards blue">eye at night</button>
+            </OptionGroup>
+            <OptionGroup name="HDR (× SDR white)">
+                <Hdr figure={id} />
             </OptionGroup>
             <OptionGroup name="tone mapping">
                 <Choice figure={id} {...TONE} />

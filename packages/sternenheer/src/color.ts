@@ -1,7 +1,6 @@
 // A star's color from its color index B-V, the difference of its blue and visual magnitudes a catalog lists: a
 // temperature, a point on the Planckian locus, a linear sRGB color at unit luminance. The shipped catalog holds the
-// result of the approximate path per star, as osgHimmel computed it; these let a consumer recolor from another
-// catalog, or more exactly.
+// result per star; these let a consumer color another catalog, or as osgHimmel did, by the approximate path.
 
 export type Rgb = readonly [r: number, g: number, b: number];
 
@@ -14,8 +13,8 @@ export function temperatureFromColorIndex(bv: number): number {
     return 4600 * (1 / (0.92 * bv + 1.7) + 1 / (0.92 * bv + 0.62));
 }
 
-/** `temperatureFromColorIndex` as Jensen et al. 2001 approximate it, 7000 K over B-V plus 0.56, which the shipped
- *  catalog's colors were computed with: 12,500 K for Vega, 5,800 K for the Sun, too hot for the hottest stars. */
+/** `temperatureFromColorIndex` as Jensen et al. 2001 approximate it, 7000 K over B-V plus 0.56, which osgHimmel's
+ *  colors were computed with: 12,500 K for Vega, 5,800 K for the Sun, too hot for the hottest stars. */
 export function temperatureFromColorIndexApprox(bv: number): number {
     return 7000 / (bv + 0.56);
 }
@@ -58,7 +57,7 @@ export function colorFromColorIndex(bv: number): Rgb {
     return linearSrgbFromChromaticity(planckianLocus(temperatureFromColorIndex(bv)));
 }
 
-/** `colorFromColorIndex` by Jensen et al.'s temperature, the shipped catalog's colors. */
+/** `colorFromColorIndex` by Jensen et al.'s temperature, osgHimmel's colors. */
 export function colorFromColorIndexApprox(bv: number): Rgb {
     return linearSrgbFromChromaticity(planckianLocus(temperatureFromColorIndexApprox(bv)));
 }

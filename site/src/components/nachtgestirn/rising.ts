@@ -109,7 +109,7 @@ export function risingFigure(root: HTMLElement) {
             earthshine: false,
             eclipse: false,
             law: "hapke2012",
-            nightVision: false,
+            darkAdapted: false,
             air: true,
         };
         // Without refraction: the same air dims and reddens the disc along straight rays, nothing lifts it; cut where the

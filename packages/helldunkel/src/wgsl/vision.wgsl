@@ -24,7 +24,7 @@ fn hdConeShare(luminance: f32) -> f32 {
 
 // Linear sRGB in cd/m² as the eye sees it at that level: the rods' share shifted to `HD_NIGHT_BLUE` and carried by
 // their own luminance, 0.4468 of it, Y over V for a white field.
-fn hdNightVision(rgb: vec3f) -> vec3f {
+fn hdDarkAdaptedEye(rgb: vec3f) -> vec3f {
     let xyz = HD_SRGB_TO_XYZ * max(rgb, vec3f(0.0));
     let sum = xyz.x + xyz.y + xyz.z;
     if (sum <= 0.0 || xyz.x <= 0.0) {

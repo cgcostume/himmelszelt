@@ -38,6 +38,9 @@ struct DkSkyParams {
     // What the debug overlay is drawn in: 1 for white after the tone curve, or the luminance a renderer that exposes the
     // pass' linear light itself exposes as white.
     gridInk: f32,
+    // The luminance in cd/m² the sun disc's brightest channel stops at, its color kept; 0 for none. For a linear output
+    // a later pass exposes: a disc a billion times display white leaves no pixel of its edge below white.
+    sunDiscCeiling: f32,
 }
 
 // Directions the light meter reads per cap, above and below the horizon: 32 workgroups of 128 sample one each.

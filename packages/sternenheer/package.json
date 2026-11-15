@@ -40,6 +40,8 @@
         "test": "pnpm build && playwright test",
         "test:gpu": "pnpm build && STERNENHEER_GPU=1 playwright test",
         "catalog": "node scripts/catalog.mjs",
+        "constellations": "node scripts/constellations.mjs",
+        "hipparcos": "node scripts/hipparcos.mjs",
         "milkyway": "node scripts/milkyway.mjs data"
     },
     "devDependencies": {

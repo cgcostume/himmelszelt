@@ -5,8 +5,21 @@
 
 // biome-ignore-all assist/source/organizeImports: exports are hand-grouped by domain, not alphabetical
 
-export type { Star, StarCatalog } from "./catalog.js";
-export { BRIGHT_STARS, catalogFromBuffer, catalogFromStars, loadCatalog, STAR_FIELDS, starAt } from "./catalog.js";
+export type { FaintStar, PackedStars, Star, StarCatalog } from "./catalog.js";
+export {
+    BRIGHT_STARS,
+    catalogFromBuffer,
+    catalogFromStars,
+    HIPPARCOS,
+    loadCatalog,
+    loadFaintStars,
+    packedStarAt,
+    packedStarColors,
+    packedStarsFromBuffer,
+    packStars,
+    STAR_FIELDS,
+    starAt,
+} from "./catalog.js";
 
 export {
     illuminanceFromMagnitude,
@@ -30,10 +43,34 @@ export {
 } from "./color.js";
 
 export type { AirTable } from "./air.js";
-export { AIR_SAMPLES, airTable, airTableAltitude, airTableBend, liftedDirection, scintillationIndex } from "./air.js";
+export {
+    AIR_SAMPLES,
+    airTable,
+    airTableAltitude,
+    airTableBend,
+    liftedDirection,
+    scintillationIndex,
+    scintillationScales,
+} from "./air.js";
+
+export type { ConstellationLines } from "./constellations.js";
+export {
+    CONSTELLATION_LINES,
+    CONSTELLATIONS,
+    constellationMask,
+    constellationsFromBuffer,
+    loadConstellations,
+    ZODIAC,
+} from "./constellations.js";
 
 export type { MilkyWay, MilkyWayFiles } from "./milkyway.js";
-export { createMilkyWay, loadMilkyWay, MILKY_WAY_LUMINANCE, MILKY_WAY_MAPS } from "./milkyway.js";
+export {
+    createMilkyWay,
+    loadMilkyWay,
+    MILKY_WAY_LUMINANCE,
+    MILKY_WAY_MAPS,
+    MILKY_WAY_STOPS,
+} from "./milkyway.js";
 
 export type { EncodeOptions, StarsParams, StarsPass, StarsPassOptions } from "./stars.js";
 export { createStarsPass, PARAMS_SIZE, paramsData } from "./stars.js";

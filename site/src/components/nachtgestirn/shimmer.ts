@@ -223,7 +223,7 @@ export function shimmerFigure(root: HTMLElement) {
                 earthshine: true,
                 eclipse: false,
                 law: "hapke2012",
-                nightVision: false,
+                darkAdapted: false,
                 air: true,
                 up,
                 // The limb where the air squeezes the disc to, zoomed out the whole disc in the middle.

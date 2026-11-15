@@ -53,7 +53,7 @@ other package at runtime: the astronomy comes in as directions and angles, from
   by the air's dispersion, from Fried's `r0`, the lens' `aperture` and the `wind`, through as much air as lies towards
   the Moon: the motion as a differential image motion monitor measures it, growing with the square root of the air,
   the cells shrinking with it, blue lifted over red by a hundredth of the refraction. `shimmerScales` gives the numbers.
-- **Night vision**: `nightVision` on the pass turns the composed Moon and sky into what the eye sees, helldunkel's
+- **Night vision**: `darkAdapted` on the pass turns the composed Moon and sky into what the eye sees, helldunkel's
   blue shift for the rods: the moonlit sky blue, the disc, far brighter, as it is.
 - **The color**: the map scaled to normal albedo and tinted to the Moon's own color, B-V 0.92, its variations kept;
   `mapColor` reads it as published or as gray instead.

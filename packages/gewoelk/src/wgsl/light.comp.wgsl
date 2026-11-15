@@ -123,7 +123,7 @@ fn gwLight(@builtin(global_invocation_id) id: vec3u) {
     if (any(id >= size)) {
         return;
     }
-    // Every voxel, cloud or not: the air under the deck is shaded by it too.
+    // Every voxel, cloud or not: the ground under the deck reads its shade at the base.
     let at = (vec3f(id) + 0.5) / vec3f(size);
     let sun = gwParams.sunDirection;
     let heading = select(vec2f(0.0, 1.0), normalize(sun.xy), length(sun.xy) > 1e-6);

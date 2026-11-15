@@ -114,7 +114,7 @@ sky and the planet's night side would otherwise pull the geometric mean towards 
 
 With `toneMap`, the pass writes display colors for an 8-bit target: exposed, mapped by Khronos PBR Neutral (`"neutral"`, the
 default), which keeps colors as they are up to 0.76 and compresses only above, or AgX (`"agx"`), whose bright colors
-fade towards white as film does, flatter and grayer by day, or Narkowicz's ACES fit (`"aces"`), the earlier default, sRGB encoded and, for an 8-bit target, dithered by interleaved gradient noise (Jimenez 2014), remapped to a
+fade towards white as film does, flatter and grayer by day, or Narkowicz's ACES fit (`"aces"`), the earlier default, sRGB encoded and, with `dither`, dithered by interleaved gradient noise (Jimenez 2014), remapped to a
 triangular distribution, from the pixel alone, without a texture. Off, it writes the exposed luminance, linear and unclamped, for a float target and
 a renderer that tone maps the frame itself, with `wgsl.tonemap` if it likes.
 
@@ -123,7 +123,8 @@ a renderer that tone maps the frame itself, with `wgsl.tonemap` if it likes.
 The Sun is drawn per pixel over the sky, never stored in a table, and in parts a renderer can take or leave:
 
 - The disc, `sunDisc`, dimmed and reddened by the air in front of it, supersampled where its rim or the horizon crosses
-  a pixel.
+  a pixel. `sunDiscCeiling` stops its luminance at a value in cd/m², for a linear output a later pass tone maps:
+  without it every pixel of the rim lies far above white there and the rim comes out hard. Off by default.
 - The aureole, `aureole`, the air's glow of about a degree around it: aerosols scatter sunlight far more sharply forward
   than the tables' one Cornette-Shanks lobe says, so a share of their scattering, `DEFAULT_AUREOLE`'s 5 % at g 0.98,
   goes into a narrow Henyey-Greenstein lobe the tables leave out and the sky pass adds per pixel within 20° of the Sun:
@@ -150,8 +151,8 @@ glows around the Moon as well, centered on where it shows, and so does the eye's
 out blue at around EV100 −3, as a camera sees it. The disc itself is not drawn: that is nachtgestirn's. The light
 meter writes the Moon's light at the observer, `moonIlluminance()`, for lighting a scene by it; the meter's reading,
 the ground's light from the sky and the aerial perspective volume stay the Sun's. A camera sees the moonlit sky as the
-day's, only dimmer; the eye does not, its rods take over and see it blue. `nightVision: true` draws it so, by
-helldunkel's `hdNightVision`, bundled.
+day's, only dimmer; the eye does not, its rods take over and see it blue. `darkAdapted: true` draws it so, by
+helldunkel's `hdDarkAdaptedEye`, bundled.
 
 ## The ground
 

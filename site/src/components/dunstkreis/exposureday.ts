@@ -124,7 +124,7 @@ function ensureMetered() {
         pass = null;
         metering = "";
         // Its own pass, never drawn: only its meter is read.
-        const options = { luts, format: "rgba8unorm" as const, groundLight: quality.groundLight };
+        const options = { luts, format: "rgba8unorm" as const, dither: true, groundLight: quality.groundLight };
         createSkyPass(gpuDevice(), options).then((next) => {
             if (passFor !== luts) return next.destroy();
             pass = next;

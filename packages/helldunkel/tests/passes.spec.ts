@@ -4,6 +4,7 @@ import {
     adaptEV100,
     createBloomPass,
     createMeterPass,
+    lowLightCompensation,
     METER_BINS,
     METER_BINS_PER_STOP,
     METER_LOWEST_STOP,
@@ -330,4 +331,28 @@ test("a panorama counts by solid angle, also thinned, and a thinned spot still l
     expect((await read(cap, { ...spot(-1), maxSize: 32 })).luminance[eight]).toBeCloseTo(0, 3);
     cap.destroy();
     meter.destroy();
+});
+
+test("at low light the meter's EV100 on the GPU and the CPU is lowered alike", async () => {
+    const device = await gpuDevice();
+    test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
+    if (!device) return;
+    const night = image(device, () => 0.01);
+    const meter = await createMeterPass(device, { source: "2d" });
+    const staging = device.createBuffer({ size: 12, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+    const encoder = device.createCommandEncoder();
+    meter.encode(encoder, night, { lowLight: true });
+    encoder.copyBufferToBuffer(meter.result, 0, staging, 0, 12);
+    device.queue.submit([encoder.finish()]);
+    await staging.mapAsync(GPUMapMode.READ);
+    const [, ev100 = 0] = new Float32Array(staging.getMappedRange().slice(0));
+    staging.unmap();
+    const expected = Math.log2((0.01 * 100) / 12.5) - lowLightCompensation(0.01);
+    // Within the histogram's bins, a 32nd of a stop.
+    expect(ev100).toBeCloseTo(expected, 1);
+    expect(await meter.readEV100()).toBeCloseTo(ev100, 3);
+    expect(expected).toBeGreaterThan(Math.log2((0.01 * 100) / 12.5) + 2);
+    night.destroy();
+    meter.destroy();
+    staging.destroy();
 });

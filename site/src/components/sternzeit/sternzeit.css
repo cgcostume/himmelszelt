@@ -755,8 +755,8 @@ g.eclipse-corona {
     gap: 1.5rem;
 }
 /* Wide enough, in the right margin of the site's width, placed and sized as the analemma beside the sun path diagram
-   and the locked views beside the armillary sphere: as wide, as far in from the wide figure's edge. The Moon and its
-   slider give up what the margin lacks. */
+   and the locked views beside the armillary sphere: as wide, as far in from the wide figure's edge. The Moon gives up
+   what the margin lacks, its slider runs the column's width. */
 @media (min-width: 72rem) {
     /* A container for the column's width, below the figure: on it, it would scope the counters that number figures. */
     .moon-pair {
@@ -766,8 +766,7 @@ g.eclipse-corona {
         --panel-width: calc(0.38 * min(80vh, var(--wide-width) * 9 / 16));
         --margin-room: calc((var(--wide-width) - 100cqw) / 2 - 1.5rem);
     }
-    .moon-pair > .moon-view,
-    .moon-pair > [data-lunation] {
+    .moon-pair > .moon-view {
         margin-right: max(0px, var(--panel-width) + 1.25rem - var(--margin-room));
     }
     /* Sketch and caption as tall as the Moon (see moonview.ts), the sketch taking what its caption leaves. */
@@ -2344,7 +2343,11 @@ span.daylight-day {
     position: relative;
     background: transparent;
 }
-/* Without the annotations, the Moon alone. */
-.moon-view.without-annotations .moon-panel > svg {
-    visibility: hidden;
+/* Without the annotations, the Moon alone: the disc and its limb stay. */
+.moon-view.without-annotations .moon-annotations {
+    display: none;
+}
+/* Textured, the rendered Moon brings its own edge. */
+.moon-view.textured.without-annotations .moon-limb {
+    display: none;
 }

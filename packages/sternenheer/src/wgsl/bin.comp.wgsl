@@ -1,6 +1,6 @@
 // Every star of the catalog onto the target: where it shows, lifted by the air, how bright, dimmed by it and
 // twinkling, how wide its image is, and into which tiles of the target it reaches, so the compose pass sums only the
-// stars near each pixel. Requires `params.wgsl`, `camera.wgsl` (dunstkreis'), `glare.wgsl` (helldunkel's) and
+// stars near each pixel; and the light beyond a star's knee into the halos' grid. Requires `params.wgsl`, `camera.wgsl` (dunstkreis'), `glare.wgsl` (helldunkel's) and
 // `stars.wgsl`.
 
 @group(0) @binding(0) var<uniform> shParams: ShParams;
@@ -8,11 +8,48 @@
 @group(0) @binding(2) var<storage, read_write> shSplats: array<ShSplat>;
 @group(0) @binding(3) var<storage, read_write> shTileCounts: array<atomic<u32>>;
 @group(0) @binding(4) var<storage, read_write> shTileEntries: array<u32>;
+// The halos' grid, three floats a texel as bits, summed atomically: `halo.comp.wgsl` makes a texture of it.
+@group(0) @binding(5) var<storage, read_write> shHaloSums: array<atomic<u32>>;
+// The faint stars, packed, and the colors of their color indices.
+@group(0) @binding(6) var<storage, read> shFaint: array<u32>;
+@group(0) @binding(7) var<storage, read> shFaintColors: array<vec4f>;
+
+// Adds to a float kept as bits: exchanged until no other star got in between.
+fn shHaloAdd(at: u32, value: f32) {
+    var old = atomicLoad(&shHaloSums[at]);
+    loop {
+        let result = atomicCompareExchangeWeak(&shHaloSums[at], old, bitcast<u32>(bitcast<f32>(old) + value));
+        if (result.exchanged) {
+            break;
+        }
+        old = result.old_value;
+    }
+}
+
+// A star's excess light into the four texels of the grid around it, by their shares, so its halo moves smoothly.
+fn shHaloSplat(pixel: vec2f, light: vec3f) {
+    let size = shHaloSize();
+    let at = (pixel + f32(SH_HALO_MARGIN)) / f32(SH_HALO_SCALE) - 0.5;
+    let base = floor(at);
+    let share = at - base;
+    for (var k = 0u; k < 4u; k = k + 1u) {
+        let offset = vec2f(f32(k & 1u), f32(k >> 1u));
+        let texel = vec2i(base + offset);
+        if (any(texel < vec2i(0)) || any(texel >= vec2i(size))) {
+            continue;
+        }
+        let weight = mix(1.0 - share.x, share.x, offset.x) * mix(1.0 - share.y, share.y, offset.y);
+        let index = (u32(texel.y) * size.x + u32(texel.x)) * 3u;
+        for (var c = 0u; c < 3u; c = c + 1u) {
+            shHaloAdd(index + c, light[c] * weight);
+        }
+    }
+}
 
 @compute @workgroup_size(64, 1, 1)
 fn shBin(@builtin(global_invocation_id) id: vec3u) {
     let i = id.x;
-    if (i >= arrayLength(&shCatalog) / SH_STAR_FIELDS) {
+    if (i >= arrayLength(&shCatalog) / SH_STAR_FIELDS + shParams.faintCount) {
         return;
     }
     let p = shParams;
@@ -41,28 +78,41 @@ fn shBin(@builtin(global_invocation_id) id: vec3u) {
     let pixel = projected.xy;
     let light = shIlluminance(magnitude) * p.starLight * shStarColor(i) * transmittance * shTwinkle(i, apparentAltitude);
     let pixelsPerRadian = shPixelsPerRadian(direction, pixel);
-    // The image's width in pixels: the point spread's, at least a little over half a pixel, so no star falls between
+    // The core's width in pixels: the point spread's, at least a little over half a pixel, so no star falls between
     // pixels. On the sky it narrows as the view zooms in, and the star brightens, as it does in a telescope.
     let sigma = max(p.psfPixels, 0.6);
     let sigmaRadians = sigma / pixelsPerRadian;
     let peak = 1.0 / (2.0 * SH_PI * sigmaRadians * sigmaRadians);
     let brightest = max(max(light.r, light.g), light.b);
-    // Cut where the exposed image falls below the threshold: the Gaussian's radius there, or the veil's.
-    let ratio = brightest * peak * p.exposure / p.threshold;
-    if (ratio <= 1.0) {
-        return;
+    // The core stays a point: its exposed peak stops at the knee, and whitens as far as it would pass it, as the eye's
+    // or a sensor's channels saturate. The light beyond it, which keeps the star's color, goes into the halos' grid, a
+    // point of light there that the pyramid spreads as 1 / r² over the whole target.
+    let exposedPeak = brightest * peak * p.displayExposure;
+    let core = min(1.0, p.knee / max(exposedPeak, 1e-30));
+    let coreLight = mix(vec3f(brightest), light, core);
+    if (core < 1.0 && p.halo > 0.0) {
+        let excess = max(light * (peak * p.displayExposure) - coreLight * (core * peak * p.displayExposure), vec3f(0.0));
+        shHaloSplat(pixel, excess * (p.halo * 2.0 * SH_PI * sigma * sigma / f32(SH_HALO_SCALE * SH_HALO_SCALE)));
     }
-    var radius = sigma * sqrt(2.0 * log(ratio));
+    // Cut where the exposed image falls below the threshold: the core's Gaussian radius there, or the veil's.
+    let ratio = exposedPeak * core / p.threshold;
+    var radius = 0.0;
+    if (ratio > 1.0) {
+        radius = sigma * sqrt(2.0 * log(ratio));
+    }
     if (p.glare > 0.0) {
         // The veil's 10 / θ² in degrees of the viewer's field: where it falls to the threshold.
-        let degrees = sqrt(10.0 * p.glare * brightest * p.exposure / p.threshold);
+        let degrees = sqrt(10.0 * p.glare * brightest * p.displayExposure / p.threshold);
         radius = max(radius, degrees / p.screenDegreesPerPixel);
+    }
+    if (radius <= 0.0) {
+        return;
     }
     radius = min(radius, p.maxRadius);
     if (pixel.x + radius < 0.0 || pixel.y + radius < 0.0 || pixel.x - radius > f32(p.width) || pixel.y - radius > f32(p.height)) {
         return;
     }
-    shSplats[i] = ShSplat(pixel, sigma, radius, light, peak, pixelsPerRadian, 0.0, 0.0, 0.0);
+    shSplats[i] = ShSplat(pixel, sigma, radius, coreLight, peak, pixelsPerRadian, core, 0.0, 0.0);
     let tile = f32(p.tileSize);
     let tilesY = (p.height + p.tileSize - 1u) / p.tileSize;
     let x0 = u32(clamp(floor((pixel.x - radius) / tile), 0.0, f32(p.tilesX - 1u)));

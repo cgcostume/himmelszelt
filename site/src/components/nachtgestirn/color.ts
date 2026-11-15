@@ -40,7 +40,7 @@ export function colorFigure(root: HTMLElement) {
             eclipse: false,
             law: "hapke2012",
             mapColor: MODES[i] ?? "tinted",
-            nightVision: false,
+            darkAdapted: false,
         }));
     }
 

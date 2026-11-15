@@ -62,8 +62,8 @@ export interface Features {
     moonlight: boolean;
     /** Build the Moon's sky-view table rather than the Sun's. */
     moonView: boolean;
-    /** The sky as the eye sees it at night, by helldunkel's `hdNightVision`, before the exposure. */
-    nightVision: boolean;
+    /** The sky as the eye sees it at night, by helldunkel's `hdDarkAdaptedEye`, before the exposure. */
+    darkAdapted: boolean;
 }
 
 export const DEFAULT_FEATURES: Features = {
@@ -82,7 +82,7 @@ export const DEFAULT_FEATURES: Features = {
     skyViewRows: 0,
     moonlight: false,
     moonView: false,
-    nightVision: false,
+    darkAdapted: false,
 };
 
 /** The `constants` record for `features.wgsl`; a test pins its keys to the overrides declared there. */
@@ -104,7 +104,7 @@ export function featureConstants(features: Partial<Features> = {}): Record<strin
         DK_SKY_VIEW_ROWS: f.skyViewRows,
         DK_MOONLIGHT: Number(f.moonlight),
         DK_MOON_VIEW: Number(f.moonView),
-        DK_NIGHT_VISION: Number(f.nightVision),
+        DK_DARK_ADAPTED: Number(f.darkAdapted),
     };
 }
 

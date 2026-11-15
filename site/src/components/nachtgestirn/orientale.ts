@@ -122,7 +122,7 @@ export function orientaleFigure(root: HTMLElement) {
             earthshine: false,
             eclipse: false,
             law: "hapke2012",
-            nightVision: false,
+            darkAdapted: false,
             displacementFrom: 0,
             softShadowsFrom: 0,
             filter: "anisotropic",

@@ -22,6 +22,9 @@
 // How rough the ground is below the relief's texels, with NG_FLAG_ROUGHNESS: red the median slope over 57 m in tenths of
 // a degree, green the Hurst exponent, 0.5 to 1 (see maps.ts).
 @group(0) @binding(11) var ngRoughnessMap: texture_2d<f32>;
+// Gradient noise's gradient, for the roughness, from `noise.comp.wgsl`, read between its texels, repeating.
+@group(0) @binding(12) var ngNoise: texture_3d<f32>;
+@group(0) @binding(13) var ngNoiseSampler: sampler;
 
 // What the pipeline is made with --------------------------------------------------------------------------------------
 
@@ -30,13 +33,13 @@
 override NG_TONE_MAP: u32 = 0u;
 override NG_HEADROOM: f32 = 1.0;
 override NG_DITHER: bool = false;
-// Over a background, and with it as the eye sees it at night, by the rods' blue shift, `hdNightVision`. Without one
+// Over a background, and with it as the eye sees it at night, by the rods' blue shift, `hdDarkAdaptedEye`. Without one
 // the Moon alone, premultiplied, with its coverage in alpha.
 override NG_BACKGROUND: bool = false;
-override NG_NIGHT_VISION: bool = false;
+override NG_DARK_ADAPTED: bool = false;
 // The Moon alone, linear and premultiplied, for the shimmer's pass to move about and finish.
 override NG_LAYER: bool = false;
-// Rays per pixel, and along the terminator and a displaced limb.
+// Rays per pixel, and along a displaced limb and the terminator, there only where the relief is minified.
 override NG_SAMPLES: u32 = 1u;
 override NG_TERMINATOR_SAMPLES: u32 = 4u;
 // Whether magnified maps are read by the cubic B-spline, rather than as the sampler filters them.
@@ -148,52 +151,20 @@ fn ngAlbedoAt(point: vec3f, footprint: NgFootprint) -> vec3f {
 
 // The roughness below the relief ---------------------------------------------------------------------------------------
 
-// A lattice point's gradient, each component in [-1, 1]: Jarzynski and Olano's pcg3d.
-fn ngLatticeGradient(cell: vec3i) -> vec3f {
-    var v = vec3u(cell) * 1664525u + 1013904223u;
-    v.x += v.y * v.z;
-    v.y += v.z * v.x;
-    v.z += v.x * v.y;
-    v ^= v >> vec3u(16u);
-    v.x += v.y * v.z;
-    v.y += v.z * v.x;
-    v.z += v.x * v.y;
-    return vec3f(v) * (2.0 / 4294967296.0) - 1.0;
-}
+// Gradient noise's gradient at `p`, in cells, from the texture `noise.comp.wgsl` made: NG_NOISE_TEXELS texels to a cell,
+// scaled into 8-bit snorm by NG_NOISE_RANGE. Between its texels it is interpolated linearly, a tap instead of eight
+// hashed corners, smoother than the analytic gradient but alike in what the roughness needs of it: its statistics.
+const NG_NOISE_TEXELS: f32 = 4.0;
+const NG_NOISE_RANGE: f32 = 2.26;
 
-// Gradient noise's gradient at `p`, analytically, after Quílez: the quintic fade's derivative included, so it is the
-// true slope of the noise and continuous across the cells.
 fn ngNoiseGradient(p: vec3f) -> vec3f {
-    let i = vec3i(floor(p));
-    let f = p - floor(p);
-    let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
-    let du = 30.0 * f * f * (f * (f - 2.0) + 1.0);
-    let ga = ngLatticeGradient(i);
-    let gb = ngLatticeGradient(i + vec3i(1, 0, 0));
-    let gc = ngLatticeGradient(i + vec3i(0, 1, 0));
-    let gd = ngLatticeGradient(i + vec3i(1, 1, 0));
-    let ge = ngLatticeGradient(i + vec3i(0, 0, 1));
-    let gf = ngLatticeGradient(i + vec3i(1, 0, 1));
-    let gg = ngLatticeGradient(i + vec3i(0, 1, 1));
-    let gh = ngLatticeGradient(i + vec3i(1, 1, 1));
-    let va = dot(ga, f);
-    let vb = dot(gb, f - vec3f(1.0, 0.0, 0.0));
-    let vc = dot(gc, f - vec3f(0.0, 1.0, 0.0));
-    let vd = dot(gd, f - vec3f(1.0, 1.0, 0.0));
-    let ve = dot(ge, f - vec3f(0.0, 0.0, 1.0));
-    let vf = dot(gf, f - vec3f(1.0, 0.0, 1.0));
-    let vg = dot(gg, f - vec3f(0.0, 1.0, 1.0));
-    let vh = dot(gh, f - vec3f(1.0, 1.0, 1.0));
-    let k4 = -va + vb + vc - vd + ve - vf - vg + vh;
-    return ga + u.x * (gb - ga) + u.y * (gc - ga) + u.z * (ge - ga) + u.x * u.y * (ga - gb - gc + gd) +
-        u.y * u.z * (ga - gc - ge + gg) + u.z * u.x * (ga - gb - ge + gf) +
-        u.x * u.y * u.z * (-ga + gb + gc - gd + ge - gf - gg + gh) +
-        du * (vec3f(vb - va, vc - va, ve - va) + u.yzx * vec3f(va - vb - vc + vd, va - vc - ve + vg, va - vb - ve + vf) +
-            u.zxy * vec3f(va - vb - ve + vf, va - vb - vc + vd, va - vc - ve + vg) + u.yzx * u.zxy * k4);
+    let size = f32(textureDimensions(ngNoise).x);
+    return textureSampleLevel(ngNoise, ngNoiseSampler, p * NG_NOISE_TEXELS / size, 0.0).xyz * NG_NOISE_RANGE;
 }
 
-// The RMS of one component of the noise's gradient, measured over many points: what makes it a slope of a given RMS.
-const NG_NOISE_SLOPE_RMS: f32 = 0.498;
+// The RMS of one component of the noise's gradient as read, measured over many points: what makes it a slope of a given
+// RMS.
+const NG_NOISE_SLOPE_RMS: f32 = 0.436;
 // At most this many octaves below the relief's texels, each half the last: 64 times finer, 21 m at the 4K maps.
 const NG_ROUGHNESS_OCTAVES: i32 = 6;
 // Half the slopes LOLA's statistics give: the noise is Gaussian and casts no shadows, where the ground's roughness lies
@@ -510,6 +481,9 @@ fn ngFootprintAt(point: vec3f, v: vec3f, width: f32) -> NgFootprint {
 const NG_HEIGHT_MIN_KM: f32 = -9.2;
 const NG_HEIGHT_MAX_KM: f32 = 10.8;
 const NG_DISPLACE_STEPS: u32 = 96u;
+// Seen less than 60° off straight on, the relief is found by fixed point, in this many reads, rather than marched.
+const NG_PARALLAX_MU: f32 = 0.5;
+const NG_PARALLAX_STEPS: u32 = 3u;
 
 // How far a point lies above the relief, radially, at unit distance: `at` from the Moon's center, `kmToUnits` km to
 // those units, the heights read at `level` of the whole relief. As finely as the pixel is wide, not over its footprint
@@ -522,13 +496,18 @@ fn ngAboveRelief(at: vec3f, sinA: f32, kmToUnits: f32, level: f32) -> f32 {
     return radius - (sinA + height * kmToUnits);
 }
 
+// Where the pixel's first ray was last well above the terrain, as tau: its other rays, a pixel apart at most, start
+// there.
+var<private> ngClear: f32 = -1e30;
+
 // Where a ray meets the relief itself, not the smooth sphere: marched through the shell the heights span, from where it
 // enters, in steps half as long as its height over the terrain, as no slope rises steeper than 63°, but no shorter than
 // half a pixel, and the crossing found between the last two steps. A ray that passes over the terrain covers the pixel
 // by how near it came, within its own width: the limb shows its mountains. Where the heights would move the surface by
-// less than a quarter pixel, the smooth sphere. `limb` the coverage of the smooth limb; returns the surface's direction
-// from the center and the ray's coverage.
-fn ngDisplaced(ray: NgRay, sampleAngle: f32, pixelAngle: f32, limb: f32) -> vec4f {
+// less than a quarter pixel, the smooth sphere. `limb` the coverage of the smooth limb, `start` where to begin, past
+// where the ray enters, `ngClear` for a pixel's later rays; returns the surface's direction from the center and the
+// ray's coverage.
+fn ngDisplaced(ray: NgRay, sampleAngle: f32, pixelAngle: f32, limb: f32, start: f32) -> vec4f {
     let sinA = sin(ngParams.angularRadius);
     let kmToUnits = sinA / ngParams.moonRadiusKm;
     let bottom = sinA + NG_HEIGHT_MIN_KM * kmToUnits;
@@ -542,6 +521,23 @@ fn ngDisplaced(ray: NgRay, sampleAngle: f32, pixelAngle: f32, limb: f32) -> vec4
         if ((top - bottom) * sqrt(max(1.0 - mu * mu, 0.0)) / mu < 0.25 * pixelAngle) {
             return vec4f(onSphere, limb);
         }
+        // Seen less than 60° off straight on, no slope hides what lies behind it: the height under the ray found by
+        // fixed point, the point where the ray meets the sphere through the last height read, which converges as the
+        // slopes times the slant's tangent stay below 1.
+        if (mu > NG_PARALLAX_MU) {
+            // The first reads bilinear from a coarser level, the last as finely as the pixel.
+            let level = log2(max(pixelAngle / kmToUnits / ngReliefTexelKm(false), 1e-4));
+            var at = onSphere;
+            for (var i = 0u; i < NG_PARALLAX_STEPS; i = i + 1u) {
+                let point = ngParams.orientation * at;
+                let inStrip = ngInDetail(point);
+                let read = select(max(level, 0.5), level, i + 1u == NG_PARALLAX_STEPS);
+                let atLevel = select(read, read + ngDetailLevels(), inStrip);
+                let height = ngHeightAt(point, atLevel, inStrip, NG_SPLINE_DISPLACED, false);
+                at = normalize(ngAlong(ray, ngEnter(ray, sinA + height * kmToUnits)));
+            }
+            return vec4f(at, limb);
+        }
     }
 
     // Near the limb a ray runs hundreds of pixels through the shell, close over the terrain: its steps no shorter than
@@ -553,10 +549,16 @@ fn ngDisplaced(ray: NgRay, sampleAngle: f32, pixelAngle: f32, limb: f32) -> vec4
     let level = log2(max(pixelAngle / kmToUnits / ngReliefTexelKm(false), 1e-4));
     let coarse = max(level, 0.5);
 
-    var t = enter;
+    var t = max(enter, min(start, leave));
     var margin = ngAboveRelief(ngAlong(ray, t), sinA, kmToUnits, coarse);
+    if (margin <= 2.0 * pixelAngle && t > enter) {
+        t = enter;
+        margin = ngAboveRelief(ngAlong(ray, t), sinA, kmToUnits, coarse);
+    }
+    ngClear = t;
     var closest = margin;
     var closestT = t;
+    var clear = margin > 4.0 * pixelAngle;
     for (var step = 0u; step < NG_DISPLACE_STEPS && margin > 0.0 && t < leave; step = step + 1u) {
         let previous = margin;
         let previousT = t;
@@ -568,6 +570,11 @@ fn ngDisplaced(ray: NgRay, sampleAngle: f32, pixelAngle: f32, limb: f32) -> vec4
             closest = margin;
             closestT = t;
         }
+        if (margin > 4.0 * pixelAngle && clear) {
+            ngClear = t;
+        } else {
+            clear = false;
+        }
     }
     if (margin <= 0.0 || t < leave) {
         return vec4f(normalize(ngAlong(ray, t)), 1.0);
@@ -576,9 +583,9 @@ fn ngDisplaced(ray: NgRay, sampleAngle: f32, pixelAngle: f32, limb: f32) -> vec4
 }
 
 // Where a ray meets the Moon, the smooth sphere or the relief itself, and how much of its share of the pixel it covers.
-fn ngHit(ray: NgRay, sampleAngle: f32, pixelAngle: f32) -> vec4f {
+fn ngHit(ray: NgRay, sampleAngle: f32, pixelAngle: f32, start: f32) -> vec4f {
     if (ngHas(NG_FLAG_DISPLACE)) {
-        return ngDisplaced(ray, sampleAngle, pixelAngle, ngLimbCoverage(ray, sampleAngle));
+        return ngDisplaced(ray, sampleAngle, pixelAngle, ngLimbCoverage(ray, sampleAngle), start);
     }
     return vec4f(ngOnSphere(ray), ngLimbCoverage(ray, sampleAngle));
 }
@@ -681,7 +688,8 @@ fn ngNearLimb(ray: NgRay, pixelAngle: f32) -> bool {
 // The disc over a pixel: the mean of the rays through it where the disc may reach, nothing elsewhere, their light
 // averaged as a sensor does. One ray suffices: the maps are filtered over the pixel, the shadows read from their map,
 // the smooth limb covered by its distance. Along the terminator, where the Sun stands low over the relief and every
-// crater rim turns from lit to dark within a texel, and along a displaced limb, NG_TERMINATOR_SAMPLES rays instead.
+// crater rim turns from lit to dark within a texel, if a pixel spans more than one, and along a displaced limb,
+// NG_TERMINATOR_SAMPLES rays instead.
 fn ngPixel(pixel: vec2f, size: vec2u) -> NgMoon {
     let center = ngPixelRay(pixel, size);
     let pixelAngle = length(ngPixelRay(pixel + vec2f(1.0, 0.0), size) - center);
@@ -694,7 +702,12 @@ fn ngPixel(pixel: vec2f, size: vec2u) -> NgMoon {
     // More rays near the terminator, where the relief's shading changes fastest, and at a displaced limb.
     let limb = ngNearLimb(middle, pixelAngle);
     let onSphere = ngOnSphere(middle);
-    let terminator = abs(dot(onSphere, ngParams.sunDirection)) < NG_TERMINATOR_BAND;
+    // Along the terminator only where the pixel's footprint spans more than a texel of the relief: magnified, the
+    // B-spline shades it smoothly, and one ray resolves it.
+    let mu = max(dot(onSphere, -middle.v), 0.05);
+    let texel = 2.0 * NG_PI / f32(textureDimensions(ngReliefMap).x);
+    let minified = pixelAngle / (sin(ngParams.angularRadius) * mu) > texel;
+    let terminator = minified && abs(dot(onSphere, ngParams.sunDirection)) < NG_TERMINATOR_BAND;
     var count = NG_SAMPLES;
     if (NG_TERMINATOR_SAMPLES > NG_SAMPLES && ngHas(NG_FLAG_RELIEF) && (limb || terminator)) {
         count = NG_TERMINATOR_SAMPLES;
@@ -717,7 +730,7 @@ fn ngPixel(pixel: vec2f, size: vec2u) -> NgMoon {
         }
         var hit: vec4f;
         if (i == 0u || !alike) {
-            hit = ngHit(ray, sampleAngle, pixelAngle);
+            hit = ngHit(ray, sampleAngle, pixelAngle, select(ngClear, -1e30, i == 0u));
         } else {
             hit = vec4f(normalize(ngOnSphere(ray) + shift), ngLimbCoverage(ray, sampleAngle));
         }
@@ -758,8 +771,8 @@ fn ngFinish(luminance: vec3f, coverage: f32, pixel: vec2u) -> vec4f {
     if (NG_BACKGROUND) {
         color = color + textureLoad(ngBackground, vec2i(pixel), 0).rgb;
         alpha = 1.0;
-        if (NG_NIGHT_VISION) {
-            color = hdNightVision(color);
+        if (NG_DARK_ADAPTED) {
+            color = hdDarkAdaptedEye(color);
         }
     }
     color = color * ngParams.exposure;

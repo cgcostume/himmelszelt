@@ -52,9 +52,9 @@ The volume repeats every `extentKm`; `variation` thins its clouds out in places 
 repeat with it (the map's raw field, turned and stretched to `variationKm`), so the repetition hides towards the
 horizon. Like the clearing, it only removes clouds, and it lightens the light grid's shadows as far as it does.
 
-The air in front of the clouds lies in their shadow where the deck closes towards the sun: its light is dimmed by what
-the light grid lets through where the ray meets the slab, which the grid holds for every voxel, cloud or not.
-The ground in the background lies in it too: where a ray meets the ground, the light grid at the base towards the sun
+The air in front of the clouds is not dimmed by their shadow, as the sky beside them is not: a far cloud seen from under
+the deck would else fade into a darker copy of the sky, a band along the horizon. The ground in the background lies in
+it: where a ray meets the ground, the light grid at the base towards the sun
 dims the sun's share of what the ground sends back, so the clouds cast their shadows, the air in front kept. What the
 deck lets through on average, of the sun's light and the sky's, dims the ground's light on the clouds' undersides.
 Deep in a thick cloud, where the octaves of scattering die out, the light diffuses on: the two-stream approximation's

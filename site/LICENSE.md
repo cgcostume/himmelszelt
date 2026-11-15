@@ -34,5 +34,7 @@ credited where the site shows it.
 | `public/images/glossary-astrolabe.webp` | The Metropolitan Museum of Art, Open Access | CC0 |
 | `public/moon/` | NASA's Scientific Visualization Studio, CGI Moon Kit | public domain |
 | nachtgestirn's `moon-roughness-1k.webp`, `-2k`, `-4k` | Rosenburg et al. (2011), LRO LOLA slope and Hurst exponent maps, NASA PDS Geosciences Node | public domain |
+| sternenheer's `constellations.csv` and `.bin` | the constellations' figures of d3-celestial, Olaf Frohn, matched to the catalog's stars | BSD 3-Clause, `packages/sternenheer/data/LICENSE-d3-celestial.txt` |
+| sternenheer's `hipparcos.csv` and `.bin` | The Hipparcos and Tycho Catalogues, ESA SP-1200 (1997), by way of NASA's HEASARC | free to use, with the acknowledgment of ESA |
 
 The photographs the figures load from Wikimedia Commons are licensed as credited under each.

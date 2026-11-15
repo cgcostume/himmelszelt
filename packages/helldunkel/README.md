@@ -9,6 +9,11 @@ package.
 - `exposureFromEV100(ev100)`: what luminance in cd/m² is multiplied by, 1 / (1.2 · 2^EV100), the convention of cameras,
   Frostbite and Unreal (Lagarde & de Rousiers 2014). About 15 for a sunny day, 0 in twilight.
 - `ev100FromLuminance(luminance)`: what a light meter reads for an average luminance, log2(L · 100 / 12.5).
+- `localAdaptation(sceneEV100, objectEV100, strength)`: the stops an object far brighter than its scene is drawn darker,
+  as the eye adapts to what it looks at: the Moon's disc in a night sky. 0 for a camera, the whole difference for the eye.
+- `lowLightCompensation(luminance)`: the stops a dim scene is exposed darker than metered, so night stays dark rather than
+  lifted to day: Krawczyk et al.'s (2005) key over middle gray, 0 from about 1.25 cd/m² up, -2.6 at night. Subtract it
+  from a metered EV100; `hdLowLightCompensation` in `wgsl.exposure`, and the meter's `lowLight` reading applies it.
 - `wgsl.tonemap`, also as `@himmelszelt/helldunkel/wgsl`: exposed, scene-linear Rec. 709 to sRGB-encoded values, by
   `hdToneMapNeutral` (Khronos PBR Neutral), `hdToneMapAgx` (Sobotka's AgX in Wrensch's fit), `hdToneMapAces` (Narkowicz's
   ACES fit) or `hdToneMapClip`, none. `hdToneMapNeutralHdr` and `hdToneMapClipHdr` compress into a display's headroom,
@@ -37,7 +42,7 @@ fn show(luminance: vec3f, exposure: f32) -> vec3f {
 - `veilingGlare(angle, age, pigment)` and `hdVeil` in `wgsl.glare`: the eye's veil around a bright point source, CIE's
   general disability glare equation (CIE 146:2002), in cd/m² per lux at the eye, to add before the exposure. The Sun's
   veil in a sky, where bloom knows only the image.
-- `nightVision(rgb)` and `hdNightVision` in `wgsl.vision`: linear sRGB in cd/m² as the eye sees it at night, Jensen et
+- `darkAdaptedEye(rgb)` and `hdDarkAdaptedEye` in `wgsl.vision`: linear sRGB in cd/m² as the eye sees it at night, Jensen et
   al.'s blue shift (Night Rendering, 2000) on Larson et al.'s scotopic luminance. Below 0.01 cd/m² the rods see alone,
   above 4 the cones, `coneShare` between; the rods' light takes the chromaticity (0.25, 0.25), so colors fade and the
   moonlit night turns blue. Per pixel, before the exposure; a camera, which has no rods, sees none of it.

@@ -48,7 +48,7 @@ export function earthshineFigure(root: HTMLElement) {
             earthshine: false,
             eclipse: false,
             law: "hapke2012",
-            nightVision: false,
+            darkAdapted: false,
         };
         const frames: TileFrame[] = [common, { ...common, earthshine: true }];
         tiles?.draw(

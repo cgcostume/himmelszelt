@@ -202,7 +202,7 @@ export function shadowFigure(root: HTMLElement) {
             earthshine: true,
             eclipse: true,
             law: "hapke2012",
-            nightVision: false,
+            darkAdapted: false,
         }));
         labels.forEach((label, i) => {
             const m = moons[i];
@@ -297,7 +297,7 @@ export function shadowFigure(root: HTMLElement) {
                 earthshine: true,
                 eclipse: true,
                 law: "hapke2012",
-                nightVision: false,
+                darkAdapted: false,
             }),
         );
         outline.setAttribute("viewBox", `0 0 ${cssW} ${cssH}`);

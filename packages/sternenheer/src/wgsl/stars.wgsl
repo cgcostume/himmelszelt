@@ -1,22 +1,45 @@
 // Shared by the star passes: where a catalog star stands in the sky and on the target, what the air does to its light,
-// and how it twinkles. Requires `params.wgsl` and `camera.wgsl` (dunstkreis'), and the bindings `shParams` and
-// `shCatalog` from the pass.
+// and how it twinkles. Requires `params.wgsl` and `camera.wgsl` (dunstkreis'), and the bindings `shParams`,
+// `shCatalog`, `shFaint` and `shFaintColors` from the pass.
 
-// A catalog star's J2000 equatorial vector moved by its proper motion, then turned into the observer's frame: ENU.
+// Stars from the catalog's count on are the faint ones, packed: `shFaint` holds two words a star, the right ascension
+// in 24 bits and the magnitude in 8, the declination in 24 bits and the color index in 8.
+fn shStarIsFaint(i: u32) -> bool {
+    return i >= arrayLength(&shCatalog) / SH_STAR_FIELDS;
+}
+
+fn shFaintWord(i: u32, word: u32) -> u32 {
+    return shFaint[(i - arrayLength(&shCatalog) / SH_STAR_FIELDS) * 2u + word];
+}
+
+// A star's J2000 equatorial vector, a catalog star's moved by its proper motion, turned into the observer's frame: ENU.
 fn shStarDirection(i: u32) -> vec3f {
-    let at = i * SH_STAR_FIELDS;
-    let declination = radians(shCatalog[at + 2u] + shCatalog[at + 4u] * shParams.years / 3600.0);
-    let cosDeclination = cos(radians(shCatalog[at + 2u]));
-    let rightAscension = radians(shCatalog[at + 1u] + shCatalog[at + 3u] * shParams.years / 3600.0 / max(cosDeclination, 1e-6));
+    var rightAscension = 0.0;
+    var declination = 0.0;
+    if (shStarIsFaint(i)) {
+        rightAscension = f32(shFaintWord(i, 0u) & 0xffffffu) * (2.0 * SH_PI / 16777216.0);
+        declination = f32(shFaintWord(i, 1u) & 0xffffffu) * (SH_PI / 16777215.0) - 0.5 * SH_PI;
+    } else {
+        let at = i * SH_STAR_FIELDS;
+        declination = radians(shCatalog[at + 2u] + shCatalog[at + 4u] * shParams.years / 3600.0);
+        let cosDeclination = cos(radians(shCatalog[at + 2u]));
+        rightAscension = radians(shCatalog[at + 1u] + shCatalog[at + 3u] * shParams.years / 3600.0 / max(cosDeclination, 1e-6));
+    }
     let equatorial = vec3f(cos(declination) * cos(rightAscension), cos(declination) * sin(rightAscension), sin(declination));
     return normalize(shParams.skyRotation * equatorial);
 }
 
 fn shStarMagnitude(i: u32) -> f32 {
+    if (shStarIsFaint(i)) {
+        return f32(shFaintWord(i, 0u) >> 24u) * 0.0625 - 2.0;
+    }
     return shCatalog[i * SH_STAR_FIELDS];
 }
 
 fn shStarColor(i: u32) -> vec3f {
+    if (shStarIsFaint(i)) {
+        return max(shFaintColors[shFaintWord(i, 1u) >> 24u].rgb, vec3f(0.0));
+    }
     let at = i * SH_STAR_FIELDS;
     return max(vec3f(shCatalog[at + 5u], shCatalog[at + 6u], shCatalog[at + 7u]), vec3f(0.0));
 }
@@ -96,8 +119,9 @@ fn shPlanePoint(ndc: vec2f) -> vec3f {
     return point.xyz / point.w - eye;
 }
 
-// Where a direction shows on the target, in pixels, and how far along the camera's axis it lies: behind the camera
-// for a value of 0 or less. The inverse of `dkProjectRay`: the angle from the axis to the image plane's radius.
+// Where a direction shows on the target, in pixels, and whether it shows at all: behind what the projection reaches
+// for a third value of 0 or less, past 90° from the axis only for a rectilinear view, further the more it bends. The
+// inverse of `dkProjectRay`: the angle from the axis to the image plane's radius.
 fn shProject(direction: vec3f) -> vec3f {
     let center = shPlanePoint(vec2f(0.0));
     let right = shPlanePoint(vec2f(1.0, 0.0)) - center;
@@ -118,7 +142,7 @@ fn shProject(direction: vec3f) -> vec3f {
     }
     let a = dot(point - center, right) / dot(right, right);
     let b = dot(point - center, up) / dot(up, up);
-    return vec3f((a + 1.0) * 0.5 * f32(shParams.width), (1.0 - b) * 0.5 * f32(shParams.height), along);
+    return vec3f((a + 1.0) * 0.5 * f32(shParams.width), (1.0 - b) * 0.5 * f32(shParams.height), d + along);
 }
 
 // How many pixels a radian of sky spans at a direction: the image of a direction turned a little.
@@ -133,6 +157,11 @@ fn shPixelsPerRadian(direction: vec3f, pixel: vec2f) -> f32 {
     }
     let turned = normalize(direction + normalize(across) * 1e-3);
     return length(shProject(turned).xy - pixel) / 1e-3;
+}
+
+// The size of the halos' grid in texels: the target and its margin, at the grid's scale.
+fn shHaloSize() -> vec2u {
+    return (vec2u(shParams.width, shParams.height) + 2u * SH_HALO_MARGIN + SH_HALO_SCALE - 1u) / SH_HALO_SCALE;
 }
 
 fn shHash(x: u32) -> u32 {
@@ -160,25 +189,29 @@ fn shNoise(seed: u32, t: f32) -> f32 {
     return mix(shNormal(seed + k * 7919u), shNormal(seed + (k + 1u) * 7919u), s);
 }
 
-// How a star's light flickers right now, per channel: the air's turbulence makes it fluctuate by a standard deviation
-// of its logarithm that grows with the airmass to the power 1.75, Young's scaling as Dravins et al. give it, for the
-// pupil and the eye's tenth of a second, saturating towards the horizon, and the channels drift apart as the air's
-// dispersion separates the star's colors near the horizon, into the flashes of color a low Sirius throws.
+// How a star's light flickers right now, per channel. A pupil is far smaller than the turbulence's Fresnel scale, so
+// the light's variance is the small aperture's, Dravins et al.'s: the zenith's times the airmass to the power 11/6,
+// saturating at 1. The eye, or an exposure, averages over many of the flicker's correlation times, which grow with
+// the root of the airmass as the Fresnel scale does: what is left is the variance of an exponentially correlated
+// signal's mean. The light is lognormal. The air's dispersion parts the colors' paths by the airmass, and once they
+// are a Fresnel scale apart the channels flicker on their own, the flashes of color a low Sirius throws.
 fn shTwinkle(i: u32, apparentAltitude: f32) -> vec3f {
     if (shParams.scintillation <= 0.0) {
         return vec3f(1.0);
     }
     let airmass = 1.0 / max(sin(apparentAltitude), 0.05);
-    let index = min(0.09 * pow(shParams.pupilCm, -2.0 / 3.0) * pow(airmass, 1.75) * exp(-shParams.heightM / 8000.0) / sqrt(0.4), 0.6);
-    let sigma = index * shParams.scintillation;
-    let chroma = clamp((airmass - 1.0) / 3.0, 0.0, 1.0);
+    let instant = min(shParams.twinkleVariance * pow(airmass, 11.0 / 6.0), 1.0);
+    let x = max(shParams.twinkleSteps / sqrt(airmass), 1e-3);
+    let seen = instant * 2.0 * (x - 1.0 + exp(-x)) / (x * x);
+    let sigma = sqrt(log(1.0 + seen)) * shParams.scintillation;
+    let chroma = 1.0 - exp(-SH_TWINKLE_DISPERSION * (airmass * airmass - 1.0) * airmass);
     let t = shParams.time * 8.0;
     let seed = i * 2654435761u;
     let whole = shNoise(seed, t);
     var factor = vec3f(0.0);
     for (var c = 0u; c < 3u; c = c + 1u) {
         let own = shNoise(seed + (c + 1u) * 104729u, t);
-        let n = mix(whole, own, chroma);
+        let n = sqrt(1.0 - chroma) * whole + sqrt(chroma) * own;
         factor[c] = exp(sigma * n - 0.5 * sigma * sigma);
     }
     return factor;

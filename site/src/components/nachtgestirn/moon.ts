@@ -158,7 +158,7 @@ export function moonFigure(root: HTMLElement) {
             earthshine: pressed("earthshine"),
             eclipse: pressed("eclipse"),
             law: "hapke2012",
-            nightVision: pressed("night"),
+            darkAdapted: pressed("night"),
             shimmer: pressed("shimmer") ? { time: performance.now() / 1000, dispersion: 1 } : null,
             ...rays(),
         });

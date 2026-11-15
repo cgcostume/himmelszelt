@@ -390,6 +390,7 @@ function createLive() {
             luts,
             format: SDR,
             toneMap: display.toneCurve,
+            dither: true,
             autoExposure: i === 0,
         });
         if (sky.key !== key) {

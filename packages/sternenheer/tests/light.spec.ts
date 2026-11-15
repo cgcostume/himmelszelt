@@ -34,7 +34,7 @@ test("Ballesteros' temperature: Vega near 10,000 K, the Sun near 5,800 K, a red 
     expect(temperatureFromColorIndexApprox(0.65)).toBeCloseTo(5785, 0);
 });
 
-test("a star's color: blue stars bluer than red, and the shipped catalog's path reproduces its colors", () => {
+test("a star's color: blue stars bluer than red, at unit luminance", () => {
     const vega = colorFromColorIndex(0);
     const betelgeuse = colorFromColorIndex(1.85);
     expect(vega[2]).toBeGreaterThan(vega[0]);
@@ -63,10 +63,16 @@ test("the air table crowds its entries at the horizon, finds it, and lifts a sta
     expect(liftedDirection(table, [0, 1, -0.1])).toEqual([0, 1, -0.1]);
 });
 
-test("the twinkling: a tenth or so at the zenith for the eye, more than half near the horizon, never past saturation", () => {
-    expect(scintillationIndex(90)).toBeGreaterThan(0.1);
-    expect(scintillationIndex(90)).toBeLessThan(0.35);
-    expect(scintillationIndex(20)).toBeGreaterThan(0.5);
-    expect(scintillationIndex(2)).toBe(0.6);
-    expect(scintillationIndex(90, 20)).toBeLessThan(scintillationIndex(90));
+test("the twinkling: faint at the zenith for the eye, a third and more near the horizon, never past saturation", () => {
+    expect(scintillationIndex(90)).toBeCloseTo(0.068, 2);
+    expect(scintillationIndex(30)).toBeCloseTo(0.15, 2);
+    expect(scintillationIndex(10)).toBeCloseTo(0.35, 1);
+    expect(scintillationIndex(2)).toBeLessThan(0.5);
+    // A worse seeing twinkles more, and a millisecond's exposure sees it unaveraged: the Hufnagel-Valley 5/7 zenith.
+    expect(scintillationIndex(90, 0.05)).toBeGreaterThan(scintillationIndex(90));
+    expect(Math.exp(scintillationIndex(90, 0.0556, 1e-5) ** 2) - 1).toBeCloseTo(0.21, 2);
+    // Less from a mountain, little from an airliner's height, none from orbit.
+    expect(scintillationIndex(30, 0.1, 0.1, 21, 4000)).toBeLessThan(scintillationIndex(30));
+    expect(scintillationIndex(30, 0.1, 0.1, 21, 12_000)).toBeLessThan(0.5 * scintillationIndex(30));
+    expect(scintillationIndex(30, 0.1, 0.1, 21, 408_000)).toBe(0);
 });

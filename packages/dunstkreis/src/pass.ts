@@ -94,6 +94,14 @@ export interface SkyParams {
      * luminance it exposes as white, 1.2 × 2^EV100 for the pass' `ev100` of -log2(1.2), which writes cd/m².
      */
     gridInk: number;
+    /**
+     * The luminance in cd/m² the sun disc stops at, its color kept; null by default, none, the disc at its 1.6 billion
+     * cd/m². For a pass made with `toneMap` off whose light a later pass exposes: every pixel of the disc's edge is
+     * far above white there, however little of it the disc covers, and the edge comes out hard. A ceiling of about
+     * twice the luminance that pass shows as white, 2 × 1.2 × 2^EV100, keeps it smooth. The light above it is lost,
+     * so leave it off where a bloom or a meter reads the disc.
+     */
+    sunDiscCeiling: number | null;
 }
 
 /** A sky cube map's settings, fixed when its pass is made. */

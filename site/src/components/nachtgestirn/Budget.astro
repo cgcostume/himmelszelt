@@ -6,9 +6,9 @@ import "./nachtgestirn.css";
  * What the pass costs and what its defaults miss, a disc for each size of the maps, as large as it gets before they
  * give less than a texel to a pixel at its middle: its defaults against everything switched on with the next finer
  * maps, shadows and displacement. Measured with timestamp queries in Chromium 153 over Vulkan on an AMD Radeon RX 7900
- * XT, a 1920 by 1080 target, a waxing gibbous Moon, medians of 2,000 frames after 100 to warm up; the error from both
- * drawn linear, per pixel the disc covers, against everything on. Measured while the defaults still cast hard shadows,
- * which cost the same and move the error by under a tenth of a percentage point.
+ * XT, a 1920 by 1080 target, a waxing gibbous Moon, medians of 2,000 frames submitted in batches, one queued behind
+ * the one awaited, after 800 to make the pipelines and warm the clocks up; the error from both drawn linear, per pixel
+ * the disc covers, against everything on.
  */
 interface Props {
     id?: string;
@@ -30,67 +30,70 @@ const ROWS: {
         disc: 162,
         view: "6.1°",
         defaults: "512 maps, against 1K",
-        ms: [0.052, 0.143],
+        ms: [0.051, 0.068],
         mb: [
             [0.668, 0.083, 1.34, 0.124],
             [2.67, 0.334, 5.34, 0.124],
         ],
-        off: 1.17,
+        off: 1.9,
     },
     {
         disc: 325,
         view: "3.1°",
         defaults: "1K maps, against 2K",
-        ms: [0.067, 0.254],
+        ms: [0.059, 0.122],
         mb: [
             [2.67, 0.334, 5.34, 0.496],
             [10.7, 1.34, 21.4, 0.496],
         ],
-        off: 1.07,
+        off: 2.06,
     },
     {
         disc: 651,
         view: "1.5°",
         defaults: "2K maps, against 4K",
-        ms: [0.121, 0.379],
+        ms: [0.07, 0.201],
         mb: [
             [10.7, 1.34, 21.4, 1.5],
             [42.6, 5.34, 85.4, 1.5],
         ],
-        off: 1.4,
+        off: 2.44,
     },
     {
         disc: 1303,
         view: "0.76°",
         defaults: "4K maps, displaced, against 8K",
-        ms: [0.686, 0.665],
+        ms: [0.311, 0.361],
         mb: [
             [42.6, 5.34, 85.4, 6],
             [170.7, 21.4, 341.3, 6],
         ],
-        off: 0.64,
+        off: 1.7,
     },
     {
         disc: 2607,
         view: "0.38°",
         defaults: "4K maps, displaced, against 8K",
-        ms: [0.947, 0.831],
+        ms: [0.266, 0.356],
         mb: [
             [42.6, 5.34, 85.4, 9],
             [170.7, 21.4, 341.3, 9],
         ],
-        off: 3.33,
+        off: 2.85,
     },
 ];
 const PARTS = ["color map", "relief", "shadow map"] as const;
 const CONFIGS = ["the defaults", "everything on"] as const;
 // Each panel's axis: its end and the step of its grid.
 // Each axis a little past its longest bar, so the bar's value fits in its own panel and the panels stand close.
-const AXES = { ms: [1.25, 0.25], mb: [600, 100], off: [4.5, 1] } as const;
+const AXES = { ms: [0.5, 0.1], mb: [600, 100], off: [4.5, 1] } as const;
 type Axis = keyof typeof AXES;
 const pct = (v: number, axis: Axis) => `${((100 * v) / AXES[axis][0]).toFixed(3)}%`;
 const ticks = (axis: Axis) =>
-    Array.from({ length: Math.floor(AXES[axis][0] / AXES[axis][1]) + 1 }, (_, i) => i * AXES[axis][1]);
+    Array.from(
+        { length: Math.floor(AXES[axis][0] / AXES[axis][1]) + 1 },
+        (_, i) => Math.round(i * AXES[axis][1] * 1e3) / 1e3,
+    );
 const grid = (axis: Axis) => `--grid: ${(100 * AXES[axis][1]) / AXES[axis][0]}%`;
 const ms = (v: number) => (v < 1 ? v.toFixed(2) : v.toFixed(1));
 const mb = (v: number) => (v < 10 ? v.toFixed(1) : v.toFixed(0));

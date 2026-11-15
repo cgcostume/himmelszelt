@@ -348,7 +348,7 @@ export interface MoonFrame {
     /** The color map tinted to the Moon's color, as published, or as gray; tinted by default. */
     mapColor?: "tinted" | "untinted" | "gray";
     /** As the eye sees it at night, rather than a camera. */
-    nightVision: boolean;
+    darkAdapted: boolean;
     /** Without the air, what lies behind the Moon, in cd/m²: black by default, or a plain daytime sky. */
     background?: readonly [number, number, number];
     /** Rays per pixel, the pass' defaults of 1 and 4 along the terminator and a displaced limb unless given: the pass
@@ -431,7 +431,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
         moonBuilding.add(key);
         const {
             toneMap,
-            nightVision,
+            darkAdapted,
             format = SDR,
             headroom = 1,
             samples,
@@ -444,7 +444,15 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
         createMoonPass(device, {
             ...(alone
                 ? { format: "rgba16float" }
-                : { format, headroom, toneMap: toneMap === "linear" ? false : toneMap, background: true, nightVision }),
+                : {
+                      format,
+                      headroom,
+                      toneMap: toneMap === "linear" ? false : toneMap,
+                      background: true,
+                      darkAdapted,
+                      // The sky behind the disc, through the air, bands in 8 bits: dithered there.
+                      dither: format === SDR,
+                  }),
             maps,
             reflectance: LAW_WGSL[frame.law],
             ...(samples === undefined ? {} : { samples }),
@@ -571,7 +579,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                   ? (mapsBound as FineMaps)
                   : (SIZES[Math.max(SIZES.indexOf(needed), kept)] ?? "4k");
         loadMaps(size);
-        const key = `${alone} ${frame.law} ${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.nightVision} ${frame.format ?? SDR} ${frame.headroom ?? 1} ${frame.samples} ${frame.terminatorSamples} ${frame.displacementFrom} ${frame.softShadowsFrom} ${frame.shadowsFrom} ${frame.filter ?? "anisotropic"}`;
+        const key = `${alone} ${frame.law} ${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.darkAdapted} ${frame.format ?? SDR} ${frame.headroom ?? 1} ${frame.samples} ${frame.terminatorSamples} ${frame.displacementFrom} ${frame.softShadowsFrom} ${frame.shadowsFrom} ${frame.filter ?? "anisotropic"}`;
         const moonPass = moonPasses.get(key);
         if (!moonPass) {
             buildMoon(key, frame, alone);

@@ -158,7 +158,12 @@ fn dkSkySunTransmittance(sky: DkSkySample) -> vec4f {
 // The sun disc's luminance along a sampled ray, attenuated by the air between it and the observer, from sun.wgsl.
 fn dkSkySunLuminance(sky: DkSkySample) -> vec3f {
     let illuminance = dkToRgb(dkAtmosphere, dkSkySunTransmittance(sky) * dkAtmosphere.solarIlluminance);
-    return dkSunDiscLuminance(illuminance, dkParams.sunAngularRadius);
+    let luminance = dkSunDiscLuminance(illuminance, dkParams.sunAngularRadius);
+    let brightest = max(luminance.r, max(luminance.g, luminance.b));
+    if (dkParams.sunDiscCeiling > 0.0 && brightest > dkParams.sunDiscCeiling) {
+        return luminance * (dkParams.sunDiscCeiling / brightest);
+    }
+    return luminance;
 }
 
 fn dkSkySunCoverage(sky: DkSkySample, footprint: f32) -> f32 {
@@ -421,8 +426,8 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
 
     // The aureole and the eye's veil, both smooth enough for the center ray.
     luminance = luminance + dkSkyAureole(view) + dkSkyVeil(view);
-    if (DK_NIGHT_VISION) {
-        luminance = hdNightVision(luminance);
+    if (DK_DARK_ADAPTED) {
+        luminance = hdDarkAdaptedEye(luminance);
     }
 
     // In cd/m², exposed. Without tone mapping, that is what is written: linear, for the caller's own tone mapping.

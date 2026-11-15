@@ -41,6 +41,8 @@ export const ICONS = {
     displace: '<path d="M1.5 14a14 14 0 0 1 13 0"/><path d="M4.6 12.6 7.8 5.5l3.4 7.1"/>',
     /** The view kept on the Moon: the same brackets round the theme toggle's crescent (see Base.astro). */
     moonLock: `${BRACKETS}<path class="solid" d="M7.115 3.943A4 4 0 1 0 11.485 10.257 4 4 0 0 1 7.115 3.943z"/>`,
+    /** The far side, which Earth never sees: moonLock's frame round the Moon's outline, dashed. */
+    farSide: `${BRACKETS}<circle cx="8" cy="8" r="4" stroke-dasharray="1.1 1.25"/>`,
     /** Back and on in time, each stepping its way on hover. */
     earlier: '<path class="step-back" d="M10 3.5 5.5 8l4.5 4.5"/>',
     later: '<path class="step-on" d="M6 3.5 10.5 8 6 12.5"/>',

@@ -567,7 +567,15 @@ export const references: Record<string, Reference> = {
         venue: "Publications of the Astronomical Society of the Pacific 110",
         year: 1998,
         url: "https://doi.org/10.1086/316232",
-        note: "Young's scaling of the scintillation with the aperture, the airmass and the integration time.",
+        note: "The scintillation of a small aperture, and how it scales with the aperture, the airmass and the integration time.",
+    },
+    osborn2015: {
+        authors: "James Osborn, Dora Föhring, Vikram S. Dhillon, Richard W. Wilson",
+        title: "Atmospheric Scintillation in Astronomical Photometry",
+        venue: "Monthly Notices of the Royal Astronomical Society 452(2)",
+        year: 2015,
+        url: "https://doi.org/10.1093/mnras/stv1400",
+        note: "The scintillation's regimes by aperture and exposure, from the turbulence's profile.",
     },
     svs4851: {
         authors: "NASA Scientific Visualization Studio, Ernie Wright",

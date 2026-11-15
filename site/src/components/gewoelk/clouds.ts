@@ -198,7 +198,7 @@ export function cloudsFigure(root: HTMLElement) {
     function buildClouds(key: string, scale: number, maxSteps: number, layers: number) {
         if (!gpu || cloudsBuilding === key) return;
         cloudsBuilding = key;
-        createCloudPass(gpu.device, { format: SDR, scale, maxSteps, grid: { layers } }).then((pass) => {
+        createCloudPass(gpu.device, { format: SDR, dither: true, scale, maxSteps, grid: { layers } }).then((pass) => {
             if (cloudsBuilding !== key) return pass.destroy();
             clouds?.pass.destroy();
             clouds = { pass, key };

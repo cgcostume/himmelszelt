@@ -31,6 +31,7 @@ const PASSES: Record<string, readonly string[]> = {
     "moon with Hapke's law of 1963": MOON.map((name) => (name === "reflectance" ? "hapke1963" : name)),
     mips: ["surface", "mips"],
     bc1: ["bc1"],
+    noise: ["noise"],
     relief: ["surface", "relief"],
     shadow: [...MOON, "shadow"],
     shimmer: [...MOON, "shimmer"],
@@ -52,6 +53,7 @@ test("the params and tables pack to the uniforms' sizes with the flags where the
         angularDiameter: 0.5,
         sunDirection: [1, 0, 0],
         sunIlluminance: 128_000,
+        exposureCompensation: 0,
         earthshine: 10,
         orientation: moonOrientation({
             direction: [0, 1, 0],
@@ -244,7 +246,7 @@ test("the pass compiles with night vision", async () => {
     if (!device) return;
     const { createMoonPass } = await import("../dist/index.js");
     device.pushErrorScope("validation");
-    const pass = await createMoonPass(device, { background: true, toneMap: "neutral", nightVision: true });
+    const pass = await createMoonPass(device, { background: true, toneMap: "neutral", darkAdapted: true });
     expect(await device.popErrorScope()).toBeNull();
     pass.destroy();
 });

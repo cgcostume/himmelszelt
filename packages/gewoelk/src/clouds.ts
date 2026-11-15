@@ -33,6 +33,7 @@ export interface CloudPassOptions {
      *  exposed luminance, linear. */
     toneMap?: ToneCurve | false;
     headroom?: number;
+    /** Dither the tone mapped output against banding, false by default: for an 8-bit target over smooth gradients. */
     dither?: boolean;
     /** Whether `encode` composes over a background in cd/m², true by default. Without, it writes the clouds alone,
      *  premultiplied, with their transmittance in alpha, for a renderer that composites itself. */
@@ -100,7 +101,6 @@ export interface CloudPass {
     destroy(): void;
 }
 
-const EIGHT_BIT = ["rgba8unorm", "bgra8unorm"];
 const TONE_CURVES: Record<string, number> = { neutral: 1, agx: 2, aces: 3, clip: 4 };
 const dispatch = (n: number, group: number) => Math.ceil(n / group);
 
@@ -117,7 +117,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         nearLightSamples = 2,
     } = options;
     const grid = { size: 256, layers: 32, ...options.grid };
-    const dither = options.dither ?? (toneMap !== false && EIGHT_BIT.includes(format));
+    const dither = options.dither ?? false;
     const storable = ["rgba8unorm", "rgba16float", "rgba32float"].includes(format);
     if (!storable && !(format === "bgra8unorm" && device.features.has("bgra8unorm-storage"))) {
         throw new Error(`gewoelk: the pass writes ${format} as a storage texture, which this device cannot`);
@@ -154,6 +154,15 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         addressModeU: "repeat",
         addressModeV: "repeat",
         addressModeW: "clamp-to-edge",
+        magFilter: "linear",
+        minFilter: "linear",
+    });
+    // The detail noise tiles in all three axes: clamping its height would break the filter at every tile edge, a seam
+    // through every cloud.
+    const detailSampler = device.createSampler({
+        addressModeU: "repeat",
+        addressModeV: "repeat",
+        addressModeW: "repeat",
         magFilter: "linear",
         minFilter: "linear",
     });
@@ -362,6 +371,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                 { binding: 9, resource: luminance },
                 { binding: 10, resource: transmittance },
                 { binding: 11, resource: clampSampler },
+                { binding: 13, resource: detailSampler },
             ]),
             bindGroup(composePipeline, [
                 { binding: 0, resource: { buffer: params } },

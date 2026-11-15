@@ -498,6 +498,14 @@
     left: auto;
     right: 6px;
 }
+/* The globe's annotations over its canvas, click-through. */
+.globe-labels {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
 /* Full screen, the panel with the lunation slider over its foot, as dunstkreis' sky stage lays its time slider. */
 .globe-stage:fullscreen > .globe-panel {
     width: 100%;
@@ -1309,6 +1317,9 @@
 }
 .budget-part-3 {
     background: var(--budget-3);
+}
+.config-figure > .budget-legend {
+    margin-top: 1.25rem;
 }
 .config-figure .view-buttons > .view-toggle {
     position: static;

@@ -22,6 +22,8 @@ function wgslSource(name: string): string {
 const PASSES: Record<string, readonly string[]> = {
     bin: ["params", "camera", "glare", "bin", "stars"],
     compose: ["params", "camera", "glare", "tonemap", "vision", "compose", "stars"],
+    halo: ["halo"],
+    lines: ["params", "camera", "glare", "lines", "stars"],
 };
 
 for (const [name, fragments] of Object.entries(PASSES)) {
@@ -46,9 +48,12 @@ test("the params pack to the uniform's size with the flags and the air where the
             inverseViewProjection: new Float32Array(16),
             projectionDistance: 0,
             ev100: -6,
+            displayEV100: null,
             horizonZ: -0.01,
             air,
             psfPixels: 0.8,
+            knee: 1,
+            halo: 1,
             scintillation: 1,
             time: 0,
             glare: 1,
@@ -56,21 +61,35 @@ test("the params pack to the uniform's size with the flags and the air where the
             starLight: 1,
             milkyWay: 1,
             magnitudeLimit: 6.5,
+            faintStars: 0,
+            r0: 0.1,
+            integration: 0.1,
             heightM: 0,
-            pupilCm: 0.7,
             threshold: 1 / 2048,
+            constellations: ["Ori", "UMa"],
+            constellationOpacity: 0.3,
+            constellationColor: [0.45, 0.6, 0.85],
+            constellationWidth: 1.25,
+            constellationGap: 7,
             maxRadius: 256,
         },
-        { width: 640, height: 480, tileSize: 16, capacity: 64, stars: true, milkyWay: 1.7e-3 },
+        { width: 640, height: 480, tileSize: 16, capacity: 64, stars: true, milkyWay: 1.7e-3, lines: true },
     );
     expect(data.byteLength).toBe(PARAMS_SIZE);
     const u = new Uint32Array(data);
     const f = new Float32Array(data);
     expect(u[40]).toBe(7);
     expect(u[42]).toBe(40);
+    expect(f[52]).toBeCloseTo(f[28] ?? 0, 6);
+    // 640 by 480 and a margin of 64 either side at half size: 384 by 304, eight halvings.
+    expect(f[55]).toBe(8);
     expect(u[48]).toBe(640);
     expect(f[28]).toBeCloseTo(1 / (1.2 * 2 ** -6), 4);
     expect(f[32]).toBeCloseTo((air.horizon * Math.PI) / 180, 6);
-    expect(f[52]).toBeCloseTo((air.bends[0] ?? 0) * (Math.PI / 180), 6);
-    expect(f[180 + 127 * 4 + 2]).toBeCloseTo(0.6, 6);
+    // Orion and the Great Bear, the 60th and the 83rd of the 88: a bit each.
+    expect(f[59]).toBeCloseTo(0.3, 6);
+    expect(u[65]).toBe(1 << (59 - 32));
+    expect(u[66]).toBe(1 << (82 - 64));
+    expect(f[68]).toBeCloseTo((air.bends[0] ?? 0) * (Math.PI / 180), 6);
+    expect(f[196 + 127 * 4 + 2]).toBeCloseTo(0.6, 6);
 });

@@ -4,7 +4,7 @@
 // biome-ignore-all assist/source/organizeImports: exports are hand-grouped by domain, not alphabetical
 
 // Exposure in EV100.
-export { ev100FromLuminance, exposureFromEV100 } from "./exposure.js";
+export { ev100FromLuminance, exposureFromEV100, localAdaptation, lowLightCompensation } from "./exposure.js";
 
 /**
  * A tone curve for a display: "neutral", Khronos PBR Neutral, which keeps colors as they are up to 0.76 and compresses
@@ -37,7 +37,7 @@ export {
 export { veilingGlare } from "./glare.js";
 
 // The eye at night: the rods' blue shift, before the exposure.
-export { coneShare, nightVision } from "./vision.js";
+export { coneShare, darkAdaptedEye } from "./vision.js";
 
 // Bloom, over a linear, exposed image.
 export type { BloomPass, BloomPassOptions } from "./bloom.js";

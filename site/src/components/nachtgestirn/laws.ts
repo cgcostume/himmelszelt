@@ -166,7 +166,7 @@ export function lawsFigure(root: HTMLElement) {
             earthshine: true,
             eclipse: false,
             law: LAWS[i] ?? "hapke2012",
-            nightVision: false,
+            darkAdapted: false,
             ...(byDay ? { background: DAY_SKY } : {}),
         }));
         // Each law's light of the whole disc against the measured Moon's at this phase angle, plain discs, in stops:

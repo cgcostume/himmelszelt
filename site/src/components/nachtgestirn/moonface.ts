@@ -78,7 +78,7 @@ export function attachMoonFace(view: HTMLElement, controller: MoonViewController
             albedo: true,
             relief: true,
             shadows: true,
-            nightVision: false,
+            darkAdapted: false,
             earthshine: true,
             eclipse: true,
             law: "hapke2012",

@@ -107,7 +107,7 @@ export function eclipsePhotosFigure(root: HTMLElement) {
                 earthshine: true,
                 eclipse: true,
                 law: "hapke2012",
-                nightVision: false,
+                darkAdapted: false,
                 // Everything at its finest, as in the photo figure: the relief displaced, the maps read along the footprint.
                 displacementFrom: 0,
                 filter: "anisotropic",
@@ -150,7 +150,7 @@ export function eclipsePhotosFigure(root: HTMLElement) {
             earthshine: true,
             eclipse: true,
             law: "hapke2012",
-            nightVision: false,
+            darkAdapted: false,
         }));
         markStrip(stripColumns, stripRows);
         const step = Math.round((release - contact) / (STRIP - 1) / MINUTE);

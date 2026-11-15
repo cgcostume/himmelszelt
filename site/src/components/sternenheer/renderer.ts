@@ -1,5 +1,6 @@
 import type { AtmosphereLUTs, AtmosphereModel, SkyPass } from "@himmelszelt/dunstkreis";
 import { airTransmittance, clampObserverHeight, createSkyPass, refractionAngle } from "@himmelszelt/dunstkreis";
+import { adaptEV100, ev100FromLuminance, localAdaptation, lowLightCompensation } from "@himmelszelt/helldunkel";
 import type { MoonMaps, MoonPass } from "@himmelszelt/nachtgestirn";
 import {
     createMoonPass,
@@ -7,23 +8,33 @@ import {
     horizonZ,
     loadMoonMaps,
     MOON_MAPS,
+    moonEV100,
     moonIlluminance,
     moonOrientation,
     refractionTable,
     SUN_ILLUMINANCE,
 } from "@himmelszelt/nachtgestirn";
-import type { AirTable, MilkyWay, StarCatalog, StarsPass } from "@himmelszelt/sternenheer";
+import type {
+    AirTable,
+    ConstellationLines,
+    MilkyWay,
+    PackedStars,
+    StarCatalog,
+    StarsPass,
+} from "@himmelszelt/sternenheer";
 import {
     airTable,
     createStarsPass,
     liftedDirection,
     loadCatalog,
+    loadConstellations,
+    loadFaintStars,
     loadMilkyWay,
     MILKY_WAY_MAPS,
     starAt,
 } from "@himmelszelt/sternenheer";
 import { apparentSiderealTime, fromJulianDay, julianEphemerisDay, moon, stars, sun } from "@himmelszelt/sternzeit";
-import { quality, SDR } from "../dunstkreis/atmosphere";
+import { quality } from "../dunstkreis/atmosphere";
 
 // The sky pass writes cd/m² when its exposure is 1: EV100 of -log2(1.2).
 const UNIT_EV100 = -Math.log2(1.2);
@@ -74,6 +85,7 @@ export function skyAt(
         moonIlluminance: moonIlluminance(phaseAngle, distanceKm),
         earthshine: earthshineIlluminance(180 - phaseAngle, distanceKm),
         moonLit: moon.illuminatedFraction(jde),
+        moonEV100: moonEV100(phaseAngle, moon.illuminatedFraction(jde)),
         distanceKm,
     };
 }
@@ -81,7 +93,7 @@ export type SkyAt = ReturnType<typeof skyAt>;
 
 // The catalog and the maps once per page, however many figures draw the stars; the Moon's small maps, as the disc
 // stays small in a view of the whole sky.
-let sharedCatalog: Promise<StarCatalog> | null = null;
+let sharedCatalog: Promise<[StarCatalog, ConstellationLines, PackedStars]> | null = null;
 let sharedMoonMaps: Promise<MoonMaps> | null = null;
 const loadedMaps = new Map<MapSize, Promise<MilkyWay>>();
 function sharedMilkyWay(device: GPUDevice, size: MapSize) {
@@ -94,6 +106,9 @@ function sharedMilkyWay(device: GPUDevice, size: MapSize) {
 export interface StarsFrame {
     sky: SkyAt;
     luts: AtmosphereLUTs;
+    /** The canvas' format, SDR or HDR, and how many times SDR white the display may show. */
+    format: GPUTextureFormat;
+    headroom: number;
     toneMap: ToneCurveName;
     width: number;
     height: number;
@@ -103,6 +118,8 @@ export interface StarsFrame {
     /** Null to meter: the sky where it is brighter than the stars' own light, else the Milky Way. */
     ev100: number | null;
     stars: boolean;
+    /** The Hipparcos stars besides the bright star catalog's. */
+    faintStars: boolean;
     milkyWay: boolean;
     maps: MapSize;
     /** The air: refraction, extinction and the horizon it shows. */
@@ -112,9 +129,10 @@ export interface StarsFrame {
     time: number;
     /** The eye's veil around bright stars. */
     glare: boolean;
-    nightVision: boolean;
-    magnitudeLimit: number;
+    darkAdapted: boolean;
     moon: boolean;
+    /** The constellations to draw the lines of, by abbreviation; null for all, empty for none. */
+    constellations: readonly string[] | null;
 }
 
 /**
@@ -122,7 +140,13 @@ export interface StarsFrame {
  * texture, the stars pass over it into a second, and the Moon pass composing and tone mapping into the canvas.
  * `requestRender` is called whenever something it waited for arrived.
  */
+// How fast the metered exposure follows the sky, in seconds: a camera's meter, a little slower towards the dark.
+const ADAPTATION = { toBrighter: 0.5, toDarker: 1 };
+// The metered exposure lets in no more light than EV100 -6 at night, a long exposure's, not a deep sky camera's.
+const DARKEST_EV100 = -2.5;
+
 export function createStarsRenderer(device: GPUDevice, requestRender: () => void) {
+    let adapted: { ev100: number; at: number } | null = null;
     let sky: { pass: SkyPass; luts: AtmosphereLUTs } | null = null;
     let skyBuilding: AtmosphereLUTs | null = null;
     let starsPass: { pass: StarsPass; key: string } | null = null;
@@ -130,6 +154,8 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
     let moonPass: { pass: MoonPass; key: string } | null = null;
     let moonBuilding = "";
     let catalog: StarCatalog | null = null;
+    let constellations: ConstellationLines | null = null;
+    let faintStars: PackedStars | null = null;
     let moonMaps: MoonMaps | null = null;
     let milkyWay: MilkyWay | null = null;
     let mapsBound: MapSize | "" = "";
@@ -149,9 +175,11 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
         moonBuilding = "";
         requestRender();
     });
-    sharedCatalog ??= loadCatalog();
-    sharedCatalog.then((loaded) => {
+    sharedCatalog ??= Promise.all([loadCatalog(), loadConstellations(), loadFaintStars()]);
+    sharedCatalog.then(([loaded, lines, faint]) => {
         catalog = loaded;
+        constellations = lines;
+        faintStars = faint;
         starsPass?.pass.destroy();
         starsPass = null;
         starsBuilding = "";
@@ -181,25 +209,36 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
     function buildStars(key: string) {
         if (starsBuilding === key) return;
         starsBuilding = key;
-        createStarsPass(device, { format: "rgba32float", toneMap: false, catalog, milkyWay, dither: false }).then(
-            (pass) => {
-                if (starsBuilding !== key) return pass.destroy();
-                starsPass?.pass.destroy();
-                starsPass = { pass, key };
-                starsBuilding = "";
-                requestRender();
-            },
-        );
+        createStarsPass(device, {
+            format: "rgba32float",
+            toneMap: false,
+            catalog,
+            constellations,
+            faintStars,
+            // The faint stars crowd the Milky Way's tiles in a wide view.
+            capacity: 256,
+            milkyWay,
+            dither: false,
+        }).then((pass) => {
+            if (starsBuilding !== key) return pass.destroy();
+            starsPass?.pass.destroy();
+            starsPass = { pass, key };
+            starsBuilding = "";
+            requestRender();
+        });
     }
-    function buildMoon(key: string, { toneMap, nightVision }: StarsFrame) {
+    function buildMoon(key: string, { format, headroom, toneMap, darkAdapted }: StarsFrame) {
         if (moonBuilding === key) return;
         moonBuilding = key;
         createMoonPass(device, {
-            format: SDR,
+            format,
+            headroom,
             toneMap,
+            // Over the night sky's gradients: dithered for an 8-bit target.
+            dither: format === "rgba8unorm",
             background: true,
             maps: moonMaps,
-            nightVision,
+            darkAdapted,
             samples: 4,
         }).then((pass) => {
             if (moonBuilding !== key) return pass.destroy();
@@ -248,7 +287,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 buildStars(starsKey);
                 return null;
             }
-            const moonKey = `${frame.toneMap} ${frame.nightVision} ${moonMaps ? "maps" : "plain"}`;
+            const moonKey = `${frame.format} ${frame.headroom} ${frame.toneMap} ${frame.darkAdapted} ${moonMaps ? "maps" : "plain"}`;
             if (!moonPass || moonPass.key !== moonKey) {
                 buildMoon(moonKey, frame);
                 return null;
@@ -269,17 +308,22 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             }
             const theAir = frame.air ? air : null;
             const ground = frame.air ? horizonZ(s.heightM, s.model.planet.groundRadiusKm) : -1;
-            // Metered on the sky where it is brighter than the stars' light, else for the Milky Way: a texel of its
-            // mean, some 24 magnitudes per square arcsecond, as mid gray.
-            const milkyWayEV100 = Math.log2(8 * 1.7e-3 * 0.027) + 2;
-            // And never brighter than the moonlit sky allows: the day's sky at the Moon's share of the Sun's light, some
-            // 0.05 cd/m² per lux at the observer, a stop under mid gray so the stars keep their room.
+            // Metered on the sky where it is brighter than the stars' light, else on the Milky Way, a texel of its mean,
+            // some 24 magnitudes per square arcsecond, and on the moonlit sky, some 0.05 cd/m² per lux of the Moon at the
+            // observer; then lowered as the eye finds a dim scene, so night stays dark instead of a pale day.
+            const milkyWay = 1.7e-3 * 0.027;
             const moonlit =
-                frame.moon && frame.air && s.moonDirection[2] > 0
-                    ? Math.log2(8 * 0.05 * s.moonIlluminance * s.moonDirection[2]) - 1
-                    : Number.NEGATIVE_INFINITY;
-            const metered = Math.max(frame.air ? skyEV100 : Number.NEGATIVE_INFINITY, milkyWayEV100, moonlit);
-            const ev100 = frame.ev100 ?? Math.min(Math.max(Math.round(metered * 10) / 10, -14), 20);
+                frame.moon && frame.air && s.moonDirection[2] > 0 ? 0.05 * s.moonIlluminance * s.moonDirection[2] : 0;
+            const metered = Math.max(frame.air ? 2 ** (skyEV100 - 3) : 0, milkyWay, moonlit);
+            const automatic = ev100FromLuminance(metered) - lowLightCompensation(metered);
+            const goal = Math.min(Math.max(automatic, DARKEST_EV100), 20);
+            // Followed over time, each step at most a 30th of a second, so a jump after a pause eases in too.
+            const now = performance.now();
+            const seconds = adapted ? Math.min((now - adapted.at) / 1000, 1 / 30) : 0;
+            const following = adapted ? adaptEV100(adapted.ev100, goal, seconds, ADAPTATION) : goal;
+            adapted = { ev100: following, at: now };
+            const adapting = frame.ev100 === null && Math.abs(following - goal) > 0.01;
+            const ev100 = frame.ev100 ?? following;
 
             const started = performance.now();
             const view = {
@@ -291,29 +335,36 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 sunDirection: s.sunDirection,
                 sunAngularDiameter: s.sunAngularDiameter,
                 observerHeightM: s.heightM,
+                // The disc's edge stays smooth through the Moon pass' tone curve: twice what it shows as white.
+                sunDiscCeiling: 2 * frame.headroom * 1.2 * 2 ** ev100,
                 pixelRatio: frame.pixelRatio,
                 ev100: UNIT_EV100,
                 autoExposureKeys: [],
-                autoExposureRange: [-10, 20],
+                autoExposureRange: [-20, 20],
                 moonDirection: s.moonDirection,
                 moonIlluminance: frame.moon ? s.moonIlluminance : 0,
             });
-            // The stars pass writes cd/m² for the Moon pass to expose; its cut-off follows the display's exposure.
+            // The stars pass writes cd/m² for the Moon pass to expose; its cut-off, knee and halo follow the display's.
             starsPass.pass.update({
                 ...view,
                 skyRotation: s.skyRotation,
                 years: s.years,
                 ev100: UNIT_EV100,
-                threshold: (1 / 2048) * (1.2 * 2 ** ev100),
+                displayEV100: ev100,
+                // A star's core as bright as the display shows, so on an HDR display the points outshine SDR white.
+                knee: frame.headroom,
                 horizonZ: ground,
                 air: theAir,
                 scintillation: frame.twinkle ? 1 : 0,
+                heightM: s.heightM,
                 time: frame.time,
-                glare: frame.glare ? 1 : 0,
+                halo: frame.glare ? 1 : 0,
+                constellations: frame.constellations,
+                faintStars: frame.faintStars ? Number.POSITIVE_INFINITY : 0,
+                constellationWidth: 1.25 * frame.pixelRatio,
+                constellationGap: 4 * frame.pixelRatio,
                 starLight: frame.stars ? 1 : 0,
                 milkyWay: frame.milkyWay ? 1 : 0,
-                magnitudeLimit: frame.magnitudeLimit,
-                heightM: s.heightM,
             });
             const refraction = frame.air
                 ? refractionTable(s.moonDirection, s.moonAngularDiameter, s.bend, s.through)
@@ -325,6 +376,8 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 sunDirection: s.moonSunDirection,
                 sunIlluminance: frame.moon ? SUN_ILLUMINANCE : 0,
                 earthshine: frame.moon ? s.earthshine : 0,
+                // As the eye sees the Moon, adapted to it, however long the night around it is exposed.
+                exposureCompensation: localAdaptation(ev100, s.moonEV100),
                 orientation: s.moonOrientation,
                 ev100,
                 horizonZ: ground,
@@ -360,7 +413,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                     if (frame.ev100 === null) requestRender();
                 });
             }
-            return { ev100, passesMs, air: theAir };
+            return { ev100, adapting, passesMs, air: theAir };
         },
     };
 }

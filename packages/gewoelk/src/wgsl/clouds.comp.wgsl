@@ -17,6 +17,7 @@
 @group(0) @binding(10) var gwAerialTransmittance: texture_3d<f32>;
 @group(0) @binding(11) var gwClampSampler: sampler;
 @group(0) @binding(12) var<storage, read> gwDeck: array<f32>;
+@group(0) @binding(13) var gwDetailSampler: sampler;
 
 // Whether a background is bound, the sky in cd/m² the far clouds fade into.
 override GW_BACKGROUND: bool = true;
@@ -96,8 +97,9 @@ fn gwThinning(x: GwPoint, left: f32) -> vec2f {
         let before = min(h - o * (1.0 - column.r), o + column.r * (1.0 - o) * reach - h);
         let after = min(h - o * (1.0 - n), o + n * (1.0 - o) * reach - h);
         // Measured from where the surface was, so the billows that heap it beyond the mound shrink with it, and
-        // nothing changes at a threshold of 0.
-        let kept = select(0.0, smoothstep(-0.15, 0.0, after - min(before, 0.0)), n > 0.0);
+        // nothing changes at a threshold of 0. A remnant fades with what is left of its mound, else it would end as a
+        // flat slab with vertical walls.
+        let kept = smoothstep(-0.15, 0.0, after - min(before, 0.0)) * smoothstep(0.0, 0.3, n / max(column.r, 1e-3));
         stays = kept * smoothstep(0.0, 0.3, left);
     }
     return vec2f(stays, 1.0 - max(1.0 - left, thinned));
@@ -114,9 +116,9 @@ fn gwDensity(m: vec4f, x: GwPoint, thinning: vec2f) -> GwSample {
     // Read at the height above the base, not above the planet's center: a sampler's fixed-point texel coordinates
     // overflow some ten thousand tiles out.
     let local = vec3f(x.ground - volume.drift, x.height);
-    // Wrapped here, in full float precision, before the sampler's coarser coordinates see it, and in height too: the
-    // sampler clamps there, and above a tile the noise would stand still, a seam at one height through every cloud.
-    let noise = textureSampleLevel(gwDetail, gwVolumeSampler, fract(local / volume.noiseScale), 0.0);
+    // Wrapped here, in full float precision, before the sampler's coarser coordinates see it; the sampler repeats in
+    // all three axes, so the filter runs across a tile's edge.
+    let noise = textureSampleLevel(gwDetail, gwDetailSampler, fract(local / volume.noiseScale), 0.0);
     let wispy = mix(noise.r, noise.g, profile);
     let billowy = mix(noise.b * 0.3, noise.a * 0.3, pow(profile, 0.25));
     // Billowy rather than wispy for the most part: the map's type field only shifts the blend.
@@ -130,21 +132,10 @@ fn gwDensity(m: vec4f, x: GwPoint, thinning: vec2f) -> GwSample {
 }
 
 // The cloudscape along the ray from `t0` to `t1`.
-// The sun's light through the cloudscape at `p`, 1 to 0, from the light grid: the slices at the sun's elevation there.
-fn gwSunThrough(p: vec3f, sun: vec3f) -> f32 {
-    let volume = gwParams.cloudscape;
-    let q = gwVolumeCoordinate(gwPointAt(p));
-    let span = volume.lightElevations;
-    let slice = clamp((gwElevation(sun, p / length(p)) - span.x) / max(span.y - span.x, 1e-6), 0.0, 1.0) * 3.0;
-    let summed = dot(textureSampleLevel(gwLight, gwVolumeSampler, q, 0.0), max(1.0 - abs(slice - vec4f(0.0, 1.0, 2.0, 3.0)), vec4f(0.0)));
-    return exp(-volume.extinction * summed);
-}
-
 fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, uv: vec2f, sky: vec3f) -> GwLayer {
     let volume = gwParams.cloudscape;
-    // The air in front of the clouds lies in their shadow where the deck closes towards the sun: its light, the sun's
-    // forward glow above all, dimmed by what the deck lets through where the ray meets it, a share kept for the sky's.
-    let shade = mix(0.3, 1.0, gwSunThrough(o + v * max(t0, 0.0), sun));
+    // The air in front of the clouds is not dimmed by their shadow: the background beside them is not either, so a far
+    // cloud seen from under the deck would fade into a darker copy of the sky, a band along the horizon.
     let extinction = volume.extinction;
     let groundShade = gwGroundShade(sun);
     // Each order's lobe, the same all along the ray.
@@ -160,8 +151,14 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
     // Jittered by up to a step as long as the first, so the bands a fixed start would draw turn into fine noise: far
     // off, where the steps have grown, by as much more.
     var t = t0 + jitter * gwParams.jitter * max(volume.stepMin, volume.stepGrowth * sqrt(max(t0, 0.0)));
+    // Whether the ray got to its end, and if not, whether it was still in the cloud its last step met, and the light
+    // that step added per share it covered: see after the march.
+    var ended = false;
+    var within = false;
+    var last = vec3f(0.0);
     for (var i = 0u; i < GW_MAX_STEPS; i = i + 1u) {
         if (t >= t1 || layer.transmittance < GW_MIN_TRANSMITTANCE) {
+            ended = true;
             break;
         }
         let p = o + v * t;
@@ -169,6 +166,7 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
         let x = gwPointAt(p);
         let left = gwClearingOver(x.ground);
         if (left <= 0.0) {
+            ended = true;
             break;
         }
         let q = gwVolumeCoordinate(x);
@@ -176,6 +174,7 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
         let sdf = gwSignedDistance(m, q);
         let adaptive = max(volume.stepMin, volume.stepGrowth * sqrt(max(t, 0.0)));
         let step = max(sdf, adaptive);
+        within = within && sdf < 0.0;
         if (sdf < 0.0) {
             let thinning = gwThinning(x, left);
             let sample = gwDensity(m, x, thinning);
@@ -229,14 +228,21 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
                 let scattered = sigmaS * (direct + ambient);
                 let through = exp(-sigmaT * step);
                 // Seen through the air between, at this step's own distance, as gwFaded sees a whole layer.
-                var air = gwAirAt(uv, t, sky);
-                air.luminance = air.luminance * shade;
+                let air = gwAirAt(uv, t, sky);
                 let covered = layer.transmittance * (1.0 - through);
-                layer.luminance = layer.luminance + covered * (air.transmittance * scattered / sigmaT + air.luminance);
+                last = air.transmittance * scattered / sigmaT + air.luminance;
+                within = true;
+                layer.luminance = layer.luminance + covered * last;
                 layer.transmittance = layer.transmittance * through;
             }
         }
         t = t + step;
+    }
+    // Out of steps within a cloud, e.g. along a deck seen from below: what is left of it is taken as opaque, lit as its
+    // last step was, rather than letting the sky behind show through.
+    if (!ended && within) {
+        layer.luminance = layer.luminance + layer.transmittance * last;
+        layer.transmittance = 0.0;
     }
     // What the march gave up on below the last percent is opaque, as Nubis3 remaps it: no layer behind shows through.
     layer.transmittance = max(layer.transmittance - GW_MIN_TRANSMITTANCE, 0.0) / (1.0 - GW_MIN_TRANSMITTANCE);

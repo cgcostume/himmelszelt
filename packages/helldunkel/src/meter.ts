@@ -1,4 +1,4 @@
-import { ev100FromLuminance } from "./exposure.js";
+import { ev100FromLuminance, lowLightCompensation } from "./exposure.js";
 import * as wgsl from "./wgsl/index.js";
 
 /** The bins of each of a meter's histograms, `HD_METER_BINS` in meter.comp.wgsl. */
@@ -109,6 +109,8 @@ export interface MeterReading extends MeterAverage {
      * place still counts by the area it covers, on average. Every texel by default.
      */
     maxSize?: number;
+    /** Lowers a dim scene's EV100 by `lowLightCompensation`, in `result` and `readEV100`, so night stays dark. Off by default. */
+    lowLight?: boolean;
     /** Follows the last reading over this many seconds, in `result`'s `adapted`. Without it, `adapted` takes this reading. */
     adapt?: MeterAdaptation & { seconds: number };
 }
@@ -132,7 +134,7 @@ export interface MeterPass {
     readHistogram(): Promise<MeterHistogram>;
     /** Their average luminance, by `meteredLuminance`, as the reading asked. */
     readLuminance(): Promise<number>;
-    /** The same as an EV100. Only for light in cd/m²: an image of relative values reads an EV100 as relative as they are. */
+    /** The same as an EV100, lowered at low light if the reading asked. Only for light in cd/m²: an image of relative values reads an EV100 as relative as they are. */
     readEV100(): Promise<number>;
     destroy(): void;
 }
@@ -144,7 +146,7 @@ export async function createMeterPass(device: GPUDevice, options: MeterPassOptio
         label: "helldunkel:meter",
         layout: "auto",
         compute: {
-            module: device.createShaderModule({ code: [wgsl.meter, wgsl.meterSource(kind)].join("\n") }),
+            module: device.createShaderModule({ code: [wgsl.exposure, wgsl.meter, wgsl.meterSource(kind)].join("\n") }),
             entryPoint: "hdMeter",
         },
     });
@@ -152,7 +154,7 @@ export async function createMeterPass(device: GPUDevice, options: MeterPassOptio
         label: "helldunkel:meterResolve",
         layout: "auto",
         compute: {
-            module: device.createShaderModule({ code: [wgsl.meter, wgsl.meterSource(kind)].join("\n") }),
+            module: device.createShaderModule({ code: [wgsl.exposure, wgsl.meter, wgsl.meterSource(kind)].join("\n") }),
             entryPoint: "hdMeterResolve",
         },
     });
@@ -168,6 +170,7 @@ export async function createMeterPass(device: GPUDevice, options: MeterPassOptio
     });
     device.queue.writeTexture({ texture: allCount }, new Uint8Array([255]), { bytesPerRow: 1 }, [1, 1]);
     let average: MeterAverage = {};
+    let lowLight = false;
     const counts = device.createBuffer({
         label: "helldunkel:meter",
         size: BYTES,
@@ -205,6 +208,7 @@ export async function createMeterPass(device: GPUDevice, options: MeterPassOptio
         encode(encoder, source, reading = {}) {
             const { focus, mask, adapt, maxSize, rangeStops = 10, percentiles } = reading;
             average = percentiles ? { percentiles } : { rangeStops };
+            lowLight = reading.lowLight ?? false;
             const stride = maxSize ? Math.max(Math.ceil(source.width / maxSize), 1) : 1;
             const texels = (source.width * source.height * (kind === "cube" ? 6 : 1)) / stride ** 2;
             const [x = 0, y = 0, z = 1] = focus?.direction ?? [];
@@ -226,6 +230,7 @@ export async function createMeterPass(device: GPUDevice, options: MeterPassOptio
                     adapt?.toBrighter ?? 0,
                     adapt?.toDarker ?? 0,
                     stride,
+                    lowLight ? 1 : 0,
                 ]),
             );
             encoder.clearBuffer(counts);
@@ -268,7 +273,10 @@ export async function createMeterPass(device: GPUDevice, options: MeterPassOptio
         },
         readHistogram,
         readLuminance,
-        readEV100: async () => ev100FromLuminance(await readLuminance()),
+        readEV100: async () => {
+            const luminance = await readLuminance();
+            return ev100FromLuminance(luminance) - (lowLight ? lowLightCompensation(luminance) : 0);
+        },
         destroy() {
             counts.destroy();
             result.destroy();

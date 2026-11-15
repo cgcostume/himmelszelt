@@ -89,7 +89,7 @@ export function softShadowsFigure(root: HTMLElement) {
             earthshine: true,
             eclipse: false,
             law: "hapke2012",
-            nightVision: false,
+            darkAdapted: false,
         };
         // The close-ups a stop more open than the disc's meter, for the low Sun at the terminator.
         const close = { ...common, ev100: moonEV100(m.phaseAngle, m.lit) - 1, offset, degreesAcross: closeup };

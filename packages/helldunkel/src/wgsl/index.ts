@@ -1,15 +1,16 @@
 /**
- * The WGSL layer, exported as plain strings. `tonemap`, `glare` and `vision` are binding-free, for a consumer's own shaders; `bloom`
+ * The WGSL layer, exported as plain strings. `exposure`, `tonemap`, `glare` and `vision` are binding-free, for a consumer's own shaders; `bloom`
  * and `meter` are the passes, with bindings of their own. Every identifier is prefixed `hd` (or `HD_` for constants) so several
  * `@himmelszelt/*` fragments can share one shader module.
  */
 import bloom from "./bloom.comp.wgsl";
+import exposure from "./exposure.wgsl";
 import glare from "./glare.wgsl";
 import meter from "./meter.comp.wgsl";
 import tonemap from "./tonemap.wgsl";
 import vision from "./vision.wgsl";
 
-export { bloom, glare, meter, tonemap, vision };
+export { bloom, exposure, glare, meter, tonemap, vision };
 
 /** The bloom pass' output binding, which has to spell out the target's format. */
 export const bloomOutput = (format: GPUTextureFormat) =>
@@ -17,7 +18,7 @@ export const bloomOutput = (format: GPUTextureFormat) =>
 
 /**
  * What the meter reads: the source's binding and its entry point, which counts every texel by the share of the sphere or
- * of the image it covers. After `meter`, whose functions it calls.
+ * of the image it covers. After `exposure` and `meter`, whose functions it calls.
  */
 export const meterSource = (kind: "cube" | "2d" | "equirectangular") =>
     kind === "cube"

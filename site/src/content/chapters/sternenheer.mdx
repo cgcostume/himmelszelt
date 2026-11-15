@@ -13,6 +13,7 @@ references:
     - kim2002
     - cie2002
     - dravins1998
+    - osborn2015
     - svs4851
     - masana2021
     - mueller2012thesis
@@ -22,6 +23,7 @@ import Cite from "../../components/Cite.astro";
 import Controls from "../../components/sternzeit/Controls.astro";
 import Term from "../../components/Term.astro";
 import Fig from "../../components/Fig.astro";
+import Planned from "../../components/Planned.astro";
 import Stars from "../../components/sternenheer/Stars.astro";
 
 This chapter is being written. The sky below is live, and it grows with the chapter.
@@ -103,11 +105,33 @@ magnitude stays a dim one. No magnitude limit decides which stars show; the expo
 a star too faint for it is simply not there. Set the exposure of <Fig id="stars" /> by hand and open it stop by stop:
 the stars come up in order of their magnitudes, the faint ones last.
 
-The eye adds a veil. A bright point scatters a little of its light across the whole retina, the same
-<Term of="Veiling glare">veiling glare</Term> the Sun throws in dunstkreis, which CIE's equation gives as a luminance
-per lux by the angle to the source <Cite id="cie2002" />: around Sirius it is a halo a degree wide on your own field of
-view, which the pass takes as the angle the picture spans at your eye, around the fainter stars nothing the sky does not
-outshine. Switch the figure's `glare` off, and every bright star shrinks to its spot.
+A screen shows nothing brighter than its white, and a spot that burns out widens into a fat disc, which no eye ever
+sees around a star. sternenheer keeps the spot a point: its luminance stops at a knee, display white by default, and
+the light beyond goes into a halo that falls as 1/r² and brightens only with the logarithm of that light, as glare in a
+photograph does, so a brighter star grows a wider halo, never a fatter core. The core whitens as far as its light
+passes the knee, as a sensor's channels fill up one after the other, and the star's color lives on in its halo. Zoom
+into <Fig id="stars" />: more stars come up, the ones already there grow their halos, and every core stays a pixel. Switch the figure's `glare` off, and
+every star shrinks to its spot. The eye's own <Term of="Veiling glare">veiling glare</Term>, CIE's equation
+<Cite id="cie2002" />, is a parameter of the pass too, by the angle the picture spans at your eye, but off by default:
+at the angle of a pixel it counts the scatter of the viewer's eye twice and swells every star into a blob.
+
+<Planned title="A star under the loupe">
+One star magnified to a grid of pixels, next to its profile, the luminance over the radius on a logarithmic scale.
+Sliders for the magnitude and the exposure: the core rises to the knee and whitens, the light beyond goes into the
+halo. A number sums every pixel and stays the star's illuminance, whatever the sliders say.
+</Planned>
+
+<Planned title="Zooming in, and where the light goes">
+The same patch of sky at three focal lengths side by side. A star stays a pixel wide and its luminance grows with the
+square of the zoom, the sky behind it does not, which is why more stars come up. With the classic mistake next to it,
+stars as fat discs.
+</Planned>
+
+<Planned title="A frame, pass by pass">
+A frame's intermediate results as a strip: the tiles colored by how many stars each holds, the halos' grid, the
+levels of the pyramid, the composed image. With the measured milliseconds per pass, and the number of stars and the
+tile size to change.
+</Planned>
 
 ## The sky turning
 
@@ -146,11 +170,27 @@ carries the difference as a <Term of="Color index">color index</Term>, B minus V
 a blue filter than through a yellow one. A star radiates close to a black body, so the index gives a temperature,
 by Ballesteros' formula <Cite id="ballesteros2012" />, 10,100 K for Vega, 5,800 K for the Sun, 3,300 K for Betelgeuse,
 and a temperature gives a chromaticity on the Planckian locus <Cite id="kim2002" /> and from there a color in linear
-sRGB at unit luminance, which the magnitude then scales. `colorFromColorIndex` does the three steps; the shipped
-catalog holds the result of the approximate path osgHimmel took, after Jensen et al. <Cite id="jensen2001" />, which
-runs hot, 12,500 K for Vega, and makes the blue stars a little bluer. The colors are saturated on purpose: a star's
-light is a black body's, and the eye at night, which sees little color, is [the night vision](#through-the-air)
+sRGB at unit luminance, which the magnitude then scales. `colorFromColorIndex` does the three steps, and the
+shipped catalog holds its result for every star. The catalog lists no color index for 310 of its stars, and those get
+the typical one of their spectral type. The colors are saturated on purpose: a star's
+light is a black body's, and the eye at night, which sees little color, is [the `eye at night`](#through-the-air)
 switch's business.
+
+<Planned title="From a color index to a color">
+The Planckian locus on the chromaticity diagram with sRGB's triangle, and a band of the colors over B-V below it. A
+slider for B-V, or a click on Vega, the Sun, Arcturus, Betelgeuse: the temperature, the point on the locus and the
+color follow. A switch between Ballesteros' temperature and Jensen's shows where they part.
+</Planned>
+
+<Planned title="The colors of nine thousand stars">
+A histogram of the catalog over B-V, every bar in its stars' color: most stars lie near white, and the few that are
+plainly red or blue are bright ones.
+</Planned>
+
+<Planned title="The colors we see at night" plan="needs the magnitude below which a star looks colorless, from a source.">
+The same sky as a camera records it and as the eye sees it: below the cones' threshold for a point of light a star
+loses its color, so only the brightest keep a tint. A slider for how dark adapted the eye is.
+</Planned>
 
 ## Through the air
 
@@ -168,10 +208,14 @@ a rising star is red and faint and why the Milky Way fades into the haze long be
 dunstkreis' `airTransmittance` at every altitude, and the pass dims each star and each pixel of the Milky Way by it.
 
 And it twinkles. The air's turbulence bends a star's light this way and that on its way down, and a pupil seven
-millimeters wide catches now more of it, now less: the light's logarithm scatters by a fifth near the zenith and
-grows with the airmass to the power 1.75, Young's scaling as Dravins and colleagues give it for a small aperture and a
-short integration <Cite id="dravins1998" />, doubling by 30° up and saturating there. Near the horizon the air also
-disperses the star's light into a tiny spectrum, and the red and the blue twinkle apart, which is the flashing of
+millimeters wide catches now more of it, now less. The patches of light and shade the turbulence throws on the ground
+are some 6 cm wide, far wider than the pupil, so the eye gets no averaging from its aperture, and from one millisecond
+to the next a star at the zenith flickers by a quarter of its light in ordinary air <Cite id="dravins1998" />. The eye
+is slow, though: it adds the light up over a tenth of a second, some thirty flickers, and what is left is 7% at the
+zenith, too little to notice, 15% at 30° up and over a third near the horizon, where the light passes through more of
+the turbulence and the flicker slows down <Cite id="osborn2015" />. `scintillationIndex` gives the number for a seeing
+and an integration time, a camera's as well as the eye's. Low down the air also disperses the star's light into a tiny
+spectrum, and once the red and the blue pass through different patches they twinkle apart, which is the flashing of
 colors a low Sirius is famous for. The pass draws the star's light with a random factor per channel, smooth in time
 and correlated across the channels high up, independent low down, from a hash of the star and the time: switch the
 figure's `twinkle` on and watch the horizon. A planet, a disc rather than a point, twinkles far less, and sternenheer
@@ -180,7 +224,18 @@ has none yet.
 The sky behind the stars is dunstkreis': by day it outshines all of them, by moonlight the fainter ones, and the
 figure meters on it where it is brighter than the stars' own light. The eye sees the night differently than a camera:
 below some 4 cd/m² its rods take over, colors fade and shift towards blue, and helldunkel's blue shift turns the
-composed light into that before it is exposed, the figure's `night vision` switch, as in nachtgestirn.
+composed light into that before it is exposed, the figure's `eye at night` switch, as in nachtgestirn.
+
+<Planned title="Twinkling">
+One star and its light over two seconds, next to the twinkling's strength over the altitude. Sliders for the altitude,
+the seeing and the integration time, the eye's tenth of a second against a camera's millisecond: next to nothing at
+the zenith, a flicker near the horizon, and low down the three channels come apart.
+</Planned>
+
+<Planned title="Why planets do not twinkle" plan="optional; may merge into the twinkling figure.">
+The turbulence's pattern of light and shade on the ground, with a pupil of 7 mm and a telescope of 20 cm on it: the
+pupil is smaller than a patch, the telescope averages over many, and so does a planet's disc.
+</Planned>
 
 ## The Milky Way
 
@@ -198,6 +253,13 @@ magnitudes per square arcsecond, brighter than a dark sky's 21.5, the galactic p
 you see in the figure is the band you see on a dark night, at the light the sky gives it: zoom out and dim the
 exposure, and it fades into the sky before the stars do.
 
+<Planned title="Against photographs" plan="needs photographs with a known moment, place, lens and exposure, free to show.">
+Photographs of the night sky next to the same sky drawn for their moment, place, lens and exposure, with a divider to
+drag across: a wide view with the Milky Way, a constellation at a normal focal length, a moonlit night. Under each
+pair what matches and what does not, the limiting magnitude, the Milky Way's brightness against the stars, the sky's
+color.
+</Planned>
+
 ## Precise and approximate
 
 Two pieces come in a precise and a cheaper variant. The precession is Meeus' three angles and their rotation, or
@@ -205,7 +267,7 @@ Jensen et al.'s linear approximation of them <Cite id="jensen2001" />, which ste
 `approx` entry: within an arcsecond of each other over this century, far below a pixel, so the approximate one is
 the one to take. The star's temperature is Ballesteros' formula or Jensen's, and here the difference shows: Jensen's
 makes Vega 12,500 K instead of 10,100 and Betelgeuse 2,900 K instead of 3,300, which is bluer blue stars and redder
-red ones, the shipped catalog's colors. `colorFromColorIndex` and `colorFromColorIndexApprox` are both there, to recolor
+red ones, osgHimmel's colors. `colorFromColorIndex` and `colorFromColorIndexApprox` are both there, to recolor
 a catalog either way.
 
 ## The people behind the numbers

@@ -84,6 +84,16 @@ const readout = (x: number, y: number, name: string, value: string, anchor: stri
 const polyline = (points: (readonly [number, number])[], cls: string) =>
     `<polyline points="${points.map(([x, y]) => `${f(x)},${f(y)}`).join(" ")}" class="${cls}"/>`;
 
+/** A normal on the disc: a dot where it stands (unless hidden behind the limb), a shaft and a head along (ux, uy). */
+function normalVector(px: number, py: number, ux: number, uy: number, length: number, dot = true) {
+    let svg = dot ? `<circle cx="${f(px)}" cy="${f(py)}" r="1.8"/>` : "";
+    if (length <= SUN_HEAD_LENGTH) return svg;
+    const [tx, ty] = [px + ux * length, py + uy * length];
+    const [hx, hy] = [tx - ux * SUN_HEAD_LENGTH, ty - uy * SUN_HEAD_LENGTH];
+    svg = `<line x1="${f(px)}" y1="${f(py)}" x2="${f(hx)}" y2="${f(hy)}"/>${svg}`;
+    return `${svg}<polygon points="${f(tx)},${f(ty)} ${f(hx - uy * 2.4)},${f(hy + ux * 2.4)} ${f(hx + uy * 2.4)},${f(hy - ux * 2.4)}"/>`;
+}
+
 /**
  * The Moon as seen from the chosen place in `view`, a `.moon-view`: its disc, phase, grid, axis, the Sun's direction
  * and the readouts in an SVG, redrawn whenever the moment or the place change.
@@ -188,6 +198,9 @@ export function moonView(view: HTMLElement, options: MoonViewOptions = {}) {
         ]);
         if (!behind) svg += polyline([...litScreen, ...litScreen.slice(0, 1)], "moon-day");
 
+        svg += `<circle r="${f(radius)}" class="moon-limb"/>`;
+        // The annotations, which the figure's switch hides: the grid, the reference sizes, the tilt, the center, the Sun.
+        svg += `<g class="moon-annotations">`;
         // The selenographic grid, only its near side.
         for (let lon = -180; lon < 180; lon += GRID_STEP) {
             const meridian = Array.from({ length: 37 }, (_, i) => selenographic(lon, -90 + i * 5, l, b));
@@ -199,7 +212,6 @@ export function moonView(view: HTMLElement, options: MoonViewOptions = {}) {
             const cls = lat === 0 ? "moon-grid moon-grid-main" : "moon-grid";
             for (const run of visibleRuns(parallel, tilt, radius)) svg += polyline(run, cls);
         }
-        svg += `<circle r="${f(radius)}" class="moon-limb"/>`;
         // Apogee and perigee sizes on top of the disc: the smaller one mostly falls inside it. Named between the two
         // circles and just outside the larger one, the text along the circle.
         const [apogee, perigee] = [APOGEE_KM, PERIGEE_KM].map((km) => radiusAt(km) * UNITS_PER_RADIAN);
@@ -213,11 +225,16 @@ export function moonView(view: HTMLElement, options: MoonViewOptions = {}) {
             svg += `<text x="${f(x)}" y="${f(y)}" transform="rotate(${180 - REFERENCE_LABEL_ANGLE} ${f(x)} ${f(y)})" class="figure-label">${name}</text>`;
         }
 
-        // The lunar north pole and the axis' tilt against the zenith, outside the perigee circle so they never overlap it: a
-        // tick from the limb along the axis with an N beyond, a dashed tick straight up, and an arc between the two.
+        // The lunar north pole: the axis as a vector out of the pole, foreshortened as the libration tilts it, with the N at
+        // its tip; with the pole turned away, out from behind the limb. Unlocked, a dashed tick up and an arc between.
         const [nx, ny] = toScreen([0, 1], tilt, 1);
-        svg += `<line x1="${f(nx * radius)}" y1="${f(ny * radius)}" x2="${f(nx * (OUTSIDE + 7))}" y2="${f(ny * (OUTSIDE + 7))}" class="moon-axis"/>`;
-        svg += svgText(nx * (OUTSIDE + 13), ny * (OUTSIDE + 13), "N", "figure-note");
+        const northPole = selenographic(0, 90, l, b);
+        const facing = northPole[2] > 0;
+        const [sx, sy] = facing ? toScreen(northPole, tilt, radius) : [nx * radius, ny * radius];
+        // Up to where the tick stood, clear of the perigee circle, so the N keeps its place over the largest disc too.
+        const axisLength = (OUTSIDE + 7 - radius) * Math.hypot(northPole[0], northPole[1]);
+        svg += `<g class="moon-sun-normal">${normalVector(sx, sy, nx, ny, axisLength, facing)}</g>`;
+        svg += svgText(sx + nx * (axisLength + 6), sy + ny * (axisLength + 6), "N", "figure-note");
         const tiltDeg = ((((twist + 180) % 360) + 360) % 360) - 180;
         if (!locked) {
             svg += `<line x1="0" y1="${f(-OUTSIDE)}" x2="0" y2="${f(-(OUTSIDE + 7))}" class="moon-zenith"/>`;
@@ -234,21 +251,13 @@ export function moonView(view: HTMLElement, options: MoonViewOptions = {}) {
         const across =
             Math.hypot(sunFrame.right, sunFrame.up) / Math.hypot(sunFrame.right, sunFrame.up, sunFrame.toward);
         if (sunFrame.toward > 0) {
-            const [px, py] = [ux * radius * across, uy * radius * across];
-            const length = SUN_NORMAL_LENGTH * across;
-            let normal = `<circle cx="${f(px)}" cy="${f(py)}" r="1.8"/>`;
-            if (length > SUN_HEAD_LENGTH) {
-                const [tx, ty] = [px + ux * length, py + uy * length];
-                const [hx, hy] = [tx - ux * SUN_HEAD_LENGTH, ty - uy * SUN_HEAD_LENGTH];
-                const shaft = `x1="${f(px)}" y1="${f(py)}" x2="${f(hx)}" y2="${f(hy)}"`;
-                normal = `<line ${shaft}/>${normal}`;
-                normal += `<polygon points="${f(tx)},${f(ty)} ${f(hx - uy * 2.4)},${f(hy + ux * 2.4)} ${f(hx + uy * 2.4)},${f(hy - ux * 2.4)}"/>`;
-            }
+            const normal = normalVector(ux * radius * across, uy * radius * across, ux, uy, SUN_NORMAL_LENGTH * across);
             svg += `<g class="moon-sun-normal">${normal}</g>`;
         } else {
             const arrow = arrowAround({ x: 0, y: 0 }, { x: ux, y: uy }, SUN_CIRCLE, unitsPerPx);
             svg += offPanelArrowSvg(arrow, true);
         }
+        svg += "</g>";
 
         // The visible horizon, below the Moon by its apparent altitude over it, at the disc's own scale (so it only shows
         // within a few tenths of a degree); the ground beneath veils what it hides.
@@ -270,6 +279,7 @@ export function moonView(view: HTMLElement, options: MoonViewOptions = {}) {
             svg += svgText(corner.x, corner.y, altitude > 0 ? "above the horizon" : "below the horizon", cornerCls);
         }
 
+        svg += `<g class="moon-annotations">`;
         // The readouts, each beside what it measures: the tilt by its arc, the size under the disc, the libration and the
         // earthshine to either side.
         const ew = l >= 0 ? "E" : "W";
@@ -299,6 +309,7 @@ export function moonView(view: HTMLElement, options: MoonViewOptions = {}) {
             svg += readout(right, corner - line * 1.25, "libration", libration, "end");
             svg += readout(right, corner, "earthshine", shine, "end");
         }
+        svg += "</g>";
         drawSvg(svgEl, svg, unitsPerPx);
         behind?.({
             widthPx: (2 * halfWidth) / unitsPerPx,

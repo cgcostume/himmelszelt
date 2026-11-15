@@ -13,6 +13,7 @@ import {
     onChange,
     state,
 } from "../sternzeit/state";
+import { drawLabels } from "./globe-labels";
 import { noGpu, orbited } from "./laws";
 import { MAPS_TEXELS, type MapSize, moonAt, type ToneCurveName } from "./renderer";
 import { createTiles } from "./tiles";
@@ -20,7 +21,7 @@ import { createTiles } from "./tiles";
 const DEG = Math.PI / 180;
 // How far the view zooms in, from the whole disc with a margin round it.
 // How far the view zooms out; in, no further than a texel of the map to a pixel at the disc's middle.
-const ZOOM_MIN = 0.2;
+const ZOOM_MIN = 0.08;
 // The zoom the figure opens at and a double click returns to: the disc taller than the view, its limb in close.
 const ZOOM_START = 1.6;
 // The view's width over its height, a wide screen's, outside full screen.
@@ -67,6 +68,13 @@ export function globeFigure(root: HTMLElement) {
             Math.min(window.devicePixelRatio || 1, 2);
         return Math.max(1, (4 * texels * 1.15) / Math.max(px, 1));
     };
+    const annotations = find("[data-field=annotations]", root);
+    const layer = find<SVGSVGElement>("[data-field=annotationLayer]", root);
+    const annotated = () => annotations.getAttribute("aria-pressed") === "true";
+    annotations.addEventListener("click", () => {
+        annotations.setAttribute("aria-pressed", String(!annotated()));
+        requestRender();
+    });
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
     // The site's 8K maps where the GPU holds them, for a disc too large for the package's.
@@ -111,13 +119,21 @@ export function globeFigure(root: HTMLElement) {
             earthshine: true,
             eclipse: false,
             law: "hapke2012" as const,
-            nightVision: false,
+            darkAdapted: false,
         };
         tiles?.draw({ count: 1, width, height, degreesAcross: across()[0] * radius }, () => ({
             offset: [view.x * radius, view.y * radius] as const,
             moon: m,
             ...frame,
         }));
+        if (annotated()) {
+            const shownAs = {
+                width: canvas.clientWidth,
+                height: canvas.clientHeight,
+                degreesAcross: across()[0] * radius,
+            };
+            drawLabels(layer, m, { ...shownAs, offset: [view.x * radius, view.y * radius] });
+        } else layer.replaceChildren();
         const { luts: _, ...parameters } = frame;
         drawn = {
             ...parameters,
@@ -227,6 +243,16 @@ export function globeFigure(root: HTMLElement) {
         const context = copy.getContext("2d");
         if (!context) return;
         context.drawImage(canvas, 0, 0);
+        const finish = () => stamp(copy, context);
+        if (!annotated()) return finish();
+        const image = new Image();
+        image.onload = () => {
+            context.drawImage(image, 0, 0, copy.width, copy.height);
+            finish();
+        };
+        image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(layer))}`;
+    });
+    function stamp(copy: HTMLCanvasElement, context: CanvasRenderingContext2D) {
         const scale = canvas.width / (canvas.clientWidth || 1);
         Object.assign(context, {
             font: `${12 * scale}px ${getComputedStyle(root).fontFamily}`,
@@ -235,7 +261,7 @@ export function globeFigure(root: HTMLElement) {
         });
         context.fillText(`${momentAndPlace()}, ${status}`, 8 * scale, copy.height - 6 * scale);
         copy.toBlob((blob) => save(blob, `himmelszelt-${root.id}-${momentStamp()}.png`), "image/png");
-    });
+    }
     // The view as a link that opens it again, and every parameter the frame was drawn with.
     const round = (value: number, digits: number) => Number(value.toFixed(digits));
     const shown = () => ({

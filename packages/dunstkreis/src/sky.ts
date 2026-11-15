@@ -44,7 +44,7 @@ export interface SkyPassOptions {
      * on an HDR display. "agx" and "aces" stay within 1. Default 1, SDR.
      */
     headroom?: number;
-    /** Dither the tone mapped output against banding, by default for an 8-bit target only. */
+    /** Dither the tone mapped output against banding, false by default: for an 8-bit target over smooth gradients. */
     dither?: boolean;
     /**
      * Expose by a light meter instead of `ev100`: the geometric mean luminance of the sky above the horizon, measured
@@ -70,12 +70,12 @@ export interface SkyPassOptions {
      */
     veil?: number;
     /**
-     * The sky as the eye sees it at night rather than a camera, by helldunkel's `hdNightVision`: below some 4 cd/m² the
+     * The sky as the eye sees it at night rather than a camera, by helldunkel's `hdDarkAdaptedEye`: below some 4 cd/m² the
      * rods take over from the cones, colors fade and shift towards blue, and by moonlight the sky turns from a camera's
      * violet gray to the blue painters give the night. Per pixel, before the exposure. A renderer that composes the sky
      * with more makes it on the composed light instead. Off by default, as a camera sees it.
      */
-    nightVision?: boolean;
+    darkAdapted?: boolean;
     /**
      * With `toneMap` off, write how much of each pixel the sun disc covers into alpha, 0 off the disc, rather than 1: a
      * caller that tone maps can curve the sky and the disc apart and mix them after, so the disc's edge stays smooth.
@@ -115,9 +115,9 @@ export interface SkyPassOptions {
 
 /**
  * Byte size of DkSkyParams in frame.wgsl: a vec3 and a scalar, a mat4x4, four scalars, a vec2 and two scalars, a vec3
- * and a scalar twice, and a vec3 padded to 16.
+ * and a scalar twice, a vec3 and a scalar, and a scalar padded to 16.
  */
-const SKY_PARAMS_SIZE = 160;
+const SKY_PARAMS_SIZE = 176;
 /** The light meter's directions per cap, `DK_METER_SAMPLES` in frame.wgsl, one per invocation of 128 per workgroup. */
 const METER_SAMPLES = 4096;
 const METER_WORKGROUPS = METER_SAMPLES / 128;
@@ -140,9 +140,8 @@ const DEFAULTS: SkyParams = {
     moonDirection: [0, 0, -1],
     moonIlluminance: 0,
     gridInk: 1,
+    sunDiscCeiling: null,
 };
-
-const EIGHT_BIT = ["rgba8unorm", "bgra8unorm"];
 
 /**
  * log2 of the sky-view table's brightest value by the sun's altitude above the observer's horizon, in degrees, for a
@@ -205,7 +204,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         groundLight = true,
         headroom = 1,
         moonlight = false,
-        nightVision = false,
+        darkAdapted = false,
     } = options;
     if (!(veil >= 0)) throw new Error(`dunstkreis: a veil of ${veil}; its strength is 0 or more`);
     if (aureole && !(aureole.share >= 0 && aureole.share <= 1 && aureole.g > 0 && aureole.g < 1)) {
@@ -213,7 +212,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             "dunstkreis: an aureole takes a share from 0 to 1 of the aerosols' scattering and a g within (0, 1)",
         );
     }
-    const dither = options.dither ?? (toneMap !== false && EIGHT_BIT.includes(format));
+    const dither = options.dither ?? false;
     const storable = ["rgba8unorm", "rgba16float", "rgba32float"].includes(format);
     if (!storable && !(format === "bgra8unorm" && device.features.has("bgra8unorm-storage"))) {
         throw new Error(`dunstkreis: the sky pass writes ${format} as a storage texture, which this device cannot`);
@@ -377,7 +376,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                     discAlpha,
                     supersample,
                     moonlight,
-                    nightVision,
+                    darkAdapted,
                 }),
             },
         }),
@@ -564,6 +563,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                 apparentMoon = { key: moonKey, direction: apparentDirection([mx, my, mz], model, height) };
             sky.set(apparentMoon.direction, 36);
             sky[39] = params.gridInk;
+            sky[40] = params.sunDiscCeiling ?? 0;
             device.queue.writeBuffer(skyParams, 0, sky);
 
             // Rebuilding the sky-view table is the expensive part, and it is why the sky pass itself is one fetch

@@ -32,6 +32,7 @@ const R0S = ["5", "10", "20"];
                         <button type="button" class="view-toggle" data-r0={r0} aria-pressed={r0 === "10" ? "true" : "false"} title={`Fried's parameter of ${r0} cm through one zenith column of air from sea level: the larger, the steadier the air`}>r₀ {r0} cm</button>
                     ))}
                 </span>
+                <span class="tiles-hint footnote">Drag the observer and the Moons on the right. Rendered with WebGPU</span>
             </span>
             <span class="view-buttons tiles-end">
                 <Rays />
@@ -47,7 +48,7 @@ const R0S = ["5", "10", "20"];
         The air's shimmer on the Moon's lower limb, seen from Potsdam: a waxing Moon by day on November 21, 2026, and a
         waning one at dusk on November 25, both at the same altitude. From the side, not to scale, the air their light
         crosses, counted in columns of the air overhead at sea level. r₀ is Fried's parameter, how steady the air is
-        through one column. Drag to move the observer and the Moons.
+        through one column.
     </figcaption>
 </figure>
 

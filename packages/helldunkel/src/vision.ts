@@ -22,9 +22,9 @@ export function coneShare(luminance: number): number {
 /**
  * Linear sRGB in cd/m² as the eye sees it at night: below some 4 cd/m² the rods take over, colors fade and shift
  * towards blue, and under the Moon the world turns blue. Jensen et al.'s blue shift with Larson et al.'s
- * scotopic luminance. The TypeScript twin of `hdNightVision` in `wgsl.vision`.
+ * scotopic luminance. The TypeScript twin of `hdDarkAdaptedEye` in `wgsl.vision`.
  */
-export function nightVision(rgb: readonly [number, number, number]): Rgb {
+export function darkAdaptedEye(rgb: readonly [number, number, number]): Rgb {
     const [x, y, z] = times(
         TO_XYZ,
         rgb.map((c) => Math.max(c, 0)),

@@ -796,6 +796,14 @@ input[type="number"]::-webkit-outer-spin-button {
         12 12,
         ns-resize;
 }
+/* A slider's label, value and scale never take a selection: a drag begun on them, in a full screen figure most of all,
+   selected the text, and the next drag moved the selection instead of the slider. */
+label:has(input[type="range"]),
+input[type="range"] ~ * {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
 input[type="range"]:not(:disabled),
 label:has(> input[type="range"]:not(:disabled)) {
     cursor: var(--cursor-wheel);

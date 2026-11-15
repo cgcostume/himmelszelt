@@ -1,6 +1,6 @@
 // A light meter: every texel of the source counted into histograms of red, green, blue, luminance and the brightest
 // channel, by the share of the source it covers, for `meter.ts` to read. Counts are integers, the only atomics there are.
-// Goes with `meterSource(kind)`: the source's declaration and the entry point, by what the source is. A pass, so it declares
+// Requires `exposure.wgsl`. Goes with `meterSource(kind)`: the source's declaration and the entry point, by what the source is. A pass, so it declares
 // its bindings.
 
 const HD_METER_BINS: u32 = 2048u;
@@ -22,8 +22,9 @@ struct HdMeterParams {
     seconds: f32,
     toBrighter: f32,
     toDarker: f32,
-    // One texel counted in so many along either axis.
+    // One texel counted in so many along either axis, and 1 to lower a dim scene's EV100 by `hdLowLightCompensation`.
     stride: f32,
+    lowLight: f32,
 }
 
 // The reading, no round trip needed: its luminance, its EV100 and the EV100 adapted towards it.
@@ -132,8 +133,8 @@ fn hdMeterResolve() {
     }
     // Nothing lit tells nothing: the exposure stays where it was.
     if (weight > 0.0) {
-        hdMeterResult.ev100 = mean / weight + 3.0;
         hdMeterResult.luminance = exp2(mean / weight);
+        hdMeterResult.ev100 = mean / weight + 3.0 - hdMeterParams.lowLight * hdLowLightCompensation(hdMeterResult.luminance);
     } else {
         hdMeterResult.luminance = 0.0;
     }

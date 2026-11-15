@@ -793,3 +793,14 @@
 .stages-ev input {
     width: 6rem;
 }
+
+/* A chooser among an option group's toggles, as plain as they are. */
+.stars-constellations {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+    border-radius: 4px;
+    padding: 0.1rem 0.25rem;
+    max-width: 11rem;
+}

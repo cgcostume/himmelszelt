@@ -1,8 +1,11 @@
+import { ZODIAC } from "@himmelszelt/sternenheer";
 import { find } from "../dom";
 import {
+    bindHdr,
     bindToneCurveChoice,
     configureCanvas,
     display,
+    displayOutput,
     gpuDevice,
     onDisplay,
     onTables,
@@ -37,6 +40,10 @@ export function starsFigure(root: HTMLElement) {
     const canvas = field<HTMLCanvasElement>("canvas");
     const compass = field("compassLabels");
     const pressed = (name: string) => maybe(name)?.getAttribute("aria-pressed") === "true";
+    const chosenConstellations = () => {
+        const chosen = maybe<HTMLSelectElement>("constellations")?.value ?? "all";
+        return chosen === "all" ? null : chosen === "zodiac" ? ZODIAC : [chosen];
+    };
     const choice = (name: string) =>
         root.querySelector<HTMLInputElement>(`input[name="${root.id}-${name}"]:checked`)?.value ?? "";
 
@@ -58,7 +65,7 @@ export function starsFigure(root: HTMLElement) {
         const context = canvas.getContext("webgpu");
         if (!context) return null;
         configureCanvas(context, SDR);
-        return { device: gpuDevice(), context, adapterName: shared.adapterName };
+        return { device: gpuDevice(), context, adapterName: shared.adapterName, format: SDR as GPUTextureFormat };
     }
     const gpu = setup();
 
@@ -105,7 +112,6 @@ export function starsFigure(root: HTMLElement) {
         }
         if (note) note.textContent = ev100.toFixed(1);
     }
-    const magnitudeLimit = () => Number(maybe<HTMLInputElement>("magnitude")?.value ?? 8);
 
     // The twinkling runs on while its switch is pressed: the one animation of the figure, besides play.
     let twinkling: ReturnType<typeof setInterval> | null = null;
@@ -132,8 +138,16 @@ export function starsFigure(root: HTMLElement) {
             camera.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, Math.asin(z)));
         }
         const basis = cameraBasis(camera, width / height);
+        // HDR where the display and the canvas can, into the chosen headroom.
+        const { format, headroom } = displayOutput();
+        if (format !== gpu.format) {
+            configureCanvas(gpu.context, format);
+            gpu.format = format;
+        }
         const drawn = renderer.draw(gpu.context.getCurrentTexture(), {
             sky,
+            format,
+            headroom,
             luts: table.luts,
             toneMap: choice("tone") as ToneCurveName,
             width,
@@ -143,19 +157,22 @@ export function starsFigure(root: HTMLElement) {
             pixelRatio: dpr,
             ev100: pressed("auto") ? null : evOfSlider(),
             stars: pressed("stars"),
+            faintStars: pressed("faint"),
             milkyWay: pressed("milkyway"),
             maps: (choice("maps") || "small") as MapSize,
             air: pressed("air"),
             twinkle: pressed("twinkle"),
             time: (performance.now() - startedAt) / 1000,
             glare: pressed("glare"),
-            nightVision: pressed("eye"),
-            magnitudeLimit: magnitudeLimit(),
+            darkAdapted: pressed("eye"),
             moon: pressed("moon"),
+            constellations: pressed("lines") ? chosenConstellations() : [],
         });
         if (!drawn) return;
         const submitted = performance.now();
         showExposure(drawn.ev100);
+        // The exposure follows its meter slowly: frames asked for while it moves, none once it has arrived.
+        if (drawn.adapting) requestAnimationFrame(requestRender);
 
         const note = maybe("status");
         const catalog = renderer.catalog();
@@ -177,6 +194,7 @@ export function starsFigure(root: HTMLElement) {
 
     if (gpu) {
         bindToneCurveChoice(root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-tone"]`));
+        bindHdr(find('[data-hdr="note"]', root), find('[data-hdr="choice"]', root));
         onDisplay(() => {
             for (const input of root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-tone"]`))
                 input.checked = input.value === display.toneCurve;
@@ -185,7 +203,7 @@ export function starsFigure(root: HTMLElement) {
         onChange(requestRender);
         onTables(requestRender);
         new ResizeObserver(requestRender).observe(canvas);
-        for (const name of ["exposure", "magnitude"]) {
+        for (const name of ["exposure"]) {
             const input = maybe<HTMLInputElement>(name);
             input?.addEventListener("input", () => {
                 paintRange(input);
@@ -198,7 +216,20 @@ export function starsFigure(root: HTMLElement) {
         for (const name of ["maps"])
             for (const input of root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-${name}"]`))
                 input.addEventListener("change", requestRender);
-        for (const name of ["auto", "lock", "stars", "milkyway", "air", "glare", "eye", "moon", "twinkle"]) {
+        maybe("constellations")?.addEventListener("change", requestRender);
+        for (const name of [
+            "auto",
+            "lock",
+            "stars",
+            "milkyway",
+            "air",
+            "glare",
+            "eye",
+            "moon",
+            "twinkle",
+            "lines",
+            "faint",
+        ]) {
             maybe(name)?.addEventListener("click", () => {
                 field(name).setAttribute("aria-pressed", String(!pressed(name)));
                 if (name === "twinkle") twinkle(pressed("twinkle"));

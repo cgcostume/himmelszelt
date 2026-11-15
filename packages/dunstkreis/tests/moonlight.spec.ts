@@ -123,14 +123,14 @@ test("the sky pass compiles with night vision, and turns the moonlit sky bluer",
         format: "rgba32float",
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC,
     });
-    const zenithColor = async (nightVision: boolean) => {
+    const zenithColor = async (darkAdapted: boolean) => {
         device.pushErrorScope("validation");
         const sky = await createSkyPass(device, {
             luts,
             format: "rgba32float",
             toneMap: false,
             moonlight: true,
-            nightVision,
+            darkAdapted,
         });
         // Looking straight up, a narrow view.
         const up = new Float32Array([0.01, 0, 0, 0, 0, 0.01, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0]);

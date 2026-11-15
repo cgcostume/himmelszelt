@@ -18,13 +18,18 @@ other package at runtime: the moment and the place come in as one rotation, from
   millionths of a lux, five magnitudes are a factor of a hundred, the Sun at -26.74 the 128,000 lux dunstkreis
   starts from. The light is spread over the star's image, a Gaussian of a width in pixels you name, `psfPixels`, the
   viewer's own blur on the screen, never narrower than a pixel, so a pixel holds the luminance that makes the exposure
-  right: a bright star saturates its center, a faint one is a dim point, a star brightens as the view zooms in, as it
+  right: a faint star is a dim point, a star brightens as the view zooms in, as it
   does in a telescope, and what the exposure cannot show is gone, as it is for the eye. No magnitude limit decides
   what shows, the light does; `magnitudeLimit` is there to leave stars out on purpose.
 - **Their colors**, from the color index B-V in the catalog by way of a temperature and the Planckian locus,
-  `colorFromColorIndex`, Ballesteros' temperature or Jensen et al.'s, which the shipped catalog holds.
+  `colorFromColorIndex`, Ballesteros' temperature, which the shipped catalog holds, or Jensen et al.'s.
+- **Points, not discs**: a star's core stops at a knee, display white by default (`knee`, against `displayEV100`
+  when a later pass exposes), and the light beyond goes into a halo (`halo`) falling as 1 / r² and brightening only
+  with its logarithm, so a brighter star, or one zoomed in on, grows a wider halo, never a fatter core. The halos are
+  a pyramid of blurs over a grid at half the target's size, helldunkel's bloom chain: one cost whatever the number of
+  stars, and a halo may span the whole target.
 - **The viewer's veil**, CIE's glare equation of a point source by the angle on the viewer's own field of view,
-  `glare` and `viewerFov`: Sirius throws a halo a degree wide.
+  `glare` and `viewerFov`, off by default: at the angle of a pixel it counts the viewer's own scatter twice.
 - **The Milky Way**: the Milky Way layer of NASA's Deep Star Maps 2020, the light of the stars of Gaia DR2 too faint
   for the catalog, in J2000 equatorial coordinates, 2048 or 4096 texels around, calibrated so that map and catalog
   together give the integrated starlight Masana et al. (2021) measured: a texel of value 1 is 1.76 thousandths of a
@@ -36,10 +41,18 @@ other package at runtime: the moment and the place come in as one rotation, from
   `airTransmittance`: the refraction lifts every star and the Milky Way, some 34 arcminutes on the horizon, the
   extinction dims and reddens them, and below the lowest ray that reaches space nothing is drawn. The table crowds
   its entries towards the horizon, where the air changes fastest.
-- **The twinkling**, `scintillation`: each star's light flickers by the air's turbulence, by Young's scaling with the
-  airmass to the power 1.75 as Dravins et al. give it, for the pupil and the eye's integration time, saturating towards
-  the horizon, where the colors come apart into the flashes a low Sirius throws.
-- **Night vision**: `nightVision` on the pass turns the composed light into what the eye sees, helldunkel's blue
+- **The twinkling**, `scintillation`: each star's light flickers by the air's turbulence, by Dravins et al.'s
+  variance for an aperture smaller than the Fresnel scale, the pupil, from the seeing `r0`, averaged over the eye's
+  `integration` time: `scintillationIndex`, 7% at the zenith, a third near the horizon, where the colors come apart
+  into the flashes a low Sirius throws.
+- **Fainter stars**, optional: `loadFaintStars` gives the 108,883 stars of the Hipparcos catalogue the shipped catalog
+  does not hold, to magnitude 12 or so, 871 KB, eight bytes a star: `faintStars` on the pass draws them through the
+  same passes, and the parameter of that name how many, the brightest first. `packStars` packs any others the same way.
+- **The constellations**, optional: `loadConstellations` gives the 743 lines of the 88 constellations between stars of
+  the shipped catalog, and `constellations` on the pass and in the parameters draws them, all, a set such as `ZODIAC`,
+  or a few by their abbreviations. A muted hint on the display, the same at any exposure, each line stopping short of
+  its two stars; `constellationOpacity`, `constellationColor`, `constellationWidth` and `constellationGap` set its look.
+- **Night vision**: `darkAdapted` on the pass turns the composed light into what the eye sees, helldunkel's blue
   shift for the rods.
 - **Tiles**: the first pass bins every star's image into the tiles of the target it reaches, the second sums the
   stars of each pixel's tile and the Milky Way behind, so a pixel costs the stars near it rather than the catalog.

@@ -460,7 +460,7 @@ async function showAerial(sky: Sky) {
     const device = gpuDevice();
     if (aerialFor !== luts) {
         aerialFor = luts;
-        const next = await createSkyPass(device, { luts, format: "rgba8unorm", aerialPerspective: true });
+        const next = await createSkyPass(device, { luts, format: "rgba8unorm", dither: true, aerialPerspective: true });
         if (aerialFor !== luts) return next.destroy();
         aerialPass?.destroy();
         aerialPass = next;
@@ -653,7 +653,12 @@ async function measure() {
         costs.tables = await timeGpu(device, precomputing(device, luts));
         requestRender();
 
-        const sky: SkyPass = await createSkyPass(device, { luts, format: "rgba8unorm", autoExposure: true });
+        const sky: SkyPass = await createSkyPass(device, {
+            luts,
+            format: "rgba8unorm",
+            dither: true,
+            autoExposure: true,
+        });
         passes.push(sky);
         costs.skyView = await timeGpu(
             device,
@@ -698,7 +703,12 @@ async function measure() {
         );
         requestRender();
 
-        const aerial = await createSkyPass(device, { luts, format: "rgba8unorm", aerialPerspective: true });
+        const aerial = await createSkyPass(device, {
+            luts,
+            format: "rgba8unorm",
+            dither: true,
+            aerialPerspective: true,
+        });
         passes.push(aerial);
         aerial.update({ sunDirection: sunAt(0), observerHeightM: 10 });
         costs.aerial = await timeGpu(

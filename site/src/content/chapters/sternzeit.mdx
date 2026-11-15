@@ -81,11 +81,11 @@ npm install @himmelszelt/sternzeit
 ```ts
 import { fromDate, moon, sun } from "@himmelszelt/sternzeit";
 
-const obs = { latitude: 52.39, longitude: 13.09 };
+const observer = { latitude: 52.39, longitude: 13.09 };
 const now = fromDate(new Date());
 // Unit vectors from where you stand: x east, y north, z up.
-const toSun = sun.direction(now, obs);
-const toMoon = moon.direction(now, obs);
+const toSun = sun.direction(now, observer);
+const toMoon = moon.direction(now, observer);
 ```
 
 The sections below explain what lies behind these two calls, from the sky down to the code.
@@ -374,16 +374,16 @@ the same way. The rest of the Moon's light is a call each:
 import { fromDate, julianEphemerisDay, moon } from "@himmelszelt/sternzeit";
 
 const time = fromDate(new Date());
-const obs = { latitude, longitude };
+const observer = { latitude, longitude };
 // Functions of a bare Julian Day take ephemeris time.
 const jde = julianEphemerisDay(time);
 const lit = moon.illuminatedFraction(jde); // 0 new, 1 full
 // Half a day on tells waxing from waning without a calendar.
 const waxing = moon.illuminatedFraction(jde + 0.5) > lit;
 // Counterclockwise from up, as the crescent stands in your sky.
-const brightLimb = moon.brightLimbAngle(time, obs);
+const brightLimb = moon.brightLimbAngle(time, observer);
 // For shading: from the Moon's center to the Sun, and Earth's glow.
-const light = moon.sunDirection(time, obs);
+const light = moon.sunDirection(time, observer);
 const glow = moon.earthshine(jde);
 ```
 
@@ -511,7 +511,7 @@ import {
 } from "@himmelszelt/sternzeit";
 
 const DAY_MS = 86_400_000;
-const obs = { latitude, longitude };
+const observer = { latitude, longitude };
 // Upper limb on the horizon, refraction included, as for sunrise.
 const isUp = (altitude: number) => altitude > -0.833;
 
@@ -520,23 +520,23 @@ for (let day = 0; day < days; day++) {
     const time = fromDate(new Date(firstDay + day * DAY_MS + timeOfDay));
     const jde = julianEphemerisDay(time);
     // The parallactic angle turns the sky's north into the zenith.
-    const q = moon.parallacticAngle(time, obs);
+    const q = moon.parallacticAngle(time, observer);
     drawMoonDisc(day, {
         lit: moon.illuminatedFraction(jde),
         earthshine: moon.earthshine(jde),
         libration: moon.librations(jde),
         // Counterclockwise from up, already turned into this sky.
-        brightLimb: moon.brightLimbAngle(time, obs),
+        brightLimb: moon.brightLimbAngle(time, observer),
         north: moon.positionAngleOfAxis(jde) - q,
-        up: isUp(moon.horizontalPosition(time, obs).altitude),
+        up: isUp(moon.horizontalPosition(time, observer).altitude),
     });
 }
 
 // The lanes, in ten-minute steps: the altitude picks the color.
 for (let minute = 0; minute < days * 1440; minute += 10) {
     const time = fromDate(new Date(firstDay + minute * 60_000));
-    drawLane("moon", minute, moon.horizontalPosition(time, obs).altitude);
-    drawLane("sun", minute, sun.horizontalPosition(time, obs).altitude);
+    drawLane("moon", minute, moon.horizontalPosition(time, observer).altitude);
+    drawLane("sun", minute, sun.horizontalPosition(time, observer).altitude);
 }
 ```
 

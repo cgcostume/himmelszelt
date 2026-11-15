@@ -26,7 +26,7 @@ export interface MoonPassOptions {
     toneMap?: ToneCurve | false;
     /** How many times SDR white an HDR display shows, 1 by default. */
     headroom?: number;
-    /** Dither the tone mapped output against banding, by default for an 8-bit target only. */
+    /** Dither the tone mapped output against banding, false by default: for an 8-bit target over smooth gradients. */
     dither?: boolean;
     /** Whether `encode` composes over a background in cd/m², false by default: the Moon alone, premultiplied, with its
      *  coverage of each pixel in alpha, for a renderer that composites itself. */
@@ -42,7 +42,8 @@ export interface MoonPassOptions {
      *  pixel and the limb covered by its distance. More resolve the relief's shading within a pixel. */
     samples?: number;
     /** Rays per pixel along the terminator, where the Sun stands low over the relief and a crater rim turns from lit
-     *  to dark within a texel, and along a displaced limb: 4 by default, `samples` or less for none extra. */
+     *  to dark within a texel, there only where a pixel spans more than a texel of the relief, and along a displaced
+     *  limb: 4 by default, `samples` or less for none extra. */
     terminatorSamples?: number;
     /** From how many pixels across the disc the relief casts shadows, 128 by default: they are marched through the
      *  heights into a shadow map, once for the Sun where it stands and the part of the Moon the view shows, kept while
@@ -59,9 +60,9 @@ export interface MoonPassOptions {
     /** The most texels the shadow map may hold, 4,194,304 by default, four bytes each: the texel coarsens past it. */
     shadowMapTexels?: number;
     /** The Moon and the sky behind it as the eye sees them at night rather than a camera, by helldunkel's
-     *  `hdNightVision`, on the composed light before the exposure: the moonlit sky blue, the bright disc as it
+     *  `hdDarkAdaptedEye`, on the composed light before the exposure: the moonlit sky blue, the bright disc as it
      *  is. With a background only; off by default. */
-    nightVision?: boolean;
+    darkAdapted?: boolean;
     /** How the maps are filtered, to compare: "nearest" and "bilinear" read the full size alone, "trilinear" between
      *  its levels; "anisotropic", the default, up to sixteen taps along the footprint, and by a cubic B-spline where the
      *  maps are magnified. */
@@ -129,6 +130,28 @@ export function shimmerScales(
     return { tilt, cell: aperture / distance, drift: wind / distance };
 }
 
+/** The shimmer's scales towards `direction`, with Kasten and Young's airmass and Bennett's refraction at its apparent
+ *  altitude where not given, and `spread`, how far apart its colors are pulled, in radians times a hundred. */
+function shimmerOf(shimmer: Shimmer, direction: Vec3) {
+    const h = (Math.asin(Math.max(-1, Math.min(1, direction[2]))) * 180) / Math.PI;
+    const airmass = 1 / (Math.max(Math.sin((h * Math.PI) / 180), 0) + 0.50572 * Math.max(h + 6.07995, 0.1) ** -1.6364);
+    const bennett =
+        ((1 / Math.tan(((Math.max(h, -1) + 7.31 / (Math.max(h, -1) + 4.4)) * Math.PI) / 180)) * Math.PI) / 10_800;
+    return {
+        ...shimmerScales(shimmer, shimmer.airColumn ?? airmass),
+        spread: (shimmer.bend ?? bennett) * shimmer.dispersion,
+    };
+}
+
+/** Whether the shimmer moves the disc's image by a tenth of a pixel or more, its rms tilt thrice or its colors apart:
+ *  less shows on no screen, and its two passes are left out. `pixelAngle` in radians. */
+function shimmerShows(shimmer: Shimmer, direction: Vec3, pixelAngle: number) {
+    const { tilt, spread } = shimmerOf(shimmer, direction);
+    return (
+        Math.max(3 * tilt * Math.max(shimmer.motion ?? 1, shimmer.boiling ?? 1), 0.0078 * spread) >= 0.1 * pixelAngle
+    );
+}
+
 /** Everything that can change per frame. Directions ENU (x east, y north, z up), unit length. */
 export interface MoonParams {
     /** Towards the Moon's center, topocentric: the true direction with `refraction`, which bends the rays back to it,
@@ -155,6 +178,10 @@ export interface MoonParams {
     projectionDistance: number;
     /** Exposure in EV100: the Moon is a sunlit rock, a full Moon exposes around 14 like a sunny day, `moonEV100`. */
     ev100: number;
+    /** Stops the disc's own light is drawn brighter by, the sky behind it left alone; 0 by default, one exposure for
+     *  both as a camera has. Negative for the eye, which adapts to the Moon it looks at: helldunkel's
+     *  `localAdaptation` of `ev100` and `moonEV100`. */
+    exposureCompensation: number;
     /** The z below which a ray hits the ground and the Moon is hidden, `horizonZ`; -1 by default, drawn everywhere. */
     horizonZ: number;
     /** Draw the color map, true by default where there is one, the relief from the heights, and the shadows the relief
@@ -223,6 +250,9 @@ const LAYER_FORMAT: GPUTextureFormat = "rgba16float";
 // between the relief's texels, where the march from each of the map's texels starts, and would show their stairs.
 const SHADOW_SUBTEXELS = 4;
 
+/** The roughness' noise, `noise.comp.wgsl`'s: 64 texels across each way, 4 to a cell, 1 MiB. */
+const NOISE_SIZE = 64;
+const NOISE_FORMAT: GPUTextureFormat = "rgba8snorm";
 /** The shadow map's format: the share of the Sun's disc a texel sees, in red, filtered when read. */
 const SHADOW_FORMAT: GPUTextureFormat = "rgba8unorm";
 const EIGHT_BIT = ["rgba8unorm", "bgra8unorm"];
@@ -249,6 +279,7 @@ const DEFAULTS: MoonParams = {
     angularDiameter: 0.518,
     sunDirection: [1, 0, 0],
     sunIlluminance: SUN_ILLUMINANCE,
+    exposureCompensation: 0,
     earthshine: 0,
     orientation: new Float32Array([0, 0, -1, 1, 0, 0, 0, 1, 0]),
     transmittance: [1, 1, 1],
@@ -300,7 +331,7 @@ export function paramsData(params: MoonParams, maps: MoonMaps | null, detail?: M
 
     // The light: Earth's center from the Moon's, the observer on Earth's surface straight above it, unless given.
     f.set(params.sunDirection, 32);
-    f[35] = params.sunIlluminance;
+    f[35] = params.sunIlluminance * 2 ** params.exposureCompensation;
     const [dx, dy, dz] = params.direction;
     const d = params.distanceKm;
     const earth = params.earthDirection ?? [-dx * d, -dy * d, -dz * d - EARTH_RADIUS_KM];
@@ -309,7 +340,7 @@ export function paramsData(params: MoonParams, maps: MoonMaps | null, detail?: M
         earth.map((c) => c / earthLength),
         36,
     );
-    f[39] = params.earthshine;
+    f[39] = params.earthshine * 2 ** params.exposureCompensation;
     f.set(params.transmittance, 40);
     f[43] = params.projectionDistance;
 
@@ -360,15 +391,9 @@ export function paramsData(params: MoonParams, maps: MoonMaps | null, detail?: M
     f[89] = refraction?.from ?? 0;
     f[90] = refraction?.step ?? 1;
 
-    // The shimmer: Kasten and Young's airmass and Bennett's refraction at the Moon's apparent altitude, where not given.
     if (shimmer) {
-        const h = (Math.asin(Math.max(-1, Math.min(1, params.direction[2]))) * 180) / Math.PI;
-        const airmass =
-            1 / (Math.max(Math.sin((h * Math.PI) / 180), 0) + 0.50572 * Math.max(h + 6.07995, 0.1) ** -1.6364);
-        const bennett =
-            ((1 / Math.tan(((Math.max(h, -1) + 7.31 / (Math.max(h, -1) + 4.4)) * Math.PI) / 180)) * Math.PI) / 10_800;
-        const { tilt, cell, drift } = shimmerScales(shimmer, shimmer.airColumn ?? airmass);
-        f.set([tilt, shimmer.time, (shimmer.bend ?? bennett) * shimmer.dispersion, cell], 92);
+        const { tilt, cell, drift, spread } = shimmerOf(shimmer, params.direction);
+        f.set([tilt, shimmer.time, spread, cell], 92);
         f.set([shimmer.motion ?? 1, shimmer.boiling ?? 1, drift], 96);
     }
     return data;
@@ -405,7 +430,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         roughness = null,
         samples = 1,
         terminatorSamples = 4,
-        nightVision = false,
+        darkAdapted = false,
         filter = "anisotropic",
         shadowsFrom = 128,
         displacementFrom = 1024,
@@ -415,7 +440,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
     } = options;
     if (!(Number.isInteger(samples) && samples >= 1)) throw new Error(`nachtgestirn: ${samples} rays per pixel`);
     if (!Number.isInteger(terminatorSamples)) throw new Error(`nachtgestirn: ${terminatorSamples} rays per pixel`);
-    const dither = options.dither ?? (toneMap !== false && EIGHT_BIT.includes(format));
+    const dither = options.dither ?? false;
     if (toneMap === false && EIGHT_BIT.includes(format)) {
         console.warn(`nachtgestirn: linear light into ${format} clips and bands; set toneMap, or take rgba16float`);
     }
@@ -431,7 +456,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         NG_BACKGROUND: background ? 1 : 0,
         NG_SAMPLES: samples,
         NG_TERMINATOR_SAMPLES: Math.max(terminatorSamples, samples),
-        NG_NIGHT_VISION: nightVision ? 1 : 0,
+        NG_DARK_ADAPTED: darkAdapted ? 1 : 0,
         NG_MAP_BSPLINE: filter === "anisotropic" ? 1 : 0,
         NG_DETAIL: maps?.detail ? 1 : 0,
     };
@@ -466,6 +491,8 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
             texture(9),
             samplerAt(10),
             texture(11),
+            { binding: 12, visibility: GPUShaderStage.COMPUTE, texture: { viewDimension: "3d" } },
+            samplerAt(13),
         ],
     });
     const outputOf = (target: GPUTextureFormat) =>
@@ -529,6 +556,13 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         label: "nachtgestirn:blank",
         size: [1, 1],
         format: "rgba8unorm",
+        usage: GPUTextureUsage.TEXTURE_BINDING,
+    });
+    const blank3d = device.createTexture({
+        label: "nachtgestirn:blank3d",
+        size: [1, 1, 1],
+        dimension: "3d",
+        format: NOISE_FORMAT,
         usage: GPUTextureUsage.TEXTURE_BINDING,
     });
     const noBackground = device.createTexture({
@@ -601,10 +635,59 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         }
         return fixed.get(key) ?? null;
     };
+    // The roughness' noise, made on the GPU the first time a frame has a roughness map to draw with, and kept; until it
+    // is made, the frame draws without the roughness.
+    let noise: GPUTexture | null = null;
+    let noisePass: GPUComputePipeline | null = null;
+    let noiseAsked = false;
+    const noiseSampler = device.createSampler({
+        label: "nachtgestirn:noise",
+        addressModeU: "repeat",
+        addressModeV: "repeat",
+        addressModeW: "repeat",
+        magFilter: "linear",
+        minFilter: "linear",
+    });
+    const makeNoise = (encoder: GPUCommandEncoder) => {
+        if (noise || roughnessMap === null) return;
+        if (!noisePass) {
+            if (noiseAsked) return;
+            noiseAsked = true;
+            device
+                .createComputePipelineAsync({
+                    label: "nachtgestirn:noise",
+                    layout: "auto",
+                    compute: { module: device.createShaderModule({ label: "nachtgestirn:noise", code: wgsl.noise }) },
+                })
+                .then((pipeline) => {
+                    noisePass = pipeline;
+                    options.onReady?.();
+                });
+            return;
+        }
+        noise = device.createTexture({
+            label: "nachtgestirn:noise",
+            size: [NOISE_SIZE, NOISE_SIZE, NOISE_SIZE],
+            dimension: "3d",
+            format: NOISE_FORMAT,
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+        });
+        const pass = encoder.beginComputePass({ label: "nachtgestirn:noise" });
+        pass.setPipeline(noisePass);
+        pass.setBindGroup(
+            0,
+            device.createBindGroup({
+                layout: noisePass.getBindGroupLayout(0),
+                entries: [{ binding: 0, resource: noise.createView() }],
+            }),
+        );
+        pass.dispatchWorkgroups(NOISE_SIZE / 4, NOISE_SIZE / 4, NOISE_SIZE / 4);
+        pass.end();
+    };
     let layer: GPUTexture | null = null;
     const params: MoonParams = { ...DEFAULTS };
     let roughnessMap = roughness;
-    let detail: MoonDetail = { shadows: null, displace: false, roughness: roughnessMap !== null };
+    let detail: MoonDetail = { shadows: null, displace: false, roughness: false };
     // The shadow map and the window it was made for.
     let shadowMap: GPUTexture | null = null;
     let made: ShadowWindow | null = null;
@@ -619,7 +702,7 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
         },
         setRoughness(texture) {
             roughnessMap = texture;
-            detail = { ...detail, roughness: texture !== null };
+            detail = { ...detail, roughness: texture !== null && noise !== null };
             device.queue.writeBuffer(uniform, 0, paramsData(params, maps, detail));
         },
         encode(encoder, target, encodeOptions = {}) {
@@ -651,10 +734,11 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
                     });
                 }
             }
+            if (wanted && params.roughness) makeNoise(encoder);
             detail = {
                 shadows: window ? made : null,
                 displace: Boolean(wanted && plan && plan.discPixels >= displacementFrom),
-                roughness: roughnessMap !== null,
+                roughness: roughnessMap !== null && noise !== null,
             };
             const data = paramsData(params, maps, detail);
             device.queue.writeBuffer(uniform, 0, data);
@@ -675,6 +759,8 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
                         { binding: 9, resource: moonLayer.createView() },
                         { binding: 10, resource: layerSampler },
                         { binding: 11, resource: (roughnessMap ?? blank).createView() },
+                        { binding: 12, resource: (noise ?? blank3d).createView() },
+                        { binding: 13, resource: noiseSampler },
                     ],
                 });
             if (remake && shadowPass && shadowMap && made) {
@@ -692,8 +778,15 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
                 pass.end();
             }
             const shadows = detail.shadows && shadowMap ? shadowMap : blank;
-            if (params.shimmer) askShimmer();
-            const shimmering = params.shimmer ? shimmerPasses : null;
+            // The shimmer only where it shows: the disc's pixels from the plan, or found for it.
+            const discPixels = params.shimmer
+                ? (plan ?? planShadows(params, target.width, target.height, Infinity, 1, 1, 0)).discPixels
+                : 0;
+            const shimmer =
+                params.shimmer &&
+                shimmerShows(params.shimmer, params.direction, (params.angularDiameter * DEG) / discPixels);
+            if (shimmer) askShimmer();
+            const shimmering = shimmer ? shimmerPasses : null;
             if (shimmering && (!layer || layer.width !== target.width || layer.height !== target.height)) {
                 layer?.destroy();
                 layer = device.createTexture({
@@ -739,6 +832,8 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
             uniform.destroy();
             tables.destroy();
             blank.destroy();
+            blank3d.destroy();
+            noise?.destroy();
             noBackground.destroy();
             shadowMap?.destroy();
             layer?.destroy();

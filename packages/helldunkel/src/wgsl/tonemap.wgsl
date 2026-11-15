@@ -32,7 +32,8 @@ fn hdToneMapClipHdr(exposed: vec3f, headroom: f32) -> vec3f {
 }
 
 // Khronos PBR Neutral (2024): linear up to 0.76 apart from a small offset in the blacks, so colors stay as they are,
-// then compressed towards white and desaturated only as much as that takes. Hues never shift.
+// then compressed towards white and desaturated only as much as that takes. Hues never shift. The offset is applied as
+// a scale by the brightest channel, see `hdToneMapNeutralHdr`.
 fn hdToneMapNeutral(exposed: vec3f) -> vec3f {
     return hdToneMapNeutralHdr(exposed, 1.0);
 }
@@ -43,8 +44,14 @@ fn hdToneMapNeutralHdr(exposed: vec3f, headroom: f32) -> vec3f {
     let startCompression = 0.8 - 0.04;
     let desaturation = 0.15;
     var color = max(exposed * HD_MIDDLE_GRAY_GAIN, vec3f(0.0));
-    let x = min(color.r, min(color.g, color.b));
-    color = color - select(0.04, x - 6.25 * x * x, x < 0.08);
+    // Khronos' offset in the blacks, x - 6.25 x² below 0.08 and 0.04 above, taken by the brightest channel and applied
+    // as a scale rather than subtracted by the darkest: the same for grays, but hues stay, and more light never darkens
+    // a channel. Subtracted, light added to two channels raises the darkest and dims the third: a star's red halo cut a
+    // dark ring into a dim blue sky.
+    let x = max(color.r, max(color.g, color.b));
+    if (x > 0.0) {
+        color = color * (1.0 - select(0.04, x - 6.25 * x * x, x < 0.08) / x);
+    }
     let peak = max(color.r, max(color.g, color.b));
     if (peak < startCompression) {
         return hdEncodeSrgbExtended(color, headroom);

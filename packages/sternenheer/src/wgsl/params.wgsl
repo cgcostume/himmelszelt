@@ -36,15 +36,34 @@ struct ShParams {
     // Below this exposed luminance a star's image is cut off, and no image grows past this radius in pixels.
     threshold: f32,
     maxRadius: f32,
-    // The observer's height in meters and the pupil's diameter in cm, for the twinkling.
-    heightM: f32,
-    pupilCm: f32,
+    // The twinkling: the variance of a star's light at the zenith, unaveraged, and how many of its correlation times
+    // there the eye or the exposure averages over.
+    twinkleVariance: f32,
+    twinkleSteps: f32,
     // The target's size in pixels, what a texel of value 1 of the Milky Way's map stands for in cd/m², and how many
     // degrees of the viewer's own field of view a pixel of the target spans, for the veil, which is the viewer's eye's.
     width: u32,
     height: u32,
     milkyWayLuminance: f32,
     screenDegreesPerPixel: f32,
+    // What luminance is multiplied by where the image is finally shown, for the cut-off, the knee and the halo: the
+    // exposure itself unless a later pass exposes; the exposed luminance at which a star's core stops brightening and
+    // its excess light goes into its halo; how strong the halo is, 0 for none; how many levels the halo's pyramid has.
+    displayExposure: f32,
+    knee: f32,
+    halo: f32,
+    haloLevels: f32,
+    // The constellations' lines: their color in units of display white and how much of it shows, 0 for none; their
+    // width in pixels and how far from a star they stop, in pixels; and which constellations show, a bit each.
+    lineColor: vec3f,
+    lineOpacity: f32,
+    lineWidth: f32,
+    lineGap: f32,
+    // How many of the faint stars after the catalog's are drawn.
+    faintCount: u32,
+    // The stops below 1 the Milky Way's map spans, each channel's logarithm; 0 for a map read linear.
+    milkyWayStops: f32,
+    constellations: vec4u,
     // How far the air bends a ray down at SH_AIR_SAMPLES apparent altitudes from airHorizon to the zenith, spaced by
     // the square of the entry's share, in radians; and what it lets through there, per channel.
     airBends: array<vec4f, 32>,
@@ -52,8 +71,8 @@ struct ShParams {
 }
 
 // One star binned into the tiles its image reaches: where it is on the target, in pixels, its image's width there, the
-// radius its light is drawn to, its light at the eye in lux per channel, the luminance at its center per lux, and how
-// many pixels a radian of sky spans at it.
+// radius its light is drawn to, its light at the eye in lux per channel, the luminance at its center per lux, how many
+// pixels a radian of sky spans at it, and the share of its light its core keeps under the knee.
 struct ShSplat {
     pixel: vec2f,
     sigma: f32,
@@ -61,9 +80,9 @@ struct ShSplat {
     light: vec3f,
     peak: f32,
     pixelsPerRadian: f32,
+    core: f32,
     pad0: f32,
     pad1: f32,
-    pad2: f32,
 }
 
 const SH_AIR_SAMPLES: u32 = 128u;
@@ -76,3 +95,29 @@ const SH_MAGNITUDE_ZERO_LUX: f32 = 2.5775e-6;
 // Floats per star in the catalog: magnitude, right ascension and declination in degrees, the proper motions in
 // arcseconds a year, red, green and blue at unit luminance.
 const SH_STAR_FIELDS: u32 = 8u;
+// How far the air's dispersion parts two neighboring channels' paths at the turbulence, squared and over the Fresnel
+// scale's square, per (airmass² - 1) airmass: 2.5e-6 rad of dispersion per tan z, 7.4 km up, at 550 nm.
+const SH_TWINKLE_DISPERSION = 0.085;
+// The exposed luminance, in units of display white, the halo's light rises towards logarithmically.
+const SH_HALO_KNEE: f32 = 0.25;
+// The halos' grid: a texel of it spans so many pixels of the target, and it reaches so many pixels past the target's
+// edges, so a bright star just outside still throws its halo in.
+const SH_HALO_SCALE: u32 = 2u;
+const SH_HALO_MARGIN: u32 = 64u;
+
+// A piece of a constellation's line on the target, in pixels: its two ends, the two stars its line joins, and whether
+// it shows.
+struct ShPiece {
+    a: vec2f,
+    b: vec2f,
+    starA: vec2f,
+    starB: vec2f,
+    shown: f32,
+    pad0: f32,
+    pad1: f32,
+    pad2: f32,
+}
+
+// The pieces a constellation's line is drawn in, and how many of them a tile holds.
+const SH_LINE_PIECES: u32 = 8u;
+const SH_LINE_CAPACITY: u32 = 16u;

@@ -44,13 +44,13 @@ const SHADOW_MAP: [number, number][] = [
     [2607, 9],
 ];
 const SHADOW_CAP = 16;
-// Figure 18's times on an AMD Radeon RX 7900 XT, ms a frame: the defaults and everything on, by the disc's size.
+// Figure 17's times on an AMD Radeon RX 7900 XT, ms a frame: the defaults and everything on, by the disc's size.
 const REFERENCE: [disc: number, defaults: number, everything: number][] = [
-    [162, 0.052, 0.143],
-    [325, 0.067, 0.254],
-    [651, 0.121, 0.379],
-    [1303, 0.686, 0.665],
-    [2607, 0.947, 0.831],
+    [162, 0.051, 0.068],
+    [325, 0.059, 0.122],
+    [651, 0.07, 0.201],
+    [1303, 0.311, 0.361],
+    [2607, 0.266, 0.356],
 ];
 // The view the benchmark draws into, a full HD screen.
 const BENCH = [1920, 1080] as const;
@@ -239,7 +239,7 @@ export function configuratorFigure(root: HTMLElement) {
             earthshine: true,
             eclipse: false,
             law: "hapke2012",
-            nightVision: false,
+            darkAdapted: false,
             samples: config.on.rays ? 4 : 1,
             terminatorSamples: 4,
             shadowsFrom: config.on.shadows ? 0 : Number.POSITIVE_INFINITY,

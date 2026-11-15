@@ -115,7 +115,7 @@ export function surfaceFigure(root: HTMLElement) {
             earthshine: true,
             eclipse: false,
             law: "hapke2012" as const,
-            nightVision: false,
+            darkAdapted: false,
             albedo: albedo.getAttribute("aria-pressed") === "true",
         };
         const close = {
