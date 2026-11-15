@@ -145,6 +145,8 @@ confirmed yet.
 | Sphere map: the horizon at sin 45° = 0.71 of the radius, every texel the same solid angle (largest over smallest 1.00 at 1,600 and 6,400 texels) | Flattening the sky | lib, derived | r = sin(zenith angle / 2), Lambert's azimuthal equal-area halved; projections figure | ok | 2026-10-22 |
 | Cube face needs W/π to hold an equirectangular of width W: 2π/W against 2/N at the middle of a face | From one to the other | derived | | ok | 2026-10-31 |
 | Midnight sun in Tromsø, June 21 22:46 UTC: glow due north, on the equirectangular's seam, at the fisheye's top | Projections caption | lib | screenshot of the figure | ok | 2026-10-22 |
+| From 2 m up, 1° of the ground (1° to 2° below the horizon) covers 57 to 115 m of the plane; a degree is about eleven rows of a 4K image | Lighting a scene | derived | 2 / tan 2° = 57.3, 2 / tan 1° = 114.6; 2048 rows over 180° = 11.4 | ok | 2026-11-15 |
+| A mipmap alone keeps the streaks, only softer; even blur along the azimuth removes the texel streaks, the photograph's own features remain; levels up to 64 to 1 | Lighting a scene | lib | grounded figure on Golden Gate Hills 4K, against HEAD and with the strongest level forced on the whole ground | ok | 2026-11-15 |
 
 ## dunstkreis
 

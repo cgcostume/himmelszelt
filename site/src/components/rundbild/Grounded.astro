@@ -26,6 +26,26 @@ const SLIDERS = [
         marks: ["−20°", "+20°"],
     },
     {
+        name: "radius",
+        label: "dome",
+        title: "The radius of the dome the image's sky lies on, its ground on the disc inside; at the far end, the plane without bound",
+        min: 0,
+        max: 100,
+        step: 1,
+        value: 39,
+        marks: ["5", "∞"],
+    },
+    {
+        name: "fade",
+        label: "band",
+        title: "Over how many degrees inside the disc's edge a band of the image's blurred colors fades in, gone a quarter of that past it",
+        min: 0,
+        max: 15,
+        step: 0.5,
+        value: 5,
+        marks: ["0°", "15°"],
+    },
+    {
         name: "blend",
         label: "blend",
         title: "Over how many degrees around the horizon the ground goes over into the plain lookup",
@@ -44,6 +64,7 @@ const SLIDERS = [
     </EnvironmentFrame>
     <div class="env-exposure grounded-controls">
         <button type="button" class="environments-button" data-field="flat" aria-pressed="true" title="Lay what lies below the horizon on a plane; off, it lies at infinity">flat ground</button>
+        <button type="button" class="environments-button" data-field="even" aria-pressed="true" title="Read the image blurred evenly where the plane stretches it; off, as it is, in streaks">even blur</button>
         {SLIDERS.map(({ name, label, title, min, max, step, value, marks }) => (
             <label class="figure-slider" title={title}>
                 <span class="note">{label}</span>

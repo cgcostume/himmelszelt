@@ -99,6 +99,16 @@ for any map.
 
 <Grounded />
 
+Near the horizon, a few rows of the image cover a great deal of the plane. Taken 2 m up, a single degree of a 4K
+photograph, about eleven rows, spreads over the ground from 57 to 115 m out, while across it every row stays as sharp
+as before. Looked up as they are, those rows draw out into streaks that run away from where the photograph was taken.
+The usual cure, a <Term of="Mipmap">mipmap</Term>, blurs both ways at once and keeps the streaks, only softer. What
+helps is to blur along the azimuth alone, as far as the stretch leaves the image short along its elevation, so that each
+spot comes out evenly blurred instead of drawn out (<Fig id="grounded" />). `rbStretchedLods` measures the stretch from
+where a pixel and its two neighbors look up and returns how far to blur along each axis, and levels of the image halved
+more often along the azimuth than along the elevation hold that blur ready, up to 64 to 1. What remains are the
+photograph's own features, drawn out across the plane: no filter adds rows the camera never took.
+
 <Environments open />
 
 <Planned title="Specular image-based lighting" plan="the pre-filtered levels are not built yet.">

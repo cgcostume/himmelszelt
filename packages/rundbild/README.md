@@ -52,6 +52,10 @@ unless the device has "float32-filterable".
 ## Status
 
 `wgsl.ground` puts an image's ground on a plane, so objects stand on it and a camera moves over it, and lifts its horizon.
+`rbStretchedLods` gives the mip levels along u and v where either stretches an equirectangular image, for a lookup
+blurred evenly rather than in streaks, from levels halved more along u than along v.
+`rbGroundedDomeDirection` lays the ground on a disc and the sky on a sphere about where the image was taken, as three.js'
+GroundedSkybox and Unreal's HDRI Backdrop do, so nothing stretches without bound.
 
 The horizon band of the original thesis and specular image-based lighting follow. Exposure and tone
 curves are `@himmelszelt/helldunkel`'s.

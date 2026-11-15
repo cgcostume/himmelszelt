@@ -1,6 +1,6 @@
 /**
  * The WGSL layer, exported as plain strings. `cube` and `panorama` are binding-free, how the two lay out directions, for
- * whoever samples or writes such a map, and `ground` too, for an image's ground on a plane and its horizon lifted; `irradiance` and `panoramaPass` are the passes, with bindings of their own.
+ * whoever samples or writes such a map, and `ground` too, for an image's ground on a plane, its horizon lifted and the mip levels where either stretches it; `irradiance` and `panoramaPass` are the passes, with bindings of their own.
  *
  * Every identifier is prefixed `rb` (or `RB_` for constants) so several `@himmelszelt/*` fragments can share one
  * shader module.

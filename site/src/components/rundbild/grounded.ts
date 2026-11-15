@@ -17,30 +17,124 @@ const field = <T extends HTMLElement = HTMLElement>(name: string) => find<T>(`[d
 const canvas = field<HTMLCanvasElement>("canvas");
 const camera = { yaw: 150 * DEG, pitch: 12 * DEG, distance: 6, fov: 50 * DEG };
 
-// What the scene shows behind its solids: the image through its camera, in the file's relative units.
+// How many times the levels for a stretch halve the image along u more than along v, a stretch of 64 to 1, and where
+// they begin, a few degrees above its horizon so that they fade in before it.
+const RIPS = 6;
+const BAND = 0.47;
+
+// What the scene shows behind its solids: the image through its camera, in the file's relative units. Where the ground
+// or the lifted horizon stretch it, it is read from levels blurred more along u than along v, built for the image's
+// lower half, and from its mip levels elsewhere, so that a stretch comes out as an even blur rather than in streaks.
 const BACKDROP = /* wgsl */ `
 ${wgsl.panorama}
 ${wgsl.ground}
-struct Params { right: vec3f, tx: f32, up: vec3f, ty: f32, forward: vec3f, height: f32, eye: vec3f, lift: f32, flat: u32, blend: f32 }
+struct Params { right: vec3f, tx: f32, up: vec3f, ty: f32, forward: vec3f, height: f32, eye: vec3f, lift: f32, flat: u32, blend: f32, size: vec2f, band: f32, even: u32, radius: f32, fade: f32 }
 @group(0) @binding(0) var<uniform> params: Params;
 @group(0) @binding(1) var image: texture_2d<f32>;
 @group(0) @binding(2) var imageSampler: sampler;
 @group(0) @binding(3) var output: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(4) var coarser: texture_2d<f32>;
+${Array.from({ length: RIPS }, (_, k) => `@group(0) @binding(${5 + k}) var rip${k + 1}: texture_2d<f32>;`).join("\n")}
+
+fn lookup(pixel: vec2f, size: vec2f) -> vec3f {
+    let uv = pixel / size * 2.0 - 1.0;
+    var direction = normalize(params.forward + params.right * (uv.x * params.tx) - params.up * (uv.y * params.ty));
+    if (params.flat != 0u && params.radius > 0.0) {
+        direction = rbGroundedDomeDirection(params.eye, direction, params.height, params.radius);
+    } else if (params.flat != 0u) {
+        direction = rbFlatGroundDirection(params.eye, direction, params.height, params.blend);
+    }
+    return rbLiftedHorizonDirection(direction, params.lift, params.blend);
+}
+
+// The image at a mip level, its first level and the coarser ones from half its size on.
+fn isotropic(uv: vec2f, lod: f32) -> vec3f {
+    let coarse = textureSampleLevel(coarser, imageSampler, uv, lod - 1.0).rgb;
+    if (lod >= 1.0) {
+        return coarse;
+    }
+    return mix(textureSampleLevel(image, imageSampler, uv, 0.0).rgb, coarse, lod);
+}
+
+// The image at mip levels \`lods\` along u and v, from the level halved k more times along u than along v.
+fn layer(k: u32, uv: vec2f, lods: vec2f) -> vec3f {
+    if (k == 0u) {
+        return isotropic(uv, max(lods.x, lods.y));
+    }
+    let band = vec2f(uv.x, (uv.y - params.band) / (1.0 - params.band));
+    let lod = lods.x - f32(k);
+    switch k {
+${Array.from({ length: RIPS - 1 }, (_, k) => `        case ${k + 1}u: { return textureSampleLevel(rip${k + 1}, imageSampler, band, lod).rgb; }`).join("\n")}
+        default: { return textureSampleLevel(rip${RIPS}, imageSampler, band, lod).rgb; }
+    }
+}
 
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) id: vec3u) {
-    let size = textureDimensions(output);
-    if (any(id.xy >= size)) {
+    let size = vec2f(textureDimensions(output));
+    if (any(vec2f(id.xy) >= size)) {
         return;
     }
-    let uv = (vec2f(id.xy) + 0.5) / vec2f(size) * 2.0 - 1.0;
-    var direction = normalize(params.forward + params.right * (uv.x * params.tx) - params.up * (uv.y * params.ty));
-    if (params.flat != 0u) {
-        direction = rbFlatGroundDirection(params.eye, direction, params.height, params.blend);
+    let pixel = vec2f(id.xy) + 0.5;
+    let direction = lookup(pixel, size);
+    let stretched = rbStretchedLods(direction, lookup(pixel + vec2f(1.0, 0.0), size), lookup(pixel + vec2f(0.0, 1.0), size), params.size);
+    // A stretch beyond what the levels hold is left a little sharp along u rather than blurred along v.
+    let lods = vec2f(min(stretched.x, stretched.y + ${RIPS}.0), stretched.y);
+    let uv = rbEquirectangularUv(direction, 0.0);
+    let k = clamp(lods.x - lods.y, 0.0, ${RIPS}.0) * smoothstep(params.band, params.band + 0.02, uv.y);
+    let k0 = u32(k);
+    var light = layer(k0, uv, lods);
+    if (k0 < ${RIPS}u && k > f32(k0)) {
+        light = mix(light, layer(k0 + 1u, uv, lods), k - f32(k0));
     }
-    direction = rbLiftedHorizonDirection(direction, params.lift, params.blend);
-    let light = textureSampleLevel(image, imageSampler, rbEquirectangularUv(direction, 0.0), 0.0).rgb;
+    if (params.even == 0u) {
+        light = textureSampleLevel(image, imageSampler, uv, 0.0).rgb;
+    }
+    // A band of the image's colors, blurred as wide as the band, over the disc's edge: across \`fade\` on the disc, where
+    // the image is stretched, and gone a quarter of that past the edge, so that the dome's sky stays as it is.
+    if (params.flat != 0u && params.radius > 0.0 && params.fade > 0.0) {
+        let rim = -asin(min(params.height / params.radius, 1.0));
+        let edge = asin(rbLiftedHorizonDirection(vec3f(cos(rim), 0.0, sin(rim)), params.lift, params.blend).z);
+        let above = asin(clamp(direction.z, -1.0, 1.0)) - edge;
+        let w = 1.0 - smoothstep(0.0, select(params.fade, 0.25 * params.fade, above > 0.0), abs(above));
+        light = mix(light, isotropic(uv, log2(params.fade * params.size.y / 3.141592653589793)), w);
+    }
     textureStore(output, vec2i(id.xy), vec4f(min(light, vec3f(6e4)), 1.0));
+}`;
+
+// Halves a level into the next by its four texels, clamped at an odd edge.
+const HALVE = /* wgsl */ `
+@group(0) @binding(0) var source: texture_2d<f32>;
+@group(0) @binding(1) var halved: texture_storage_2d<rgba16float, write>;
+
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+    if (any(id.xy >= textureDimensions(halved))) {
+        return;
+    }
+    let last = textureDimensions(source) - 1u;
+    var sum = vec4f(0.0);
+    for (var i = 0u; i < 4u; i++) {
+        sum += min(textureLoad(source, min(id.xy * 2u + vec2u(i & 1u, i >> 1u), last), 0), vec4f(6e4));
+    }
+    textureStore(halved, id.xy, sum * 0.25);
+}`;
+
+// Halves a level along u alone, from the source's row \`top\` on.
+const HALVE_U = /* wgsl */ `
+@group(0) @binding(0) var source: texture_2d<f32>;
+@group(0) @binding(1) var halved: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(2) var<uniform> top: u32;
+
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+    if (any(id.xy >= textureDimensions(halved))) {
+        return;
+    }
+    let last = textureDimensions(source).x - 1u;
+    let a = textureLoad(source, vec2u(min(id.x * 2u, last), id.y + top), 0);
+    let b = textureLoad(source, vec2u(min(id.x * 2u + 1u, last), id.y + top), 0);
+    textureStore(halved, id.xy, (min(a, vec4f(6e4)) + min(b, vec4f(6e4))) * 0.5);
 }`;
 
 // A cube map only for the nine coefficients, which need no more.
@@ -62,8 +156,26 @@ if (gpu.error) {
         layout: "auto",
         compute: { module: device.createShaderModule({ code: BACKDROP }), entryPoint: "main" },
     });
-    const sampler = device.createSampler({ magFilter: "linear", minFilter: "linear", addressModeU: "repeat" });
-    const params = device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    const halve = device.createComputePipeline({
+        label: "sternwarte:groundedHalve",
+        layout: "auto",
+        compute: { module: device.createShaderModule({ code: HALVE }), entryPoint: "main" },
+    });
+    const halveU = device.createComputePipeline({
+        label: "sternwarte:groundedHalveU",
+        layout: "auto",
+        compute: { module: device.createShaderModule({ code: HALVE_U }), entryPoint: "main" },
+    });
+    const tops = [0, 0].map(() =>
+        device.createBuffer({ size: 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+    );
+    const sampler = device.createSampler({
+        magFilter: "linear",
+        minFilter: "linear",
+        mipmapFilter: "linear",
+        addressModeU: "repeat",
+    });
+    const params = device.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const cube = device.createTexture({
         label: "sternwarte:groundedCube",
         size: [CUBE_SIZE, CUBE_SIZE, 6],
@@ -75,13 +187,81 @@ if (gpu.error) {
     let target: GPUTexture | null = null;
     let passes: [CubeFromPanoramaPass, IrradiancePass] | null = null;
     let litBy: GPUTexture | null = null;
+    let levels: GPUTexture[] = [];
+    let top = 0;
     Promise.all([createCubeFromPanoramaPass(device, { samples: 4 }), createIrradiancePass(device)]).then((made) => {
         passes = made;
         request();
     });
 
     const slider = (name: string) => Number(field<HTMLInputElement>(name).value);
-    const flat = () => field("flat").getAttribute("aria-pressed") === "true";
+    // The dome's radius from 5 to 500 on a logarithmic slider, its last step 0: the plane, without bound.
+    const domeRadius = () => (slider("radius") >= 100 ? 0 : 5 * 100 ** (slider("radius") / 99));
+    const pressed = (name: string) => field(name).getAttribute("aria-pressed") === "true";
+
+    const texture = (label: string, width: number, height: number) =>
+        device.createTexture({
+            label,
+            size: [width, height],
+            mipLevelCount: Math.floor(Math.log2(Math.max(width, height))) + 1,
+            format: "rgba16float",
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+        });
+    const level = (texture: GPUTexture, baseMipLevel: number) => texture.createView({ baseMipLevel, mipLevelCount: 1 });
+
+    function halving(
+        pass: GPUComputePassEncoder,
+        pipeline: GPUComputePipeline,
+        source: GPUTextureView,
+        target: GPUTexture,
+        mip: number,
+        extra: GPUBindGroupEntry[] = [],
+    ) {
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(
+            0,
+            device.createBindGroup({
+                layout: pipeline.getBindGroupLayout(0),
+                entries: [{ binding: 0, resource: source }, { binding: 1, resource: level(target, mip) }, ...extra],
+            }),
+        );
+        pass.dispatchWorkgroups(
+            Math.ceil(Math.max(1, target.width >> mip) / 8),
+            Math.ceil(Math.max(1, target.height >> mip) / 8),
+        );
+    }
+
+    /**
+     * The image's mip levels from half its size on, and for its lower half the levels halved 1 to RIPS times along u
+     * alone, each with mip levels of its own.
+     */
+    function build(encoder: GPUCommandEncoder, image: GPUTexture) {
+        for (const old of levels) old.destroy();
+        top = Math.floor(image.height * BAND);
+        device.queue.writeBuffer(tops[1] as GPUBuffer, 0, new Uint32Array([top]));
+        const coarser = texture(
+            "sternwarte:groundedCoarser",
+            Math.max(1, image.width >> 1),
+            Math.max(1, image.height >> 1),
+        );
+        const rips = Array.from({ length: RIPS }, (_, k) =>
+            texture(`sternwarte:groundedRip${k + 1}`, Math.max(1, image.width >> (k + 1)), image.height - top),
+        );
+        const pass = encoder.beginComputePass({ label: "sternwarte:groundedLevels" });
+        halving(pass, halve, image.createView(), coarser, 0);
+        for (let k = 0; k < RIPS; ++k) {
+            const source = k === 0 ? image.createView() : level(rips[k - 1] as GPUTexture, 0);
+            halving(pass, halveU, source, rips[k] as GPUTexture, 0, [
+                { binding: 2, resource: { buffer: tops[k === 0 ? 1 : 0] as GPUBuffer } },
+            ]);
+        }
+        for (const target of [coarser, ...rips]) {
+            for (let mip = 1; mip < target.mipLevelCount; ++mip)
+                halving(pass, halve, level(target, mip - 1), target, mip);
+        }
+        pass.end();
+        levels = [coarser, ...rips];
+    }
 
     function render() {
         if (!context || !hdri.texture || !passes) return;
@@ -106,10 +286,12 @@ if (gpu.error) {
             toCube.encode(encoder, hdri.texture, cube);
             ibl.encode(encoder, cube);
             litBy = hdri.texture;
+            build(encoder, hdri.texture);
         }
+        if (pressed("flat") && domeRadius() > 0) camera.distance = Math.min(camera.distance, 0.8 * domeRadius());
         const { eye, forward, right, up } = cameraFrame(camera);
         const ty = Math.tan(camera.fov / 2);
-        const data = new ArrayBuffer(80);
+        const data = new ArrayBuffer(96);
         new Float32Array(data).set([
             ...right,
             ty * (width / height),
@@ -120,8 +302,11 @@ if (gpu.error) {
             ...eye,
             slider("lift") * DEG,
         ]);
-        new Uint32Array(data)[16] = flat() ? 1 : 0;
+        new Uint32Array(data)[16] = pressed("flat") ? 1 : 0;
         new Float32Array(data)[17] = slider("blend") * DEG;
+        new Float32Array(data).set([hdri.texture.width, hdri.texture.height, top / hdri.texture.height], 18);
+        new Uint32Array(data)[21] = pressed("even") ? 1 : 0;
+        new Float32Array(data).set([domeRadius(), slider("fade") * DEG], 22);
         device.queue.writeBuffer(params, 0, data);
         const pass = encoder.beginComputePass({ label: "sternwarte:groundedBackdrop" });
         pass.setPipeline(backdrop);
@@ -134,6 +319,7 @@ if (gpu.error) {
                     { binding: 1, resource: hdri.texture.createView() },
                     { binding: 2, resource: sampler },
                     { binding: 3, resource: target.createView() },
+                    ...levels.map((texture, i) => ({ binding: 4 + i, resource: texture.createView() })),
                 ],
             }),
         );
@@ -157,16 +343,20 @@ if (gpu.error) {
         field("heightReading").textContent = slider("height").toFixed(1);
         field("liftReading").textContent = `${slider("lift").toFixed(1)}°`;
         field("blendReading").textContent = `${slider("blend").toFixed(0)}°`;
+        field("radiusReading").textContent = domeRadius() > 0 ? domeRadius().toFixed(0) : "∞";
+        field("fadeReading").textContent = `${slider("fade").toFixed(1)}°`;
     }
     const request = onDemand(render, canvas);
 
     onHdri(request);
     new ResizeObserver(request).observe(canvas);
-    for (const name of ["height", "lift", "blend"]) field(name).addEventListener("input", request);
-    field("flat").addEventListener("click", () => {
-        field("flat").setAttribute("aria-pressed", String(!flat()));
-        request();
-    });
+    for (const name of ["height", "lift", "blend", "radius", "fade"]) field(name).addEventListener("input", request);
+    for (const name of ["flat", "even"]) {
+        field(name).addEventListener("click", () => {
+            field(name).setAttribute("aria-pressed", String(!pressed(name)));
+            request();
+        });
+    }
     canvas.addEventListener("pointerdown", (event) => {
         canvas.setPointerCapture(event.pointerId);
         const start = { x: event.clientX, y: event.clientY, yaw: camera.yaw, pitch: camera.pitch };
