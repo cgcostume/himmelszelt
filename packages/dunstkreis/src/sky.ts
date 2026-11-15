@@ -140,6 +140,7 @@ const DEFAULTS: SkyParams = {
     moonDirection: [0, 0, -1],
     moonIlluminance: 0,
     gridInk: 1,
+    moonAngularDiameter: 0,
     sunDiscCeiling: null,
 };
 
@@ -567,6 +568,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             device.queue.writeBuffer(skyParams, 0, sky);
 
             // Rebuilding the sky-view table is the expensive part, and it is why the sky pass itself is one fetch
+            sky[41] = params.moonAngularDiameter > 0 ? Math.cos((params.moonAngularDiameter * Math.PI) / 360) : 2;
             // per pixel rather than a raymarch. It depends on nothing but the Sun and the observer. Above the
             // atmosphere nothing reads the table: the sky pass raymarches per pixel, and so does the meter.
             const key = `${sx},${sy},${sz},${height}`;

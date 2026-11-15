@@ -157,6 +157,10 @@ fn dkSkySunTransmittance(sky: DkSkySample) -> vec4f {
 
 // The sun disc's luminance along a sampled ray, attenuated by the air between it and the observer, from sun.wgsl.
 fn dkSkySunLuminance(sky: DkSkySample) -> vec3f {
+    // Behind the Moon, a solar eclipse: both true directions, as the ray leaves the air.
+    if (dot(sky.direction, dkParams.moonDirection) > dkParams.moonDiscCos) {
+        return vec3f(0.0);
+    }
     let illuminance = dkToRgb(dkAtmosphere, dkSkySunTransmittance(sky) * dkAtmosphere.solarIlluminance);
     let luminance = dkSunDiscLuminance(illuminance, dkParams.sunAngularRadius);
     let brightest = max(luminance.r, max(luminance.g, luminance.b));

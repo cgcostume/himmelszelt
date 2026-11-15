@@ -8,6 +8,7 @@ import {
     localAdaptation,
     lowLightCompensation,
     meteredLuminance,
+    veilingGlare,
 } from "@himmelszelt/helldunkel";
 import type { MoonMaps, MoonPass } from "@himmelszelt/nachtgestirn";
 import {
@@ -68,6 +69,12 @@ export function skyAt(
     const through = (altitude: number) => airTransmittance(model, heightM, altitude);
     const moonDirection = moon.direction(time, observer);
     const phaseAngle = moon.phaseAngle(jde);
+    // What of a body's light reaches the observer: none once the ground hides its center.
+    const lit = (direction: readonly [number, number, number]) => {
+        const [r, g, b] = through((Math.asin(moonLifted(direction, bend)[2]) * 180) / Math.PI) ?? [0, 0, 0];
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const sunDirection = sun.direction(time, observer);
     // Along the line to the Moon's center as it shows, or the lowest above it that still reaches space.
     let moonAltitude = (Math.asin(moonLifted(moonDirection, bend)[2]) * 180) / Math.PI;
     while (through(moonAltitude) === null && moonAltitude < 2) moonAltitude += 0.02;
@@ -85,7 +92,10 @@ export function skyAt(
         skyRotation: stars.horizontalMatrix(time, observer),
         years: (jde - 2451545) / 365.25,
         siderealTime: apparentSiderealTime(time) + observer.longitude,
-        sunDirection: sun.direction(time, observer),
+        sunDirection,
+        // The Sun's and the Moon's light at the eye, in lux.
+        sunAtEye: SUN_ILLUMINANCE * lit(sunDirection),
+        moonAtEye: moonIlluminance(phaseAngle, distanceKm) * lit(moonDirection),
         sunAngularDiameter: sun.apparentAngularDiameter(jde),
         moonDirection,
         moonAngularDiameter: moon.topocentricAngularDiameter(time, observer),
@@ -160,6 +170,9 @@ export interface StarsFrame {
 const ADAPTATION = { toBrighter: 0.5, toDarker: 1 };
 // The metered exposure lets in no more light than EV100 -6 at night, a long exposure's, not a deep sky camera's.
 const DARKEST_EV100 = -2.5;
+
+const dot = (a: ArrayLike<number>, b: ArrayLike<number>) =>
+    (a[0] ?? 0) * (b[0] ?? 0) + (a[1] ?? 0) * (b[1] ?? 0) + (a[2] ?? 0) * (b[2] ?? 0);
 
 export function createStarsRenderer(device: GPUDevice, requestRender: () => void) {
     let adapted: { ev100: number; at: number } | null = null;
@@ -341,7 +354,23 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 frame.moon && frame.air && s.moonDirection[2] > 0 ? 0.05 * s.moonIlluminance * s.moonDirection[2] : 0;
             // Until the frame is metered, on the whole sky's light and on what the Moon lends it.
             const guess = Math.max(frame.air ? 2 ** (skyEV100 - 3) : 0, moonlit);
-            const metered = Math.max(frameLuminance ?? guess, milkyWay);
+            // A bright body in the frame veils the eye, by CIE's glare equation at its angle from where the eye looks: the
+            // Sun exposes as day wherever it stands, also over a black sky, and the Moon dims the stars around it.
+            const m = frame.inverseViewProjection;
+            const along = (x: number, y: number) => {
+                const w = m[3] * x + m[7] * y + m[11] + m[15];
+                const d = [0, 1, 2].map((i) => (m[i] * x + m[4 + i] * y + m[8 + i] + m[12 + i]) / w);
+                const length = Math.hypot(...d);
+                return d.map((c) => c / length);
+            };
+            const forward = along(0, 0);
+            const reach = Math.acos(Math.min(dot(forward, along(1, 1)), 1));
+            const veil = (direction: ArrayLike<number>, lux: number) => {
+                const angle = Math.acos(Math.max(Math.min(dot(forward, direction), 1), -1));
+                return angle < reach ? lux * veilingGlare((angle * 180) / Math.PI) : 0;
+            };
+            const veiled = veil(s.sunDirection, s.sunAtEye) + (frame.moon ? veil(s.moonDirection, s.moonAtEye) : 0);
+            const metered = Math.max(frameLuminance ?? guess, milkyWay) + veiled;
             const automatic = ev100FromLuminance(metered) - lowLightCompensation(metered);
             const goal = Math.min(Math.max(automatic, DARKEST_EV100), 20);
             // Followed over time, each step at most a 30th of a second, so a jump after a pause eases in too.
@@ -370,6 +399,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 autoExposureRange: [-20, 20],
                 moonDirection: s.moonDirection,
                 moonIlluminance: frame.moon ? s.moonIlluminance : 0,
+                moonAngularDiameter: frame.moon ? s.moonAngularDiameter : 0,
             });
             // The stars pass writes cd/m² for the Moon pass to expose; its cut-off, knee and halo follow the display's.
             starsPass.pass.update({

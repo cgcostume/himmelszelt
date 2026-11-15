@@ -88,6 +88,9 @@ export interface SkyParams {
      * of the Sun's light, from the Moon's direction. 0 by default, none.
      */
     moonIlluminance: number;
+    /** The Moon's apparent angular diameter, in degrees: its disc at `moonDirection` hides the sun disc behind it, a
+     *  solar eclipse; the sky's light stays as it is. 0 by default, no Moon in the way. */
+    moonAngularDiameter: number;
     /**
      * What the debug overlay is drawn in, for a sky pass made with `debugGrid`: 1 by default, white after the tone
      * curve. Without one the pass writes light the renderer exposes itself, and the grid shows white where this is the

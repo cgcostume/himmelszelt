@@ -125,6 +125,7 @@ The Sun is drawn per pixel over the sky, never stored in a table, and in parts a
 - The disc, `sunDisc`, dimmed and reddened by the air in front of it, supersampled where its rim or the horizon crosses
   a pixel. `sunDiscCeiling` stops its luminance at a value in cd/m², for a linear output a later pass tone maps:
   without it every pixel of the rim lies far above white there and the rim comes out hard. Off by default.
+  `moonAngularDiameter` hides it behind the Moon's disc at `moonDirection`, a solar eclipse; 0 by default, no Moon.
 - The aureole, `aureole`, the air's glow of about a degree around it: aerosols scatter sunlight far more sharply forward
   than the tables' one Cornette-Shanks lobe says, so a share of their scattering, `DEFAULT_AUREOLE`'s 5 % at g 0.98,
   goes into a narrow Henyey-Greenstein lobe the tables leave out and the sky pass adds per pixel within 20° of the Sun:
