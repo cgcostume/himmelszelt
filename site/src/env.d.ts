@@ -9,5 +9,7 @@ declare namespace App {
     interface Locals {
         /** The chapter's section ids, for the rule above each (see Section.astro). */
         sections?: { id: string; title: string }[];
+        /** The chapter's id, for its rules' scenes (see skyrule.ts). */
+        chapter?: string;
     }
 }

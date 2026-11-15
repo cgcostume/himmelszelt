@@ -20,6 +20,9 @@ export interface SheetParams {
     wind: readonly [number, number];
     /** How fast the shape changes, in map changes per hour; 0 keeps it. */
     evolution: number;
+    /** Where the drift and the evolution start from at time 0, for continuity: see `continuedMotion`. */
+    driftOffsetKm?: readonly [number, number];
+    evolutionOffset?: number;
     seed: number;
     /** Octaves of noise and lattice cells of the first across a tile. */
     octaves: number;
@@ -88,6 +91,9 @@ export interface CloudscapeParams {
     offset: number;
     wind: readonly [number, number];
     evolution: number;
+    /** Where the drift and the evolution start from at time 0, for continuity: see `continuedMotion`. */
+    driftOffsetKm?: readonly [number, number];
+    evolutionOffset?: number;
     seed: number;
     octaves: number;
     cells: number;
@@ -167,8 +173,12 @@ export interface CloudParams {
     sunIlluminance: Rgb;
     /** The sun's illuminance aloft, in lux, at the altitudes and elevations `sunlightRows` names, row after row,
      *  `SUNLIGHT_ENTRIES` each: clouds far towards the sun stay lit after the near ones, reddened, and the planet's
-     *  shadow climbs them at dusk. Without it, `sunIlluminance` where the sun clears the horizon, cut off beyond. */
-    sunlight?: readonly Rgb[];
+     *  shadow climbs them at dusk. Without it, `sunIlluminance` where the sun clears the horizon, cut off beyond: an
+     *  update keeps what it is not given, `null` clears it. */
+    sunlight?: readonly Rgb[] | null;
+    /** The rows `sunlight` was made for, so a table that comes late, after the sun moved on, keeps its values at their
+     *  elevations rather than stretched over the current rows. The current ones where left out. */
+    sunlightRows?: readonly SunlightRow[] | null;
     /** The sky's luminance along the horizon, in cd/m²: what far clouds fade into. */
     horizonLuminance: readonly [number, number, number];
     /** The sky's irradiance on a surface facing up and the lit ground's on one facing down, in lux. */
@@ -278,13 +288,41 @@ const wrap = (value: number, period: number) => ((value % period) + period) % pe
  *  what 32-bit floats resolve to a meter. At 8 m/s it wraps once in twelve days. */
 export const DRIFT_PERIOD_KM = 8192;
 
-/** Where a layer has drifted to with its wind by `timeS`, in km, wrapped by `DRIFT_PERIOD_KM`. */
-export function drift(wind: readonly [number, number], timeS: number): [number, number] {
-    return [wrap((wind[0] * timeS) / 1000, DRIFT_PERIOD_KM), wrap((wind[1] * timeS) / 1000, DRIFT_PERIOD_KM)];
+/** Where a layer has drifted to with its wind by `timeS`, in km, from `offsetKm`, wrapped by `DRIFT_PERIOD_KM`. */
+export function drift(wind: readonly [number, number], timeS: number, offsetKm: readonly [number, number] = [0, 0]) {
+    const at = (i: 0 | 1) => wrap(offsetKm[i] + (wind[i] * timeS) / 1000, DRIFT_PERIOD_KM);
+    return [at(0), at(1)] as [number, number];
 }
 
-/** The map's third coordinate at `timeS` for a layer evolving at `evolution` changes per hour. */
-export const evolutionAt = (evolution: number, timeS: number) => wrap((evolution * timeS) / 3600, EVOLUTION_PERIOD);
+/** The map's third coordinate at `timeS` for a layer evolving at `evolution` changes per hour, from `offset`. */
+export const evolutionAt = (evolution: number, timeS: number, offset = 0) =>
+    wrap(offset + (evolution * timeS) / 3600, EVOLUTION_PERIOD);
+
+/** What moves a layer: its wind and evolution and where they start from. */
+export interface LayerMotion {
+    wind: readonly [number, number];
+    evolution: number;
+    driftOffsetKm?: readonly [number, number];
+    evolutionOffset?: number;
+}
+
+/**
+ * The offsets that let a layer go on from where `previous` had it at `timeS` with the wind and evolution of `next`:
+ * drift and evolution are functions of the time, so a new rate alone would move the clouds by all the time since the
+ * epoch at once. Spread into the next layer, `{ ...next, ...continuedMotion(previous, next, timeS) }`.
+ */
+export function continuedMotion(previous: LayerMotion, next: LayerMotion, timeS: number) {
+    const at = drift(previous.wind, timeS, previous.driftOffsetKm);
+    const from = drift(next.wind, timeS);
+    const evolution = evolutionAt(previous.evolution, timeS, previous.evolutionOffset);
+    return {
+        driftOffsetKm: [wrap(at[0] - from[0], DRIFT_PERIOD_KM), wrap(at[1] - from[1], DRIFT_PERIOD_KM)] as [
+            number,
+            number,
+        ],
+        evolutionOffset: wrap(evolution - evolutionAt(next.evolution, timeS), EVOLUTION_PERIOD),
+    };
+}
 
 /** `GwModel` packed, for the cloud map of `layer`: the cloudscape's or a sheet's shaping. */
 export function modelData(
@@ -352,7 +390,8 @@ function sunCleared(sun: Rgb, row: SunlightRow, elevation: number, planetRadiusK
 export function sunlightData(p: CloudParams): ArrayBuffer {
     const buffer = new ArrayBuffer(SUNLIGHT_SIZE);
     const f = new Float32Array(buffer);
-    sunlightRows(p).forEach((row, i) => {
+    const rows = (p.sunlight && p.sunlightRows) || sunlightRows(p);
+    rows.forEach((row, i) => {
         f.set([row.fromRad, row.toRad], i * 4);
         for (let k = 0; k < SUNLIGHT_ENTRIES; k++) {
             const at = i * SUNLIGHT_ENTRIES + k;
@@ -374,7 +413,7 @@ export function cloudscapeData(
     const buffer = new ArrayBuffer(CLOUDSCAPE_SIZE);
     const f = new Float32Array(buffer);
     const u = new Uint32Array(buffer);
-    f.set(drift(c.wind, timeS), 0);
+    f.set(drift(c.wind, timeS, c.driftOffsetKm), 0);
     f.set([c.extentKm, c.baseKm, slabHeightKm(c), c.extinction, c.albedo, c.noiseScaleKm, c.profileDepthKm], 2);
     f.set([c.sdfRangeKm, c.stepMinKm, c.stepGrowth, c.forwardG, c.backwardG, c.multiScatter], 9);
     u[15] = c.enabled ? 1 : 0;
@@ -394,8 +433,8 @@ export function sheetData(s: SheetParams, timeS: number): ArrayBuffer {
     const f = new Float32Array(buffer);
     const u = new Uint32Array(buffer);
     f.set([s.altitudeKm, s.opticalDepth, s.coverage, s.sharpness], 0);
-    f.set(drift(s.wind, timeS), 4);
-    f.set([s.scaleKm, evolutionAt(s.evolution, timeS), s.albedo, s.forwardG], 6);
+    f.set(drift(s.wind, timeS, s.driftOffsetKm), 4);
+    f.set([s.scaleKm, evolutionAt(s.evolution, timeS, s.evolutionOffset), s.albedo, s.forwardG], 6);
     u.set([s.enabled ? 1 : 0, s.seed >>> 0], 10);
     const speed = Math.hypot(s.wind[0], s.wind[1]);
     f.set(

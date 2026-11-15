@@ -46,6 +46,8 @@ import stripes from "./stripes.comp.wgsl";
 /** No lower than this does the meter open for the umbra: EV100 4 exposes the umbra's edge, some 2 cd/m², as mid gray,
  *  and its deep red middle stays dark, as the eye and a camera see a total eclipse. */
 export const UMBRA_EV100 = 4;
+// The umbral magnitudes from which the meter turns from the sunlit part to the umbra, and at which it has.
+const [UMBRA_FROM, UMBRA_AT] = [0.5, 0.8];
 const luminanceOf = ([r, g, b]: readonly [number, number, number]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 // The sky pass writes cd/m² when its exposure is 1: EV100 of -log2(1.2).
 const UNIT_EV100 = -Math.log2(1.2);
@@ -607,12 +609,16 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             : null;
         const through = airOnDisc ? (center ? (center[0] + center[1] + center[2]) / 3 : 0) : 1;
         // Metered on the lit part of the disc outside the umbra, opening up as the umbra swallows it but no further
-        // than the umbra's own exposure, or on the sky around it where that is brighter, so neither burns out.
-        const outsideUmbra = frame.eclipse ? Math.max(1 - Math.max(m.shadow.umbralMagnitude, 0), 1e-4) : 1;
-        const disc = Math.max(
-            moonEV100(m.phaseAngle, m.lit, Math.max(through, 1e-3) * outsideUmbra),
-            frame.eclipse && m.shadow.umbralMagnitude > 0 ? UMBRA_EV100 : Number.NEGATIVE_INFINITY,
-        );
+        // than the umbra's own exposure, or on the sky around it where that is brighter, so neither burns out. From
+        // half the disc in the umbra on, the meter turns to the umbra, and with 80% in it exposes for the umbra alone,
+        // the sunlit sliver left to burn out, as photographs of an eclipse do.
+        const umbral = frame.eclipse ? Math.max(m.shadow.umbralMagnitude, 0) : 0;
+        const sunlit = moonEV100(m.phaseAngle, m.lit, Math.max(through, 1e-3) * Math.max(1 - umbral, 1e-4));
+        const toUmbra = Math.min(Math.max((umbral - UMBRA_FROM) / (UMBRA_AT - UMBRA_FROM), 0), 1);
+        const disc =
+            umbral > 0
+                ? Math.max(sunlit + (UMBRA_EV100 - sunlit) * toUmbra * toUmbra * (3 - 2 * toUmbra), UMBRA_EV100)
+                : sunlit;
         // The sky lies in front of the disc, so the two add up: a plain background, a daytime sky behind the tiles, too.
         const behind = frame.air
             ? (skyMeters.get(skyKeyOf(m)) ?? lastSky)
@@ -643,7 +649,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             autoExposureRange: [-6, 20],
             // The sky by moonlight, dimmed in Earth's shadow as the disc is.
             moonDirection: m.trueDirection,
-            moonIlluminance: moonIlluminance(m.phaseAngle, m.distanceKm) * outsideUmbra,
+            moonIlluminance: moonIlluminance(m.phaseAngle, m.distanceKm) * Math.max(1 - umbral, 1e-4),
         });
         moonPass.setRoughness(frame.roughness && maps ? sharedRoughness(device, mapsBound, requestRender) : null);
         moonPass.update({

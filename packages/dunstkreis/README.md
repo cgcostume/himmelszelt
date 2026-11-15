@@ -128,7 +128,8 @@ The Sun is drawn per pixel over the sky, never stored in a table, and in parts a
   `moonAngularDiameter` hides it behind the Moon's disc at `moonDirection`, a solar eclipse; 0 by default, no Moon.
 - The aureole, `aureole`, the air's glow of about a degree around it: aerosols scatter sunlight far more sharply forward
   than the tables' one Cornette-Shanks lobe says, so a share of their scattering, `DEFAULT_AUREOLE`'s 5 % at g 0.98,
-  goes into a narrow Henyey-Greenstein lobe the tables leave out and the sky pass adds per pixel within 20° of the Sun:
+  goes into a narrow Henyey-Greenstein lobe the tables leave out and the sky pass adds per pixel where the lobe is above
+  a five-thousandth of its peak, within 20° of the Sun at g 0.98, less for a sharper lobe, never more:
   the aerosols' sunlit scattering marched along the same bent path as the sky, dimmed by the air in front, times the
   lobe, centered on where the Sun shows. The cube map gets it too. `false` for Bruneton's one lobe alone.
 - The veil, `veil`, the eye's own glare: CIE's equation (CIE 146:2002) from the Sun's illuminance at the observer, which
@@ -170,6 +171,9 @@ The Sun and the sky light a scene apart, the usual split for image-based lightin
 
 - The Sun as a directional light, from its apparent direction (`apparentDirection`), with `sunIlluminance()`: the
   sunlight that reaches the observer through the air, per channel in lux, measured by the light meter on the GPU.
+  `lightThroughAir(model, sunDirection, observerHeightM)` gives the same on the CPU, for the same frame without a
+  round trip, and `lightBuffer` the meter's buffer for a pass of your own that reads it on the GPU.
+- The sky's irradiance on the ground with `skyIrradiance()`, without the Sun, from the table with `groundLight`.
 - The Moon the same way with `moonlight`, from its apparent direction, with `moonIlluminance()`: its light through
   the air, in sunlight's color, some 0.3 lux at full Moon high up. The cube map holds the moonlit sky too.
 - The sky as a cube map, from a cube pass made once, `await sky.createCubePass({ format: "rgba16float" })`, then
@@ -298,7 +302,7 @@ pipeline-overridable constants, set through `constants` on the pipeline descript
 and the passes' switches (tone mapping, dithering, auto exposure, the Sun's disc, the cube map) in `features.wgsl`.
 Integration loop bounds stay compile-time constants so the compiler can unroll them, and a disabled feature leaves no
 code behind rather than branching per pixel. `common.wgsl` declares one of its own, `DK_REFRACTION`, on by default,
-which is right either way. The uniforms keep only what changes per frame: 112 bytes for the sky.
+which is right either way. The uniforms keep only what changes per frame: 176 bytes for the sky.
 
 Every identifier is prefixed `dk`/`DK_` so several `@himmelszelt/*` fragments can share one shader module.
 Rolldown inlines the `.wgsl` files at build time, so `dist` reads nothing from disk and stays browser-safe.

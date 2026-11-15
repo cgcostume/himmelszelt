@@ -189,6 +189,14 @@ export interface SkyPass {
      *  unless the pass was made with `aerialPerspective`. */
     readonly aerialPerspective: AerialPerspectiveVolume | null;
     /**
+     * The light meter's buffer, for a pass of your own that reads the light on the GPU in the same frame, without a round
+     * trip: at byte 0 log2 of the sky's mean luminance (f32), at 16 the Sun's illuminance at the observer and at 32 the
+     * Moon's, in lux per channel of linear sRGB (vec3f each), at 48 the sky's irradiance on the ground at the model's
+     * four wavelengths (vec4f, `dkToRgb` from `wgsl.atmosphere` turns it into lux), with `groundLight`. Written by
+     * `update()` whenever the table is rebuilt. Bind it as read-only storage.
+     */
+    readonly lightBuffer: GPUBuffer;
+    /**
      * Takes the parameters over, writes the uniforms, and, when the sun or the observer moved, rebuilds the sky-view
      * table and meters it, and the aerial perspective volume also when the camera moved: submitted on its own, or
      * recorded into `encoder` to go with the frame's own submission.
@@ -210,6 +218,12 @@ export interface SkyPass {
      * from where it shows (`apparentDirection`), next to the moonlit sky in the cube map.
      */
     moonIlluminance(): Promise<[number, number, number]>;
+    /**
+     * The sky's irradiance on the ground, a surface facing up, per channel in lux, read back from the GPU: the sky alone,
+     * without the Sun, gathered from the table with `groundLight`, zero without. For a scene's diffuse light without a
+     * cube map, or clouds lit from above.
+     */
+    skyIrradiance(): Promise<[number, number, number]>;
     /**
      * Makes a pass that writes this sky into a cube map, its pipelines compiled without blocking. Without the sun disc,
      * a cube map lights a scene, and shows behind it with the disc drawn over it by `dkSunDisc` from `wgsl.sun`. `@himmelszelt/rundbild` lights a scene by it and lays it out as a panorama.

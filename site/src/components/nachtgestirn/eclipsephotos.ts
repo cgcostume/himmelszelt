@@ -1,5 +1,6 @@
 import { eclipse, fromDate, fromJulianDay, julianDayUT, julianEphemerisDay, toDate } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
+import { figureInfo } from "../figure-info";
 import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
@@ -7,6 +8,7 @@ import { drawSvg, svgText, THUMB_RADIUS } from "../sternzeit/figure";
 import { CLIFTON_PARK, ECLIPSE_PHOTOS, ev100Of } from "./eclipse-photos";
 import { noGpu } from "./laws";
 import { moonAt, onUmbraTable, type ToneCurveName } from "./renderer";
+import { saveFigure } from "./snapshot";
 import { createTiles, type TileFrame } from "./tiles";
 
 // The photographs are 1024 pixels square; the disc's radius as a share of a tile, the photographs' own, about.
@@ -43,7 +45,6 @@ export function eclipsePhotosFigure(root: HTMLElement) {
     const stripCanvas = find<HTMLCanvasElement>("canvas", strip);
     const stripTiles = createTiles(stripCanvas, requestRender);
     if (!stripTiles) noGpu(stripCanvas);
-    const stripNote = find("[data-field=stripNote]", root);
     const stripMarks = find<SVGSVGElement>("[data-field=stripMarks]", root);
     // The umbra's first and last contact, either side of the photographs' totality.
     const middle = moments[0] ?? 0;
@@ -153,8 +154,6 @@ export function eclipsePhotosFigure(root: HTMLElement) {
             darkAdapted: false,
         }));
         markStrip(stripColumns, stripRows);
-        const step = Math.round((release - contact) / (STRIP - 1) / MINUTE);
-        stripNote.textContent = `every ${step} minutes from ${hhmm(contact)} to ${hhmm(release)} UTC, the umbra's first contact to its last`;
     }
 
     // The photographs' moments on the strip, dashed through their row where the time between the Moons puts them, each
@@ -213,6 +212,10 @@ export function eclipsePhotosFigure(root: HTMLElement) {
     panel.addEventListener("pointermove", (event) => {
         if (panel.hasPointerCapture(event.pointerId)) drag(event);
     });
+    find("[data-field=download]", root).addEventListener("click", () =>
+        saveFigure(root, stripCanvas, render, { svgs: [stripMarks] }),
+    );
+    figureInfo(root);
     onTables(requestRender);
     onUmbraTable(requestRender);
     onDisplay(requestRender);

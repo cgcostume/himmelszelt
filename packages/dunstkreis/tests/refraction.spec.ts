@@ -1,7 +1,13 @@
 import { earth } from "@himmelszelt/sternzeit";
 import { expect, test } from "@playwright/test";
 import { DEFAULT_ATMOSPHERE_MODEL, RGB_ATMOSPHERE_MODEL } from "../src/model.js";
-import { airRefractivity, airTransmittance, apparentDirection, refractionAngle } from "../src/refraction.js";
+import {
+    airRefractivity,
+    airTransmittance,
+    apparentDirection,
+    lightThroughAir,
+    refractionAngle,
+} from "../src/refraction.js";
 
 const model = DEFAULT_ATMOSPHERE_MODEL;
 const GROUND_M = 0.001;
@@ -94,4 +100,17 @@ test("two passes double the optical depth before the color, which squaring the c
     const [r2, g2] = twice();
     expect(((g1 ?? 0) / (r1 ?? 1)) ** 2 / ((g2 ?? 0) / (r2 ?? 1))).toBeGreaterThan(1.03);
     expect(airTransmittance(model, 100, 30, 1)).toEqual(airTransmittance(model, 100, 30));
+});
+
+test("lightThroughAir gives the meter's sunlight on the CPU: 3° up from 10 m, and from space", () => {
+    const near = (a: readonly number[], b: readonly number[], tolerance: number) =>
+        a.forEach((v, i) => {
+            expect(Math.abs(v / (b[i] as number) - 1)).toBeLessThan(tolerance);
+        });
+    const low: [number, number, number] = [Math.cos((3 * Math.PI) / 180), 0, Math.sin((3 * Math.PI) / 180)];
+    // The golden values of tables.spec.ts, which the GPU meter reads from the transmittance table.
+    near(lightThroughAir(model, low, 10), [40391, 17550, 2147.6], 0.01);
+    near(lightThroughAir(model, low, 300_000), [139650, 125070, 122740], 0.001);
+    near(lightThroughAir(model, low, 10, model.solarIlluminance / 400), [101, 43.9, 5.37], 0.01);
+    expect(lightThroughAir(model, [Math.cos(0.05), 0, -Math.sin(0.05)], 10)).toEqual([0, 0, 0]);
 });

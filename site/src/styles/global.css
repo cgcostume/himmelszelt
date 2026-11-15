@@ -322,7 +322,8 @@ a.sky-sun:focus-visible {
     text-decoration: none;
 }
 /* Sunrise and sunset, the lower half below the horizon, glow and all. */
-.sky-sun.on-horizon {
+.sky-sun.on-horizon,
+.sky-scene.on-horizon {
     clip-path: inset(-100% -100% 50% -100%);
 }
 /* The current section's scene around its Sun (see SkyRule.astro), in screen pixels, in the figures' line styles. */
@@ -402,6 +403,63 @@ a.sky-sun:focus-visible {
 .sky-scene .cover {
     fill: var(--bg);
     stroke: none;
+}
+/* nachtgestirn's rule (see moonrule.ts): the other markers are Moons in their phase, the current one is its scene. */
+.sky-sun.moon {
+    background: none;
+    box-shadow: none;
+    color: var(--muted);
+}
+.sky-sun.moon:not(.current) {
+    width: 7px;
+    height: 7px;
+}
+.sky-sun.moon.ahead {
+    color: var(--line);
+}
+.sky-sun.moon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+.sky-sun.moon::after,
+a.sky-sun.moon:hover::after,
+a.sky-sun.moon:focus-visible::after {
+    display: none;
+}
+a.sky-sun.moon:hover,
+a.sky-sun.moon:focus-visible {
+    color: var(--accent);
+}
+.sky-scene .thin {
+    stroke-width: 0.7px;
+}
+.sky-scene .dim {
+    opacity: 0.75;
+}
+.sky-scene .blue {
+    fill: oklch(0.55 0.12 250);
+    stroke: none;
+}
+.sky-scene .copper {
+    fill: oklch(0.58 0.13 40);
+    stroke: none;
+}
+.sky-scene .golden {
+    fill: var(--golden-hour);
+    stroke: none;
+    filter: var(--sun-glow);
+    color: var(--golden-hour);
+}
+.sky-scene .mare {
+    fill: var(--muted);
+    stroke: none;
+    opacity: 0.75;
+}
+.sky-scene .streaks {
+    stroke: var(--bg);
+    stroke-width: 0.55px;
 }
 /* A computed result, behind an arrow like what a program prints, its lines set in as far as the controls' title is
    behind its +. */

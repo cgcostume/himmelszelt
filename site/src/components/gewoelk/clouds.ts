@@ -6,13 +6,13 @@ import {
     DEFAULT_AUTO_EXPOSURE_KEYS,
     refractionAngle,
 } from "@himmelszelt/dunstkreis";
-import type { CloudParams, CloudPass, Weather, WeatherName } from "@himmelszelt/gewoelk";
+import type { CloudParams, CloudPass, LayerMotion, Weather, WeatherName } from "@himmelszelt/gewoelk";
 import {
+    continuedMotion,
     createCloudPass,
-    DEFAULT_CLOUD_PARAMS,
     DEFAULT_CLOUDSCAPE,
     DEFAULT_SHEET,
-    sunlightRows,
+    SUNLIGHT_ENTRIES,
     WEATHER,
 } from "@himmelszelt/gewoelk";
 import { fromJulianDay, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
@@ -36,7 +36,6 @@ import { paintRange } from "../range";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
 import { createAerialRgb } from "./aerial";
-import { createSunlight } from "./sunlight";
 
 const DEG = Math.PI / 180;
 // The sky pass writes cd/m² when its exposure is 1: EV100 of -log2(1.2).
@@ -167,12 +166,17 @@ export function cloudsFigure(root: HTMLElement) {
     let skyIrradiance: [number, number, number] = [0, 0, 0];
     let groundIrradiance: [number, number, number] = [0, 0, 0];
     let horizon: [number, number, number] = [0, 0, 0];
-    // The sun's light aloft by altitude and its elevation over the local horizon, read back when the rows change.
-    const sunlight = gpu ? createSunlight(gpu.device) : null;
     const aerialRgb = gpu ? createAerialRgb(gpu.device) : null;
-    let sunTable: [number, number, number][] | undefined;
-    let sunTableFor = "";
+    // The sun's light aloft comes from gewoelk's own table, through dunstkreis' air; with the sun switched off, none.
+    const noSunlight = Array.from({ length: 4 * SUNLIGHT_ENTRIES }, (): [number, number, number] => [0, 0, 0]);
     const requestRender = onDemand(render, root);
+    // The cloud pass reads the tables it was made with: a new set makes a new pass.
+    const lutIds = new WeakMap<AtmosphereLUTs, number>();
+    let lutCount = 0;
+    function lutsId(luts: AtmosphereLUTs): number {
+        if (!lutIds.has(luts)) lutIds.set(luts, ++lutCount);
+        return lutIds.get(luts) ?? 0;
+    }
 
     function buildSky(luts: AtmosphereLUTs) {
         if (!gpu || skyBuilding === luts) return;
@@ -195,10 +199,18 @@ export function cloudsFigure(root: HTMLElement) {
             requestRender();
         });
     }
-    function buildClouds(key: string, scale: number, maxSteps: number, layers: number) {
+    function buildClouds(key: string, scale: number, maxSteps: number, layers: number, luts: AtmosphereLUTs) {
         if (!gpu || cloudsBuilding === key) return;
         cloudsBuilding = key;
-        createCloudPass(gpu.device, { format: SDR, dither: true, scale, maxSteps, grid: { layers } }).then((pass) => {
+        const { atmosphereBuffer, transmittance, sampler, model } = luts;
+        const atmosphere = {
+            atmosphereBuffer,
+            transmittance,
+            sampler,
+            apparentElevation: (altitudeKm: number, elevation: number) => lifted(model, altitudeKm, elevation),
+        };
+        const options = { format: SDR, dither: true, scale, maxSteps, grid: { layers }, atmosphere };
+        createCloudPass(gpu.device, options).then((pass) => {
             if (cloudsBuilding !== key) return pass.destroy();
             clouds?.pass.destroy();
             clouds = { pass, key };
@@ -278,7 +290,18 @@ export function cloudsFigure(root: HTMLElement) {
         return `${layer}: { ${inner.join(", ")} },`;
     }
 
+    // Each layer's motion as last drawn: a new wind or evolution goes on from where the clouds stand.
+    const motions: (LayerMotion | undefined)[] = [];
+    function moving(layer: number, wind: [number, number], evolution: number, timeS: number): LayerMotion {
+        const last = motions[layer];
+        const next = { wind, evolution };
+        const same = last && last.wind[0] === wind[0] && last.wind[1] === wind[1] && last.evolution === evolution;
+        if (!same) motions[layer] = last ? { ...next, ...continuedMotion(last, next, timeS) } : next;
+        return motions[layer] as LayerMotion;
+    }
+
     function cloudParams(): Partial<CloudParams> {
+        const timeS = seconds();
         const windOf = (speed: number, azimuth: number): [number, number] => [
             speed * Math.sin(azimuth * DEG),
             speed * Math.cos(azimuth * DEG),
@@ -287,13 +310,12 @@ export function cloudsFigure(root: HTMLElement) {
         const ambientOn = pressed("light.ambient");
         return {
             sunIlluminance: sunOn ? sunIlluminance : [0, 0, 0],
-            // Set every time, so the table goes with the sun: a partial update keeps what it is not given.
-            sunlight: sunOn ? sunTable : undefined,
+            sunlight: sunOn ? null : noSunlight,
             skyIrradiance: ambientOn ? skyIrradiance : [0, 0, 0],
             groundIrradiance: ambientOn ? groundIrradiance : [0, 0, 0],
             horizonLuminance: horizon,
             ev100: ev100 - CLOUD_COMPENSATION,
-            timeS: seconds(),
+            timeS,
             cloudscape: {
                 ...DEFAULT_CLOUDSCAPE,
                 enabled: pressed("cloudscape.enabled"),
@@ -302,8 +324,12 @@ export function cloudsFigure(root: HTMLElement) {
                 baseKm: slider("cloudscape.baseKm"),
                 heightKm: slider("cloudscape.heightKm"),
                 offset: slider("cloudscape.offset"),
-                wind: windOf(slider("cloudscape.windSpeed"), slider("cloudscape.windFrom") + 180),
-                evolution: slider("cloudscape.evolution"),
+                ...moving(
+                    0,
+                    windOf(slider("cloudscape.windSpeed"), slider("cloudscape.windFrom") + 180),
+                    slider("cloudscape.evolution"),
+                    timeS,
+                ),
                 clearingKm: slider("cloudscape.clearingKm"),
                 clearingFromKm: slider("cloudscape.clearingFromKm"),
                 variation: slider("cloudscape.variation"),
@@ -321,7 +347,12 @@ export function cloudsFigure(root: HTMLElement) {
                     coverage: slider("sheet.coverage"),
                     altitudeKm: slider("sheet.altitudeKm"),
                     opticalDepth: slider("sheet.opticalDepth"),
-                    wind: windOf(slider("sheet.windSpeed"), slider("sheet.windFrom") + 180),
+                    ...moving(
+                        1,
+                        windOf(slider("sheet.windSpeed"), slider("sheet.windFrom") + 180),
+                        DEFAULT_SHEET.evolution,
+                        timeS,
+                    ),
                     ripples: slider("sheet.ripples"),
                     noise: Object.fromEntries(
                         sliders
@@ -343,9 +374,9 @@ export function cloudsFigure(root: HTMLElement) {
         const scale = Number(choice("scale")) || 1;
         const maxSteps = Number(choice("steps")) || 128;
         const layers = Number(choice("layers")) || 64;
-        const key = `${scale},${maxSteps},${layers}`;
+        const key = `${scale},${maxSteps},${layers},${lutsId(table.luts)}`;
         if (clouds?.key !== key) {
-            buildClouds(key, scale, maxSteps, layers);
+            buildClouds(key, scale, maxSteps, layers, table.luts);
             return;
         }
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -409,19 +440,6 @@ export function cloudsFigure(root: HTMLElement) {
             planetRadiusKm: table.luts.model.planet.groundRadiusKm,
             ...cloudParams(),
         };
-        const rows = sunlightRows({ ...DEFAULT_CLOUD_PARAMS, ...params });
-        const rowsKey = `${JSON.stringify(rows)},${sky.luts === table.luts}`;
-        if (rowsKey !== sunTableFor && sunlight) {
-            const luts = sky.luts;
-            sunlight
-                .table(luts, rows, (h, e) => lifted(luts.model, h, e))
-                .then((values) => {
-                    if (!values || sky?.luts !== luts) return;
-                    sunTableFor = rowsKey;
-                    sunTable = values;
-                    requestRender();
-                });
-        }
         clouds.pass.update(params);
 
         placeCompass(basis, canvas.clientWidth, canvas.clientHeight);

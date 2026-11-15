@@ -1,6 +1,6 @@
 ---
+import CopyInfo from "../CopyInfo.astro";
 import Icon from "../Icon.astro";
-import Term from "../Term.astro";
 import "../sternzeit/sternzeit.css";
 import Resolutions from "../Resolutions.astro";
 import Rays from "./Rays.astro";
@@ -12,14 +12,12 @@ interface Props {
     id?: string;
 }
 const { id = "shimmer" } = Astro.props;
-// Fried's parameter through one zenith column, in centimeters: a poor night, a fair one, a good one.
-const R0S = ["5", "10", "20"];
 ---
 
-<figure class="tiles-figure wide" id={id} data-shimmer>
+<figure class="tiles-figure" id={id} data-shimmer>
     <div class="shimmer-row">
-        <div class="tiles-panel as-seen split" style="--count: 2">
-            <canvas aria-label="The Moon's lower limb through the air, shimmering, waxing and waning, rendered with WebGPU"></canvas>
+        <div class="tiles-panel as-seen">
+            <canvas aria-label="The Moon's lower limb through the air, shimmering, rendered with WebGPU"></canvas>
             <span class="tiles-start">
                 <Resolutions options={WHOLE_RESOLUTIONS} chosen="4k" />
                 <span class="view-buttons">
@@ -27,16 +25,13 @@ const R0S = ["5", "10", "20"];
                     <button type="button" class="view-toggle" data-part="boiling" aria-pressed="true" title="The smaller cells, which make the image boil within those patches">boiling</button>
                     <button type="button" class="view-toggle" data-part="colors" aria-pressed="true" title="The air's dispersion: it bends blue more than red, so the blue image stands higher, more the lower the Moon">colors</button>
                 </span>
-                <span class="view-buttons">
-                    {R0S.map((r0) => (
-                        <button type="button" class="view-toggle" data-r0={r0} aria-pressed={r0 === "10" ? "true" : "false"} title={`Fried's parameter of ${r0} cm through one zenith column of air from sea level: the larger, the steadier the air`}>r₀ {r0} cm</button>
-                    ))}
-                </span>
-                <span class="tiles-hint footnote">Drag the observer and the Moons on the right. Rendered with WebGPU</span>
+                <span class="tiles-hint footnote">Rendered with WebGPU</span>
             </span>
             <span class="view-buttons tiles-end">
                 <Rays />
                 <button type="button" class="view-icon" data-field="play" aria-pressed="true" title="Let the air drift on, or hold it" aria-label="Pause"><Icon name="play" /></button>
+                <button type="button" class="view-icon" data-field="download" title="Download the close-up and the air from the side as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+                <CopyInfo />
             </span>
         </div>
         <div class="shimmer-cut" title="Drag the observer up and down, the Moon from one horizon over the zenith to the other; double click for where they started">
@@ -45,10 +40,8 @@ const R0S = ["5", "10", "20"];
     </div>
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        The air's shimmer on the Moon's lower limb, seen from Potsdam: a waxing Moon by day on November 21, 2026, and a
-        waning one at dusk on November 25, both at the same altitude. From the side, not to scale, the air their light
-        crosses, counted in columns of the air overhead at sea level. r₀ is Fried's parameter, how steady the air is
-        through one column.
+        The air's shimmer on the Moon's lower limb, seen from Potsdam at dusk on November 25, 2026, the Moon waning.
+        From the side, not to scale, the air its light crosses, counted in columns of the air overhead at sea level.
     </figcaption>
 </figure>
 

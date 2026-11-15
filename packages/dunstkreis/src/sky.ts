@@ -1,6 +1,7 @@
 import { exposureFromEV100, type ToneCurve } from "@himmelszelt/helldunkel";
 import { autoExposureCompensation, DEFAULT_AUTO_EXPOSURE_KEYS } from "./exposure.js";
 import { createLut, dispatch } from "./luts.js";
+import { spectrumToRgb } from "./model.js";
 import {
     type AerialPerspectiveOptions,
     type AerialPerspectiveVolume,
@@ -139,8 +140,8 @@ const DEFAULTS: SkyParams = {
     projectionDistance: 0,
     moonDirection: [0, 0, -1],
     moonIlluminance: 0,
-    gridInk: 1,
     moonAngularDiameter: 0,
+    gridInk: 1,
     sunDiscCeiling: null,
 };
 
@@ -525,6 +526,8 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
 
         aerialPerspective: aerialVolume,
 
+        lightBuffer: metering,
+
         update(next, frameEncoder) {
             params = { ...params, ...next };
             const [sx, sy, sz] = params.sunDirection;
@@ -565,10 +568,10 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             sky.set(apparentMoon.direction, 36);
             sky[39] = params.gridInk;
             sky[40] = params.sunDiscCeiling ?? 0;
+            sky[41] = params.moonAngularDiameter > 0 ? Math.cos((params.moonAngularDiameter * Math.PI) / 360) : 2;
             device.queue.writeBuffer(skyParams, 0, sky);
 
             // Rebuilding the sky-view table is the expensive part, and it is why the sky pass itself is one fetch
-            sky[41] = params.moonAngularDiameter > 0 ? Math.cos((params.moonAngularDiameter * Math.PI) / 360) : 2;
             // per pixel rather than a raymarch. It depends on nothing but the Sun and the observer. Above the
             // atmosphere nothing reads the table: the sky pass raymarches per pixel, and so does the meter.
             const key = `${sx},${sy},${sz},${height}`;
@@ -639,6 +642,13 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         async moonIlluminance() {
             const [r, g, b] = await readMetering(32, 3);
             return [r as number, g as number, b as number];
+        },
+
+        async skyIrradiance() {
+            const spectral = await readMetering(48, 4);
+            return spectrumToRgb(model).map((row) =>
+                row.reduce((sum, m, j) => sum + m * (spectral[j] as number), 0),
+            ) as [number, number, number];
         },
 
         async createCubePass(cubeOptions: SkyCubeOptions) {

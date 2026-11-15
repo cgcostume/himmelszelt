@@ -11,6 +11,7 @@ import {
     modelData,
     PARAMS_SIZE,
     paramsData,
+    SUNLIGHT_ENTRIES,
     SUNLIGHT_SIZE,
     type SunlightRow,
     sizedCloudscape,
@@ -49,6 +50,22 @@ export interface CloudPassOptions {
     /** Steps a ray takes at most through the cloudscape, 256 by default, and detailed light samples per step, 2. */
     maxSteps?: number;
     nearLightSamples?: number;
+    /** The air the sunlight comes through, for the sunlight table computed here on the GPU, in the frame's own encoder,
+     *  as the sun moves: dunstkreis' `AtmosphereLUTs` as they are. A `sunlight` table given to `update` overrides it. */
+    atmosphere?: SunlightAtmosphere;
+}
+
+/**
+ * The air for the sunlight table: dunstkreis' `DkAtmosphere` uniform, its transmittance table and the sampler for it,
+ * as its `AtmosphereLUTs` hold them, of the dunstkreis version gewoelk was built with. The table's rays start in the
+ * sun's apparent direction: `apparentElevation` lifts a true elevation in radians at an altitude in km to it, none by
+ * default, as dunstkreis' `refractionAngle` traces it.
+ */
+export interface SunlightAtmosphere {
+    atmosphereBuffer: GPUBuffer;
+    transmittance: GPUTexture;
+    sampler: GPUSampler;
+    apparentElevation?: (altitudeKm: number, elevation: number) => number;
 }
 
 /**
@@ -273,6 +290,38 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
 
     const bindGroup = (pipeline: GPUComputePipeline, entries: GPUBindGroupEntry[], group = 0) =>
         device.createBindGroup({ layout: pipeline.getBindGroupLayout(group), entries });
+
+    // The sunlight table from the air's transmittance, with `atmosphere`: per entry an altitude and the sine of the
+    // sun's apparent elevation in, the illuminance out, copied into the table's place in the sunlight uniform.
+    const air = options.atmosphere;
+    const tableEntries = 4 * SUNLIGHT_ENTRIES;
+    const sunTable = air
+        ? await (async () => {
+              const tablePipeline = await pipeline(
+                  "sunlight",
+                  module("gewoelk:sunlight", [wgsl.airLookup, wgsl.sunlight]),
+                  "gwSunlightTable",
+              );
+              const query = device.createBuffer({
+                  label: "gewoelk:sunlightQuery",
+                  size: tableEntries * 8,
+                  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+              });
+              const values = device.createBuffer({
+                  label: "gewoelk:sunlightTable",
+                  size: tableEntries * 16,
+                  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+              });
+              const group = bindGroup(tablePipeline, [
+                  { binding: 0, resource: { buffer: air.atmosphereBuffer } },
+                  { binding: 1, resource: air.transmittance.createView() },
+                  { binding: 2, resource: air.sampler },
+                  { binding: 3, resource: { buffer: query } },
+                  { binding: 4, resource: { buffer: values } },
+              ]);
+              return { pipeline: tablePipeline, query, values, group };
+          })()
+        : null;
     const mapArray = map.createView({ dimension: "2d-array" });
     const cloudMapBindGroups = models.map((model) =>
         bindGroup(cloudMapPipeline, [
@@ -431,13 +480,39 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
 
         update(next, frameEncoder) {
             current = { ...current, ...next };
+            // The rows go with their table: a new table without them is for the current rows.
+            if ("sunlight" in next && !("sunlightRows" in next)) current.sunlightRows = null;
             frame += 1;
             const { sheets, timeS } = current;
             const c = sizedCloudscape(current.cloudscape);
             device.queue.writeBuffer(params, 0, paramsData(current, frame));
             const { fromRad, toRad } = sunlightRows(current)[0] as SunlightRow;
             device.queue.writeBuffer(cloudscape, 0, cloudscapeData(c, timeS, [fromRad, toRad]));
-            device.queue.writeBuffer(sunlight, 0, sunlightData(current));
+            const computed = sunTable && !current.sunlight;
+            // Computed, only the rows: the table itself is copied in after it.
+            device.queue.writeBuffer(sunlight, 0, sunlightData(current), 0, computed ? 64 : SUNLIGHT_SIZE);
+            if (computed) {
+                const query = new Float32Array(tableEntries * 2);
+                const lift = air?.apparentElevation ?? ((_: number, e: number) => e);
+                sunlightRows(current).forEach((row, i) => {
+                    for (let k = 0; k < SUNLIGHT_ENTRIES; k++) {
+                        const elevation = row.fromRad + ((row.toRad - row.fromRad) * k) / (SUNLIGHT_ENTRIES - 1);
+                        query.set(
+                            [row.altitudeKm, Math.sin(lift(row.altitudeKm, elevation))],
+                            (i * SUNLIGHT_ENTRIES + k) * 2,
+                        );
+                    }
+                });
+                device.queue.writeBuffer(sunTable.query, 0, query);
+                const encoder = frameEncoder ?? device.createCommandEncoder({ label: "gewoelk:sunlight" });
+                const pass = encoder.beginComputePass({ label: "gewoelk:sunlight" });
+                pass.setPipeline(sunTable.pipeline);
+                pass.setBindGroup(0, sunTable.group);
+                pass.dispatchWorkgroups(dispatch(tableEntries, 64));
+                pass.end();
+                encoder.copyBufferToBuffer(sunTable.values, 0, sunlight, 64, tableEntries * 16);
+                if (!frameEncoder) device.queue.submit([encoder.finish()]);
+            }
 
             // Which maps changed shape: the cloudscape's first, then the sheets'.
             const growth = {
@@ -447,10 +522,10 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                 towerScale: Math.max(1, c.towerScale ?? 1),
             };
             const shapes = [
-                { model: c, evolution: evolutionAt(c.evolution, timeS), offset: c.offset, growth },
+                { model: c, evolution: evolutionAt(c.evolution, timeS, c.evolutionOffset), offset: c.offset, growth },
                 ...sheets.slice(0, MAX_SHEETS).map((s) => ({
                     model: s,
-                    evolution: evolutionAt(s.evolution, timeS),
+                    evolution: evolutionAt(s.evolution, timeS, s.evolutionOffset),
                     offset: 0,
                     growth: undefined,
                 })),
@@ -470,7 +545,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                 device.queue.writeBuffer(
                     models[0] as GPUBuffer,
                     0,
-                    modelData(0, c, evolutionAt(c.evolution, timeS), c.offset, growth),
+                    modelData(0, c, evolutionAt(c.evolution, timeS, c.evolutionOffset), c.offset, growth),
                 );
             const nextVolumeKey = `${mapKeys[0]},${c.offset},${c.extentKm},${c.heightKm},${c.profileDepthKm},${c.sdfRangeKm},${growth.billows},${growth.billowCells},${growth.towerScale}`;
             const rebuildVolume = c.enabled && nextVolumeKey !== volumeKey;
@@ -565,6 +640,8 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
             clouds?.destroy();
             for (const buffer of [params, cloudscape, sunlight, coverage, ...models, ...jumpBuffers, deck])
                 buffer.destroy();
+            sunTable?.query.destroy();
+            sunTable?.values.destroy();
         },
     };
 }

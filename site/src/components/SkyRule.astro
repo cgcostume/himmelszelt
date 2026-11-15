@@ -1,6 +1,7 @@
 ---
 import { findEntry } from "../lib/glossary";
-import { SCENES, sunAt } from "../lib/skyrule";
+import { MOON_SCENES, markerMoon, phaseAt, plainMoon } from "../lib/moonrule";
+import { MOON_RULES, SCENES, sunAt } from "../lib/skyrule";
 import { SUN_SYMBOL, sunRays } from "./sternzeit/figure";
 
 interface Props {
@@ -27,7 +28,14 @@ const suns = Array.from({ length: total }, (_, i) => ({
 const here = suns[index];
 const sunClass = (state: string, i: number) => `sky-sun ${state}${i === 0 || i === total - 1 ? " on-horizon" : ""}`;
 const sunStyle = (x: number, y: number) => `--x: ${x.toFixed(4)}; --y: ${y.toFixed(4)}`;
-const scene = SCENES[id];
+// The rule's height in pixels, 2.5rem in global.css, for the line from the horizon up to the Sun.
+const RULE_PX = 40;
+const chapter = Astro.locals.chapter ?? "";
+const moons = MOON_RULES.has(chapter);
+const scene = moons ? "" : (SCENES[chapter]?.[id] ?? "");
+// In a Moon's chapter the current marker is its scene, or the Moon alone in its phase.
+const moonScene = moons ? (MOON_SCENES[SCENES[chapter]?.[id] ?? ""] ?? plainMoon) : undefined;
+const moonSvg = moonScene?.({ phase: phaseAt(index, total), horizon: here.y * RULE_PX });
 // The path's direction at the current Sun, from its neighbors, for the scenes that line up along it.
 const place = `--x: ${here.x.toFixed(4)}; --y: ${here.y.toFixed(4)}`;
 // The path's direction on either side of the current Sun, for the Moons lined up along it: each side turns its own way.
@@ -66,8 +74,6 @@ const symbol = `<circle r="${SUN}" class="sun"/><path d="${sunRays()
             `M${(a.x * SHRINK).toFixed(2)} ${(a.y * SHRINK).toFixed(2)}L${(b.x * SHRINK).toFixed(2)} ${(b.y * SHRINK).toFixed(2)}`,
     )
     .join("")}" class="rays" style="stroke-dasharray: 0.1 ${(5.2 * SHRINK).toFixed(2)}"/>`;
-// The rule's height in pixels, 2.5rem in global.css, for the line from the horizon up to the Sun.
-const RULE_PX = 40;
 // A stick figure standing on the horizon down to the right of the Sun, looking up at it along a dotted line of sight.
 function observer() {
     // Its size in pixels: k times the proportions below.
@@ -122,11 +128,14 @@ const ALONG: Record<string, { left?: string; right?: string }> = {
         {index < total - 1 && <polyline class="ahead" points={points(index, total - 1)} vector-effect="non-scaling-stroke" />}
     </svg>
     {/* The other Suns first, so the current section's scene is drawn over them; every one of them leads to its section. */}
-    {suns.map(({ x, y, state }, i) => i !== index && <a class={sunClass(state, i)} style={sunStyle(x, y)} href={targets[i].href} aria-label={targets[i].title} />)}
+    {suns.map(({ x, y, state }, i) => i !== index && (moons
+        ? <a class={`${sunClass(state, i)} moon`} style={sunStyle(x, y)} href={targets[i].href} aria-label={targets[i].title} set:html={markerMoon(phaseAt(i, total), state === "ahead")} />
+        : <a class={sunClass(state, i)} style={sunStyle(x, y)} href={targets[i].href} aria-label={targets[i].title} />))}
+    {moonSvg && <svg class={`sky-scene${index === total - 1 ? " on-horizon" : ""}`} aria-hidden="true" viewBox="-24 -16 48 32" style={place} set:html={moonSvg} />}
     {scene && <svg class="sky-scene" aria-hidden="true" viewBox="-24 -16 48 32" style={place} set:html={drawings[scene]} />}
     {ALONG[scene]?.left && <svg class="sky-scene along" aria-hidden="true" viewBox="-24 -16 48 32" style={along(before, here)} set:html={ALONG[scene].left} />}
     {ALONG[scene]?.right && <svg class="sky-scene along" aria-hidden="true" viewBox="-24 -16 48 32" style={along(here, after)} set:html={ALONG[scene].right} />}
-    <span class={`${sunClass(here.state, index)}${["grid", "astrolabe", "squeezed"].includes(scene ?? "") ? " replaced" : ""}${scene === "squeezed" ? " squeezed" : ""}`} style={sunStyle(here.x, here.y)} aria-current="location" />
+    <span class={`${sunClass(here.state, index)}${moons ? " moon" : ""}${["grid", "astrolabe", "squeezed"].includes(scene ?? "") ? " replaced" : ""}${scene === "squeezed" ? " squeezed" : ""}`} style={sunStyle(here.x, here.y)} aria-current="location" />
     {
         scene === "earth" && (
             <span class="term sky-observer" tabindex="0" style={place}>
@@ -147,3 +156,10 @@ const ALONG: Record<string, { left?: string; right?: string }> = {
     }
     {OVER[scene] && <svg class="sky-scene" aria-hidden="true" viewBox="-24 -16 48 32" style={place} set:html={OVER[scene]} />}
 </nav>
+
+<script>
+    import { showTonight } from "../lib/moonrule";
+
+    // The phase drawn at build time is the build's; the reader's night is now.
+    showTonight(document);
+</script>

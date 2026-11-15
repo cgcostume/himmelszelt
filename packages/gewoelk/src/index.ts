@@ -5,7 +5,7 @@
 
 // biome-ignore-all assist/source/organizeImports: exports are hand-grouped by domain, not alphabetical
 
-export type { CloudParams, CloudscapeParams, SheetNoise, SheetParams, SunlightRow } from "./params.js";
+export type { CloudParams, CloudscapeParams, LayerMotion, SheetNoise, SheetParams, SunlightRow } from "./params.js";
 export {
     DEFAULT_CLOUD_PARAMS,
     DEFAULT_CLOUDSCAPE,
@@ -17,6 +17,7 @@ export {
     SUNLIGHT_ENTRIES,
     SUNLIGHT_SIZE,
     DRIFT_PERIOD_KM,
+    continuedMotion,
     drift,
     evolutionAt,
     paramsData,
@@ -30,7 +31,14 @@ export {
 export type { Weather, WeatherName } from "./weather.js";
 export { mixWeather, WEATHER } from "./weather.js";
 
-export type { AerialPerspective, CloudPass, CloudPassOptions, EncodeOptions, GridOptions } from "./clouds.js";
+export type {
+    AerialPerspective,
+    CloudPass,
+    CloudPassOptions,
+    EncodeOptions,
+    GridOptions,
+    SunlightAtmosphere,
+} from "./clouds.js";
 export { createCloudPass } from "./clouds.js";
 
 // The raw WGSL, for inlining into a consumer's own pipelines instead of using the pass above.

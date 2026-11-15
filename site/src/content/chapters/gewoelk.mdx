@@ -83,7 +83,7 @@ cooled enough for its water to condense, the same for the whole sky that day.
 gewoelk keeps the map and the trick, and voxelizes the result: a grid of 256 by 256 by 32 voxels over a slab 16 km
 across and 2.4 km tall, which repeats east and north so it reaches the horizon, each voxel inside or outside the
 height field. From that grid a <Term of="Jump flooding">jump flood</Term> finds, for every voxel, the nearest voxel of
-the clouds' surface, in eight passes, and the distance to it becomes Nubis³'s modeling data: outside the clouds the
+the clouds' surface, in six passes, and the distance to it becomes Nubis³'s modeling data: outside the clouds the
 signed distance, stored in 8 bits and rounded down so no step ever overshoots; inside, the
 <Term of="Dimensional profile">dimensional profile</Term>, a gradient from 0 at the surface to 1 some 150 m in, which
 is both the shape the detail noise erodes and, later, the chance that light scatters there. All of it is rebuilt on the
@@ -123,16 +123,16 @@ eye depends on the angle, by the phase function. A raymarcher that is honest abo
 sample towards the Sun, and that second march is what makes volumetric clouds expensive <Cite id="schneider2015" />.
 Nubis³ cuts it loose: for every voxel that holds cloud, the density to the Sun is summed once, in a pass of its own,
 and the march reads the sum. gewoelk sums it to the sky above and the ground below as well, so the ambient light fades
-with depth too. The sum is coarse, so the first two samples towards the Sun are still taken in full detail, half a
-voxel and one and a half voxels on, which keeps the edges crisp.
+with depth too. The sum is coarse, so the first two samples towards the Sun are still taken in full detail, a quarter
+and three quarters of a voxel on, which keeps the edges crisp.
 
 Light scattered once is not enough: a sunlit cloud top is nearly white, and single scattering with a forward lobe
 gives it a dull gray, since little of that lobe points at the eye. The light that has scattered two, three, many times
 is what fills it in, and gewoelk takes it as octaves, the trick from the film Oz <Cite id="wrenninge2013" /> that
 Frostbite brought to games <Cite id="hillaire2016" />: each order a share of the one before, through less cloud, with
 a lobe half as narrow, eight of them. The share may never be larger than the factor the cloud thins by, or the octaves
-would make light out of nothing. The sky's light reaches a point the more the closer it lies to the surface, as in
-Nubis³: the square root of one minus the profile, the profile saying how deep the point lies.
+would make light out of nothing. The sky's light fades with depth by its own sum alone, not by the profile as well,
+as in Nubis³: that counts the depth twice and draws dark bands between the sky-lit tops and the ground-lit bases.
 Switch the three parts in <Fig id="clouds" />, the Sun, the multiple scattering and the ambient light, to see what
 each one adds: the Sun alone gives a cloud with black shadows, the multiple scattering its glow, the ambient light its
 gray underside. The Sun's light reaches the clouds at their own altitude, not the observer's: after sunset the

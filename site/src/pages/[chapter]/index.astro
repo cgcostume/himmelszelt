@@ -20,6 +20,7 @@ const { chapter } = Astro.props;
 const { Content, headings } = await render(chapter);
 const sections = headings.filter((heading) => heading.depth === 2);
 Astro.locals.sections = sections.map((section) => ({ id: section.slug, title: section.text }));
+Astro.locals.chapter = chapter.id;
 // What the German name means, from the glossary, for the readers who do not speak it.
 const name = findEntry(chapter.data.title);
 const scope = chapter.data.package.slice(0, -chapter.data.title.length);

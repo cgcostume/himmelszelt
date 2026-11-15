@@ -1351,11 +1351,11 @@
     width: 100%;
     height: 100%;
 }
-/* The hint at the top left, as over the other figures' canvases, clear of the copy button. */
+/* The hint at the top left, as over the other figures' canvases, clear of the download and copy buttons. */
 .config-preview > .tiles-start {
     position: absolute;
     top: 6px;
-    right: 52px;
+    right: 92px;
     left: 6px;
     z-index: 5;
     display: flex;

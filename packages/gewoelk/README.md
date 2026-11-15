@@ -33,8 +33,8 @@ The march per pixel is Nubis3's: outside the clouds the step is the signed dista
 root of the distance from the camera, and the first is jittered; at each step inside, the profile is eroded by the
 detail composite, two samples towards the sun add detail to the summed light, Henyey-Greenstein lobes shape the
 scattering, the orders of scattering after the first come as octaves (Wrenninge 2013, Hillaire 2016), each through
-no less of a factor of the depth than its share, so they keep energy, and the ambient light fades with depth after
-Nubis3's profile. Nubis3's inner glow is left out: it stands in for the same orders the octaves already give.
+no less of a factor of the depth than its share, so they keep energy, and the ambient light fades with depth by the
+ambient light's grid, not by the profile. Nubis3's inner glow is left out: it stands in for the same orders the octaves already give.
 
 The air in front of the clouds is taken step by step, at each step's own distance, and leaves them as opaque as they
 are. Given an `aerialPerspective` volume at `encode`, RGB froxels laid out as Hillaire's (dunstkreis' volume, turned

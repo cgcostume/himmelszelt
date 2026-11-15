@@ -40,7 +40,9 @@ fn ngTurbulence(onSky: vec2f, time: f32, cell: f32, resolved: f32, rms: f32, par
         let weight = select(parts.y, parts.x, octave < 3.0);
         let full = rms * NG_TURBULENCE_NORM * pow(size / cell, 1.0 / 6.0) * weight;
         let amplitude = select(0.0, min(full, size * NG_FOLD * weight), size >= resolved);
-        blur = blur + 0.5 * (full * full - amplitude * amplitude);
+        // Never below none: fused into one multiply-add, the difference of the equal squares can come out a hair under
+        // zero, and its root at the end a NaN that sends every pixel's taps to the same texel.
+        blur = blur + 0.5 * max(full * full - amplitude * amplitude, 0.0);
         if (amplitude > 0.0) {
             let angle = f32(i) * 2.399963 + 0.4;
             let across = vec2f(cos(angle), sin(angle));

@@ -5,7 +5,16 @@ import { compileWgsl, gpuDevice } from "./gpu.js";
 
 /** A shader by name, this package's or one of the fragments it bundles from the packages that own them. */
 function wgslSource(name: string): string {
-    const owner = { camera: "../../dunstkreis/src/wgsl", tonemap: "../../helldunkel/src/wgsl" }[name] ?? "../src/wgsl";
+    const dunstkreis = "../../dunstkreis/src/wgsl";
+    const owners: Record<string, string> = {
+        camera: dunstkreis,
+        atmosphere: dunstkreis,
+        common: dunstkreis,
+        lut: dunstkreis,
+        sampling: dunstkreis,
+        tonemap: "../../helldunkel/src/wgsl",
+    };
+    const owner = owners[name] ?? "../src/wgsl";
     const read = (file: string) => readFileSync(new URL(`${owner}/${file}`, import.meta.url), "utf8");
     try {
         return read(`${name}.wgsl`);
@@ -22,6 +31,7 @@ const PASSES: Record<string, readonly string[]> = {
     light: ["params", "light"],
     clouds: ["noise", "params", "camera", "sheet", "clouds"],
     compose: ["noise", "params", "camera", "sheet", "tonemap", "compose"],
+    sunlight: ["atmosphere", "common", "lut", "sampling", "sunlight"],
 };
 const OUTPUTS: Record<string, string> = { clouds: cloudOutput("rgba16float"), compose: cloudOutput("rgba8unorm") };
 
@@ -34,3 +44,19 @@ for (const [name, fragments] of Object.entries(PASSES)) {
         expect(errors, `${name}:\n${errors.join("\n")}`).toEqual([]);
     });
 }
+
+test("with dunstkreis' tables, the pass computes its sunlight table on the GPU without a validation error", async () => {
+    const device = await gpuDevice();
+    test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
+    if (!device) return;
+    const { precomputeAtmosphere } = await import("@himmelszelt/dunstkreis");
+    const { createCloudPass, DEFAULT_CLOUD_PARAMS } = await import("../dist/index.js");
+    const luts = await precomputeAtmosphere(device);
+    device.pushErrorScope("validation");
+    const pass = await createCloudPass(device, { format: "rgba16float", background: false, atmosphere: luts });
+    pass.update({ ...DEFAULT_CLOUD_PARAMS, sunDirection: [0, 0.9986, 0.0523] });
+    pass.update({ sunlight: null });
+    expect(await device.popErrorScope()).toBeNull();
+    pass.destroy();
+    luts.destroy();
+});

@@ -1,5 +1,6 @@
 import { liftedDirection, shimmerScales, type Vec3 } from "@himmelszelt/nachtgestirn";
 import { find } from "../dom";
+import { figureInfo } from "../figure-info";
 import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { morph } from "../dunstkreis/skyframe";
 import { onDemand } from "../frame";
@@ -8,25 +9,30 @@ import { apply, cross, dot, multiply, noGpu, normalize, rotation, transpose } fr
 import { julianDayOf } from "./place";
 import { type MoonAt, moonAt, shimmerThrough, type ToneCurveName } from "./renderer";
 import { mapResolutions } from "./resolutions";
+import { saveFigure } from "./snapshot";
 import { createTiles } from "./tiles";
 
 const DEG = Math.PI / 180;
 const ARCSEC = 206_265;
-// Two Moons side by side from Potsdam: 12.1 days after the new moon, waxing, by day, and 16.4 days, waning, at dusk.
-const MOMENTS = [julianDayOf("2026-11-21T09:26Z"), julianDayOf("2026-11-25T16:01Z")];
+// The Moon from Potsdam at dusk, 16.4 days after the new moon, waning.
+const MOMENTS = [julianDayOf("2026-11-25T16:01Z")];
 const PLACE = { latitude: 52.3920607, longitude: 13.0925765, heightM: 1 };
-// Each close-up, square: this share of the disc across, the lower or upper limb this share of the way in from its edge.
+// The close-up, twice as wide as high: this share of the disc up and down, the lower or upper limb this share of the way
+// in from its edge.
 const SHARE = 0.25;
+const WIDE = 2;
 const LIMB = 0.25;
-// Where the Moons stand at first, in degrees: lower, the day sky near the horizon outshines the waxing one.
+// Where the Moon stands at first, in degrees.
 const LOW = 15;
+// Fried's parameter through one zenith column of air from sea level, in meters: a fair night.
+const R0 = 0.1;
 // The lens the air is seen through, in meters: a telephoto's.
 const APERTURE = 0.1;
-// The side view as dunstkreis' sunlight through the air draws it, not to scale: the planet half as wide, the air four
-// times as thick, in km, a band of it a scale height, as many km across right of the zenith; the zenith this far in
+// The side view as dunstkreis' sunlight through the air draws it, not to scale: the planet half as wide, the air
+// `THICKER` times as thick, in km, a band of it a scale height, as many km across right of the zenith; the zenith this far in
 // from the left, room for the heights' names and a Moon past it, and room above the air's top and below the observer
 // on the ground, in px.
-const THICKER = 4;
+const THICKER = 3;
 const GROUND_KM = 3180;
 const SCALE_KM = 8;
 const TOP_KM = 5 * SCALE_KM;
@@ -96,18 +102,10 @@ export function shimmerFigure(root: HTMLElement) {
     const resolution = mapResolutions(root, "4k", requestRender);
     const pressed = (button: Element) => button.getAttribute("aria-pressed") === "true";
     const parts = [...root.querySelectorAll<HTMLElement>("[data-part]")];
-    const r0s = [...root.querySelectorAll<HTMLElement>("[data-r0]")];
     const part = (name: string) => parts.some((button) => button.dataset.part === name && pressed(button));
-    const r0 = () => Number(r0s.find(pressed)?.dataset.r0 ?? 10) / 100;
     for (const button of parts) {
         button.addEventListener("click", () => {
             button.setAttribute("aria-pressed", String(!pressed(button)));
-            requestRender();
-        });
-    }
-    for (const button of r0s) {
-        button.addEventListener("click", () => {
-            for (const other of r0s) other.setAttribute("aria-pressed", String(other === button));
             requestRender();
         });
     }
@@ -165,7 +163,7 @@ export function shimmerFigure(root: HTMLElement) {
         const real = -Math.acos(Math.max(-1, Math.min(1, 1 - share * (1 - Math.cos(h))))) / DEG;
         return angle > 90 ? 180 - real : real;
     };
-    // The Moons' apparent altitude set by a drag in the side view, or null for `LOW`.
+    // The Moon's apparent altitude set by a drag in the side view, or null for `LOW`.
     let chosen: number | null = null;
     // The observer's height set by a drag in the side view, in meters, or null for the place's.
     let chosenHeight: number | null = null;
@@ -189,7 +187,7 @@ export function shimmerFigure(root: HTMLElement) {
         const slope = ((real.bend(elevation + 0.05) ?? 0) - (real.bend(elevation - 0.05) ?? 0)) / 0.1;
         const squeezed = 1 / (1 - slope);
         const shimmer = {
-            r0: r0(),
+            r0: R0,
             aperture: APERTURE,
             time: clock,
             dispersion: part("colors") ? 1 : 0,
@@ -209,7 +207,8 @@ export function shimmerFigure(root: HTMLElement) {
         const width = (canvas.parentElement?.clientWidth || 800) / MOMENTS.length;
         const tilePx = Math.round(width * Math.min(window.devicePixelRatio || 1, 2));
         const across = (real.angularDiameter * SHARE) / zoom;
-        tiles?.draw({ count: views.length, width: tilePx, degreesAcross: across }, (i) => {
+        const layout = { count: views.length, width: tilePx, height: Math.round(tilePx / WIDE) };
+        tiles?.draw({ ...layout, degreesAcross: across * WIDE }, (i) => {
             const { m, up, litAbove } = views[i] ?? (views[0] as (typeof views)[number]);
             return {
                 moon: m,
@@ -335,10 +334,11 @@ export function shimmerFigure(root: HTMLElement) {
         if (distance - inAir > 14)
             svg += `<line x1="${f(ex)}" y1="${f(ey)}" x2="${f(mx)}" y2="${f(my)}" class="shimmer-space"/>`;
         svg += `<line x1="${f(ox)}" y1="${f(oy)}" x2="${f(ex)}" y2="${f(ey)}" class="shimmer-path"/>`;
-        const [lx, ly] = along(shown, inAir / 2);
+        // Under the path towards its end, clear of the heights' names up the zenith.
+        const [lx, ly] = along(shown, inAir * 0.75);
         const name = `${column.toFixed(1)} columns of air`;
         svg += east
-            ? svgText(lx + 8, ly - 10, name, "figure-note figure-anchor-start")
+            ? svgText(lx + 6, ly + 13, name, "figure-note figure-anchor-start")
             : svgText(ox + 14, oy - 7, name, "figure-note figure-anchor-start");
         // The observer as the sliders' thumb, named with its height and the air below it.
         const real = heightM / 1000;
@@ -352,7 +352,12 @@ export function shimmerFigure(root: HTMLElement) {
             "figure-label figure-anchor-start",
         );
         svg += `<g class="shimmer-moon">${moonSymbol(mx, my, 9, lit, dx, dy, earthshine)}<circle cx="${f(mx)}" cy="${f(my)}" r="16" class="shimmer-grab"/></g>`;
-        svg += svgText(width - 4, 10, "not to scale", "figure-label figure-anchor-end");
+        svg += svgText(
+            width - 4,
+            10,
+            "drag the observer and the Moon · not to scale",
+            "figure-label figure-anchor-end",
+        );
         Object.assign(geometry, { observer: [ox, oy], moon: [mx, my], scale });
         drawSvg(cut, svg, 1);
     }
@@ -396,13 +401,17 @@ export function shimmerFigure(root: HTMLElement) {
     };
     cut.addEventListener("pointerup", release);
     cut.addEventListener("pointercancel", release);
-    // A double click puts the Moons and the observer back where they started.
+    // A double click puts the Moon and the observer back where they started.
     cut.addEventListener("dblclick", () => {
         chosen = null;
         chosenHeight = null;
         requestRender();
     });
 
+    find("[data-field=download]", root).addEventListener("click", () =>
+        saveFigure(root, canvas, render, { svgs: [cut] }),
+    );
+    figureInfo(root);
     onTables(requestRender);
     onDisplay(requestRender);
     new ResizeObserver(requestRender).observe(root);

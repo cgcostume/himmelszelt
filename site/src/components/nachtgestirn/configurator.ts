@@ -8,6 +8,7 @@ import { ownMoment } from "../sternzeit/lunation";
 import { onChange, state } from "../sternzeit/state";
 import { noGpu, orbited } from "./laws";
 import { type MoonAt, moonAt, type ToneCurveName } from "./renderer";
+import { saveFigure } from "./snapshot";
 import { createTiles, type TileFrame } from "./tiles";
 
 const DEG = Math.PI / 180;
@@ -395,6 +396,7 @@ export function configuratorFigure(root: HTMLElement) {
     measureButton.addEventListener("click", measure);
     if (!tiles) measureButton.disabled = true;
 
+    find("[data-field=download]", root).addEventListener("click", () => saveFigure(root, canvas, render));
     figureInfo(root, () => ({
         discPixels: disc,
         config,

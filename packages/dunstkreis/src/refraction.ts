@@ -7,7 +7,7 @@
  * it holds at any height, looking up or down, from inside the atmosphere or through it from space.
  */
 import type { AtmosphereModel, Spectral } from "./model.js";
-import { spectrumToRgb } from "./model.js";
+import { luminanceScale, spectrumToRgb } from "./model.js";
 
 /**
  * Refractivity n - 1 of dry air around 550 nm, proportional to its density: 2.778e-4 at the standard atmosphere's
@@ -156,6 +156,34 @@ export function airTransmittance(
     const sun = rgb(model.solarSpectrum);
     const through = rgb(model.solarSpectrum.map((s, k) => s * Math.exp(-passes * (ray.depth[k] ?? 0))));
     return through.map((c, i) => Math.max(c, 0) / Math.max(sun[i] ?? 1, 1e-12)) as [number, number, number];
+}
+
+/**
+ * The illuminance a light in the true (geometric) `direction` gives at `observerHeightM` meters up, in lux per channel of
+ * linear sRGB: `illuminance` above the air, the Sun's by default, through it along the bent path from where it shows,
+ * zero once even the most bent ray ends on the ground. The CPU twin of the sky pass' `sunIlluminance()` and
+ * `moonIlluminance()`, for the same frame without a round trip; it traces the bent ray where the meter takes the
+ * table's straight one, a few percent apart within a degree of the horizon. ENU, like every direction here.
+ */
+export function lightThroughAir(
+    model: AtmosphereModel,
+    direction: readonly [number, number, number],
+    observerHeightM: number,
+    illuminance = model.solarIlluminance,
+): [number, number, number] {
+    const apparent = apparentDirection(direction, model, observerHeightM);
+    const altitude = (Math.asin(Math.max(-1, Math.min(1, apparent[2]))) * 180) / Math.PI;
+    const ray = traceSeen(model, observerHeightM, altitude);
+    if (ray === null) return [0, 0, 0];
+    const scale = (luminanceScale(model) * illuminance) / model.solarIlluminance;
+    const through = model.solarSpectrum.map((s, k) => s * Math.exp(-(ray.depth[k] ?? 0)));
+    return spectrumToRgb(model).map(
+        (row) =>
+            Math.max(
+                row.reduce((sum, m, j) => sum + m * (through[j] ?? 0), 0),
+                0,
+            ) * scale,
+    ) as [number, number, number];
 }
 
 /**

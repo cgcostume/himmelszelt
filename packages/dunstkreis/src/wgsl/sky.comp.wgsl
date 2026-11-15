@@ -174,9 +174,15 @@ fn dkSkySunCoverage(sky: DkSkySample, footprint: f32) -> f32 {
     return dkSunDiscCoverage(sky.direction, dkParams.sunDirection, dkParams.sunAngularRadius, footprint);
 }
 
-// Within how many degrees of the sun the aureole is marched, and from where it fades out towards that: at 12° its lobe
-// is a five-thousandth of its peak, lost against the sky the tables already hold.
-const DK_AUREOLE_REACH: vec2f = vec2f(12.0, 20.0);
+// Within how many degrees of the sun the aureole is marched, and from where it fades out towards that: where its lobe
+// falls to a five-thousandth of its peak, lost against the sky the tables already hold, 20° at g 0.98, fading from 60 %
+// of it. A sharper lobe is marched over less of the sky, a broader one never over more than 20°.
+fn dkAureoleReach() -> vec2f {
+    let g = DK_AUREOLE_G;
+    let oneMinusCos = (1.0 - g) * (1.0 - g) * (pow(2e-4, -2.0 / 3.0) - 1.0) / (2.0 * g);
+    let reach = min(acos(clamp(1.0 - oneMinusCos, -1.0, 1.0)) * 57.29577951308232, 20.0);
+    return vec2f(0.6 * reach, reach);
+}
 
 // The angle between a view ray and where a light shows, in degrees.
 fn dkFromApparent(view: vec3f, apparent: vec3f) -> f32 {
@@ -203,14 +209,15 @@ fn dkSkyAureole(view: vec3f) -> vec3f {
 // The aureole of a light of the Sun's illuminance towards `light`, showing at `apparent`.
 fn dkAureoleOf(view: vec3f, light: vec3f, apparent: vec3f) -> vec3f {
     let angle = dkFromApparent(view, apparent);
-    if (angle >= DK_AUREOLE_REACH.y) {
+    let reach = dkAureoleReach();
+    if (angle >= reach.y) {
         return vec3f(0.0);
     }
     let a = dkAtmosphere;
     let h = max(dkParams.observerAltitude, 0.0);
     let column = dkRaymarchAerosol(a, dkTransmittanceLut, dkLutSampler, h, view, light);
     let phase = dkPhaseHenyeyGreenstein(DK_AUREOLE_G, dot(view, apparent));
-    let fade = 1.0 - smoothstep(DK_AUREOLE_REACH.x, DK_AUREOLE_REACH.y, angle);
+    let fade = 1.0 - smoothstep(reach.x, reach.y, angle);
     return dkToRgb(a, column * a.solarIlluminance) * (DK_AUREOLE_SHARE * phase * fade);
 }
 

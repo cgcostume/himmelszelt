@@ -211,7 +211,7 @@ export function shadowFigure(root: HTMLElement) {
             const depth = Math.min(Math.max(m.shadow.umbralMagnitude, 0), 1);
             label.innerHTML = `<span class="tiles-name">${text}</span> <span class="tiles-value">${depth >= 1 ? "total" : `umbra ${Math.round(depth * 100)}%`}</span>`;
         });
-        const where = renderBig(e.greatest + Number(offset.value) * MINUTE, table.luts.model, table.luts);
+        const where = renderBig(e.greatest + Number(offset.value) * MINUTE, table.luts, perTile ? null : shared);
         const date = clock(toDate(fromJulianDay(e.greatest)), { day: "numeric", month: "long", year: "numeric" });
         const span = clock(toDate(fromJulianDay(e.first)), { hour: "2-digit", minute: "2-digit" });
         const end = clock(toDate(fromJulianDay(e.last)), { hour: "2-digit", minute: "2-digit" });
@@ -219,7 +219,7 @@ export function shadowFigure(root: HTMLElement) {
         note.textContent =
             `${date.text}, in the umbra from ${span.text} to ${end.text} ${date.offset} · ` +
             `${depth >= 1 ? "total" : "partial"}, umbral magnitude ${depth.toFixed(2)} · the big Moon ${where} · ` +
-            `${perTile ? "each disc metered on its own" : `all at EV100 ${shared.toFixed(1)}, the uneclipsed Moon's`}`;
+            `${perTile ? "each Moon metered on its own" : `all at EV100 ${shared.toFixed(1)}, the uneclipsed Moon's`}`;
     }
 
     /** The eclipses of the years around the shown one, a bar each as tall as the eclipse is deep, the shown one in the
@@ -275,9 +275,12 @@ export function shadowFigure(root: HTMLElement) {
         if (!eclipses.complete) setTimeout(() => renderTimeline(lastShown), 0);
     }
 
-    /** The big Moon at `jd`, metered, and the shadow's edges over it. */
-    function renderBig(jd: number, model: AtmosphereModel, luts: AtmosphereLUTs) {
-        const m = moonAt(jd, ANY_PLACE, model);
+    // Where each edge's name sat last, as an angle around it: it stays there while that is in view, so it does not hop.
+    const labelAngles = new Map<string, number>();
+
+    /** The big Moon at `jd`, metered or at `ev100`, and the shadow's edges over it. */
+    function renderBig(jd: number, luts: AtmosphereLUTs, ev100: number | null) {
+        const m = moonAt(jd, ANY_PLACE, luts.model);
         const cssW = big.clientWidth || 600;
         const cssH = Math.round(cssW / 2);
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -290,7 +293,7 @@ export function shadowFigure(root: HTMLElement) {
                 luts,
                 toneMap: display.toneCurve as ToneCurveName,
                 maps: "auto",
-                ev100: null,
+                ev100,
                 albedo: true,
                 relief: true,
                 shadows: true,
@@ -321,16 +324,33 @@ export function shadowFigure(root: HTMLElement) {
             ] as const) {
                 const r = km * scale;
                 svg += `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" class="${cls}"/>`;
-                // Named just inside its edge, as high up as the edge is in view and clear of the Moon's disc in the middle.
+                // Named just inside its edge, in view and clear of the Moon's disc in the middle: where it sat before, or
+                // the nearest place to it that is, at first as high up as the edge is in view.
                 const moonPx = MOON_RADIUS_KM * scale;
-                let best: [number, number] | null = null;
-                for (let a = 0; a < 360; a += 3) {
-                    const [lx, ly] = [cx + Math.cos(a * DEG) * (r - 12), cy + Math.sin(a * DEG) * (r - 12)];
+                const at = (a: number) =>
+                    [cx + Math.cos(a * DEG) * (r - 12), cy + Math.sin(a * DEG) * (r - 12)] as const;
+                const fits = (a: number) => {
+                    const [lx, ly] = at(a);
                     const inView = lx > 36 && lx < cssW - 36 && ly > 16 && ly < cssH - 50;
-                    if (inView && Math.hypot(lx - cssW / 2, ly - cssH / 2) > moonPx + 30 && (!best || ly < best[1]))
-                        best = [lx, ly];
+                    return inView && Math.hypot(lx - cssW / 2, ly - cssH / 2) > moonPx + 30;
+                };
+                const last = labelAngles.get(name);
+                let best: number | null = null;
+                for (let a = 0; a < 360; a += 1) {
+                    if (!fits(a)) continue;
+                    const apart = (b: number) => Math.abs(((((a - b) % 360) + 540) % 360) - 180);
+                    if (best === null) best = a;
+                    else if (
+                        last !== undefined ? apart(last) < apart(best) : (at(a)[1] as number) < (at(best)[1] as number)
+                    )
+                        best = a;
                 }
-                if (best) svg += svgText(best[0], best[1], name, "figure-label");
+                if (best === null) labelAngles.delete(name);
+                else {
+                    labelAngles.set(name, best);
+                    const [lx, ly] = at(best);
+                    svg += svgText(lx, ly, name, "figure-label");
+                }
             }
         }
         drawSvg(outline, svg, 1);
@@ -383,7 +403,11 @@ export function shadowFigure(root: HTMLElement) {
         });
     }
     onTables(requestRender);
-    onUmbraTable(requestRender);
+    // The row's Moons were taken with the typical umbra while the eclipse's own was being integrated: taken again.
+    onUmbraTable(() => {
+        row = null;
+        requestRender();
+    });
     onDisplay(requestRender);
     new ResizeObserver(requestRender).observe(root);
     requestRender();
