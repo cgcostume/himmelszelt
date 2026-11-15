@@ -140,6 +140,31 @@ fn gwAirAt(uv: vec2f, distance: f32, sky: vec3f) -> GwAir {
     return GwAir(vec3f(f), sky * (1.0 - f));
 }
 
+// The air in front of a point `distance` km along the ray from the observer at `o` towards `v`, with the deck's shadow on
+// it: under the cloudscape the air is lit by what the deck lets through of the sun on average, not by the sun, or the
+// sun's glare would shine in front of an overcast sky. The stretch under the deck runs from an observer below its top
+// to where the ray leaves it, or the clearing has thinned it away, or the point; its light, as the volume has it up to
+// there, loses the share the deck holds back. The sky beside a cloud takes the same, so both stay one sky.
+fn gwAirUnderDeck(uv: vec2f, o: vec3f, v: vec3f, distance: f32, sky: vec3f) -> GwAir {
+    let air = gwAirAt(uv, distance, sky);
+    let volume = gwParams.cloudscape;
+    if (volume.enabled == 0u || volume.aerial.x <= 0.0) {
+        return air;
+    }
+    let top = volume.base + volume.height;
+    let lost = (1.0 - gwDeck[0]) * (1.0 - smoothstep(volume.base, top, gwParams.observerAltitude));
+    if (lost <= 0.0) {
+        return air;
+    }
+    var under = min(distance, gwSphere(o, v, gwParams.planetRadius + top).far);
+    if (volume.clearing > 0.0) {
+        let halfway = 0.5 * (min(volume.clearingFrom, volume.clearing) + volume.clearing);
+        under = min(under, halfway / max(length(v.xy), 1e-3));
+    }
+    let shaded = gwAirAt(uv, under, sky).luminance;
+    return GwAir(air.transmittance, max(air.luminance - lost * shaded, vec3f(0.0)));
+}
+
 // Seen through `air`: the layer's own light dimmed by it, and the air's added where the layer covers what lies behind,
 // which brings the air's own light along with it.
 fn gwFaded(layer: GwLayer, air: GwAir) -> GwLayer {
@@ -271,7 +296,7 @@ fn gwSheets(o: vec3f, v: vec3f, sun: vec3f, spread: f32, uv: vec2f, sky: vec3f) 
         var distance = -1.0;
         let sheet = gwSheet(s, o, v, sun, spread, &distance);
         if (distance > 0.0) {
-            layers[s] = gwFaded(sheet, gwAirAt(uv, distance, sky));
+            layers[s] = gwFaded(sheet, gwAirUnderDeck(uv, o, v, distance, sky));
             at[s] = distance;
         }
     }
@@ -320,7 +345,9 @@ fn gwGroundShade(sun: vec3f) -> f32 {
 }
 
 // How much of its light the ground keeps at `g`, on the ground: the sun's through the clouds towards it, from the light
-// grid where its ray enters the base, the sky's as on average.
+// grid where its ray enters the base, the sky's as on average, and all of it where the clearing has left no clouds
+// above: else the deck's average shade reaches on to the horizon, and from high up its edge at the terminator, where
+// the sun's share drops, shows as a sharp line across the ground.
 fn gwGroundShadow(g: vec3f, sun: vec3f) -> f32 {
     let volume = gwParams.cloudscape;
     if (volume.enabled == 0u) {
@@ -338,5 +365,5 @@ fn gwGroundShadow(g: vec3f, sun: vec3f) -> f32 {
         through = gwDiffused(volume.extinction * summed * gwClearingOver(x.ground), volume.forwardG);
     }
     let share = gwSunShare(up, sun);
-    return share * through + (1.0 - share) * gwDeck[1];
+    return mix(1.0, share * through + (1.0 - share) * gwDeck[1], gwClearingOver(gwGround(g)));
 }

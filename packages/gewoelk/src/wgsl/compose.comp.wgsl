@@ -52,10 +52,15 @@ fn gwCompose(@builtin(global_invocation_id) id: vec3u) {
     if (GW_BACKGROUND) {
         behind = textureLoad(gwBackground, vec2i(id.xy), 0).rgb;
         // The ground in the clouds' shadow: what it sends back dimmed, the air in front of it kept.
+        // The air under the deck in its shadow, in front of the ground and of the sky alike.
         let earth = gwSphere(o, v, gwParams.planetRadius);
         if (earth.hits && earth.near > 0.0) {
             let air = gwAirAt(uv, earth.near, behind);
-            behind = air.luminance + (behind - air.luminance) * gwGroundShadow(o + v * earth.near, normalize(gwParams.sunDirection));
+            let shaded = gwAirUnderDeck(uv, o, v, earth.near, behind);
+            behind = shaded.luminance + (behind - air.luminance) * gwGroundShadow(o + v * earth.near, normalize(gwParams.sunDirection));
+        } else {
+            let far = 1e9;
+            behind = max(behind - (gwAirAt(uv, far, behind).luminance - gwAirUnderDeck(uv, o, v, far, behind).luminance), vec3f(0.0));
         }
     }
     let sheets = gwSheets(o, v, normalize(gwParams.sunDirection), spread, uv, gwAirLight(behind, GW_BACKGROUND));

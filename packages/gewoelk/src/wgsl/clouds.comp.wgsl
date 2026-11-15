@@ -134,8 +134,7 @@ fn gwDensity(m: vec4f, x: GwPoint, thinning: vec2f) -> GwSample {
 // The cloudscape along the ray from `t0` to `t1`.
 fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, uv: vec2f, sky: vec3f) -> GwLayer {
     let volume = gwParams.cloudscape;
-    // The air in front of the clouds is not dimmed by their shadow: the background beside them is not either, so a far
-    // cloud seen from under the deck would fade into a darker copy of the sky, a band along the horizon.
+    // The air in front of the clouds lies in the deck's shadow, as the sky beside them does (see gwAirUnderDeck).
     let extinction = volume.extinction;
     let groundShade = gwGroundShade(sun);
     // Each order's lobe, the same all along the ray.
@@ -228,7 +227,7 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
                 let scattered = sigmaS * (direct + ambient);
                 let through = exp(-sigmaT * step);
                 // Seen through the air between, at this step's own distance, as gwFaded sees a whole layer.
-                let air = gwAirAt(uv, t, sky);
+                let air = gwAirUnderDeck(uv, o, v, t, sky);
                 let covered = layer.transmittance * (1.0 - through);
                 last = air.transmittance * scattered / sigmaT + air.luminance;
                 within = true;

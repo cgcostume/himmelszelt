@@ -43,6 +43,16 @@ const UNIT_EV100 = -Math.log2(1.2);
 // A stop more than the clear sky's meter, as a photographer exposes for clouds: metered, a cloudy sky comes out gray.
 const CLOUD_COMPENSATION = 1;
 // Seconds since J2000 drive the wind and the evolution: any epoch does, the same every frame.
+// How far the aerial perspective volume reaches, in km: past the horizon to the top of the clouds, `CLOUD_TOP_KM`, as seen
+// from `heightM` up, in steps of doubling from 400 km, so the sky pass is not made again for every meter climbed. Beyond
+// its reach the volume holds its last slice, and a cloud farther off would show darker by a sharp edge.
+const CLOUD_TOP_KM = 10;
+const AERIAL_LEAST_KM = 400;
+function aerialReach(heightM: number, radiusKm: number) {
+    const beyond = (heightKm: number) => Math.sqrt(Math.max((radiusKm + heightKm) ** 2 - radiusKm ** 2, 0));
+    const farthest = beyond(Math.max(heightM, 0) / 1000) + beyond(CLOUD_TOP_KM);
+    return AERIAL_LEAST_KM * 2 ** Math.max(0, Math.ceil(Math.log2(farthest / AERIAL_LEAST_KM)));
+}
 const seconds = () => (state.jd - 2451545) * 86_400;
 
 // The cosine lobe's weights per spherical harmonics band, and the basis at the zenith and the nadir, as rundbild's.
@@ -154,8 +164,8 @@ export function cloudsFigure(root: HTMLElement) {
     }
 
     // The sky pass for the page's tables, the cloud pass for the chosen scale and steps, each remade when needed.
-    let sky: { pass: SkyPass; luts: AtmosphereLUTs } | null = null;
-    let skyBuilding: AtmosphereLUTs | null = null;
+    let sky: { pass: SkyPass; luts: AtmosphereLUTs; reach: number } | null = null;
+    let skyBuilding: { luts: AtmosphereLUTs; reach: number } | null = null;
     let clouds: { pass: CloudPass; key: string } | null = null;
     let cloudsBuilding = "";
     let background: GPUTexture | null = null;
@@ -178,9 +188,10 @@ export function cloudsFigure(root: HTMLElement) {
         return lutIds.get(luts) ?? 0;
     }
 
-    function buildSky(luts: AtmosphereLUTs) {
-        if (!gpu || skyBuilding === luts) return;
-        skyBuilding = luts;
+    function buildSky(luts: AtmosphereLUTs, reach: number) {
+        if (!gpu || (skyBuilding?.luts === luts && skyBuilding.reach === reach)) return;
+        const building = { luts, reach };
+        skyBuilding = building;
         createSkyPass(gpu.device, {
             luts,
             format: "rgba32float",
@@ -188,12 +199,12 @@ export function cloudsFigure(root: HTMLElement) {
             autoExposure: false,
             groundLight: quality.groundLight,
             dither: false,
-            // The air in front of the clouds, out to beyond the farthest in sight.
-            aerialPerspective: { maxDistanceKm: 400 },
+            // The air in front of the clouds, out to the farthest cloud in sight.
+            aerialPerspective: { maxDistanceKm: reach },
         }).then((pass) => {
-            if (skyBuilding !== luts) return pass.destroy();
+            if (skyBuilding !== building) return pass.destroy();
             sky?.pass.destroy();
-            sky = { pass, luts };
+            sky = { pass, luts, reach };
             skyBuilding = null;
             skyViewFor = "";
             requestRender();
@@ -367,10 +378,13 @@ export function cloudsFigure(root: HTMLElement) {
     function render() {
         const table = tables();
         if (!gpu || !table) return;
+        const reach = aerialReach(state.heightM, table.luts.model.planet.groundRadiusKm);
         if (sky?.luts !== table.luts) {
-            buildSky(table.luts);
+            buildSky(table.luts, reach);
             return;
         }
+        // A new reach keeps the sky it has until the next one is made.
+        if (sky.reach !== reach) buildSky(table.luts, reach);
         const scale = Number(choice("scale")) || 1;
         const maxSteps = Number(choice("steps")) || 128;
         const layers = Number(choice("layers")) || 64;
