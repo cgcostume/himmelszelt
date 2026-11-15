@@ -117,7 +117,7 @@ fn shCompose(@builtin(global_invocation_id) id: vec3u) {
     let pixel = vec2f(id.xy) + 0.5;
     let view = shPixelRay(pixel);
     var color = vec3f(0.0);
-    var sky = view.z >= p.horizonZ;
+    var sky = view.z >= p.horizonZ && dot(view, p.occluder.xyz) < p.occluder.w;
     var transmittance = vec3f(1.0);
     var direction = view;
     if ((p.flags & SH_FLAG_AIR) != 0u) {

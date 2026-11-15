@@ -64,6 +64,9 @@ struct ShParams {
     // The stops below 1 the Milky Way's map spans, each channel's logarithm; 0 for a map read linear.
     milkyWayStops: f32,
     constellations: vec4u,
+    // What hides the stars behind it, the Moon say: towards its center as it shows, and the cosine of its angular
+    // radius, above 1 for none.
+    occluder: vec4f,
     // How far the air bends a ray down at SH_AIR_SAMPLES apparent altitudes from airHorizon to the zenith, spaced by
     // the square of the entry's share, in radians; and what it lets through there, per channel.
     airBends: array<vec4f, 32>,

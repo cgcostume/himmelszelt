@@ -50,6 +50,7 @@ test("the params pack to the uniform's size with the flags and the air where the
             ev100: -6,
             displayEV100: null,
             horizonZ: -0.01,
+            occluder: null,
             air,
             psfPixels: 0.8,
             knee: 1,
@@ -90,6 +91,6 @@ test("the params pack to the uniform's size with the flags and the air where the
     expect(f[59]).toBeCloseTo(0.3, 6);
     expect(u[65]).toBe(1 << (59 - 32));
     expect(u[66]).toBe(1 << (82 - 64));
-    expect(f[68]).toBeCloseTo((air.bends[0] ?? 0) * (Math.PI / 180), 6);
-    expect(f[196 + 127 * 4 + 2]).toBeCloseTo(0.6, 6);
+    expect(f[72]).toBeCloseTo((air.bends[0] ?? 0) * (Math.PI / 180), 6);
+    expect(f[200 + 127 * 4 + 2]).toBeCloseTo(0.6, 6);
 });

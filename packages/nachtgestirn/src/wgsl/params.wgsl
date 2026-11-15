@@ -62,6 +62,8 @@ struct NgParams {
     // The air's table, with NG_FLAG_AIR: the apparent altitude of its first entry, and the step between them.
     refractionFrom: f32,
     refractionStep: f32,
+    // What the disc's own light is multiplied by where it is shown, the background left alone: 2^exposureCompensation.
+    discGain: f32,
 
     // The air's shimmer, for `shimmer.comp.wgsl`: the image's rms wander, the time in seconds the turbulence has
     // drifted by, how far the air spreads green from red and blue, and the finest cell on the sky; how much its larger

@@ -331,7 +331,7 @@ export function paramsData(params: MoonParams, maps: MoonMaps | null, detail?: M
 
     // The light: Earth's center from the Moon's, the observer on Earth's surface straight above it, unless given.
     f.set(params.sunDirection, 32);
-    f[35] = params.sunIlluminance * 2 ** params.exposureCompensation;
+    f[35] = params.sunIlluminance;
     const [dx, dy, dz] = params.direction;
     const d = params.distanceKm;
     const earth = params.earthDirection ?? [-dx * d, -dy * d, -dz * d - EARTH_RADIUS_KM];
@@ -340,7 +340,7 @@ export function paramsData(params: MoonParams, maps: MoonMaps | null, detail?: M
         earth.map((c) => c / earthLength),
         36,
     );
-    f[39] = params.earthshine * 2 ** params.exposureCompensation;
+    f[39] = params.earthshine;
     f.set(params.transmittance, 40);
     f[43] = params.projectionDistance;
 
@@ -390,6 +390,7 @@ export function paramsData(params: MoonParams, maps: MoonMaps | null, detail?: M
     f[88] = EARTH_RADIUS_KM;
     f[89] = refraction?.from ?? 0;
     f[90] = refraction?.step ?? 1;
+    f[91] = 2 ** params.exposureCompensation;
 
     if (shimmer) {
         const { tilt, cell, drift, spread } = shimmerOf(shimmer, params.direction);

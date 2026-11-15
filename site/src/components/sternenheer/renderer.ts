@@ -1,6 +1,14 @@
 import type { AtmosphereLUTs, AtmosphereModel, SkyPass } from "@himmelszelt/dunstkreis";
 import { airTransmittance, clampObserverHeight, createSkyPass, refractionAngle } from "@himmelszelt/dunstkreis";
-import { adaptEV100, ev100FromLuminance, localAdaptation, lowLightCompensation } from "@himmelszelt/helldunkel";
+import type { MeterPass } from "@himmelszelt/helldunkel";
+import {
+    adaptEV100,
+    createMeterPass,
+    ev100FromLuminance,
+    localAdaptation,
+    lowLightCompensation,
+    meteredLuminance,
+} from "@himmelszelt/helldunkel";
 import type { MoonMaps, MoonPass } from "@himmelszelt/nachtgestirn";
 import {
     createMoonPass,
@@ -10,6 +18,7 @@ import {
     MOON_MAPS,
     moonEV100,
     moonIlluminance,
+    liftedDirection as moonLifted,
     moonOrientation,
     refractionTable,
     SUN_ILLUMINANCE,
@@ -59,6 +68,11 @@ export function skyAt(
     const through = (altitude: number) => airTransmittance(model, heightM, altitude);
     const moonDirection = moon.direction(time, observer);
     const phaseAngle = moon.phaseAngle(jde);
+    // Along the line to the Moon's center as it shows, or the lowest above it that still reaches space.
+    let moonAltitude = (Math.asin(moonLifted(moonDirection, bend)[2]) * 180) / Math.PI;
+    while (through(moonAltitude) === null && moonAltitude < 2) moonAltitude += 0.02;
+    const [r, g, b] = through(moonAltitude) ?? [1, 1, 1];
+    const moonThrough = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     const distanceKm = moon.distance(jde);
     return {
         jd,
@@ -85,7 +99,9 @@ export function skyAt(
         moonIlluminance: moonIlluminance(phaseAngle, distanceKm),
         earthshine: earthshineIlluminance(180 - phaseAngle, distanceKm),
         moonLit: moon.illuminatedFraction(jde),
-        moonEV100: moonEV100(phaseAngle, moon.illuminatedFraction(jde)),
+        moonEV100: moonEV100(phaseAngle, moon.illuminatedFraction(jde), 1, 2),
+        // The stops the air takes from the Moon's light on its way down.
+        moonAirStops: Math.log2(Math.max(moonThrough, 1e-4)),
         distanceKm,
     };
 }
@@ -164,6 +180,14 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
     let composed: GPUTexture | null = null;
     let skyEV100 = Number.NEGATIVE_INFINITY;
     let skyMeteredFor = "";
+    // What the camera sees, metered: the frame's sky and stars in cd/m², the ground and the Moon's disc left out.
+    let meter: MeterPass | null = null;
+    let metering = false;
+    let frameLuminance: number | null = null;
+    createMeterPass(device, { source: "2d" }).then((created) => {
+        meter = created;
+        requestRender();
+    });
     let airFor = "";
     let air: AirTable | null = null;
 
@@ -307,6 +331,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 air = airTable(s.bend, s.through);
             }
             const theAir = frame.air ? air : null;
+            const moonShown = theAir ? liftedDirection(theAir, s.moonDirection) : s.moonDirection;
             const ground = frame.air ? horizonZ(s.heightM, s.model.planet.groundRadiusKm) : -1;
             // Metered on the sky where it is brighter than the stars' light, else on the Milky Way, a texel of its mean,
             // some 24 magnitudes per square arcsecond, and on the moonlit sky, some 0.05 cd/m² per lux of the Moon at the
@@ -314,7 +339,9 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             const milkyWay = 1.7e-3 * 0.027;
             const moonlit =
                 frame.moon && frame.air && s.moonDirection[2] > 0 ? 0.05 * s.moonIlluminance * s.moonDirection[2] : 0;
-            const metered = Math.max(frame.air ? 2 ** (skyEV100 - 3) : 0, milkyWay, moonlit);
+            // Until the frame is metered, on the whole sky's light and on what the Moon lends it.
+            const guess = Math.max(frame.air ? 2 ** (skyEV100 - 3) : 0, moonlit);
+            const metered = Math.max(frameLuminance ?? guess, milkyWay);
             const automatic = ev100FromLuminance(metered) - lowLightCompensation(metered);
             const goal = Math.min(Math.max(automatic, DARKEST_EV100), 20);
             // Followed over time, each step at most a 30th of a second, so a jump after a pause eases in too.
@@ -354,6 +381,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 // A star's core as bright as the display shows, so on an HDR display the points outshine SDR white.
                 knee: frame.headroom,
                 horizonZ: ground,
+                occluder: frame.moon ? { direction: moonShown, angularDiameter: s.moonAngularDiameter } : null,
                 air: theAir,
                 scintillation: frame.twinkle ? 1 : 0,
                 heightM: s.heightM,
@@ -377,7 +405,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 sunIlluminance: frame.moon ? SUN_ILLUMINANCE : 0,
                 earthshine: frame.moon ? s.earthshine : 0,
                 // As the eye sees the Moon, adapted to it, however long the night around it is exposed.
-                exposureCompensation: localAdaptation(ev100, s.moonEV100),
+                exposureCompensation: localAdaptation(ev100, s.moonEV100 + (frame.air ? s.moonAirStops : 0)),
                 orientation: s.moonOrientation,
                 ev100,
                 horizonZ: ground,
@@ -403,6 +431,22 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             moonPass.pass.encode(encoder, target, { background: composed });
             device.queue.submit([encoder.finish()]);
             const passesMs = performance.now() - started;
+            if (meter && !metering && frame.ev100 === null) {
+                metering = true;
+                const reading = device.createCommandEncoder({ label: "sternwarte:starsMeter" });
+                meter.encode(reading, composed, { maxSize: 256 });
+                device.queue.submit([reading.finish()]);
+                meter.readHistogram().then((histogram) => {
+                    metering = false;
+                    // The ground and empty space are black, not dark: they say nothing about the light.
+                    histogram.luminance[0] = 0;
+                    const luminance = meteredLuminance(histogram);
+                    const stops = Math.log2((luminance + 1e-9) / ((frameLuminance ?? 0) + 1e-9));
+                    if (frameLuminance !== null && Math.abs(stops) < 0.05) return;
+                    frameLuminance = luminance;
+                    requestRender();
+                });
+            }
             const skyKey = `${s.jd},${s.heightM},${frame.moon}`;
             if (frame.air && skyKey !== skyMeteredFor) {
                 skyMeteredFor = skyKey;

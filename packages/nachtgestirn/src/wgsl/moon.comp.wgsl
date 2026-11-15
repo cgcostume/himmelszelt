@@ -766,13 +766,16 @@ fn ngToneMap(exposed: vec3f) -> vec3f {
 // The disc's light, premultiplied, at a pixel made what the target shows: over the background where there is one, as
 // the eye sees it at night if asked, exposed, tone mapped and dithered, or left linear.
 fn ngFinish(luminance: vec3f, coverage: f32, pixel: vec2u) -> vec4f {
-    var color = luminance;
+    var color = luminance * ngParams.discGain;
     var alpha = coverage;
     if (NG_BACKGROUND) {
-        color = color + textureLoad(ngBackground, vec2i(pixel), 0).rgb;
+        let behind = textureLoad(ngBackground, vec2i(pixel), 0).rgb;
+        color = color + behind;
         alpha = 1.0;
         if (NG_DARK_ADAPTED) {
-            color = hdDarkAdaptedEye(color);
+            // The eye's shift by the light as it is, not as the gain shows it: the sunlit disc keeps its colors.
+            let seen = hdDarkAdaptedEye(behind);
+            color = seen + (hdDarkAdaptedEye(behind + luminance) - seen) * ngParams.discGain;
         }
     }
     color = color * ngParams.exposure;
@@ -794,7 +797,7 @@ fn ngCompose(@builtin(global_invocation_id) id: vec3u) {
     }
     let moon = ngPixel(vec2f(id.xy) + 0.5, size);
     if (NG_LAYER) {
-        ngOutputStore(id.xy, vec4f(moon.luminance, moon.coverage));
+        ngOutputStore(id.xy, vec4f(moon.luminance * ngParams.discGain, moon.coverage));
         return;
     }
     ngOutputStore(id.xy, ngFinish(moon.luminance, moon.coverage, id.xy));

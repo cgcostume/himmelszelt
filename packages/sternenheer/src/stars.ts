@@ -54,6 +54,9 @@ export interface StarsParams {
     displayEV100: number | null;
     /** The z below which a ray hits the ground; -1 by default, the whole sphere. */
     horizonZ: number;
+    /** What hides the stars behind it, the Moon say: towards its center as it shows, ENU, and its angular diameter
+     *  in degrees. Null by default, nothing. */
+    occluder: { direction: ArrayLike<number>; angularDiameter: number } | null;
     /** The air, `airTable`: bends every star and the Milky Way up near the horizon, dims and reddens them, and hides
      *  what lies below the horizon it finds. Null by default, no air. */
     air: AirTable | null;
@@ -128,7 +131,7 @@ export interface StarsPass {
 const TONE_CURVES: Record<string, number> = { neutral: 1, agx: 2, aces: 3, clip: 4 };
 /** Byte size of ShParams in params.wgsl: a mat4x4, a mat3x3 of three padded columns, ten vec4-sized rows, the air's
  *  bends in 32 vec4s and its transmittances in 128. */
-export const PARAMS_SIZE = (16 + 12 + 40 + 128 + 512) * 4;
+export const PARAMS_SIZE = (16 + 12 + 44 + 128 + 512) * 4;
 const PIECE_SIZE = 48;
 const LINE_PIECES = 8;
 const LINE_CAPACITY = 16;
@@ -142,6 +145,7 @@ const DEFAULTS: StarsParams = {
     ev100: -6,
     displayEV100: null,
     horizonZ: -1,
+    occluder: null,
     air: null,
     psfPixels: 0.7,
     knee: 1,
@@ -238,10 +242,12 @@ export function paramsData(params: StarsParams, frame: Frame): ArrayBuffer {
     u[62] = Math.max(0, Math.min(Math.floor(params.faintStars), frame.faintStars ?? 0));
     f[63] = frame.milkyWayStops ?? 0;
     u.set(mask, 64);
+    const { occluder } = params;
+    f.set(occluder ? [...occluder.direction, Math.cos((occluder.angularDiameter * Math.PI) / 360)] : [0, 0, 1, 2], 68);
     if (air) {
         for (let i = 0; i < AIR_SAMPLES; i++) {
-            f[68 + i] = ((air.bends[i] ?? 0) * Math.PI) / 180;
-            f.set(air.transmittances.subarray(i * 3, i * 3 + 3), 196 + i * 4);
+            f[72 + i] = ((air.bends[i] ?? 0) * Math.PI) / 180;
+            f.set(air.transmittances.subarray(i * 3, i * 3 + 3), 200 + i * 4);
         }
     }
     return data;
