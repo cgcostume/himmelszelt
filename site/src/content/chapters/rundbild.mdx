@@ -89,25 +89,30 @@ from the same nine for shaders that prefer a lookup.
 
 An image has no depth: all of it lies at infinity, its ground as well. So a solid put into it floats, and the ground slides
 along with the camera. Laying everything below the horizon on a plane fixes both for the cost of one intersection per
-pixel. The camera's ray meets the plane, and the image is looked up from where it was taken, some way above that plane, towards
-that point (<Fig id="grounded" />). A ray close to the horizon meets the plane far off and looks up nearly the same
-direction as before, so the ground joins the sky without a seam. What truly rises from the ground, a tree or a house, lies flat on
-the plane and smears the further the camera moves from where the photograph was taken. Lifting the horizon is simpler still:
-the image is stretched between its poles, for a horizon that is not where the image has it. Both fade in over a few degrees
-around the horizon, so neither sets in at a line. Both are `wgsl.ground`, two functions from a direction to a direction,
-for any map.
+pixel: the camera's ray meets the plane, and the image is looked up from where it was taken, some way above that plane,
+towards that point. Towards the horizon, though, the plane reaches out without end, and a mountain far off ends up
+smeared across the ground. [three.js](https://threejs.org/examples/webgl_materials_envmaps_groundprojected.html) and
+Unreal's [HDRI Backdrop](https://dev.epicgames.com/documentation/en-us/unreal-engine/hdri-backdrop-visualization-tool-in-unreal-engine)
+close it off instead: the ground ends in a disc, and the sky lies on a sphere about where the image was taken
+(<Fig id="grounded" />). The disc meets the sphere without a seam, and the mountain stands on the sphere, at the horizon.
 
 <Grounded />
 
-Near the horizon, a few rows of the image cover a great deal of the plane. Taken 2 m up, a single degree of a 4K
-photograph, about eleven rows, spreads over the ground from 57 to 115 m out, while across it every row stays as sharp
-as before. Looked up as they are, those rows draw out into streaks that run away from where the photograph was taken.
-The usual cure, a <Term of="Mipmap">mipmap</Term>, blurs both ways at once and keeps the streaks, only softer. What
-helps is to blur along the azimuth alone, as far as the stretch leaves the image short along its elevation, so that each
-spot comes out evenly blurred instead of drawn out (<Fig id="grounded" />). `rbStretchedLods` measures the stretch from
-where a pixel and its two neighbors look up and returns how far to blur along each axis, and levels of the image halved
-more often along the azimuth than along the elevation hold that blur ready, up to 64 to 1. What remains are the
-photograph's own features, drawn out across the plane: no filter adds rows the camera never took.
+Near the disc's edge, a few rows of the image still cover a great deal of ground. With the photograph taken 2 m up and
+a disc of some 30 m, its last degree, about eleven rows of a 4K image, spans more than 6 m, while across it every row
+stays as sharp as before. Looked up as they are, those rows draw out into streaks that run away from where the
+photograph was taken. The usual cure, a <Term of="Mipmap">mipmap</Term>, blurs both ways at once and keeps the streaks,
+only softer. What helps is to blur along the azimuth alone, as far as the stretch leaves the image short along its
+elevation. `rbStretchedLods` measures the stretch from where a pixel and its two neighbors look up and returns how far
+to blur along each axis, and levels of the image halved more often along the azimuth than along the elevation hold that
+blur ready, up to 64 to 1. Over the disc's last few degrees, a band of the image's colors fades in, blurred as wide as
+the band, and a quarter of its width past the edge it is gone, so that the sky on the sphere stays sharp.
+
+What remains are the photograph's own features: no filter adds rows the camera never took, and what truly rises from
+the ground inside the disc, a tree or a house, lies flat and smears the further the camera moves from where the
+photograph was taken. Lifting the horizon is simpler still: the image is stretched between its poles, for a horizon
+that is not where the image has it. All of these are `wgsl.ground`, functions from a direction to a direction, for any
+map, and the plane without end is still there, the dome's radius at its far end.
 
 <Environments open />
 
