@@ -1,0 +1,179 @@
+{
+    "files": [
+        {
+            "name": "lroc_color_16bit_srgb_4k.tif",
+            "kind": "source",
+            "tag": "svs-4720-cgi-moon-kit-2025-12",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/svs-4720-cgi-moon-kit-2025-12/lroc_color_16bit_srgb_4k.tif",
+            "original": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_16bit_srgb_4k.tif",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA's Scientific Visualization Studio",
+            "size": 61891324,
+            "sha256": "9731fa8af425b6c2f88f277ecca82bf8c603f3743894f64ed7b25c5bfefa22ff"
+        },
+        {
+            "name": "lroc_color_16bit_srgb_8k.tif",
+            "kind": "source",
+            "tag": "svs-4720-cgi-moon-kit-2025-12",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/svs-4720-cgi-moon-kit-2025-12/lroc_color_16bit_srgb_8k.tif",
+            "original": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_16bit_srgb_8k.tif",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA's Scientific Visualization Studio",
+            "size": 243289792,
+            "sha256": "db7808e878b6a55eb409bb231eab8deb477f84b5c9d7396d76ff73e5d54992d9"
+        },
+        {
+            "name": "ldem_64_uint.tif",
+            "kind": "source",
+            "tag": "svs-4720-cgi-moon-kit-2025-12",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/svs-4720-cgi-moon-kit-2025-12/ldem_64_uint.tif",
+            "original": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/ldem_64_uint.tif",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA's Scientific Visualization Studio",
+            "size": 530934146,
+            "sha256": "0f40bce8b42864deddb6943a38474879e691d5b20647aa5e54c2612b23106499"
+        },
+        {
+            "name": "MAS_57M_16.IMG",
+            "kind": "source",
+            "tag": "lola-fractal-rosenburg-2011",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/lola-fractal-rosenburg-2011/MAS_57M_16.IMG",
+            "original": "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/extras/fractal/img/MAS_57M_16.IMG",
+            "license": "Public domain (NASA PDS)",
+            "credit": "Rosenburg, M. A. et al. 2011, JGR 116, E02001; NASA PDS Geosciences Node",
+            "size": 33177600,
+            "sha256": "1fa4ccfb94a7b54dba2841a92b371d0417b3d4065393f4e78d8f08e6afcf9d7f"
+        },
+        {
+            "name": "HE_8.IMG",
+            "kind": "source",
+            "tag": "lola-fractal-rosenburg-2011",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/lola-fractal-rosenburg-2011/HE_8.IMG",
+            "original": "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/extras/fractal/img/HE_8.IMG",
+            "license": "Public domain (NASA PDS)",
+            "credit": "Rosenburg, M. A. et al. 2011, JGR 116, E02001; NASA PDS Geosciences Node",
+            "size": 8294400,
+            "sha256": "b924a0bf97f273ec38915d0fce32adc1aea72a87fad0de5b0e4ffb966b04b054"
+        },
+        {
+            "name": "moon-color-8k.webp",
+            "kind": "built",
+            "tag": "nachtgestirn-maps-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/nachtgestirn-maps-2026-11-21/moon-color-8k.webp",
+            "original": null,
+            "made": "pnpm maps --whole --size 8k",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA's Scientific Visualization Studio; Rosenburg, M. A. et al. 2011, JGR 116, E02001; NASA PDS Geosciences Node (roughness)",
+            "size": 4414010,
+            "sha256": "e44f8a373477fc563264415c56b15ee0d80ee68e4628b665c6883dad1048574f"
+        },
+        {
+            "name": "moon-height-8k.webp",
+            "kind": "built",
+            "tag": "nachtgestirn-maps-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/nachtgestirn-maps-2026-11-21/moon-height-8k.webp",
+            "original": null,
+            "made": "pnpm maps --whole --size 8k",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA's Scientific Visualization Studio; Rosenburg, M. A. et al. 2011, JGR 116, E02001; NASA PDS Geosciences Node (roughness)",
+            "size": 38099080,
+            "sha256": "7886cab3664e24ffe25276cfb6e20ed06bc3d0b1d6e2ab4d2fa42e0f86059430"
+        },
+        {
+            "name": "moon-color-seen-2k.webp",
+            "kind": "built",
+            "tag": "nachtgestirn-maps-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/nachtgestirn-maps-2026-11-21/moon-color-seen-2k.webp",
+            "original": null,
+            "made": "pnpm maps --seen --size 2k",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA's Scientific Visualization Studio; Rosenburg, M. A. et al. 2011, JGR 116, E02001; NASA PDS Geosciences Node (roughness)",
+            "size": 205208,
+            "sha256": "10dae5ecd6fbd1c52b0b5942762c9326a960ab85b5578a36634714d8a8f6856c"
+        },
+        {
+            "name": "moon-height-seen-2k.webp",
+            "kind": "built",
+            "tag": "nachtgestirn-maps-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/nachtgestirn-maps-2026-11-21/moon-height-seen-2k.webp",
+            "original": null,
+            "made": "pnpm maps --seen --size 2k",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA's Scientific Visualization Studio; Rosenburg, M. A. et al. 2011, JGR 116, E02001; NASA PDS Geosciences Node (roughness)",
+            "size": 1897494,
+            "sha256": "fd8cc1fc65a4a815f40946ee5489ce329aa6013d26232826cad3b8b1f35af079"
+        },
+        {
+            "name": "moon-roughness-seen-2k.webp",
+            "kind": "built",
+            "tag": "nachtgestirn-maps-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/nachtgestirn-maps-2026-11-21/moon-roughness-seen-2k.webp",
+            "original": null,
+            "made": "pnpm roughness --seen --size 2k",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA's Scientific Visualization Studio; Rosenburg, M. A. et al. 2011, JGR 116, E02001; NASA PDS Geosciences Node (roughness)",
+            "size": 1845922,
+            "sha256": "600818dcd45912788364a6884e2099bc7253f230c97b7b9a34ac0b00122e11f7"
+        },
+        {
+            "name": "moon-color-seen-4k.webp",
+            "kind": "built",
+            "tag": "nachtgestirn-maps-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/nachtgestirn-maps-2026-11-21/moon-color-seen-4k.webp",
+            "original": null,
+            "made": "pnpm maps --seen --size 4k",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA's Scientific Visualization Studio; Rosenburg, M. A. et al. 2011, JGR 116, E02001; NASA PDS Geosciences Node (roughness)",
+            "size": 791618,
+            "sha256": "fcbf7406c505212ba220714b250fb1c70e786d2f361805b4bf24bc6bcfc138f4"
+        },
+        {
+            "name": "moon-height-seen-4k.webp",
+            "kind": "built",
+            "tag": "nachtgestirn-maps-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/nachtgestirn-maps-2026-11-21/moon-height-seen-4k.webp",
+            "original": null,
+            "made": "pnpm maps --seen --size 4k",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA's Scientific Visualization Studio; Rosenburg, M. A. et al. 2011, JGR 116, E02001; NASA PDS Geosciences Node (roughness)",
+            "size": 6993958,
+            "sha256": "3f7ba7a5dd1ed508415d250b6505457947896af7ee37b5cabe694c4d612f1ee3"
+        },
+        {
+            "name": "moon-roughness-seen-4k.webp",
+            "kind": "built",
+            "tag": "nachtgestirn-maps-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/nachtgestirn-maps-2026-11-21/moon-roughness-seen-4k.webp",
+            "original": null,
+            "made": "pnpm roughness --seen --size 4k",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA's Scientific Visualization Studio; Rosenburg, M. A. et al. 2011, JGR 116, E02001; NASA PDS Geosciences Node (roughness)",
+            "size": 5536500,
+            "sha256": "123300321a2354cea3622a0cf5d643dacb75363c913476c0c37099fac07d45bb"
+        },
+        {
+            "name": "moon-color-seen-8k.webp",
+            "kind": "built",
+            "tag": "nachtgestirn-maps-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/nachtgestirn-maps-2026-11-21/moon-color-seen-8k.webp",
+            "original": null,
+            "made": "pnpm maps --seen --size 8k",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA's Scientific Visualization Studio; Rosenburg, M. A. et al. 2011, JGR 116, E02001; NASA PDS Geosciences Node (roughness)",
+            "size": 2495472,
+            "sha256": "897096e62f64fdfbc43067b2c4a0f5b4b26710acea08dc34ab103bc1507b7057"
+        },
+        {
+            "name": "moon-height-seen-8k.webp",
+            "kind": "built",
+            "tag": "nachtgestirn-maps-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/nachtgestirn-maps-2026-11-21/moon-height-seen-8k.webp",
+            "original": null,
+            "made": "pnpm maps --seen --size 8k",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA's Scientific Visualization Studio; Rosenburg, M. A. et al. 2011, JGR 116, E02001; NASA PDS Geosciences Node (roughness)",
+            "size": 26077180,
+            "sha256": "597cfa0ed68a62d11794c19189c71a70cb456c042660f19a67f948f81976358a"
+        }
+    ]
+}

@@ -25,13 +25,13 @@ interface Config {
 // Mebibytes, as Figure 17 counts them.
 const MiB = 2 ** 20;
 const WIDTHS: Record<Maps, number> = { "512": 512, "1k": 1024, "2k": 2048, "4k": 4096, "8k": 8192 };
-// The files' sizes in bytes: the package's maps, the site's 8K, and the roughness map each set of maps takes.
+// The files' sizes in bytes: the package's whole maps, the site's 8K, and the roughness map each set of maps takes.
 const FILES: Record<Maps, number> = {
-    "512": 40_706 + 189_748,
-    "1k": 106_082 + 731_266,
-    "2k": 376_906 + 2_730_346,
-    "4k": 1_361_808 + 10_195_982,
-    "8k": 4_435_958 + 38_099_080,
+    "512": 21_910 + 189_748,
+    "1k": 87_286 + 731_266,
+    "2k": 358_110 + 2_730_346,
+    "4k": 1_339_860 + 10_195_982,
+    "8k": 4_414_010 + 38_099_080,
 };
 const ROUGHNESS: Record<Maps, "1k" | "2k" | "4k"> = { "512": "1k", "1k": "1k", "2k": "2k", "4k": "4k", "8k": "4k" };
 const ROUGHNESS_FILES = { "1k": 736_380, "2k": 2_659_164, "4k": 8_026_860 };
@@ -118,21 +118,27 @@ function snippet(disc: number, config: Config) {
     if (!config.on.soft) options.push("softShadowsFrom: Infinity");
     if (config.on.displace !== disc >= 1024) options.push(`displacementFrom: ${config.on.displace ? 0 : "Infinity"}`);
     const names = ["createMoonPass", "loadMoonMaps", ...(config.on.roughness ? ["loadMoonRoughness"] : [])];
-    names.push(...(config.maps === "8k" ? [] : ["MOON_MAPS"]), ...(config.on.roughness ? ["MOON_ROUGHNESS"] : []));
+    names.push(
+        ...(config.maps === "8k" ? [] : ["MOON_MAPS_WHOLE"]),
+        ...(config.on.roughness ? ["MOON_ROUGHNESS_WHOLE"] : []),
+    );
     const files =
         config.maps === "8k"
             ? '{ color: "moon-color-8k.webp", heights: "moon-height-8k.webp", width: 8192 }'
-            : `MOON_MAPS["${config.maps}"]`;
+            : `MOON_MAPS_WHOLE["${config.maps}"]`;
+    const rough = ROUGHNESS[config.maps];
+    const sizes = [...new Set([config.maps, ...(config.on.roughness ? [rough] : [])])].join(",");
+    const build = `npx @himmelszelt/nachtgestirn data maps${config.on.roughness ? " roughness" : ""} --whole --size ${sizes}`;
     const lines = [
         `import { ${names.join(", ")} } from "@himmelszelt/nachtgestirn";`,
         "",
-        `// A disc ${disc} px across.${config.maps === "8k" ? " The 8K maps, yours to host." : ""}`,
+        `// A disc ${disc} px across. ${config.maps === "8k" ? "The 8K maps, yours to host." : `The whole maps: ${build}.`}`,
         `const maps = await loadMoonMaps(device, ${files}${config.on.compress ? ", { compress: true }" : ""});`,
         `const pass = await createMoonPass(device, { ${options.join(", ")} });`,
     ];
     if (config.on.roughness) {
         lines.push(
-            `const roughness = await loadMoonRoughness(device, MOON_ROUGHNESS["${ROUGHNESS[config.maps]}"]);`,
+            `const roughness = await loadMoonRoughness(device, MOON_ROUGHNESS_WHOLE["${rough}"]);`,
             "pass.setRoughness(roughness);",
             "pass.update({ roughness: true });",
         );

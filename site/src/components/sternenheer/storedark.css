@@ -1,0 +1,35 @@
+/* Three ways to store the dark, laid out as sternzeit's eclipse views, three across and stacked where a sub-figure's
+   caption would take a third line; what remains has no shared rule. */
+.eclipse-views.storedark-views {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
+@media (max-width: 44rem) {
+    .eclipse-views.storedark-views {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+.storedark-panel > canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: var(--radius-canvas);
+    background: var(--bg);
+}
+.storedark-levels {
+    display: block;
+    width: 100%;
+    height: 92px;
+    margin-top: 0.5rem;
+    font-size: var(--text-small);
+}
+/* The levels per stop: every stop's bar recessive, those the patch covers in the accent over a faint band. */
+.storedark-bar {
+    fill: var(--line);
+}
+.storedark-bar-patch {
+    fill: var(--accent);
+}
+.storedark-range {
+    fill: color-mix(in oklab, var(--accent), transparent 88%);
+}

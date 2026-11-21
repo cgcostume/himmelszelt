@@ -17,8 +17,8 @@ import {
     liftedDirection,
     loadMoonMaps,
     loadMoonRoughness,
-    MOON_MAPS,
-    MOON_ROUGHNESS,
+    MOON_MAPS_WHOLE,
+    MOON_ROUGHNESS_WHOLE,
     mapWidthFor,
     moonEV100,
     moonIlluminance,
@@ -39,6 +39,7 @@ import {
     sun,
 } from "@himmelszelt/sternzeit";
 import { quality, SDR } from "../dunstkreis/atmosphere";
+import { groundGrid } from "../dunstkreis/groundgrid";
 import lambert from "./laws/lambert.wgsl";
 import orenNayar from "./laws/oren-nayar.wgsl";
 import stripes from "./stripes.comp.wgsl";
@@ -57,21 +58,21 @@ const skyKeyOf = (m: MoonAt) => `${m.jd},${m.trueDirection.join(",")},${m.height
 export type ToneCurveName = "neutral" | "agx" | "aces" | "clip";
 /** Which of nachtgestirn's maps: "auto" the smallest that shows the disc at a texel per pixel, never a smaller one
  *  than before. */
-export type MapSize = "auto" | keyof typeof MOON_MAPS | FineMaps;
+export type MapSize = "auto" | keyof typeof MOON_MAPS_WHOLE | FineMaps;
 const SIZES = ["512", "1k", "2k", "4k"] as const;
 
-// The maps the package does not ship, made by its `maps-hq.mjs` and hosted with the site: the whole Moon at 8K.
+// The maps the site hosts itself, made by the package's `maps.mjs --whole --size 8k`: the whole Moon at 8K.
 const HQ = `${import.meta.env.BASE_URL.replace(/\/?$/, "/")}moon/`;
 const SHIPPED = {
-    meanReflectance: MOON_MAPS["4k"].meanReflectance,
-    meanColor: MOON_MAPS["4k"].meanColor,
+    meanReflectance: MOON_MAPS_WHOLE["4k"].meanReflectance,
+    meanColor: MOON_MAPS_WHOLE["4k"].meanColor,
 };
 export const FINE_MAPS = {
     "8k": { color: `${HQ}moon-color-8k.webp`, heights: `${HQ}moon-height-8k.webp`, width: 8192, ...SHIPPED },
 } satisfies Record<string, MoonMapFiles>;
 export type FineMaps = keyof typeof FINE_MAPS;
 /** The widest texture each set needs, for whether the GPU takes it. */
-export const MAPS_TEXELS: Record<keyof typeof MOON_MAPS | FineMaps, number> = {
+export const MAPS_TEXELS: Record<keyof typeof MOON_MAPS_WHOLE | FineMaps, number> = {
     "512": 512,
     "1k": 1024,
     "2k": 2048,
@@ -264,7 +265,7 @@ export type MoonAt = ReturnType<typeof moonAt>;
 
 // The roughness maps, optional, once per page and only once a figure draws the roughness: as fine as the maps, up to the
 // 4K, beyond which Rosenburg's statistics hold no more.
-const ROUGHNESS_FOR: Record<string, keyof typeof MOON_ROUGHNESS> = { "512": "1k", "1k": "1k", "2k": "2k" };
+const ROUGHNESS_FOR: Record<string, keyof typeof MOON_ROUGHNESS_WHOLE> = { "512": "1k", "1k": "1k", "2k": "2k" };
 const roughnessLoading = new Map<string, Promise<GPUTexture>>();
 const roughnessLoaded = new Map<string, GPUTexture>();
 function sharedRoughness(device: GPUDevice, maps: string, ready: () => void) {
@@ -273,7 +274,7 @@ function sharedRoughness(device: GPUDevice, maps: string, ready: () => void) {
     if (loaded) return loaded;
     let loading = roughnessLoading.get(size);
     if (!loading) {
-        loading = loadMoonRoughness(device, MOON_ROUGHNESS[size]);
+        loading = loadMoonRoughness(device, MOON_ROUGHNESS_WHOLE[size]);
         roughnessLoading.set(size, loading);
         loading.then((texture) => roughnessLoaded.set(size, texture));
     }
@@ -286,7 +287,7 @@ const loadedMaps = new Map<string, Promise<MoonMaps>>();
 function sharedMaps(device: GPUDevice, size: Exclude<MapSize, "auto">) {
     let maps = loadedMaps.get(size);
     if (!maps) {
-        const files = size in FINE_MAPS ? FINE_MAPS[size as FineMaps] : MOON_MAPS[size as (typeof SIZES)[number]];
+        const files = size in FINE_MAPS ? FINE_MAPS[size as FineMaps] : MOON_MAPS_WHOLE[size as (typeof SIZES)[number]];
         const changed = () => progressEvents.dispatchEvent(new Event("change"));
         mapsProgress.set(size, { loaded: 0, total: 0 });
         changed();
@@ -372,6 +373,8 @@ export interface MoonFrame {
     headroom?: number;
     /** dunstkreis' grid over the sky: altitude lines every 10°, the compass directions and the Sun's symbol. */
     grid?: boolean;
+    /** A grid on the ground under the air, for a view in flight: how far it has flown, in km east and north. */
+    ground?: { east: number; north: number } | null;
     /** How the maps are filtered, "anisotropic" by default, as the package does. */
     filter?: MapFilter;
     /** The air's shimmer over the disc, as the pass takes it, or none. */
@@ -396,6 +399,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     let mapsBound = "";
     let mapsWanted = "";
     let background: GPUTexture | null = null;
+    let groundPass: ReturnType<typeof groundGrid> | null = null;
     // dunstkreis' meter on the sky, read back once per sky the tiles show, as several tiles may show different ones: by
     // day the sky sets the exposure.
     const skyMeters = new Map<string, number>();
@@ -571,7 +575,8 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             if (!sky || sky.luts !== luts) return null;
         }
         // The maps asked for, or the smallest that shows the disc sharply, but never smaller than the ones bound.
-        const needed = SIZES.find((size) => (MOON_MAPS[size].width ?? 0) >= mapWidthFor(frame.discPixels)) ?? "4k";
+        const needed =
+            SIZES.find((size) => (MOON_MAPS_WHOLE[size].width ?? 0) >= mapWidthFor(frame.discPixels)) ?? "4k";
         const kept = Math.max(0, SIZES.indexOf(mapsBound as (typeof SIZES)[number]));
         // Finer maps once bound stay bound for "auto" too.
         const size =
@@ -683,8 +688,20 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             device.queue.submit([encoder.finish()]);
             return { ev100, through, passesMs: performance.now() - started };
         }
+        let underneath = background;
         if (frame.air) {
             sky.pass.encode(encoder, background);
+            if (frame.ground) {
+                groundPass ??= groundGrid(device);
+                const radiusKm = m.model.planet.groundRadiusKm;
+                underneath = groundPass.encode(encoder, background, {
+                    inverseViewProjection: frame.inverseViewProjection,
+                    projectionDistance: frame.projectionDistance,
+                    heightM: m.heightM,
+                    radiusKm,
+                    flown: frame.ground,
+                });
+            }
         } else {
             const [r, g, b] = frame.background ?? [0, 0, 0];
             encoder
@@ -701,7 +718,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                 .end();
         }
         moonPass.encode(encoder, target, {
-            background,
+            background: underneath,
             ...(frame.timestamps ? { timestampWrites: frame.timestamps } : {}),
         });
         device.queue.submit([encoder.finish()]);

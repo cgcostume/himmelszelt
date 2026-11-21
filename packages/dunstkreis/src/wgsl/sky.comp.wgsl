@@ -1,6 +1,6 @@
 // The sky pass: a compute pass that turns the precomputed tables into pixels, one invocation per pixel of the target,
 // with no rasterization. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`, `sampling.wgsl`, `raymarch.wgsl`,
-// `camera.wgsl`, `cube.wgsl`, `sun.wgsl`, `glare.wgsl`, `tonemap.wgsl`, `vision.wgsl`, `grid.wgsl`, `frame.wgsl`, `quality.wgsl` and
+// `camera.wgsl`, `cube.wgsl`, `sun.wgsl`, `glare.wgsl`, `whitebalance.wgsl`, `tonemap.wgsl`, `vision.wgsl`, `grid.wgsl`, `frame.wgsl`, `quality.wgsl` and
 // `features.wgsl`, plus the output
 // at group 1, `dkOutputSize` and `dkOutputStore`, declared by whoever builds the pipeline since its format has to be
 // spelled out: `skyOutput(format)` for an image, `skyCubeOutput(format)` for a cube map's six faces.
@@ -18,6 +18,8 @@
 @group(0) @binding(6) var<storage, read> dkMetering: DkMetering;
 // The Moon's sky-view table, read with DK_MOONLIGHT; the Sun's is bound in its place without.
 @group(0) @binding(7) var dkMoonViewLut: texture_2d<f32>;
+// helldunkel's blue noise, read with DK_DITHER.
+@group(0) @binding(8) var dkBlueNoise: texture_2d<f32>;
 
 // Offsets within a texel, in [-0.5, 0.5), from Roberts' R2 sequence: evenly spread for any count, the first at the
 // center.
@@ -441,9 +443,10 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
         luminance = hdDarkAdaptedEye(luminance);
     }
 
-    // In cd/m², exposed. Without tone mapping, that is what is written: linear, for the caller's own tone mapping.
+    // In cd/m², white balanced and exposed. Without tone mapping, that is what is written: linear, for the caller's own
+    // tone mapping.
     let exposure = dkExposure();
-    var color = luminance * exposure;
+    var color = hdWhiteBalance(luminance, dkParams.whiteBalance) * exposure;
     // The disc by how much of the pixel it covers, on the sky's part of it, looked up only there. Tone mapped, sky and
     // disc apart and mixed after, since the disc is far beyond white: mixed before, a pixel it barely touches would
     // turn white, and its edge would step.
@@ -455,7 +458,7 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
             sunLuminance = dkSkySunLuminance(sky);
         }
     }
-    let sun = sunLuminance * exposure;
+    let sun = hdWhiteBalance(sunLuminance, dkParams.whiteBalance) * exposure;
     if (DK_TONE_MAP != 0u) {
         var mapped = dkToneMap(color);
         if (disc > 0.0) {
@@ -471,7 +474,7 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
         color = dkDebugOverlay(color, view, right, below);
     }
     if (DK_TONE_MAP != 0u && DK_DITHER) {
-        color = clamp(hdDither(color, id.xy, 255.0), vec3f(0.0), hdEncodeSrgbExtended(vec3f(DK_HEADROOM), DK_HEADROOM));
+        color = clamp(hdDitherBlue(color, id.xy, 255.0, dkBlueNoise), vec3f(0.0), hdEncodeSrgbExtended(vec3f(DK_HEADROOM), DK_HEADROOM));
     }
     dkOutputStore(id.xy, 0u, vec4f(color, select(1.0, disc, DK_TONE_MAP == 0u && DK_DISC_ALPHA)));
 }

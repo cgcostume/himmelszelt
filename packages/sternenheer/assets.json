@@ -1,0 +1,119 @@
+{
+    "files": [
+        {
+            "name": "heasarc_hipparcos.tdat.gz",
+            "kind": "source",
+            "tag": "heasarc-hipparcos-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/heasarc-hipparcos-2026-11-21/heasarc_hipparcos.tdat.gz",
+            "original": "https://heasarc.gsfc.nasa.gov/FTP/heasarc/dbase/tdat_files/heasarc_hipparcos.tdat.gz",
+            "license": "CC BY-NC 3.0 IGO",
+            "credit": "ESA",
+            "size": 14808803,
+            "sha256": "e0e1e94344ada0010a1843c03cd4fc0e5276d28c5e2770bd86b7361ecc0fe10d"
+        },
+        {
+            "name": "heasarc_tycho2.tdat.gz",
+            "kind": "source",
+            "tag": "heasarc-tycho2-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/heasarc-tycho2-2026-11-21/heasarc_tycho2.tdat.gz",
+            "original": "https://heasarc.gsfc.nasa.gov/FTP/heasarc/dbase/tdat_files/heasarc_tycho2.tdat.gz",
+            "license": "CC BY-NC 3.0 IGO",
+            "credit": "ESA; Høg, E. et al. 2000, A&A 355, L27",
+            "size": 200744161,
+            "sha256": "f6635a44fb3e1095339b713a6ab34384e52efb308b64b81afa7d85de594cf9ad"
+        },
+        {
+            "name": "milkyway_2020_4k.exr",
+            "kind": "source",
+            "tag": "svs-4851-deep-star-maps-2020",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/svs-4851-deep-star-maps-2020/milkyway_2020_4k.exr",
+            "original": "https://svs.gsfc.nasa.gov/vis/a000000/a004800/a004851/milkyway_2020_4k.exr",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA/Goddard Space Flight Center Scientific Visualization Studio",
+            "size": 36436668,
+            "sha256": "2eb802d6e68d170b410f766c7fec07f7518619f6b6708fdc81e9302d93e74fdb"
+        },
+        {
+            "name": "milkyway_2020_8k.exr",
+            "kind": "source",
+            "tag": "svs-4851-deep-star-maps-2020",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/svs-4851-deep-star-maps-2020/milkyway_2020_8k.exr",
+            "original": "https://svs.gsfc.nasa.gov/vis/a000000/a004800/a004851/milkyway_2020_8k.exr",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA/Goddard Space Flight Center Scientific Visualization Studio",
+            "size": 137307727,
+            "sha256": "361d1961647af073b3b3e4aea4fca85f15b3c9d915e0c8c4befb02520dadd10a"
+        },
+        {
+            "name": "hiptyc_2020_4k.exr",
+            "kind": "source",
+            "tag": "svs-4851-deep-star-maps-2020",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/svs-4851-deep-star-maps-2020/hiptyc_2020_4k.exr",
+            "original": "https://svs.gsfc.nasa.gov/vis/a000000/a004800/a004851/hiptyc_2020_4k.exr",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA/Goddard Space Flight Center Scientific Visualization Studio",
+            "size": 21251204,
+            "sha256": "3de43bdd83e26662ee29d82bdc97a19cd343879f1bd1b36cae7351ad75e2cd5d"
+        },
+        {
+            "name": "milkyway-8k.webp",
+            "kind": "built",
+            "tag": "sternenheer-milkyway-8k-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/sternenheer-milkyway-8k-2026-11-21/milkyway-8k.webp",
+            "original": null,
+            "made": "pnpm milkyway --size 8k",
+            "license": "Public domain (NASA media usage guidelines)",
+            "credit": "NASA/Goddard Space Flight Center Scientific Visualization Studio",
+            "size": 18516402,
+            "sha256": "49f5ab6d9b62b2ef5d9f01b08ae07998d1bf4f22bfdc3f0f5629478bb80d5620"
+        },
+        {
+            "name": "hipparcos.bin.gz",
+            "kind": "built",
+            "tag": "sternenheer-esa-catalogs-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/sternenheer-esa-catalogs-2026-11-21/hipparcos.bin.gz",
+            "original": null,
+            "made": "pnpm hipparcos",
+            "license": "CC BY-NC 3.0 IGO",
+            "credit": "ESA",
+            "size": 700511,
+            "sha256": "4ae382761790875b26368085382b2119e693e050d959d2a096e5ea931160d576"
+        },
+        {
+            "name": "hipparcos-compact.bin.gz",
+            "kind": "built",
+            "tag": "sternenheer-esa-catalogs-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/sternenheer-esa-catalogs-2026-11-21/hipparcos-compact.bin.gz",
+            "original": null,
+            "made": "pnpm hipparcos",
+            "license": "CC BY-NC 3.0 IGO",
+            "credit": "ESA",
+            "size": 579065,
+            "sha256": "e24d631d43fdc8df09e308e0be3f8a5ecbeba1ab4e9b4b7e07f5c7c0f7fd8383"
+        },
+        {
+            "name": "tycho.bin.gz",
+            "kind": "built",
+            "tag": "sternenheer-esa-catalogs-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/sternenheer-esa-catalogs-2026-11-21/tycho.bin.gz",
+            "original": null,
+            "made": "pnpm tycho",
+            "license": "CC BY-NC 3.0 IGO",
+            "credit": "ESA",
+            "size": 14105224,
+            "sha256": "eca660df9e9b77321581029352f95a526f639cb7ed1261c03c0593046bb6f143"
+        },
+        {
+            "name": "tycho-compact.bin.gz",
+            "kind": "built",
+            "tag": "sternenheer-esa-catalogs-2026-11-21",
+            "url": "https://github.com/cgcostume/himmelszelt-assets/releases/download/sternenheer-esa-catalogs-2026-11-21/tycho-compact.bin.gz",
+            "original": null,
+            "made": "pnpm tycho",
+            "license": "CC BY-NC 3.0 IGO",
+            "credit": "ESA",
+            "size": 12036155,
+            "sha256": "e69042ea2fb53bae92a2860c029f623652f521004d0b57261d016eecb99492b6"
+        }
+    ]
+}

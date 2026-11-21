@@ -1,0 +1,48 @@
+/* The flicker figure's four panels, all 4:3, the charts drawn to their size by the script (see flicker.ts). */
+.flicker-panel {
+    position: relative;
+    aspect-ratio: 4 / 3;
+}
+.flicker-panel > :is(canvas, svg) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+/* The star and the pattern are seen as they are: dark, rounded like the other skies. */
+.flicker-panel.as-seen {
+    overflow: hidden;
+    border-radius: var(--radius-canvas);
+    background: oklch(0 0 0);
+}
+.flicker-panel > .view-buttons {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    z-index: 5;
+}
+.flicker-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+.flicker-lens {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+}
+.flicker-scale {
+    stroke: var(--muted);
+    stroke-width: 2;
+}
+.flicker-chosen {
+    fill: var(--accent);
+}
+/* The pattern's labels as marks drawn straight onto a render: white, lifted off its light patches by a dark halo. */
+.flicker-overlay text {
+    fill: var(--render-ink);
+    paint-order: stroke;
+    stroke: var(--render-shade);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}

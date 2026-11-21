@@ -57,3 +57,10 @@ fn dkToRgb(a: DkAtmosphere, spectral: vec4f) -> vec3f {
     }
     return mix(rgb, vec3f(luminance), -lowest / (luminance - lowest));
 }
+
+// A transmittance at the four wavelengths as linear sRGB factors, weighted by the sun's spectrum: a white surface
+// lit by sunlight takes the tint the air gives sunlight.
+fn dkTransmittanceRgb(a: DkAtmosphere, transmittance: vec4f) -> vec3f {
+    let white = a.toRgb * a.solarIlluminance;
+    return clamp(a.toRgb * (transmittance * a.solarIlluminance) / max(white, vec3f(1e-9)), vec3f(0.0), vec3f(1.0));
+}

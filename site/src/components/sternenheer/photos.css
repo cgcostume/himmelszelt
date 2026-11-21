@@ -1,0 +1,113 @@
+/* A photograph of the night sky with sternenheer's sky for it laid over, in a stage of the photograph's shape: both the
+   size of its frame, the canvas clipped to the right of a split line; in full screen the frame as large as fits. The
+   picker, the credit and the split's slider are the Moon's photo figure's (nachtgestirn.css). */
+.starphoto-stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: var(--aspect, 1.5);
+    background: #000;
+    cursor: ew-resize;
+    touch-action: pan-y;
+}
+.photo-full:fullscreen .starphoto-stage {
+    height: 100%;
+    aspect-ratio: auto;
+}
+.starphoto-frame {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+}
+.tiles-figure .tiles-panel .starphoto-frame > :is(img, canvas) {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+}
+/* Named stars, a ring and a name each, over both sides: faint, so the stars under them stay the thing to look at. */
+.photo-marks .starphoto-ring {
+    fill: none;
+    stroke: rgb(255 255 255 / 0.5);
+    stroke-width: 1;
+}
+.photo-marks .starphoto-name {
+    fill: rgb(255 255 255 / 0.8);
+    font-size: 11px;
+    paint-order: stroke;
+    stroke: rgb(0 0 0 / 0.6);
+    stroke-width: 3px;
+}
+/* The exposure under the stage, as the stars figure has it in its options. */
+[data-star-photos] .figure-slider > output {
+    min-width: 13rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+/* What was measured in both pictures, and what it says: a table of a few rows, then two short paragraphs, in the
+   column, as the caption is. */
+.starphoto-findings {
+    max-width: calc(var(--measure) - 3rem);
+    margin: 0.75rem auto 0;
+    font-size: var(--text-small);
+    line-height: 1.5;
+}
+.starphoto-findings table {
+    width: 100%;
+    margin: 0 0 0.6rem;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+}
+.starphoto-findings :is(th, td) {
+    padding: 0.2rem 0.75rem 0.2rem 0;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: baseline;
+}
+.starphoto-findings thead th {
+    color: var(--muted);
+    font-weight: normal;
+}
+.starphoto-findings tbody th {
+    font-weight: normal;
+}
+.starphoto-findings p {
+    margin: 0.35rem 0 0;
+    color: var(--muted);
+    text-wrap: pretty;
+}
+.starphoto-findings p > span {
+    color: var(--text);
+}
+/* Six photographs, not the Moon's seven: tabs of a fixed size at the bar's left end, not a sixth of the figure each. */
+[data-star-photos] .photo-tabs {
+    grid-template-columns: repeat(var(--count), minmax(0, 6rem));
+}
+/* In full screen the exposure and the picker as wide as their text needs, not as six tabs are. */
+[data-star-photos] .photo-full:fullscreen > :is(.photo-picker, .figure-slider) {
+    width: min(calc(100% - 2rem), 44rem);
+}
+/* Without WebGPU, the note over the photograph's foot. */
+.starphoto-frame > .tiles-empty {
+    position: absolute;
+    inset: auto 0 2.5rem;
+    margin: 0;
+    padding: 0.5rem 1rem;
+    text-shadow: 0 0 4px #000;
+}
+/* The starred figure's choice of NASA's map, at the top right, over the side it picks for. */
+.tiles-panel > .view-buttons.starred-maps {
+    left: auto;
+    right: 6px;
+}
+/* On a phone the exposure's reading under its slider, which it would otherwise squeeze to nothing. */
+@media (max-width: 40rem) {
+    [data-star-photos] .figure-slider {
+        flex-wrap: wrap;
+    }
+    [data-star-photos] .figure-slider > output {
+        flex: 1 0 100%;
+        min-width: 0;
+    }
+}

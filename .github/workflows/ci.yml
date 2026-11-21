@@ -21,6 +21,20 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      # The files no package ships or checks in, fetched by `pnpm assets` from the asset mirror
+      # (github.com/cgcostume/himmelszelt-assets), each checked against its SHA-256 in the manifests: ESA's star
+      # catalogues, the Milky Way's 8K map, the Moon's 8K maps and the starred map, 90 MB. Kept in Actions' cache until a
+      # manifest changes; nothing is built here.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            packages/sternenheer/data/hipparcos*.bin.gz
+            packages/sternenheer/data/tycho*.bin.gz
+            packages/sternenheer/data/milkyway-8k.webp
+            site/public/moon/moon-*-8k.webp
+            site/public/stars/starmap-cygnus.webp
+          key: assets-${{ hashFiles('packages/*/assets.json', 'site/assets.json') }}
+      - run: pnpm assets
       # Build first: packages typecheck against each other's dist (e.g. dunstkreis' tests import @himmelszelt/sternzeit).
       - run: pnpm build
       - run: pnpm typecheck

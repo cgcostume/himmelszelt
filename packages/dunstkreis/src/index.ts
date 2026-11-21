@@ -41,6 +41,9 @@ export {
 export type { AutoExposureKey } from "./exposure.js";
 export { autoExposureCompensation, DEFAULT_AUTO_EXPOSURE_KEYS } from "./exposure.js";
 export { ev100FromLuminance, exposureFromEV100 } from "@himmelszelt/helldunkel";
+// The white balance, before the exposure: a reference white shown as D65.
+export type { WhiteBalance } from "@himmelszelt/helldunkel";
+export { NO_WHITE_BALANCE, whiteBalance } from "@himmelszelt/helldunkel";
 
 // Packing the model into the DkAtmosphere uniform block the shaders take.
 export { ATMOSPHERE_UNIFORM_SIZE, atmosphereUniformData } from "./uniforms.js";
@@ -64,6 +67,9 @@ export { createSkyPass } from "./sky.js";
 // context or render pass of its own.
 export type {
     AerialPerspectiveOptions,
+    AerialPerspectivePass,
+    AerialPerspectivePassOptions,
+    AerialPerspectiveScene,
     AerialPerspectiveVolume,
     AtmosphereLUTs,
     SkyCubeOptions,
@@ -78,9 +84,46 @@ export {
     airRefractivity,
     airTransmittance,
     apparentDirection,
+    apparentHorizon,
     lightThroughAir,
     refractionAngle,
 } from "./refraction.js";
+
+// What the air does to light from beyond it, a star's, the Moon's, a satellite's: one table per observer height of the
+// bend, the transmittance, the airmass and the turbulence over the apparent altitude, looked up here and by `wgsl.air`.
+export type { Air, AirTable } from "./air.js";
+export {
+    AIR_TABLE_FORMAT,
+    AIR_TABLE_ROWS,
+    AIR_TABLE_WIDTH,
+    airAt,
+    airLift,
+    airShows,
+    airTable,
+    airTableFrom,
+    createAirTexture,
+    liftedDirection,
+    unbentDirection,
+    writeAirTexture,
+} from "./air.js";
+
+// The air's turbulence: how it moves an image and makes a point flicker, for `wgsl.seeing` and the shimmer pass.
+export type { PathTurbulence, Seeing, Turbulence } from "./seeing.js";
+export {
+    SEEING_UNIFORM_SIZE,
+    SEEING_WAVELENGTH_M,
+    scintillation,
+    scintillationIndex,
+    seeingUniformData,
+    shimmerScales,
+    turbulenceStrength,
+    turbulenceThrough,
+    turbulenceWind,
+    zenithScintillation,
+    zenithTilt,
+} from "./seeing.js";
+export type { ShimmerParams, ShimmerParts, ShimmerPass, ShimmerPassOptions } from "./shimmer.js";
+export { AIR_DISPERSION, createShimmerPass, shimmerExtent, shimmerReach, shimmerShows } from "./shimmer.js";
 
 // Reading a LUT back to the CPU, for inspecting or exporting one.
 export type { TexturePixels } from "./readback.js";

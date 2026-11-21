@@ -15,8 +15,11 @@ interface Props {
     id?: string;
     caption?: string;
     try?: { label: string; set: string; text: string };
+    /** The lab: the figure with a clock of its own, the cloudscape changing by keyframes, and what each part costs. */
+    lab?: boolean;
 }
 const {
+    lab = false,
     id = "clouds",
     caption = "The clouds at the chosen moment and place over dunstkreis' sky: a cloudscape of low clouds marched through its voxel volume, and a sheet of cirrus above. The compass directions on the horizon.",
     try: experiment,
@@ -252,13 +255,93 @@ const LAYERS = {
     ],
     checked: "64",
 };
+// The lab's choices and sliders: how the cloudscape changes, how fast, and how much of a keyframe a frame may build.
+const MODE = {
+    name: "mode",
+    label: "Change",
+    title: "How a change of the clouds' shape or of the Sun reaches the volumes: rebuilt at once in the frame that asks, or built ahead as a keyframe, a few steps a frame, and blended in",
+    options: [
+        ["immediate", "immediate"],
+        ["keyframes", "keyframes"],
+    ],
+    checked: "keyframes",
+};
+const SPEED = {
+    name: "speed",
+    label: "Speed",
+    title: "How fast the lab's clock runs while it animates: the wind, the change of shape and the billows follow it",
+    options: [
+        ["1", "1x"],
+        ["60", "60x"],
+        ["360", "360x"],
+        ["3600", "3600x"],
+    ],
+    checked: "60",
+};
+const BUDGET = {
+    name: "budget",
+    label: "Steps per frame",
+    title: "How many of a keyframe's steps a frame may run: fewer spread its cost over more frames",
+    options: [
+        ["1", "1"],
+        ["2", "2"],
+        ["4", "4"],
+        ["all", "all"],
+    ],
+    checked: "2",
+};
+const GRID = {
+    name: "grid",
+    label: "Voxels across",
+    title: "Voxels east and north over the cloudscape's extent: four times the voxels and the memory per doubling",
+    options: [
+        ["128", "128"],
+        ["256", "256"],
+        ["512", "512"],
+    ],
+    checked: "256",
+};
+type LabSlider = [name: string, label: string, min: number, max: number, step: number, value: number, title: string];
+const LAB: LabSlider[] = [
+    [
+        "billowSpeed",
+        "billow speed",
+        0,
+        5,
+        0.1,
+        0.5,
+        "How fast the detail noise rises through the clouds, in m/s of the lab's clock: free, nothing is rebuilt for it",
+    ],
+    [
+        "interval",
+        "keyframe",
+        0.1,
+        5,
+        0.1,
+        1,
+        "How long the blend from one keyframe to the next takes, in seconds as you watch",
+    ],
+];
 ---
 
-<figure class="scene-frame wide" id={id} data-clouds>
-    <SkyFrame png grid={false} locked={false} hint="Drag to look around, scroll to zoom. Rendered with WebGPU, the clouds after Nubis3.">
+<figure class="scene-frame wide" id={id} data-clouds data-lab={lab ? "" : undefined}>
+    <SkyFrame png fly ownHeight grid={false} locked={false} hint="Drag to look around, scroll to zoom. Rendered with WebGPU, the clouds after Nubis3.">
         <canvas data-field="canvas" aria-label="Clouds over the sky at the chosen moment and place"></canvas>
+        <div class="cloud-textures" data-field="textures"></div>
         <div class="sky-compass" data-field="compassLabels"></div>
         <Fragment slot="options">
+            {lab && (
+                <OptionGroup name="change">
+                    <button type="button" class="view-toggle" data-field="lab.animate" aria-pressed="false" title="Animate: the lab's clock runs, frame after frame, until switched off">animate</button>
+                    <button type="button" class="view-toggle" data-field="lab.cycle" aria-pressed="false" title="While it animates, the weather moves on to the next preset every 6 seconds">cycle weather</button>
+                    <Choice figure={id} {...MODE} />
+                    <Choice figure={id} {...SPEED} />
+                    <Choice figure={id} {...BUDGET} />
+                    {LAB.map(([name, label, min, max, step, value, title]) => (
+                        <label class="sky-ev clouds-slider" title={title}>{label} <input data-lab={name} type="range" min={min} max={max} step={step} value={value} /> <output /></label>
+                    ))}
+                </OptionGroup>
+            )}
             <OptionGroup name="weather">
                 <Choice figure={id} {...WEATHER} />
             </OptionGroup>
@@ -290,11 +373,16 @@ const LAYERS = {
                 <Choice figure={id} {...SCALE} />
                 <Choice figure={id} {...STEPS} />
                 <Choice figure={id} {...LAYERS} />
+                {lab && <Choice figure={id} {...GRID} />}
                 <Choice figure={id} {...AIR} />
+                <button type="button" class="view-toggle" data-field="textures.on" aria-pressed="true" title="The textures the figure renders from, down the left of the view: hover one for what it is for">textures</button>
+                <button type="button" class="view-toggle" data-field="ground.grid" aria-pressed="true" title="A grid on the ground, for orientation, speed and height: thin lines every 10 km, 1 km, 100 m and on down to 1 mm, each level showing once its cells are a few pixels across">grid</button>
             </OptionGroup>
         </Fragment>
     </SkyFrame>
     <p class="view-status"><span data-field="sun" /> <span class="sky-timing" data-field="timing" /></p>
+    {lab && <p class="view-status"><span data-field="lab.cost" /></p>}
+    {lab && <p class="view-status footnote"><span data-field="lab.steps" /></p>}
     <figcaption class="figure-caption">
         {caption}
         {experiment && <Try label={experiment.label} set={experiment.set} fig={id}>{experiment.text}</Try>}

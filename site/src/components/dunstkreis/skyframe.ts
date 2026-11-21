@@ -9,6 +9,26 @@ const heightOf = (value: number) => Math.round(10 ** ((value / 1000) * LOG_TOP))
 const sliderOf = (heightM: number) => (Math.log10(Math.max(1, heightM)) / LOG_TOP) * 1000;
 const meters = (m: number) => (m < 1000 ? `${m} m` : `${(m / 1000).toFixed(m < 100_000 ? 1 : 0)} km`);
 
+/**
+ * The height the figure in `root` is seen from, in m. In a frame with a height of its own (see SkyFrame.astro) that is
+ * the page's until the frame's scale or a flight sets another, which no other figure follows, and the page's again once
+ * that changes; `changed` hears of it. Any other frame's height is the page's, and setting it sets the page's.
+ */
+export function frameHeight(root: HTMLElement, changed?: () => void) {
+    const frame = root.matches("[data-sky-frame]") ? root : root.querySelector<HTMLElement>("[data-sky-frame]");
+    const own = frame?.hasAttribute("data-own-height") ? frame : null;
+    if (changed) own?.addEventListener("skyheight", changed);
+    return {
+        get: () => Number(own?.dataset.heightM) || state.heightM,
+        set(heightM: number) {
+            const clamped = Math.min(Math.max(heightM, 1), 408_000);
+            if (!own) return update({ heightM: clamped });
+            own.dataset.heightM = String(clamped);
+            own.dispatchEvent(new Event("skyheight"));
+        },
+    };
+}
+
 // Play steps the moment on by 12 seconds, thirty times a second: an hour in 10 seconds. It is the page's animation, so
 // the controls' animate button and every play button show it, and anything else that sets the moment stops it.
 const STEP = 12 / 86_400;
@@ -84,14 +104,19 @@ export function skyFrames() {
         const offset = field<HTMLInputElement>("offset");
         const time = offset.closest<HTMLElement>("[data-offset]");
         const heightValue = field("heightValue");
-        height.addEventListener("input", () => update({ heightM: heightOf(Number(height.value)) }, height));
+        const seenFrom = frameHeight(frame);
+        height.addEventListener("input", () => seenFrom.set(heightOf(Number(height.value))));
+        let pageHeight = state.heightM;
         const playButton = field("play");
         playButton.addEventListener("click", () => play(!state.animate));
         const fold = morph(playButton);
         const sync = () => {
-            if (document.activeElement !== height) height.value = String(sliderOf(state.heightM));
+            // The page's height has changed: the frame's own gives way to it.
+            if (state.heightM !== pageHeight) delete frame.dataset.heightM;
+            pageHeight = state.heightM;
+            if (document.activeElement !== height) height.value = String(sliderOf(seenFrom.get()));
             paintRange(height);
-            heightValue.textContent = meters(Math.round(state.heightM));
+            heightValue.textContent = meters(Math.round(seenFrom.get()));
             heightValue.style.setProperty("--at", String(Number(height.value) / 1000));
             // How far along the time slider is, for its value riding the rail in full screen.
             const span = Number(offset.max) - Number(offset.min);
@@ -101,6 +126,7 @@ export function skyFrames() {
             fold(state.animate);
         };
         onChange(sync);
+        frame.addEventListener("skyheight", sync);
         sync();
 
         // The marks step through their states, off, the compass, the compass with the grid, before the figure hears the click.

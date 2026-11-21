@@ -1,4 +1,6 @@
 ---
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { resolve } from "node:path";
 import Cite from "../Cite.astro";
 import CopyInfo from "../CopyInfo.astro";
 import Icon from "../Icon.astro";
@@ -6,18 +8,42 @@ import "../sternzeit/sternzeit.css";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
 import "./nachtgestirn.css";
 
-/** The two maps the Moon is drawn from, flat: NASA's color mosaic and LOLA's heights. */
+/** The three maps the Moon is drawn from, flat, as the package loads them by default: what Earth ever sees, past it the
+ *  color's mean and no relief. With the files' sizes, whole to seen, from the tree or, for those only the asset mirror holds, its manifest. */
 interface Props {
     id?: string;
 }
 const { id = "maps" } = Astro.props;
+
+const PACKAGE = resolve(process.cwd(), "../packages/nachtgestirn");
+const mirrored = new Map<string, number>(
+    JSON.parse(readFileSync(`${PACKAGE}/assets.json`, "utf8")).files.map((f: { name: string; size: number }) => [
+        f.name,
+        f.size,
+    ]),
+);
+const bytes = (name: string) =>
+    existsSync(`${PACKAGE}/maps/${name}`) ? statSync(`${PACKAGE}/maps/${name}`).size : mirrored.get(name);
+const N = "\u202f";
+const unit = (b: number) => (b < 1e6 ? "KB" : "MB");
+const amount = (b: number) => (b < 1e6 ? String(Math.round(b / 1e3)) : (b / 1e6).toFixed(b < 1e7 ? 1 : 0));
+const pair = (whole: number, seen: number) =>
+    unit(whole) === unit(seen)
+        ? `${amount(whole)} to ${amount(seen)}${N}${unit(seen)}`
+        : `${amount(whole)}${N}${unit(whole)} to ${amount(seen)}${N}${unit(seen)}`;
+const SIZES = ["512", "1k", "2k", "4k", "8k"];
+const sizes = (kind: string) =>
+    SIZES.flatMap((size) => {
+        const [whole, seen] = [bytes(`moon-${kind}-${size}.webp`), bytes(`moon-${kind}-seen-${size}.webp`)];
+        return whole && seen ? [pair(whole, seen)] : [];
+    }).join(", ");
 ---
 
 <figure class="tiles-figure" id={id} data-maps>
     <div class="maps-panel as-seen">
-        <img data-field="color" alt="NASA's color map of the Moon, an equirectangular mosaic from the Lunar Reconnaissance Orbiter's wide angle camera" />
-        <canvas data-field="heights" aria-label="The Moon's heights from the Lunar Orbiter Laser Altimeter, as gray, low to high" hidden></canvas>
-        <canvas data-field="roughness" aria-label="How steep the Moon's ground is over 57 m, from the Lunar Orbiter Laser Altimeter's tracks, as gray, smooth to rough" hidden></canvas>
+        <img data-field="color" alt="NASA's color map of the Moon, an equirectangular mosaic from the Lunar Reconnaissance Orbiter's wide angle camera, the far side past what Earth ever sees its mean" />
+        <canvas data-field="heights" aria-label="The Moon's heights from the Lunar Orbiter Laser Altimeter, as gray, low to high, the far side past what Earth ever sees at the mean radius" hidden></canvas>
+        <canvas data-field="roughness" aria-label="How steep the Moon's ground is over 57 m, from the Lunar Orbiter Laser Altimeter's tracks, as gray, smooth to rough, the far side past what Earth ever sees smooth" hidden></canvas>
         <canvas class="maps-seen" data-field="seen" aria-hidden="true"></canvas>
         <span class="view-buttons">
             <button type="button" class="view-toggle" data-map="color" aria-pressed="true" title="The color map, the surface's albedo">albedo</button>
@@ -25,16 +51,21 @@ const { id = "maps" } = Astro.props;
             <button type="button" class="view-toggle" data-map="roughness" aria-pressed="false" title="The roughness, the median slope over 57 m as gray, from flat to 15° and steeper, which the pass adds below the texels where a pixel is finer">roughness</button>
         </span>
         <span class="view-buttons maps-end">
-            <button type="button" class="view-icon" data-field="download" title="Download the map shown, with what Earth sees, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+            <button type="button" class="view-icon" data-field="annotations" aria-pressed="false" title="The annotations over the map, over the hatching of the moment: the edge of what Earth ever sees, the diurnal libration included, and past it the 2° margin and the 4° feather into the mean color, no height and no slope" aria-label="Annotations"><Icon name="labels" /></button>
+            <button type="button" class="view-icon" data-field="download" title="Download the map shown, with what Earth sees or the annotations, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
             <CopyInfo />
         </span>
     </div>
     <LunationSlider />
     <p class="view-status" data-field="note" hidden></p>
     <figcaption class="figure-caption">
-        nachtgestirn's maps laid out flat, NASA's color or the heights in gray, from the CGI Moon Kit <Cite id="svs4720" />, or
-        the roughness below them, the median slope over 57 m from the laser altimeter's tracks <Cite id="rosenburg2011" />.
-        Inside the line what Earth sees at the chosen moment, hatched what it does not, densely what it never sees.
+        nachtgestirn's maps laid out flat as the package loads them by default, 1024 texels around: NASA's color or the
+        heights in gray, from the CGI Moon Kit <Cite id="svs4720" />, or the roughness below them, the median slope over
+        57 m from the laser altimeter's tracks <Cite id="rosenburg2011" />. Past what Earth ever sees, the color holds its
+        mean, the heights and the roughness none. Inside the line what Earth sees at the chosen moment, hatched what it does not, densely what it never
+        sees; annotated, also the edge of what it ever sees, the diurnal libration included, and the 2° margin past it before
+        a 4° feather into it. The files, whole to seen, at 512, 1K, 2K, 4K and 8K texels around: the color
+        ({sizes("color")}), the heights ({sizes("height")}) and the roughness ({sizes("roughness")}, no 8K).
     </figcaption>
 </figure>
 

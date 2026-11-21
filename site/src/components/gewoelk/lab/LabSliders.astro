@@ -1,0 +1,24 @@
+---
+/** A research figure's sliders, one a row: the parameter's name, its label, range, step, start and what it does. */
+export type LabSlider = [
+    param: string,
+    label: string,
+    min: number,
+    max: number,
+    step: number,
+    value: number,
+    title: string,
+];
+interface Props {
+    sliders: LabSlider[];
+}
+const { sliders } = Astro.props;
+---
+
+{
+    sliders.map(([param, label, min, max, step, value, title]) => (
+        <label class="sky-ev clouds-slider" title={title}>
+            {label} <input data-param={param} type="range" min={min} max={max} step={step} value={value} /> <output />
+        </label>
+    ))
+}

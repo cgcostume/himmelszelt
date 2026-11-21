@@ -27,6 +27,20 @@
 .sky-view canvas:active {
     cursor: grabbing;
 }
+/* In flight (see flight.ts): a mark at the view's center, where it heads, in place of the captured pointer. */
+.sky-view[data-flying]::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 7px;
+    height: 7px;
+    border: 1px solid oklch(1 0 0 / 0.7);
+    border-radius: 50%;
+    box-shadow: 0 0 2px oklch(0 0 0 / 0.6);
+    content: "";
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
 /* In the sky's own dark shades, as sternzeit's scenes credit theirs, and without a shadow. */
 .sky-view .vis-credit {
     color: var(--muted);

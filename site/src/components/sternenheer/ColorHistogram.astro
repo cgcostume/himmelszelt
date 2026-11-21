@@ -1,0 +1,49 @@
+---
+import Cite from "../Cite.astro";
+import Term from "../Term.astro";
+import "../sternzeit/sternzeit.css";
+import "../nachtgestirn/nachtgestirn.css";
+import "./colorhistogram.css";
+import StarGroups from "./StarGroups.astro";
+
+/** The stars over B-V, binned by `pnpm star-colors`: every bar in its stars' color, split by magnitude, by count or light. */
+interface Props {
+    id?: string;
+}
+const { id = "star-colors" } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+const classes = ["brighter than 2", "2 to 4", "4 to 6", "fainter than 6"];
+---
+
+<figure class="plot-figure colorhist-figure" id={id} data-color-histogram data-base={`${base}stars/`}>
+    <div class="colorhist-panel as-seen" data-export="star-colors" data-export-timeless>
+        <div class="colorhist-bar">
+            <StarGroups catalog="yale" offsets={[]} fetches={false} />
+            <span class="view-buttons">
+                <button type="button" class="view-toggle" data-set="count" aria-pressed="true" title="Each bar's share of the stars">stars</button>
+                <button type="button" class="view-toggle" data-set="light" aria-pressed="false" title="Each bar's share of the light the stars send, which the brightest dominate">light</button>
+            </span>
+        </div>
+        <svg data-field="plot" tabindex="0" role="img" aria-label="A histogram of the stars over their color index B-V, each bar in the color of its stars and split by magnitude"></svg>
+        <div class="colorhist-legend note" aria-hidden="true">
+            {classes.map((label, i) => <span><i class={`colorhist-swatch colorhist-class-${i}`}></i>{label}</span>)}
+        </div>
+    </div>
+    <div class="view-status colorhist-readout" data-field="readout" aria-live="polite"><p></p><p></p></div>
+    <figcaption class="figure-caption">
+        The stars over their <Term of="Color index">color index</Term>, B−V, in bins of 0.05, the redder ones from 2 on in
+        the last: each bar in the color its stars are drawn in, scaled to its brightest channel, as a share of all the
+        stars or of all their light, on one scale for every catalog. Within a bar the brightest stars are on top, those
+        fainter than magnitude 2, 4 and 6 each a step dimmer below them. Along the top the temperatures by Ballesteros'
+        formula, under the axis the colors by it, and the Sun, which no catalog lists; dashed, the median. The 9,093 stars
+        of the Yale Bright Star Catalogue, 116,837 with the Hipparcos stars, 2.5 million with Tycho-2's, each without the
+        stars that have no measured index. Tycho-2's index is converted from its own two bands <Cite id="esa1997" />;
+        for its typical star, of magnitude 11, it is uncertain by about 0.2, four bins. Hipparcos and Tycho-2 data: ESA.
+    </figcaption>
+</figure>
+
+<script>
+    import { colorHistogramFigure } from "./colorhistogram";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-color-histogram]")) colorHistogramFigure(root);
+</script>

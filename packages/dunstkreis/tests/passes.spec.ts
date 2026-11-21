@@ -31,6 +31,7 @@ const PASSES: Record<string, readonly string[]> = {
         "cube",
         "sun",
         "glare",
+        "whitebalance",
         "tonemap",
         "vision",
         "grid",
@@ -49,6 +50,7 @@ const PASSES: Record<string, readonly string[]> = {
         "cube",
         "sun",
         "glare",
+        "whitebalance",
         "tonemap",
         "vision",
         "grid",
@@ -59,6 +61,7 @@ const PASSES: Record<string, readonly string[]> = {
     ],
     exposure: ["atmosphere", "common", "lut", "sampling", "raymarch", "spiral", "frame", "exposure"],
     aerialvolume: ["atmosphere", "common", "lut", "sampling", "raymarch", "frame", "aerial", "aerialvolume"],
+    aerialapply: ["features", "frame", "whitebalance", "aerial", "aerialapply"],
     mipmap: ["cube", "mipmap"],
 };
 // What the passes leave to whoever builds their pipelines: the sky pass' output, and the sums over a workgroup, here
@@ -66,6 +69,7 @@ const PASSES: Record<string, readonly string[]> = {
 const OUTPUTS: Record<string, string> = {
     sky: skyOutput("rgba8unorm"),
     skyCube: skyCubeOutput("rgba16float"),
+    aerialapply: skyOutput("rgba16float"),
     mipmap: skyCubeOutput("rgba16float"),
     multiscattering: workgroupSum(64, false),
     skyview: workgroupSum(64, false),
@@ -95,4 +99,23 @@ test("the composable fragments compile without any pass, binding or override", a
         .map(wgslSource)
         .join("\n");
     expect(await compileWgsl(device, composable)).toEqual([]);
+});
+
+test("the aerial perspective's lookup compiles on its own, with nothing of the model", async () => {
+    const device = await gpuDevice();
+    test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
+    if (!device) return;
+
+    // What a renderer pastes into its own shader, a fragment shader here: two textures, a sampler and one call.
+    const fragment = `${wgslSource("aerial")}
+@group(0) @binding(0) var airLuminance: texture_3d<f32>;
+@group(0) @binding(1) var airTransmittance: texture_3d<f32>;
+@group(0) @binding(2) var airSampler: sampler;
+
+@fragment
+fn shade(@builtin(position) position: vec4f, @location(0) color: vec3f, @location(1) distanceKm: f32) -> @location(0) vec4f {
+    let air = dkAerialPerspective(airLuminance, airTransmittance, airSampler, position.xy / vec2f(1920.0, 1080.0), distanceKm);
+    return vec4f(color * air.transmittance + air.luminance, 1.0);
+}`;
+    expect(await compileWgsl(device, fragment)).toEqual([]);
 });

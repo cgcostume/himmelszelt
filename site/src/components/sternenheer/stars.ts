@@ -13,6 +13,7 @@ import {
     gpu as shared,
     tables,
 } from "../dunstkreis/atmosphere";
+import { flightIn } from "../dunstkreis/flight";
 import { type Basis, cameraBasis, lookAround, project } from "../dunstkreis/skycamera";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
@@ -26,6 +27,7 @@ import {
     starsAbove,
     type ToneCurveName,
 } from "./renderer";
+import { bindStarGroups, offsetOf, picked } from "./stargroups";
 
 const DEG = Math.PI / 180;
 
@@ -48,6 +50,8 @@ export function starsFigure(root: HTMLElement) {
         root.querySelector<HTMLInputElement>(`input[name="${root.id}-${name}"]:checked`)?.value ?? "";
 
     const camera = { yaw: Math.PI, pitch: 35 * DEG, fov: 120 * DEG };
+    // Flight, with a grid on the ground while it lasts, and the height the figure is seen from: its own.
+    const air = flightIn(root, canvas, camera, () => requestRender());
     const marks = () => Number(field("marks").dataset.level);
     field("marks").addEventListener("click", () => requestRender());
 
@@ -92,7 +96,7 @@ export function starsFigure(root: HTMLElement) {
         if (!timing) return;
         gpu.device.queue.onSubmittedWorkDone().then(() => {
             timing.textContent =
-                marks() === 1
+                marks() === 2
                     ? `${gpu.adapterName} · astronomy ${astronomyMs.toFixed(2)} ms · passes ${passesMs.toFixed(2)} ms · GPU done after ${(performance.now() - submitted).toFixed(2)} ms`
                     : "";
         });
@@ -130,7 +134,7 @@ export function starsFigure(root: HTMLElement) {
         if (canvas.width !== width || canvas.height !== height) Object.assign(canvas, { width, height });
 
         const started = performance.now();
-        const sky = skyAt(state.jd, state, table.luts.model);
+        const sky = skyAt(state.jd, { ...state, heightM: air.height() }, table.luts.model);
         const astronomyMs = performance.now() - started;
         if (pressed("lock")) {
             const [x, y, z] = sky.moonDirection;
@@ -156,17 +160,23 @@ export function starsFigure(root: HTMLElement) {
             projectionDistance: basis.d,
             pixelRatio: dpr,
             ev100: pressed("auto") ? null : evOfSlider(),
-            stars: pressed("stars"),
-            faintStars: pressed("faint"),
-            milkyWay: pressed("milkyway"),
-            maps: (choice("maps") || "small") as MapSize,
+            stars: offsetOf(root, "stars").light > 0,
+            faintStars: picked(root, "catalog") !== "yale",
+            deepStars: picked(root, "catalog") === "tycho",
+            milkyWay: offsetOf(root, "milkyWay").light > 0,
+            maps: (choice("maps") || "auto") as MapSize | "auto",
             air: pressed("air"),
             twinkle: pressed("twinkle"),
             time: (performance.now() - startedAt) / 1000,
             glare: pressed("glare"),
+            halo: Number(maybe<HTMLInputElement>("halo")?.value ?? 1),
+            starCompensation: offsetOf(root, "stars").stops,
+            milkyWayCompensation: offsetOf(root, "milkyWay").stops,
             darkAdapted: pressed("eye"),
             moon: pressed("moon"),
             constellations: pressed("lines") ? chosenConstellations() : [],
+            grid: marks() === 2,
+            ground: air.flying() ? air.flown : null,
         });
         if (!drawn) return;
         const submitted = performance.now();
@@ -183,8 +193,21 @@ export function starsFigure(root: HTMLElement) {
                 sky.moonDirection[2] > 0
                     ? `Moon ${(Math.asin(sky.moonDirection[2]) / DEG).toFixed(0)}° high, ${(sky.moonLit * 100).toFixed(0)}% lit`
                     : "Moon below the horizon";
+            const deep = renderer.deepStars();
+            const deepText =
+                picked(root, "catalog") !== "tycho"
+                    ? ""
+                    : deep.state === "loaded"
+                      ? ` and ${deep.count.toLocaleString()} deep stars`
+                      : deep.state === "missing"
+                        ? " (no deep stars: pnpm assets makes them)"
+                        : " (fetching the deep stars)";
+            const faintText =
+                picked(root, "catalog") !== "yale" && renderer.faintMissing()
+                    ? " (no faint stars: pnpm assets makes them)"
+                    : "";
             note.textContent =
-                `${above.toLocaleString()} of ${catalog.count.toLocaleString()} stars above the horizon · ` +
+                `${above.toLocaleString()} of ${catalog.count.toLocaleString()} stars above the horizon${faintText}${deepText} · ` +
                 `Sirius ${siriusAltitude >= 0 ? `${siriusAltitude.toFixed(1)}° high` : "set"} · ` +
                 `${moonText} · sidereal time ${(lst / 15).toFixed(2)} h`;
         }
@@ -213,23 +236,25 @@ export function starsFigure(root: HTMLElement) {
             });
             if (input) paintRange(input);
         }
+        // The halo's strength with its reading.
+        const halo = maybe<HTMLInputElement>("halo");
+        const showHalo = () => {
+            if (!halo) return;
+            paintRange(halo);
+            const value = maybe("haloValue");
+            if (value) value.textContent = Number(halo.value).toFixed(2);
+        };
+        halo?.addEventListener("input", () => {
+            showHalo();
+            requestRender();
+        });
+        showHalo();
+        bindStarGroups(root, requestRender);
         for (const name of ["maps"])
             for (const input of root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-${name}"]`))
                 input.addEventListener("change", requestRender);
         maybe("constellations")?.addEventListener("change", requestRender);
-        for (const name of [
-            "auto",
-            "lock",
-            "stars",
-            "milkyway",
-            "air",
-            "glare",
-            "eye",
-            "moon",
-            "twinkle",
-            "lines",
-            "faint",
-        ]) {
+        for (const name of ["auto", "lock", "air", "glare", "eye", "moon", "twinkle", "lines"]) {
             maybe(name)?.addEventListener("click", () => {
                 field(name).setAttribute("aria-pressed", String(!pressed(name)));
                 if (name === "twinkle") twinkle(pressed("twinkle"));

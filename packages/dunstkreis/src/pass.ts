@@ -1,3 +1,4 @@
+import type { WhiteBalance } from "@himmelszelt/helldunkel";
 import type { AutoExposureKey } from "./exposure.js";
 import type { AtmosphereModel, PrecomputedTextureConfig } from "./model.js";
 
@@ -105,6 +106,12 @@ export interface SkyParams {
      * so leave it off where a bloom or a meter reads the disc.
      */
     sunDiscCeiling: number | null;
+    /**
+     * A white balance, helldunkel's `whiteBalance(white)`: a 3x3 matrix over linear sRGB, column-major, applied wherever
+     * the exposure is, before it, to the sky, the sun disc and the air the aerial perspective pass adds; not to a cube
+     * map, which holds cd/m². `NO_WHITE_BALANCE` by default, the identity, D65 as it is.
+     */
+    whiteBalance: WhiteBalance;
 }
 
 /** A sky cube map's settings, fixed when its pass is made. */
@@ -151,22 +158,58 @@ export interface AerialPerspectiveOptions {
     height?: number;
     /** Slices in depth, 32 by default. */
     depth?: number;
-    /** How far the last slice reaches, in km, 32 by default. */
+    /**
+     * How far the last slice reaches, in km, 32 by default: as far as the geometry does, since a point beyond takes the
+     * last slice's air. The slices lie at the square of their number, so a longer reach keeps the near ones thin, and
+     * costs no more. Kept as a half float holds it, up to 65504.
+     */
     maxDistanceKm?: number;
 }
 
 /**
  * Hillaire's aerial perspective volume: the air between the camera and the geometry in front of it, over the camera's
- * frustum, for fading and tinting distant terrain. Froxels follow the screen in x and y, top left first, and the
- * distance in z, slice k at `maxDistanceKm * ((k + 0.5) / depth) ** 2`. Look it up with `dkSampleAerialPerspective`
- * and apply it with `dkApplyAerialPerspective`, both from `wgsl.aerial`.
+ * frustum, for fading and tinting distant terrain, clouds, anything inside the atmosphere. Froxels follow the screen in
+ * x and y, top left first, and the distance in z, slice k at `maxDistanceKm * ((k + 0.5) / depth) ** 2`. In linear
+ * sRGB, and it describes itself, so a shader needs the two textures and a linear, clamping sampler, and nothing else of
+ * dunstkreis: `dkAerialPerspective` from `wgsl.aerial` looks it up, in a fragment or a compute shader.
  */
 export interface AerialPerspectiveVolume {
-    /** The light the air adds at the four wavelengths, times `SkyPass.skyViewScale`, a 3D rgba16float texture. */
+    /** The light the air adds: rgb times 2^alpha is cd/m², the exponent the same in every froxel and set by `update()`,
+     *  so half floats hold noon and a moonlit night alike. A 3D rgba16float texture. */
     readonly luminance: GPUTexture;
-    /** The transmittance of the geometry's own light at the four wavelengths, a 3D rgba16float texture. */
+    /** What the air lets through of the geometry's own light, per channel, and in alpha `maxDistanceKm`. A 3D
+     *  rgba16float texture. */
     readonly transmittance: GPUTexture;
     readonly maxDistanceKm: number;
+}
+
+/** A pass that lays the air over a rendered scene, its settings fixed when it is made. */
+export interface AerialPerspectivePassOptions {
+    /** Format of the target the pass writes, linear light, with `STORAGE_BINDING` usage. */
+    format: "rgba16float" | "rgba32float";
+    /** The depth the scene's depth buffer was cleared to, 1 by default, 0 for a reversed one: where it still stands,
+     *  nothing was drawn, and the sky behind stays as it is. */
+    clearDepth?: number;
+    /** Meters per unit of the scene, the space `inverseViewProjection` projects from; 1 by default. */
+    metersPerUnit?: number;
+}
+
+/** A rendered scene: its color with the sky behind it, linear and exposed as the sky pass exposes its own, in cd/m² for
+ *  a sky pass with `toneMap` off and an `ev100` of -log2(1.2), and its depth buffer. Both of the target's size, with
+ *  `TEXTURE_BINDING` usage, not multisampled. */
+export interface AerialPerspectiveScene {
+    color: GPUTexture;
+    depth: GPUTexture;
+}
+
+/**
+ * A pass that lays the aerial perspective over a rendered scene, for a renderer that would rather not touch its
+ * shaders: every pixel of the scene seen through the air in front of it, as far away as its depth says, by the sky
+ * pass' camera and exposure. It reads the sky pass' volume, so it follows its `update()`.
+ */
+export interface AerialPerspectivePass {
+    /** Records the pass into `encoder`, writing all of `target`. */
+    encode(encoder: GPUCommandEncoder, target: GPUTexture, scene: AerialPerspectiveScene): void;
 }
 
 /**
@@ -185,8 +228,8 @@ export interface SkyPass {
      * two that follows the sun, set by `update()`, so the table's values sit where half floats resolve them best.
      */
     readonly skyViewScale: number;
-    /** The aerial perspective volume, rebuilt by `update()` whenever the camera, the sun or the observer moved; null
-     *  unless the pass was made with `aerialPerspective`. */
+    /** The aerial perspective volume, rebuilt by `update()` whenever the camera, the Sun, the Moon or the observer
+     *  moved; null unless the pass was made with `aerialPerspective`. */
     readonly aerialPerspective: AerialPerspectiveVolume | null;
     /**
      * The light meter's buffer, for a pass of your own that reads the light on the GPU in the same frame, without a round
@@ -229,6 +272,12 @@ export interface SkyPass {
      * a cube map lights a scene, and shows behind it with the disc drawn over it by `dkSunDisc` from `wgsl.sun`. `@himmelszelt/rundbild` lights a scene by it and lays it out as a panorama.
      */
     createCubePass(options: SkyCubeOptions): Promise<SkyCubePass>;
+    /**
+     * Makes a pass that lays this sky's aerial perspective over a rendered scene, by its color and depth buffers, its
+     * pipeline compiled without blocking. For a sky pass made with `aerialPerspective`. A renderer that shades its
+     * geometry itself reads the volume in its own shader instead, with `dkAerialPerspective` from `wgsl.aerial`.
+     */
+    createAerialPerspectivePass(options: AerialPerspectivePassOptions): Promise<AerialPerspectivePass>;
     /** Records the pass into `encoder`, writing all of `target`, which needs `STORAGE_BINDING` usage and the format
      *  the pass was created for. */
     encode(encoder: GPUCommandEncoder, target: GPUTexture): void;

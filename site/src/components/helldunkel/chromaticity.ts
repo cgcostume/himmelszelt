@@ -1,3 +1,4 @@
+import { WHITE_POINTS } from "@himmelszelt/helldunkel";
 import { find } from "../dom";
 import { onDemand } from "../frame";
 
@@ -43,7 +44,6 @@ const SPACES = [
         dash: "2 3",
     },
 ];
-const WHITES: Record<string, [number, number]> = { D65: [0.3127, 0.329], D50: [0.3457, 0.3585], A: [0.4476, 0.4074] };
 
 const SIZE = 520;
 const [SX, SY] = [SIZE / 0.8, SIZE / 0.9];
@@ -109,7 +109,7 @@ const BLUE_END = [
 
 function overlay() {
     const white = root.querySelector<HTMLInputElement>('input[name="chromaticity-white"]:checked')?.value ?? "D65";
-    const [wx, wy] = WHITES[white] as [number, number];
+    const [wx, wy] = WHITE_POINTS[white as keyof typeof WHITE_POINTS] ?? WHITE_POINTS.D65;
     const locus: string[] = [];
     // The fit is good where there is light to fit; up to 470 nm, whose few photons it bends into a hook, the 1931 observer's own table.
     const point = (x: number, y: number) => `${px(x).toFixed(1)},${py(y).toFixed(1)}`;

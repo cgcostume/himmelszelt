@@ -1,7 +1,7 @@
 import { eclipse, fromDate, fromJulianDay, julianDayUT, julianEphemerisDay, toDate } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
-import { figureInfo } from "../figure-info";
 import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
+import { figureInfo } from "../figure-info";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { drawSvg, svgText, THUMB_RADIUS } from "../sternzeit/figure";

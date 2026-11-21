@@ -8,8 +8,11 @@ references:
     - bennett1982
     - bruneton2008
     - bruneton2017
+    - bufton1973
     - cie2002
+    - dravins1998
     - edlen1966
+    - fried1966
     - fritsch1980
     - henyey1941
     - hillaire2020
@@ -17,6 +20,8 @@ references:
     - kopp2011
     - mueller2012thesis
     - nishita1993
+    - sarazin1990
+    - valley1980
     - wyman2013
 ---
 
@@ -175,12 +180,6 @@ ray enters the atmosphere: the planet's lit face, its thin glowing rim, and the 
 bound is 1 m, eye level give or take, and it is a bound for a reason: exactly on the ground the horizon is level, every
 downward ray ends at once, and the sky looks like nothing a person sees. Raise the height in <Fig id="sky" /> and
 watch the horizon drop; at 100 km the sky is black at noon.
-
-
-A mountain ridge behind another is paler, bluer and lower in contrast, and painters since Leonardo have used that to
-paint depth: the air between you and the ridge scatters sky light into the line of sight and takes some of the ridge's
-own light out. The same tables give it, the light scattered along a ray of a known length and what is left of what
-started at its end, and it is next on dunstkreis' list.
 
 ## Tables instead of raymarching
 
@@ -417,6 +416,258 @@ background as for a reflection, and nine numbers for all of the diffuse light. L
 not only the part the camera sees. At 128 texels a face, a build computes 98,304 texels, a twentieth of the pixels of a
 full HD frame; how long it takes shows above the figure.
 
+## Aerial perspective
+
+A mountain ridge behind another is paler, bluer and lower in contrast, and painters since Leonardo have used that to
+paint depth: the air between you and the ridge scatters sky light into the line of sight and takes some of the ridge's
+own light out. <Term of="Aerial perspective">Aerial perspective</Term>, Luftperspektive in German, is the sky's own
+light cut short: the same air and the same Sun, along a ray that ends on something. Thirty kilometers of air along the
+ground let through seven tenths of a ridge's red light and a third of its blue, and add two thirds of the blue the
+horizon itself has. Everything a renderer draws inside the atmosphere needs it, terrain as well as clouds: without it,
+a ridge 30 km away is as crisp as the stone at your feet, and the scene looks like a model on a table.
+
+The shortcut many renderers take is fog: one color, blended in by the distance. It fails on both counts. The air's
+light is not one color, blue across from the Sun, pale towards it and orange at sunset, and what the air takes out is
+not gray, so a far snow field loses its blue first. The march that fills the sky view gives both for any ray: the
+light scattered along a known length of it, and what is left of the light that started at its end.
+
+Hillaire keeps the two for the whole view at once, in a small volume laid over what the camera sees: 32 by 32
+<Term of="Froxel">froxels</Term> across the screen and 32 slices in depth, out to 32 km <Cite id="hillaire2020" />.
+dunstkreis fills it with one ray per column of froxels, marched once through all of its slices, in about a tenth of a
+millisecond, whenever the camera, the Sun or the observer moves. The slices lie at the square of their number, thin
+where the camera looks closest: the first is centered 8 m in, the last is 2 km deep. Where Hillaire stores one mean
+for what the air lets through, dunstkreis keeps it per channel, the lost blue included.
+
+The volume is made to be read by a shader that knows nothing else of dunstkreis. It holds linear sRGB, not the four
+wavelengths of the tables, and it describes itself: the scale of its light, the power of two that follows the Sun,
+rides in the alpha channel as an exponent, and its reach in the other texture's. So a renderer binds two textures and
+a sampler and calls one function, `dkAerialPerspective`, with a pixel's place on the screen and its distance in
+kilometers. The function is all there is to `wgsl.aerial`, and it runs in a fragment shader as in a compute shader.
+For a terrain drawn by a rasterizer, where `terrainPipeline`, `terrainShader`, `shade` and `frame` are your own:
+
+```ts
+import {
+    createSkyPass,
+    precomputeAtmosphere,
+    wgsl,
+} from "@himmelszelt/dunstkreis";
+
+const luts = await precomputeAtmosphere(device);
+const sky = await createSkyPass(device, {
+    luts,
+    format: "rgba16float",
+    toneMap: false,
+    // As far as the terrain is drawn.
+    aerialPerspective: { maxDistanceKm: 120 },
+});
+
+// The lookup goes in front of your shader, the volume into a bind group.
+const module = device.createShaderModule({ code: wgsl.aerial + terrainShader });
+const { luminance, transmittance } = sky.aerialPerspective;
+const air = device.createBindGroup({
+    layout: terrainPipeline.getBindGroupLayout(1),
+    entries: [
+        { binding: 0, resource: luminance.createView() },
+        { binding: 1, resource: transmittance.createView() },
+        { binding: 2, resource: luts.sampler },
+    ],
+});
+```
+
+```wgsl
+@group(1) @binding(0) var airLuminance: texture_3d<f32>;
+@group(1) @binding(1) var airTransmittance: texture_3d<f32>;
+@group(1) @binding(2) var airSampler: sampler;
+
+@fragment
+fn terrain(in: TerrainFragment) -> @location(0) vec4f {
+    // Your shading, in cd/m² like the sky behind it.
+    let color = shade(in);
+    // Where the pixel is on the screen, and how far from the camera, in km.
+    let uv = in.position.xy / frame.viewport;
+    let distanceKm = distance(in.world, frame.eye) / 1000.0;
+    let air = dkAerialPerspective(
+        airLuminance, airTransmittance, airSampler, uv, distanceKm,
+    );
+    return vec4f(color * air.transmittance + air.luminance, 1.0);
+}
+```
+
+The lookup takes a place on the screen and a distance, and no direction, so a world that is y-up or counts in meters
+is as good as any. The axes matter in one place only, the camera matrix handed to `update`, which has to end in ENU, x
+east, y north and z up: a y-up engine holds an ENU vector as `(x, z, -y)` and turns its matrix by that before handing
+it over. The air's light is in cd/m², like the sky, so a renderer that shades in other units multiplies it by its
+exposure.
+
+Pixels where nothing was drawn keep the sky as the sky pass wrote it: the sky view holds all of the air along such a
+ray, and a ridge far enough away arrives at that very color, so distant terrain melts into the horizon and never
+stands in front of it. For that the volume has to reach as far as the terrain does, since a point beyond the last
+slice takes the last slice's air, too little, and stands out dark. Set `maxDistanceKm` to your far plane: the cost
+stays the same, and at 120 km the first slice is still only 30 m in.
+
+A renderer that draws with shaders it would rather not touch lays the same volume over the finished frame.
+`createAerialPerspectivePass` makes a compute pass that reads the frame and its depth buffer, finds each pixel's
+distance by the camera matrix the sky pass already has, whatever its projection, and writes the frame as seen through
+the air, in 0.04 ms for a full HD frame. With `drawScene` your own, and a depth buffer that is reversed:
+
+```ts
+// Once. A reversed depth buffer is cleared to 0; the scene counts in meters.
+const air = await sky.createAerialPerspectivePass({
+    format: "rgba16float",
+    clearDepth: 0,
+});
+
+// Every frame: the sky, your scene over it, then the air in front of it.
+const encoder = device.createCommandEncoder();
+sky.update({ sunDirection, observerHeightM, inverseViewProjection }, encoder);
+sky.encode(encoder, skyTexture);
+drawScene(encoder, { background: skyTexture, color, depth });
+air.encode(encoder, target, { color, depth });
+device.queue.submit([encoder.finish()]);
+```
+
+The volume takes the air along a ray as lit, with nothing but the planet's own shadow in it. Under an overcast sky or
+in a valley's shade the air in front of a ridge adds less, and what it adds between two distances is the difference of
+two lookups: [gewoelk](../gewoelk/) takes a share of that away for the stretch under its cloud deck, and reads the
+volume as it is for the air in front of its clouds. The choice Air in its figure switches between the volume and a
+plain blend into the sky behind. By night the volume holds the Moon's light, for a sky pass made with `moonlight`: a
+ridge under the Moon fades into the moonlit sky the same way, at a few millionths of the light.
+
+<Planned title="Ridges in the air" plan="a small terrain of the figure's own, through the aerial perspective pass.">
+    A simple terrain or a row of mountain ridges, one behind the other, with the air between them switched on and
+    off: by day, at sunset and under the Moon. It follows the moment and the place, and the camera's height.
+</Planned>
+
+## Light from beyond the air
+
+A star low over the horizon twinkles and flashes in colors. The Moon sets flattened and red, and in a long lens its
+limb trembles. A planet, the space station crossing the sky, the Sun's own disc: whatever lies outside the atmosphere
+reaches the eye through it, and the air does the same four things to all of them. It bends the light, dims and reddens
+it, bends blue a little more than red, and stirs it with its turbulence. dunstkreis draws none of these bodies, but the
+air is its business, so it has what each of them needs: one small table of the air, lookups for it in TypeScript and
+in WGSL, and a pass that makes an image shimmer. [sternenheer](../sternenheer/) and [nachtgestirn](../nachtgestirn/)
+bring the stars and the Moon.
+
+Earth's air is the same all round, so what it does to a ray depends on two things alone: how high the observer stands,
+and how high above the horizon the ray is seen, its apparent altitude. For one observer that leaves a single number to
+look everything up by. `airTable` traces 256 rays through the model's air, from the horizon to the zenith and crowded
+towards the horizon, where the air changes fastest, and notes for each how far it bent, what it lets through per
+channel, and how much air it crossed, the <Term of="Airmass">airmass</Term>: 1 overhead, 2 at 30°, 39 on the horizon.
+It takes some 9 ms, and only the observer's height or another air makes it stale; the Sun, the Moon, the time and the
+camera do not. The classic shortcut for the airmass, one over the sine of the altitude, runs off to infinity on the
+horizon and has no answer below it, where a plane still has sky: from 10 km up, a ray 2° below the level crosses 31
+airmasses, three times what a level one does.
+
+<Planned title="The air, ray by ray" plan="an SVG from the table alone, no GPU; it follows the observer's height.">
+    The table as curves over the apparent altitude, the horizon end stretched: the bend, the three transmittances, the
+    airmass, the dilution and the two measures of turbulence, with the chosen height's horizon and, above the
+    atmosphere, the ray that touches its top marked. Raising the height from the ground to orbit shows the horizon
+    sink, the limb's air shrink to a band of 2.6°, and the curves steepen until the bend falls nine degrees per degree.
+</Planned>
+
+The bend answers a pixel's question: where did this ray come from before the air turned it? A star asks the opposite:
+where does a body show whose true place is known? Renderers tend to find that by trying the bend a few times over,
+which settles from the ground and swings apart from orbit. There the air squeezes a Moon about to set to as little as
+an eighth of its height, and the bend falls nine times faster than the altitude rises. So the table holds the answer
+both ways, the bend by the apparent altitude and the lift by the true one. The squeeze has a price for points of
+light. A surface keeps its brightness and only shows smaller, but a star's light is spread thinner by as much as the
+sky is squeezed: to 0.78 on the ground's horizon and to a tenth at the edge of the limb from the space station, the
+table's dilution. The next lines build the table, hand it to the GPU, and ask where the Moon shows and through what
+air, with `moonDirection` its true direction from sternzeit:
+
+```ts
+import {
+    airAt,
+    airTable,
+    createAirTexture,
+    DEFAULT_ATMOSPHERE_MODEL,
+    liftedDirection,
+} from "@himmelszelt/dunstkreis";
+
+// Once per observer height: 256 rays, some 9 ms.
+const table = airTable(DEFAULT_ATMOSPHERE_MODEL, observerHeightM);
+const airTexture = createAirTexture(device, table);
+
+// Where the Moon shows, and the air along that line of sight.
+const shown = liftedDirection(table, moonDirection);
+const altitude = (Math.asin(shown[2]) * 180) / Math.PI;
+const air = airAt(table, altitude); // null: the ground hides it
+// 10° up from the ground: bent by 0.087°, 5.6 airmasses,
+// transmittance [0.59, 0.46, 0.23], dilution 0.99
+```
+
+On the GPU the same table is a texture of 256 by 5 texels, and `wgsl.air` reads it: `dkAirLifted` for a star,
+`dkAirUnbent` for a pixel's ray into a star map, `dkAirTowards` for everything else along a direction. The functions
+take the texture as an argument and declare no bindings, like every dunstkreis snippet, and another package can bundle
+them without depending on dunstkreis at runtime. Anyone may also fill the table: `airTableFrom` takes a function of
+the altitude, Bennett's refraction with a textbook airmass if that is the air at hand.
+
+The air is not still, either. Parcels of warmer and cooler air drift through the line of sight, each a weak lens, and
+astronomers sum them up in one length, the <Term of="Fried parameter">Fried parameter</Term> <Cite id="fried1966" />:
+the width of the lens the air still lets resolve what its size allows, 10 cm on a fair night, an
+<Term of="Arcsecond">arcsecond</Term> of <Term of="Seeing">seeing</Term>. `Seeing` takes it, with the wind, the width
+of the lens looking and its exposure. Where the turbulence lies is a profile over the height
+<Cite id="valley1980" />, carried by a wind that peaks in the jet stream <Cite id="bufton1973" />, and it holds a
+surprise: three quarters of it hug the ground within a few hundred meters, yet more than half of a star's twinkling
+comes from the layer around 10 km. An image only cares how much turbulence its light crosses. A point's flicker grows
+on the way, so the far layers count most. The table therefore sums both along each traced ray, with their distances.
+
+That makes two effects with one cause. An image wanders, by half an arcsecond overhead through a 10 cm lens, one
+arcsecond 15° up and eight on the horizon <Cite id="sarazin1990" />. A star's light flickers, the
+<Term of="Scintillation">scintillation</Term>: to the eye by some 8% overhead, 17% 30° up and 39% 10° up
+<Cite id="dravins1998" />, and by a third less from a mountain 2 km up, above the ground's layer and some of the
+rest. From the space station the turbulence lies 2,300 km away, on the limb. `dkScintillation` in `wgsl.seeing` gives
+a star's factor for the moment, per channel, because of the fourth thing the air does. It bends blue a hundredth more
+than red <Cite id="edlen1966" />, which on the horizon sets the blue image 20 arcseconds over the red one, a hundredth
+of the Moon's width. That is the red rim under a low Moon and the green one over a setting Sun. It also sends a star's
+red and blue light through different parcels of air, so low stars flicker in colors.
+
+For an image there is a pass. `createShimmerPass` takes any layer drawn without the air's unrest, its light linear and
+its coverage in alpha: the Moon, a planet's disc, the station, the Sun. It writes the layer as a camera catches it in
+one short exposure, moved about by the turbulence in patches, boiling in between, its colors spread, and it reads the
+table per pixel, so a Moon half sunk into the limb from orbit trembles at its lower edge and holds still above the
+air. With `moonLayer` and `shimmered` two textures of your own:
+
+```ts
+import { createShimmerPass } from "@himmelszelt/dunstkreis";
+
+const shimmer = await createShimmerPass(device);
+
+// Every frame: a 10 cm lens on a fair night, the clock in seconds.
+shimmer.update({
+    direction: shown,
+    seeing: { r0: 0.1, aperture: 0.1 },
+    time,
+    inverseViewProjection,
+});
+shimmer.encode(encoder, moonLayer, airTexture, shimmered);
+```
+
+<Planned
+    title="Shimmer"
+    plan="nachtgestirn's Shimmer figure moves here once the Moon pass calls this one; its side view of the light's
+    path through the air stays."
+>
+    The Moon's lower limb through the air, live, as in nachtgestirn's chapter today: the seeing, the lens and the clock
+    to set, the motion, the boiling and the colors to switch off one at a time, and the Moon's altitude from one
+    horizon over the zenith to the other. New here: a choice of what is looked at, the Moon, a planet's disc, the
+    station or the Sun's edge, since the pass takes any of them, and the observer's height up to orbit, where only
+    the part of the disc inside the limb trembles.
+</Planned>
+
+What hides most of the twinkling is averaging, over time and over the lens. The turbulence casts a pattern of light and
+shade on the ground, patches some 6 cm wide overhead and 15 cm at 10° up, as wide as the light from the turbulence
+spreads on its way down, and a pupil of 7 mm sits inside one patch and takes its light as it comes. The wind carries the
+pattern past, though, a new patch every few milliseconds, and the eye adds up a tenth of a second, some 25 patches
+overhead: a flicker of a quarter of the light within a millisecond shrinks to 8%. A telescope of 20 cm spans many
+patches at once and keeps a third of what the pupil sees. A planet does the same with its disc, each point of which
+casts the pattern a little shifted: from a disc 30 arcseconds wide the copies lie about a meter apart overhead, some 17
+patches, and fill each other in, which is why planets shine steadily; [the stars' chapter](../sternenheer/#flicker) lets
+you try it. From the space station only stars seen through the limb twinkle, within 0.7° of the horizon, and its own
+speed of 7.7 km/s, `speed` in `Seeing`, sweeps the pattern past so fast that 5% of the flicker is left, where two thirds
+or more would be if it stood still.
+
+
 ## The Sun in the picture
 
 Look at the Sun in a photograph and there is no disc of half a degree to be seen: a white blaze, soft at its edge, a
@@ -504,3 +755,11 @@ constant anew in 2011, lower than before, 1361 W/m² <Cite id="kopp2011" />, whi
 aureole's lobe is Louis Henyey and Jesse Greenstein's of 1941, written for the dust between the stars
 <Cite id="henyey1941" />. The veil around the Sun is the eye's, as the CIE's committee under Johannes Vos and Thomas van
 den Berg measured it on people <Cite id="cie2002" />.
+
+The air's unrest rests on a few more. David Fried gave it its measure in 1966, one length for how steady the air is
+<Cite id="fried1966" />. The profile of the turbulence over the height is R. E. Hufnagel's, with the layer on the
+ground George Valley added to it in 1980 <Cite id="valley1980" />, and the wind that carries it Jack Bufton's
+<Cite id="bufton1973" />. How far an image moves in such air follows the formula Marc Sarazin and François Roddier
+gave for the monitors that test the sites of observatories <Cite id="sarazin1990" />, and a star's flicker, with what
+a wider lens and a longer exposure leave of it, follows Dainis Dravins and his colleagues at Lund, who measured it on La
+Palma <Cite id="dravins1998" />.

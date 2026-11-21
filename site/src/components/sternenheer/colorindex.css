@@ -1,0 +1,144 @@
+/* From a color index to a color: sternzeit's panel, slider and sub-figure classes, dunstkreis' wavelengths buttons and
+   numbers; what remains has no shared rule. */
+.colorindex-figure svg {
+    display: block;
+    width: 100%;
+    font-size: var(--text-small);
+    cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+}
+/* The plot and (a) unframed, on the page's ground, (a) placed against the plot alone. */
+.colorindex-panel {
+    container-type: inline-size;
+}
+.colorindex-plot {
+    position: relative;
+}
+/* (a) in the plot's lower right, which the locus leaves empty, on the plot's ground so the gamut's edge stops at it. */
+.colorindex-inset {
+    position: absolute;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    width: 27%;
+    background: var(--bg);
+}
+.colorindex-inset > figcaption {
+    margin-top: 0.2rem;
+}
+/* The strips' row mirrors the slider's: their names in the note's column, each level with its strip, and the value
+   kept for its width alone. */
+.colorindex-ghost {
+    visibility: hidden;
+}
+.colorindex-figure .figure-slider > .note {
+    min-width: 6.2em;
+}
+.colorindex-names {
+    position: relative;
+    align-self: stretch;
+}
+.colorindex-names > span {
+    position: absolute;
+    left: 0;
+    transform: translateY(-50%);
+    white-space: nowrap;
+}
+.colorindex-figure .figure-slider > output {
+    min-width: 5ch;
+    text-align: right;
+}
+/* The Sun in the numbers' row: a tick at its index, its name after it, clear of 0.5 before it; where the rail is
+   short, the halves give way and the name centers on its index. */
+.colorindex-scale {
+    container-type: inline-size;
+}
+@container (max-width: 18rem) {
+    .colorindex-half,
+    .colorindex-sun > .figure-slider-tick {
+        display: none;
+    }
+    .colorindex-scale > .colorindex-sun {
+        transform: translateX(-50%);
+    }
+}
+.colorindex-sun {
+    display: flex;
+    gap: 3px;
+    transform: none;
+    color: var(--text);
+}
+.colorindex-sun > .figure-slider-tick {
+    margin-top: 0.1em;
+    height: 0.8em;
+}
+/* The numbers under the plot on a phone; where the plot is wide, in its empty foot below the arc, left of (a). */
+.colorindex-numbers {
+    margin-top: 0.75rem;
+}
+@container (min-width: 42rem) {
+    .colorindex-numbers {
+        position: absolute;
+        right: calc(27% + 2.5rem);
+        bottom: 0.5rem;
+        padding: 0.2rem 0.3rem 0.2rem 0;
+        background: var(--bg);
+    }
+}
+.colorindex-numbers tbody tr {
+    background: none;
+}
+.colorindex-figure .wavelengths-matrix :is(th, td) {
+    padding-left: 0.5rem;
+    white-space: nowrap;
+}
+/* The diagram's marks: the gamut recessive, the locus thin, its reach bold in ink, Jensen's dashed in the accent, the
+   marker filled with the star's color. */
+.colorindex-view {
+    fill: none;
+    stroke: var(--accent);
+}
+.colorindex-gamut {
+    fill: none;
+    stroke: var(--muted);
+    stroke-dasharray: 4 3;
+}
+.colorindex-locus,
+.colorindex-tick {
+    fill: none;
+    stroke: var(--muted);
+}
+.colorindex-spectrum {
+    fill: none;
+    stroke: var(--text);
+}
+.colorindex-reach {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 3;
+    stroke-linecap: round;
+}
+.colorindex-whole .colorindex-reach {
+    stroke-width: 1.5;
+}
+.colorindex-reach-jensen,
+.colorindex-marker.colorindex-jensen {
+    stroke: var(--accent);
+    stroke-width: 2;
+    stroke-dasharray: 5 4;
+}
+.colorindex-white {
+    fill: var(--muted);
+}
+.colorindex-marker {
+    stroke: var(--text);
+    stroke-width: 2;
+}
+.colorindex-band-marker {
+    stroke: var(--accent);
+    stroke-width: 1;
+}
+/* The temperature stays centered over the tick at either end of the strips, out into the row's empty space. */
+.colorindex-figure [data-field="band"] {
+    overflow: visible;
+}

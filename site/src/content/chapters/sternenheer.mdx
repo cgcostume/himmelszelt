@@ -10,42 +10,66 @@ references:
     - meeus1998
     - jensen2001
     - ballesteros2012
-    - kim2002
+    - kang2002
+    - cie2018
     - cie2002
     - dravins1998
     - osborn2015
     - svs4851
     - masana2021
     - mueller2012thesis
+    - esa1997
+    - hog2000
+    - spencer1995
+    - larson1997
+    - puschnig2014
+    - iauconstellations
+    - jimenez2014
 ---
 
 import Cite from "../../components/Cite.astro";
 import Controls from "../../components/sternzeit/Controls.astro";
 import Term from "../../components/Term.astro";
 import Fig from "../../components/Fig.astro";
+import Flicker from "../../components/dunstkreis/Flicker.astro";
 import Planned from "../../components/Planned.astro";
+import Budget from "../../components/sternenheer/Budget.astro";
+import ColorIndex from "../../components/sternenheer/ColorIndex.astro";
+import ColorHistogram from "../../components/sternenheer/ColorHistogram.astro";
+import Loupe from "../../components/sternenheer/Loupe.astro";
+import NightBlue from "../../components/sternenheer/NightBlue.astro";
+import OneStar from "../../components/sternenheer/OneStar.astro";
+import Passes from "../../components/sternenheer/Passes.astro";
+import Photos from "../../components/sternenheer/Photos.astro";
+import Starred from "../../components/sternenheer/Starred.astro";
+import Sizes from "../../components/sternenheer/Sizes.astro";
 import Stars from "../../components/sternenheer/Stars.astro";
+import StoreDark from "../../components/sternenheer/StoreDark.astro";
 
 This chapter is being written. The sky below is live, and it grows with the chapter.
 
-Look up on a clear night far from town and you see some two thousand stars, and on the best nights a band of faint
-light across them. Each star is a point, too far away to have any size at all, so a renderer cannot ask how large it
-is, only how much light it sends: a star of <Term of="Apparent magnitude">magnitude</Term> 0 lights your eye with
-some 2.6 millionths of a lux, the faintest you can see a four hundredth of that <Cite id="cox2000" />. sternenheer
-draws the stars from that number: every star of the Yale Bright Star Catalogue <Cite id="hoffleit1991" />, nine
-thousand of them, all the sky holds to the naked eye, at its light in lux, spread over the image the eye or a camera
-makes of a point, with the Milky Way behind them from NASA's map of the stars too faint for the catalog
-<Cite id="svs4851" />, calibrated to the measured light of all the stars together <Cite id="masana2021" />. Where
-the stars stand tonight comes from [sternzeit](../sternzeit/) as one rotation; the air that lifts them near the
-horizon, dims them and makes them twinkle, and the sky they shine through, from [dunstkreis](../dunstkreis/); the
-Moon over them from [nachtgestirn](../nachtgestirn/). osgHimmel drew the same catalog as points of a size set by hand
+Look up on a clear night far from town and you see some two thousand stars, and on the best nights a band of faint light
+across them. Each star is a point, too far away to have any size at all, so a renderer cannot ask how large it is, only
+how much light it sends: a star of <Term of="Apparent magnitude">magnitude</Term> 0 lights your eye with some 2.6
+millionths of a lux, the faintest you can see with a four hundredth of that <Cite id="cox2000" />. sternenheer draws the
+stars from that number: every star of the Yale Bright Star Catalogue <Cite id="hoffleit1991" />, nine thousand of them,
+all the sky holds to the naked eye, each at its light in lux, spread over the image the eye or a camera makes of a
+point. Behind them lies the Milky Way, from NASA's map of the stars too faint for the catalog <Cite id="svs4851" />,
+calibrated to the measured light of all the stars together <Cite id="masana2021" />. Where the stars stand tonight comes
+from [sternzeit](../sternzeit/) as one rotation; the air that lifts them near the horizon, dims them and makes them
+twinkle, and the sky they shine through, from [dunstkreis](../dunstkreis/); the Moon over them from
+[nachtgestirn](../nachtgestirn/). osgHimmel drew the same catalog as points of a size set by hand
 <Cite id="mueller2012thesis" />; here the light is in lux and the pixels in cd/m², so the stars expose like the sky and
 the Moon, and come and go with the exposure as they do for the eye.
 
-For a developer: TypeScript and WGSL, two WebGPU compute passes, no dependency on any other package at runtime. One
-pass bins every star's image into the tiles of the target it reaches, the other sums the stars of each pixel's tile
-and the Milky Way behind, over a background in cd/m², and tone maps or stays linear, as dunstkreis' sky does. What it
-costs is on the line under <Fig id="stars" />: a fraction of a millisecond.
+`@himmelszelt/sternenheer` is TypeScript and WGSL: a handful of WebGPU compute passes, with no other package needed at
+runtime. One pass sorts every star's image into the tiles of the target it reaches, a pyramid of blurs spreads the glow
+of the brightest, and the last sums the stars of each pixel's tile and the Milky Way behind them, over a background in
+cd/m², and tone maps or stays linear, as dunstkreis' sky does. What it costs is on the line under <Fig id="stars" />: a
+fraction of a millisecond. What it is for: a night sky behind any scene, exposed like the rest of it, the stars over a
+date and a place of your choosing, or a star chart with [the constellations' lines](#lines-between-the-stars). Two
+sections look inside: [how a frame is made](#a-frame-pass-by-pass), and [where the data comes
+from](#the-data-and-its-scripts), its scripts included.
 
 The sky below is those passes over dunstkreis' sky, under nachtgestirn's Moon, a wide view towards the south: drag to
 look around, scroll to zoom in on a star, and set the moment and the place under it, which every figure of the chapter
@@ -61,87 +85,300 @@ follows.
 
 <Controls open />
 
-Four lines are the whole setup: the catalog and the map once, the pass once, and per frame the rotation sternzeit
-computes for the moment and the place, `stars.horizontalMatrix`, with the camera, the exposure and the air.
+The sky is drawn live by the library, in your browser, for one moment and one place, which the controls under it set.
+Buttons over it mark the compass directions and a grid, pick the catalog and set the stars and the Milky Way off or up
+to four stops brighter; its options take the rest apart, with a switch each for the Moon, the air, the twinkling, the
+glare and the eye at night, and the sections below name the one to try.
+
+In code, it takes one install, the catalog, the map and the pass once, and a handful of numbers per frame: the rotation
+sternzeit computes for the moment and the place, your camera, an exposure, and the air, a small table per height of the
+observer that [dunstkreis provides](#through-the-air).
+
+```sh
+npm install @himmelszelt/sternenheer @himmelszelt/sternzeit \
+    @himmelszelt/dunstkreis
+```
 
 ```ts
-import { airTable, createStarsPass, loadCatalog, loadMilkyWay } from "@himmelszelt/sternenheer";
+import {
+    airTable, createAirTexture, DEFAULT_ATMOSPHERE_MODEL,
+} from "@himmelszelt/dunstkreis";
+import {
+    createStarsPass, loadCatalog, loadMilkyWay,
+} from "@himmelszelt/sternenheer";
+import { fromDate, stars } from "@himmelszelt/sternzeit";
 
 const catalog = await loadCatalog();
 const milkyWay = await loadMilkyWay(device);
-const pass = await createStarsPass(device, { format: "rgba8unorm", catalog, milkyWay });
-// Per frame: the sky's rotation, the camera, the exposure, and the air.
-pass.update({ skyRotation, inverseViewProjection, ev100: -9, air: airTable(bend, through) });
-pass.encode(encoder, target, { background: skyInCandelaPerSquareMeter });
+const pass = await createStarsPass(device, {
+    format: "rgba8unorm", catalog, milkyWay,
+});
+// The air seen from the ground, made anew only when the height changes.
+const table = airTable(DEFAULT_ATMOSPHERE_MODEL, 0);
+const air = {
+    texture: createAirTexture(device, table), horizon: table.horizon,
+};
+
+// Per frame: the sky's rotation for the moment and the place, the camera,
+// the exposure, and the air.
+const observer = { latitude, longitude };
+pass.update({
+    skyRotation: stars.horizontalMatrix(fromDate(new Date()), observer),
+    inverseViewProjection, // your camera, as dunstkreis' sky pass takes it
+    ev100: -9, // a moonless night
+    air,
+});
+pass.encode(encoder, target, { background: sky }); // the sky in cd/m²
 ```
+
+The sections below follow one star from its row in the catalog to its pixels, then the sky it stands in: its turning,
+the air, the constellations, the Milky Way, and at the end the frame and the data.
 
 ## Nine thousand stars
 
-Hipparchus sorted the stars he could see into six classes of brightness, the first for the brightest, the sixth for
-the faintest, and the scale never left: a star of the sixth magnitude is a hundred times fainter than one of the
-first, each magnitude a factor of 2.512, and the brightest stars run past zero into negative numbers, Sirius at
-−1.46, the Sun at −26.74 <Cite id="cox2000" />. A renderer wants light, not classes, so sternenheer turns the scale
-around: `illuminanceFromMagnitude` gives the illuminance at the eye in lux, pinned to the Sun's 128,000 lux that
-dunstkreis starts from, which puts a magnitude 0 star at 2.6 millionths of a lux, Sirius at ten millionths, and a star
-of 6.5, the naked eye's limit under a dark sky, at six billionths.
+Hipparchus sorted the stars he could see into six classes of brightness, the first for the brightest, the sixth for the
+faintest, and the scale never left: a star of the sixth magnitude is a hundred times fainter than one of the first, each
+magnitude a factor of 2.512, and the brightest stars run past zero into negative numbers, Sirius at −1.46, the Sun at
+−26.74 <Cite id="cox2000" />. A renderer wants light, not classes, so sternenheer turns the scale around:
+`illuminanceFromMagnitude` gives the illuminance at the eye in lux, pinned to the Sun's 128,000 lux that dunstkreis
+starts from, which puts a magnitude 0 star at 2.6 millionths of a lux, Sirius at ten millionths, and a star of 6.5, the
+naked eye's limit under a dark sky, at six billionths.
 
-The catalog is the Yale Bright Star Catalogue, fifth edition, 9,093 stars to magnitude 7.1 <Cite id="hoffleit1991" />,
-8,403 of them within the naked eye's reach, shipped as 291 KB of eight numbers per star: the magnitude, the position
-at J2000.0, the star's own motion, and its color. All of them together give a magnitude of −5.0, about as much light
-as Venus at its brightest; the stars you see are a dusting, and most of the night's starlight comes from the ones you
-cannot, which is where [the Milky Way](#the-milky-way) comes in.
+The catalog is the Yale Bright Star Catalogue, fifth edition <Cite id="hoffleit1991" />: 9,093 stars, 8,403 of them
+within the naked eye's reach, the rest a little beyond it, down to magnitude 8. A star is one row of six numbers, and
+this is Sirius: its magnitude, its <Term of="Equatorial coordinates">right ascension</Term> in hours and its declination
+in degrees at <Term of="J2000.0">J2000.0</Term>, how far it moves in each over a year, in
+<Term of="Arcsecond">arcseconds</Term>, and its <Term of="Color index">color index</Term>.
+
+```txt
+vmag,ra,de,pmRa,pmDe,bv
+-1.46,6.752472,-16.71611,-0.553,-1.205,0
+```
+
+The rest of this section and the next two take that row to the screen: the magnitude becomes light, [the color index a
+color](#the-colors-of-the-stars), and the two together [an image a few pixels wide](#points-of-light). The position
+waits for [the sky's turning](#the-sky-turning). All nine thousand together give a magnitude of −5.0, about as much
+light as Venus at its brightest; the stars you see are a dusting, and most of the night's starlight comes from the ones
+you cannot, which is where [the Milky Way](#the-milky-way) comes in.
+
+Between the two lie the stars a pair of binoculars shows. `loadFaintStars` brings those of the Hipparcos catalogue <Cite
+id="esa1997" />, the satellite's 118,218 less those the Yale catalog holds already and a few without a position: 108,883
+stars, complete to somewhere between magnitude 7.3 and 9, depending on the part of the sky and the kind of star, with
+stragglers down to 12 and beyond. Twelve times as many stars, and together they give a magnitude of −4.4, six tenths of
+the light of the nine thousand: faint stars are many, but not many enough. They come packed, 6 bytes a star, in 579 KB
+compressed: sorted into cells of the sky, the place in the cell in 16 bits each way, under half an arcsecond, the
+magnitude in sixteenths, the color index in hundredths, and no motion of their own. The pass takes them as `faintStars`
+next to the catalog and draws the brightest so many of them, which its parameter of the same name sets. ESA's terms keep
+them out of the npm package: one command makes them, as [the data's section](#the-data-and-its-scripts) shows. In the
+figure they are the middle catalog button. Zoom in, and they come up between the catalog's stars: a star brightens with
+the square of the zoom, as [its image](#points-of-light) will explain, so every doubling reaches a magnitude and a half
+deeper.
+
+```ts
+import {
+    createStarsPass, illuminanceFromMagnitude, loadCatalog, loadFaintStars,
+} from "@himmelszelt/sternenheer";
+
+illuminanceFromMagnitude(-1.46); // 9.89e-6 lux: Sirius
+illuminanceFromMagnitude(6.5); // 6.47e-9 lux: the naked eye's limit
+const catalog = await loadCatalog(); // 9,093 stars, 89 KB
+const faintStars = await loadFaintStars(); // 108,883 more, 579 KB
+const pass = await createStarsPass(device, { format, catalog, faintStars });
+pass.update({ faintStars: 20_000 }); // the brightest of them, to magnitude 7.6
+```
+
+## The colors of the stars
+
+Stars have colors, faint to the eye and plain to a camera: Betelgeuse is orange, Vega blue-white. A catalog carries the
+difference as the color index, B−V: the star's magnitude through a blue filter less its magnitude through a yellow-green
+one. Magnitudes count backwards, so a larger index is a redder star: 0 for Vega, 0.65 for the Sun, 1.85 for Betelgeuse.
+
+Three steps turn the index into a color. A star radiates close to a black body, so two filters are enough to tell its
+temperature, by Ballesteros' formula <Cite id="ballesteros2012" />: 10,100 K for Vega, 5,800 K for the Sun, 3,300 K for
+Betelgeuse. A black body's temperature fixes its <Term of="Chromaticity">chromaticity</Term>, a point on the
+<Term of="Planckian locus">Planckian locus</Term>, which Kang and colleagues fitted from 1,667 K to 25,000 K
+<Cite id="kang2002" />. And a chromaticity becomes a color in linear sRGB, scaled so that its luminance is 1: 0.87, 0.99,
+1.44 for Vega, 1.11, 0.98, 0.91 for the Sun, 1.62, 0.88, 0.36 for Betelgeuse. The star's lux then multiply it, so color
+and brightness never mix. `colorFromColorIndex` does the three steps, and the shipped catalog holds the result for every
+star in place of the index.
+
+No star is green, and the steps say why: run them over every temperature the fit covers, and green is never the
+strongest of the three channels. The locus runs from red through orange and white to blue and passes green by. All of
+the catalog's colors lie inside sRGB's gamut, the reddest at 2,200 K, the bluest at 16,600 K. The catalog lists no color
+index for 310 of its stars, and those get the typical one of their spectral type; the Hipparcos stars carry their index,
+and the pass looks their color up in a table of 512, one per hundredth.
+
+```ts
+import {
+    colorFromColorIndex, planckianLocus, temperatureFromColorIndex,
+} from "@himmelszelt/sternenheer";
+
+const kelvin = temperatureFromColorIndex(1.85); // 3,333 K: Betelgeuse
+const [x, y] = planckianLocus(kelvin); // 0.415, 0.396: orange
+// The three steps in one: linear sRGB whose luminance is 1.
+const color = colorFromColorIndex(1.85); // [1.62, 0.88, 0.36]
+```
+
+These colors are saturated on purpose. They are what a camera records; what the eye makes of them at night is the
+business of [the eye at night](#the-eye-at-night).
+
+Run the three steps over every index from −0.3 to 2, and the color slides along the locus from blue-white through
+white to orange (<Fig id="colorindex" />). White itself is a choice: linear sRGB calls D65 white, the CIE's daylight at
+6,504 K, and the CIE's other standard whites lie close to the locus, A, a tungsten lamp, on it at 2,856 K, and the
+daylights D50 to D75 a little above it, towards green <Cite id="cie2018" />. Jensen's simpler temperature agrees with Ballesteros' within 5% only from
+0.44 to 0.97, around the Sun; towards both ends the two [part ways](#precise-and-approximate).
+
+<ColorIndex />
+
+Sorted by their index, the catalog's stars fall into two crowds, blue-white around 0 and orange around 1, with a gap
+between them where the Sun would stand (<Fig id="star-colors" />). Only one star in 27 lies between 0.6 and 0.8, as
+yellow as the Sun, and one in eight is redder than 1.4. Add the fainter Hipparcos stars, and the gap fills: one in ten
+of them lies between 0.6 and 0.8.
+
+<ColorHistogram />
 
 ## Points of light
 
-A star has no size, but its image has: your eye blurs a point into a spot about an arcminute across, on the sky and
-on a screen alike. sternenheer spreads each star's light over a Gaussian
-<Term of="Point spread function">point spread function</Term> of a width in pixels, under one by default, the viewer's
-own blur, and never narrower than a pixel, so no star falls between two. What the pixel then holds is a luminance in
-cd/m², the star's lux over the spot's solid angle on the sky, and that solid angle shrinks as the view zooms in: a
-star does not grow with the magnification, it brightens, as it does in a telescope, while the Milky Way and the sky,
-spread over area, stay as they are. In a view of the whole sky Sirius peaks at a fraction of a cd/m², a thousand times
-the night sky, and burns out to a white point at any exposure that shows the Milky Way, while a star of the sixth
-magnitude stays a dim one. No magnitude limit decides which stars show; the exposure does, as it does for the eye, and
-a star too faint for it is simply not there. Set the exposure of <Fig id="stars" /> by hand and open it stop by stop:
-the stars come up in order of their magnitudes, the faint ones last.
+A star has no size, but its image has. No lens brings light to a perfect point: the eye's spreads a star into a spot
+about an arcminute across, a camera's into a few pixels, and a screen cannot show anything smaller than one of its own.
+The image an optical system makes of a point is its <Term of="Point spread function">point spread function</Term>, and a
+renderer has to choose one.
 
-A screen shows nothing brighter than its white, and a spot that burns out widens into a fat disc, which no eye ever
-sees around a star. sternenheer keeps the spot a point: its luminance stops at a knee, display white by default, and
-the light beyond goes into a halo that falls as 1/r² and brightens only with the logarithm of that light, as glare in a
-photograph does, so a brighter star grows a wider halo, never a fatter core. The core whitens as far as its light
-passes the knee, as a sensor's channels fill up one after the other, and the star's color lives on in its halo. Zoom
-into <Fig id="stars" />: more stars come up, the ones already there grow their halos, and every core stays a pixel. Switch the figure's `glare` off, and
-every star shrinks to its spot. The eye's own <Term of="Veiling glare">veiling glare</Term>, CIE's equation
-<Cite id="cie2002" />, is a parameter of the pass too, by the angle the picture spans at your eye, but off by default:
-at the angle of a pixel it counts the scatter of the viewer's eye twice and swells every star into a blob.
+sternenheer's is a Gaussian with a standard deviation of 0.7 pixels, `psfPixels`, some 1.6 pixels across at half its
+height, and never under 0.6. The floor is there for a reason. Drawn narrower, a star falls between the pixels: at 0.4
+pixels its pixels add up to a sixth more or less light depending on where it sits on the grid, and it flickers as the
+sky turns. At 0.6 they add up to the star's light within a third of a percent, wherever it sits.
 
-<Planned title="A star under the loupe">
-One star magnified to a grid of pixels, next to its profile, the luminance over the radius on a logarithmic scale.
-Sliders for the magnitude and the exposure: the core rises to the knee and whitens, the light beyond goes into the
-halo. A number sums every pixel and stays the star's illuminance, whatever the sliders say.
-</Planned>
+What a pixel then holds is a luminance in cd/m²: the star's lux over the solid angle of its spot on the sky. That solid
+angle shrinks as the view zooms in, so a star does not grow with the magnification. It brightens, by the square of the
+zoom, as it does in a telescope, while the Milky Way and the sky, spread over area, stay as they are. In a view of the
+whole sky, 180° down 1,080 pixels, Sirius peaks at 0.4 cd/m², over a thousand times the dark sky around it.
 
-<Planned title="Zooming in, and where the light goes">
-The same patch of sky at three focal lengths side by side. A star stays a pixel wide and its luminance grows with the
-square of the zoom, the sky behind it does not, which is why more stars come up. With the classic mistake next to it,
-stars as fat discs.
-</Planned>
+No magnitude limit decides which stars show. The exposure does, as it does for the eye: eleven stops below display white
+a star's image is cut off, `threshold`, which is 8.3 magnitudes, and a star that much fainter than one that reaches
+white is not drawn at all. For a chart there is `magnitudeLimit` all the same. Set the exposure of <Fig id="stars" /> by
+hand and open it stop by stop: the stars come up in order of their magnitudes, the faint ones last.
 
-<Planned title="A frame, pass by pass">
-A frame's intermediate results as a strip: the tiles colored by how many stars each holds, the halos' grid, the
-levels of the pyramid, the composed image. With the measured milliseconds per pass, and the number of stars and the
-tile size to change.
-</Planned>
+A screen shows nothing brighter than its white. A Gaussian that passes it burns out into a disc, wider the brighter the
+star, until Sirius is a white coin: the classic mistake, and nothing an eye ever saw. sternenheer keeps the core a
+point. Its exposed luminance stops at a knee, display white by default, `knee`, and the light beyond goes into a halo
+around the star instead. The core whitens as far as its light passes the knee, as a sensor's channels fill up one after
+the other, and the star's color lives on in the halo.
+
+The halo moves that light and adds none: summed, its pixels hold what the knee took from the core, and `halo` says how
+much of it they show, all of it by default. It falls with the cube of the distance from the star, as CIE's equation has
+the glare a bright point throws in the eye <Cite id="cie2002" />, over a width set in your own field of view, so it is
+as wide on any screen. Held against three photographs, the width that fits them best is a tenth of an arcminute, so
+narrow that a halo is a glow of a few pixels that widens with a star's light alone. Only its display is shaped: it
+brightens with the logarithm of its light, so a star a hundred times brighter gets a wider halo, not a burnt-out one. A
+glow around a point is how a picture says bright: it is what makes a light look brighter than the white of the screen
+<Cite id="spencer1995" />. The halo is a sign for it, the light spread rather than shown.
+
+Zoom into <Fig id="stars" />: more stars come up, the ones already there grow their halos, and every core stays a point.
+Switch the figure's `glare` off, and every star shrinks to its spot. The eye's own <Term of="Veiling glare">veiling
+glare</Term>, CIE's equation <Cite id="cie2002" />, is a parameter of the pass too, `glare`, by the angle the picture
+spans at your eye, but off by default: at the angle of a pixel it counts the scatter of the viewer's eye twice, once in
+the picture and once in the eye that looks at it, and swells every star into a blob.
+
+```ts
+pass.update({
+    psfPixels: 0.7, // the core's width, the standard deviation in pixels
+    knee: 1, // where a core stops brightening, in units of display white
+    halo: 1, // how much of the light beyond the knee its halo shows
+    magnitudeLimit: 6.5, // only for a chart: the exposure decides otherwise
+});
+```
+
+Together, these steps take one row of the catalog to a few pixels, and two more lie on the way, which later sections
+explain: [the sky's turning](#the-sky-turning) puts the star in its place tonight, and [the air](#through-the-air)
+lifts, dims and reddens it near the horizon. The stars to follow are ones that films made famous, from Vega in Contact
+to Canopus in Dune (<Fig id="onestar" />). Open the exposure stop by stop, and the core's peak stays at the knee while
+the halo takes a larger share of the light.
+
+<OneStar
+    try={{
+        label: "Canopus over Cairo",
+        set: "date=2027-02-10T19:00Z&lat=30.044&lon=31.236&h=23&star=2326",
+        text: "Dune's star climbs to only some 7° there, and the air takes two thirds of its light and turns the blue-white star a pale orange.",
+    }}
+/>
+
+<Controls />
+
+Where a star's light goes past the knee can be measured: the pass draws a single star as readily as nine thousand,
+hands its pixels back, and tells for each star what its core and its halo show, `readStars`. Vega, in the view of the
+whole sky at a moonless night's exposure, peaks at some 90 times display white, the knee leaves its core about a
+hundredth of its light, and the halo takes the rest (<Fig id="loupe" />). With the halo's curve undone, the pixels hold
+that light to a tenth of a percent, on a target 129 pixels wide as on one of 1,025. On the curve, as a screen shows
+them, the 33 by 33 pixels around the star hold a tenth of Vega's light. Below the knee the sums hold, for a star of
+magnitude 6 to within a twentieth of a percent. Switch the `knee` off, and the pixels add up to all of Vega's light again, but a screen clips
+them at its white and shows a sixteenth of it, in a burnt-out disc. Zoom in, and fainter stars reach the knee, a
+magnitude and a half fainter for every doubling, while a dark sky behind them stays as it was.
+
+<Loupe />
+
+## The eye at night
+
+To the naked eye nearly every star is white. A handful of the brightest show a tint, Betelgeuse its orange, Vega a cold
+blue-white, and the rest none, though a photograph finds color in all of them. The eye is what leaves it out. It sees
+with two kinds of cells: cones, which need light and see color, and <Term of="Scotopic vision">rods</Term>, which need
+very little and see none. From a few cd/m² down the rods join in, and below some hundredth of one they see alone
+<Cite id="larson1997" />. A dark sky, at 0.0003 cd/m², lies far below that.
+
+Two things follow, and they are easy to mix up. The first is about brightness. The rods are most sensitive to blue-green
+light, the cones to yellow-green, so as the light fades, what is blue holds its brightness and what is red goes dark:
+the <Term of="Purkinje shift">Purkinje shift</Term>. It reaches the stars too. Of two stars of the same magnitude, one
+as blue-white as Vega and one as orange as Betelgeuse, the rods get twice the light from the blue one, by the fit to the
+rods' sensitivity that helldunkel uses <Cite id="larson1997" />. The second is about color. The rods' picture has none,
+yet a night does not look gray to us, it looks bluish, and painters have always given it blue. Jensen and colleagues put
+that into their night sky as a blue shift <Cite id="jensen2001" />: whatever the rods see is given one pale blue.
+
+helldunkel's `darkAdaptedEye` does both, and the pass applies it with `darkAdapted`, the figure with its `eye at night`
+switch. What the pass does is simpler than the eye, though, and worth knowing. It runs over the composed picture, stars,
+Milky Way and sky together, pixel by pixel, before the exposure, and decides by that pixel's luminance how much of it
+the rods see. For the sky and the Milky Way that is right: they are surfaces, and their luminance is what the eye meets.
+
+For a star it is a stand-in. A star's pixel holds its lux over the solid angle of its spot, and that depends on the zoom
+and on the width of its image, not on the star alone. In the view of the whole sky from the last section, every star
+fainter than magnitude 2.5 falls below a hundredth of a cd/m² and turns wholly the rods' blue, and Sirius keeps two
+thirds of its color. Zoom in ten times, and stars down to magnitude 7.5 keep some of theirs.
+
+The eye does not work that way. Whether a star shows its color depends on whether its light at the eye is enough for the
+cones, a matter of its lux, however a picture of it is zoomed. A fade by each star's illuminance would be closer to
+the eye; sternenheer keeps one rule for every pixel instead. So read the switch as the night's blue cast: right for
+the sky and the band, a rough guess for the points. Switch it off, and the stars show the colors of their
+temperatures, as a camera records them. Switch it on and zoom in on a bright star, and its color returns as its pixels
+brighten.
+
+```ts
+import { darkAdaptedEye } from "@himmelszelt/helldunkel";
+
+// Linear sRGB in cd/m², as the eye sees it at that level: a patch of the
+// Milky Way at 0.0003 cd/m² comes out blue, whatever its color was.
+const seen = darkAdaptedEye([0.0003, 0.0003, 0.00025]);
+// In the pass: the composed picture, before the exposure.
+const pass = await createStarsPass(device, {
+    format, catalog, darkAdapted: true,
+});
+```
+
+Followed from daylight down to starlight, the blue shift takes the colors in turn (<Fig id="night-blue" />). Above
+4 cd/m² the eye sees as a camera records; by a hundredth of one the cones are gone, the orange stars a stop darker
+than the blue-white ones, and every color the same pale blue. The full Moon's sky lies below that already, at some
+0.004 cd/m² <Cite id="puschnig2014" />, so in Jensen's model the blue of a moonlit night is the eye's, not the
+sky's. A star's core lies wherever the zoom puts it, and its dot climbs out of the rods' range as the view zooms in: the
+pass' shortcut, made visible. Lower the luminance to the full Moon's sky, and the white and the moonlit sky turn the
+same blue.
+
+<NightBlue />
 
 ## The sky turning
 
-A catalog gives a star's place for one moment, the <Term of="Standard equinox">standard equinox</Term> of
-2000, in <Term of="Equatorial coordinates">equatorial coordinates</Term>, and the sky
-has moved since. Earth turns under the stars once a sidereal day, which is sternzeit's
-<Term of="Sidereal time">sidereal time</Term>, and its axis slowly turns too, the
-<Term of="Precession">precession</Term> of the equinoxes, some 50 arcseconds a year along the ecliptic
-<Cite id="meeus1998" />: since 2000 Vega has drifted 11 arcminutes from its catalog place, a third of the Moon's
-width, more than a pixel of any view of the whole sky. The stars' own motion, their
+A catalog gives a star's place for one moment, the standard equinox of 2000, in equatorial coordinates, and the sky has
+moved since. Earth turns under the stars once a sidereal day, which is sternzeit's <Term of="Sidereal time">sidereal
+time</Term>, and its axis slowly turns too, the <Term of="Precession">precession</Term> of the equinoxes, some 50
+arcseconds a year along the ecliptic <Cite id="meeus1998" />: since 2000 Vega has drifted 11 arcminutes from its catalog
+place, a third of the Moon's width, more than a pixel of any view of the whole sky. The stars' own motion, their
 <Term of="Proper motion">proper motion</Term>, is far smaller: the fastest star in the catalog, Groombridge 1830,
 crosses a Moon's width in 260 years.
 
@@ -163,102 +400,456 @@ const skyRotation = stars.horizontalMatrix(time, observer);
 const years = (julianEphemerisDay(time) - 2451545) / 365.25;
 ```
 
-## The colors of the stars
-
-Stars have colors, faint to the eye and plain to a camera: Betelgeuse is orange, Vega blue-white, and the catalog
-carries the difference as a <Term of="Color index">color index</Term>, B minus V, how much brighter a star is through
-a blue filter than through a yellow one. A star radiates close to a black body, so the index gives a temperature,
-by Ballesteros' formula <Cite id="ballesteros2012" />, 10,100 K for Vega, 5,800 K for the Sun, 3,300 K for Betelgeuse,
-and a temperature gives a chromaticity on the Planckian locus <Cite id="kim2002" /> and from there a color in linear
-sRGB at unit luminance, which the magnitude then scales. `colorFromColorIndex` does the three steps, and the
-shipped catalog holds its result for every star. The catalog lists no color index for 310 of its stars, and those get
-the typical one of their spectral type. The colors are saturated on purpose: a star's
-light is a black body's, and the eye at night, which sees little color, is [the `eye at night`](#through-the-air)
-switch's business.
-
-<Planned title="From a color index to a color">
-The Planckian locus on the chromaticity diagram with sRGB's triangle, and a band of the colors over B-V below it. A
-slider for B-V, or a click on Vega, the Sun, Arcturus, Betelgeuse: the temperature, the point on the locus and the
-color follow. A switch between Ballesteros' temperature and Jensen's shows where they part.
-</Planned>
-
-<Planned title="The colors of nine thousand stars">
-A histogram of the catalog over B-V, every bar in its stars' color: most stars lie near white, and the few that are
-plainly red or blue are bright ones.
-</Planned>
-
-<Planned title="The colors we see at night" plan="needs the magnitude below which a star looks colorless, from a source.">
-The same sky as a camera records it and as the eye sees it: below the cones' threshold for a point of light a star
-loses its color, so only the brightest keep a tint. A slider for how dark adapted the eye is.
-</Planned>
-
 ## Through the air
 
 The air does three things to a star's light, all of them worst near the horizon. It bends the light, so every star
 shows higher than it is: on the horizon by some 35 arcminutes, more than the Moon's width, and a star that is truly
-on the horizon already stands half a degree up. The pass takes the air as a table over the apparent altitude,
-`airTable`, filled from any refraction you hand it, the figure dunstkreis' own, traced through the same air the sky
-is drawn from, and its entries crowd towards the horizon, where the bend changes fastest. It lifts every star by it,
-looks the Milky Way up along the unbent ray, and draws nothing below the lowest ray that still reaches space, which
-from the ground lies a little below the geometric horizon and from orbit far below it.
+on the horizon already stands half a degree up. The pass takes the air as dunstkreis' table over the apparent altitude,
+`airTable`, traced through the same air the sky is drawn from, one small texture per height of the observer, its
+entries crowded towards the horizon, where the bend changes fastest. It lifts every star by it, looks the Milky Way up
+along the unbent ray, and draws nothing below the lowest ray that still reaches space, which from the ground lies a
+little below the geometric horizon and from orbit far below it. Near the horizon the air also squeezes the sky, as it
+flattens the setting Sun: two stars show closer together than they are, and a star's light is spread thinner, by a
+fifth on the horizon. A surface such as the Milky Way keeps its brightness as it is squeezed, so only the stars are
+dimmed by it.
 
-It takes light away, more of the blue: at the zenith the air lets 87% of the green through and 77% of the blue, at
-5° up a quarter of the green and a sixteenth of the blue, on the horizon under one percent of anything, which is why
-a rising star is red and faint and why the Milky Way fades into the haze long before the horizon. The same table holds
-dunstkreis' `airTransmittance` at every altitude, and the pass dims each star and each pixel of the Milky Way by it.
+It takes light away, more of the blue: at the zenith the air lets 87% of the green through and 77% of the blue, at 5° up
+a quarter of the green and a sixteenth of the blue, on the horizon some 4% of the red and next to none of the blue,
+which is why a rising star is red and faint and why the Milky Way fades into the haze long before the horizon. The same
+table holds dunstkreis' `airTransmittance` at every altitude, and the pass dims each star and each pixel of the Milky
+Way by it.
 
 And it twinkles. The air's turbulence bends a star's light this way and that on its way down, and a pupil seven
 millimeters wide catches now more of it, now less. The patches of light and shade the turbulence throws on the ground
 are some 6 cm wide, far wider than the pupil, so the eye gets no averaging from its aperture, and from one millisecond
 to the next a star at the zenith flickers by a quarter of its light in ordinary air <Cite id="dravins1998" />. The eye
-is slow, though: it adds the light up over a tenth of a second, some thirty flickers, and what is left is 7% at the
-zenith, too little to notice, 15% at 30° up and over a third near the horizon, where the light passes through more of
-the turbulence and the flicker slows down <Cite id="osborn2015" />. `scintillationIndex` gives the number for a seeing
-and an integration time, a camera's as well as the eye's. Low down the air also disperses the star's light into a tiny
-spectrum, and once the red and the blue pass through different patches they twinkle apart, which is the flashing of
-colors a low Sirius is famous for. The pass draws the star's light with a random factor per channel, smooth in time
-and correlated across the channels high up, independent low down, from a hash of the star and the time: switch the
-figure's `twinkle` on and watch the horizon. A planet, a disc rather than a point, twinkles far less, and sternenheer
-has none yet.
+is slow, though: it adds the light up over a tenth of a second, some thirty flickers, and what is left is 8% at the
+zenith, too little to notice, 17% at 30° up and two fifths 10° up, where the light passes through more of the
+turbulence and the flicker slows down <Cite id="osborn2015" />. The model is dunstkreis', [its
+chapter](../dunstkreis/) tells it, and its `scintillationIndex` gives the number for a seeing and an exposure, a
+camera's as well as the eye's. Low down the air also disperses the star's light into a tiny spectrum, and once the red
+and the blue pass through different patches they twinkle apart, which is the flashing of colors a low Sirius is famous
+for. The pass takes the seeing as `seeing`, and draws the star's light with a random factor per channel, a new one
+about every tenth of a second and smooth in between, correlated across the channels high up and independent low down,
+from a hash of the star and the time: switch the figure's `twinkle` on and watch the horizon. A planet, a disc rather
+than a point, twinkles far less, and sternenheer has none yet.
 
-The sky behind the stars is dunstkreis': by day it outshines all of them, by moonlight the fainter ones, and the
-figure meters on it where it is brighter than the stars' own light. The eye sees the night differently than a camera:
-below some 4 cd/m² its rods take over, colors fade and shift towards blue, and helldunkel's blue shift turns the
-composed light into that before it is exposed, the figure's `eye at night` switch, as in nachtgestirn.
+The sky behind the stars is dunstkreis': by day it outshines all of them, by moonlight the fainter ones, and the figure
+meters on it where it is brighter than the stars' own light. What the eye makes of such a night was the subject of [the
+eye at night](#the-eye-at-night).
 
-<Planned title="Twinkling">
-One star and its light over two seconds, next to the twinkling's strength over the altitude. Sliders for the altitude,
-the seeing and the integration time, the eye's tenth of a second against a camera's millisecond: next to nothing at
-the zenith, a flicker near the horizon, and low down the three channels come apart.
-</Planned>
+How one star's flicker changes with the altitude, the seeing, the lens and the exposure, and why a planet's disc hardly
+flickers, shows <Fig id="flicker" />. Its numbers are dunstkreis' own, from the seeing model and the table of the air
+that the pass takes, explained in [dunstkreis' chapter](../dunstkreis/#light-from-beyond-the-air).
 
-<Planned title="Why planets do not twinkle" plan="optional; may merge into the twinkling figure.">
-The turbulence's pattern of light and shade on the ground, with a pupil of 7 mm and a telescope of 20 cm on it: the
-pupil is smaller than a patch, the telescope averages over many, and so does a planet's disc.
-</Planned>
+<Flicker />
+
+## Lines between the stars
+
+Nobody ever saw a line in the sky, and nobody finds their way around it without them. What is official about the
+constellations is less than one would think. The International Astronomical Union agreed on a list of 88 in 1922 and on
+their boundaries in 1928, areas that cover the whole sky between them, and it defines no figures at all
+<Cite id="iauconstellations" />. The lines that join a constellation's stars into a shape are convention.
+
+sternenheer ships one set of them, the figures of [d3-celestial](https://github.com/ofrohn/d3-celestial): 743 lines,
+each between two stars of the catalog, in 4 KB. `loadConstellations` brings them, the pass takes them as
+`constellations`, and its parameter of the same name picks which to draw, by their abbreviations: `["Ori"]`, the
+exported `ZODIAC`, or `null` for all 88.
+
+A line is a hint on the display, not light in the sky. It keeps its muted blue gray whatever the exposure, stops a few
+pixels short of each star so the star stays the brighter thing, follows its two stars as the air lifts them, and shows
+only while both stand above the horizon. Switch `lines` on in <Fig id="stars" /> and choose the zodiac: it has thirteen
+constellations, not twelve, since the Sun also passes through Ophiuchus, which the calendar's signs leave out.
+
+```ts
+import {
+    createStarsPass, loadConstellations, ZODIAC,
+} from "@himmelszelt/sternenheer";
+
+const constellations = await loadConstellations();
+const pass = await createStarsPass(device, {
+    format, catalog, constellations,
+});
+// By abbreviation: Orion and the Great Bear, the zodiac, or null for all.
+pass.update({ constellations: ["Ori", "UMa"] });
+pass.update({ constellations: ZODIAC, constellationOpacity: 0.2 });
+```
 
 ## The Milky Way
 
-Most of the night's starlight comes from stars too faint to see one by one, and together they are the band across
-the sky. sternenheer draws them from NASA's Deep Star Maps of 2020 <Cite id="svs4851" />, the map of the Milky Way
-without the stars of Hipparcos and Tycho, which holds the light of the stars of Gaia's catalog fainter than the
-eleventh magnitude, 1.7 billion of them, in the same J2000 equatorial coordinates as the catalog, so the one rotation
-turns both. osgHimmel drew a photograph of the Milky Way as a cube map with an intensity set by hand
-<Cite id="mueller2012thesis" />; the map is calibrated instead. Masana and colleagues measured the light of all the
+Most of the night's starlight comes from stars too faint to see one by one, and together they are the band across the
+sky. sternenheer draws them from NASA's Deep Star Maps of 2020 <Cite id="svs4851" />: the whole sky as a picture, made
+by plotting 1.7 billion stars, most of them from Gaia's catalog, in the same J2000 equatorial coordinates as the catalog
+here, so the one rotation turns both. osgHimmel drew a photograph of the Milky Way as a cube map with an intensity set
+by hand <Cite id="mueller2012thesis" />. This map is made of counted stars, and so it can be given a unit.
+
+NASA publishes the map in layers, and which one a renderer takes is not a detail. One layer holds every star. Another is
+the background alone, without the stars of the Hipparcos and Tycho catalogs, which reach down to magnitude 11.5.
+sternenheer takes the background, because the pass draws the bright stars itself, as points in lux. A map that still
+held them would show each of them twice: once as the pass' sharp point, and once more as a blob a texel wide baked into
+the picture, 5 arcminutes in the large map and 10 in the small, a sixth and a third of the Moon's width.
+
+And the baked one behaves like a patch of sky, not like a star. Its light is a luminance, so it does not brighten as the
+view zooms in; it spreads into a blur. It never twinkles, has neither knee nor halo, and stays when the stars are
+switched off. The air does treat it as it treats the whole map, pixel by pixel, so it rises and reddens near the horizon
+as it should. But its light is counted twice, which undoes the calibration that follows.
+
+Even the background has points left, the brightest of the stars it does hold, and the script that makes the shipped maps
+takes those out too. Every texel more than 2.5 times as bright as the median of the 5 by 5 around it comes down to that
+median, 487,205 of the map's 8.4 million, one in seventeen. What it lost is spread around it, over half a degree, so the
+map keeps its light and loses its points.
+
+Drawn under the same stars, either side of a line, sternenheer's map and NASA's show the difference: over the starred
+layer every bright star appears twice, a point over a blur, and the band carries the stars' light once more (<Fig
+id="starred" />). Switch the stars off, and the starred map keeps its own. Pick NASA's starless layer instead, as
+published, and zoom in: the points the script takes out, a few hundred around Deneb, stay in it as faint blurred dots
+under the drawn stars.
+
+<Starred />
+
+A picture needs a unit before it can stand next to stars in lux. Masana and colleagues measured the light of all the
 stars together, the <Term of="Integrated starlight">integrated starlight</Term>, from the same Gaia data: at the zenith
 of a place at 40° north it averages a <Term of="Surface brightness">surface brightness</Term> of 23.2 magnitudes per
-square arcsecond over a year, a fifth of the natural night sky's light <Cite id="masana2021" />. The map plus the
-catalog are scaled to give that along the band of the sky that zenith sweeps, which puts the galactic center at 21.0
-magnitudes per square arcsecond, brighter than a dark sky's 21.5, the galactic poles at 25.5, far below it. The band
-you see in the figure is the band you see on a dark night, at the light the sky gives it: zoom out and dim the
-exposure, and it fades into the sky before the stars do.
+square arcsecond over a year, a fifth of the natural night sky's light <Cite id="masana2021" />. That zenith sweeps the
+sky around declination 40°, and along the band from 35° to 45° the script adds up what the package draws: the catalog
+gives a third of Masana's light, the Hipparcos stars a quarter, and the map is scaled to give the rest. A texel of value
+1 then stands for 0.0012 cd/m², `MILKY_WAY_LUMINANCE`. That puts the map's brightest patch, in Sagittarius, a few
+degrees from the galactic center, at 20.3 magnitudes per square arcsecond, three times as bright as a dark sky's 21.5,
+and the galactic poles near 26, two hundred times fainter than the patch. A renderer that leaves the Hipparcos stars out
+draws that band a quarter short. A sky designed rather than measured can brighten or dim the map by stops,
+`milkyWayCompensation`, whose 0 is the calibrated light.
 
-<Planned title="Against photographs" plan="needs photographs with a known moment, place, lens and exposure, free to show.">
-Photographs of the night sky next to the same sky drawn for their moment, place, lens and exposure, with a divider to
-drag across: a wide view with the Milky Way, a constellation at a normal focal length, a moonlit night. Under each
-pair what matches and what does not, the limiting magnitude, the Milky Way's brightness against the stars, the sky's
-color.
+The band you see in <Fig id="stars" /> is the band you see on a dark night, at the light the sky gives it: zoom out and
+dim the exposure, and it fades into the sky before the stars do.
+
+A scene that needs no more than a backdrop, with no stars of its own, can do without the pass. The layer with every star
+in it is the picture for that, and [rundbild](../rundbild/) the package: its `createCubeFromPanoramaPass` turns such a
+panorama into a cube map, with an `azimuthOffset` of −90 laying the cube's axes along the catalog's, and a renderer
+samples it along its ray turned back into that frame, by the transpose of `stars.horizontalMatrix`. NASA publishes the
+layers as OpenEXR, to be converted first. Those stars are then pixels of a picture, with everything just said of the
+baked ones.
+
+<Planned
+    title="Where the starlight comes from"
+    plan="cheap, on the CPU: the two catalogs' magnitudes binned ahead into a small JSON, and the numbers of
+    milkyway.json; for the band's shares the map's script would have to write out the three sums it prints."
+>
+The light of the stars sorted by magnitude, as bars: the nine thousand of the catalog, the Hipparcos stars after them,
+and the map's stars as one block, with a switch from counting stars to adding up their light. The count climbs steeply
+with every magnitude, the light per magnitude rises only slowly, and the block of stars nobody sees one by one outweighs
+each of the others. The reader sees why a sky of nine thousand points is not yet a night sky.
 </Planned>
+
+A sky drawn from numbers can be held against the sky itself, as cameras record it. Six photographs carry all the check
+needs, the moment, the place, the lens and the exposure: the Milky Way over Idaho and stars over the Watzmann through
+wide lenses, Orion through a normal one, a night under a waning Moon in New Zealand, twilight over Slovenia, and the
+Pleiades through a long lens (<Fig id="photos" />). Nothing in the figure is placed by hand. A script finds the stars in
+each photograph, names them from the catalog, and fits where the camera pointed, how it was turned, its focal length and
+its lens' distortion to as many of them as it names, from 85 to 796. What is left between the photograph's stars and the
+catalog's is 0.1 to 3.4 arcminutes, a pixel of these pictures at most: the sky's rotation from sternzeit and the air's
+lift from dunstkreis put every star where the camera found it, down to 4° over the horizon. The exposure is the camera's
+own, its f-number, seconds and ISO as one EV<sub>100</sub>, less the stops by which each photograph's stars outshine
+that: 0.4 for a JPEG straight from the camera, no more than a camera's ISO rating leaves open, within a stop for three
+more, edited as they are, and 2.3 and 3.2 for the two that were processed hard.
+
+<Photos />
+
+Past the stars' places, the figure measures both pictures alike, and three things hold. A star's light in lux lands on
+the pixels as a sensor records it. The Milky Way, calibrated to the measured starlight and never to a photograph, adds
+within 0.4 magnitudes of what two of the photographs show against their own stars, and a magnitude more than the
+Watzmann's. And moonlit air comes out blue, as in the photograph, from nothing but the Moon's light and the air. Three
+things do not hold. The sky between the stars is 4 to 65 times darker than in three of the photographs: the air glows by
+itself at night, which with the sunlit dust between the planets is most of the natural night sky's light <Cite
+id="masana2021" />, it scatters the light of towns besides, and neither sternenheer nor dunstkreis draws any of that
+yet. In so dark a sky the stars show one to four magnitudes fainter than a camera finds them, and the Milky Way stands
+out four to five times as strongly. A bright star's halo is drawn four and two times as wide as Antares' in the two
+processed photographs, and a third as wide as Rigel's in the one of Orion: no single width matches all three, so the
+pass keeps the narrowest, and two of the photographs widen their stars by their processing more than any halo would. And
+four of the photographs hold something sternenheer has no data for: Saturn, Mars, Venus, the Orion Nebula. Drag the line
+across Orion and pick the last catalog button, Tycho-2: the photograph's faintest stars fill in, and many more besides.
+
+## Twelve stops in eight bits
+
+The Milky Way is all shadow detail. In the map more than half of the sky lies over six <Term of="Stop">stops</Term>
+below the brightest value, under a sixtieth of it, the galactic poles eight stops, and only a thirtieth of the sky comes
+within three. And a night's exposure opens until exactly those dark parts fill the screen.
+
+The obvious file for a picture is 8-bit sRGB, and here it is the wrong one. sRGB spends its 256 levels where a screen
+needs them by day: 68 on the brightest stop, 16 on the sixth, 9 on the eighth, where the poles lie, 3 on the tenth. At
+the poles one level is 9% brighter than the one before. Rounding alone would hardly show, since the map's own grain
+hides steps of that size, but a file this large is compressed, and WebP's compression errs by a level or two in blocks
+of 8 by 8 texels. Where a level is 9%, that is a blotch of color, and an exposure for the poles shows it plainly.
+
+So the shipped maps store each channel's logarithm. A byte counts 255 equal steps down 12 stops, `MILKY_WAY_STOPS`, each
+3.3% above the last: 21 levels to every stop, the twelfth as many as the first, and 0 for black. The darkest step is a
+four thousandth of the brightest, 29 magnitudes per square arcsecond in the map's calibration, two stops below the
+darkest sky in the map. The shader undoes it, two to the power of what it reads, and as the GPU's filter blends the
+stored numbers, the map is interpolated in stops, between two texels along their ratio. The file stays what a browser
+reads by itself, a WebP, and the compression's error stays a few percent in every stop: 4 MB at 4096 by 2048 texels, 0.8
+MB at half that.
+
+The price is a quarter more bytes, 4.0 MB against sRGB's 3.2, and it is paid at the bright end too. In the top four
+stops sRGB's steps are finer than 3.3%, and a ninth of the sky lies there, the hearts of the star clouds. From the sixth
+stop down the logarithm has more levels, and more by comparison with every stop.
+
+What NASA publishes is finer than either: OpenEXR in half floats, 1,024 levels to every stop. It is also 36 MB for the
+same 4096 by 2048 texels, nine times the WebP, and no browser reads it without a decoder shipped along. A 16-bit PNG of
+it comes to 39 MB. On the GPU the gap is smaller: half floats take 8 bytes a texel, 67 MB for the large map, the
+logarithm's bytes 4, 34 MB.
+
+```ts
+import {
+    createMilkyWay, loadMilkyWay, MILKY_WAY_MAPS,
+} from "@himmelszelt/sternenheer";
+
+// The large map, for zooming in: 4096 texels around, 4 MB.
+const milkyWay = await loadMilkyWay(device, MILKY_WAY_MAPS.large);
+// Or a map of your own in sRGB, stops 0, and what its white is in cd/m².
+const own = createMilkyWay(device, bitmap, { luminance: 1e-3, stops: 0 });
+```
+
+Magnified at the pole's meter reading, next to the floats as the reference, the sRGB patch breaks into blotches of
+color, while the logarithm's stays as smooth. Switch the `WebP` off, and the sRGB patch, rounded alone, shows how little of it is the rounding
+(<Fig id="store-dark" />).
+
+<StoreDark />
+
+## A frame, pass by pass
+
+How the pass turns all of this into pixels is the business of this section; a reader after the sky can skip to [where
+the data comes from](#the-data-and-its-scripts).
+
+A night sky is a strange picture to draw. Nearly every pixel is nearly empty, and what light there is sits in points,
+the brightest a million times the faintest. The GPU's own ways of drawing a point fit it badly. A point primitive in
+WebGPU is one pixel, with no size to set: a star drawn so hops from pixel to pixel as the sky turns, and cannot carry a
+halo. A quad per star, the usual answer, costs by its area, and the areas could not differ more: a faint star needs a
+few pixels, the halo of Sirius reaches across the picture, and every quad is blended into a float target on top of the
+others. sternenheer turns the question around. It asks for every pixel which stars reach it, in compute passes
+throughout, like dunstkreis and nachtgestirn, and writes into a texture you own.
+
+The first pass runs once per star, `wgsl.bin`. It moves the star by its proper motion, turns it into your sky, lifts it
+by the air, and drops it if it stands below the horizon, outside the picture or fainter than the magnitude limit. It
+projects the star with the camera of dunstkreis' sky, bent projections included, and multiplies its lux by its color, by
+what the air lets through and by the twinkling. From the width of the core and the pixels a degree of sky spans at that
+spot follows the luminance at the star's center, and from the exposure how far out its image stays above the cut-off:
+under three pixels with the defaults, and nowhere for a star too faint for the exposure, whose part in the frame ends
+there.
+
+What is left goes into tiles. The target is cut into squares of 16 by 16 pixels, `tileSize`, and every star counts
+itself into each tile its image reaches: one as a rule, two near an edge, four at a corner. Thousands of stars do so at
+once, so each tile's counter is raised atomically. A second step then writes the stars' numbers into their tiles. A
+tile holds 64 stars, `capacity`, at four bytes each, 2 MB for a target of 1920 by 1080. Where more reach a tile than it
+holds, its stars are sorted in by their light: each slot keeps the brighter of what it held and what arrives and hands
+the other on, so a full tile keeps its brightest stars, the same ones every frame, in whatever order the stars came.
+That costs a little, so the capacity should still cover the fullest tile: the figure takes 256, for the faint stars
+along the Milky Way in a wide view.
+
+The same pass looks after the light beyond the knee. For a star that passes it, that light is added as one point to a
+second, coarser grid: half the target's size, with 64 pixels of margin around it, so a bright star just outside the
+picture still throws its glow in. The point is shared among the four texels around it by how close each lies, so the
+halo glides with the star instead of hopping. Adding has to be atomic again, and WGSL's atomics are integers, so the
+pass keeps each float as its bits and swaps them in until no other star got in between. A small pass turns the grid into
+a texture of levels, as a bloom does <Cite id="jimenez2014" />: it halves the grid level by level, each texel the mean
+of the four below it, and adds the levels back up from the coarsest. Each level holds the light about twice as wide as
+the one below and gets its share of it, for a profile that falls with the cube of the distance is a sum of Gaussians of
+every width, and each level stands for those of its own. The shares add up to 1, so the halos move light and add none,
+at the cost of blurring a half-size image whatever the number of stars: a target of 1920 by 1080 takes a grid of 1,024
+by 604 texels, of which the default halo needs three levels, and `halo: 0` none, nor their memory.
+
+The constellations' lines have a pass of their own, `wgsl.lines`. Each line is cut into eight pieces along the great
+circle between its two stars, so it stays a curve where the projection bends, and each piece is put into the tiles it
+crosses, sixteen to a tile, the way the stars are.
+
+The last pass runs once per pixel, `wgsl.compose`. It finds the pixel's ray and asks whether it sees sky at all: above
+the horizon, and not behind the Moon, whose disc the pass takes as `occluder`. Then it adds up, in cd/m²: the stars of
+its tile, each a Gaussian around its center, capped at the knee; the halos, one lookup into the pyramid's sum; the Milky
+Way, looked up along the ray as it ran before the air bent it, and dimmed by the air; the lines; and the background,
+dunstkreis' sky. With `darkAdapted` the sum passes through [the eye at night](#the-eye-at-night). Last comes the
+exposure, one multiplication by what the <Term of="EV100">EV100</Term> says, as in dunstkreis, then one of helldunkel's
+tone curves, and for an 8-bit target a dither if you ask for it. One write per pixel, no blending, and no texture
+besides yours and the halos' pyramid.
+
+A renderer with more to draw over the stars does not want them tone mapped yet. With `toneMap: false` the pass writes
+the light linear into a float target, and at an exposure of 1 that is cd/m², the next pass' background. The knee, the
+cut-off and the halo are matters of the display, though, and need the exposure the picture is finally shown at:
+`displayEV100`. The sky at the top is built this way, three passes in a row: dunstkreis' sky in cd/m², the stars over
+it, and nachtgestirn's Moon over both, which alone exposes and tone maps. The passes `sky` and `moon` are made as their
+chapters show:
+
+```ts
+// An exposure of 1: the pass writes cd/m², as it took them.
+const UNIT_EV100 = -Math.log2(1.2);
+const starsPass = await createStarsPass(device, {
+    format: "rgba32float", toneMap: false, catalog, milkyWay,
+});
+
+// Per frame: the stars linear, their knee and halos by the display's EV100.
+starsPass.update({ skyRotation, ev100: UNIT_EV100, displayEV100: ev100 });
+sky.encode(encoder, skyTexture);
+starsPass.encode(encoder, starsTexture, { background: skyTexture });
+moon.encode(encoder, target, { background: starsTexture });
+```
+
+Everything is also there in pieces, for a renderer that wants the stars inside a pass of its own: the WGSL as strings,
+`wgsl.bin`, `wgsl.compose` and the rest, and `paramsData`, which packs the parameters as the shaders read them.
+
+A frame can also be taken apart. Made with `debug`, the pass keeps what each of its passes leaves for the next and
+hands it out with `inspect`, and times every pass on the GPU's clock where the browser allows it: the tiles and how full
+each one is, the tiles the lines cross, the light past the knee as the bin pass left it in the halos' grid, the halos as
+that grid spreads them, and the frame they make (<Fig id="passes" />). Off, as by default, nothing of it is kept and
+nothing costs. Lower the capacity, and the tiles along the Milky Way fill up and keep only their brightest stars; widen
+the tiles, and every pixel has more stars to look through. Switch the Moon and the air off, and their passes drop out
+of the timings.
+
+<Passes />
+
+<Controls />
+
+What the tiles buy is easy to count. A pixel looks through the stars of its own tile, never more than `capacity`,
+instead of every quad that covers it, and the halos, which would make the brightest quads as large as the picture, cost
+it one lookup. Nothing is blended, so the target can be any format a compute pass writes, `rgba32float` too, which
+WebGPU blends only with the optional feature `float32-blendable`.
+
+## What it costs
+
+A night sky is a backdrop: whatever else a frame shows stands in front of it, and a renderer has little time to spare
+for what lies behind. The sky this chapter opens with, both catalogs with their halos and the Milky Way through the air,
+takes sternenheer 0.14 ms on a target of 1920 by 1080 pixels, under a hundredth of the 16.7 ms a frame at 60 Hz has. It
+holds 38 MiB on the GPU, less than three half float render targets of that size, and downloads 1.6 MiB.
+
+The time does not go where the stars are. Sorting 118,000 stars into their tiles takes three hundredths of a
+millisecond, a fifth of the frame, and the faint stars, twelve times the catalog's, make the frame two fifths longer.
+Half of it is the last pass, which visits every pixel, and a fifth is the halos' levels, which hold two fifths of the
+memory and are made only while `halo` asks for them. So the cost follows the target, not the sky: 3840 by 2160 pixels,
+four times as many, take three times as long. The air adds a twentieth and the constellations' lines
+a ninth; the twinkling and the 4K map add nothing that shows in the time, though the larger map holds 32 MiB more
+(<Fig id="budget" />).
+
+<Budget />
+
+Stars by the million are another matter. With the 2.4 million stars `loadDeepStars` adds, the same sky takes 0.65 ms,
+over four times as long, seven tenths of it in the pass that adds their light. It holds twice the memory and downloads
+nine times as much, which is one reason the package makes that catalog and does not ship it; [its
+license](#the-data-and-its-scripts) is the other.
+
+A stopwatch around the calls measures none of this: `encode` returns once the commands are recorded, and the GPU draws
+later. The times here come from the GPU's own clock, read around every pass, and a frame runs from its first pass' start
+to its last one's end. A browser hands a page that clock rounded, Chromium to 0.066 ms, longer than most of these passes
+take, so a single reading says nothing and the mean of some hundred frames does. The figure's button measures every row
+that way on your GPU and draws it under the reference's (<Fig id="budget" />).
+
+## The data and its scripts
+
+Every point in the picture is somebody's measurement, and none of them the package's own: three catalogs of stars, one
+set of lines and one map, each from a public source. Each is kept as a file a person can read, the CSV files in the
+repository and the largest catalog where its archive serves it, and turned into what the GPU reads by a script that
+runs again with one command. The scripts are plain Node and live next to the source, in
+[`packages/sternenheer/scripts`](https://github.com/cgcostume/himmelszelt/tree/main/packages/sternenheer/scripts). Each
+prints the terms its data comes under and the credit they ask for, keeps its downloads in a cache, and does nothing
+while what it wrote is newer than what it read. The catalogs leave them gzip compressed and turned into byte planes: the
+first byte of every star, then the second of every star, and so on, so that neighbors' magnitudes and positions, which
+differ little, lie side by side, and the loaders turn them back with the browser's `DecompressionStream`.
+
+`pnpm catalog` reads `data/brightstars.csv`, the Yale catalog with a line per star, 374 KB: the six numbers of [Sirius'
+row](#nine-thousand-stars). The magnitudes, positions and motions came by way of osgHimmel's source, the color indices
+from the catalog's own file, and the 310 stars without one got the typical index of their spectral type. The script
+turns the hours of right ascension into degrees, runs each index through [the three steps to a
+color](#the-colors-of-the-stars) and writes `brightstars.bin.gz`, eight 32-bit floats a star, 208 KB, and
+`brightstars-compact.bin.gz`, three 32-bit words a star, 89 KB: the magnitude, the color index and the motions as the
+catalog lists them, the position within a sixth of an arcsecond, finer than the catalog's own rounding to about a
+second. NASA's archive lists its copy of the catalog as a work of the U.S. Government, for public use
+<Cite id="hoffleit1991" />.
+
+`pnpm hipparcos` reads `data/hipparcos.csv`, 3.4 MB: the Hipparcos catalogue as NASA's HEASARC serves it
+<Cite id="esa1997" />, cut down to what the Yale catalog lacks and sorted brightest first. A line holds the magnitude,
+the position, moved from the catalogue's epoch of 1991.25 to 2000 by the star's own motion, and the color index, the
+Sun's for the 1,139 stars without one. Left out are 263 entries without a position or a magnitude and 9,072 that are
+Yale's stars again. The script writes the stars twice: two 32-bit words a star, brightest first, 701 KB, and 6 bytes a
+star sorted into the deep stars' cells, 579 KB. ESA distributes the catalogue under a
+Creative Commons license for non-commercial use, CC BY-NC 3.0 IGO, with the credit ESA, which is not the MIT license of
+the package's code. So the npm package carries neither the file nor the CSV, and whoever wants the faint stars makes
+them, accepting ESA's terms: outside the repository the script fetches the catalogue from HEASARC, 15 MB once, and cuts
+it down the same way, to the same stars.
+
+`pnpm tycho` makes the deep stars from the Tycho-2 catalogue <Cite id="hog2000" />, under the same terms: a download of
+200 MB, once, from which it keeps the 2.4 million stars the two other files lack, sorts them into 384 cells of the sky,
+brightest first in each, and writes them in full, 14.1 MB, and compact, 12.0 MB. No CSV is kept of it, for its size: the
+catalogue as HEASARC serves it is the record.
+
+So each catalog comes in two layouts, and the loaders fetch the compact one unless asked for `"full"`. A compact faint
+star stands within 0.6 arcseconds of its full twin, a third of a pixel where the stars figure zooms in closest, half a
+degree across 1080 pixels, and less than the median one has moved by its own motion since 2000, which neither layout
+holds. Its direction comes from the cell and the place in it, a point on a cube's face made unit length, without a sine
+or a cosine. The Yale file shrinks to less than half and the faint and the deep stars' by about a sixth; on the GPU the deep
+stars hold 4.5 MiB less and the Hipparcos stars 0.4 MiB more, as the pass keeps a slot for every place of their cells'
+blocks. Neither layout draws faster: the time goes to adding up light, not to reading stars (<Fig id="budget" />). The
+pass takes either layout for each catalog and builds its shaders for the ones it gets, so the decoder of the other costs
+nothing.
+
+`pnpm constellations` reads `data/constellations.csv`, 743 lines in 10 KB: a constellation's abbreviation and the two
+rows of the star file its line joins. The figures are d3-celestial's, by Olaf Frohn, under the BSD 3-Clause license,
+each of their points matched to the catalog's star at that place, all within half an arcminute. The script writes
+triples of 16-bit numbers, 4 KB.
+
+`pnpm milkyway` is the one that works for its result, and the one with needs: ImageMagick with OpenEXR and WebP, and a
+download of 36 MB, once, into a cache. It fetches NASA's background layer, reads it as floats, takes the stars out and
+spreads their light, adds up the two catalogs along the calibration's band and prints the scale, as [the Milky
+Way](#the-milky-way) describes. Then it writes the two maps as WebP, with [the logarithm in 8
+bits](#twelve-stops-in-eight-bits), the small one averaged down from the large in linear light, and `milkyway.json` with
+the scale and what it was matched against. NASA's Scientific Visualization Studio asks for its credit, and for Gaia's.
+With `--size 8k` it makes a larger map from NASA's own larger file, 137 MB, which the package does not ship: 19 MB, a
+texel 2.6 arcminutes.
+
+`pnpm assets` runs the scripts whose files are not in the repository, the two of ESA's catalogues and the 8K map, and
+with `--all` the others too; at the repository's root it does so for every package, as the site's build does before it
+starts. An npm package has no `pnpm` scripts, so the package brings the same as a command, which writes into the
+installed package's `data` folder, where `loadFaintStars` and `loadDeepStars` look:
+
+```sh
+cd packages/sternenheer
+pnpm assets          # the Hipparcos and the Tycho-2 stars, the 8K map: 352 MB
+pnpm assets --all    # every file, the shipped ones too
+pnpm catalog         # brightstars.csv to brightstars(-compact).bin.gz
+pnpm hipparcos       # hipparcos.csv to hipparcos(-compact).bin.gz
+pnpm tycho           # HEASARC's Tycho-2 to tycho(-compact).bin.gz
+pnpm constellations  # constellations.csv to constellations.bin
+pnpm milkyway        # NASA's EXR to the two maps and milkyway.json
+
+# Where the package is installed from npm, accepting ESA's terms:
+npx @himmelszelt/sternenheer data hipparcos tycho
+```
+
+What is not a script is the step before the CSV files: picking the columns out of the catalogs as their archives serve
+them, and matching Hipparcos against Yale and d3-celestial's points against the catalog's stars. Those ran once,
+`data/README.md` says what they did, and the CSV files are their record. To correct a star or bring a catalog of your
+own, edit a CSV and run its script, or skip the files altogether: `catalogFromStars` builds a catalog in memory, full
+by default and compact on request, and `packStars` the faint stars' full layout.
+
+```ts
+import {
+    catalogFromStars, colorFromColorIndex,
+} from "@himmelszelt/sternenheer";
+
+// A catalog of your own, here of Vega alone: degrees, arcseconds a year,
+// and a color.
+const catalog = catalogFromStars([{
+    magnitude: 0.03, rightAscension: 279.2346, declination: 38.7836,
+    properMotionRightAscension: 0.202, properMotionDeclination: 0.286,
+    color: colorFromColorIndex(0),
+}]);
+```
+
+Which of the files a renderer loads depends on how far its views zoom in. A map pays off once a pixel spans less than a
+texel of the next coarser one: across 1080 pixels, in a view narrower than 118° for the 4K map and 79° for the 8K map
+(<Tab id="sizes" />). A catalog pays off once its stars show, and every doubling of the zoom reaches [a magnitude and a
+half deeper](#nine-thousand-stars). At the stars figure's exposure for a moonless night, half of the Hipparcos stars
+show in a view of 87°, but half of the Tycho-2 stars only in one of 29°; at EV<sub>100</sub> −9, as a long photograph
+exposes, in views of 167° and 136°. So a wide view needs neither the 8K map nor Tycho-2, which together download 31 MB
+and hold over 200 MiB on the GPU, and a zoomed view gains from both. The stars figure works that way: it fetches the 8K
+map only once a pixel at the center of its view spans less than a texel of the 4K map, and draws it once it has arrived
+(<Fig id="stars" />).
+
+<Sizes />
 
 ## Precise and approximate
 
@@ -266,20 +857,31 @@ Two pieces come in a precise and a cheaper variant. The precession is Meeus' thr
 Jensen et al.'s linear approximation of them <Cite id="jensen2001" />, which sternzeit offers as `stars` under its
 `approx` entry: within an arcsecond of each other over this century, far below a pixel, so the approximate one is
 the one to take. The star's temperature is Ballesteros' formula or Jensen's, and here the difference shows: Jensen's
-makes Vega 12,500 K instead of 10,100 and Betelgeuse 2,900 K instead of 3,300, which is bluer blue stars and redder
+makes Vega 12,500 K instead of 10,100 and Betelgeuse 2,900 K instead of 3,300, which is bluer blue stars and redder
 red ones, osgHimmel's colors. `colorFromColorIndex` and `colorFromColorIndexApprox` are both there, to recolor
 a catalog either way.
 
 ## The people behind the numbers
 
-Dorrit Hoffleit kept the Yale Bright Star Catalogue through its editions for half a century, to the fifth of 1991
-with Wayne Warren that the stars here come from <Cite id="hoffleit1991" />. Jean Meeus' chapter on precession gives
-the three angles and the rotation sternzeit turns the catalog by <Cite id="meeus1998" />. Henrik Wann Jensen and his
-colleagues put the stars into a renderer in lux in 2001, with the approximate precession and the temperature formula
-osgHimmel took from them <Cite id="jensen2001" />. Fernando Ballesteros derived the temperature from the color index
-by treating a star as a black body seen through two filters <Cite id="ballesteros2012" />, and Kim and colleagues fit
-the Planckian locus that turns the temperature into a color <Cite id="kim2002" />. Andrew Young worked out how the
-twinkling scales with the air, which Dainis Dravins and his colleagues measured over three papers in the nineties
-<Cite id="dravins1998" />. The Milky Way's map is NASA's Scientific Visualization Studio's <Cite id="svs4851" />, and
-its calibration rests on Eduard Masana and colleagues' map of the natural night sky, which summed the light of Gaia's
-stars <Cite id="masana2021" />.
+Dorrit Hoffleit edited the Yale Bright Star Catalogue from its third edition, of 1964, to the fifth of 1991 with Wayne
+Warren that the stars here come from <Cite id="hoffleit1991" />. The fainter ones are the European Space Agency's,
+from the catalogue of its Hipparcos satellite, published in 1997 <Cite id="esa1997" />. Jean Meeus' chapter on
+precession gives the three angles and the rotation sternzeit turns the catalog by <Cite id="meeus1998" />. Henrik Wann
+Jensen and his colleagues put the stars into a renderer in lux in 2001, with the approximate precession and the
+temperature formula osgHimmel took from them, and with the blue shift the eye at night still uses
+<Cite id="jensen2001" />.
+
+Fernando Ballesteros derived the temperature from the color index by treating a star as a black body seen through two
+filters <Cite id="ballesteros2012" />, and Bongsoon Kang and his colleagues at Dong-A University and Samsung fitted the
+Planckian locus that turns the temperature into a color, for televisions that change their white
+<Cite id="kang2002" />. Greg Spencer and his colleagues worked out in 1995 why a bright point shows with a glow around
+it, in the eye and in a picture, the reasoning behind the halo <Cite id="spencer1995" />, and Jorge Jimenez showed the
+chain of blurs that spreads it <Cite id="jimenez2014" />. Gregory Ward Larson, Holly Rushmeier and Christine Piatko
+fitted the rods' luminance to a color's three numbers in 1997, the brightness the eye at night goes by
+<Cite id="larson1997" />.
+
+Andrew Young worked out how the twinkling scales with the air, which Dainis Dravins and his colleagues measured over
+three papers in the nineties <Cite id="dravins1998" />. The constellations' figures are Olaf Frohn's, from his
+d3-celestial. The Milky Way's map is Ernie Wright's, of NASA's Scientific Visualization Studio <Cite id="svs4851" />,
+and its calibration rests on Eduard Masana and colleagues' map of the natural night sky, which summed the light of
+Gaia's stars <Cite id="masana2021" />.

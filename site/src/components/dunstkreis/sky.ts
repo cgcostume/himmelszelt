@@ -30,6 +30,8 @@ import {
     skyViewChanged,
     tables,
 } from "./atmosphere";
+import { flightIn } from "./flight";
+import { groundGrid } from "./groundgrid";
 import { type Basis, cameraBasis, lookAround, project } from "./skycamera";
 
 // The parts of the sky a figure with `data-parts` switches: the air's three ingredients, which take tables of their own
@@ -123,6 +125,10 @@ export function skyFigure(root: HTMLElement) {
 
     // Camera in the observer's ENU frame, yaw a compass azimuth; locked to the sun until dragged.
     const camera = { yaw: 0, pitch: 10 * DEG, fov: 70 * DEG };
+    // Flight, with a grid on the ground while it lasts, and the height the figure is seen from: its own, but for the
+    // primary's, which is the page's, since the other figures take their sky from it.
+    const air = flightIn(root, canvas, camera, () => requestRender());
+    let groundPass: ReturnType<typeof groundGrid> | null = null;
 
     function showError(html: string) {
         const error = document.createElement("div");
@@ -235,7 +241,7 @@ export function skyFigure(root: HTMLElement) {
         if (ditherButton) ditherButton.disabled = format !== SDR;
         const autoExposure = pressed("auto");
         // Where the sun shows, lifted by the same air the sky is traced through.
-        const [x, y, z] = apparentDirection(sunDirection, table.luts.model, clampObserverHeight(state.heightM));
+        const [x, y, z] = apparentDirection(sunDirection, table.luts.model, clampObserverHeight(air.height()));
         const sunNote = maybe("sun");
         if (sunNote)
             sunNote.textContent =
@@ -271,18 +277,18 @@ export function skyFigure(root: HTMLElement) {
         pass.update({
             sunDirection,
             sunAngularDiameter,
-            observerHeightM: state.heightM,
+            observerHeightM: air.height(),
             inverseViewProjection: inverseViewProjection(basis),
             projectionDistance: basis.d,
             pixelRatio: dpr,
             ev100: evOfSlider(),
             autoExposureKeys: pressed("ramp") ? DEFAULT_AUTO_EXPOSURE_KEYS : [],
         });
-        const skyViewKey = `${state.jd},${state.latitude},${state.longitude},${state.heightM}`;
+        const skyViewKey = `${state.jd},${state.latitude},${state.longitude},${air.height()}`;
         if (primary && (skyViewKey !== skyViewFor || pass !== notified)) {
             skyViewFor = skyViewKey;
             notified = pass;
-            const observerHeightM = clampObserverHeight(state.heightM);
+            const observerHeightM = clampObserverHeight(air.height());
             skyViewChanged({ pass, sunDirection, apparentSun: [x, y, z], sunAngularDiameter, observerHeightM });
         }
         // The pass above is kept current whatever shows, since the other figures take their sky from it; the canvas is
@@ -291,7 +297,18 @@ export function skyFigure(root: HTMLElement) {
 
         placeCompass(basis, canvas.clientWidth, canvas.clientHeight);
         const encoder = gpu.device.createCommandEncoder();
-        pass.encode(encoder, gpu.context.getCurrentTexture());
+        const target = gpu.context.getCurrentTexture();
+        if (air.flying()) {
+            // The sky into a texture like the canvas', and from there with the grid onto the canvas.
+            groundPass ??= groundGrid(gpu.device);
+            const drawn = groundPass.skyFor(target);
+            pass.encode(encoder, drawn);
+            const view = { inverseViewProjection: inverseViewProjection(basis), projectionDistance: basis.d };
+            const radiusKm = table.luts.model.planet.groundRadiusKm;
+            groundPass.encode(encoder, drawn, { ...view, heightM: air.height(), radiusKm, flown: air.flown }, target);
+        } else {
+            pass.encode(encoder, target);
+        }
         gpu.device.queue.submit([encoder.finish()]);
         const submitted = performance.now();
         showTiming(astronomyMs, submitted - skyStarted, submitted);

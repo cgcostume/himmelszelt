@@ -161,54 +161,86 @@ export interface LoadMoonMapsOptions extends Omit<MoonMapsOptions, "color" | "he
     onProgress?: (loaded: number, total: number) => void;
 }
 
-// The near side's mean, as `pnpm maps` printed it for the shipped maps.
+// The near side's mean, as `pnpm maps` printed it, the same for the seen and the whole maps.
 const SHIPPED = {
     meanReflectance: 0.396,
-    meanColor: [0.4125, 0.3924, 0.3828] as Vec3,
+    meanColor: Object.freeze([0.4125, 0.3924, 0.3828]) as Vec3,
 };
 
+const shipped = (color: URL, heights: URL, width: number): Readonly<MoonMapFiles> =>
+    Object.freeze({ color, heights, width, ...SHIPPED });
+
+const UNSHIPPED = "; maps the package does not ship are made by `npx @himmelszelt/nachtgestirn data`";
+
 /**
- * The maps the package ships, made by `pnpm maps` from NASA's CGI Moon Kit: the color map and the heights from LOLA's
- * 64 texels per degree, by how many texels around: "512", 225 KiB, for a disc up to 163 pixels across, "1k", 818 KiB, up
- * to 326, "2k", 3.0 MiB, up to 652, and "4k", 11.0 MiB, beyond, each as far as it gives a texel to a pixel at the disc's
- * middle (`mapWidthFor`). Resolved next to the package's own files, which bundlers that know
+ * The seen maps, the default: made by `pnpm maps` from NASA's CGI Moon Kit, the color map and the heights from LOLA's 64
+ * texels per degree, where the part of the Moon no libration ever turns to Earth is that part's own mean color at no height, which makes
+ * them a third smaller. For views from Earth or a low orbit around it; a globe, a camera that orbits the Moon, or anything
+ * else that shows the far side takes `MOON_MAPS_WHOLE`. By how many texels around: "512", 142 KiB, for a disc up to 163 pixels across,
+ * "1k", 537 KiB, up to 326, both shipped, and, made on request by `npx @himmelszelt/nachtgestirn data maps --size 2k,4k`
+ * and absent until then, "2k", 2.0 MiB, up to 652, and "4k", 7.4 MiB, beyond, each as far as it gives a texel to a pixel
+ * at the disc's middle (`mapWidthFor`). Resolved next to the package's own files, which bundlers that know
  * `new URL(..., import.meta.url)` copy along.
  */
-export const MOON_MAPS: Record<"512" | "1k" | "2k" | "4k", MoonMapFiles> = {
-    "512": {
-        color: new URL("../maps/moon-color-512.webp", import.meta.url),
-        heights: new URL("../maps/moon-height-512.webp", import.meta.url),
-        width: 512,
-        ...SHIPPED,
-    },
-    "1k": {
-        color: new URL("../maps/moon-color-1k.webp", import.meta.url),
-        heights: new URL("../maps/moon-height-1k.webp", import.meta.url),
-        width: 1024,
-        ...SHIPPED,
-    },
-    "2k": {
-        color: new URL("../maps/moon-color-2k.webp", import.meta.url),
-        heights: new URL("../maps/moon-height-2k.webp", import.meta.url),
-        width: 2048,
-        ...SHIPPED,
-    },
-    "4k": {
-        color: new URL("../maps/moon-color-4k.webp", import.meta.url),
-        heights: new URL("../maps/moon-height-4k.webp", import.meta.url),
-        width: 4096,
-        ...SHIPPED,
-    },
-};
+export const MOON_MAPS: Readonly<Record<"512" | "1k" | "2k" | "4k", Readonly<MoonMapFiles>>> = Object.freeze({
+    "512": shipped(
+        new URL("../maps/moon-color-seen-512.webp", import.meta.url),
+        new URL("../maps/moon-height-seen-512.webp", import.meta.url),
+        512,
+    ),
+    "1k": shipped(
+        new URL("../maps/moon-color-seen-1k.webp", import.meta.url),
+        new URL("../maps/moon-height-seen-1k.webp", import.meta.url),
+        1024,
+    ),
+    "2k": shipped(
+        new URL("../maps/moon-color-seen-2k.webp", import.meta.url),
+        new URL("../maps/moon-height-seen-2k.webp", import.meta.url),
+        2048,
+    ),
+    "4k": shipped(
+        new URL("../maps/moon-color-seen-4k.webp", import.meta.url),
+        new URL("../maps/moon-height-seen-4k.webp", import.meta.url),
+        4096,
+    ),
+});
+
+/**
+ * The whole maps, the far side too, as `MOON_MAPS` otherwise: for a globe, a camera that orbits the Moon, or anything
+ * else that shows the part Earth never sees. Not shipped: `npx @himmelszelt/nachtgestirn data maps --whole --size
+ * 512,1k,2k,4k` makes them next to the package's own files. "512", 207 KiB, "1k", 799 KiB, "2k", 2.9 MiB, "4k", 11.0 MiB.
+ */
+export const MOON_MAPS_WHOLE: Readonly<Record<"512" | "1k" | "2k" | "4k", Readonly<MoonMapFiles>>> = Object.freeze({
+    "512": shipped(
+        new URL("../maps/moon-color-512.webp", import.meta.url),
+        new URL("../maps/moon-height-512.webp", import.meta.url),
+        512,
+    ),
+    "1k": shipped(
+        new URL("../maps/moon-color-1k.webp", import.meta.url),
+        new URL("../maps/moon-height-1k.webp", import.meta.url),
+        1024,
+    ),
+    "2k": shipped(
+        new URL("../maps/moon-color-2k.webp", import.meta.url),
+        new URL("../maps/moon-height-2k.webp", import.meta.url),
+        2048,
+    ),
+    "4k": shipped(
+        new URL("../maps/moon-color-4k.webp", import.meta.url),
+        new URL("../maps/moon-height-4k.webp", import.meta.url),
+        4096,
+    ),
+});
 
 /**
  * Fetches and decodes a set of maps, as a browser does, and uploads them: `createMoonMaps` with the images. The
- * package's own 4K set by default. `onProgress` hears how many bytes of all the files have come, of how many, once
+ * package's seen 1K set by default. `onProgress` hears how many bytes of all the files have come, of how many, once
  * every file has said its size.
  */
 export async function loadMoonMaps(
     device: GPUDevice,
-    files: MoonMapFiles = MOON_MAPS["4k"],
+    files: MoonMapFiles = MOON_MAPS["1k"],
     options: LoadMoonMapsOptions = {},
 ): Promise<MoonMaps> {
     const { onProgress, ...rest } = options;
@@ -229,7 +261,7 @@ export async function loadMoonMaps(
     const decode = async (url: string | URL | undefined, i: number) => {
         if (!url) return null;
         const response = await fetch(url);
-        if (!response.ok) throw new Error(`nachtgestirn: ${url} gave ${response.status}`);
+        if (!response.ok) throw new Error(`nachtgestirn: ${url} gave ${response.status}${UNSHIPPED}`);
         const type = response.headers.get("content-type") ?? "";
         sizes[i] = Number(response.headers.get("content-length")) || 0;
         let blob: Blob;
@@ -402,16 +434,27 @@ function compressBc1(device: GPUDevice, texture: GPUTexture): GPUTexture {
 }
 
 /**
- * The roughness maps the package ships, made by `pnpm roughness` from Rosenburg et al. 2011's LOLA maps: red the median
- * slope over 57 m in tenths of a degree, green the Hurst exponent from 57 m to 2.7 km, 0.5 to 1 over 0 to 255. Optional,
- * for a pass that draws the slopes below the relief's texels: "1k", 0.7 MiB, "2k", 2.5 MiB, and "4k", 7.7 MiB, beyond which
- * the source holds no more. They only set how steep the noise is, so a smaller one than the color map serves.
+ * The roughness maps, made by `pnpm roughness` from Rosenburg et al. 2011's LOLA maps: red the median slope over 57 m in
+ * tenths of a degree, green the Hurst exponent from 57 m to 2.7 km, 0.5 to 1 over 0 to 255. Optional, for a pass that
+ * draws the slopes below the relief's texels. Seen, as `MOON_MAPS`, and whole, as `MOON_MAPS_WHOLE`, by the same
+ * reasoning: the seen "512", 129 KiB, and "1k", 501 KiB, shipped; the seen "2k" and "4k" and every whole one made on
+ * request by `npx @himmelszelt/nachtgestirn data roughness --size 2k,4k [--whole]`. The 4K, 7.7 MiB whole, is as fine
+ * as the source goes. They only set how steep the noise is, so a smaller one than the color map serves.
  */
-export const MOON_ROUGHNESS: Record<"1k" | "2k" | "4k", URL> = {
+export const MOON_ROUGHNESS: Readonly<Record<"512" | "1k" | "2k" | "4k", URL>> = Object.freeze({
+    "512": new URL("../maps/moon-roughness-seen-512.webp", import.meta.url),
+    "1k": new URL("../maps/moon-roughness-seen-1k.webp", import.meta.url),
+    "2k": new URL("../maps/moon-roughness-seen-2k.webp", import.meta.url),
+    "4k": new URL("../maps/moon-roughness-seen-4k.webp", import.meta.url),
+});
+
+/** The whole roughness maps, the far side too, for what `MOON_MAPS_WHOLE` is for. Not shipped, made on request. */
+export const MOON_ROUGHNESS_WHOLE: Readonly<Record<"512" | "1k" | "2k" | "4k", URL>> = Object.freeze({
+    "512": new URL("../maps/moon-roughness-512.webp", import.meta.url),
     "1k": new URL("../maps/moon-roughness-1k.webp", import.meta.url),
     "2k": new URL("../maps/moon-roughness-2k.webp", import.meta.url),
     "4k": new URL("../maps/moon-roughness-4k.webp", import.meta.url),
-};
+});
 
 /** Uploads a roughness map, decoded without color conversion or premultiplied alpha, for `MoonPass.setRoughness`. */
 export function createMoonRoughness(device: GPUDevice, image: ImageBitmap): GPUTexture {
@@ -425,13 +468,13 @@ export function createMoonRoughness(device: GPUDevice, image: ImageBitmap): GPUT
     return texture;
 }
 
-/** Fetches, decodes and uploads a roughness map, the package's 1K by default: `createMoonRoughness` with the image. */
+/** Fetches, decodes and uploads a roughness map, the package's seen 1K by default: `createMoonRoughness` with the image. */
 export async function loadMoonRoughness(
     device: GPUDevice,
     url: string | URL = MOON_ROUGHNESS["1k"],
 ): Promise<GPUTexture> {
     const response = await fetch(url);
-    if (!response.ok) throw new Error(`nachtgestirn: ${url} gave ${response.status}`);
+    if (!response.ok) throw new Error(`nachtgestirn: ${url} gave ${response.status}${UNSHIPPED}`);
     const image = await createImageBitmap(await response.blob(), {
         colorSpaceConversion: "none",
         premultiplyAlpha: "none",

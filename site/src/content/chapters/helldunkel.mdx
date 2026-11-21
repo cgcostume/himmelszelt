@@ -8,15 +8,21 @@ references:
     - bayer1973
     - bt2408
     - cie2002
+    - cie2018
     - goethe1810
+    - icc2022
     - iec1999
     - jimenez2014
     - jarzynski2020
+    - kang2002
     - khronos2024
     - lagarde2014
+    - lam1985
+    - li2017
     - narkowicz2016
     - polyhaven
     - sobotka2023
+    - thejll2014
     - ulichney1988
     - wrensch2023
     - wyman2013
@@ -25,6 +31,7 @@ references:
 import Cite from "../../components/Cite.astro";
 import Controls from "../../components/sternzeit/Controls.astro";
 import Fig from "../../components/Fig.astro";
+import Planned from "../../components/Planned.astro";
 import Term from "../../components/Term.astro";
 import Sky from "../../components/dunstkreis/Sky.astro";
 import Environments from "../../components/environment/Environments.astro";
@@ -153,6 +160,52 @@ again each time, as [its chapter](../dunstkreis/#exposure-over-a-day) follows th
 
 <Controls open />
 
+## White balance
+
+A photograph of the full Moon shows a gray-white disc, yet the Moon is a dark rock lit by the Sun, and its color index
+is about a quarter of a magnitude redder than the Sun's <Cite id="thejll2014" />. The camera made it white. An eye and
+a camera both judge colors against a white of their own, and a camera's <Term of="White balance">white balance</Term>
+picks that white and shows it as the display's. The light stays what it was; only the convention changes. helldunkel
+works in linear sRGB, whose white is D65, noon daylight, and leaves it there unless asked: a sky in cd/m² then shows the
+colors its light has.
+
+`whiteBalance` takes another white, as linear sRGB, and returns the matrix that shows it as D65 at its own luminance, so
+the exposure stays as it was. It scales the three cone responses in Bradford's sharpened space <Cite id="lam1985" />,
+as color profiles <Cite id="icc2022" /> and raw converters do; CAT16, the newer transform <Cite id="li2017" />, gives
+the white the same and other colors within a few percent. `planckianWhite` and `daylightWhite` give the white of a color
+temperature, a lamp's on the Planckian locus <Cite id="kang2002" /> or daylight's on the CIE's <Cite id="cie2018" />.
+The classic mistake is balancing after the tone curve, on encoded values: the curve has already pressed the brightest
+colors together towards white, and a balance applied after it tints what was white.
+
+Which white is right depends on what the image claims to be. In linear sRGB the Sun above the air is about 1.12, 1,
+0.98, a touch warmer than D65, and the Moon about 1.21, 1, 0.79. A photograph at night was balanced by the camera on the
+brightest thing in view, the Moon through the air, so the moonlit land looks like a dim day. The Moon above the air is
+the white for the Moon at dusk and by day, and the Sun's for photographs of the stars, where a star like the Sun shows
+white. Everything else on this site stays at D65, where the colors are the light's.
+
+<Planned
+    title="One night, three whites"
+    plan="from dunstkreis' sky and nachtgestirn's Moon, once nachtgestirn takes the white balance."
+>
+    The same moonlit frame three times, the sky in cd/m² and the Moon's disc, balanced on D65, on the Sun and on
+    the Moon through the air: a blue sky over a warm Moon, almost the same, and a deeper blue over a neutral Moon.
+    Each panel is named by what it is for, the light as it is, a photograph of the stars, and a photograph at night.
+</Planned>
+
+```ts
+import { whiteBalance, wgsl } from "@himmelszelt/helldunkel";
+
+// The Moon above the air, in linear sRGB: shown as a neutral gray.
+const balance = whiteBalance([1.21, 1, 0.79]);
+// Before the exposure, on linear light. In a uniform, a mat3x3f's columns
+// are padded to four floats each.
+const code = `${wgsl.whitebalance}
+${wgsl.tonemap}
+fn show(light: vec3f, balance: mat3x3f, exposure: f32) -> vec3f {
+    return hdToneMapNeutral(hdWhiteBalance(light, balance) * exposure);
+}`;
+```
+
 ## Tone curves
 
 A tone curve folds what is brighter than white into what the display shows, and the last step encodes the result for
@@ -192,19 +245,25 @@ no noise at all: a fixed threshold per pixel, tiled every eight, cheap and stead
 frequency alike, so some neighbors happen to agree and the grain clumps. Blue noise holds back its low frequencies, what
 the eye sees most, so its grain stays even <Cite id="ulichney1988" />, at the price of a texture to carry and tile.
 Jimenez's interleaved gradient noise lies between: one line of shader from the pixel's position alone, so it stands still
-from frame to frame and needs no texture <Cite id="jimenez2014" />, though it shows a diagonal order up close. `hdDither`
-takes that one, `hdBayer` gives Bayer's thresholds, and `hdDitherBy` takes any noise of your own. Set four bits and
-enlarge the pixels to compare, and turn the noise down: anything less than the full amount leaves some of the steps.
+from frame to frame and needs no texture <Cite id="jimenez2014" />, though it shows a diagonal order up close, most in
+dark, flat areas. helldunkel carries a tile of blue noise, 64 by 64 pixels, in its code: `hdDitherBlue` dithers by it,
+from the texture `blueNoiseTexture` makes once per device, and so do the passes of dunstkreis, gewoelk and sternenheer
+whenever they dither. `hdDither` takes Jimenez's noise, `hdBayer` gives Bayer's thresholds, and `hdDitherBy` takes any
+noise of your own. Set four bits and enlarge the pixels to compare, and turn the noise down: anything less than the full
+amount leaves some of the steps.
 
 <Banding />
 
 ```ts
-import { wgsl } from "@himmelszelt/helldunkel";
+import { blueNoiseTexture, wgsl } from "@himmelszelt/helldunkel";
 
+// Bound where the shader declares it, the same texture for every pass on the device.
+const noise = blueNoiseTexture(device);
 const code = `${wgsl.tonemap}
+@group(0) @binding(1) var noise: texture_2d<f32>;
 fn show(exposed: vec3f, pixel: vec2u) -> vec3f {
-    // Encoded by the curve, then a step of noise for 255 steps.
-    return hdDither(hdToneMapNeutral(exposed), pixel, 255.0);
+    // Encoded by the curve, then a step of blue noise for 255 steps.
+    return hdDitherBlue(hdToneMapNeutral(exposed), pixel, 255.0, noise);
 }`;
 ```
 

@@ -1,0 +1,35 @@
+/* Why the night looks blue, laid out as sternzeit's eclipse views, its colors as dunstkreis' wavelengths figure and its
+   plot as nachtgestirn's; what remains has no shared rule. A tap sets the luminance and lets the page scroll. */
+.nightblue-figure svg {
+    display: block;
+    width: 100%;
+    font-size: var(--text-small);
+    cursor: crosshair;
+    touch-action: pan-y;
+    user-select: none;
+}
+/* Where rods and cones see together. */
+.nightblue-band {
+    fill: color-mix(in oklab, var(--text), transparent 94%);
+}
+/* A star's core, filled with its color as seen, ringed in ink to stand off the curve. */
+.nightblue-core {
+    stroke: var(--text);
+    stroke-width: 1.5;
+}
+.nightblue-chosen {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+}
+/* The chosen luminance over the colors: ink with a halo of the page, legible on blue and on orange in either theme. */
+.nightblue-cursor {
+    stroke: var(--text);
+    stroke-width: 1.5;
+    filter: drop-shadow(0 0 1px var(--bg));
+}
+/* The luminance in one width, from 0.0003 to 10,000, so the rail stays put. */
+.nightblue-figure .figure-slider > output {
+    min-width: 7ch;
+    text-align: right;
+}

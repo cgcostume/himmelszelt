@@ -30,12 +30,15 @@ import {
     skyViewChanged,
     tables,
 } from "../dunstkreis/atmosphere";
+import { flightIn } from "../dunstkreis/flight";
+import { groundGrid } from "../dunstkreis/groundgrid";
 import { type Basis, cameraBasis, lookAround, project } from "../dunstkreis/skycamera";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
-import { createAerialRgb } from "./aerial";
+import { changeLab } from "./change";
+import { SHOW, texturePanel } from "./textures";
 
 const DEG = Math.PI / 180;
 // The sky pass writes cd/m² when its exposure is 1: EV100 of -log2(1.2).
@@ -176,7 +179,6 @@ export function cloudsFigure(root: HTMLElement) {
     let skyIrradiance: [number, number, number] = [0, 0, 0];
     let groundIrradiance: [number, number, number] = [0, 0, 0];
     let horizon: [number, number, number] = [0, 0, 0];
-    const aerialRgb = gpu ? createAerialRgb(gpu.device) : null;
     // The sun's light aloft comes from gewoelk's own table, through dunstkreis' air; with the sun switched off, none.
     const noSunlight = Array.from({ length: 4 * SUNLIGHT_ENTRIES }, (): [number, number, number] => [0, 0, 0]);
     const requestRender = onDemand(render, root);
@@ -210,7 +212,14 @@ export function cloudsFigure(root: HTMLElement) {
             requestRender();
         });
     }
-    function buildClouds(key: string, scale: number, maxSteps: number, layers: number, luts: AtmosphereLUTs) {
+    function buildClouds(
+        key: string,
+        scale: number,
+        maxSteps: number,
+        grid: { layers: number; size?: number },
+        luts: AtmosphereLUTs,
+        keyframes = false,
+    ) {
         if (!gpu || cloudsBuilding === key) return;
         cloudsBuilding = key;
         const { atmosphereBuffer, transmittance, sampler, model } = luts;
@@ -220,11 +229,12 @@ export function cloudsFigure(root: HTMLElement) {
             sampler,
             apparentElevation: (altitudeKm: number, elevation: number) => lifted(model, altitudeKm, elevation),
         };
-        const options = { format: SDR, dither: true, scale, maxSteps, grid: { layers }, atmosphere };
+        const options = { format: SDR, dither: true, scale, maxSteps, grid, atmosphere, keyframes, ...lab?.created };
         createCloudPass(gpu.device, options).then((pass) => {
             if (cloudsBuilding !== key) return pass.destroy();
             clouds?.pass.destroy();
             clouds = { pass, key };
+            lab?.reset(pass);
             cloudsBuilding = "";
             requestRender();
         });
@@ -256,6 +266,10 @@ export function cloudsFigure(root: HTMLElement) {
     function showTiming() {
         const note = maybe("timing");
         if (!note || !gpu) return;
+        if (lab) {
+            note.textContent = gpu.adapterName ?? "";
+            return;
+        }
         const cost = Number.isFinite(cloudsMs) ? `clouds ${cloudsMs.toFixed(2)} ms on the GPU` : "no GPU timestamps";
         note.textContent = `${gpu.adapterName} · ${cost}`;
     }
@@ -301,6 +315,10 @@ export function cloudsFigure(root: HTMLElement) {
         return `${layer}: { ${inner.join(", ")} },`;
     }
 
+    const textures = gpu ? texturePanel(root, gpu.device) : null;
+    const groundPass = gpu ? groundGrid(gpu.device) : null;
+    // Flight, and the height and the place over the ground the figure is seen from: its own, no other figure follows.
+    const { flown, height: heightM } = flightIn(root, canvas, camera, () => requestRender());
     // Each layer's motion as last drawn: a new wind or evolution goes on from where the clouds stand.
     const motions: (LayerMotion | undefined)[] = [];
     function moving(layer: number, wind: [number, number], evolution: number, timeS: number): LayerMotion {
@@ -308,11 +326,28 @@ export function cloudsFigure(root: HTMLElement) {
         const next = { wind, evolution };
         const same = last && last.wind[0] === wind[0] && last.wind[1] === wind[1] && last.evolution === evolution;
         if (!same) motions[layer] = last ? { ...next, ...continuedMotion(last, next, timeS) } : next;
-        return motions[layer] as LayerMotion;
+        // Flown over: the clouds lie as far back as the observer has come, their own motion as it was.
+        const motion = motions[layer] as LayerMotion;
+        const [east, north] = motion.driftOffsetKm ?? [0, 0];
+        return { ...motion, driftOffsetKm: [east - flown.east, north - flown.north] };
     }
 
+    // The lab's weather cycle: the next preset, its button checked as a click would.
+    function nextWeather() {
+        const choices = [...root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-weather"]`)];
+        const next = choices[(choices.findIndex((input) => input.checked) + 1) % choices.length];
+        if (!next) return;
+        next.checked = true;
+        changeWeather(next.value as WeatherName);
+    }
+    // With `data-lab`, the figure's lab: a clock of its own, the cloudscape by keyframes, and what each part costs.
+    const lab =
+        gpu && root.hasAttribute("data-lab")
+            ? changeLab(root, gpu.device, { requestRender, nextWeather, timed: () => textures?.refresh() })
+            : null;
+
     function cloudParams(): Partial<CloudParams> {
-        const timeS = seconds();
+        const timeS = seconds() + (lab?.clock.seconds ?? 0);
         const windOf = (speed: number, azimuth: number): [number, number] => [
             speed * Math.sin(azimuth * DEG),
             speed * Math.cos(azimuth * DEG),
@@ -349,6 +384,7 @@ export function cloudsFigure(root: HTMLElement) {
                 size: slider("cloudscape.size"),
                 towerScale: slider("cloudscape.towerScale"),
                 billows: slider("cloudscape.billows"),
+                detailShiftKm: lab?.clock.detailShiftKm ?? 0,
                 multiScatter: pressed("light.multi") ? DEFAULT_CLOUDSCAPE.multiScatter : 0,
             },
             sheets: [
@@ -378,7 +414,7 @@ export function cloudsFigure(root: HTMLElement) {
     function render() {
         const table = tables();
         if (!gpu || !table) return;
-        const reach = aerialReach(state.heightM, table.luts.model.planet.groundRadiusKm);
+        const reach = aerialReach(heightM(), table.luts.model.planet.groundRadiusKm);
         if (sky?.luts !== table.luts) {
             buildSky(table.luts, reach);
             return;
@@ -388,11 +424,13 @@ export function cloudsFigure(root: HTMLElement) {
         const scale = Number(choice("scale")) || 1;
         const maxSteps = Number(choice("steps")) || 128;
         const layers = Number(choice("layers")) || 64;
-        const key = `${scale},${maxSteps},${layers},${lutsId(table.luts)}`;
+        const grid = lab ? { layers, size: lab.gridSize } : { layers };
+        const key = `${scale},${maxSteps},${layers},${lutsId(table.luts)},${lab?.keyframes},${lab?.gridSize}`;
         if (clouds?.key !== key) {
-            buildClouds(key, scale, maxSteps, layers, table.luts);
+            buildClouds(key, scale, maxSteps, grid, table.luts, lab?.keyframes);
             return;
         }
+        lab?.tick();
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const width = Math.max(1, Math.round(canvas.clientWidth * dpr));
         const height = Math.max(1, Math.round(canvas.clientHeight * dpr));
@@ -411,13 +449,13 @@ export function cloudsFigure(root: HTMLElement) {
         const position = sun.horizontalPosition(time, state);
         const sunDirection = sun.direction(time, state);
         const sunAngularDiameter = sun.apparentAngularDiameter(julianEphemerisDay(time));
-        const observerHeightM = clampObserverHeight(state.heightM);
+        const observerHeightM = clampObserverHeight(heightM());
         const basis = cameraBasis(camera, width / height);
         const ivp = inverseViewProjection(basis);
         sky.pass.update({
             sunDirection,
             sunAngularDiameter,
-            observerHeightM: state.heightM,
+            observerHeightM: heightM(),
             inverseViewProjection: ivp,
             projectionDistance: basis.d,
             pixelRatio: dpr,
@@ -433,7 +471,7 @@ export function cloudsFigure(root: HTMLElement) {
         }
         // Whenever the sky view may have been rebuilt: the meter's reading and the sunlight, read back, and the
         // environment that gives the clouds their ambient light.
-        const skyViewKey = `${state.jd},${state.latitude},${state.longitude},${state.heightM},${sky.luts === table.luts}`;
+        const skyViewKey = `${state.jd},${state.latitude},${state.longitude},${heightM()},${sky.luts === table.luts}`;
         if (skyViewKey !== skyViewFor) {
             skyViewFor = skyViewKey;
             const { pass } = sky;
@@ -454,21 +492,31 @@ export function cloudsFigure(root: HTMLElement) {
             planetRadiusKm: table.luts.model.planet.groundRadiusKm,
             ...cloudParams(),
         };
-        clouds.pass.update(params);
+        const encoder = gpu.device.createCommandEncoder({ label: "sternwarte:clouds" });
+        if (lab) lab.update(clouds.pass, params, encoder);
+        else clouds.pass.update(params);
 
         placeCompass(basis, canvas.clientWidth, canvas.clientHeight);
-        const encoder = gpu.device.createCommandEncoder({ label: "sternwarte:clouds" });
         sky.pass.encode(encoder, background);
+        // The ground's grid, drawn onto the sky's ground before the clouds are composed over it.
+        const radiusKm = table.luts.model.planet.groundRadiusKm;
+        const behind =
+            groundPass && pressed("ground.grid")
+                ? groundPass.encode(encoder, background, {
+                      inverseViewProjection: ivp,
+                      projectionDistance: basis.d,
+                      heightM: observerHeightM,
+                      radiusKm,
+                      flown,
+                  })
+                : background;
         // The air in front of the clouds from dunstkreis' volume, or, chosen so, a blend into the sky behind them.
-        const volume = sky.pass.aerialPerspective;
-        const aerialPerspective =
-            choice("air") === "volume" && volume && aerialRgb
-                ? aerialRgb.encode(encoder, sky.luts, volume, sky.pass.skyViewScale)
-                : undefined;
-        const timestamps = timing && !timing.busy;
+        const aerialPerspective = choice("air") === "volume" ? sky.pass.aerialPerspective : null;
+        const timestamps = timing && !timing.busy && !lab;
         clouds.pass.encode(encoder, gpu.context.getCurrentTexture(), {
-            background,
+            background: behind,
             ...(aerialPerspective ? { aerialPerspective } : {}),
+            ...lab?.march(),
             ...(timestamps
                 ? { timestampWrites: { querySet: timing.set, beginningOfPassWriteIndex: 0, endOfPassWriteIndex: 1 } }
                 : {}),
@@ -477,9 +525,82 @@ export function cloudsFigure(root: HTMLElement) {
             encoder.resolveQuerySet(timing.set, 0, 2, timing.resolve, 0);
             encoder.copyBufferToBuffer(timing.resolve, 0, timing.read, 0, 16);
         }
+        lab?.finish(encoder);
+        const { mapTexture, modelingTexture, lightTexture, ambientTexture, detailTexture } = clouds.pass;
+        // In the lab, what each texture last took to compute.
+        const took = (part: Parameters<NonNullable<typeof lab>["took"]>[0], timed = "") =>
+            lab ? { ms: () => lab.took(part), timed } : {};
+        textures?.show([
+            {
+                label: "cloud map",
+                title: "The cloud map's red channel, one tile from above, north up: how tall each column of cloud is, after coverage and sharpness. Its other channels say which clouds are billowy and which frayed, hold the noise before shaping, which the march reads again to thin the clouds out far off, and mark where towers grow. Everything else is built from this map.",
+                texture: mapTexture,
+                kind: "array",
+                mode: SHOW.red,
+                ...took("map"),
+            },
+            {
+                label: "cirrus map",
+                title: "The high sheet's map: how much cirrus lies where, before its fibers are drawn in per pixel.",
+                texture: mapTexture,
+                kind: "array",
+                at: 1,
+                mode: SHOW.red,
+                ...took("sheets"),
+            },
+            {
+                label: "shape + distance",
+                title: "An upright cut through the voxel volume, east to west: the modeling data. Inside a cloud, warm to white, how deep a point lies under the surface: the shape the detail noise erodes. Outside, in blues, the distance to the nearest cloud: how far a ray may step without missing one.",
+                texture: modelingTexture,
+                kind: "3d",
+                at: -1,
+                mode: SHOW.modeling,
+                ...took("volume"),
+            },
+            {
+                label: "light",
+                title: "The same cut through the light grid: how much cloud lies between each voxel and the Sun, summed once per Sun position, bright where the Sun reaches and dark in shadow. The march reads it instead of marching a second ray towards the Sun.",
+                texture: lightTexture,
+                kind: "3d",
+                at: -1,
+                mode: SHOW.shade,
+                scale: 8,
+                channel: 1,
+                ...took("light"),
+            },
+            {
+                label: "sky's light",
+                title: "The same cut through the ambient grid, at half the resolution: how much of the sky's light reaches a voxel through the clouds around it. A second channel holds the same for the ground's light from below. Together they give the clouds their gray undersides.",
+                texture: ambientTexture,
+                kind: "3d",
+                at: -1,
+                mode: SHOW.red,
+                ...took("ambient"),
+            },
+            {
+                label: "billows",
+                title: "A level slice of the detail noise, a 3D texture that tiles: its coarse billows. At every sample the noise erodes the smooth voxel shape into a cloud's surface, rounding it into lumps.",
+                texture: detailTexture,
+                kind: "3d",
+                at: 0.5,
+                mode: SHOW.blue,
+                ...took("detail", "once"),
+            },
+            {
+                label: "wisps",
+                title: "The same slice of the detail noise, its coarse wisps: where the air around eats into a cloud and leaves webs and curls. The map's type decides how much of each a cloud gets.",
+                texture: detailTexture,
+                kind: "3d",
+                at: 0.5,
+                mode: SHOW.red,
+                ...took("detail", "once"),
+            },
+        ]);
+        textures?.encode(encoder, pressed("textures.on"));
         gpu.device.queue.submit([encoder.finish()]);
         if (timestamps) readTiming();
         else showTiming();
+        lab?.submitted();
         for (const input of sliders) {
             const output = input.parentElement?.querySelector("output");
             if (output) output.textContent = input.value;

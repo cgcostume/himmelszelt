@@ -1,9 +1,10 @@
-import { exposureFromEV100, type ToneCurve } from "@himmelszelt/helldunkel";
+import { blueNoiseTexture, exposureFromEV100, NO_WHITE_BALANCE, type ToneCurve } from "@himmelszelt/helldunkel";
 import { autoExposureCompensation, DEFAULT_AUTO_EXPOSURE_KEYS } from "./exposure.js";
 import { createLut, dispatch } from "./luts.js";
 import { spectrumToRgb } from "./model.js";
 import {
     type AerialPerspectiveOptions,
+    type AerialPerspectivePass,
     type AerialPerspectiveVolume,
     type AtmosphereLUTs,
     clampObserverHeight,
@@ -45,8 +46,13 @@ export interface SkyPassOptions {
      * on an HDR display. "agx" and "aces" stay within 1. Default 1, SDR.
      */
     headroom?: number;
-    /** Dither the tone mapped output against banding, false by default: for an 8-bit target over smooth gradients. */
+    /**
+     * Dither the tone mapped output against banding by a step of helldunkel's blue noise, false by default: for an
+     * 8-bit target over smooth gradients.
+     */
     dither?: boolean;
+    /** The blue noise to dither by, helldunkel's `blueNoiseTexture(device)` by default: one for a frame's passes. */
+    blueNoise?: GPUTexture;
     /**
      * Expose by a light meter instead of `ev100`: the geometric mean luminance of the sky above the horizon, measured
      * on the GPU whenever the sky-view table is rebuilt, and read by the sky pass without a round trip to the CPU. For a
@@ -101,24 +107,32 @@ export interface SkyPassOptions {
      */
     scattering?: { single?: boolean; multiple?: boolean };
     /**
-     * Build Hillaire's aerial perspective volume as well, for the air in front of the caller's geometry: `true` for
-     * 32x32 froxels in 32 slices out to 32 km, or its shape. Off by default.
+     * Build Hillaire's aerial perspective volume as well, for the air in front of the caller's geometry, terrain as
+     * clouds: `true` for 32x32 froxels in 32 slices out to 32 km, or its shape. In linear sRGB, read by
+     * `dkAerialPerspective` from `wgsl.aerial` or laid over a rendered scene by `createAerialPerspectivePass`. Off by
+     * default.
      */
     aerialPerspective?: boolean | AerialPerspectiveOptions;
     /**
      * The Moon as a second light of the sky: a sky-view table of its own, built from `moonDirection` by the same march,
      * read beside the Sun's, and an aureole around it. The sky by moonlight, blue like the day at a few millionths of
-     * its light, and the glow around the Moon in haze. The meter, the ground's light from the sky and the aerial
-     * perspective volume stay the Sun's. Off by default.
+     * its light, and the glow around the Moon in haze, and its light in the aerial perspective volume. The meter and
+     * the ground's light from the sky stay the Sun's. Off by default.
      */
     moonlight?: boolean;
 }
 
 /**
  * Byte size of DkSkyParams in frame.wgsl: a vec3 and a scalar, a mat4x4, four scalars, a vec2 and two scalars, a vec3
- * and a scalar twice, a vec3 and a scalar, and a scalar padded to 16.
+ * and a scalar twice, a vec3 and a scalar, a scalar padded to 16, and a mat3x3 of three columns padded to 16.
  */
-const SKY_PARAMS_SIZE = 176;
+const SKY_PARAMS_SIZE = 224;
+/** `x` as a half float holds it, to the nearest: the aerial perspective volume keeps its reach in one. */
+const halfFloat = (x: number) => {
+    const step = 2 ** (Math.floor(Math.log2(x)) - 10);
+    return Math.round(x / step) * step;
+};
+
 /** The light meter's directions per cap, `DK_METER_SAMPLES` in frame.wgsl, one per invocation of 128 per workgroup. */
 const METER_SAMPLES = 4096;
 const METER_WORKGROUPS = METER_SAMPLES / 128;
@@ -143,6 +157,7 @@ const DEFAULTS: SkyParams = {
     moonAngularDiameter: 0,
     gridInk: 1,
     sunDiscCeiling: null,
+    whiteBalance: NO_WHITE_BALANCE,
 };
 
 /**
@@ -215,6 +230,8 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         );
     }
     const dither = options.dither ?? false;
+    // Bound whatever `dither` says: the binding stays in the layout.
+    const blueNoise = options.blueNoise ?? blueNoiseTexture(device);
     const storable = ["rgba8unorm", "rgba16float", "rgba32float"].includes(format);
     if (!storable && !(format === "bgra8unorm" && device.features.has("bgra8unorm-storage"))) {
         throw new Error(`dunstkreis: the sky pass writes ${format} as a storage texture, which this device cannot`);
@@ -247,6 +264,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             wgsl.cube,
             wgsl.sun,
             wgsl.glare,
+            wgsl.whitebalance,
             wgsl.tonemap,
             wgsl.vision,
             wgsl.grid,
@@ -279,13 +297,16 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         aerial &&
         !(
             [aerial.width, aerial.height, aerial.depth].every((n) => Number.isInteger(n) && n > 0) &&
-            aerial.maxDistanceKm > 0
+            aerial.maxDistanceKm >= 2 ** -14 &&
+            aerial.maxDistanceKm <= 65504
         )
     ) {
-        throw new Error("dunstkreis: the aerial perspective volume takes whole froxels and a distance above 0");
+        throw new Error("dunstkreis: the aerial perspective volume takes whole froxels and a distance up to 65504 km");
     }
-    // Luminance and transmittance at four wavelengths each, in two textures of four channels, like the sky-view table:
-    // the light filters in the space it was integrated in and turns into RGB once, where it is applied.
+    // The volume holds its reach in a half float, so the pass that fills it marches to that very number.
+    const aerialReach = aerial ? halfFloat(aerial.maxDistanceKm) : 0;
+    // Luminance and transmittance in linear sRGB, in two textures: turned from the four wavelengths once, where the
+    // volume is filled, so whoever reads it needs nothing of the model. See aerial.wgsl for what the alphas hold.
     const froxels = (label: string) =>
         aerial &&
         device.createTexture({
@@ -299,7 +320,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         ? {
               luminance: froxels("dunstkreis:aerialLuminance") as GPUTexture,
               transmittance: froxels("dunstkreis:aerialTransmittance") as GPUTexture,
-              maxDistanceKm: aerial.maxDistanceKm,
+              maxDistanceKm: aerialReach,
           }
         : null;
     // Everything that changes per frame, read by every pass here: the sky-view table, the meter and the sky pass.
@@ -403,7 +424,9 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                     constants: {
                         ...refractionConstants(model),
                         ...scatteringConstants(options.scattering),
-                        DK_AERIAL_PERSPECTIVE_DISTANCE: aerial.maxDistanceKm,
+                        ...aureoleConstants(aureole),
+                        DK_AERIAL_PERSPECTIVE_DISTANCE: aerialReach,
+                        DK_AERIAL_MOONLIGHT: Number(moonlight),
                     },
                 },
             }),
@@ -470,6 +493,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             { binding: 5, resource: luts.multiScattering.createView() },
             { binding: 6, resource: { buffer: metering } },
             { binding: 7, resource: (moonView ?? skyView).createView() },
+            { binding: 8, resource: blueNoise.createView() },
         ]);
     const skyBindGroup = skyBindGroupFor(skyPipeline);
     const aerialBindGroup =
@@ -569,20 +593,23 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             sky[39] = params.gridInk;
             sky[40] = params.sunDiscCeiling ?? 0;
             sky[41] = params.moonAngularDiameter > 0 ? Math.cos((params.moonAngularDiameter * Math.PI) / 360) : 2;
+            const [m0, m1, m2, m3, m4, m5, m6, m7, m8] = params.whiteBalance;
+            sky.set([m0, m1, m2, 0, m3, m4, m5, 0, m6, m7, m8], 44);
             device.queue.writeBuffer(skyParams, 0, sky);
 
             // Rebuilding the sky-view table is the expensive part, and it is why the sky pass itself is one fetch
             // per pixel rather than a raymarch. It depends on nothing but the Sun and the observer. Above the
             // atmosphere nothing reads the table: the sky pass raymarches per pixel, and so does the meter.
             const key = `${sx},${sy},${sz},${height}`;
-            const cameraKey = `${key},${params.inverseViewProjection.join(",")}`;
             const rebuildSkyView = key !== skyViewKey;
-            const rebuildAerial = Boolean(aerialPipeline) && cameraKey !== aerialKey;
             const inSpace = height / 1000 > model.planet.thicknessKm;
             const moonTableKey = moonShare > 0 && !inSpace ? `${moonKey},${moonShare}` : "";
             const rebuildMoon = moonTableKey !== "" && moonTableKey !== moonViewKey;
             // The meter also writes the Moon's light at the observer, from space as well.
             const moonLightKey = moonShare > 0 ? `${moonKey},${moonShare}` : "";
+            // The air in front of geometry follows the camera too, and the Moon where it lights the air.
+            const cameraKey = `${key},${moonLightKey},${params.inverseViewProjection.join(",")}`;
+            const rebuildAerial = Boolean(aerialPipeline) && cameraKey !== aerialKey;
             const remeter = rebuildSkyView || moonLightKey !== meteredMoonKey;
             if (!remeter && !rebuildAerial && !rebuildMoon) return;
             skyViewKey = key;
@@ -762,6 +789,81 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                 },
             };
             return cubePass;
+        },
+
+        async createAerialPerspectivePass(passOptions) {
+            const { format: targetFormat, clearDepth = 1, metersPerUnit = 1 } = passOptions;
+            if (!aerialVolume) throw new Error("dunstkreis: this sky pass was made without `aerialPerspective`");
+            if (targetFormat !== "rgba16float" && targetFormat !== "rgba32float") {
+                throw new Error(`dunstkreis: the aerial perspective pass writes linear light, not ${targetFormat}`);
+            }
+            if (!(metersPerUnit > 0)) throw new Error("dunstkreis: a scene's unit is more than 0 meters");
+            const pipeline = await device.createComputePipelineAsync({
+                label: "dunstkreis:aerialPerspectivePass",
+                layout: "auto",
+                compute: {
+                    module: device.createShaderModule({
+                        code: [
+                            wgsl.features,
+                            wgsl.frame,
+                            wgsl.whitebalance,
+                            wgsl.aerial,
+                            wgsl.skyOutput(targetFormat),
+                            wgsl.aerialapply,
+                        ].join("\n"),
+                    }),
+                    entryPoint: "dkApplyAerialPerspective",
+                    constants: {
+                        ...featureConstants({ autoExposure }),
+                        DK_AERIAL_CLEAR_DEPTH: clearDepth,
+                        DK_AERIAL_UNIT_KM: metersPerUnit / 1000,
+                    },
+                },
+            });
+            const [luminance, transmittance] = [
+                aerialVolume.luminance.createView(),
+                aerialVolume.transmittance.createView(),
+            ];
+            // The group that takes the scene, remade only when its textures change.
+            let scene: { color: GPUTexture; depth: GPUTexture; group: GPUBindGroup } | null = null;
+            const targets = new WeakMap<GPUTexture, GPUBindGroup>();
+            const aerialPass: AerialPerspectivePass = {
+                encode(encoder, target, { color, depth }) {
+                    if ([color, depth].some((t) => t.width !== target.width || t.height !== target.height)) {
+                        throw new Error("dunstkreis: the scene's color and depth are the target's size");
+                    }
+                    if (target.format !== targetFormat) {
+                        throw new Error(`dunstkreis: this pass writes ${targetFormat}, not ${target.format}`);
+                    }
+                    if (scene?.color !== color || scene.depth !== depth) {
+                        const group = bindGroup(pipeline, [
+                            { binding: 0, resource: { buffer: skyParams } },
+                            { binding: 1, resource: { buffer: metering } },
+                            { binding: 2, resource: luminance },
+                            { binding: 3, resource: transmittance },
+                            { binding: 4, resource: luts.sampler },
+                            { binding: 5, resource: color.createView() },
+                            { binding: 6, resource: depth.createView({ aspect: "depth-only" }) },
+                        ]);
+                        scene = { color, depth, group };
+                    }
+                    let output = targets.get(target);
+                    if (!output) {
+                        output = device.createBindGroup({
+                            layout: pipeline.getBindGroupLayout(1),
+                            entries: [{ binding: 0, resource: target.createView() }],
+                        });
+                        targets.set(target, output);
+                    }
+                    const pass = encoder.beginComputePass({ label: "dunstkreis:aerialPerspectivePass" });
+                    pass.setPipeline(pipeline);
+                    pass.setBindGroup(0, scene.group);
+                    pass.setBindGroup(1, output);
+                    pass.dispatchWorkgroups(dispatch(target.width), dispatch(target.height));
+                    pass.end();
+                },
+            };
+            return aerialPass;
         },
 
         encode(encoder, target) {

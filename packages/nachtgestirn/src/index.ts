@@ -37,7 +37,9 @@ export {
     loadMoonRoughness,
     MOON_COLOR,
     MOON_MAPS,
+    MOON_MAPS_WHOLE,
     MOON_ROUGHNESS,
+    MOON_ROUGHNESS_WHOLE,
 } from "./maps.js";
 
 export type { EarthShadow, EncodeOptions, MapFilter, MoonParams, MoonPass, MoonPassOptions, Shimmer } from "./moon.js";

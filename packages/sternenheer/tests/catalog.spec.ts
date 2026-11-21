@@ -1,23 +1,52 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import {
-    catalogFromBuffer,
+    BRIGHT_STARS,
+    COMPACT_STAR_WORDS,
     catalogFromStars,
+    type DeepStars,
+    type FaintStar,
+    HIPPARCOS,
+    isCompact,
+    loadCatalog,
+    loadDeepStars,
+    loadFaintStars,
+    type PackedStars,
     packedStarAt,
-    packedStarsFromBuffer,
     packStars,
     STAR_FIELDS,
     starAt,
+    TYCHO,
 } from "../src/catalog.js";
 import { colorFromColorIndex } from "../src/color.js";
 import { CONSTELLATIONS, constellationMask, constellationsFromBuffer } from "../src/constellations.js";
 
-const bytes = readFileSync(new URL("../data/brightstars.bin", import.meta.url));
-const catalog = catalogFromBuffer(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+// The loaders fetch; here the package's files come off the disk, compressed as a server would send them.
+globalThis.fetch = (async (url: string | URL) =>
+    new Response(readFileSync(url instanceof URL ? url : new URL(url)))) as typeof fetch;
+const catalog = await loadCatalog();
+const full = await loadCatalog("full");
+
+/** The angle between two places on the sky, in arcseconds. */
+function apart(a: { rightAscension: number; declination: number }, b: { rightAscension: number; declination: number }) {
+    const r = Math.PI / 180;
+    const [x, y] = [(b.rightAscension - a.rightAscension) * r, (b.declination - a.declination) * r];
+    const h = Math.sin(y / 2) ** 2 + Math.cos(a.declination * r) * Math.cos(b.declination * r) * Math.sin(x / 2) ** 2;
+    return (2 * Math.asin(Math.sqrt(h)) * 180 * 3600) / Math.PI;
+}
+
+/** The largest and the root mean square of some errors. */
+const spread = (errors: number[]) => ({
+    max: errors.reduce((most, e) => Math.max(most, e), 0),
+    rms: Math.sqrt(errors.reduce((sum, e) => sum + e * e, 0) / errors.length),
+});
 
 test("the shipped catalog holds the 9,093 stars of the Yale Bright Star Catalogue, Sirius the brightest", () => {
     expect(catalog.count).toBe(9093);
-    expect(catalog.data.length).toBe(9093 * STAR_FIELDS);
+    expect(catalog.compact).toBe(true);
+    expect(catalog.data.length).toBe(9093 * COMPACT_STAR_WORDS);
+    expect(full.data.length).toBe(9093 * STAR_FIELDS);
     let brightest = 0;
     for (let i = 1; i < catalog.count; i++)
         if (starAt(catalog, i).magnitude < starAt(catalog, brightest).magnitude) brightest = i;
@@ -75,9 +104,110 @@ test("the shipped lines join stars of the shipped catalog, Orion's belt among th
     expect(() => constellationMask(["Xyz"])).toThrow();
 });
 
-test("the shipped Hipparcos stars are the ones the catalog lacks, brightest first, and pack to a 13th of an arcsecond", () => {
-    const file = readFileSync(new URL("../data/hipparcos.bin", import.meta.url));
-    const faint = packedStarsFromBuffer(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength));
+test("the shipped catalog is gzip compressed byte planes, a third smaller", () => {
+    for (const [file, made] of [
+        [BRIGHT_STARS.full, full],
+        [BRIGHT_STARS.compact, catalog],
+    ] as const) {
+        const packed = readFileSync(file);
+        expect([packed[0], packed[1]]).toEqual([0x1f, 0x8b]);
+        expect(packed.length).toBeLessThan(0.82 * made.data.byteLength);
+    }
+});
+
+test("the compact catalog keeps the magnitudes, colors and proper motions, and the places within a sixth of an arcsecond", () => {
+    const errors: number[] = [];
+    for (let i = 0; i < full.count; i++) {
+        const [a, b] = [starAt(full, i), starAt(catalog, i)];
+        errors.push(apart(a, b));
+        expect(Math.abs(a.magnitude - b.magnitude)).toBeLessThan(1e-5);
+        expect(Math.abs(a.properMotionRightAscension - b.properMotionRightAscension)).toBeLessThan(1e-6);
+        expect(Math.abs(a.properMotionDeclination - b.properMotionDeclination)).toBeLessThan(1e-6);
+        for (let c = 0; c < 3; c++) expect(Math.abs((a.color[c] ?? 0) - (b.color[c] ?? 0))).toBeLessThan(1e-5);
+    }
+    const { max, rms } = spread(errors);
+    console.log(`Yale compact: places off by ${max.toFixed(3)}" at most, ${rms.toFixed(3)}" rms`);
+    // The full layout's floats hold a right ascension near 360° to 0.1 arcseconds themselves: against the CSV the
+    // compact places are within 0.16 arcseconds.
+    expect(max).toBeLessThan(0.21);
+    const rows = readFileSync(new URL("../data/brightstars.csv", import.meta.url), "utf8")
+        .trim()
+        .split("\n")
+        .slice(1);
+    const truth = rows
+        .map((row) => row.split(",").map(Number))
+        .map(([, ra = 0, declination = 0]) => ({ rightAscension: ra * 15, declination }));
+    const exact = spread(truth.map((star, i) => apart(star, starAt(catalog, i))));
+    const fromFull = spread(truth.map((star, i) => apart(star, starAt(full, i))));
+    console.log(
+        `Yale against the CSV: compact ${exact.max.toFixed(3)}" at most, ${exact.rms.toFixed(3)}" rms; full ${fromFull.max.toFixed(3)}", ${fromFull.rms.toFixed(3)}"`,
+    );
+    expect(exact.max).toBeLessThan(0.16);
+    // A catalog made compact in memory reads back as the file does.
+    const made = catalogFromStars(
+        [starAt(full, 0), starAt(full, 1)].map((star, i) => ({
+            ...star,
+            colorIndex: starAt(catalog, i).colorIndex ?? 0,
+        })),
+        "compact",
+    );
+    expect([...made.data]).toEqual([...catalog.data.subarray(0, 6)]);
+});
+
+/** Faint stars of either layout, the empty places left out, keyed by their magnitude and color codes. */
+function faintByCodes(stars: PackedStars): Map<string, FaintStar[]> {
+    const slots = "blocks" in stars ? (stars as DeepStars).blocks * (stars as DeepStars).blockSize : stars.count;
+    const byCodes = new Map<string, FaintStar[]>();
+    for (let i = 0; i < slots; i++) {
+        const star = packedStarAt(stars, i);
+        if (!Number.isFinite(star.magnitude)) continue;
+        // The full layout keeps a magnitude code of 255, the compact one stops at 254: one Hipparcos star.
+        const key = `${Math.min(Math.round(star.magnitude * 16), 222)} ${Math.round(star.colorIndex * 100)}`;
+        byCodes.get(key)?.push(star) ?? byCodes.set(key, [star]);
+    }
+    return byCodes;
+}
+
+/** Each star of `compact` matched to the nearest of `full` with the same codes: the errors in arcseconds. */
+function matched(full: PackedStars, compact: PackedStars): number[] {
+    const [a, b] = [faintByCodes(full), faintByCodes(compact)];
+    const errors: number[] = [];
+    for (const [key, stars] of b) {
+        const candidates = a.get(key) ?? [];
+        expect(candidates.length, key).toBe(stars.length);
+        // In cells of a tenth of a degree by declination, the candidates near each star.
+        const cell = (s: FaintStar) => Math.floor((s.declination + 90) * 10);
+        const grid = new Map<number, FaintStar[]>();
+        for (const s of candidates) grid.get(cell(s))?.push(s) ?? grid.set(cell(s), [s]);
+        for (const star of stars) {
+            let best = Number.POSITIVE_INFINITY;
+            for (let k = cell(star) - 1; k <= cell(star) + 1; k++)
+                for (const s of grid.get(k) ?? [])
+                    if (Math.abs(s.declination - star.declination) < 0.01) best = Math.min(best, apart(s, star));
+            errors.push(best);
+        }
+    }
+    return errors;
+}
+
+test("the compact Hipparcos and Tycho-2 stars stand where the full ones do, within 0.6 arcseconds, as bright and as colored", async () => {
+    test.setTimeout(120_000);
+    for (const [name, files, load] of [
+        ["Hipparcos", HIPPARCOS, loadFaintStars],
+        ["Tycho-2", TYCHO, loadDeepStars],
+    ] as const) {
+        if (!existsSync(fileURLToPath(files.compact)) || !existsSync(fileURLToPath(files.full))) continue;
+        const [a, b] = [await load("full"), await load("compact")];
+        expect(isCompact(b) && b.count).toBe(a.count);
+        const { max, rms } = spread(matched(a, b));
+        console.log(`${name} compact: places off by ${max.toFixed(3)}" at most, ${rms.toFixed(3)}" rms`);
+        expect(max).toBeLessThan(0.6);
+    }
+});
+
+test("the Hipparcos stars are the ones the catalog lacks, brightest first, and pack to a 13th of an arcsecond", async () => {
+    test.skip(!existsSync(fileURLToPath(HIPPARCOS.full)), "no Hipparcos stars: pnpm hipparcos makes them");
+    const faint = await loadFaintStars("full");
     expect(faint.count).toBe(108_883);
     expect(packedStarAt(faint, 0).magnitude).toBeGreaterThan(5.9);
     for (let i = 1; i < faint.count; i += 997)

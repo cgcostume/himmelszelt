@@ -62,10 +62,15 @@ export function lookAround(
         canvas.setPointerCapture(event.pointerId);
         const start = { x: event.clientX, y: event.clientY, yaw: camera.yaw, pitch: camera.pitch };
         const move = (e: PointerEvent) => {
+            // Captured in flight (see flight.ts), the mouse turns the view by itself.
+            if (document.pointerLockElement === canvas) return;
             onDrag?.();
             const perPixel = Math.min(camera.fov, Math.PI) / canvas.clientHeight;
-            camera.yaw = start.yaw - (e.clientX - start.x) * perPixel;
-            camera.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, start.pitch + (e.clientY - start.y) * perPixel));
+            // A drag pulls the sky along with the pointer; in flight it turns the view the way the pointer goes.
+            const turn = canvas.hasAttribute("data-flying") ? -1 : 1;
+            camera.yaw = start.yaw - turn * (e.clientX - start.x) * perPixel;
+            const pitch = start.pitch + turn * (e.clientY - start.y) * perPixel;
+            camera.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, pitch));
             onChange();
         };
         canvas.addEventListener("pointermove", move);

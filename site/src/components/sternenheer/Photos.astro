@@ -1,0 +1,98 @@
+---
+import CopyInfo from "../CopyInfo.astro";
+import Icon from "../Icon.astro";
+import "../sternzeit/sternzeit.css";
+import "../nachtgestirn/nachtgestirn.css";
+import "./photos.css";
+import { PHOTOS } from "./photo-options";
+import StarGroups from "./StarGroups.astro";
+
+/**
+ * Photographs of the night sky, one at a time, each with sternenheer's stars over dunstkreis' sky for its moment, place,
+ * lens and exposure over it, a split line between; under them what was measured in both pictures and what it says.
+ */
+interface Props {
+    id?: string;
+}
+const { id = "photos" } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+const first = PHOTOS[0];
+---
+
+<figure class="tiles-figure" id={id} data-star-photos data-base={`${base}stars/`}>
+    <div class="photo-full" data-field="full" style={`--count: ${PHOTOS.length}`}>
+        <div class="tiles-panel as-seen photo-stage" data-field="stage">
+            <div class="starphoto-stage" style={`--aspect: ${first ? first.width / first.height : 1.5}`}>
+                <div class="starphoto-frame" data-field="frame">
+                    <img src={first && `${base}stars/${first.file}`} alt="A photograph of the night sky" decoding="async" draggable="false" />
+                    <canvas aria-label="sternenheer's stars over dunstkreis' sky for the photograph's moment, place, lens and exposure, rendered with WebGPU"></canvas>
+                    <svg class="photo-marks" data-field="marks" aria-hidden="true"></svg>
+                </div>
+            </div>
+            <span class="tiles-start">
+                <StarGroups offsets={[]} />
+                <span class="view-buttons">
+                    <button type="button" class="view-toggle" data-field="milkyway" aria-pressed="true" title="The Milky Way, from NASA's Deep Star Maps, at the light the calibration gives it">Milky Way</button>
+                    <button type="button" class="view-toggle" data-field="air" aria-pressed="true" title="The air: dunstkreis' sky behind the stars, lit by the Moon where it is up, and every star lifted, dimmed and reddened; off, the stars from space, over black">air</button>
+                    <button type="button" class="view-toggle" data-field="glare" aria-pressed="true" title="The halo around a star too bright for its pixel: the light beyond display white spread around it, falling with the cube of the distance">glare</button>
+                </span>
+                <span class="view-buttons">
+                    <button type="button" class="view-toggle" data-field="names" aria-pressed="false" title="The brightest stars in the frame, ringed and named, where the fit puts them">names</button>
+                </span>
+            </span>
+            <span class="photo-note" data-field="note"></span>
+            <span class="tiles-ends">
+                <span class="view-buttons">
+                    <button type="button" class="view-icon" data-field="download" title="Download the comparison as shown, at the photograph's pixels, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+                    <CopyInfo />
+                    <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
+                </span>
+            </span>
+        </div>
+        <label class="figure-slider split-slider" title="Where the line between the photograph and sternenheer's sky runs">
+            <span class="note">sternenheer</span>
+            <span class="figure-slider-rail">
+                <input type="range" data-field="split" min="0" max="100" step="0.5" value="50" aria-label="Where the split runs, from all sternenheer to all photograph" />
+            </span>
+            <span class="note">photograph</span>
+        </label>
+        <label class="figure-slider" title="The exposure sternenheer's sky is drawn at: from the photograph's aperture, time and sensitivity, less what its stars show its processing added. Brighter to the right">
+            <span class="note">EV<sub>100</sub></span>
+            <span class="figure-slider-rail">
+                <input type="range" data-field="exposure" min="-4" max="4" step="0.1" value="0" aria-label="The exposure of sternenheer's sky, in stops brighter than the photograph's stars match at" />
+            </span>
+            <output data-field="ev"></output>
+        </label>
+        <label class="figure-slider" title="How much of the light past a star's knee its halo shows: none at the left, all of it at the right, where the halo adds no light and takes none">
+            <span class="note">halo</span>
+            <span class="figure-slider-rail">
+                <input type="range" data-field="halo" min="0" max="1" step="0.05" value="1" aria-label="The share of the light past the knee the halos show" />
+            </span>
+            <output data-field="haloValue"></output>
+        </label>
+        <div class="photo-picker">
+            <p class="photo-credit" data-field="credit" aria-live="polite"></p>
+            <div class="photo-tabs" role="group" aria-label="Photographs">
+                {PHOTOS.map((photo, i) => (
+                    <button type="button" class="photo-tab" data-pick={i} aria-pressed={i === 0 ? "true" : "false"} title={`${photo.label}: ${photo.when}, ${photo.where}, by ${photo.author}, ${photo.license}`} aria-label={photo.label}>
+                        <img src={`${base}stars/${photo.file.replace(".webp", "-thumb.webp")}`} alt="" loading="lazy" />
+                    </button>
+                ))}
+            </div>
+        </div>
+    </div>
+    <div class="starphoto-findings" data-field="findings" aria-live="polite"></div>
+    <figcaption class="figure-caption">
+        Photographs of the night sky left of the line, and right of it sternenheer's stars, of the catalogs the buttons
+        pick, and its Milky Way over dunstkreis' sky for each photograph's moment, place, lens and exposure. The camera's direction, its turn and its focal length
+        are fitted to the stars found in the photograph, from 85 to 796, which is resampled to a lens without distortion; the
+        exposure is the camera's own, less what the photograph's stars show its processing added. Under them what
+        was measured in both pictures alike. Photographs from Wikimedia Commons, each credited over its tab.
+    </figcaption>
+</figure>
+
+<script>
+    import { photosFigure } from "./photos";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-star-photos]")) photosFigure(root);
+</script>

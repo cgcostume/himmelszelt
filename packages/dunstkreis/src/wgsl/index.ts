@@ -13,11 +13,17 @@
  * The passes that sum over a workgroup take `workgroupSum(threads, subgroups)` first, with subgroup operations where the
  * device has the "subgroups" feature and workgroup memory where it has not.
  *
+ * `air`, `seeing` and `shimmer` are for whatever lies beyond the atmosphere, a star, the Moon, a satellite: the air
+ * table's lookups, a point's flicker and a layer's shimmer, each taking its textures as arguments. They need no
+ * `DkAtmosphere`, only the table `airTable` fills, so a package that draws such a body can bundle them alone.
+ *
  * Every identifier is prefixed `dk` (or `DK_` for constants) so several `@himmelszelt/*` fragments can share one
  * shader module.
  */
 import aerial from "./aerial.wgsl";
+import aerialapply from "./aerialapply.comp.wgsl";
 import aerialvolume from "./aerialvolume.comp.wgsl";
+import air from "./air.wgsl";
 import atmosphere from "./atmosphere.wgsl";
 import camera from "./camera.wgsl";
 import common from "./common.wgsl";
@@ -31,6 +37,9 @@ import multiscattering from "./multiscattering.comp.wgsl";
 import quality from "./quality.wgsl";
 import raymarch from "./raymarch.wgsl";
 import sampling from "./sampling.wgsl";
+import seeing from "./seeing.wgsl";
+import shimmer from "./shimmer.wgsl";
+import shimmerlayer from "./shimmerlayer.comp.wgsl";
 import sky from "./sky.comp.wgsl";
 import skyview from "./skyview.comp.wgsl";
 import spiral from "./spiral.wgsl";
@@ -38,8 +47,9 @@ import sun from "./sun.wgsl";
 import transmittance from "./transmittance.comp.wgsl";
 
 // One source with the packages that own them, bundled here so the sky pass needs no other package: how a cube map lays
-// out directions, for whoever samples the sky's, the tone curves, the eye's veil around the sun and its night vision.
-export { glare, tonemap, vision } from "@himmelszelt/helldunkel/wgsl";
+// out directions, for whoever samples the sky's, the white balance, the tone curves, the eye's veil around the sun and its
+// night vision.
+export { glare, tonemap, vision, whitebalance } from "@himmelszelt/helldunkel/wgsl";
 export { cube } from "@himmelszelt/rundbild/wgsl";
 
 export { skyCubeOutput, skyOutput } from "./output.js";
@@ -47,7 +57,9 @@ export { workgroupSum } from "./reduce.js";
 
 export {
     aerial,
+    aerialapply,
     aerialvolume,
+    air,
     atmosphere,
     camera,
     common,
@@ -61,6 +73,9 @@ export {
     quality,
     raymarch,
     sampling,
+    seeing,
+    shimmer,
+    shimmerlayer,
     sky,
     skyview,
     spiral,

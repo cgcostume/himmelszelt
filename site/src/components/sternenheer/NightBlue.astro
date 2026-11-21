@@ -1,0 +1,107 @@
+---
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import Cite from "../Cite.astro";
+import Term from "../Term.astro";
+import "../sternzeit/sternzeit.css";
+import "../nachtgestirn/nachtgestirn.css";
+import "../dunstkreis/wavelengths.css";
+import "./nightblue.css";
+import { FILM_STARS } from "./filmstars";
+import { type BuiltPatch, MARKS, PATCHES } from "./nightblue-data";
+
+/**
+ * Why the night looks blue: the cones' share of the light over the luminance, and a field of colors as the dark-adapted
+ * eye sees them from daylight down to starlight, by helldunkel's `coneShare` and `darkAdaptedEye`, on the CPU. The stars
+ * are ones films name, their magnitudes read from the catalog's CSV at build time.
+ */
+interface Props {
+    id?: string;
+}
+const { id = "night-blue" } = Astro.props;
+
+// Astro builds and serves from site/, whichever bundle this frontmatter ends up in.
+const rows = readFileSync(resolve(process.cwd(), "../packages/sternenheer/data/brightstars.csv"), "utf8")
+    .trim()
+    .split("\n");
+const patches = PATCHES.flatMap((patch): BuiltPatch[] => {
+    if (patch.kind !== "star") return [{ ...patch, magnitude: null, film: patch.note }];
+    const star = FILM_STARS.find((s) => s.name === patch.name);
+    const row = star?.row ?? patch.row;
+    if (row === undefined) return [];
+    const [magnitude, , , , , bv] = (rows[row + 1] ?? "").split(",").map(Number) as number[];
+    if (star && bv !== star.bv) throw new Error(`NightBlue: row ${star.row} of brightstars.csv is not ${star.name}'s`);
+    const films = FILM_STARS.filter((s) => s.name === patch.name).map((s) => s.film.replace(/ and the .*$/, ""));
+    return [
+        {
+            ...patch,
+            bv: bv ?? 0,
+            magnitude: magnitude ?? null,
+            film: films.length ? films.reduce((a, b) => (b.length < a.length ? b : a)) : (patch.note ?? ""),
+        },
+    ];
+});
+const signed = (v: number) => (v < 0 ? "−" : "") + Math.abs(v).toFixed(2);
+const at = (log: number) => (((log - MARKS.min) / (MARKS.max - MARKS.min)) * 100).toFixed(2);
+const DECADES: [number, string][] = [
+    [-4, "10⁻⁴"],
+    [-2, "0.01"],
+    [0, "1"],
+    [2, "100"],
+    [4, "10⁴"],
+];
+---
+
+<figure class="eclipse-figure nightblue-figure" id={id} data-night-blue data-patches={JSON.stringify(patches)}>
+    <div class="eclipse-views">
+        <figure class="eclipse-view">
+            <svg data-field="share" role="img" aria-label="The cones' share of the light over the luminance, with marks for a moonless sky, the full Moon's sky and a display's white, and the chosen star's core at three zooms"></svg>
+            <figcaption><span class="subfigure-title">cones and rods</span>, by the luminance</figcaption>
+        </figure>
+        <figure class="eclipse-view">
+            <svg data-field="field" role="img" aria-label="Star colors, the moonlit sky and a white as the eye sees them, from daylight at the top to starlight at the bottom"></svg>
+            <figcaption><span class="subfigure-title">as the eye sees it</span>, from daylight to starlight</figcaption>
+        </figure>
+    </div>
+    <figure class="eclipse-view">
+        <label class="figure-slider" title="The luminance the eye sees the colors at, in cd/m²: drag, or click a panel">
+            <span class="note">cd/m²</span>
+            <span class="figure-slider-rail">
+                <input type="range" data-field="luminance" min={MARKS.min} max={MARKS.max} step="0.01" value={Math.log10(MARKS.moonless).toFixed(2)} aria-label="The luminance, as its logarithm in cd/m²" />
+                <span class="figure-slider-scale" aria-hidden="true">
+                    {DECADES.map(([v, text]) => <span class="figure-slider-mark" style={`left: ${at(v)}%`}>{text}</span>)}
+                </span>
+            </span>
+            <output data-field="value"></output>
+        </label>
+        <div class="wavelengths-skies" role="radiogroup" aria-label="Colors, from stars that films name to a white">
+            {patches.map((patch, i) => (
+                <button type="button" role="radio" class="wavelengths-pair" data-index={i} aria-checked="false" title={patch.kind === "star" ? `${patch.name}, magnitude ${signed(patch.magnitude ?? 0)}, B−V ${signed(patch.bv ?? 0)}: ${patch.film}` : `${patch.name}: ${patch.film}`}>
+                    <span class="wavelengths-swatch"><span data-half="camera"></span><span data-half="eye"></span></span>
+                    <span>{patch.name}</span>
+                    <span>{patch.film}</span>
+                </button>
+            ))}
+        </div>
+        <p class="view-status" data-field="status" aria-live="polite"></p>
+        <figcaption><span class="subfigure-title">camera and eye</span>, each color as recorded and as seen</figcaption>
+    </figure>
+    <figcaption class="figure-caption">
+        Why the night looks blue, by the eye's two kinds of cells and Jensen's blue shift <Cite id="jensen2001" />. (a)
+        The share of the light the cones see over the luminance, all of it above 4 cd/m², none below a hundredth, where
+        the <Term of="Scotopic vision">rods</Term> see alone <Cite id="larson1997" />; the band between them shaded.
+        Dashed, a display's white, the clear sky under a full Moon at 18.5 magnitudes per square arcsecond <Cite
+        id="puschnig2014" />, and a moonless sky; the accent the chosen luminance. The dots are the chosen star's core
+        as the pass meets it, in the view of the whole sky, 180° down 1,080 pixels, and zoomed ten and a hundred times.
+        (b) Stars from blue-white to orange by their color index, the moonlit sky as dunstkreis draws it and a white,
+        each as the eye sees it at the luminance beside it, every level at an exposure of its own, as the eye adapts:
+        the colors drain to one pale blue, the orange ones darken first. (c) Each color left as a camera records it and
+        right as the eye sees it at the chosen luminance, the stars those films and history name.
+    </figcaption>
+</figure>
+
+<script>
+    import { nightBlueFigure } from "./nightblue";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-night-blue]")) nightBlueFigure(root);
+</script>

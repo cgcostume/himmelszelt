@@ -43,6 +43,8 @@ struct DkSkyParams {
     sunDiscCeiling: f32,
     // The cosine of the Moon's angular radius, whose disc hides the sun disc behind it; above 1 for none.
     moonDiscCos: f32,
+    // The white balance, helldunkel's `hdWhiteBalance`, applied wherever the exposure is: the identity for none.
+    whiteBalance: mat3x3f,
 }
 
 // Directions the light meter reads per cap, above and below the horizon: 32 workgroups of 128 sample one each.

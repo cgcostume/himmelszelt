@@ -1,5 +1,14 @@
-import type { AtmosphereLUTs, AtmosphereModel, SkyPass } from "@himmelszelt/dunstkreis";
-import { airTransmittance, clampObserverHeight, createSkyPass, refractionAngle } from "@himmelszelt/dunstkreis";
+import type { AirTable, AtmosphereLUTs, AtmosphereModel, SkyPass } from "@himmelszelt/dunstkreis";
+import {
+    airTable,
+    airTransmittance,
+    clampObserverHeight,
+    createAirTexture,
+    createSkyPass,
+    liftedDirection,
+    refractionAngle,
+    seeingUniformData,
+} from "@himmelszelt/dunstkreis";
 import type { MeterPass } from "@himmelszelt/helldunkel";
 import {
     adaptEV100,
@@ -16,7 +25,7 @@ import {
     earthshineIlluminance,
     horizonZ,
     loadMoonMaps,
-    MOON_MAPS,
+    MOON_MAPS_WHOLE,
     moonEV100,
     moonIlluminance,
     liftedDirection as moonLifted,
@@ -25,19 +34,18 @@ import {
     SUN_ILLUMINANCE,
 } from "@himmelszelt/nachtgestirn";
 import type {
-    AirTable,
     ConstellationLines,
+    DeepStars,
     MilkyWay,
     PackedStars,
     StarCatalog,
     StarsPass,
 } from "@himmelszelt/sternenheer";
 import {
-    airTable,
     createStarsPass,
-    liftedDirection,
     loadCatalog,
     loadConstellations,
+    loadDeepStars,
     loadFaintStars,
     loadMilkyWay,
     MILKY_WAY_MAPS,
@@ -45,13 +53,15 @@ import {
 } from "@himmelszelt/sternenheer";
 import { apparentSiderealTime, fromJulianDay, julianEphemerisDay, moon, stars, sun } from "@himmelszelt/sternzeit";
 import { quality } from "../dunstkreis/atmosphere";
+import { groundGrid } from "../dunstkreis/groundgrid";
+import { createGridPass } from "./grid";
 
 // The sky pass writes cd/m² when its exposure is 1: EV100 of -log2(1.2).
 const UNIT_EV100 = -Math.log2(1.2);
 const DEG = Math.PI / 180;
 
 export type ToneCurveName = "neutral" | "agx" | "aces" | "clip";
-export type MapSize = "small" | "large";
+export type MapSize = "small" | "large" | "8k";
 
 /**
  * The sky at a moment and place, as the figure draws it: the rotation that turns the catalog into it, the Sun and the
@@ -119,13 +129,36 @@ export type SkyAt = ReturnType<typeof skyAt>;
 
 // The catalog and the maps once per page, however many figures draw the stars; the Moon's small maps, as the disc
 // stays small in a view of the whole sky.
-let sharedCatalog: Promise<[StarCatalog, ConstellationLines, PackedStars]> | null = null;
+// The faint stars null where `pnpm assets` has not made them: the package does not ship ESA's catalogues.
+let sharedCatalog: Promise<[StarCatalog, ConstellationLines, PackedStars | null]> | null = null;
 let sharedMoonMaps: Promise<MoonMaps> | null = null;
-const loadedMaps = new Map<MapSize, Promise<MilkyWay>>();
-function sharedMilkyWay(device: GPUDevice, size: MapSize) {
-    const map = loadedMaps.get(size) ?? loadMilkyWay(device, MILKY_WAY_MAPS[size]);
+// The deep stars, 14 MB, fetched when a figure first asks for them: null where `pnpm assets` has not made them.
+let sharedDeepStars: Promise<DeepStars | null> | null = null;
+/** The deep stars, fetched once a page for every figure that asks; null where `pnpm assets` has not made them. */
+export function deepStarsOnce() {
+    sharedDeepStars ??= loadDeepStars().catch(() => null);
+    return sharedDeepStars;
+}
+const loadedMaps = new Map<MapSize, Promise<MilkyWay | null>>();
+/** A map of the Milky Way, fetched once a page for every figure that asks; null where it is missing, as the 8K map is
+ *  until `pnpm assets` makes it. */
+export function milkyWayOnce(device: GPUDevice, size: MapSize) {
+    const map = loadedMaps.get(size) ?? loadMilkyWay(device, MILKY_WAY_MAPS[size]).catch(() => null);
     loadedMaps.set(size, map);
     return map;
+}
+
+/** The angle in radians a texel of a map `width` texels around spans: a finer map shows more once a pixel spans less. */
+export const texelAngle = (width: number) => (2 * Math.PI) / width;
+
+/** The map a view needs whose pixel at its center spans `pixel` radians: the 8K map, 18.5 MB, only once a pixel spans
+ *  less than a texel of the 4K map, 5.3 arcminutes; the 4K map below the 2K map's 10.5. */
+export function mapForPixel(pixel: number): MapSize {
+    return pixel < texelAngle(MILKY_WAY_MAPS.large.width)
+        ? "8k"
+        : pixel < texelAngle(MILKY_WAY_MAPS.small.width)
+          ? "large"
+          : "small";
 }
 
 /** One frame: the sky, the view and the switches. */
@@ -146,19 +179,30 @@ export interface StarsFrame {
     stars: boolean;
     /** The Hipparcos stars besides the bright star catalog's. */
     faintStars: boolean;
+    /** The deep stars, Tycho-2's, fetched once asked for. */
+    deepStars: boolean;
     milkyWay: boolean;
-    maps: MapSize;
+    /** The map of the Milky Way, or "auto" for the one the view's pixels need, the next finer drawn once it is there. */
+    maps: MapSize | "auto";
     /** The air: refraction, extinction and the horizon it shows. */
     air: boolean;
     /** The stars twinkling, at the time given in seconds. */
     twinkle: boolean;
     time: number;
-    /** The eye's veil around bright stars. */
+    /** The halos around bright stars, and their strength, the share of the light past the knee they show, 1 by default. */
     glare: boolean;
+    halo?: number;
+    /** Artistic offsets in stops on the stars' and the Milky Way's light, 0 by default, physical. */
+    starCompensation?: number;
+    milkyWayCompensation?: number;
     darkAdapted: boolean;
     moon: boolean;
     /** The constellations to draw the lines of, by abbreviation; null for all, empty for none. */
     constellations: readonly string[] | null;
+    /** dunstkreis' grid over the sky: altitude lines every 10°, the compass directions and the Sun's symbol. */
+    grid?: boolean;
+    /** A grid on the ground under the air, for a view in flight: how far it has flown, in km east and north. */
+    ground?: { east: number; north: number } | null;
 }
 
 /**
@@ -168,16 +212,34 @@ export interface StarsFrame {
  */
 // How fast the metered exposure follows the sky, in seconds: a camera's meter, a little slower towards the dark.
 const ADAPTATION = { toBrighter: 0.5, toDarker: 1 };
-// The metered exposure lets in no more light than EV100 -6 at night, a long exposure's, not a deep sky camera's.
+// The metered exposure lets in no more light than EV100 -2.5 at night: a night stays dark, not a long exposure's.
 const DARKEST_EV100 = -2.5;
+
+// Earth's gravitational parameter in m³/s²: how fast a circular orbit runs at a height.
+const EARTH_GM = 3.986004418e14;
+
+/** How fast the observer crosses the turbulence's line of sight, in m/s: a circular orbit's speed above the air, none
+ *  below its top, where the observer stands or flies slowly next to the wind. */
+export function observerSpeed(heightM: number, model: AtmosphereModel): number {
+    const { groundRadiusKm, thicknessKm } = model.planet;
+    return heightM / 1000 > thicknessKm ? Math.sqrt(EARTH_GM / (groundRadiusKm * 1000 + heightM)) : 0;
+}
 
 const dot = (a: ArrayLike<number>, b: ArrayLike<number>) =>
     (a[0] ?? 0) * (b[0] ?? 0) + (a[1] ?? 0) * (b[1] ?? 0) + (a[2] ?? 0) * (b[2] ?? 0);
 
+/** The angle in radians the pixel at a view's center spans, `height` pixels high: as wide for a bent projection, whose
+ *  scale at the center is the pinhole's. */
+export function pixelAngle(inverseViewProjection: Float32Array, height: number): number {
+    const m = inverseViewProjection;
+    return 2 * Math.atan(Math.hypot(m[4] ?? 0, m[5] ?? 0, m[6] ?? 0) / height);
+}
+
 export function createStarsRenderer(device: GPUDevice, requestRender: () => void) {
     let adapted: { ev100: number; at: number } | null = null;
-    let sky: { pass: SkyPass; luts: AtmosphereLUTs } | null = null;
-    let skyBuilding: AtmosphereLUTs | null = null;
+    let sky: { pass: SkyPass; luts: AtmosphereLUTs; grid: boolean } | null = null;
+    let skyBuilding: { luts: AtmosphereLUTs; grid: boolean } | null = null;
+    let gridPass: ReturnType<typeof createGridPass> | null = null;
     let starsPass: { pass: StarsPass; key: string } | null = null;
     let starsBuilding = "";
     let moonPass: { pass: MoonPass; key: string } | null = null;
@@ -185,11 +247,14 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
     let catalog: StarCatalog | null = null;
     let constellations: ConstellationLines | null = null;
     let faintStars: PackedStars | null = null;
+    let deepStars: DeepStars | null = null;
+    let deepState: "none" | "loading" | "loaded" | "missing" = "none";
     let moonMaps: MoonMaps | null = null;
     let milkyWay: MilkyWay | null = null;
     let mapsBound: MapSize | "" = "";
     let mapsWanted: MapSize | "" = "";
     let background: GPUTexture | null = null;
+    let groundPass: ReturnType<typeof groundGrid> | null = null;
     let composed: GPUTexture | null = null;
     let skyEV100 = Number.NEGATIVE_INFINITY;
     let skyMeteredFor = "";
@@ -201,10 +266,19 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
         meter = created;
         requestRender();
     });
-    let airFor = "";
-    let air: AirTable | null = null;
+    // The air table of the observer's height, on the CPU and as the stars pass reads it, and the seeing there.
+    let air: { key: string; table: AirTable; texture: GPUTexture; seeing: Float32Array } | null = null;
+    function airFor(heightM: number, model: AtmosphereModel) {
+        const key = `${heightM} ${model.refractivity} ${model.planet.groundRadiusKm} ${model.planet.thicknessKm}`;
+        if (air?.key === key) return air;
+        air?.texture.destroy();
+        const table = airTable(model, heightM);
+        const seeing = seeingUniformData({ speed: observerSpeed(heightM, model) });
+        air = { key, table, texture: createAirTexture(device, table), seeing };
+        return air;
+    }
 
-    sharedMoonMaps ??= loadMoonMaps(device, MOON_MAPS["512"]);
+    sharedMoonMaps ??= loadMoonMaps(device, MOON_MAPS_WHOLE["512"]);
     sharedMoonMaps.then((loaded) => {
         moonMaps = loaded;
         moonPass?.pass.destroy();
@@ -212,7 +286,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
         moonBuilding = "";
         requestRender();
     });
-    sharedCatalog ??= Promise.all([loadCatalog(), loadConstellations(), loadFaintStars()]);
+    sharedCatalog ??= Promise.all([loadCatalog(), loadConstellations(), loadFaintStars().catch(() => null)]);
     sharedCatalog.then(([loaded, lines, faint]) => {
         catalog = loaded;
         constellations = lines;
@@ -223,10 +297,12 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
         requestRender();
     });
 
-    function buildSky(luts: AtmosphereLUTs) {
-        if (skyBuilding === luts) return;
-        skyBuilding = luts;
+    function buildSky(luts: AtmosphereLUTs, grid: boolean) {
+        if (skyBuilding?.luts === luts && skyBuilding.grid === grid) return;
+        const building = { luts, grid };
+        skyBuilding = building;
         createSkyPass(device, {
+            debugGrid: grid,
             luts,
             format: "rgba32float",
             toneMap: false,
@@ -235,9 +311,9 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             groundLight: quality.groundLight,
             dither: false,
         }).then((pass) => {
-            if (skyBuilding !== luts) return pass.destroy();
+            if (skyBuilding !== building) return pass.destroy();
             sky?.pass.destroy();
-            sky = { pass, luts };
+            sky = { pass, luts, grid };
             skyBuilding = null;
             skyMeteredFor = "";
             requestRender();
@@ -252,6 +328,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             catalog,
             constellations,
             faintStars,
+            deepStars,
             // The faint stars crowd the Milky Way's tiles in a wide view.
             capacity: 256,
             milkyWay,
@@ -285,16 +362,23 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             requestRender();
         });
     }
+    function loadDeep() {
+        if (deepState !== "none") return;
+        deepState = "loading";
+        deepStarsOnce().then((loaded) => {
+            deepStars = loaded;
+            deepState = loaded ? "loaded" : "missing";
+            requestRender();
+        });
+    }
+    // The pass drawing the map before keeps drawing until the stars pass with the one wanted is made.
     function loadMaps(size: MapSize) {
         if (mapsWanted === size) return;
         mapsWanted = size;
-        sharedMilkyWay(device, size).then((loaded) => {
-            if (mapsWanted !== size) return;
+        milkyWayOnce(device, size).then((loaded) => {
+            if (mapsWanted !== size || !loaded) return;
             milkyWay = loaded;
             mapsBound = size;
-            starsPass?.pass.destroy();
-            starsPass = null;
-            starsBuilding = "";
             requestRender();
         });
     }
@@ -311,18 +395,24 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
     return {
         /** The catalog, once loaded. */
         catalog: () => catalog,
+        /** Whether the faint stars are missing, once the catalog is there. */
+        faintMissing: () => catalog !== null && faintStars === null,
+        /** The deep stars once asked for: being fetched, there with their count, or missing. */
+        deepStars: () => ({ state: deepState, count: deepStars?.count ?? 0 }),
         /** Draws `frame` into `target`; null while a pass is still being made, which calls `requestRender` when done. */
         draw(target: GPUTexture, frame: StarsFrame) {
             const { sky: s, luts, width, height } = frame;
-            if (!sky || sky.luts !== luts) {
-                buildSky(luts);
-                return null;
+            const grid = frame.grid ?? false;
+            if (!sky || sky.luts !== luts || sky.grid !== grid) {
+                buildSky(luts, grid);
+                if (!sky || sky.luts !== luts) return null;
             }
-            loadMaps(frame.maps);
-            const starsKey = `${catalog ? "stars" : "none"} ${mapsBound}`;
+            loadMaps(frame.maps === "auto" ? mapForPixel(pixelAngle(frame.inverseViewProjection, height)) : frame.maps);
+            if (frame.deepStars) loadDeep();
+            const starsKey = `${catalog ? "stars" : "none"} ${mapsBound} ${deepStars ? "deep" : ""}`;
             if (!starsPass || starsPass.key !== starsKey) {
                 buildStars(starsKey);
-                return null;
+                if (!starsPass) return null;
             }
             const moonKey = `${frame.format} ${frame.headroom} ${frame.toneMap} ${frame.darkAdapted} ${moonMaps ? "maps" : "plain"}`;
             if (!moonPass || moonPass.key !== moonKey) {
@@ -338,13 +428,8 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             if (!composed) return null;
 
             // The air over the sky, rebuilt when the air or the observer changed.
-            const airKey = `${s.heightM} ${s.model.refractivity}`;
-            if (frame.air && airKey !== airFor) {
-                airFor = airKey;
-                air = airTable(s.bend, s.through);
-            }
-            const theAir = frame.air ? air : null;
-            const moonShown = theAir ? liftedDirection(theAir, s.moonDirection) : s.moonDirection;
+            const theAir = frame.air ? airFor(s.heightM, s.model) : null;
+            const moonShown = theAir ? liftedDirection(theAir.table, s.moonDirection) : s.moonDirection;
             const ground = frame.air ? horizonZ(s.heightM, s.model.planet.groundRadiusKm) : -1;
             // Metered on the sky where it is brighter than the stars' light, else on the Milky Way, a texel of its mean,
             // some 24 magnitudes per square arcsecond, and on the moonlit sky, some 0.05 cd/m² per lux of the Moon at the
@@ -395,6 +480,8 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 sunDiscCeiling: 2 * frame.headroom * 1.2 * 2 ** ev100,
                 pixelRatio: frame.pixelRatio,
                 ev100: UNIT_EV100,
+                // The grid in an eighth of what the Moon pass exposes as white, as nachtgestirn's Moon figure draws it.
+                gridInk: (1.2 * 2 ** ev100) / 8,
                 autoExposureKeys: [],
                 autoExposureRange: [-20, 20],
                 moonDirection: s.moonDirection,
@@ -412,17 +499,19 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 knee: frame.headroom,
                 horizonZ: ground,
                 occluder: frame.moon ? { direction: moonShown, angularDiameter: s.moonAngularDiameter } : null,
-                air: theAir,
-                scintillation: frame.twinkle ? 1 : 0,
-                heightM: s.heightM,
+                air: theAir && { texture: theAir.texture, horizon: theAir.table.horizon },
+                seeing: frame.twinkle && theAir ? theAir.seeing : null,
                 time: frame.time,
-                halo: frame.glare ? 1 : 0,
+                halo: frame.glare ? (frame.halo ?? 1) : 0,
                 constellations: frame.constellations,
                 faintStars: frame.faintStars ? Number.POSITIVE_INFINITY : 0,
+                deepStars: frame.deepStars ? Number.POSITIVE_INFINITY : 0,
                 constellationWidth: 1.25 * frame.pixelRatio,
                 constellationGap: 4 * frame.pixelRatio,
                 starLight: frame.stars ? 1 : 0,
                 milkyWay: frame.milkyWay ? 1 : 0,
+                starCompensation: frame.starCompensation ?? 0,
+                milkyWayCompensation: frame.milkyWayCompensation ?? 0,
             });
             const refraction = frame.air
                 ? refractionTable(s.moonDirection, s.moonAngularDiameter, s.bend, s.through)
@@ -448,8 +537,29 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 distanceKm: s.distanceKm - s.model.planet.groundRadiusKm * s.moonDirection[2],
             });
             const encoder = device.createCommandEncoder({ label: "sternwarte:stars" });
+            let behind = background;
             if (frame.air) {
                 sky.pass.encode(encoder, background);
+                if (frame.ground) {
+                    groundPass ??= groundGrid(device);
+                    const radiusKm = s.model.planet.groundRadiusKm;
+                    behind = groundPass.encode(encoder, background, {
+                        inverseViewProjection: frame.inverseViewProjection,
+                        projectionDistance: frame.projectionDistance,
+                        heightM: s.heightM,
+                        radiusKm,
+                        flown: frame.ground,
+                    });
+                }
+            } else if (grid) {
+                gridPass ??= createGridPass(device);
+                gridPass.encode(encoder, background, {
+                    ...view,
+                    pixelRatio: frame.pixelRatio,
+                    sunDirection: s.sunDirection,
+                    sunAngularDiameter: s.sunAngularDiameter,
+                    ink: (1.2 * 2 ** ev100) / 8,
+                });
             } else {
                 encoder
                     .beginRenderPass({
@@ -457,7 +567,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                     })
                     .end();
             }
-            starsPass.pass.encode(encoder, composed, { background });
+            starsPass.pass.encode(encoder, composed, { background: behind });
             moonPass.pass.encode(encoder, target, { background: composed });
             device.queue.submit([encoder.finish()]);
             const passesMs = performance.now() - started;
@@ -487,7 +597,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                     if (frame.ev100 === null) requestRender();
                 });
             }
-            return { ev100, adapting, passesMs, air: theAir };
+            return { ev100, adapting, passesMs, air: theAir?.table ?? null };
         },
     };
 }

@@ -38,7 +38,8 @@
         "build": "rolldown -c rolldown.config.ts",
         "typecheck": "tsc --noEmit",
         "test": "pnpm build && playwright test",
-        "test:gpu": "pnpm build && HELLDUNKEL_GPU=1 playwright test"
+        "test:gpu": "pnpm build && HELLDUNKEL_GPU=1 playwright test",
+        "bluenoise": "node scripts/bluenoise.mjs"
     },
     "devDependencies": {
         "@playwright/test": "^1.62.1",

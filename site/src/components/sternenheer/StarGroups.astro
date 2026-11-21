@@ -1,0 +1,68 @@
+---
+import Icon from "../Icon.astro";
+import type { IconName } from "../icons";
+import "./stargroups.css";
+
+/**
+ * The stars figures' overlay groups (see stargroups.ts): the star catalog, each including the ones before it, and the
+ * light of the Milky Way and of the stars, off or brighter by stops. Each a radio group: one tab stop, arrows pick.
+ */
+interface Props {
+    catalog?: "yale" | "hipparcos" | "tycho";
+    offsets?: readonly ("milkyWay" | "stars")[];
+    /** The steps the offset groups offer: off, as measured, +2 and +4 stops by default. */
+    steps?: readonly ("off" | "0" | "2" | "4")[];
+    /** Whether a pick fetches the catalog's stars, which the Tycho-2 button's title then sizes: true by default. */
+    fetches?: boolean;
+}
+const { catalog = "hipparcos", offsets = ["milkyWay", "stars"], steps = ["off", "0", "2", "4"] } = Astro.props;
+const { fetches = true } = Astro.props;
+
+const CATALOGS = [
+    {
+        pick: "yale",
+        icon: "catalogYale",
+        label: "Yale Bright Star Catalogue",
+        title: "The Yale Bright Star Catalogue: 9,093 stars, what the eye sees and a little beyond, to magnitude 8",
+    },
+    {
+        pick: "hipparcos",
+        icon: "catalogHipparcos",
+        label: "Hipparcos too",
+        title: "Hipparcos too, 108,883 stars more, complete to magnitude 7.3 to 9: what a pair of binoculars shows",
+    },
+    {
+        pick: "tycho",
+        icon: "catalogTycho",
+        label: "Tycho-2 too",
+        title: `Tycho-2 too, 2.4 million stars more, to magnitude 11.5: what a small telescope shows${fetches ? ". 14 MB, fetched when first picked" : ""}`,
+    },
+] as const;
+const OFFSETS = {
+    milkyWay: { label: "Milky Way", icon: "milkyWay", what: "its calibrated light" },
+    stars: { label: "Stars", icon: "sparkle", what: "their measured light, and fainter ones come up" },
+} as const;
+const stepTitle = (label: string, what: string, pick: string) =>
+    pick === "off"
+        ? `${label} off`
+        : pick === "0"
+          ? `${label} as measured, 0 stops`
+          : `${label} +${pick} stops, ${2 ** Number(pick)}× ${what}`;
+const stepIcon = (icon: string, pick: string) =>
+    `${icon}${pick === "off" ? "Off" : pick === "0" ? "" : pick}` as IconName;
+---
+
+<span class="star-groups">
+    <span class="view-buttons pick-group" role="radiogroup" aria-label="Star catalog" data-group="catalog">
+        {CATALOGS.map((c) => (
+            <button type="button" class="view-icon" data-pick={c.pick} aria-pressed={c.pick === catalog ? "true" : "false"} tabindex={c.pick === catalog ? 0 : -1} title={c.title} aria-label={c.label}><Icon name={c.icon} /></button>
+        ))}
+    </span>
+    {offsets.map((name) => (
+        <span class="view-buttons pick-group" role="radiogroup" aria-label={OFFSETS[name].label} data-group={name}>
+            {steps.map((pick) => (
+                <button type="button" class="view-icon" data-pick={pick} aria-pressed={pick === "0" ? "true" : "false"} tabindex={pick === "0" ? 0 : -1} title={stepTitle(OFFSETS[name].label, OFFSETS[name].what, pick)} aria-label={stepTitle(OFFSETS[name].label, OFFSETS[name].what, pick)}><Icon name={stepIcon(OFFSETS[name].icon, pick)} /></button>
+            ))}
+        </span>
+    ))}
+</span>

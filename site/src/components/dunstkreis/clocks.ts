@@ -4,7 +4,6 @@ import {
     precomputeAtmosphere,
     type SkyCubePass,
     type SkyPass,
-    spectrumToRgb,
 } from "@himmelszelt/dunstkreis";
 import { createIrradiancePass, type IrradiancePass } from "@himmelszelt/rundbild";
 import { find } from "../dom";
@@ -497,8 +496,7 @@ async function showAerial(sky: Sky) {
     await readback.mapAsync(GPUMapMode.READ);
     const bits = new Uint16Array(readback.getMappedRange().slice(0));
     readback.destroy();
-    // The four wavelengths into linear RGB by the model's matrix, scaled so the brightest froxel is white.
-    const matrix = spectrumToRgb(luts.model);
+    // Linear sRGB, scaled so the brightest froxel is white.
     const width = SLICES.length * FROXELS;
     const rgb = new Float32Array(width * FROXELS * 3);
     let top = 1e-30;
@@ -506,14 +504,9 @@ async function showAerial(sky: Sky) {
         for (let y = 0; y < FROXELS; ++y) {
             for (let x = 0; x < FROXELS; ++x) {
                 const texel = ((i * FROXELS + y) * FROXELS + x) * 4;
-                const light = [0, 1, 2, 3].map((c) => half(bits[texel + c] ?? 0));
                 const pixel = (y * width + i * FROXELS + x) * 3;
                 for (let c = 0; c < 3; ++c) {
-                    const row = matrix[c] ?? [];
-                    const value = Math.max(
-                        0,
-                        light.reduce((sum, l, j) => sum + l * (row[j] ?? 0), 0),
-                    );
+                    const value = Math.max(0, half(bits[texel + c] ?? 0));
                     rgb[pixel + c] = value;
                     top = Math.max(top, value);
                 }

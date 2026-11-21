@@ -1,8 +1,8 @@
 // The clouds over the background: the cloudscape's layer, premultiplied luminance and transmittance, at whatever size
 // it was rendered, read bilinearly over the target, over the sheets, read here at the target's full size for their
-// fine strands, over the background in cd/m² where there is one, then exposed and tone mapped like dunstkreis' sky,
-// or left linear. Requires `noise.wgsl`, `params.wgsl`, `camera.wgsl`, `sheet.wgsl`, `tonemap.wgsl` and the output
-// binding.
+// fine strands, over the background in cd/m² where there is one, then white balanced, exposed and tone mapped like
+// dunstkreis' sky, or left linear. Requires `noise.wgsl`, `params.wgsl`, `camera.wgsl`, `aerial.wgsl`, `sheet.wgsl`,
+// `whitebalance.wgsl`, `tonemap.wgsl` and the output binding.
 
 @group(0) @binding(0) var<uniform> gwParams: GwParams;
 @group(0) @binding(1) var gwClouds: texture_2d<f32>;
@@ -16,6 +16,8 @@
 @group(0) @binding(9) var gwClampSampler: sampler;
 @group(0) @binding(10) var gwLight: texture_3d<f32>;
 @group(0) @binding(11) var<storage, read> gwDeck: array<f32>;
+// helldunkel's blue noise, read with GW_DITHER.
+@group(0) @binding(12) var gwBlueNoise: texture_2d<f32>;
 
 // Tone map for a display by Neutral (1), AgX (2), ACES (3) or none (4); 0 writes the exposed luminance, linear.
 override GW_TONE_MAP: u32 = 1u;
@@ -75,11 +77,11 @@ fn gwCompose(@builtin(global_invocation_id) id: vec3u) {
         color = behind * clouds.transmittance + clouds.luminance;
         alpha = 1.0;
     }
-    color = color * gwParams.exposure;
+    color = hdWhiteBalance(color, gwParams.whiteBalance) * gwParams.exposure;
     if (GW_TONE_MAP != 0u) {
         color = gwToneMap(color);
         if (GW_DITHER) {
-            color = clamp(hdDither(color, id.xy, 255.0), vec3f(0.0), hdEncodeSrgbExtended(vec3f(GW_HEADROOM), GW_HEADROOM));
+            color = clamp(hdDitherBlue(color, id.xy, 255.0, gwBlueNoise), vec3f(0.0), hdEncodeSrgbExtended(vec3f(GW_HEADROOM), GW_HEADROOM));
         }
     }
     gwOutputStore(id.xy, vec4f(color, alpha));

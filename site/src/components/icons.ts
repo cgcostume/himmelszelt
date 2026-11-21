@@ -7,6 +7,19 @@ const CHECK = '<path class="check" d="M3 8.5l3 3 7-7"/>';
 // The resolutions' K, beside a digit of each.
 const K = '<path d="M9.5 3.5v9M14 3.5 9.5 8.5l4.5 4"/>';
 
+// The stops a layer is brightened by, written small in the top right corner.
+const STOPS = (stops: number) => `<text class="solid stops" x="13" y="5" text-anchor="middle">+${stops}</text>`;
+
+// A slash across a layer's icon: the layer off.
+const OFF = '<path d="M2.5 2.5l11 11"/>';
+
+// The star catalogs as the sky, a disc, filling up, each holding the ones before it: Yale's few bright stars,
+// Hipparcos' fainter ones between them, and Tycho-2's many faintest.
+const dots = (r: number, at: string) =>
+    at.replace(/([\d.]+) ([\d.]+)(, )?/g, `<circle class="solid" cx="$1" cy="$2" r="${r}"/>`);
+const YALE = `<circle cx="8" cy="8" r="6.5"/>${dots(1.1, "6 6, 10.5 7, 7.5 10.5")}`;
+const HIPPARCOS = YALE + dots(0.6, "8 4, 4.2 9, 11 10.8, 10 4.5, 5.5 12");
+
 export const ICONS = {
     /** An environment map's resolution, by its width in texels. */
     res1k: `<path d="M3.5 5.5l2-2v9"/>${K}`,
@@ -41,6 +54,23 @@ export const ICONS = {
     displace: '<path d="M1.5 14a14 14 0 0 1 13 0"/><path d="M4.6 12.6 7.8 5.5l3.4 7.1"/>',
     /** The view kept on the Moon: the same brackets round the theme toggle's crescent (see Base.astro). */
     moonLock: `${BRACKETS}<path class="solid" d="M7.115 3.943A4 4 0 1 0 11.485 10.257 4 4 0 0 1 7.115 3.943z"/>`,
+    /** The Milky Way: a band of light at a slant, its bulge in the middle; with +2 or +4 in its corner, brighter by two
+     *  or four stops. The band turns about its own middle, which icons.css makes every part's origin. */
+    milkyWay:
+        '<ellipse cx="8" cy="8" rx="6.5" ry="2.2" transform="rotate(-30)"/><circle class="solid" cx="8" cy="8" r="1"/>',
+    milkyWay2: `<ellipse cx="6.5" cy="9.5" rx="5.2" ry="1.8" transform="rotate(-30)"/><circle class="solid" cx="6.5" cy="9.5" r="0.8"/>${STOPS(2)}`,
+    milkyWay4: `<ellipse cx="6.5" cy="9.5" rx="5.2" ry="1.8" transform="rotate(-30)"/><circle class="solid" cx="6.5" cy="9.5" r="0.8"/>${STOPS(4)}`,
+    /** A star: a four-pointed sparkle; with +2 or +4 in its corner, brighter by two or four stops. */
+    sparkle: '<path d="M8 1.5 9.3 6.7 14.5 8 9.3 9.3 8 14.5 6.7 9.3 1.5 8 6.7 6.7z"/>',
+    sparkle2: `<path d="M6 5.6 6.78 8.72 9.9 9.5 6.78 10.28 6 13.4 5.22 10.28 2.1 9.5 5.22 8.72z"/>${STOPS(2)}`,
+    sparkle4: `<path d="M6 5.6 6.78 8.72 9.9 9.5 6.78 10.28 6 13.4 5.22 10.28 2.1 9.5 5.22 8.72z"/>${STOPS(4)}`,
+    /** The Milky Way and the stars off: their icons slashed. */
+    milkyWayOff: `<ellipse cx="8" cy="8" rx="6.5" ry="2.2" transform="rotate(-30)"/>${OFF}`,
+    sparkleOff: `<path d="M8 1.5 9.3 6.7 14.5 8 9.3 9.3 8 14.5 6.7 9.3 1.5 8 6.7 6.7z"/>${OFF}`,
+    /** The star catalogs: Yale's bright stars, Hipparcos' added, Tycho-2's added. */
+    catalogYale: YALE,
+    catalogHipparcos: HIPPARCOS,
+    catalogTycho: `${HIPPARCOS}${dots(0.35, "3.5 6.5, 6.5 3, 12 5.5, 12.8 8.5, 9 8.2, 6 8.5, 9 12.5, 3.8 11, 8 13.5, 12 12, 4.5 4.5, 11 3.4")}`,
     /** The far side, which Earth never sees: moonLock's frame round the Moon's outline, dashed. */
     farSide: `${BRACKETS}<circle cx="8" cy="8" r="4" stroke-dasharray="1.1 1.25"/>`,
     /** Back and on in time, each stepping its way on hover. */
@@ -72,6 +102,8 @@ export const ICONS = {
     copy: `<g class="body"><rect class="nudge" x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5v-1a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h1"/></g>${CHECK}`,
     /** The browser's location: a fix in cross hairs, which pulses on hover. */
     locate: '<circle cx="8" cy="8" r="4.5"/><circle class="solid" cx="8" cy="8" r="1.6"/><circle class="pulse" cx="8" cy="8" r="4.5"/><path d="M8 1v2.5M8 12.5V15M1 8h2.5M12.5 8H15"/>',
+    /** A paper plane, for flying through a view (see flight.ts). */
+    fly: '<path d="M14 2 1.75 6.75l4.5 2.25L8.5 13.75z"/><path d="M14 2 6.25 9"/>',
     /** A padlock, its shackle swung open while off. */
     padlock:
         '<rect x="3.5" y="7.5" width="9" height="6.5" rx="1.2"/><path class="shackle" d="M5.5 7.5V5.5a2.5 2.5 0 0 1 5 0v2"/>',

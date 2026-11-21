@@ -1,7 +1,7 @@
 // What the passes share along a pixel's ray: its direction, layers of cloud to composite front to back, the ground
 // beneath a point, the sun's light aloft, and the sheets of high cloud, read once each where the ray crosses their
-// sphere, cheap enough for every pixel of the frame. Requires `noise.wgsl`, `params.wgsl` and `camera.wgsl`, and of
-// the pass `gwParams`, `gwMap`, `gwVolumeSampler`, `gwSunlight`, `gwAerialLuminance`, `gwAerialTransmittance`,
+// sphere, cheap enough for every pixel of the frame. Requires `noise.wgsl`, `params.wgsl`, and dunstkreis'
+// `camera.wgsl` and `aerial.wgsl`, and of the pass `gwParams`, `gwMap`, `gwVolumeSampler`, `gwSunlight`, `gwAerialLuminance`, `gwAerialTransmittance`,
 // `gwClampSampler`, `gwLight` and `gwDeck`.
 
 // The ray through a point of the target, in pixels from its top left corner, on dunstkreis' camera.
@@ -121,20 +121,13 @@ struct GwAir {
     luminance: vec3f,
 }
 
-// The air in front of a point `distance` km along the ray through `uv`, in [0, 1] from the target's top left. From an
-// aerial perspective volume where one is bound, its froxels laid out as dunstkreis' (x and y the screen, slice k at
-// reach * ((k + 0.5) / slices)^2 km), in RGB; else the point fades into `sky` by `fade`, 1/e of its light left there.
+// The air in front of a point `distance` km along the ray through `uv`, in [0, 1] from the target's top left. From
+// dunstkreis' aerial perspective volume where one is bound, by its own lookup; else the point fades into `sky` by
+// `fade`, 1/e of its light left there.
 fn gwAirAt(uv: vec2f, distance: f32, sky: vec3f) -> GwAir {
-    let aerial = gwParams.cloudscape.aerial;
-    if (aerial.x > 0.0) {
-        let slices = f32(textureDimensions(gwAerialLuminance).z);
-        let first = 0.5 / slices;
-        let p = vec3f(uv, max(sqrt(max(distance, 0.0) / aerial.x), first));
-        // Short of the first slice's center, a share of it, as both grow with the distance there.
-        let near = min(distance / (aerial.x * first * first), 1.0);
-        let luminance = textureSampleLevel(gwAerialLuminance, gwClampSampler, p, 0.0).rgb / max(aerial.y, 1e-9);
-        let transmittance = textureSampleLevel(gwAerialTransmittance, gwClampSampler, p, 0.0).rgb;
-        return GwAir(mix(vec3f(1.0), transmittance, near), luminance * near);
+    if (gwParams.cloudscape.aerial > 0.0) {
+        let air = dkAerialPerspective(gwAerialLuminance, gwAerialTransmittance, gwClampSampler, uv, distance);
+        return GwAir(air.transmittance, air.luminance);
     }
     let f = exp(-distance / max(gwParams.fade, 1e-3));
     return GwAir(vec3f(f), sky * (1.0 - f));
@@ -148,7 +141,7 @@ fn gwAirAt(uv: vec2f, distance: f32, sky: vec3f) -> GwAir {
 fn gwAirUnderDeck(uv: vec2f, o: vec3f, v: vec3f, distance: f32, sky: vec3f) -> GwAir {
     let air = gwAirAt(uv, distance, sky);
     let volume = gwParams.cloudscape;
-    if (volume.enabled == 0u || volume.aerial.x <= 0.0) {
+    if (volume.enabled == 0u || volume.aerial <= 0.0) {
         return air;
     }
     let top = volume.base + volume.height;

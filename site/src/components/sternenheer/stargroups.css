@@ -1,0 +1,48 @@
+/* The stars figures' overlay groups (see StarGroups.astro), in a row; on a phone each shows its pick alone until opened. */
+.star-groups {
+    display: flex;
+    flex: none;
+    gap: 6px;
+    justify-content: flex-end;
+    pointer-events: none;
+}
+.pick-group > .view-icon:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+@media (max-width: 40rem) {
+    .pick-group:not(.open) > .view-icon:not([aria-pressed="true"]) {
+        display: none;
+    }
+}
+
+/* Over the stars figure the groups share the bar's row; below the width the row holds, they take a row of their own
+   under it, at the right, and the options panel moves down past them. */
+@media (max-width: 48rem) {
+    figure[data-stars] .sky-bar {
+        flex-wrap: wrap;
+    }
+    figure[data-stars] .sky-bar-end {
+        display: contents;
+    }
+    figure[data-stars] .sky-bar-start {
+        flex: 1 1 0;
+    }
+    figure[data-stars] .star-groups {
+        order: 1;
+        flex-basis: 100%;
+    }
+    figure[data-stars] .sky-options {
+        top: 92px;
+        max-height: calc(100% - 100px - var(--sky-foot, 0px));
+    }
+}
+
+/* Over the starred figure, at the top left beside the inset. */
+.tiles-panel > .star-groups {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    z-index: 5;
+    justify-content: flex-start;
+}

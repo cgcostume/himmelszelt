@@ -14,3 +14,54 @@
     min-width: 3.5ch;
     text-align: right;
 }
+
+/* The textures a cloud figure renders from, down the left of its view, beside the height's scale (see textures.ts). */
+.cloud-textures {
+    position: absolute;
+    top: 60px;
+    left: 104px;
+    z-index: 4;
+    display: flex;
+    flex-flow: column wrap;
+    gap: 6px 8px;
+    align-content: flex-start;
+    max-height: calc(100% - 84px - var(--sky-foot, 0px));
+    pointer-events: none;
+}
+.cloud-textures[hidden] {
+    display: none;
+}
+.cloud-texture {
+    margin: 0;
+    color: oklch(1 0 0 / 0.75);
+    font-size: var(--text-meta);
+    line-height: 1.3;
+    text-shadow: 0 0 3px oklch(0 0 0 / 0.7);
+    pointer-events: auto;
+    cursor: help;
+}
+.cloud-texture figcaption {
+    width: fit-content;
+    margin-top: 2px;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: oklch(0 0 0 / 0.4);
+}
+.cloud-texture figcaption span {
+    display: block;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.cloud-texture figcaption span + span {
+    color: oklch(1 0 0 / 0.6);
+}
+.cloud-texture figcaption span:empty {
+    display: none;
+}
+.sky-view .cloud-texture canvas {
+    width: 84px;
+    height: 84px;
+    border-radius: 4px;
+    outline: 1px solid oklch(1 0 0 / 0.25);
+    cursor: help;
+}

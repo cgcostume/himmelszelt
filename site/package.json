@@ -11,7 +11,12 @@
         "preview": "astro preview",
         "typecheck": "astro check",
         "bluenoise": "node scripts/bluenoise.mjs",
-        "images": "magick src/data/corona-2023-04-20-exmouth-phil-hart.png -resize 1024x1024 -strip -quality 80 -define webp:method=6 public/images/corona-2023-04-20-exmouth.webp && magick src/data/sunrise-2015-07-30-iss044e025484-scott-kelly.jpg -depth 16 -resize 1536x1536 -attenuate 0.1 +noise Gaussian -depth 8 -strip -quality 90 -define webp:method=6 -define webp:sns-strength=0 -define webp:filter-strength=0 public/images/sunrise-2015-07-30-iss.webp",
+        "milkyway-crops": "node scripts/milkyway-crops.mjs",
+        "starmap": "node scripts/starmap.mjs",
+        "starless": "node scripts/starless.mjs",
+        "star-colors": "node scripts/star-colors.mjs",
+        "images": "node scripts/images.mjs",
+        "assets": "node scripts/assets.mjs",
         "test:browser": "playwright test"
     },
     "dependencies": {
@@ -33,6 +38,7 @@
         "@playwright/test": "^1.62.1",
         "@types/zdog": "^1.1.7",
         "@webgpu/types": "^0.1.74",
+        "sharp": "^0.35.4",
         "typescript": "^6.0.0"
     }
 }

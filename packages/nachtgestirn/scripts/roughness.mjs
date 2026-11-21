@@ -1,36 +1,31 @@
 #!/usr/bin/env node
-// Makes the Moon's roughness map from Rosenburg et al. 2011's LOLA maps (PDS, LRO LOLA RDR, extras/fractal): red the
+// Makes the Moon's roughness maps from Rosenburg et al. 2011's LOLA maps (PDS, LRO LOLA RDR, extras/fractal): red the
 // median absolute slope over 57 m in tenths of a degree (MAS_57M_16), green the Hurst exponent from 57 m to 2.7 km
-// (HE_8), 0.5 to 1 over 0 to 255, together how steep the ground is below what the relief map resolves. 1024, 2048 and
-// 4096 texels around, equirectangular, centered on 0° longitude, east to the right, north up, as the other maps. Rerunnable:
-// `node scripts/roughness.mjs <outDir> [--cache <dir>]`. Needs ImageMagick 7 (`magick`) with WebP. Downloads 39 MiB once.
-import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+// (HE_8), 0.5 to 1 over 0 to 255, together how steep the ground is below what the relief map resolves. 512 to 4096 texels
+// around, beyond which the source holds no more, equirectangular, centered on 0° longitude, east to the right, north up,
+// as the other maps, seen and whole as `maps.mjs` makes them. Rerunnable: `node scripts/roughness.mjs [--size
+// 512,1k,2k,4k] [--whole] [--seen] [--out <dir>] [--cache <dir>] [--force]`, the seen 512 and 1K by default. Needs
+// sharp. Downloads 41 MB once.
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { download, mapFile, options, seenFade, towards, upToDate, WIDTHS, writeWebp } from "./common.mjs";
 
 const PDS = "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/extras/fractal/img";
 // Each 16-bit little endian, from 0° east round to 360°, north to south; value = DN * scale + offset, as the labels say.
-const SLOPE = { file: "MAS_57M_16.IMG", width: 5760, height: 2880, scale: 0.0015, offset: 45 };
-const HURST = { file: "HE_8.IMG", width: 2880, height: 1440, scale: 0.000025, offset: 0.5 };
-const SIZES = { "1k": 1024, "2k": 2048, "4k": 4096 };
+const SLOPE = { file: "MAS_57M_16.IMG", size: "33 MB", width: 5760, height: 2880, scale: 0.0015, offset: 45 };
+const HURST = { file: "HE_8.IMG", size: "8 MB", width: 2880, height: 1440, scale: 0.000025, offset: 0.5 };
 
-const args = process.argv.slice(2);
-const out = args.find((a) => !a.startsWith("--"));
-const cache = args.includes("--cache") ? args[args.indexOf("--cache") + 1] : "node_modules/.cache/nachtgestirn-maps";
-if (!out) {
-    console.error("usage: node scripts/roughness.mjs <outDir> [--cache <dir>]");
-    process.exit(1);
+const { out, cache, force, sizes, variants } = options(["512", "1k", "2k", "4k"]);
+const outputs = sizes.flatMap((size) => variants.map((seen) => join(out, mapFile("roughness", size, seen))));
+const scripts = ["roughness.mjs", "common.mjs"].map((file) => fileURLToPath(new URL(file, import.meta.url)));
+if (upToDate(outputs, [...[SLOPE, HURST].map(({ file }) => join(cache, file)), ...scripts], force)) {
+    console.log("the roughness maps are up to date; --force remakes them");
+    process.exit(0);
 }
-mkdirSync(out, { recursive: true });
-mkdirSync(cache, { recursive: true });
 
-function load({ file, width, height, scale, offset }) {
-    const path = join(cache, file);
-    if (!existsSync(path)) {
-        console.log(`downloading ${file}`);
-        execFileSync("curl", ["-sSL", "-o", path, `${PDS}/${file}`], { stdio: "inherit" });
-    }
-    const bytes = readFileSync(path);
+function load({ file, size, width, height, scale, offset }) {
+    const bytes = readFileSync(download(`${PDS}/${file}`, cache, size));
     const values = new Float32Array(width * height);
     for (let i = 0; i < values.length; i++) values[i] = bytes.readInt16LE(i * 2) * scale + offset;
     return { values, width, height };
@@ -76,31 +71,20 @@ function resample({ values, width, height }, OUT) {
 const sources = [load(SLOPE), load(HURST)];
 const sorted = (a) => Float64Array.from(a).sort();
 const median = (a) => sorted(a)[a.length >> 1];
-for (const [name, width] of Object.entries(SIZES)) {
-    const OUT = { width, height: width / 2 };
-    const [slope, hurst] = sources.map((source) => resample(source, OUT));
-    const rgb = new Uint8Array(OUT.width * OUT.height * 3);
-    for (let i = 0; i < slope.length; i++) {
-        rgb[i * 3] = Math.max(0, Math.min(255, Math.round(slope[i] * 10)));
-        rgb[i * 3 + 1] = Math.max(0, Math.min(255, Math.round(((hurst[i] - 0.5) / 0.5) * 255)));
-    }
-    const file = `moon-roughness-${name}.webp`;
-    const result = spawnSync(
-        "magick",
-        [
-            "-size",
-            `${OUT.width}x${OUT.height}`,
-            "-depth",
-            "8",
-            "rgb:-",
-            "-define",
-            "webp:lossless=true",
-            join(out, file),
-        ],
-        { input: Buffer.from(rgb.buffer), maxBuffer: 2 ** 28 },
-    );
-    if (result.status !== 0) throw new Error(`magick: ${result.stderr}`);
+for (const size of sizes) {
+    const OUT = { width: WIDTHS[size], height: WIDTHS[size] / 2 };
+    const resampled = sources.map((source) => resample(source, OUT));
     console.log(
-        `wrote ${file}: median slope ${median(slope).toFixed(2)}°, median Hurst exponent ${median(hurst).toFixed(3)}`,
+        `${size}: median slope ${median(resampled[0]).toFixed(2)}°, median Hurst exponent ${median(resampled[1]).toFixed(3)}`,
     );
+    for (const seen of variants) {
+        // Past what Earth sees, smooth: no slope, and the Hurst exponent its least, 0.5.
+        const [slope, hurst] = seen ? towards(resampled, seenFade(OUT.width), [0, 0.5]) : resampled;
+        const rgb = new Uint8Array(OUT.width * OUT.height * 3);
+        for (let i = 0; i < slope.length; i++) {
+            rgb[i * 3] = Math.max(0, Math.min(255, Math.round(slope[i] * 10)));
+            rgb[i * 3 + 1] = Math.max(0, Math.min(255, Math.round(((hurst[i] - 0.5) / 0.5) * 255)));
+        }
+        await writeWebp(rgb, OUT.width, OUT.height, join(out, mapFile("roughness", size, seen)), true);
+    }
 }

@@ -6,7 +6,7 @@ export type Rgb = readonly [r: number, g: number, b: number];
 
 /**
  * A star's effective temperature in kelvin from its color index B-V, by Ballesteros' formula (2012), which treats the
- * star as a black body seen through the two filters: 10,100 K for Vega's 0.0, 5,800 K for the Sun's 0.65, 3,600 K for
+ * star as a black body seen through the two filters: 10,100 K for Vega's 0.0, 5,800 K for the Sun's 0.65, 3,300 K for
  * Betelgeuse's 1.85. Good to a few percent from 2,500 K to 30,000 K.
  */
 export function temperatureFromColorIndex(bv: number): number {
@@ -20,7 +20,7 @@ export function temperatureFromColorIndexApprox(bv: number): number {
 }
 
 /**
- * The chromaticity of a black body at `temperature` kelvin, CIE 1931 x and y, by Kim et al.'s cubic spline fit of the
+ * The chromaticity of a black body at `temperature` kelvin, CIE 1931 x and y, by Kang et al.'s cubic spline fit of the
  * Planckian locus (2002), within 0.001 from 1,667 K to 25,000 K; clamped to that range.
  */
 export function planckianLocus(temperature: number): readonly [x: number, y: number] {

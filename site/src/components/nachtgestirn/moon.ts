@@ -13,6 +13,7 @@ import {
     gpu as shared,
     tables,
 } from "../dunstkreis/atmosphere";
+import { flightIn } from "../dunstkreis/flight";
 import { type Basis, cameraBasis, lookAround, project } from "../dunstkreis/skycamera";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
@@ -39,6 +40,8 @@ export function moonFigure(root: HTMLElement) {
         root.querySelector<HTMLInputElement>(`input[name="${root.id}-${name}"]:checked`)?.value ?? "";
 
     const camera = { yaw: 0, pitch: 0, fov: 1.5 * DEG };
+    // Flight, with a grid on the ground while it lasts, and the height the figure is seen from: its own.
+    const air = flightIn(root, canvas, camera, () => requestRender());
     const marks = () => Number(field("marks").dataset.level);
     field("marks").addEventListener("click", () => requestRender());
 
@@ -115,7 +118,7 @@ export function moonFigure(root: HTMLElement) {
         if (canvas.width !== width || canvas.height !== height) Object.assign(canvas, { width, height });
 
         const started = performance.now();
-        const m = moonAt(state.jd, state, table.luts.model);
+        const m = moonAt(state.jd, { ...state, heightM: air.height() }, table.luts.model);
         const astronomyMs = performance.now() - started;
         const { direction, angularDiameter, horizontal, lit, waxing, libration, earthshine, shadow } = m;
         // Kept on the Moon, or on the Sun.
@@ -147,6 +150,7 @@ export function moonFigure(root: HTMLElement) {
             projectionDistance: basis.d,
             pixelRatio: dpr,
             grid: marks() === 2,
+            ground: air.flying() ? air.flown : null,
             discPixels: ((angularDiameter * DEG) / camera.fov) * height,
             maps: "auto",
             air: true,

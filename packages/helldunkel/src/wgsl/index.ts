@@ -1,5 +1,5 @@
 /**
- * The WGSL layer, exported as plain strings. `exposure`, `tonemap`, `glare` and `vision` are binding-free, for a consumer's own shaders; `bloom`
+ * The WGSL layer, exported as plain strings. `exposure`, `whitebalance`, `tonemap`, `glare` and `vision` are binding-free, for a consumer's own shaders; `bloom`
  * and `meter` are the passes, with bindings of their own. Every identifier is prefixed `hd` (or `HD_` for constants) so several
  * `@himmelszelt/*` fragments can share one shader module.
  */
@@ -9,8 +9,9 @@ import glare from "./glare.wgsl";
 import meter from "./meter.comp.wgsl";
 import tonemap from "./tonemap.wgsl";
 import vision from "./vision.wgsl";
+import whitebalance from "./whitebalance.wgsl";
 
-export { bloom, exposure, glare, meter, tonemap, vision };
+export { bloom, exposure, glare, meter, tonemap, vision, whitebalance };
 
 /** The bloom pass' output binding, which has to spell out the target's format. */
 export const bloomOutput = (format: GPUTextureFormat) =>

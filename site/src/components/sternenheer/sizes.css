@@ -1,0 +1,12 @@
+/* The sizes table: six short columns, as wide as their contents, scrolling sideways on a phone rather than wrapping. */
+.sizes-table {
+    overflow-x: auto;
+}
+.sizes-table table {
+    table-layout: auto;
+    font-size: var(--text-small);
+}
+.sizes-table td,
+.sizes-table th {
+    white-space: nowrap;
+}

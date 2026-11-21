@@ -1,0 +1,29 @@
+/* A frame pass by pass: sternzeit's sub-figures, sliders and status; what remains has no shared rule. */
+.passes-canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #000;
+}
+/* The tiles as the squares they are, not blurred into each other. */
+.passes-blocky {
+    image-rendering: pixelated;
+}
+.passes-times {
+    display: block;
+    width: 100%;
+    font-size: var(--text-small);
+}
+.passes-bar {
+    fill: var(--accent);
+}
+/* The catalog's group and the Moon and air switches in a row before the status. */
+.passes-switches {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    vertical-align: middle;
+}
+.passes-switches > .star-groups {
+    pointer-events: auto;
+}

@@ -30,9 +30,24 @@
             "import": "./dist/index.js"
         }
     },
+    "bin": {
+        "sternenheer": "scripts/data.mjs"
+    },
     "files": [
         "dist",
-        "data"
+        "scripts",
+        "assets.json",
+        "data/brightstars.bin.gz",
+        "data/brightstars-compact.bin.gz",
+        "data/brightstars.csv",
+        "data/constellations.bin",
+        "data/constellations.csv",
+        "data/milkyway-2k.webp",
+        "data/milkyway-4k.webp",
+        "data/milkyway.json",
+        "data/LICENSE.md",
+        "data/LICENSE-d3-celestial.txt",
+        "data/README.md"
     ],
     "scripts": {
         "build": "rolldown -c rolldown.config.ts",
@@ -42,7 +57,17 @@
         "catalog": "node scripts/catalog.mjs",
         "constellations": "node scripts/constellations.mjs",
         "hipparcos": "node scripts/hipparcos.mjs",
-        "milkyway": "node scripts/milkyway.mjs data"
+        "tycho": "node scripts/tycho.mjs",
+        "milkyway": "node scripts/milkyway.mjs",
+        "assets": "node scripts/data.mjs assets"
+    },
+    "peerDependencies": {
+        "sharp": "^0.35.4"
+    },
+    "peerDependenciesMeta": {
+        "sharp": {
+            "optional": true
+        }
     },
     "devDependencies": {
         "@himmelszelt/dunstkreis": "workspace:*",
@@ -53,6 +78,7 @@
         "@webgpu/types": "^0.1.71",
         "rolldown": "^1.2.2",
         "rolldown-plugin-dts": "^0.28.0",
+        "sharp": "^0.35.4",
         "typescript": "^7.0.2",
         "webgpu": "^0.6.1"
     }

@@ -14,12 +14,26 @@ package.
 - `lowLightCompensation(luminance)`: the stops a dim scene is exposed darker than metered, so night stays dark rather than
   lifted to day: Krawczyk et al.'s (2005) key over middle gray, 0 from about 1.25 cd/m² up, -2.6 at night. Subtract it
   from a metered EV100; `hdLowLightCompensation` in `wgsl.exposure`, and the meter's `lowLight` reading applies it.
+- `whiteBalance(white)`: a camera's white balance, the 3x3 matrix over linear sRGB that shows a reference white as D65,
+  the working white of linear sRGB, at its own luminance, by the linear Bradford transform (Lam 1985), as ICC profiles
+  (ICC.1:2022, Annex E) and raw converters adapt, column-major for WGSL's `mat3x3f`. Apply it before the exposure, by
+  `applyWhiteBalance(rgb, balance)` or `hdWhiteBalance(rgb, balance)` in `wgsl.whitebalance`; `hdWhiteBalanceFor(white)`
+  builds the same matrix on the GPU, for a white metered there. The whites: `whiteFromChromaticity([x, y])`,
+  `planckianWhite(kelvin)` (Kang et al. 2002), `daylightWhite(kelvin)` (the CIE daylight locus, D65 at 6,504 K), all at
+  unit luminance, `D65_WHITE`, whose balance is `NO_WHITE_BALANCE`, the identity, which changes nothing, and the CIE's
+  standard white points A, D50, D55, D65, D75 and E as chromaticities, `WHITE_POINTS` (CIE 15:2018).
 - `wgsl.tonemap`, also as `@himmelszelt/helldunkel/wgsl`: exposed, scene-linear Rec. 709 to sRGB-encoded values, by
   `hdToneMapNeutral` (Khronos PBR Neutral), `hdToneMapAgx` (Sobotka's AgX in Wrensch's fit), `hdToneMapAces` (Narkowicz's
   ACES fit) or `hdToneMapClip`, none. `hdToneMapNeutralHdr` and `hdToneMapClipHdr` compress into a display's headroom,
-  for a float canvas with extended tone mapping. `hdDither(color, pixel, levels)` adds a step of
-  interleaved gradient noise (Jimenez 2014) before an 8-bit target rounds, `hdDitherBy(color, noise, levels)` a step of
-  noise of your own, such as a blue noise texture's, and `hdBayer(pixel)` Bayer's 8x8 thresholds. Every identifier is prefixed `hd`/`HD_`.
+  for a float canvas with extended tone mapping. `hdDitherBlue(color, pixel, levels, noise)` adds a step of blue noise
+  (Ulichney's void and cluster, 1993) before an 8-bit target rounds, tiled from the texture `blueNoiseTexture(device)`
+  makes; dunstkreis' sky pass and gewoelk's and sternenheer's compose dither by it. `hdBlueNoise(noise, pixel, frame)`
+  reads it, moved along by the golden ratio each frame for a pass whose grain may change. `hdDither(color, pixel,
+  levels)` adds interleaved gradient noise (Jimenez 2014) instead: no texture and cheaper, but its diagonal order shows
+  in dark, flat areas. `hdDitherBy(color, noise, levels)` takes noise of your own, and `hdBayer(pixel)` gives Bayer's
+  8x8 thresholds. Every identifier is prefixed `hd`/`HD_`.
+- `blueNoiseTexture(device)`: the blue noise as a 64x64 r8unorm texture, made once per device and shared, from 4 KB of
+  ranks carried in the code (`blueNoiseData()`, `pnpm bluenoise` regenerates them).
 
 ```js
 import { exposureFromEV100, wgsl } from "@himmelszelt/helldunkel";

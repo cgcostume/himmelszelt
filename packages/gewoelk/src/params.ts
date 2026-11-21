@@ -1,3 +1,5 @@
+import { NO_WHITE_BALANCE, type WhiteBalance } from "@himmelszelt/helldunkel";
+
 /**
  * What the clouds are made of and lit by, as plain numbers: a cloudscape of low clouds in a voxel volume, up to two
  * sheets of high cloud, and the light. Lengths in km unless named otherwise, directions ENU (x east, y north, z up),
@@ -138,6 +140,9 @@ export interface CloudscapeParams {
     /** How much larger the clouds are, every length of them but the base's height: 1 as given. Their extinction
      *  falls by as much, so a cloud as a whole lets as much light through. */
     size?: number;
+    /** How far the detail noise has moved up through the clouds, in km: the billows' own motion, which costs nothing,
+     *  as no volume is rebuilt for it. The caller adds to it over time, at half a meter a second, say. */
+    detailShiftKm?: number;
 }
 
 /** The slab's height, in km: the ordinary clouds' layer, times the towers' scale. Of a cloudscape already sized. */
@@ -190,6 +195,9 @@ export interface CloudParams {
     projectionDistance: number;
     /** Exposure in EV100, applied when the pass composes; the cloud layer itself stays in cd/m². */
     ev100: number;
+    /** A white balance, helldunkel's `whiteBalance(white)`, applied with the exposure to clouds and background alike:
+     *  `NO_WHITE_BALANCE` by default, the identity. A background from dunstkreis' sky pass is then written without one. */
+    whiteBalance?: WhiteBalance;
     /** Seconds, for the wind's drift and the evolution: any epoch, the same every frame. */
     timeS: number;
     /** The distance at which a cloud has faded to 1/e into the sky behind it, in km: the air in between. */
@@ -259,6 +267,7 @@ export const DEFAULT_CLOUD_PARAMS: CloudParams = {
     inverseViewProjection: new Float32Array([1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0]),
     projectionDistance: 0,
     ev100: 14,
+    whiteBalance: NO_WHITE_BALANCE,
     timeS: 0,
     horizonFadeKm: 60,
     planetRadiusKm: 6360,
@@ -271,7 +280,7 @@ export const DEFAULT_CLOUD_PARAMS: CloudParams = {
 export const EVOLUTION_PERIOD = 8;
 
 /** Byte sizes of the uniform structs in params.wgsl. */
-export const PARAMS_SIZE = 528;
+export const PARAMS_SIZE = 576;
 export const SUNLIGHT_SIZE = 64 + 128 * 16;
 export const CLOUDSCAPE_SIZE = 112;
 export const SHEET_SIZE = 128;
@@ -280,6 +289,7 @@ const CLOUDSCAPE_OFFSET = 160;
 /** Where the cloudscape's `aerial` lies in `GwParams`, which the pass writes when it encodes. */
 export const AERIAL_OFFSET = CLOUDSCAPE_OFFSET + 88;
 const SHEETS_OFFSET = 272;
+const WHITE_BALANCE_OFFSET = 528;
 export const MAX_SHEETS = 2;
 
 const wrap = (value: number, period: number) => ((value % period) + period) % period;
@@ -358,6 +368,13 @@ export interface SunlightRow {
 }
 
 /**
+ * The observer's height the sunlight's rows and the light grid take, in m: the next step up a ladder of the square root
+ * of 2, so they hold while an observer climbs or descends and change, with a rebuild of the light, twice per doubling.
+ * Higher than the true height at most by that step: the rows reach a little farther than they must.
+ */
+export const steppedHeightM = (heightM: number) => 2 ** (Math.ceil(Math.log2(Math.max(heightM, 1)) * 2) / 2);
+
+/**
  * Where the clouds want the sun's illuminance: four rows, the cloudscape's base and top and each sheet's altitude,
  * over the elevations the sun has above the horizon of anything at that altitude in sight. It stands higher over a
  * cloud towards it, by the angle the planet curves through in between.
@@ -365,7 +382,7 @@ export interface SunlightRow {
 export function sunlightRows(p: CloudParams): SunlightRow[] {
     const r = p.planetRadiusKm;
     const elevation = Math.asin(Math.max(-1, Math.min(1, p.sunDirection[2])));
-    const observer = Math.sqrt(2 * r * Math.max(p.observerHeightM / 1000, 0));
+    const observer = Math.sqrt((2 * r * steppedHeightM(p.observerHeightM)) / 1000);
     const row = (altitudeKm: number, farKm = altitudeKm): SunlightRow => {
         const reach = (observer + Math.sqrt(2 * r * Math.max(farKm, 0.01))) / r;
         const fromRad = Math.max(-Math.PI / 2, elevation - reach);
@@ -421,6 +438,8 @@ export function cloudscapeData(
     f.set(lightElevations, 18);
     const clearing = c.clearingKm ?? 0;
     f.set([clearing, Math.min(c.clearingFromKm ?? clearing / 2, clearing)], 20);
+    // Wrapped by the noise's tile, which it repeats by, so 32-bit floats keep it to the millimeter.
+    f[23] = wrap(c.detailShiftKm ?? 0, c.noiseScaleKm);
     // Less as the coverage closes the sky: a full deck stays full.
     const variation = (c.variation ?? 0) * Math.min(1, 2 * (1 - c.coverage));
     f.set([Math.max(0, variation), c.variationKm ?? 40, c.offset, Math.max(1, c.towerScale ?? 1)], 24);
@@ -467,5 +486,7 @@ export function paramsData(p: CloudParams, frame: number): ArrayBuffer {
         const data = sheetData(sheet, p.timeS);
         new Uint8Array(buffer, SHEETS_OFFSET + i * SHEET_SIZE).set(new Uint8Array(data));
     });
+    const [m0, m1, m2, m3, m4, m5, m6, m7, m8] = p.whiteBalance ?? NO_WHITE_BALANCE;
+    f.set([m0, m1, m2, 0, m3, m4, m5, 0, m6, m7, m8], WHITE_BALANCE_OFFSET / 4);
     return buffer;
 }

@@ -25,7 +25,7 @@ export function magnitudeFromIlluminance(illuminance: number): number {
 export const S10_LUMINANCE = illuminanceFromMagnitude(10) / (Math.PI / 180) ** 2;
 
 /** A surface brightness in magnitudes per square arcsecond, the astronomer's unit for the night sky, as a luminance
- *  in cd/m²: 21.5, a dark rural sky, is some 0.2 thousandths of a candela per square meter. */
+ *  in cd/m²: 21.5, a dark rural sky, is some 0.28 thousandths of a candela per square meter. */
 export function luminanceFromSurfaceBrightness(magnitudesPerSquareArcsecond: number): number {
     return illuminanceFromMagnitude(magnitudesPerSquareArcsecond) / (Math.PI / 180 / 3600) ** 2;
 }

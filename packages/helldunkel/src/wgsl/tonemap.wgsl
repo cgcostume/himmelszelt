@@ -95,9 +95,23 @@ fn hdToneMapAgx(exposed: vec3f) -> vec3f {
 }
 
 // A step of noise, added before a color is quantized to `levels` steps per channel, 255 for 8 bits: it trades a smooth
-// gradient's bands for grain too fine to see. Jimenez's interleaved gradient noise, which spreads neighboring values apart
-// like blue noise, from the pixel alone, so it is stable from frame to frame and needs no texture; remapped to a
-// triangular distribution, whose error does not depend on the signal. For encoded values, the last thing before writing.
+// gradient's bands for grain too fine to see. Ulichney's blue noise, from `noise`, the texture `blueNoiseTexture`
+// makes, tiled; remapped to a triangular distribution, whose error does not depend on the signal. For encoded values,
+// the last thing before writing. What the passes dither by.
+fn hdDitherBlue(color: vec3f, pixel: vec2u, levels: f32, noise: texture_2d<f32>) -> vec3f {
+    return hdDitherBy(color, hdBlueNoise(noise, pixel, 0u), levels);
+}
+
+// The blue noise at a pixel, in (0, 1): the texel's rank, 0 to 255 in an r8unorm texture, at the middle of its step.
+// Another `frame` moves every value along by the golden ratio, for a pass that renders a new image each frame and lets
+// the grain average out over time; 0 for a still image.
+fn hdBlueNoise(noise: texture_2d<f32>, pixel: vec2u, frame: u32) -> f32 {
+    let rank = textureLoad(noise, vec2i(pixel % textureDimensions(noise)), 0).r * 255.0;
+    return fract((rank + 0.5) / 256.0 + 0.618034 * f32(frame % 4096u));
+}
+
+// The same by Jimenez's interleaved gradient noise, from the pixel alone: no texture, and cheaper, but its diagonal
+// order shows in dark, flat areas.
 fn hdDither(color: vec3f, pixel: vec2u, levels: f32) -> vec3f {
     return hdDitherBy(color, fract(52.9829189 * fract(dot(vec2f(pixel), vec2f(0.06711056, 0.00583715)))), levels);
 }
@@ -114,7 +128,7 @@ fn hdBayer(pixel: vec2u) -> f32 {
     return (f32(rank) + 0.5) / 64.0;
 }
 
-// The same with noise of your own, in [0, 1), such as a tiled blue noise texture's.
+// The same with noise of your own, in [0, 1).
 fn hdDitherBy(color: vec3f, uniform: f32, levels: f32) -> vec3f {
     let noise = uniform * 2.0 - 1.0;
     return color + sign(noise) * (1.0 - sqrt(1.0 - abs(noise))) / levels;

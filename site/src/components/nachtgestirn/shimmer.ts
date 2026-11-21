@@ -1,8 +1,8 @@
 import { liftedDirection, shimmerScales, type Vec3 } from "@himmelszelt/nachtgestirn";
 import { find } from "../dom";
-import { figureInfo } from "../figure-info";
 import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { morph } from "../dunstkreis/skyframe";
+import { figureInfo } from "../figure-info";
 import { onDemand } from "../frame";
 import { drawSvg, moonSymbol, svgText, THUMB_RADIUS } from "../sternzeit/figure";
 import { apply, cross, dot, multiply, noGpu, normalize, rotation, transpose } from "./laws";

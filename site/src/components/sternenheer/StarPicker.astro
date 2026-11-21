@@ -1,0 +1,61 @@
+---
+import "../sternzeit/sternzeit.css";
+import "../dunstkreis/wavelengths.css";
+import "./starpicker.css";
+import { FILM_STARS, told } from "./filmstars";
+
+/**
+ * The film stars as points of light on a strip of night sky, each in its color, sorted by B−V, one to pick; a status
+ * line under them, one row, names it with its designation and a work. Its value is the star's HR number, or "sun".
+ * The figure's script drives it with `starPicker` from `starpicker.ts`.
+ */
+interface Props {
+    label: string;
+    /** The Sun among them, the one star no catalog lists. */
+    sun?: boolean;
+    /** The star picked at first, by HR number; none if left out. */
+    value?: number;
+    class?: string;
+}
+const { label, sun = false, value, class: className } = Astro.props;
+
+type Work = { film: string; year: number; note: string; history: boolean };
+type Entry = { value: string; name: string; designation: string; bv: number; works: Work[] };
+const byHr = new Map<string, Entry>();
+for (const { hr, name, designation, bv, film, year, history = false, note } of FILM_STARS) {
+    const official = `${designation}, HR ${hr}`;
+    const entry = byHr.get(String(hr)) ?? { value: String(hr), name, designation: official, bv, works: [] };
+    entry.works.push({ film, year, note, history });
+    byHr.set(String(hr), entry);
+}
+const note = "the one star no catalog lists";
+const sunWork = { film: "", year: 0, note, history: false };
+const sunEntry: Entry = { value: "sun", name: "the Sun", designation: "", bv: 0.65, works: [sunWork] };
+const stars = [...byHr.values(), ...(sun ? [sunEntry] : [])].sort((a, b) => a.bv - b.bv);
+// Names short enough for an eighth of the column, the full name in the tooltip and the status line.
+const SHORT: Record<string, string> = {
+    "Zeta² Reticuli": "ζ² Ret",
+    "Alpha Centauri A": "α Cen A",
+    "40 Eridani A": "40 Eri A",
+    "the Sun": "Sun",
+};
+const signed = (v: number) => (v < 0 ? "−" : "") + Math.abs(v).toFixed(2);
+// The tooltip tells the whole story, the status line only the name, its designation if it fits, B−V and one work.
+const tooltip = ({ name, designation, bv, works }: Entry) =>
+    [
+        `${name}${designation ? ` (${designation})` : ""}, B−V ${signed(bv)}.`,
+        ...works.map((w) => (w.film ? `${told(w)}: ${w.note}` : `${w.note.replace(/^t/, "T")}.`)),
+    ].join(" ");
+---
+
+<div class:list={["starpicker", className]} data-star-picker data-stars={JSON.stringify(stars)}>
+    <div class="wavelengths-skies starpicker-strip as-seen" role="radiogroup" aria-label={label} style={`--stars: ${stars.length}; --half: ${Math.ceil(stars.length / 2)}`}>
+        {stars.map((star) => (
+            <button type="button" role="radio" class="wavelengths-pair" data-value={star.value} data-bv={star.bv} aria-checked={star.value === String(value) ? "true" : "false"} tabindex={-1} title={tooltip(star)}>
+                <span class="starpicker-dot"></span>
+                <span>{SHORT[star.name] ?? star.name}</span>
+            </button>
+        ))}
+    </div>
+    <p class="view-status starpicker-status" data-field="pickedStar" aria-live="polite"></p>
+</div>

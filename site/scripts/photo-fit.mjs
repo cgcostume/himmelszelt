@@ -12,7 +12,6 @@
 //
 // A tool for the chapter while its content is worked on, not part of any package.
 
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -27,6 +26,7 @@ import {
     moon,
 } from "@himmelszelt/sternzeit";
 import { chromium } from "@playwright/test";
+import sharp from "sharp";
 import { CLIFTON_PARK, ECLIPSE_PHOTOS } from "../src/components/nachtgestirn/eclipse-photos.ts";
 import { PHOTOS } from "../src/components/nachtgestirn/photo-options.ts";
 
@@ -81,24 +81,38 @@ function downsample(img, f) {
     return out;
 }
 
-// Images as gray floats through ImageMagick.
-function gray(file, width, height) {
-    const resize = ["-resize", `${width}x${height}!`];
-    const raw = execFileSync("magick", [file, "-colorspace", "Gray", ...resize, "-depth", "8", "gray:-"], {
-        maxBuffer: 1 << 30,
-    });
-    if (raw.length !== width * height) throw new Error(`${file}: ${raw.length} bytes, not ${width}x${height}`);
-    return Float32Array.from(raw);
+// 8-bit images as gray floats, 0 to 255, through sharp: Rec. 709 luma of the encoded values with ImageMagick's weights, as
+// its Gray has it, resized by Lanczos 3 in 16 bits where a size is given.
+async function gray(input, width, height) {
+    const { data, info } = await sharp(input, { ignoreIcc: true, limitInputPixels: false })
+        .removeAlpha()
+        .toColourspace("srgb")
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+    const luma = Float32Array.from(
+        { length: data.length / 3 },
+        (_, i) => 0.212656 * data[i * 3] + 0.715158 * data[i * 3 + 1] + 0.072186 * data[i * 3 + 2],
+    );
+    if (!width) return luma.map(Math.round);
+    const wide = Uint16Array.from(luma, (v) => Math.round(v * 257));
+    const resized = await sharp(wide, { raw: { width: info.width, height: info.height, channels: 1 } })
+        .resize(width, height, { fit: "fill", kernel: "lanczos3" })
+        .toColourspace("grey16")
+        .raw({ depth: "ushort" })
+        .toBuffer();
+    return Float32Array.from(new Uint16Array(resized.buffer, resized.byteOffset, resized.length / 2), (v) =>
+        Math.round(v / 257),
+    );
 }
-function savePng(file, data, width, height) {
+async function savePng(file, data, width, height) {
     const bytes = Uint8Array.from(data, (v) => Math.max(0, Math.min(255, v)));
-    execFileSync("magick", ["-size", `${width}x${height}`, "-depth", "8", "gray:-", file], { input: bytes });
+    await sharp(bytes, { raw: { width, height, channels: 1 } })
+        .png()
+        .toFile(file);
 }
-function identify(file) {
-    return execFileSync("magick", ["identify", "-format", "%w %h", `${file}[0]`])
-        .toString()
-        .split(" ")
-        .map(Number);
+async function identify(file) {
+    const { width, height } = await sharp(file).metadata();
+    return [width, height];
 }
 
 async function download(photo) {
@@ -404,18 +418,18 @@ const fitted = [];
 for (const [index, photo] of LIST.entries()) {
     if (only && !only.includes(index)) continue;
     const file = await download(photo);
-    const [width, height] = identify(file);
+    const [width, height] = await identify(file);
     if (width !== photo.width || height !== photo.height)
         console.warn(`${photo.label}: ${width}x${height}, not as listed`);
     const shotFile = join(args.cache, `render-${index}.png`);
     writeFileSync(shotFile, await screenshot(page, index));
-    const [sw, sh] = identify(shotFile);
+    const [sw, sh] = await identify(shotFile);
     if (sw !== S || sh !== S) throw new Error(`render ${sw}x${sh}, not ${S}`);
-    const render = gray(shotFile, S, S);
+    const render = await gray(shotFile, S, S);
     // The photograph resized to the render's scale, so sampling it does not alias.
     const pw = Math.round(width * placement(photo, width, height).k);
     const ph = Math.round((height * pw) / width);
-    const img = gray(file, pw, ph);
+    const img = await gray(file, pw, ph);
 
     const R = DISC * S;
     // The photo figure draws nachtgestirn's Moon turned already by the photograph's listed turn, so the fit finds only
@@ -430,7 +444,7 @@ for (const [index, photo] of LIST.entries()) {
     let noLens;
     if (args.out) {
         mkdirSync(args.out, { recursive: true });
-        savePng(
+        await savePng(
             join(args.out, `photo-${index}-start.png`),
             warp(img, pw, ph, place).map((v) => (Number.isNaN(v) ? 0 : v)),
             S,
@@ -500,13 +514,13 @@ for (const [index, photo] of LIST.entries()) {
         if (args.out) {
             mkdirSync(args.out, { recursive: true });
             N = S;
-            savePng(
+            await savePng(
                 join(args.out, `photo-${index}-warped.png`),
                 warp(img, pw, ph, place).map((v) => (Number.isNaN(v) ? 0 : v)),
                 S,
                 S,
             );
-            savePng(join(args.out, `photo-${index}-render.png`), render, S, S);
+            await savePng(join(args.out, `photo-${index}-render.png`), render, S, S);
         }
     }
     const kmPerUnit = MOON_RADIUS_KM;

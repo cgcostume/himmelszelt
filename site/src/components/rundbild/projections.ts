@@ -409,7 +409,7 @@ fn gridCoverage(position: vec2f, d: vec3f) -> f32 {
     return dkGridCoverage(d, right, below, params.sunDirection, params.sunAngularRadius, params.pixelRatio);
 }
 
-// Written out, with dither as the sky pass has it: Jimenez's interleaved gradient noise, an 8-bit step, triangular.
+// Written out, dithered by Jimenez's interleaved gradient noise, an 8-bit step, triangular: no texture to bind.
 fn put(p: vec2u, color: vec3f) {
     var c = color;
     if (params.dither != 0u) {

@@ -1,0 +1,11 @@
+{
+    "source": "https://svs.gsfc.nasa.gov/vis/a000000/a004800/a004851/starmap_2020_4k.exr",
+    "width": 4096,
+    "stops": 12,
+    "background": 0.5,
+    "center": {
+        "rightAscension": 310.358,
+        "declination": 45.28
+    },
+    "radius": 36
+}

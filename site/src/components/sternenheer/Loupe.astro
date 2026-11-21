@@ -1,0 +1,95 @@
+---
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import Term from "../Term.astro";
+import "../sternzeit/sternzeit.css";
+import "../nachtgestirn/nachtgestirn.css";
+import "./loupe.css";
+import { FILM_STARS } from "./filmstars";
+import StarPicker from "./StarPicker.astro";
+
+/**
+ * One star under a loupe: the pass' own pixels of it, magnified, its profile on a logarithmic scale, its pixels added up
+ * from the center out against the star's light, and where that light goes. Sliders for the magnitude, the exposure, the
+ * zoom and the core's width, and a switch for the knee and the halo. The stars are those films made famous, each one's
+ * magnitude read from the catalog's CSV at build time.
+ */
+interface Props {
+    id?: string;
+}
+const { id = "loupe" } = Astro.props;
+
+// Astro builds and serves from site/, whichever bundle this frontmatter ends up in.
+const csv = readFileSync(resolve(process.cwd(), "../packages/sternenheer/data/brightstars.csv"), "utf8");
+const rows = csv.trim().split("\n");
+const seen = new Map<number, { hr: number; magnitude: number; bv: number }>();
+for (const star of FILM_STARS) {
+    const line = rows[star.row + 1];
+    if (!line) continue;
+    const [magnitude = 0, , , , , bv = star.bv] = line.split(",").map(Number);
+    seen.set(star.row, { hr: star.hr, magnitude, bv });
+}
+const choices = [...seen.values()];
+const VEGA = 7001;
+---
+
+<figure class="loupe-figure" id={id} data-loupe data-choices={JSON.stringify(choices)}>
+    <StarPicker label="The star under the loupe" value={VEGA} />
+    <div class="loupe-views">
+        <div class="loupe-grid as-seen">
+            <canvas data-field="grid" aria-label="The star's pixels as sternenheer's pass draws them, magnified, rendered with WebGPU"></canvas>
+            <span class="view-buttons">
+                <button type="button" class="view-toggle" data-field="knee" aria-pressed="true" title="The knee and the halo: the core stops brightening at display white and the light beyond goes into a halo; off, a plain Gaussian, which the screen clips">knee</button>
+            </span>
+        </div>
+        <div class="loupe-plots">
+            <svg data-field="profile" aria-label="Every pixel's luminance over its distance from the star's center, in units of display white, on a logarithmic scale"></svg>
+            <svg data-field="sum" aria-label="The pixels added up from the center out, against the star's light"></svg>
+        </div>
+    </div>
+    <svg class="loupe-ledger" data-field="ledger" aria-label="Where the star's light goes"></svg>
+    <label class="figure-slider" title="The star's apparent magnitude: lower is brighter, each step 2.512 times. Brighter to the right">
+        <span class="note">magnitude</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="magnitude" min="-8" max="1.5" step="0.01" value="0" aria-label="The star's magnitude, negated" />
+        </span>
+        <output data-field="magnitudeValue"></output>
+    </label>
+    <label class="figure-slider" title="The exposure the pixels are shown at: a moonless night meters about EV100 −9. Brighter to the right">
+        <span class="note">EV<sub>100</sub></span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="exposure" min="-4" max="14" step="0.5" value="9" aria-label="The exposure, as minus the EV100" />
+        </span>
+        <output data-field="exposureValue"></output>
+    </label>
+    <label class="figure-slider" title="How much sky a pixel spans: from the chapter's first view, 6.7 arcminutes a pixel, to a telescope's few arcseconds. Closer to the right">
+        <span class="note">zoom</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="zoom" min="0" max="8" step="0.1" value="0" aria-label="The zoom, in doublings from 6.7 arcminutes a pixel" />
+        </span>
+        <output data-field="zoomValue"></output>
+    </label>
+    <label class="figure-slider" title="The width of the star's core, the standard deviation of its Gaussian in pixels, psfPixels; the pass never draws it under 0.6">
+        <span class="note">core</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="psf" min="0.6" max="2" step="0.05" value="0.7" aria-label="The width of the core in pixels" />
+        </span>
+        <output data-field="psfValue"></output>
+    </label>
+    <p class="view-status" data-field="status" aria-live="polite"></p>
+    <figcaption class="figure-caption">
+        One star under a loupe, drawn by sternenheer's pass on its own: (a) its pixels, magnified, as a screen shows
+        them, over black; (b) every pixel's luminance over its distance from the star's center, in units of display
+        white on a logarithmic scale, those the halo reaches in gold, dashed the star's <Term of="Point spread function">point
+        spread function</Term> without the knee;
+        (c) the pixels added up from the center out, the core alone dashed, against the star's light at the eye; and
+        under them where that light goes, across the whole target the pass drew, 257 pixels wide. The stars are those
+        films and history made famous, at their magnitude and color from the catalog.
+    </figcaption>
+</figure>
+
+<script>
+    import { loupeFigure } from "./loupe";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-loupe]")) loupeFigure(root);
+</script>

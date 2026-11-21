@@ -1,0 +1,29 @@
+{
+    "size": 384,
+    "stops": 12,
+    "sizes": {
+        "exr": 36436668,
+        "srgb": 3188066,
+        "log": 3956238
+    },
+    "patches": {
+        "pole": {
+            "x": 3758,
+            "y": 523,
+            "rightAscension": 192.86,
+            "declination": 27.13,
+            "low": -9,
+            "median": -8.04,
+            "high": -6.82
+        },
+        "band": {
+            "x": 2539,
+            "y": 422,
+            "rightAscension": 300,
+            "declination": 36,
+            "low": -5.79,
+            "median": -4.02,
+            "high": -2.51
+        }
+    }
+}

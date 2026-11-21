@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { fromDate, julianDayUT } from "@himmelszelt/sternzeit";
 import { chromium } from "@playwright/test";
+import sharp from "sharp";
 import { CLIFTON_PARK, ECLIPSE_PHOTOS } from "../src/components/nachtgestirn/eclipse-photos.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -52,8 +53,8 @@ const linear = (v) => {
     const c = v / 255;
     return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 };
-function rgb(file, width, height) {
-    const raw = execFileSync("magick", [file, "-depth", "8", "rgb:-"], { maxBuffer: 1 << 30 });
+async function rgb(file, width, height) {
+    const raw = await sharp(file, { ignoreIcc: true }).removeAlpha().toColourspace("srgb").raw().toBuffer();
     if (raw.length !== width * height * 3) throw new Error(`${file}: ${raw.length} bytes, not ${width}x${height}x3`);
     return raw;
 }
@@ -114,7 +115,7 @@ await browser.close();
 
 const rowFile = join(here, ".eclipse-color-render.png");
 writeFileSync(rowFile, shot);
-const row = rgb(rowFile, columns * S, S);
+const row = await rgb(rowFile, columns * S, S);
 execFileSync("rm", [rowFile]);
 
 const only = args.only?.split(",").map(Number);
@@ -122,7 +123,7 @@ const results = [];
 for (const [index, photo] of ECLIPSE_PHOTOS.entries()) {
     if (only && !only.includes(index)) continue;
     const g = geometry[index];
-    const img = rgb(join(here, "../public/eclipse-2008", photo.file), PHOTO_PX, PHOTO_PX);
+    const img = await rgb(join(here, "../public/eclipse-2008", photo.file), PHOTO_PX, PHOTO_PX);
     // The sky behind the Moon, light pollution and glow, which adds to every pixel of the disc too: its median per
     // channel, linear, taken off the photograph's pixels before they are compared.
     const sky = [0, 1, 2].map((ch) => {

@@ -1,10 +1,10 @@
 // The constellations' lines onto the target: every line in pieces short enough to stay straight on a bent projection,
 // each along the great circle between its two stars as the air lifts them, binned into the tiles it crosses, so the
-// compose pass looks only at the pieces near each pixel. Requires `params.wgsl`, `camera.wgsl` (dunstkreis') and
-// `stars.wgsl`.
+// compose pass looks only at the pieces near each pixel. Requires `params.wgsl`, `camera.wgsl`, `air.wgsl` and
+// `seeing.wgsl` (dunstkreis') and `stars.wgsl`.
 
 @group(0) @binding(0) var<uniform> shParams: ShParams;
-@group(0) @binding(1) var<storage, read> shCatalog: array<f32>;
+@group(0) @binding(1) var<storage, read> shCatalog: array<u32>;
 // Per line: the constellation's index, its two stars' indices in the catalog, and a zero.
 @group(0) @binding(2) var<storage, read> shLines: array<vec4u>;
 @group(0) @binding(3) var<storage, read_write> shPieces: array<ShPiece>;
@@ -12,14 +12,15 @@
 @group(0) @binding(5) var<storage, read_write> shLineEntries: array<u32>;
 @group(0) @binding(6) var<storage, read> shFaint: array<u32>;
 @group(0) @binding(7) var<storage, read> shFaintColors: array<vec4f>;
+@group(0) @binding(15) var shAir: texture_2d<f32>;
 
 // A star's direction as it shows, and whether it shows above the horizon.
 fn shShown(direction: vec3f) -> vec4f {
     var shown = direction;
     var up = direction.z >= shParams.horizonZ;
     if ((shParams.flags & SH_FLAG_AIR) != 0u) {
-        shown = shLift(direction);
-        up = up && shAltitude(shown) >= shParams.airHorizon;
+        shown = dkAirLifted(shAir, direction);
+        up = up && dkAirTowards(shAir, shown).shows;
     }
     return vec4f(shown, f32(up));
 }

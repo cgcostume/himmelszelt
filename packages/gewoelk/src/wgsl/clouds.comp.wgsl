@@ -2,7 +2,7 @@
 // target, which may be smaller than the frame; the sheets are left to the compose pass, at the frame's. It is marched
 // as Nubis3 marches its voxel clouds: steps the signed distance long outside the clouds and adaptive inside,
 // the density up-rezzed from the dimensional profile by the detail noise, the light summed per voxel beforehand.
-// Requires `noise.wgsl`, `params.wgsl`, `camera.wgsl`, `sheet.wgsl` and the output binding.
+// Requires `noise.wgsl`, `params.wgsl`, `camera.wgsl`, `aerial.wgsl`, `sheet.wgsl` and the output binding.
 
 @group(0) @binding(0) var<uniform> gwParams: GwParams;
 @group(0) @binding(1) var gwMap: texture_2d_array<f32>;
@@ -115,7 +115,7 @@ fn gwDensity(m: vec4f, x: GwPoint, thinning: vec2f) -> GwSample {
     }
     // Read at the height above the base, not above the planet's center: a sampler's fixed-point texel coordinates
     // overflow some ten thousand tiles out.
-    let local = vec3f(x.ground - volume.drift, x.height);
+    let local = vec3f(x.ground - volume.drift, x.height - volume.detailShift);
     // Wrapped here, in full float precision, before the sampler's coarser coordinates see it; the sampler repeats in
     // all three axes, so the filter runs across a tile's edge.
     let noise = textureSampleLevel(gwDetail, gwDetailSampler, fract(local / volume.noiseScale), 0.0);

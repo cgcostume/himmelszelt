@@ -65,29 +65,27 @@ it off. Every ball a renderer shades the usual way darkens towards its rim. The 
 dust, and dust reflects light by a law of its own. nachtgestirn draws the Moon by that law, Bruce Hapke's
 <Cite id="hapke2012" />, over NASA's maps of its color and its relief <Cite id="svs4720" />: lit by the Sun, by
 <Term of="Earthshine">earthshine</Term> on its night side and, during an eclipse, by the copper light Earth's air bends
-into its shadow. Where the Moon stands and how it is turned comes from [sternzeit](../sternzeit/); the sky behind it
-and the air in front of it from [dunstkreis](../dunstkreis/).
+into its shadow. Where the Moon stands and how it is turned comes from [sternzeit](../sternzeit/), the sky and the air
+around it from [dunstkreis](../dunstkreis/), and the stars it covers from [sternenheer](../sternenheer/).
 
-`@himmelszelt/nachtgestirn` is TypeScript and WGSL: one WebGPU compute pass, with no other package needed at runtime.
-It takes directions, angles and lux as plain inputs and draws into a texture you own, over a sky of yours or alone,
-with its coverage in alpha. Everything is in physical units, so the Moon exposes like the sky around it, by day as by
-night, and the pass costs a fraction of a millisecond for the Moon as a sky shows it. What it is for: [the Moon in your
-sky](#the-moon-tonight) first of all, [an eclipse](#earths-shadow) as its night shows it, a Moon to turn and zoom
-into, and a dusty ball of any kind, since Hapke wrote his law for the airless bodies of the solar system, not for the
-Moon alone.
+`@himmelszelt/nachtgestirn` is TypeScript and WGSL: one WebGPU compute pass that casts a ray per pixel against a
+sphere, with no mesh and no other package needed at runtime. It takes directions, angles and lux as plain inputs and
+draws into a texture you own, over a sky of yours or alone, with its coverage in alpha. Everything is in physical units,
+so the Moon exposes like the sky around it, by day as by night, and the pass costs a fraction of a millisecond for the
+Moon as a sky shows it. The same pass draws the half-degree Moon of a wide sky and the close-up of a long lens, both
+true to [a photograph of the same moment](#one-face-almost). What it is for: [the Moon in your sky](#the-moon-tonight)
+first of all, [an eclipse](#earths-shadow) as its night shows it, and a dusty ball of any kind.
 
 The Moon below is that pass with the sky and the air taken away, out of your sky and into your hands: the Sun where it
 stands at the chosen moment, the night side in earthshine, mountains and crater rims casting their shadows along the
-<Term of="Terminator">terminator</Term>, the line between day and night. Drag it round onto the far side, which no one
-on Earth has ever seen in the sky, and zoom in until single craters fill the view.
+<Term of="Terminator">terminator</Term>, the line between day and night.
 
 <Globe />
 <Controls height={false} />
 
-Every figure on this page is drawn live by the library, in your browser. Most follow one moment, the page's: the slider
-under a figure runs it from one new moon to the next, so any phase is a drag away, and the controls under the Moon above
-set any other date. A few keep a moment of their own, picked for what they show. A place matters only at the end, for
-[the Moon in your sky](#the-moon-tonight), and the controls there take one.
+Every figure on this page is drawn live by the library, in your browser. Most share the page's moment: the slider
+under a figure runs it through a month, and the controls above set any date. A few keep a moment of their own. A place
+matters only for [the Moon in your sky](#the-moon-tonight).
 
 In code, it takes one install, the maps and the pass once, and a handful of numbers per frame, which sternzeit
 computes:
@@ -201,15 +199,15 @@ from it only what a renderer needs.
 
 <Lobes />
 
-Bruce Hapke made the powder a law in 1963 <Cite id="hapke1963" />, and added what happens with the Sun right behind
-the viewer: every grain then hides its own shadow, and the ground brightens by up to a factor of two, the
-<Term of="Opposition surge">opposition surge</Term>. We never see it in full, since a Moon exactly opposite the Sun is
-a Moon in Earth's shadow. Jensen and colleagues brought the law into rendering <Cite id="jensen2001" />, and
-osgHimmel's Moon followed them <Cite id="mueller2012thesis" />. Hapke kept working on it for half a century. Its
-modern form <Cite id="hapke2012" /> adds the light scattered from grain to grain and the shadows the ground's slopes
-cast on each other, some 24° steep on average <Cite id="hapke1984" />, and Sato and colleagues fitted it to some
-66,000 images from the Lunar Reconnaissance Orbiter <Cite id="sato2014" />. nachtgestirn shades by that fit, at no
-more cost than the law of 1963.
+Bruce Hapke made the powder a law in 1963 <Cite id="hapke1963" />, and added what happens with the Sun right behind the
+viewer: every grain then hides its own shadow, and the ground brightens by up to a factor of two, the <Term
+of="Opposition surge">opposition surge</Term>. We never see it in full, since a Moon exactly opposite the Sun is a Moon
+in Earth's shadow. Jensen and colleagues brought the law into rendering <Cite id="jensen2001" />, and osgHimmel's Moon
+followed them <Cite id="mueller2012thesis" />. Hapke kept working on it for half a century. Its modern form <Cite
+id="hapke2012" />, written for any airless body of the solar system, adds the light scattered from grain to grain and
+the shadows the ground's slopes cast on each other, some 24° steep on average <Cite id="hapke1984" />, and Sato and
+colleagues fitted it to some 66,000 images from the Lunar Reconnaissance Orbiter <Cite id="sato2014" />. nachtgestirn
+shades by that fit, at no more cost than the law of 1963.
 
 How bright the result is follows from one more number: seen face on, the Moon reflects 12% of what a white disc
 would, its <Term of="Geometric albedo">geometric albedo</Term> <Cite id="nssdc" />. In the 128,000 lux of the Sun
@@ -256,16 +254,21 @@ the right, so a point's longitude and latitude read straight off them.
 
 <Maps />
 
-The package ships them in four sizes, 512 to 4096 texels around, `MOON_MAPS["512"]` to `MOON_MAPS["4k"]`, from 230 KB
-to 11.5 MB. Which one a renderer needs follows from the disc on screen: a map wraps around the whole Moon, so it
-stays sharp on a disc up to about a third of its own width. The smallest set does for a disc some 160 pixels across,
-the Moon of most skies, the next two for 330 and 650, and the largest is for zooming in. `mapWidthFor` picks the size
-for a disc.
+They come in four sizes, 512 to 4096 texels around, `MOON_MAPS["512"]` to `MOON_MAPS["4k"]`, from 145 KB to 7.8 MB a
+set. The package ships the two smaller ones, and `npx @himmelszelt/nachtgestirn data maps --size 2k,4k` fetches the
+others. Which one a renderer needs follows from the disc on screen: a map wraps around the whole Moon, so it stays sharp
+on a disc up to about a third of its own width. The smallest set does for a disc some 160 pixels across, the Moon of
+most skies, the next two for 330 and 650, and the largest is for zooming in. `mapWidthFor` picks the size for a disc.
 
 Below a texel the ground goes on. A third map holds how rough it is at scales the heights no longer show, from the
 altimeter's tracks <Cite id="rosenburg2011" />: the maria smooth, with slopes around 1° over 57 m, the highlands
 rough, some 6°, and steeper still around young craters. Where you zoom in past the relief's texels, the pass fills
 in slopes as steep as those statistics say the ground is, as noise, down to the pixel.
+
+Earth never sees two fifths of the Moon, so the maps hold only the rest: a little past the edge of what any libration
+shows, the color fades into its own mean and the relief and roughness to none, a flat, smooth sphere, which leaves the
+files about a third smaller (<Fig id="maps" />). A globe, or a camera that orbits the Moon, takes `MOON_MAPS_WHOLE` and
+`MOON_ROUGHNESS_WHOLE` instead. Where Earth sees, the heights and the roughness are the whole maps' bit for bit.
 
 The color map was made with the Sun high over every part of it, which is what makes it a map and not a picture: it
 holds no shadows, so a renderer has to make its own. Most reach for a normal map, as osgHimmel's Moon did

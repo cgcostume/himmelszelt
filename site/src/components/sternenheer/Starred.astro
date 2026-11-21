@@ -1,0 +1,70 @@
+---
+import Cite from "../Cite.astro";
+import "../sternzeit/sternzeit.css";
+import "../dunstkreis/dunstkreis.css";
+import "../nachtgestirn/nachtgestirn.css";
+import "./photos.css";
+import StarGroups from "./StarGroups.astro";
+
+/**
+ * The Milky Way with and without its stars: the same sky around Deneb, wide or zoomed in, the catalogs' stars drawn on
+ * both sides of a line, left over sternenheer's map, right over NASA's map with its stars baked in or over its starless
+ * layer as published. Both by sternenheer's pass.
+ */
+interface Props {
+    id?: string;
+}
+const { id = "starred" } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+---
+
+<figure class="tiles-figure" id={id} data-starred data-base={base}>
+    <div class="tiles-panel as-seen">
+        <div class="starphoto-stage" style="--aspect: 16 / 9" data-field="wide">
+            <div class="starphoto-frame">
+                <canvas data-side="backdrop" aria-label="The sky around Deneb, over NASA's map, rendered with WebGPU"></canvas>
+                <canvas data-side="drawn" aria-label="The sky around Deneb, sternenheer's starless map and stars, rendered with WebGPU"></canvas>
+                <svg class="photo-marks" aria-hidden="true"></svg>
+            </div>
+        </div>
+        <StarGroups offsets={["stars"]} steps={["off", "0"]} />
+        <span class="view-buttons pick-group starred-maps" role="radiogroup" aria-label="NASA's map right of the line" data-group="backdrop">
+            <button type="button" class="view-toggle" data-pick="starred" aria-pressed="true" tabindex="0" title="NASA's map with its stars baked in, the Hipparcos and Tycho stars over half the background">starred</button>
+            <button type="button" class="view-toggle" data-pick="starless" aria-pressed="false" tabindex="-1" title="NASA's starless layer as published, before sternenheer's script takes out the points left in it">starless</button>
+        </span>
+    </div>
+    <label class="figure-slider split-slider" title="Where the line between sternenheer's map and NASA's runs">
+        <span class="note">sternenheer</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="split" min="0" max="100" step="0.5" value="50" aria-label="Where the line runs, from all NASA's map to all sternenheer's" />
+        </span>
+        <span class="note">NASA's map</span>
+    </label>
+    <label class="figure-slider" title="How large a texel of the maps is on the screen, from 1 pixel to 32. Closer to the right">
+        <span class="note">zoom</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="zoom" min="0" max="5" step="0.05" value="0" aria-label="A texel of the maps on the screen, in doublings from 1 pixel to 32" />
+        </span>
+        <output data-field="zoomValue"></output>
+    </label>
+    <figcaption class="figure-caption">
+        The Milky Way around Deneb, rising 25° above the northeast horizon of Berlin, from a texel of the maps a pixel wide to 32 pixels, drawn
+        twice by sternenheer's pass with the stars of the catalogs the buttons at the left pick: left of the line over
+        sternenheer's map, right of it over the layer of NASA's the buttons at the right pick. (a) Starred: NASA's map with
+        its stars baked in, as a renderer that lays a starred backdrop under its own stars would, where every bright star
+        shows twice, a point over a blur, and the band holds the stars' light once more. The baked Deneb keeps about a
+        twentieth of its light: NASA's layer is clipped at 1 and scaled for looks, and spreads a star over a texel.
+        (b) Starless: NASA's background layer as published, before sternenheer's script takes out the points left in it,
+        9,706 within 36° of Deneb, which stay as faint blurred dots under the drawn stars, with the same light to within a
+        percent. NASA's layers 4096 texels around, a texel 5 arcminutes, sternenheer's as fine, or 8192 around once a
+        pixel spans less than a texel of 4096; all dimmed and reddened by the air alike; the starred layer at twice the light a texel, which matches its
+        background to sternenheer's. Exposed at EV<sub>100</sub> −6, without the sky's own glow. Maps from NASA's Deep
+        Star Maps 2020 <Cite id="svs4851" />.
+    </figcaption>
+</figure>
+
+<script>
+    import { starredFigure } from "./starred";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-starred]")) starredFigure(root);
+</script>

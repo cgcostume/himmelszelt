@@ -1,0 +1,46 @@
+---
+import Term from "../Term.astro";
+import "../sternzeit/sternzeit.css";
+import "./sizes.css";
+
+/** What each size of the package's data brings to a render: the Milky Way's maps and the three catalogs, with the
+ *  field of view across 1080 pixels below which each pays off, a catalog's at two exposures, its download and its
+ *  memory on the GPU, compact and full. */
+const N = " ";
+const MAPS = [
+    ["Milky Way 2K", "texel 10.5′", "every view", `813${N}KB`, `10.7${N}MiB`],
+    ["Milky Way 4K", "texel 5.3′", "118°", `3.96${N}MB`, `42.7${N}MiB`],
+    ["Milky Way 8K", "texel 2.6′", "79°", `18.5${N}MB`, `171${N}MiB`],
+];
+const CATALOGS = [
+    ["Yale", "9,093 stars, to 6.5", "145°", "176°", `89${N}KB, full 208${N}KB`, `0.5${N}MiB, full 0.7${N}MiB`],
+    ["Hipparcos", "108,883 stars, to 9.9", "87°", "167°", `579${N}KB, full 701${N}KB`, `6.2${N}MiB, full 5.8${N}MiB`],
+    ["Tycho-2", "2,420,098 stars, to 12.3", "29°", "136°", `12.0${N}MB, full 14.1${N}MB`, `38${N}MiB, full 42${N}MiB`],
+];
+---
+
+<div class="sizes-table" id="table-sizes" data-table>
+    <details class="fold table-fold" open>
+        <summary><span class="table-caption">What each size of the data brings to a render.</span> Fields of view
+            across 1080 pixels: a map pays off in views narrower than where a pixel spans a texel of the next coarser
+            map, at any exposure; a catalog where half its stars show, at EV<sub>100</sub> −2.5, the darkest the stars
+            figure's auto exposure goes, and at EV<sub>100</sub> −9, a long exposure as a photograph takes. Each +2 stops on the stars figure's
+            stars button moves a catalog's threshold as 2 stops of exposure would. A catalog reaches the
+            <Term of="Apparent magnitude">magnitude</Term> nine tenths of its stars are brighter than; its download and
+            its memory, at 1920 by 1080 pixels, are the compact layout's the package loads by default, then the full
+            one's.</summary>
+        <table>
+            <thead>
+                <tr><th>data</th><th>holds</th><th class="value">pays off below, EV<sub>100</sub> −2.5</th><th class="value">EV<sub>100</sub> −9</th><th class="value">download</th><th class="value">GPU, <Term of="Mipmap">mipmaps</Term> too</th></tr>
+            </thead>
+            <tbody>
+                {MAPS.map(([name, holds, below, download, memory]) => (
+                    <tr><td>{name}</td><td>{holds}</td><td class="value" colspan="2">{below}, any exposure</td><td class="value">{download}</td><td class="value">{memory}</td></tr>
+                ))}
+                {CATALOGS.map(([name, holds, night, long, download, memory]) => (
+                    <tr><td>{name}</td><td>{holds}</td><td class="value">{night}</td><td class="value">{long}</td><td class="value">{download}</td><td class="value">{memory}</td></tr>
+                ))}
+            </tbody>
+        </table>
+    </details>
+</div>

@@ -7,11 +7,13 @@ import Hdr from "../dunstkreis/Hdr.astro";
 import OptionGroup from "../dunstkreis/OptionGroup.astro";
 import SkyFrame from "../dunstkreis/SkyFrame.astro";
 import Try from "../Try.astro";
+import StarGroups from "./StarGroups.astro";
 
 /**
  * The stars figure: sternenheer's stars and Milky Way over dunstkreis' sky in cd/m², nachtgestirn's Moon over them,
- * composed and tone mapped by the Moon pass, in the shared frame, a wide view towards the south. Its options switch the
- * stars, the Milky Way, the air, the twinkling, the halo and the eye at night, the Moon, and set the exposure.
+ * composed and tone mapped by the Moon pass, in the shared frame, a wide view towards the south. Its buttons pick the
+ * catalog and the light of the stars and the Milky Way; its options switch the air, the twinkling, the halo and the eye
+ * at night, the Moon, and set the exposure.
  */
 interface Props {
     id?: string;
@@ -20,19 +22,20 @@ interface Props {
 }
 const {
     id = "stars",
-    caption = "The stars at the chosen moment and place over dunstkreis' sky, with nachtgestirn's Moon: every star of the Yale Bright Star Catalogue at its light in lux, a point that brightens as you zoom in, the Milky Way from NASA's Deep Star Maps behind them, all lifted, dimmed and reddened by the air near the horizon. The compass directions on the horizon. Drag to look around, scroll to zoom.",
+    caption = "The stars at the chosen moment and place over dunstkreis' sky, with nachtgestirn's Moon: every star of the Yale Bright Star Catalogue, and of Hipparcos and Tycho-2 as the buttons pick, at its light in lux, a point that brightens as you zoom in, the Milky Way from NASA's Deep Star Maps behind them, all lifted, dimmed and reddened by the air near the horizon. The compass directions on the horizon; the grid adds altitude lines every 10°, lines up from the compass directions to 80° high, and the Sun's symbol where it truly is, unbent by the air. Drag to look around, scroll to zoom.",
     try: experiment,
 } = Astro.props;
 
 const MAPS = {
     name: "maps",
     label: "Milky Way map",
-    title: "Which of sternenheer's maps of the Milky Way is drawn: 2K (810 KB), a texel ten arcminutes, or 4K (4 MB) for zooming in",
+    title: "Which of sternenheer's maps of the Milky Way is drawn: by default the one the view needs, the 8K map (18.5 MB, a texel 2.6 arcminutes) fetched only once a pixel spans less than a texel of the 4K map, 5.3 arcminutes; or the 2K map (810 KB, a texel ten arcminutes) or the 4K map (4 MB) throughout",
     options: [
+        ["auto", "auto"],
         ["small", "2K"],
         ["large", "4K"],
     ],
-    checked: "small",
+    checked: "auto",
 };
 const TONE = {
     name: "tone",
@@ -49,18 +52,18 @@ const TONE = {
 ---
 
 <figure class="scene-frame wide" id={id} data-stars>
-    <SkyFrame png grid={false} locked={false} lockIcon="moonLock" lockTitle="Keep the view on the Moon; dragging lets go" hint="Drag to look around, scroll to zoom. Rendered with WebGPU, the stars and the Moon over dunstkreis' sky.">
+    <SkyFrame png fly ownHeight marks={1} locked={false} lockIcon="moonLock" lockTitle="Keep the view on the Moon; dragging lets go" hint="Drag to look around, scroll to zoom. Rendered with WebGPU, the stars and the Moon over dunstkreis' sky.">
         <canvas data-field="canvas" aria-label="The stars at the chosen moment and place"></canvas>
         <div class="sky-compass" data-field="compassLabels"></div>
+        <Fragment slot="bar">
+            <StarGroups />
+        </Fragment>
         <Fragment slot="options">
             <OptionGroup name="exposure">
                 <label class="sky-ev">EV<sub>100</sub> <input data-field="exposure" type="range" min="-20" max="14" step="0.1" value="9" title="Brighter to the right: a lower EV lets in more light" /> <output data-field="ev" /></label>
                 <button type="button" class="view-toggle" data-field="auto" aria-pressed="true" title="Expose for the sky where it is brighter than the stars, by day and by moonlight, else for the Milky Way">auto</button>
             </OptionGroup>
             <OptionGroup name="sky">
-                <button type="button" class="view-toggle" data-field="stars" aria-pressed="true" title="The 9,093 stars of the Yale Bright Star Catalogue, each at its light in lux">stars</button>
-                <button type="button" class="view-toggle" data-field="faint" aria-pressed="true" title="The 108,883 stars of the Hipparcos catalogue the bright star catalog does not hold, to magnitude 12 or so: what a pair of binoculars shows">faint stars</button>
-                <button type="button" class="view-toggle" data-field="milkyway" aria-pressed="true" title="The Milky Way, the light of the stars too faint for the catalog, from NASA's Deep Star Maps of Gaia's stars, calibrated to the integrated starlight">Milky Way</button>
                 <button type="button" class="view-toggle" data-field="moon" aria-pressed="true" title="nachtgestirn's Moon, lighting the sky and hiding the stars behind its disc, lit or not">Moon</button>
                 <Choice figure={id} {...MAPS} />
             </OptionGroup>
@@ -77,7 +80,7 @@ const TONE = {
                 <button type="button" class="view-toggle" data-field="twinkle" aria-pressed="false" title="The twinkling: each star's light flickers by the air's turbulence, more near the horizon, where its colors come apart. Runs on while pressed">twinkle</button>
             </OptionGroup>
             <OptionGroup name="eye">
-                <button type="button" class="view-toggle" data-field="glare" aria-pressed="true" title="The halo around a bright star: the light its core cannot show, spread over 1 / r², wider the brighter the star">glare</button>
+                <button type="button" class="view-toggle" data-field="glare" aria-pressed="true" title="The halo around a bright star: the light its core cannot show, spread around it, falling with the cube of the distance, wider the brighter the star">glare</button>
                 <button type="button" class="view-toggle" data-field="eye" aria-pressed="true" title="As the dark-adapted eye sees the night rather than a camera: below some 4 cd/m² the rods take over from the cones, colors fade and what is left shifts towards blue">eye at night</button>
             </OptionGroup>
             <OptionGroup name="HDR (× SDR white)">
@@ -88,6 +91,11 @@ const TONE = {
             </OptionGroup>
         </Fragment>
     </SkyFrame>
+    <label class="figure-slider" title="How much of the light past a star's knee its halo shows: none at the left, all of it at the right, where the halo adds no light and takes none">
+        <span class="note">halo</span>
+        <span class="figure-slider-rail"><input type="range" data-field="halo" min="0" max="1" step="0.05" value="1" aria-label="The share of the light past the knee the halos show" /></span>
+        <output data-field="haloValue"></output>
+    </label>
     <p class="view-status"><span data-field="status" /> <span class="sky-timing" data-field="timing" /></p>
     <figcaption class="figure-caption">
         {caption}

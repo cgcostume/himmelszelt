@@ -9,12 +9,12 @@
 //
 // A tool for the chapter while its content is worked on, not part of any package.
 
-import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { chromium } from "@playwright/test";
+import sharp from "sharp";
 import { PHOTOS } from "../src/components/nachtgestirn/photo-options.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -30,12 +30,28 @@ const { values: args } = parseArgs({
 const DISC = 0.42;
 const SIZE = 900;
 
-function gray(png) {
-    const raw = execFileSync("magick", ["png:-", "-colorspace", "Gray", "-depth", "8", "gray:-"], {
-        input: png,
-        maxBuffer: 1 << 28,
-    });
-    return Float32Array.from(raw);
+// 8-bit images as gray floats, 0 to 255, through sharp: Rec. 709 luma of the encoded values with ImageMagick's weights, as
+// its Gray has it, resized by Lanczos 3 in 16 bits where a size is given.
+async function gray(input, width, height) {
+    const { data, info } = await sharp(input, { ignoreIcc: true, limitInputPixels: false })
+        .removeAlpha()
+        .toColourspace("srgb")
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+    const luma = Float32Array.from(
+        { length: data.length / 3 },
+        (_, i) => 0.212656 * data[i * 3] + 0.715158 * data[i * 3 + 1] + 0.072186 * data[i * 3 + 2],
+    );
+    if (!width) return luma.map(Math.round);
+    const wide = Uint16Array.from(luma, (v) => Math.round(v * 257));
+    const resized = await sharp(wide, { raw: { width: info.width, height: info.height, channels: 1 } })
+        .resize(width, height, { fit: "fill", kernel: "lanczos3" })
+        .toColourspace("grey16")
+        .raw({ depth: "ushort" })
+        .toBuffer();
+    return Float32Array.from(new Uint16Array(resized.buffer, resized.byteOffset, resized.length / 2), (v) =>
+        Math.round(v / 257),
+    );
 }
 
 function blur(img, n, sigma) {
@@ -128,9 +144,9 @@ for (const [index, photo] of PHOTOS.entries()) {
         }, value);
     const clip = { x: 0, y: 0, width: SIZE, height: SIZE };
     await split(0);
-    const render = gray(await settled(page, clip));
+    const render = await gray(await settled(page, clip));
     await split(100);
-    const shot = gray(await settled(page, clip));
+    const shot = await gray(await settled(page, clip));
     // The disc's lit part, where both show it, short of the limb.
     const r = DISC * SIZE;
     const mask = [];

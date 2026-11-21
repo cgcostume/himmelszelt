@@ -1,0 +1,139 @@
+---
+import Icon from "../Icon.astro";
+import Term from "../Term.astro";
+import "../sternzeit/sternzeit.css";
+import "../nachtgestirn/nachtgestirn.css";
+import "./dunstkreis.css";
+import "./flicker.css";
+import { FILM_STARS } from "../sternenheer/filmstars";
+import StarPicker from "../sternenheer/StarPicker.astro";
+
+/** One star's flicker through the air, from dunstkreis' seeing on the CPU: its light, the twinkling's strength over
+ *  the altitude, and the pattern of light and shade the turbulence casts on the ground. */
+interface Props {
+    id?: string;
+}
+const { id = "flicker" } = Astro.props;
+
+// One entry per star, its HR number the picker's value; Canopus at first, which most of the north sees low, if at all.
+const choices = FILM_STARS.filter((star, i) => FILM_STARS.findIndex((other) => other.hr === star.hr) === i).map(
+    ({ hr, name, row, bv }) => ({ hr, name, row, bv }),
+);
+const CANOPUS = 2326;
+// Log-scaled sliders: their values are powers of ten, the marks placed by the same.
+const at = (value: number, min: number, max: number) => `left: ${(((value - min) / (max - min)) * 100).toFixed(2)}%`;
+const EXPOSURE = { min: -3.5, max: 0 };
+const APERTURE = { min: -2.7, max: -0.3 };
+---
+
+<figure class="scene-frame flicker" id={id} data-flicker data-choices={JSON.stringify(choices)}>
+    <div class="eclipse-views">
+        <figure class="eclipse-view">
+            <div class="flicker-panel as-seen">
+                <canvas data-field="star-canvas" aria-label="The star, enlarged, its light as the air leaves it right now"></canvas>
+                <span class="view-buttons">
+                    <button type="button" class="view-icon" data-field="play" aria-pressed="false" title="Let the star flicker on, or hold it" aria-label="Play"><Icon name="play" /></button>
+                </span>
+            </div>
+            <figcaption><span class="subfigure-title">the star</span>, enlarged</figcaption>
+        </figure>
+        <figure class="eclipse-view">
+            <div class="flicker-panel">
+                <svg data-field="light" role="img" aria-label="The star's light over the last two seconds, red, green and blue, and as a strip of color"></svg>
+            </div>
+            <figcaption><span class="subfigure-title">its light</span> over two seconds</figcaption>
+        </figure>
+    </div>
+    <div class="eclipse-views">
+        <figure class="eclipse-view">
+            <div class="flicker-panel">
+                <svg data-field="altitudes" role="img" aria-label="How strongly a star twinkles over the altitude, for the lens and exposure chosen and unaveraged"></svg>
+            </div>
+            <figcaption><span class="subfigure-title">the twinkling</span> over the altitude</figcaption>
+        </figure>
+        <figure class="eclipse-view">
+            <div class="flicker-panel as-seen">
+                <canvas data-field="ground" aria-label="The pattern of light and shade the turbulence casts on the ground, and the lens on it"></canvas>
+                <svg class="flicker-overlay" data-field="ground-overlay" aria-hidden="true"></svg>
+                <span class="view-buttons">
+                    <button type="button" class="view-toggle" data-field="planet" aria-pressed="false" title="A planet's disc 30 arcseconds wide instead of a point: each of its points casts the pattern a little shifted">planet</button>
+                </span>
+            </div>
+            <figcaption><span class="subfigure-title">the pattern</span> on the ground</figcaption>
+        </figure>
+    </div>
+    <label class="figure-slider" title="The star's apparent altitude, the horizon end stretched">
+        <span class="note">Altitude</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="altitude" min="0" max="1" step="0.001" value="0.3333" aria-label="The star's apparent altitude, on a stretched scale" />
+            <span class="figure-slider-scale" aria-hidden="true">
+                <span class="figure-slider-mark" style="left: 0%">horizon</span>
+                <span class="figure-slider-mark" style="left: 100%">top</span>
+            </span>
+        </span>
+        <output data-field="altitudeValue"></output>
+    </label>
+    <label class="figure-slider" title="How high the observer stands, from the ground to the space station's orbit, where it moves at 7.7 km/s">
+        <span class="note">Observer</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="height" min="0" max="5.61" step="0.01" value="0" aria-label="The observer's height, on a scale of powers of ten" />
+            <span class="figure-slider-scale" aria-hidden="true">
+                <span class="figure-slider-mark" style="left: 0%">1 m</span>
+                <span class="figure-slider-mark" style="left: 53.5%">1 km</span>
+                <span class="figure-slider-mark" style="left: 100%">orbit</span>
+            </span>
+        </span>
+        <output data-field="heightValue"></output>
+    </label>
+    <label class="figure-slider" title="Fried's parameter, the seeing straight up from sea level: 5 cm a poor night, 10 cm a fair one, 20 cm a very good one">
+        <span class="note">Seeing r<sub>0</sub></span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="r0" min="3" max="30" step="1" value="10" aria-label="Fried's parameter, in cm" />
+            <span class="figure-slider-scale" aria-hidden="true">
+                <span class="figure-slider-mark" style={at(5, 3, 30)}>poor</span>
+                <span class="figure-slider-mark" style={at(20, 3, 30)}>very good</span>
+            </span>
+        </span>
+        <output data-field="r0Value"></output>
+    </label>
+    <label class="figure-slider" title="How long the light is added up: the eye's tenth of a second, a camera's exposure">
+        <span class="note">Exposure</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="exposure" min={EXPOSURE.min} max={EXPOSURE.max} step="0.05" value="-1" aria-label="The exposure, on a scale of powers of ten" />
+            <span class="figure-slider-scale" aria-hidden="true">
+                <span class="figure-slider-mark" style={at(-3, EXPOSURE.min, EXPOSURE.max)}>camera</span>
+                <span class="figure-slider-mark" style={at(-1, EXPOSURE.min, EXPOSURE.max)}>eye</span>
+            </span>
+        </span>
+        <output data-field="exposureValue"></output>
+    </label>
+    <label class="figure-slider" title="The width of the lens: the eye's pupil at night, 7 mm, up to a telescope">
+        <span class="note">Lens</span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="aperture" min={APERTURE.min} max={APERTURE.max} step="0.01" value={Math.log10(0.007).toFixed(2)} aria-label="The width of the lens, on a scale of powers of ten" />
+            <span class="figure-slider-scale" aria-hidden="true">
+                <span class="figure-slider-mark" style={at(Math.log10(0.007), APERTURE.min, APERTURE.max)}>pupil</span>
+                <span class="figure-slider-mark" style={at(Math.log10(0.2), APERTURE.min, APERTURE.max)}>20 cm</span>
+            </span>
+        </span>
+        <output data-field="apertureValue"></output>
+    </label>
+    <StarPicker label="The star whose color and flicker are shown" value={CANOPUS} />
+    <p class="view-status" data-field="note" aria-live="polite"></p>
+    <figcaption class="figure-caption">
+        A star's flicker through the air, the <Term of="Scintillation">scintillation</Term>, at the chosen altitude, in
+        the star's own color. (a) The star, enlarged, at the moment at the right end of (b). (b) Its light over the last
+        two seconds, red, green and blue, in multiples of its mean on a logarithmic scale, and under it the same light
+        as a strip of color. (c) How strongly it twinkles, the spread of its light's logarithm, over the apparent
+        altitude, the horizon end stretched: through the chosen lens and exposure (accent), and unaveraged, through a
+        lens far smaller than a patch of the pattern in an instant (dashed). (d) The pattern of light and shade the
+        turbulence casts on the ground there, slowed down, the lens on it, and the same pattern under a planet's disc
+        30 arcseconds wide, whose points each cast it a little shifted. The stars are those films and history made famous.
+    </figcaption>
+</figure>
+
+<script>
+    import { flickerFigure } from "./flicker";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-flicker]")) flickerFigure(root);
+</script>

@@ -1,9 +1,8 @@
-import { wgsl } from "@himmelszelt/helldunkel";
+import { blueNoiseTexture, wgsl } from "@himmelszelt/helldunkel";
 import { find } from "../dom";
 import { gpu, gpuDevice } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
-import blueNoiseUrl from "../scene/bluenoise.bin?url";
 
 const root = find("#banding");
 const SOURCE = /* wgsl */ `
@@ -40,7 +39,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
             case 1u: { color = color + (hdBayer(id.xy) - 0.5) / levels; }
             case 2u: { color = hdDither(color, id.xy, levels); }
             case 3u: { color = hdDitherBy(color, white(id.xy), levels); }
-            case 4u: { color = hdDitherBy(color, textureLoad(blueNoise, vec2i(id.xy % 64u), 0).r, levels); }
+            case 4u: { color = hdDitherBlue(color, id.xy, levels, blueNoise); }
             default: {}
         }
     }
@@ -50,18 +49,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 
 if (!gpu.error) {
     const device = gpuDevice();
-    const blueNoise = device.createTexture({
-        label: "sternwarte:bandingBlueNoise",
-        size: [64, 64],
-        format: "rg8unorm",
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-    });
-    fetch(blueNoiseUrl)
-        .then((response) => response.arrayBuffer())
-        .then((bytes) => {
-            device.queue.writeTexture({ texture: blueNoise }, bytes, { bytesPerRow: 128 }, [64, 64]);
-            request();
-        });
+    const blueNoise = blueNoiseTexture(device);
     const pipeline = device.createComputePipeline({
         label: "sternwarte:banding",
         layout: "auto",

@@ -37,6 +37,8 @@ export type {
     CloudPassOptions,
     EncodeOptions,
     GridOptions,
+    KeyframeOptions,
+    Keyframes,
     SunlightAtmosphere,
 } from "./clouds.js";
 export { createCloudPass } from "./clouds.js";

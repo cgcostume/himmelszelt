@@ -78,8 +78,10 @@ struct GwCloudscape {
     // are all there, from where they grow fewer.
     clearing: f32,
     clearingFrom: f32,
-    // The aerial perspective volume's reach in km and the scale its luminance is stored at; a reach of 0 for none.
-    aerial: vec2f,
+    // Above 0 where an aerial perspective volume is bound, which holds its own reach and scale.
+    aerial: f32,
+    // How far the detail noise has moved up through the clouds, in km, within one tile of it.
+    detailShift: f32,
     // How far a broad, unrepeating field thins the clouds out in places, 0 to 1, and its size in km: the volume
     // repeats, the gaps it leaves do not.
     variation: f32,
@@ -116,6 +118,8 @@ struct GwParams {
     pad: f32,
     cloudscape: GwCloudscape,
     sheet: array<GwSheet, 2>,
+    // The white balance, helldunkel's `hdWhiteBalance`, applied with the exposure: the identity for none.
+    whiteBalance: mat3x3f,
 }
 
 // The sun's illuminance in lux by its elevation above the local horizon, which grows by a degree every 111 km towards

@@ -71,6 +71,11 @@ Exposure is in EV100, the convention of cameras, Frostbite and Unreal (Lagarde &
 `exposureFromEV100(ev100)` is 1 / (1.2 · 2^EV100). About 15 for a sunny day, 0 in twilight. A scene in cd/m² exposed at
 the same EV100 looks the same in any renderer that follows it.
 
+`whiteBalance` in the sky's parameters is a 3x3 matrix over linear sRGB, helldunkel's `whiteBalance(white)`, re-exported
+here: it shows that reference white as D65 at its own luminance, and is applied before the exposure wherever the pass
+exposes, to the sky, the sun disc and the air the aerial perspective pass adds, not to a cube map in cd/m².
+`NO_WHITE_BALANCE`, the identity, is the default and changes no bit of the frame.
+
 `autoExposure: true` on `createSkyPass` exposes by a light meter instead, for a renderer without an exposure of its own or to follow day
 into night. Whenever the sky-view table is rebuilt, a compute pass reads it in 4096 directions spread evenly over the sky
 above the horizon and as many, apart, below it, and a second sums them and writes the brighter of the two geometric mean
@@ -114,8 +119,8 @@ sky and the planet's night side would otherwise pull the geometric mean towards 
 
 With `toneMap`, the pass writes display colors for an 8-bit target: exposed, mapped by Khronos PBR Neutral (`"neutral"`, the
 default), which keeps colors as they are up to 0.76 and compresses only above, or AgX (`"agx"`), whose bright colors
-fade towards white as film does, flatter and grayer by day, or Narkowicz's ACES fit (`"aces"`), the earlier default, sRGB encoded and, with `dither`, dithered by interleaved gradient noise (Jimenez 2014), remapped to a
-triangular distribution, from the pixel alone, without a texture. Off, it writes the exposed luminance, linear and unclamped, for a float target and
+fade towards white as film does, flatter and grayer by day, or Narkowicz's ACES fit (`"aces"`), the earlier default, sRGB encoded and, with `dither`, dithered by helldunkel's 64x64 blue noise (Ulichney 1993), remapped to a
+triangular distribution, from one texture per device or the one `blueNoise` passes in. Off, it writes the exposed luminance, linear and unclamped, for a float target and
 a renderer that tone maps the frame itself, with `wgsl.tonemap` if it likes.
 
 ## The Sun in the picture
@@ -151,10 +156,10 @@ moonIlluminance })` takes the Moon's true direction and its illuminance above th
 direction at its share of the Sun's light, is rebuilt when the Moon moves and read beside the Sun's, and the aureole
 glows around the Moon as well, centered on where it shows, and so does the eye's `veil`. The sky by full moon comes
 out blue at around EV100 −3, as a camera sees it. The disc itself is not drawn: that is nachtgestirn's. The light
-meter writes the Moon's light at the observer, `moonIlluminance()`, for lighting a scene by it; the meter's reading,
-the ground's light from the sky and the aerial perspective volume stay the Sun's. A camera sees the moonlit sky as the
-day's, only dimmer; the eye does not, its rods take over and see it blue. `darkAdapted: true` draws it so, by
-helldunkel's `hdDarkAdaptedEye`, bundled.
+meter writes the Moon's light at the observer, `moonIlluminance()`, for lighting a scene by it; the meter's reading
+and the ground's light from the sky stay the Sun's, and the aerial perspective volume takes the Moon's light too. A
+camera sees the moonlit sky as the day's, only dimmer; the eye does not, its rods take over and see it blue.
+`darkAdapted: true` draws it so, by helldunkel's `hdDarkAdaptedEye`, bundled.
 
 ## The ground
 
@@ -195,25 +200,152 @@ do not depend on each other at runtime.
 
 Distant mountains fade into the sky and take its color: the air between the camera and a point adds its own light and
 lets only part of the point's through. `createSkyPass(device, { ..., aerialPerspective: true })` builds Hillaire's
-aerial perspective volume for that, whenever `update()` sees the camera, the Sun or the observer move: froxels over
-the camera's frustum, 32x32 across the screen in 32 slices out to 32 km, or `{ width, height, depth, maxDistanceKm }`.
-Slice k lies `maxDistanceKm * ((k + 0.5) / depth)²` away, thin near the camera. One invocation per column of froxels
-marches its ray once through all slices, some 130 steps, rather than each froxel its own.
+aerial perspective volume for that, whenever `update()` sees the camera, the Sun, the Moon or the observer move:
+froxels over the camera's frustum, 32x32 across the screen in 32 slices out to 32 km, or
+`{ width, height, depth, maxDistanceKm }`. Slice k lies `maxDistanceKm * ((k + 0.5) / depth)²` away, thin near the
+camera. One invocation per column of froxels marches its ray once through all slices, some 130 steps, rather than each
+froxel its own, in about a tenth of a millisecond on a desktop GPU.
 
-`sky.aerialPerspective` holds two 3D rgba16float textures, the light the air adds at the four wavelengths, times
-`sky.skyViewScale` as the sky-view table, and the transmittance at the four wavelengths, and `maxDistanceKm`. A
-renderer binds both with the tables' sampler and the `DkAtmosphere` uniform, and shades its geometry with `wgsl.aerial`:
+The volume is made for a shader that knows nothing else of dunstkreis. `sky.aerialPerspective` holds two 3D
+rgba16float textures in linear sRGB, and they describe themselves: `luminance` is the light the air adds, rgb times
+2^alpha in cd/m², a shared exponent that follows the Sun and the Moon, so half floats hold noon and a moonlit night
+alike; `transmittance` is what the air lets through per channel, with the reach in km in alpha. A renderer binds the
+two with a linear, clamping sampler (`luts.sampler` is one) and pastes `wgsl.aerial` in front of its shader, which
+needs no other snippet, no uniform and no scale handed along. In a fragment shader as in a compute shader:
 
 ```wgsl
 // uv on the screen from the top left, the point's distance from the camera in km, its lit color in cd/m².
-let air = dkSampleAerialPerspective(luminanceVolume, transmittanceVolume, lutSampler, uv, distance, maxDistance, scale);
-let seen = dkApplyAerialPerspective(atmosphere, color, air);
+let air = dkAerialPerspective(airLuminance, airTransmittance, airSampler, uv, distanceKm);
+let seen = color * air.transmittance + air.luminance;
 ```
 
-`dkApplyAerialPerspective` turns the four wavelengths into linear sRGB as the sky does, the transmittance weighted by
-sunlight's spectrum. Beyond `maxDistanceKm` the last slice holds; short of the first it fades to nothing in the way.
-The volume follows the camera's matrix alone, not the fisheye of `projectionDistance`. `dkRaymarchAerialPerspective`
-in `wgsl.raymarch` marches one such segment directly, from any altitude, for a renderer of its own.
+A renderer that would rather not touch its shaders lays the air over its finished frame, by the depth buffer:
+
+```ts
+const air = await sky.createAerialPerspectivePass({ format: "rgba16float" });
+// Each frame, after the scene is drawn over the sky: color and depth in, the frame seen through the air out.
+air.encode(encoder, target, { color, depth });
+```
+
+It finds each pixel's distance by the `inverseViewProjection` the sky pass has, any perspective, and exposes the air's
+light as the sky pass exposes the sky. `clearDepth` is the depth where nothing was drawn, 1 by default and 0 for a
+reversed depth buffer: those pixels keep the sky as it is. `metersPerUnit` is 1 by default, a scene in meters. Color
+and depth are not multisampled. Some 0.04 ms for a full HD frame.
+
+What to know when shading by it:
+
+- The camera. The froxels follow the `inverseViewProjection` given to `update()`, the matrix alone, not the fisheye of
+  `projectionDistance`, and `uv` is that view's. The lookup takes no direction, so a y-up scene in meters is as good
+  as any: only that matrix has to end in ENU. A second view, a reflection or a shadow map, needs a sky pass of its
+  own, or `dkRaymarchAerialPerspective` from `wgsl.raymarch`, which marches one segment from any altitude and takes
+  the tables and the `DkAtmosphere` uniform.
+- Units. Distances are km. The light is cd/m²: a renderer that shades in other units multiplies `air.luminance` by its
+  exposure, as the pass does with the sky pass' own.
+- The reach. Beyond `maxDistanceKm` a point takes the last slice's air, too little: make the volume reach as far as
+  the geometry does, the far plane or the horizon, √(2 · 6360 km · height) from the camera plus the same for the
+  highest thing in sight. It costs no more: the steps per slice stay, and since the slices spread by the square of
+  their number, the first is 8 m in at 32 km and 100 m at 400 km. Short of the first slice the air fades to nothing.
+- The sky behind. Pixels without geometry keep the sky pass' own, which holds all of the air along its ray; a point
+  where the ray's air ends, far beyond the horizon, comes out as that sky, without the Sun's disc and its aureole,
+  which the froxels are too coarse for.
+- Shadows. The volume takes the air along a ray as lit, but for the planet's own shadow. The air's light between two
+  distances is the difference of two lookups, so a stretch known to lie in shadow, under a cloud deck or in a valley,
+  gives a share of it back. `@himmelszelt/gewoelk` shades the air under its clouds that way, and takes the volume as
+  it is for the air in front of them.
+- The Moon. With `moonlight` the volume holds the Moon's light in the air as well, the same march from its direction
+  at its share of the Sun's light, so a night scene fades into the moonlit sky.
+
+## Light from beyond the air
+
+A star, the Moon, a planet, a satellite, the Sun's disc: whatever lies outside the atmosphere reaches the eye through
+it, and the air does the same to all of them. It bends the light, dims and reddens it, bends blue more than red, and
+stirs it with its turbulence. dunstkreis draws none of these bodies; it has the air for them, as one kit: a table,
+lookups for it in TypeScript and in WGSL, a seeing model, and a pass.
+
+**The air table.** The atmosphere is the same all round, so for one observer height everything depends on a ray's
+apparent altitude alone. `airTable(model, observerHeightM)` traces 256 rays through the model's air, from the horizon
+the air shows up to the zenith, or from above the atmosphere up to the ray that touches its top, crowded towards the
+horizon by the fourth power, and holds for each what `airAt(table, altitude)` reads back:
+
+| | |
+|---|---|
+| `bend` | how far the air turned the ray down, in degrees |
+| `transmittance` | what it lets through of sunlight, per channel of linear sRGB |
+| `airmass` | the air crossed, in columns of it straight up from sea level |
+| `dilution` | how much the air squeezes the sky there, 1 / (1 - d bend / d altitude): a point's light is multiplied by it |
+| `seeing` | the turbulence along the ray for an image's motion: its amount, distance and wind |
+| `scintillation` | the same for a point's flicker, each part weighed by its distance to the power 5/6 |
+
+A fifth row holds the inverse of the bend, the lift over the true altitude: `liftedDirection(table, direction)` is
+where a body shows, `unbentDirection(table, view)` where a ray came from, and the two agree to a hundredth of an
+arcsecond. No iteration: from orbit the bend falls nine degrees per degree at the limb, and iterating on it diverges.
+Below the true horizon a body sinks on behind the ground at the horizon's rate, and `airShows` or a `null` from
+`airAt` says the ground hides it. Between its entries the table reads the traced bend to half an arcsecond and the
+transmittance to 0.4% at any height from the ground to 408 km, which a test pins.
+
+The table is traced on the CPU on purpose: 9 ms in JavaScript, only when the observer's height or the model changes,
+in double precision, and the CPU needs it anyway, to aim a camera at the Moon or to meter, without a round trip.
+`createAirTexture(device, table)` makes the texture the shaders read, 256 by 5 texels of rgba32float (20 KiB), and
+`writeAirTexture` refills it. Its layout is documented at the top of `src/air.ts` and `src/wgsl/air.wgsl`, and
+`airTableFrom` fills it from any function of the altitude, for an air that is not dunstkreis' own.
+
+**The lookups in WGSL.** `wgsl.air` reads the table with `textureLoad`, so it needs no sampler and no device feature,
+and takes the texture as an argument: bind it wherever you like, as an unfilterable float texture.
+
+```wgsl
+${wgsl.air}
+${wgsl.seeing}
+@group(0) @binding(4) var airTable: texture_2d<f32>;
+@group(0) @binding(5) var<uniform> seeing: DkSeeing;      // seeingUniformData(), 32 bytes
+
+// A star: lifted, dimmed, diluted, twinkling. Nothing if the ground hides it.
+let shown = dkAirLifted(airTable, trueDirection);
+let air = dkAirTowards(airTable, shown);
+let light = select(vec3f(0.0), illuminance * air.transmittance * air.dilution
+    * dkScintillation(seeing, air, starIndex, time), air.shows);
+
+// A pixel's ray into a star map or onto the Moon: where it came from.
+let beyond = dkAirUnbent(airTable, viewRay);
+```
+
+`dkAirLight` and `dkAirLift` take altitudes in radians instead of directions, `dkAirAt` gives the whole `DkAir` for
+one, and `DK_AIR_DISPERSION` holds how much more or less than green the air bends red and blue, by Edlén's formula.
+The functions need nothing of the atmosphere model, so a package that draws such a body can bundle `air`, `seeing`
+and `shimmer` alone, at build time, and take the texture as a plain input.
+
+**Seeing.** One model of the turbulence for an image's motion and for a point's flicker: the Hufnagel-Valley 5/7
+profile of Cn² over the height, carried by Bufton's wind, summed along each of the table's bent rays and scaled by
+Fried's parameter. `Seeing` is `{ r0, wind, speed, aperture, exposure }`: `r0` in meters at 550 nm straight up from
+sea level, 0.1 by default; the wind up high in m/s, 21; the observer's own speed across the line of sight, 0, 7700
+in orbit; the lens' width, 0.007, the eye's pupil; the exposure in seconds, 0.1, the eye's. `shimmerScales(seeing,
+air.seeing)` gives an image's rms tilt, the finest patch that moves as one and its drift across the sky;
+`scintillation(seeing, air.scintillation)` a star's variance and how long its flicker stays alike, with the aperture
+and the exposure averaged over; `scintillationIndex` the standard deviation of the logarithm of its light. On the GPU
+`dkScintillation(seeing, air, seed, time)` in `wgsl.seeing` is the star's factor for the moment, lognormal, per
+channel: the air's dispersion parts the colors' paths, and low stars flicker in colors. Because the turbulence is
+summed along the traced ray, it holds looking down from a plane, where an airmass of 1 / sin has no answer, and from
+orbit, where the turbulence lies 2,300 km away on the limb.
+
+**The shimmer pass.** `createShimmerPass(device, { format })` makes a compute pass over any linear layer with
+coverage in alpha: the Moon, a planet's disc, a satellite, the Sun. It writes the layer as a camera takes it in one
+short exposure, moved about by eight octaves of Kolmogorov's waves, blurred by those the pixels cannot follow, its
+colors spread by the dispersion, and nothing of it below the horizon. The turbulence's amount and the bend are read
+from the table per pixel, so a disc half inside the limb from orbit trembles only there.
+
+```js
+const table = airTable(model, observerHeightM);          // when the height changes
+const airTexture = createAirTexture(device, table);
+const shimmer = await createShimmerPass(device);          // once
+
+const shown = liftedDirection(table, moonDirection);
+shimmer.update({ direction: shown, seeing: { r0: 0.1, aperture: 0.1 }, time, inverseViewProjection });
+shimmer.encode(encoder, moonLayer, airTexture, shimmered);
+```
+
+`shimmerShows(seeing, air, pixel)` tells whether any of it would move the image by a tenth of a pixel, to leave the
+pass out otherwise, and `shimmerReach` how far around the body it has to work, for `reach`. A pass of your own that
+would rather shimmer its layer and finish the pixel in one go calls `dkShimmerLayer` from `wgsl.shimmer` instead, with
+its own layer, sampler and camera.
 
 ## Quality and cost
 
@@ -259,8 +391,13 @@ Implemented so far:
 - `src/luts.ts`: the transmittance and multiple-scattering tables, `precomputeAtmosphere()`.
 - `src/sky.ts`: the sky-view table, the light meter, the sky pass and its cube pass, `createSkyPass()`.
 - `src/exposure.ts`: the automatic exposure's ramp.
-- `src/wgsl/aerial.wgsl` and `src/wgsl/aerialvolume.comp.wgsl`: the aerial perspective volume, its lookup and how it
-  applies to a color.
+- `src/air.ts` and `src/wgsl/air.wgsl`: the air table for light from beyond the atmosphere, `airTable()`, and its
+  lookups on both sides.
+- `src/seeing.ts`, `src/wgsl/seeing.wgsl`: the turbulence, an image's motion and a point's scintillation.
+- `src/shimmer.ts`, `src/wgsl/shimmer.wgsl` and `src/wgsl/shimmerlayer.comp.wgsl`: the shimmer over a linear layer,
+  `createShimmerPass()`.
+- `src/wgsl/aerial.wgsl`, `src/wgsl/aerialvolume.comp.wgsl` and `src/wgsl/aerialapply.comp.wgsl`: the aerial
+  perspective volume's lookup, the pass that fills it and the pass that lays it over a rendered scene.
 
 Bruneton's table as another filler follows.
 
@@ -332,16 +469,27 @@ Echtzeit"](https://daniellimberger.de/resources/2012%20%E2%80%93%20Mueller%20%28
   (EGSR 2004): the Rayleigh scattering coefficients, by way of Bruneton & Neyret.
 - G. G. Bennett, "The Calculation of Astronomical Refraction in Marine Navigation" (1982): the fit the traced
   refraction is tested against.
-- B. Edlén, "The Refractive Index of Air" (Metrologia, 1966): the refractivity of air.
+- B. Edlén, "The Refractive Index of Air" (Metrologia, 1966): the refractivity of air, and its dispersion.
+- D. L. Fried, "Optical Resolution Through a Randomly Inhomogeneous Medium for Very Long and Very Short Exposures"
+  (JOSA, 1966), and "Anisoplanatism in adaptive optics" (JOSA, 1982): the parameter r0 the seeing is set by, and the
+  isoplanatic distance of the turbulence.
+- G. C. Valley, "Isoplanatic degradation of tilt correction and short-term imaging systems" (Applied Optics, 1980):
+  the Hufnagel-Valley profile of the turbulence.
+- J. L. Bufton, "Comparison of vertical profile turbulence structure with stellar observations" (Applied Optics,
+  1973): the wind that carries it.
+- M. Sarazin, F. Roddier, "The ESO differential image motion monitor" (Astronomy and Astrophysics, 1990): how far an
+  image moves for a given r0.
+- D. Dravins, L. Lindegren, E. Mezey, A. T. Young, "Atmospheric Intensity Scintillation of Stars" I to III (PASP,
+  1997 to 1998): a star's scintillation and how apertures and exposures average it.
+- L. C. Andrews, R. L. Phillips, "Laser Beam Propagation through Random Media" (SPIE Press, 2nd ed. 2005): the
+  aperture averaging factor.
 - F. N. Fritsch, R. E. Carlson, "Monotone Piecewise Cubic Interpolation" (SIAM J. Numer. Anal., 1980): the curve
   through the exposure keys.
 - G. Kopp, J. L. Lean, "A new, lower value of total solar irradiance" (Geophysical Research Letters, 2011): the
   solar constant.
 - S. Lagarde, C. de Rousiers, "Moving Frostbite to Physically Based Rendering" (SIGGRAPH course, 2014): EV100 and the
   light meter's calibration.
-- J. Jimenez, ["Next Generation Post Processing in Call of Duty: Advanced
-  Warfare"](https://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare/) (SIGGRAPH course,
-  2014): interleaved gradient noise, the dither.
+- R. Ulichney, "The void-and-cluster method for dither array generation" (SPIE 1913, 1993): the blue noise, the dither.
 - M. Roberts, ["The Unreasonable Effectiveness of Quasirandom
   Sequences"](https://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/) (2018): the R2
   sequence, the cube map's samples per texel.

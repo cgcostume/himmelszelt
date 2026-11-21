@@ -1,0 +1,213 @@
+---
+import "../../sternzeit/sternzeit.css";
+import "../../dunstkreis/dunstkreis.css";
+import "../clouds.css";
+import Choice from "../../dunstkreis/Choice.astro";
+import OptionGroup from "../../dunstkreis/OptionGroup.astro";
+import SkyFrame from "../../dunstkreis/SkyFrame.astro";
+import LabSliders, { type LabSlider } from "./LabSliders.astro";
+
+/**
+ * A research figure for how the sky's clouds are layered: three layers, each a map of its own size and kind, marched
+ * as one density with nothing baked but the maps, so every slider acts at once. For settling what the layers are
+ * before they get distance fields and light grids; nothing here is the library's yet.
+ */
+interface Props {
+    id?: string;
+    caption?: string;
+}
+const {
+    id = "formation-lab",
+    caption = "Three layers of cloud marched as one: low heaps or a deck, deep towers or a front that is placed rather than tiled, and a middle layer. The view from above shows where each layer's map puts its clouds.",
+} = Astro.props;
+
+const layer = (i: number, v: number[], what: string): LabSlider[] => [
+    [`l${i}.coverage`, "coverage", 0, 1, 0.01, v[0] ?? 0, `How much of the sky ${what} cover: 0 for none`],
+    [`l${i}.base`, "base", 0.2, 10, 0.1, v[1] ?? 0, "The layer's base, in km"],
+    [`l${i}.depth`, "depth", 0.2, 12, 0.1, v[2] ?? 0, "How deep the layer is, in km: its tallest clouds"],
+    [`l${i}.feature`, "size", 0.3, 40, 0.1, v[3] ?? 0, "A cloud's size across, in km"],
+    [`l${i}.tile`, "tile", 8, 400, 4, v[4] ?? 0, "One tile of the layer's map, in km: it repeats beyond"],
+    [`l${i}.extinction`, "density", 2, 100, 1, v[5] ?? 0, "Extinction per km of full density"],
+    [`l${i}.detail`, "detail", 0, 1, 0.05, v[6] ?? 0, "How far the detail noise erodes the shape"],
+    [`l${i}.sharp`, "sharpness", 0, 1, 0.05, v[7] ?? 0, "How hard the map's edges are"],
+];
+const LOW = layer(0, [0.36, 1.2, 1.4, 2.5, 24, 40, 0.6, 0.4], "the low clouds");
+const DEEP = layer(1, [0, 1, 9, 14, 112, 25, 0.5, 0.3], "the deep clouds");
+const MIDDLE = layer(2, [0.25, 4.5, 0.7, 1.6, 28, 10, 0.5, 0.3], "the middle clouds");
+const FRONT: LabSlider[] = [
+    [
+        "front.distance",
+        "front at",
+        -200,
+        200,
+        1,
+        12,
+        "How far the front's leading edge is, in km along its bearing: negative once it has passed overhead",
+    ],
+    ["front.bearing", "bearing", 0, 360, 5, 20, "Where the front stands, in degrees from north through east"],
+    ["front.depth", "front depth", 40, 400, 10, 160, "From the front's leading edge to its back, in km"],
+];
+const TIME: LabSlider[] = [
+    [
+        "wind.speed",
+        "wind",
+        0,
+        40,
+        1,
+        10,
+        "The wind the layers drift with while the animation runs, in m/s: the deep clouds at 0.6 of it, the middle ones at 1.8",
+    ],
+    ["wind.from", "wind from", 0, 360, 5, 200, "Where the wind blows from, in degrees from north through east"],
+    ["phase", "phase", 0, 8, 0.05, 0, "The maps' evolution, which loops every 8"],
+    ["change", "change", 0, 20, 0.5, 1, "How fast the phase runs while the animation does, in steps per hour"],
+    ["seed", "seed", 1, 99, 1, 23, "Another sky of the same kind"],
+];
+const LIGHT: LabSlider[] = [
+    ["sun.elevation", "sun elevation", -2, 90, 1, 34, "The Sun's elevation, in degrees"],
+    ["sun.azimuth", "sun azimuth", 0, 360, 5, 250, "The Sun's azimuth, in degrees from north through east"],
+    ["multiple", "multiple", 0, 0.9, 0.05, 0.6, "Each further order of scattering's share of the one before"],
+    ["ambient", "ambient", 0, 2, 0.05, 1, "The sky's light on the clouds"],
+    ["view.ev", "exposure", 11, 17, 0.1, 14.2, "The exposure, in EV100"],
+];
+const MARCH: LabSlider[] = [
+    ["stepKm", "step", 0.02, 0.4, 0.01, 0.06, "The first step's length, in km"],
+    ["stepGrowth", "step growth", 0, 0.1, 0.005, 0.03, "How steps grow with the distance, per km"],
+    ["reachKm", "reach", 20, 400, 10, 200, "How far the march goes through the layers, in km"],
+    ["fadeKm", "air", 20, 300, 5, 90, "The distance at which a cloud has faded to 1/e into the sky, in km"],
+    ["noiseKm", "noise tile", 0.3, 6, 0.1, 1.6, "One tile of the detail noise, in km"],
+    ["mapKm", "map extent", 40, 800, 20, 300, "How many km the view from above is tall"],
+];
+const kinds = (i: number, options: string[][], checked: string) => ({
+    name: `kind${i}`,
+    label: "Kind",
+    title: "What the layer's map is made of",
+    options,
+    checked,
+});
+const HEAPS = ["0", "heaps", "A field of cumulus from the thesis' cloud map"];
+const DECK = ["1", "deck", "A closed layer, its top in lumps"];
+const TOWERS = ["2", "towers", "A few cells of many grow tall and spread into anvils"];
+const FRONTS = [
+    "3",
+    "front",
+    "A band placed in the world: a wall of towers behind its leading edge, a shield of cloud to the rear",
+];
+const PRESET = {
+    name: "preset",
+    label: "Weather",
+    title: "Weathers to start from: a click eases the sliders over to one and sets the layers' kinds",
+    options: [
+        ["fair", "fair"],
+        ["towering", "towering"],
+        ["front", "front ahead"],
+        ["rain", "under the front"],
+        ["alto", "altocumulus"],
+    ],
+    checked: "towering",
+};
+const choice = (name: string, label: string, title: string, options: string[][], checked: string) => ({
+    name,
+    label,
+    title,
+    options,
+    checked,
+});
+const SCALE = choice(
+    "scale",
+    "Render scale",
+    "The share of the frame's pixels the clouds are marched at",
+    [
+        ["1", "full"],
+        ["0.5", "half"],
+        ["0.25", "quarter"],
+    ],
+    "0.5",
+);
+const STEPS = choice(
+    "steps",
+    "Steps",
+    "Steps a ray takes at most",
+    [
+        ["64", "64"],
+        ["128", "128"],
+        ["256", "256"],
+    ],
+    "128",
+);
+const VIEW = choice(
+    "view",
+    "View",
+    "The sky, or the layers from above with the observer in the middle, north up",
+    [
+        ["sky", "sky"],
+        ["top", "from above"],
+    ],
+    "sky",
+);
+const SPEED = choice(
+    "speed",
+    "Speed",
+    "How fast the figure's clock runs while its animation does",
+    [
+        ["1", "1x"],
+        ["60", "60x"],
+        ["600", "600x"],
+    ],
+    "60",
+);
+---
+
+<figure class="scene-frame wide" id={id} data-formation-lab>
+    <SkyFrame fly ownHeight grid={false} locked={false} hint="Drag to look around, scroll to zoom. A research figure: the sky behind is a stand-in.">
+        <canvas data-field="canvas" aria-label="Three layers of cloud marched as one"></canvas>
+        <div class="cloud-textures" data-field="textures"></div>
+        <div class="sky-compass" data-field="compassLabels"></div>
+        <Fragment slot="options">
+            <OptionGroup name="weather">
+                <Choice figure={id} {...PRESET} />
+                <button type="button" class="view-toggle" data-copy title="Copies every slider as a preset, to paste into the figure's list">copy</button>
+            </OptionGroup>
+            <OptionGroup name="low">
+                <button type="button" class="view-toggle" data-field="l0.enabled" aria-pressed="true" title="The low layer">low</button>
+                <Choice figure={id} {...kinds(0, [HEAPS, DECK], "0")} />
+                <LabSliders sliders={LOW} />
+            </OptionGroup>
+            <OptionGroup name="deep">
+                <button type="button" class="view-toggle" data-field="l1.enabled" aria-pressed="true" title="The deep layer, from near the ground to the top of the weather">deep</button>
+                <Choice figure={id} {...kinds(1, [TOWERS, FRONTS], "2")} />
+                <LabSliders sliders={DEEP} />
+                <LabSliders sliders={FRONT} />
+            </OptionGroup>
+            <OptionGroup name="middle">
+                <button type="button" class="view-toggle" data-field="l2.enabled" aria-pressed="true" title="The middle layer">middle</button>
+                <Choice figure={id} {...kinds(2, [DECK, HEAPS], "1")} />
+                <LabSliders sliders={MIDDLE} />
+            </OptionGroup>
+            <OptionGroup name="time">
+                <button type="button" class="view-toggle" data-field="animate" aria-pressed="false" title="Runs the figure's clock: the layers drift, the front comes on and the maps change, baked again every frame">animate</button>
+                <Choice figure={id} {...SPEED} />
+                <LabSliders sliders={TIME} />
+            </OptionGroup>
+            <OptionGroup name="light">
+                <button type="button" class="view-toggle" data-field="sun.page" aria-pressed="false" title="Take the Sun from the page's moment and place instead of the two sliders">page's Sun</button>
+                <LabSliders sliders={LIGHT} />
+            </OptionGroup>
+            <OptionGroup name="render">
+                <Choice figure={id} {...SCALE} />
+                <Choice figure={id} {...STEPS} />
+                <Choice figure={id} {...VIEW} />
+                <button type="button" class="view-toggle" data-field="textures.on" aria-pressed="true" title="The textures the figure renders from, down the left of the view: hover one for what it is for">textures</button>
+                <button type="button" class="view-toggle" data-field="ground.grid" aria-pressed="true" title="A grid on the ground, for orientation, speed and height: thin lines every 10 km, 1 km, 100 m and on down to 1 mm, each level showing once its cells are a few pixels across">grid</button>
+                <LabSliders sliders={MARCH} />
+            </OptionGroup>
+        </Fragment>
+    </SkyFrame>
+    <p class="view-status"><span class="sky-timing" data-field="timing"></span></p>
+    <figcaption class="figure-caption">{caption}</figcaption>
+</figure>
+
+<script>
+    import { formationFigure } from "./formation";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-formation-lab]")) formationFigure(root);
+</script>

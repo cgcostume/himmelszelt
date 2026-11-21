@@ -37,8 +37,9 @@ no less of a factor of the depth than its share, so they keep energy, and the am
 ambient light's grid, not by the profile. Nubis3's inner glow is left out: it stands in for the same orders the octaves already give.
 
 The air in front of the clouds is taken step by step, at each step's own distance, and leaves them as opaque as they
-are. Given an `aerialPerspective` volume at `encode`, RGB froxels laid out as Hillaire's (dunstkreis' volume, turned
-into RGB), it is the atmosphere's own in-scattering and transmittance. Without, for a baked background, far clouds fade
+are. Given an `aerialPerspective` volume at `encode`, the `aerialPerspective` of dunstkreis' sky pass as it is, made
+for the same camera, it is the atmosphere's own in-scattering and transmittance, by dunstkreis' own lookup, bundled
+here. Without, for a baked background, far clouds fade
 into the background's own pixel by `horizonFadeKm`, held below a few times `horizonLuminance` so the sun's disc does
 not shine through, or into `horizonLuminance` where there is no background. With `clearingKm` the clouds grow fewer towards that distance from `clearingFromKm` on, the map's coverage falling and their tops
 sinking first, and leave a clear horizon, under which a low sun reaches them.
@@ -96,11 +97,41 @@ clouds.encode(encoder, canvasTexture, { background: skyTexture });
 
 `scale` renders the clouds at a share of the target's size and composes them bilinearly: at 0.5 a quarter of the rays.
 `background: false` writes the clouds alone, premultiplied luminance and transmittance, for a renderer that composites
-them itself, and `toneMap: false` leaves the composed result linear. `maxSteps` and `nearLightSamples` set the march's
+them itself, and `toneMap: false` leaves the composed result linear. `whiteBalance`, helldunkel's `whiteBalance(white)`,
+is applied with the exposure to the clouds and the background alike, the identity by default, so a background from
+dunstkreis' sky pass is written without one. `maxSteps` and `nearLightSamples` set the march's
 cost at creation.
 
+### Change over time
+
+Three things change a cloudscape, at three costs. The wind's drift is a uniform. So is `detailShiftKm`, how far the
+detail noise has risen through the clouds: add to it over time and the billows move, with nothing rebuilt. A change
+of shape, of the Sun or of the weather rebuilds the volumes, some 24 ms for 256 x 256 x 64 voxels on a Radeon RX 7900
+XT, which `update` does at once in the frame that asks.
+
+With `keyframes: true` the pass builds them ahead instead, and the march reads a blend of the last two:
+
+```js
+const clouds = await createCloudPass(device, { format: "rgba8unorm", keyframes: true });
+const { keyframes } = clouds;
+// Per frame, t running from 0 to 1 over as long as a keyframe should take to blend in.
+clouds.update(params, encoder);
+if (keyframes.stale && keyframes.pending === 0 && !keyframes.ready) keyframes.begin();
+keyframes.advance(2, { encoder });
+if (t >= 1 && keyframes.ready) {
+    keyframes.promote();
+    t = 0;
+}
+keyframes.blend(Math.min(t, 1), { encoder });
+```
+
+`begin` freezes the parameters as last updated, `advance` runs that many of the build's steps, some fourteen passes,
+and returns their names, `promote` makes the built keyframe the one blended towards, and `blend` writes the volumes
+the march reads. It costs three more sets of the volumes in memory, and the blend each frame it runs. The first
+keyframe is built by the first `update`.
+
 Every identifier in the WGSL is prefixed `gw`/`GW_`; `wgsl` exports the fragments for inlining. The camera rays are
-dunstkreis' `camera.wgsl` and the tone curves helldunkel's, bundled at build time.
+dunstkreis' `camera.wgsl` and the tone curves and the white balance helldunkel's, bundled at build time.
 
 ## Status
 

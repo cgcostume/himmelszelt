@@ -22,6 +22,8 @@ interface Props {
     /** Whether the view has a grid of lines of its own, and what it shows; then the marks switch through three states. */
     grid?: boolean;
     gridTitle?: string;
+    /** Where the marks start: off, the compass, or with the grid; by default as far as the view has them. */
+    marks?: 0 | 1 | 2;
     /** The Sun lock's title: where it keeps the view. */
     lockTitle?: string;
     /** Whether the view starts on the Sun. */
@@ -32,6 +34,10 @@ interface Props {
     sunLock?: boolean;
     /** Whether the view offers refraction to switch, for the whole page (see sky.ts). */
     refraction?: boolean;
+    /** Whether one can fly through the view (see flight.ts): a button for it, before play's. */
+    fly?: boolean;
+    /** Whether the height is the figure's own once its scale or a flight has set it, and no longer the page's. */
+    ownHeight?: boolean;
 }
 const {
     hint = "Drag to look around, scroll to zoom. Rendered with WebGPU.",
@@ -46,6 +52,9 @@ const {
     lockIcon = "sunLock",
     sunLock = false,
     refraction = false,
+    fly = false,
+    ownHeight = false,
+    marks = grid ? 2 : 1,
 } = Astro.props;
 // The marks' button steps through off, the compass, and the compass with the grid where the view has one (see skyframe.ts).
 const marksTitles = [
@@ -62,7 +71,7 @@ const decades = [0, 1, 2, 3, 4, 5].map((decade) => ({ decade, at: `--at: ${decad
 const named: Record<number, string> = { 0: "1 m", 3: "1 km", 5: "100 km" };
 ---
 
-<div class="sky-stage" data-sky-frame>
+<div class="sky-stage" data-sky-frame data-own-height={ownHeight ? "" : undefined}>
     <div class={`sky-view as-seen ${viewClass}`} data-panel={panel}>
         <slot />
         <div class="sky-bar">
@@ -71,12 +80,13 @@ const named: Record<number, string> = { 0: "1 m", 3: "1 km", 5: "100 km" }
                     <button type="button" class="view-icon" data-field="lock" aria-pressed={locked ? "true" : "false"} title={lockTitle} aria-label={lockIcon === "moonLock" ? "Moon lock" : "Sun lock"}><Icon name={lockIcon} /></button>
                     {sunLock && <button type="button" class="view-icon" data-field="sunLock" aria-pressed="false" title="Keep the view on the Sun's apparent direction; dragging lets go" aria-label="Sun lock"><Icon name="sunLock" /></button>}
                     {refraction && <button type="button" class="view-icon" data-field="refraction" aria-pressed="true" title="Refraction: the light traced through the air, bending, the Sun lifted and squeezed low over the horizon. Switches it for the whole page, recomputing every table and cube map" aria-label="Refraction"><Icon name="refraction" /></button>}
-                    <button type="button" class="view-icon sky-marks" data-field="marks" data-levels={grid ? 3 : 2} data-level={grid ? 2 : 1} data-titles={JSON.stringify(marksTitles)} aria-pressed="true" title={marksTitles[grid ? 2 : 1]} aria-label="Compass and grid"><Icon name="marks" /></button>
+                    <button type="button" class="view-icon sky-marks" data-field="marks" data-levels={grid ? 3 : 2} data-level={marks} data-titles={JSON.stringify(marksTitles)} aria-pressed={marks > 0 ? "true" : "false"} title={marksTitles[marks]} aria-label="Compass and grid"><Icon name="marks" /></button>
                 </span>
                 <span class="sky-hint footnote">{hint}</span>
             </span>
             <span class="sky-bar-end">
             <slot name="bar" />
+            {fly && <span class="view-buttons"><button type="button" class="view-icon" data-field="fly" aria-pressed="false" title="Fly, or F over the view: the mouse is captured and turns the view, W A S D move, E up and Q down, at a speed of the height over the ground per second, Shift faster, over a grid on the ground. F lands" aria-label="Fly"><Icon name="fly" /></button></span>}
             <span class="view-buttons">
                 <button type="button" class="view-icon" data-field="play" aria-pressed="false" title="Play: the moment runs on, an hour in 10 seconds, half a day in 2 minutes" aria-label="Play"><Icon name="play" /></button>
                 {options && <button type="button" class="view-icon" data-field="options" aria-pressed="true" title="Show or hide this figure's options" aria-label="Options"><Icon name="options" /></button>}

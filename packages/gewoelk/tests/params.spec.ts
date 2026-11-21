@@ -23,6 +23,7 @@ const SIZES: Record<string, [size: number, align: number]> = {
     vec2f: [8, 8],
     vec3f: [12, 16],
     vec4f: [16, 16],
+    mat3x3f: [48, 16],
     mat4x4f: [64, 16],
 };
 
@@ -74,10 +75,21 @@ test("the packer writes GwParams as params.wgsl lays it out", () => {
     expect(u[(params.members.sheets ?? -4) / 4]).toBe(2);
     const volume = (params.members.cloudscape ?? 0) + (cloudscape.members.extinction ?? 0);
     expect(at(volume)).toBe(p.cloudscape.extinction);
+    // The detail noise's shift lies within one tile of the noise, however far it has moved.
+    const shifted = { ...p, cloudscape: { ...p.cloudscape, detailShiftKm: 2.5 * p.cloudscape.noiseScaleKm } };
+    const shift = ((params.members.cloudscape ?? 0) + (cloudscape.members.detailShift ?? -4)) / 4;
+    expect(new Float32Array(paramsData(shifted, 5))[shift]).toBeCloseTo(0.5 * p.cloudscape.noiseScaleKm);
+    expect(f[shift]).toBe(0);
     const second = (params.members.sheet ?? 0) + 128 + (sheet.members.seed ?? 0);
     expect(u[second / 4]).toBe(9);
     const windDrift = (params.members.sheet ?? 0) + (sheet.members.drift ?? 0);
     expect(at(windDrift)).toBeCloseTo(drift(DEFAULT_SHEET.wind, 3600)[0]);
+    // The white balance's columns, padded to four floats: the identity by default, a matrix as given.
+    const balance = (params.members.whiteBalance ?? -1) / 4;
+    expect(Array.from(f.subarray(balance, balance + 12))).toEqual([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
+    const m = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
+    const g = new Float32Array(paramsData({ ...p, whiteBalance: m }, 5));
+    expect(Array.from(g.subarray(balance, balance + 12))).toEqual([1, 2, 3, 0, 4, 5, 6, 0, 7, 8, 9, 0]);
 });
 
 test("drift and evolution wrap", () => {

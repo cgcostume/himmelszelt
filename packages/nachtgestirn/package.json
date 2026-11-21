@@ -29,17 +29,41 @@
             "import": "./dist/index.js"
         }
     },
+    "bin": {
+        "nachtgestirn": "scripts/data.mjs"
+    },
     "files": [
         "dist",
-        "maps"
+        "scripts/common.mjs",
+        "scripts/data.mjs",
+        "scripts/maps.mjs",
+        "scripts/roughness.mjs",
+        "scripts/mirror.mjs",
+        "assets.json",
+        "maps/README.md",
+        "maps/moon-color-seen-512.webp",
+        "maps/moon-color-seen-1k.webp",
+        "maps/moon-height-seen-512.webp",
+        "maps/moon-height-seen-1k.webp",
+        "maps/moon-roughness-seen-512.webp",
+        "maps/moon-roughness-seen-1k.webp"
     ],
     "scripts": {
         "build": "rolldown -c rolldown.config.ts",
         "typecheck": "tsc --noEmit",
         "test": "pnpm build && playwright test",
         "test:gpu": "pnpm build && NACHTGESTIRN_GPU=1 playwright test",
-        "maps": "node scripts/maps.mjs maps",
-        "roughness": "node scripts/roughness.mjs maps"
+        "maps": "node scripts/maps.mjs",
+        "roughness": "node scripts/roughness.mjs",
+        "assets": "node scripts/data.mjs assets"
+    },
+    "peerDependencies": {
+        "sharp": "^0.35.4"
+    },
+    "peerDependenciesMeta": {
+        "sharp": {
+            "optional": true
+        }
     },
     "devDependencies": {
         "@himmelszelt/dunstkreis": "workspace:*",
@@ -50,6 +74,7 @@
         "@webgpu/types": "^0.1.71",
         "rolldown": "^1.2.2",
         "rolldown-plugin-dts": "^0.28.0",
+        "sharp": "^0.35.4",
         "typescript": "^7.0.2",
         "webgpu": "^0.6.1"
     }

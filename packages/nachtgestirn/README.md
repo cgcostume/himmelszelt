@@ -70,18 +70,47 @@ other package at runtime: the astronomy comes in as directions and angles, from
 
 ## The maps
 
-`pnpm maps <outDir>` makes them from NASA's [CGI Moon Kit](https://svs.gsfc.nasa.gov/4720): the color map of December
-2025, from the LROC wide angle camera's Hapke-normalized mosaic, as WebP, and a height map from the LOLA elevation map
-at 64 texels per degree, LOLA's 16-bit half meters in a lossless WebP's red and green, each 4096, 2048, 1024 and 512
-texels around. The package ships them in `maps/`, as `MOON_MAPS["4k"]` (11.0 MiB), `"2k"` (3.0 MiB), `"1k"` (818 KiB) and
-`"512"` (225 KiB), resolved by `new URL(..., import.meta.url)`, which bundlers copy along: a disc shows a map
-`mapWidthFor(pixels)`, π times its width, at one texel per pixel, so `"512"` does up to a disc of some 160 pixels,
-`"1k"` to some 330, `"2k"` to some 650. All equirectangular, centered on 0° longitude, east to the right, north up; the
-pass reads them that way, the heights turned on the GPU into heights and slopes with mip levels. The color map is
-balanced to look right, not to measure, and nearly neutral: `createMoonMaps` takes the near side's mean color the script
-prints, scales the map to normal albedo, so the drawn disc averages the geometric albedo, and tints it to `MOON_COLOR`,
-the Moon's B-V of 0.92, a warm gray; `MOON_MAPS` carries the mean along. `loadMoonMaps` loads `MOON_MAPS["4k"]` by
-default, or any set laid out the same way.
+The maps come from NASA's [CGI Moon Kit](https://svs.gsfc.nasa.gov/4720): the color map of December 2025, from the LROC
+wide angle camera's Hapke-normalized mosaic, as WebP, and a height map from the LOLA elevation map at 64 texels per
+degree, LOLA's 16-bit half meters in a lossless WebP's red and green. An optional roughness map comes from Rosenburg et
+al. 2011's LOLA slope and Hurst exponent maps. All equirectangular, centered on 0° longitude, east to the right, north
+up; the pass reads them that way, the heights turned on the GPU into heights and slopes with mip levels. A disc shows a
+map `mapWidthFor(pixels)`, π times its width, at one texel per pixel, so `"512"` does up to a disc of some 160 pixels,
+`"1k"` to some 330, `"2k"` to some 650, `"4k"` beyond.
+
+Each comes in two variants. The seen maps, the default, hold only what Earth ever sees: past the edge of what any
+libration shows, the color fades into the mean of the part beyond and the heights and roughness to none, which makes their files a third smaller and changes nothing
+on the GPU. Take them for views from Earth or a low orbit around it. The whole maps keep the far side: take them for a
+globe, a camera that orbits the Moon, or anything else that shows the part Earth never sees. The suffix `seen` before the
+size tells them apart, `moon-color-seen-1k.webp` against `moon-color-1k.webp`.
+
+| | Seen (default) | Whole |
+|---|---|---|
+| Color and heights | `MOON_MAPS`: `"512"` 142 KiB, `"1k"` 537 KiB shipped; `"2k"` 2.0 MiB, `"4k"` 7.4 MiB made on request | `MOON_MAPS_WHOLE`: `"512"` 207 KiB, `"1k"` 799 KiB, `"2k"` 2.9 MiB, `"4k"` 11.0 MiB, made on request |
+| Roughness | `MOON_ROUGHNESS`: `"512"` 128 KiB, `"1k"` 500 KiB shipped; `"2k"`, `"4k"` made on request | `MOON_ROUGHNESS_WHOLE`: `"512"` to `"4k"` (7.7 MiB), made on request |
+
+The package ships the seen 512 and 1K in `maps/`, resolved by `new URL(..., import.meta.url)`, which bundlers copy along.
+The others are made where the package is installed, next to its own files, and absent until then:
+
+```sh
+npx @himmelszelt/nachtgestirn data maps --size 2k,4k          # the seen color and heights
+npx @himmelszelt/nachtgestirn data maps --size 4k --whole     # the whole ones
+npx @himmelszelt/nachtgestirn data roughness --size 1k --whole
+npx @himmelszelt/nachtgestirn data maps --size 8k --whole --out public/moon   # 8K, yours to host
+```
+
+`--seen` and `--whole` together make both; `--out` and `--cache` move the output and the downloads (590 MB from NASA, the
+8K 240 MB more, the roughness 41 MB from the PDS), and the work is skipped while the output is newer than its inputs.
+The maps not shipped, the seen ones from 2K and every 8K, come built from the asset mirror
+(github.com/cgcostume/himmelszelt-assets), checked against their SHA-256; `--build` makes them here, which needs `sharp`
+(`npm install sharp`), and its downloads come from the mirror first too. In the repository `pnpm maps` and `pnpm
+roughness` build with the same options, and `pnpm assets` makes the whole maps the site draws, `--all` the shipped ones
+too.
+
+The color map is balanced to look right, not to measure, and nearly neutral: `createMoonMaps` takes the near side's mean
+color the script prints, scales the map to normal albedo, so the drawn disc averages the geometric albedo, and tints it
+to `MOON_COLOR`, the Moon's B-V of 0.92, a warm gray. The mean is the near side's, the same for both variants, and every
+set carries it along. `loadMoonMaps` loads `MOON_MAPS["1k"]` by default, or any set laid out the same way.
 
 ## Use
 

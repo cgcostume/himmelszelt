@@ -78,7 +78,7 @@ const {
 ---
 
 <figure class="scene-frame wide" id={id} data-sky data-full={full ? "" : undefined} data-primary={primary ? "" : undefined} data-parts={parts ? "" : undefined}>
-    <SkyFrame png refraction>
+    <SkyFrame png refraction fly ownHeight={!primary}>
         <canvas data-field="canvas" aria-label="The sky at the chosen moment and place"></canvas>
         <div class="sky-compass" data-field="compassLabels"></div>
         {
