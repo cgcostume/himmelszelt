@@ -54,12 +54,13 @@
         "typecheck": "tsc --noEmit",
         "test": "pnpm build && playwright test",
         "test:gpu": "pnpm build && STERNENHEER_GPU=1 playwright test",
-        "catalog": "node scripts/catalog.mjs",
-        "constellations": "node scripts/constellations.mjs",
-        "hipparcos": "node scripts/hipparcos.mjs",
-        "tycho": "node scripts/tycho.mjs",
-        "milkyway": "node scripts/milkyway.mjs",
-        "assets": "node scripts/data.mjs assets"
+        "data:catalog": "node scripts/catalog.mjs",
+        "data:constellations": "node scripts/constellations.mjs",
+        "data:hipparcos": "node scripts/hipparcos.mjs",
+        "data:tycho": "node scripts/tycho.mjs",
+        "data:milkyway": "node scripts/milkyway.mjs",
+        "assets": "node scripts/data.mjs assets",
+        "data": "pnpm data:catalog && pnpm data:hipparcos && pnpm data:tycho && pnpm data:constellations && pnpm data:milkyway"
     },
     "peerDependencies": {
         "sharp": "^0.35.4"

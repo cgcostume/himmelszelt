@@ -97,7 +97,7 @@ export function photoFigure(root: HTMLElement) {
     const slider = find<HTMLInputElement>("[data-field=split]", root);
     const note = find("[data-field=note]", root);
     const requestRender = onDemand(render, root);
-    const tiles = createTiles(canvas, requestRender);
+    const tiles = createTiles(canvas, requestRender, false);
     if (!tiles) noGpu(canvas);
     // The finest maps the GPU holds: the 8K where it takes textures that wide, else the 4K.
     const finest = (shared.device?.limits.maxTextureDimension2D ?? 0) >= 8192 ? "8k" : "4k";

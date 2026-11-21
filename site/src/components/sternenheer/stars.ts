@@ -19,6 +19,7 @@ import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
+import { skyWhite } from "../white";
 import {
     createStarsRenderer,
     inverseViewProjection,
@@ -50,7 +51,7 @@ export function starsFigure(root: HTMLElement) {
         root.querySelector<HTMLInputElement>(`input[name="${root.id}-${name}"]:checked`)?.value ?? "";
 
     const camera = { yaw: Math.PI, pitch: 35 * DEG, fov: 120 * DEG };
-    // Flight, with a grid on the ground while it lasts, and the height the figure is seen from: its own.
+    // Flight, with a grid on the ground, and the height the figure is seen from: its own.
     const air = flightIn(root, canvas, camera, () => requestRender());
     const marks = () => Number(field("marks").dataset.level);
     field("marks").addEventListener("click", () => requestRender());
@@ -169,6 +170,8 @@ export function starsFigure(root: HTMLElement) {
             twinkle: pressed("twinkle"),
             time: (performance.now() - startedAt) / 1000,
             glare: pressed("glare"),
+            starburst: pressed("starburst"),
+            veil: maybe("veil") ? pressed("veil") : true,
             halo: Number(maybe<HTMLInputElement>("halo")?.value ?? 1),
             starCompensation: offsetOf(root, "stars").stops,
             milkyWayCompensation: offsetOf(root, "milkyWay").stops,
@@ -176,7 +179,8 @@ export function starsFigure(root: HTMLElement) {
             moon: pressed("moon"),
             constellations: pressed("lines") ? chosenConstellations() : [],
             grid: marks() === 2,
-            ground: air.flying() ? air.flown : null,
+            ground: air.flown,
+            whiteBalance: skyWhite(sky.sunDirection),
         });
         if (!drawn) return;
         const submitted = performance.now();
@@ -254,7 +258,7 @@ export function starsFigure(root: HTMLElement) {
             for (const input of root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-${name}"]`))
                 input.addEventListener("change", requestRender);
         maybe("constellations")?.addEventListener("change", requestRender);
-        for (const name of ["auto", "lock", "air", "glare", "eye", "moon", "twinkle", "lines"]) {
+        for (const name of ["auto", "lock", "air", "glare", "starburst", "veil", "eye", "moon", "twinkle", "lines"]) {
             maybe(name)?.addEventListener("click", () => {
                 field(name).setAttribute("aria-pressed", String(!pressed(name)));
                 if (name === "twinkle") twinkle(pressed("twinkle"));

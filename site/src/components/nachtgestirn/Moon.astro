@@ -1,8 +1,8 @@
 ---
-import "../sternzeit/sternzeit.css";
 import "../dunstkreis/dunstkreis.css";
 import Choice from "../dunstkreis/Choice.astro";
 import Hdr from "../dunstkreis/Hdr.astro";
+import Lens from "../dunstkreis/Lens.astro";
 import OptionGroup from "../dunstkreis/OptionGroup.astro";
 import SkyFrame from "../dunstkreis/SkyFrame.astro";
 import Icon from "../Icon.astro";
@@ -22,7 +22,7 @@ interface Props {
 }
 const {
     id = "moon",
-    caption = "The Moon at the chosen moment and place over dunstkreis' sky, through its air: lit by the Sun and by earthshine, in Earth's shadow during an eclipse, exposed for its lit part or for the sky, whichever is brighter. The compass directions on the horizon.",
+    caption = "The Moon at the chosen moment and place over dunstkreis' sky, through its air, lit by the Sun and by earthshine. The compass directions on the horizon.",
     try: experiment,
 } = Astro.props;
 
@@ -38,9 +38,21 @@ const TONE = {
     ],
     checked: "neutral",
 };
+const WHITE = {
+    name: "white",
+    label: "White balance",
+    title: "The white the picture is balanced on, sky and Moon alike, as a camera's white balance and an eye's adaptation choose one",
+    options: [
+        ["auto", "auto", "The Sun's white by day and the Moon's by night, as every sky figure on this site has it"],
+        ["moon", "Moon", "The Moon above the air: a neutral gray high in the sky, reddened only by the air"],
+        ["sun", "Sun", "The Sun above the air, a camera set to daylight: the Moon in its own color, a warm gray"],
+        ["none", "none", "No balance, the light's colors against the display's white: the Moon tan"],
+    ],
+    checked: "auto",
+};
 ---
 
-<figure class="scene-frame wide" id={id} data-moon>
+<figure class="fig scene-frame wide" id={id} data-moon>
     <SkyFrame png refraction fly ownHeight lockIcon="moonLock" sunLock lockTitle="Keep the view on the Moon; dragging lets go" hint="Drag to look around, scroll to zoom. Rendered with WebGPU, the Moon over dunstkreis' sky.">
         <canvas data-field="canvas" aria-label="The Moon at the chosen moment and place"></canvas>
         <div class="sky-compass" data-field="compassLabels"></div>
@@ -56,11 +68,15 @@ const TONE = {
                 <button type="button" class="view-toggle" data-field="shimmer" aria-pressed="true" title="The air's shimmer: turbulence moves the image about, half an arcsecond at the zenith, growing with the air the light crosses from where you stand, some 3 arcseconds on the horizon and none above the air, and the air spreads the colors, blue lifted more than red, near the horizon some tens of arcseconds. It moves, so the figure draws on while it is on">shimmer</button>
                 <button type="button" class="view-toggle" data-field="night" aria-pressed="false" title="As the eye sees it at night rather than a camera: below some 4 cd/m² the rods take over, colors fade and shift towards blue; the disc, far brighter, keeps its color">night vision</button>
             </OptionGroup>
+            <Lens />
             <OptionGroup name="HDR (× SDR white)">
                 <Hdr figure={id} />
             </OptionGroup>
             <OptionGroup name="tone mapping">
                 <Choice figure={id} {...TONE} />
+            </OptionGroup>
+            <OptionGroup name="white balance">
+                <Choice figure={id} {...WHITE} />
             </OptionGroup>
         </Fragment>
     </SkyFrame>

@@ -3,8 +3,6 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import Cite from "../Cite.astro";
 import Term from "../Term.astro";
-import "../sternzeit/sternzeit.css";
-import "../nachtgestirn/nachtgestirn.css";
 import "../dunstkreis/wavelengths.css";
 import "./nightblue.css";
 import { FILM_STARS } from "./filmstars";
@@ -52,7 +50,7 @@ const DECADES: [number, string][] = [
 ];
 ---
 
-<figure class="eclipse-figure nightblue-figure" id={id} data-night-blue data-patches={JSON.stringify(patches)}>
+<figure class="fig eclipse-figure nightblue-figure" id={id} data-night-blue data-patches={JSON.stringify(patches)}>
     <div class="eclipse-views">
         <figure class="eclipse-view">
             <svg data-field="share" role="img" aria-label="The cones' share of the light over the luminance, with marks for a moonless sky, the full Moon's sky and a display's white, and the chosen star's core at three zooms"></svg>
@@ -87,16 +85,10 @@ const DECADES: [number, string][] = [
         <figcaption><span class="subfigure-title">camera and eye</span>, each color as recorded and as seen</figcaption>
     </figure>
     <figcaption class="figure-caption">
-        Why the night looks blue, by the eye's two kinds of cells and Jensen's blue shift <Cite id="jensen2001" />. (a)
-        The share of the light the cones see over the luminance, all of it above 4 cd/m², none below a hundredth, where
-        the <Term of="Scotopic vision">rods</Term> see alone <Cite id="larson1997" />; the band between them shaded.
-        Dashed, a display's white, the clear sky under a full Moon at 18.5 magnitudes per square arcsecond <Cite
-        id="puschnig2014" />, and a moonless sky; the accent the chosen luminance. The dots are the chosen star's core
-        as the pass meets it, in the view of the whole sky, 180° down 1,080 pixels, and zoomed ten and a hundred times.
-        (b) Stars from blue-white to orange by their color index, the moonlit sky as dunstkreis draws it and a white,
-        each as the eye sees it at the luminance beside it, every level at an exposure of its own, as the eye adapts:
-        the colors drain to one pale blue, the orange ones darken first. (c) Each color left as a camera records it and
-        right as the eye sees it at the chosen luminance, the stars those films and history name.
+        Why the night looks blue, by Jensen's blue shift <Cite id="jensen2001" />: (a) the share of the light the cones
+        see over the luminance, the <Term of="Scotopic vision">rods</Term> alone below a hundredth of a cd/m², the
+        chosen luminance in the accent; (b) star colors, the moonlit sky and a white as the eye sees them at the
+        luminance beside each; (c) each color as a camera records it and as the eye sees it.
     </figcaption>
 </figure>
 

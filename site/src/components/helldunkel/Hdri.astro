@@ -1,13 +1,11 @@
 ---
-import "../sternzeit/sternzeit.css";
 import "../environment/environments.css";
 import Hdr from "../dunstkreis/Hdr.astro";
 import EnvironmentFrame from "../environment/EnvironmentFrame.astro";
-import "../dunstkreis/dunstkreis.css";
 import "./helldunkel.css";
 ---
 
-<figure class="scene-frame wide" id="hdri" data-needs-hdri data-loading>
+<figure class="fig scene-frame wide" id="hdri" data-needs-hdri data-loading>
     <EnvironmentFrame fullscreen>
         <div class="hdri-view as-seen"><canvas data-field="canvas" aria-label="The chosen HDRI"></canvas></div>
     </EnvironmentFrame>

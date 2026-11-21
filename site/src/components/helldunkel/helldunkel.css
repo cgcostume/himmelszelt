@@ -176,14 +176,7 @@
     display: flex;
     align-items: flex-end;
     margin: 0;
-    padding: 0 0 6px 6px;
-}
-.banding-names span {
-    padding: 0 0.4rem;
-    border-radius: var(--radius-small);
-    background: var(--overlay-solid);
-    color: var(--overlay-ink);
-    font-size: var(--text-small);
+    padding: 0 0 8px 8px;
 }
 .curves-plot {
     position: relative;
@@ -239,16 +232,11 @@
 }
 .tone-tile figcaption {
     position: absolute;
-    left: 6px;
-    bottom: 6px;
+    left: 8px;
+    bottom: 8px;
     margin: 0;
-    padding: 0 0.4rem;
-    border-radius: var(--radius-small);
-    background: var(--overlay-solid);
-    color: var(--overlay-ink);
-    font-size: var(--text-small);
 }
 /* The lower tiles' names above the image's credit, which runs across them. */
 .tone-tile:nth-of-type(n + 3) figcaption {
-    bottom: 34px;
+    bottom: 42px;
 }

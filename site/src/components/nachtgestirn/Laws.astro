@@ -2,7 +2,6 @@
 import CopyInfo from "../CopyInfo.astro";
 import Icon from "../Icon.astro";
 import Try from "../Try.astro";
-import "../sternzeit/sternzeit.css";
 import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
@@ -20,8 +19,8 @@ const LAWS = [
 ] as const;
 ---
 
-<figure class="tiles-figure wide" id={id} data-laws>
-    <div class="tiles-panel as-seen split">
+<figure class="fig tiles-figure wide" id={id} data-laws>
+    <div class="tiles-panel as-seen split" data-actions="copy">
         <canvas aria-label="The Moon shaded by Lambert's law, Oren-Nayar's, Hapke's of 1963 and Hapke's of 2012, rendered with WebGPU" title="Drag to carry yourself around the Moon, the Sun staying put; double click to come back to Earth"></canvas>
         <ul class="tiles-labels disc-labels">
             {LAWS.map(([law, name]) => (
@@ -40,7 +39,7 @@ const LAWS = [
             <span class="view-buttons">
                 <Rays />
             </span>
-            <span class="view-buttons">
+            <span class="view-buttons fig-actions">
                 <button type="button" class="view-icon" data-field="download" title="Download the discs as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
                 <CopyInfo />
             </span>
@@ -48,9 +47,8 @@ const LAWS = [
     </div>
     <LunationSlider />
     <figcaption class="figure-caption">
-        The Moon at the chosen moment under the four laws of the side views, from Earth's center with north up, all
-        four exposed alike. Under each disc, how far its light as a whole is off the measured Moon's, in stops. Striped,
-        at a switch, where a disc is more than a third of a stop off Hapke's model of 2012: red brighter, blue darker.
+        The Moon at the chosen moment under the four laws, north up, exposed alike, under each disc how far its light is
+        off the measured Moon's in stops. Striped where more than a third of a stop off Hapke 2012: red brighter, blue darker.
         <Try label="First quarter" set="date=2026-11-17T12:00Z" fig={id}>
             Hapke's half Moon of 1963 stays bright up to the terminator, his half Moon of 2012 fades into it.
         </Try>

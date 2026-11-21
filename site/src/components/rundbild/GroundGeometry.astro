@@ -1,0 +1,79 @@
+---
+import "../sternzeit/sternzeit.css";
+
+// The sliders of the grounded figure, with its ranges and defaults, but a dome of some 15 m rather than one without end.
+const SLIDERS = [
+    {
+        name: "height",
+        label: "height",
+        title: "How far above the ground the image was taken, in meters",
+        min: 0.2,
+        max: 8,
+        step: 0.1,
+        value: 2,
+        marks: ["0.2", "8"],
+    },
+    {
+        name: "lift",
+        label: "horizon",
+        title: "How far the image's horizon is lifted, or lowered, in degrees",
+        min: -20,
+        max: 20,
+        step: 0.5,
+        value: 0,
+        marks: ["−20°", "+20°"],
+    },
+    {
+        name: "reach",
+        label: "reach",
+        title: "How far from under the capture point the ground lies flat, about half the dome's radius at most",
+        min: 0,
+        max: 100,
+        step: 1,
+        value: 15,
+        marks: ["3", "∞"],
+    },
+    {
+        name: "radius",
+        label: "dome",
+        title: "The radius of the dome the horizon and the sky lie on, at least two and a half heights; at the far end, without bound",
+        min: 0,
+        max: 100,
+        step: 1,
+        value: 24,
+        marks: ["5", "∞"],
+    },
+];
+---
+
+<figure class="fig scene-frame" id="ground-geometry">
+    <div class="frame-scene" data-export="ground-geometry" data-export-timeless>
+        <svg class="dome-layer zdog" data-layer="ground" aria-hidden="true"></svg>
+        <svg class="dome-layer zdog" data-layer="above" aria-label="The ground, the dome and the blend between them around where the image was taken, and two rays from a camera"></svg>
+        <div class="frame-labels" aria-hidden="true"></div>
+        <div class="scene-bar">
+            <p class="vis-credit footnote">
+                Drag to rotate. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
+            </p>
+        </div>
+    </div>
+    {SLIDERS.map(({ name, label, title, min, max, step, value, marks }) => (
+        <label class="figure-slider" title={title}>
+            <span class="note">{label}</span>
+            <span class="figure-slider-rail">
+                <input type="range" data-field={name} min={min} max={max} step={step} value={value} aria-label={title} />
+                <span class="figure-slider-scale" aria-hidden="true">{marks.map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 100}%`}>{mark}</span>)}</span>
+            </span>
+            <output data-field={`${name}Reading`}></output>
+        </label>
+    ))}
+    <figcaption class="figure-caption">
+        The surface an image is laid on around where it was taken: flat out to the reach, a dome from the horizon up, a
+        blend between. Where a ray from the camera (accent) lands, the image is looked up from the capture point (dashed);
+        a lifted horizon shows as a dashed ring. To scale, in meters.
+    </figcaption>
+</figure>
+
+<script>
+    import "./groundgeometry";
+</script>

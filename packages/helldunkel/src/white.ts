@@ -24,6 +24,21 @@ export const WHITE_POINTS = {
     E: [1 / 3, 1 / 3],
 } as const satisfies Record<string, readonly [number, number]>;
 
+/**
+ * The Sun above the air in linear sRGB at unit luminance, a little warmer than D65, about 6,000 K: its spectrum, as
+ * dunstkreis has it, through the CIE's color matching functions. Balanced on it, sunlight is white, as a camera set to
+ * daylight shows it, and what the sky and the Moon make of it keeps its color.
+ */
+export const SUN_WHITE: readonly [number, number, number] = [1.091, 0.9771, 0.9589];
+
+/**
+ * The Moon above the air in linear sRGB at unit luminance, about 4,750 K: sunlight as a rock reflects it that is
+ * redder than the light it gets, by a quarter of a magnitude in B-V (Thejll et al. 2014), red 1.21 and blue 0.79 of
+ * green, as nachtgestirn has it. Balanced on it, the Moon is a neutral gray high in the sky, as photographs and an eye
+ * in the dark show it, and only what the air takes on the way down colors it.
+ */
+export const MOON_WHITE: readonly [number, number, number] = [1.2765, 0.9448, 0.7325];
+
 /** No white balance, the identity: what `whiteBalance(D65_WHITE)` returns, exactly. */
 export const NO_WHITE_BALANCE: WhiteBalance = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
@@ -64,15 +79,31 @@ const luminanceOf = (rgb: readonly number[]) => apply(SRGB_TO_XYZ, rgb)[1];
  * The white balance that shows `white`, given in linear sRGB, as D65 of the same luminance: the Moon through the air
  * becomes a neutral gray as bright as it was. Every channel's cone response is scaled by D65's over the white's, in
  * Bradford's sharpened space (linear Bradford, ICC.1:2022 Annex E). A gray white gives `NO_WHITE_BALANCE`.
+ *
+ * `degree` is how far the balance goes, 1 by default, all the way, as a camera's does. An eye adapts less than fully,
+ * the less the darker it is around what it looks at, `adaptationDegree`: each gain is mixed with 1 by it, as CIECAM02
+ * does, and the white keeps the rest of its color. 0 is no balance.
  */
-export function whiteBalance(white: readonly [number, number, number]): WhiteBalance {
+export function whiteBalance(white: readonly [number, number, number], degree = 1): WhiteBalance {
     const [r, g, b] = white;
-    if (r === g && g === b) return NO_WHITE_BALANCE;
+    const d = Math.min(Math.max(degree, 0), 1);
+    if ((r === g && g === b) || d === 0) return NO_WHITE_BALANCE;
     const lms = apply(SRGB_TO_LMS, white);
     const y = luminanceOf(white);
-    const gain = D65_LMS.map((c, i) => (c * y) / (lms[i] ?? 1));
+    const gain = D65_LMS.map((c, i) => 1 - d + (d * c * y) / (lms[i] ?? 1));
     const m = times(LMS_TO_SRGB, SRGB_TO_LMS.map((row, i) => row.map((c) => c * (gain[i] ?? 1))) as Mat3);
     return [m[0][0], m[1][0], m[2][0], m[0][1], m[1][1], m[2][1], m[0][2], m[1][2], m[2][2]];
+}
+
+/**
+ * How far an eye adapts to the white of what it sees, from 0 to 1, as `whiteBalance` takes it for `degree`:
+ * CIECAM02's D = F (1 - e^((-L - 42) / 92) / 3.6), for the luminance L it is adapted to, in cd/m², and its surround, F
+ * 1 for "average", a lit room or daylight, 0.9 for "dim" and 0.8 for "dark", a cinema or the night. Fully by day, and
+ * about two thirds for the Moon in a night sky, which therefore keeps a third of its color.
+ */
+export function adaptationDegree(adaptingLuminance: number, surround: "average" | "dim" | "dark" = "average"): number {
+    const f = surround === "dark" ? 0.8 : surround === "dim" ? 0.9 : 1;
+    return Math.min(Math.max(f * (1 - Math.exp((-Math.max(adaptingLuminance, 0) - 42) / 92) / 3.6), 0), 1);
 }
 
 /** `rgb` in linear sRGB balanced by `balance`: the TypeScript twin of `hdWhiteBalance` in `wgsl.whitebalance`. */

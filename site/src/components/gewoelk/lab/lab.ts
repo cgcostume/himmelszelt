@@ -1,7 +1,15 @@
 import { wgsl as gewoelk } from "@himmelszelt/gewoelk";
 import { fromJulianDay, sun } from "@himmelszelt/sternzeit";
 import { find } from "../../dom";
-import { configureCanvas, gpuDevice, SDR, gpu as shared } from "../../dunstkreis/atmosphere";
+import {
+    bindHdr,
+    configureCanvas,
+    displayOutput,
+    gpuDevice,
+    HDR,
+    onDisplay,
+    gpu as shared,
+} from "../../dunstkreis/atmosphere";
 import { flightIn } from "../../dunstkreis/flight";
 import { GRID_STRENGTH, GRID_WGSL, gridOffsets } from "../../dunstkreis/groundgrid";
 import { type Basis, cameraBasis, lookAround, project, type SkyCamera } from "../../dunstkreis/skycamera";
@@ -31,6 +39,12 @@ export function viewData(view: {
     frame?: number;
     flown: { east: number; north: number };
     grid: boolean;
+    /** What the stand-in sun's light is multiplied by, 1 by default: the Moon's share of it by night. */
+    lightScale?: number;
+    /** The luminance in cd/m² the stand-in sky's colors are brought to for the clouds' ambient light; 0 as they are. */
+    skyLuminance?: number;
+    /** How many times SDR white the display may show, 1 by default. */
+    headroom?: number;
 }) {
     const { f, r, u, tx, ty, d } = view.basis;
     const data = new Float32Array(VIEW_SIZE / 4);
@@ -39,7 +53,7 @@ export function viewData(view: {
     data.set([Math.max(view.heightM, 1) / 1000, view.radiusKm, 1 / (1.2 * 2 ** view.ev100), view.pixelAngle], 20);
     data.set([view.clock ?? 0, view.frame ?? 0, view.flown.east, view.flown.north], 24);
     data.set(gridOffsets(view.flown), 28);
-    data[44] = view.grid ? GRID_STRENGTH : 0;
+    data.set([view.grid ? GRID_STRENGTH : 0, view.lightScale ?? 1, view.skyLuminance ?? 0, view.headroom ?? 1], 44);
     return data;
 }
 /** The shader prelude every research pass starts with: the camera's rays, the tone curves, the ground's grid and the view. */
@@ -99,7 +113,7 @@ export type Lab = NonNullable<ReturnType<typeof createLab>>;
 export function createLab(
     root: HTMLElement,
     draw: (lab: Lab) => void,
-    options: { presets?: Presets; camera?: SkyCamera } = {},
+    options: { presets?: Presets; morePresets?: Record<string, Presets>; camera?: SkyCamera } = {},
 ) {
     const field = <T extends HTMLElement = HTMLElement>(name: string) => find<T>(`[data-field="${name}"]`, root);
     const maybe = (name: string) => root.querySelector<HTMLElement>(`[data-field="${name}"]`);
@@ -112,7 +126,9 @@ export function createLab(
     }
     const context = canvas.getContext("webgpu");
     if (!context) return null;
-    configureCanvas(context, SDR);
+    // Half floats whatever the display: one canvas format for the passes that write it, and values over 1 only where
+    // the page's display choice gives them headroom.
+    configureCanvas(context, HDR);
     const device = gpuDevice();
 
     const sliders = [...root.querySelectorAll<HTMLInputElement>("input[data-param]")];
@@ -130,6 +146,7 @@ export function createLab(
     // Flight, and the height and the place over the ground the figure is seen from: its own, no other figure follows.
     const { flown, height: seenFrom } = flightIn(root, canvas, camera, () => lab.request());
     const view = device.createBuffer({ size: VIEW_SIZE, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    let viewed: Parameters<typeof viewData>[0] | null = null;
 
     const lab = {
         root,
@@ -139,6 +156,8 @@ export function createLab(
         camera,
         /** The view's uniform, written by `size()`. */
         view,
+        /** How far the figure has flown from where it started, in km east and north. */
+        flown,
         value: (param: string) => Number(byParam.get(param)?.value ?? 0),
         pressed: (name: string) => maybe(name)?.getAttribute("aria-pressed") === "true",
         choice: (name: string) =>
@@ -147,17 +166,8 @@ export function createLab(
         get clock() {
             return clock;
         },
-        /** The sun's direction: from the figure's own sliders, or the page's moment and place where chosen so. */
-        sun(): readonly [number, number, number] {
-            if (lab.pressed("sun.page")) return sun.direction(fromJulianDay(state.jd), state);
-            const elevation = lab.value("sun.elevation") * DEG;
-            const azimuth = lab.value("sun.azimuth") * DEG;
-            return [
-                Math.cos(elevation) * Math.sin(azimuth),
-                Math.cos(elevation) * Math.cos(azimuth),
-                Math.sin(elevation),
-            ];
-        },
+        /** The sun's direction at the page's moment and place, as every figure of the page has it. */
+        sun: (): readonly [number, number, number] => sun.direction(fromJulianDay(state.jd), state),
         /** Sizes the canvas to its box, writes the view's uniform and returns the size in pixels. */
         size() {
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -169,18 +179,10 @@ export function createLab(
             const pixelAngle = Math.min(camera.fov, Math.PI) / height;
             const grid = lab.pressed("ground.grid");
             const heightM = seenFrom();
-            const data = viewData({
-                basis,
-                sun: lab.sun(),
-                heightM,
-                radiusKm: 6360,
-                ev100,
-                pixelAngle,
-                clock,
-                frame,
-                flown,
-                grid,
-            });
+            const { headroom } = displayOutput();
+            const sun = lab.sun();
+            viewed = { basis, sun, heightM, radiusKm: 6360, ev100, pixelAngle, clock, frame, flown, grid, headroom };
+            const data = viewData(viewed);
             device.queue.writeBuffer(view, 0, data);
             if (compass) {
                 compass.hidden = Number(maybe("marks")?.dataset.level ?? 1) < 1;
@@ -196,7 +198,19 @@ export function createLab(
                     if (at) Object.assign(label.style, { left: `${at.x}px`, top: `${at.y}px` });
                 });
             }
-            return { width, height, dpr };
+            return {
+                width,
+                height,
+                dpr,
+                heightM,
+                headroom,
+                inverseViewProjection: data.slice(0, 16),
+                projectionDistance: basis.d,
+            };
+        },
+        /** The view's uniform again with another light: for a figure whose light and exposure come from a real sky. */
+        relight(light: { sun: readonly number[]; ev100: number; lightScale: number; skyLuminance: number }) {
+            if (viewed) device.queue.writeBuffer(view, 0, viewData({ ...viewed, ...light }));
         },
         timer: createTimer(device, () => {
             showStatus();
@@ -230,9 +244,11 @@ export function createLab(
         if (animating) lab.request();
     }, root);
 
+    // The presets by the name of the choice that picks one: the figure's own, and more where it has several kinds.
+    const presets: Record<string, Presets> = { preset: options.presets ?? {}, ...options.morePresets };
     // A preset's choices, its entries named "@choice": the option of that value checked.
-    function checkChoices(name: string) {
-        for (const [key, value] of Object.entries(options.presets?.[name] ?? {})) {
+    function checkChoices(group: string, name: string) {
+        for (const [key, value] of Object.entries(presets[group]?.[name] ?? {})) {
             if (!key.startsWith("@")) continue;
             const input = root.querySelector<HTMLInputElement>(
                 `input[name="${root.id}-${key.slice(1)}"][value="${value}"]`,
@@ -241,15 +257,15 @@ export function createLab(
         }
     }
     // A preset: its sliders eased over from where they stand, the frames drawn only while that lasts.
-    let easing = 0;
-    function applyPreset(name: string) {
-        checkChoices(name);
-        const target = Object.entries(options.presets?.[name] ?? {}).flatMap(([param, to]) => {
+    const easing = new Map<string, number>();
+    function applyPreset(group: string, name: string) {
+        checkChoices(group, name);
+        const target = Object.entries(presets[group]?.[name] ?? {}).flatMap(([param, to]) => {
             const input = byParam.get(param);
             return input ? [{ input, from: Number(input.value), to }] : [];
         });
         const start = performance.now();
-        cancelAnimationFrame(easing);
+        cancelAnimationFrame(easing.get(group) ?? 0);
         const step = (now: number) => {
             const t = Math.min(1, (now - start) / 1200);
             const s = t * t * (3 - 2 * t);
@@ -258,9 +274,9 @@ export function createLab(
                 paintRange(input);
             }
             lab.request();
-            if (t < 1) easing = requestAnimationFrame(step);
+            if (t < 1) easing.set(group, requestAnimationFrame(step));
         };
-        easing = requestAnimationFrame(step);
+        easing.set(group, requestAnimationFrame(step));
     }
 
     for (const input of sliders) {
@@ -268,8 +284,8 @@ export function createLab(
         input.addEventListener("input", lab.request);
     }
     for (const input of root.querySelectorAll<HTMLInputElement>('input[type="radio"]')) {
-        const preset = input.name === `${root.id}-preset`;
-        input.addEventListener("change", () => (preset ? applyPreset(input.value) : lab.request()));
+        const group = input.name.slice(root.id.length + 1);
+        input.addEventListener("change", () => (group in presets ? applyPreset(group, input.value) : lab.request()));
     }
     for (const button of root.querySelectorAll<HTMLButtonElement>("button.view-toggle[data-field]")) {
         button.addEventListener("click", () => {
@@ -291,15 +307,21 @@ export function createLab(
     new ResizeObserver(lab.request).observe(canvas);
     lookAround(canvas, camera, { onChange: lab.request });
     // The checked preset's values over the sliders' own, so the two never disagree at the start.
-    const first = lab.choice("preset");
-    checkChoices(first);
-    for (const [param, value] of Object.entries(options.presets?.[first] ?? {})) {
-        const input = byParam.get(param);
-        if (input) {
-            input.value = String(value);
-            paintRange(input);
+    for (const group of Object.keys(presets)) {
+        const first = lab.choice(group);
+        checkChoices(group, first);
+        for (const [param, value] of Object.entries(presets[group]?.[first] ?? {})) {
+            const input = byParam.get(param);
+            if (input) {
+                input.value = String(value);
+                paintRange(input);
+            }
         }
     }
+    // The page's display choice: its headroom radios where the figure has them, and a frame when it changes.
+    const hdr = ["note", "choice"].map((name) => root.querySelector<HTMLElement>(`[data-hdr="${name}"]`));
+    if (hdr[0] && hdr[1]) bindHdr(hdr[0], hdr[1]);
+    onDisplay(() => lab.request());
     lab.request();
     return lab;
 }

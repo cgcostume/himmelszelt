@@ -3,7 +3,6 @@ import { find } from "../dom";
 import { onDemand } from "../frame";
 import { drawSvg, LABEL_GAP as GAP, STRIP_MARGIN as MARGIN, stripMoment, svgText } from "./figure";
 import { onChange, state } from "./state";
-import "./export";
 
 // Far back on the long-term parabola of Espenak and Meeus, beyond their canon's −2000, to the end of their polynomials,
 // and where the measurements take over from them.

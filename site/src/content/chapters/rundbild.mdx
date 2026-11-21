@@ -21,11 +21,13 @@ import Planned from "../../components/Planned.astro";
 import Term from "../../components/Term.astro";
 import Sky from "../../components/dunstkreis/Sky.astro";
 import Environment from "../../components/rundbild/Environment.astro";
+import GroundGeometry from "../../components/rundbild/GroundGeometry.astro";
 import Grounded from "../../components/rundbild/Grounded.astro";
 import Environments from "../../components/environment/Environments.astro";
 import Harmonics from "../../components/rundbild/Harmonics.astro";
 import Lighting from "../../components/rundbild/Lighting.astro";
 import Projections from "../../components/rundbild/Projections.astro";
+import Costs from "../../components/rundbild/Costs.astro";
 
 This chapter is being written. Its figures still show only the computed sky of dunstkreis.
 
@@ -73,9 +75,10 @@ pixel wide, instead of picking one texel of many and flickering as the view turn
 
 Nine numbers per color channel hold the sky's diffuse light, as a sound is held by a few of its lowest tones (<Fig id="harmonics" />): the first is the
 sky's average brightness, the next three say how much brighter it is above than below and towards the Sun than away
-from it, and the last five bend that into the shape of a lit horizon over a dark ground. A diffuse surface sees the
-sky blurred over the whole hemisphere it faces, and nine terms of that blur keep more than 99% of the light it receives,
-for any sky <Cite id="ramamoorthi2001" />. A shader turns them into the light on any surface with nine multiplies and
+from it, and the last five bend that into the shape of a lit horizon over a dark ground. Like overtones over a
+fundamental, each band turns faster around the sphere than the one before. A diffuse surface sees the sky blurred over
+the whole hemisphere it faces, and nine terms of that blur keep more than 99% of the light it receives, for any sky
+<Cite id="ramamoorthi2001" />: of band 3 it receives nothing at all. A shader turns them into the light on any surface with nine multiplies and
 no texture lookup, which is what `createIrradiancePass` writes into a buffer, next to an irradiance cube map computed
 from the same nine for shaders that prefer a lookup.
 
@@ -90,29 +93,39 @@ from the same nine for shaders that prefer a lookup.
 An image has no depth: all of it lies at infinity, its ground as well. So a solid put into it floats, and the ground slides
 along with the camera. Laying everything below the horizon on a plane fixes both for the cost of one intersection per
 pixel: the camera's ray meets the plane, and the image is looked up from where it was taken, some way above that plane,
-towards that point. Towards the horizon, though, the plane reaches out without end, and a mountain far off ends up
-smeared across the ground. [three.js](https://threejs.org/examples/webgl_materials_envmaps_groundprojected.html) and
+towards that point (<Fig id="ground-geometry" />). Towards the horizon, though, the plane reaches out without end, and a
+mountain far off ends up smeared across the ground. [three.js](https://threejs.org/examples/webgl_materials_envmaps_groundprojected.html) and
 Unreal's [HDRI Backdrop](https://dev.epicgames.com/documentation/en-us/unreal-engine/hdri-backdrop-visualization-tool-in-unreal-engine)
-close it off instead: the ground ends in a disc, and the sky lies on a sphere about where the image was taken
-(<Fig id="grounded" />). The disc meets the sphere without a seam, and the mountain stands on the sphere, at the horizon.
+close it off instead: the ground ends in a disc, and the sky lies on a sphere about where the image was taken. The
+mountain then stands on the sphere, at the horizon.
+
+<GroundGeometry />
 
 <Grounded />
 
-Near the disc's edge, a few rows of the image still cover a great deal of ground. With the photograph taken 2 m up and
-a disc of some 30 m, its last degree, about eleven rows of a 4K image, spans more than 6 m, while across it every row
-stays as sharp as before. Looked up as they are, those rows draw out into streaks that run away from where the
-photograph was taken. The usual cure, a <Term of="Mipmap">mipmap</Term>, blurs both ways at once and keeps the streaks,
-only softer. What helps is to blur along the azimuth alone, as far as the stretch leaves the image short along its
-elevation. `rbStretchedLods` measures the stretch from where a pixel and its two neighbors look up and returns how far
-to blur along each axis, and levels of the image halved more often along the azimuth than along the elevation hold that
-blur ready, up to 64 to 1. Over the disc's last few degrees, a band of the image's colors fades in, blurred as wide as
-the band, and a quarter of its width past the edge it is gone, so that the sky on the sphere stays sharp.
+A sphere has one radius for all of it, though. Small enough to end the ground before it smears, it brings the sky in as
+well, and the mountain slides past the solids as the camera moves: on a dome of 30 m, a step of 6 m to the side shifts
+it by 11°, some twenty times the Moon's width. rundbild keeps the two apart (<Fig id="grounded" />). The ground lies
+flat as far as its reach, the horizon and the sky lie on a dome with a radius of its own, and in between the image
+recedes from the one to the other, by how far below its horizon it lies, without a seam. The dome can be without end,
+where a sky belongs: the ground then falls away past its reach like a hilltop, and the mountain stays at infinity.
+Within the reach, `rbGroundedDirection` still costs the one intersection, and past it up to fifteen steps along the ray,
+which close in on the surface.
 
-What remains are the photograph's own features: no filter adds rows the camera never took, and what truly rises from
-the ground inside the disc, a tree or a house, lies flat and smears the further the camera moves from where the
-photograph was taken. Lifting the horizon is simpler still: the image is stretched between its poles, for a horizon
-that is not where the image has it. All of these are `wgsl.ground`, functions from a direction to a direction, for any
-map, and the plane without end is still there, the dome's radius at its far end.
+Far out on the ground, a few rows of the image cover a great deal of it. With the photograph taken 2 m up, the degree of
+it that ends 30 m out, about eleven rows of a 4K image, spans more than 6 m, while across it every row stays as sharp as
+before. Looked up as they are, those rows draw out into streaks that run away from where the photograph was taken. The
+usual cure, a <Term of="Mipmap">mipmap</Term>, blurs both ways at once and keeps the streaks, only softer. What helps is
+to blur along the azimuth alone, as far as the stretch leaves the image short along its elevation. `rbStretchedLods`
+measures the stretch from where a pixel and its two neighbors look up and returns how far to blur along each axis, and
+levels of the image halved more often along the azimuth than along the elevation hold that blur ready, up to 64 to 1.
+
+What remains are the photograph's own features: no filter adds rows the camera never took, and what truly rises from the
+ground within its reach, a tree or a house, lies flat and smears the further the camera moves from where the photograph
+was taken. So the reach is best no longer than the ground is flat, and the camera best within it. Lifting the horizon is
+simpler still: the image is stretched between its poles, for a horizon that is not where the image has it. All of these
+are `wgsl.ground`, functions from a direction to a direction, for any map, and the plane without end is still there,
+with the reach and the dome at their far ends.
 
 <Environments open />
 
@@ -178,6 +191,19 @@ a scale each first.
 <Planned what="section" title="The horizon band" plan="from the thesis, with the horizon band of osgHimmel.">
     The hard edge of a hemisphere's map, and the band that hides it.
 </Planned>
+
+## What it costs
+
+An HDRI is dear to hold and cheap to use. The chapter's first, Poly Haven's file of 4K, downloads 24 MiB once and stays
+in the browser; on the GPU its pixels in half floats take 64 MiB, and a cube map as sharp as the panorama, [a third of
+its width](#from-one-to-the-other) rounded up to a power of two, 2048 a face, another 256 MiB, made in a millisecond.
+Lighting asks for far less: a cube map of 256 a face, four lookups a texel, takes a twelfth of a millisecond and 4 MiB,
+and the panorama may go once it is made. Everything after that costs less than a frame of a computed sky: the nine
+coefficients and the irradiance 0.03 ms, a fade of two environments 512 a face 0.06 ms, a panorama laid out 0.03 ms.
+The package downloads some 14 KiB of code, gzipped (<Fig id="costs" />). The times are taken as [dunstkreis'
+are](../dunstkreis/#what-it-costs).
+
+<Costs />
 
 ## The people behind the numbers
 

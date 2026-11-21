@@ -39,7 +39,8 @@ const KEYS: Record<string, readonly [forward: number, right: number, up: number]
 };
 
 export const flightSpeed = (heightM: number) => SPEED_PER_HEIGHT * Math.max(heightM, LEAST_HEIGHT_M);
-const speedText = (mps: number) => (mps < 1000 ? `${Math.round(mps)} m/s` : `${(mps / 1000).toFixed(1)} km/s`);
+// In km/h, to three digits: "36 km/h", "8,810,000 km/h".
+const speedText = (mps: number) => `${Number((mps * 3.6).toPrecision(3)).toLocaleString("en-US")} km/h`;
 
 let landCurrent: (() => void) | null = null;
 
@@ -143,6 +144,7 @@ export function flight(
         // Refused where the browser has no capture to give: flight goes on, turned by dragging.
         Promise.resolve(canvas.requestPointerLock()).catch(() => {});
         show();
+        look();
     }
     button?.addEventListener("click", () => (flying ? land() : takeOff()));
 

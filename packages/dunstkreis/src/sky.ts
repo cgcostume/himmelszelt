@@ -17,10 +17,13 @@ import {
 import {
     type Aureole,
     aureoleConstants,
+    DEFAULT_STARBURST,
     type Features,
     featureConstants,
+    LENS_VEIL,
     pipelineConstants,
     refractionConstants,
+    type Starburst,
     scatteringConstants,
 } from "./quality.js";
 import { apparentDirection } from "./refraction.js";
@@ -71,11 +74,34 @@ export interface SkyPassOptions {
      */
     aureole?: Aureole | false;
     /**
-     * The eye's veil around the sun, by CIE's glare equation, from the sun's illuminance at the observer: its strength,
-     * 1 for the eye's own, which washes out some 10° around the Sun by day, a two-hundredth for a camera's lens. 0 by
-     * default, none. Needs the sun's illuminance, which the light meter writes with every sky-view table.
+     * The veil around the sun, the glow an eye or a lens lays around anything that bright, by CIE's glare equation from
+     * the sun's illuminance at the observer, which the light meter writes with every sky-view table, and with
+     * `moonlight` around the Moon from its own. Its strength: 1 for the eye's own, which washes out some 10° around the
+     * Sun by day; `LENS_VEIL`, a two-hundredth, for a camera's lens, the default, without which the disc stands as a
+     * bare white circle above the haze; 0 for none. Only of what is looked at: it fades as the sun leaves the frame and
+     * is gone 40 % of the image's half extent beyond its edge. It knows nothing of what hides the sun but the planet: a
+     * renderer with clouds or terrain in front turns it off and adds `hdVeil` with the light that gets through.
      */
     veil?: number;
+    /**
+     * A starburst around the sun, the spikes the blades of a camera's aperture diffract its light into, fixed to the
+     * camera: `true` for `DEFAULT_STARBURST`'s six blades, or the count of blades, an even one drawing as many spikes
+     * and an odd one twice as many. Off by default. It leaves the frame with the sun as the veil does.
+     */
+    starburst?: Starburst | boolean;
+    /**
+     * The Sun's corona and chromosphere around its disc, with `sunDisc`: Baumbach's corona, five millionths of the
+     * disc's luminance at the limb, and the thin pink shell under it, behind the air, the ground and the Moon as the
+     * disc is. Lost in the sky by day and, above the air, in a lens's veil, some forty times brighter at the limb, as
+     * in any camera: it shows from above the air without the veil, close in or at a long exposure. In the image only,
+     * not in a cube map. On by default.
+     */
+    solarCorona?: boolean;
+    /**
+     * The disc darker and redder towards its limb, by Hestroffer and Magnan's power law, its light the same. Seen once
+     * the exposure is short enough for the disc not to burn out, some EV100 32. On by default.
+     */
+    limbDarkening?: boolean;
     /**
      * The sky as the eye sees it at night rather than a camera, by helldunkel's `hdDarkAdaptedEye`: below some 4 cd/m² the
      * rods take over from the cones, colors fade and shift towards blue, and by moonlight the sky turns from a camera's
@@ -124,7 +150,7 @@ export interface SkyPassOptions {
 
 /**
  * Byte size of DkSkyParams in frame.wgsl: a vec3 and a scalar, a mat4x4, four scalars, a vec2 and two scalars, a vec3
- * and a scalar twice, a vec3 and a scalar, a scalar padded to 16, and a mat3x3 of three columns padded to 16.
+ * and a scalar twice, a vec3 and a scalar, three scalars padded to 16, and a mat3x3 of three columns padded to 16.
  */
 const SKY_PARAMS_SIZE = 224;
 /** `x` as a half float holds it, to the nearest: the aerial perspective volume keeps its reach in one. */
@@ -132,6 +158,33 @@ const halfFloat = (x: number) => {
     const step = 2 ** (Math.floor(Math.log2(x)) - 10);
     return Math.round(x / step) * step;
 };
+
+/**
+ * How much of the veil and the starburst of a source towards `direction` shows in the frame of an inverse
+ * view-projection matrix `m` with the projection's `d`, as `dkProjectRay` draws it: all of it while the source is in
+ * the image, fading to none 40 % of the image's half extent beyond its edge, and none behind the camera.
+ */
+function inFrame(m: ArrayLike<number>, d: number, direction: readonly number[]): number {
+    const column = (i: number) => [0, 1, 2, 3].map((k) => m[4 * i + k] ?? 0) as [number, number, number, number];
+    const [across, upward, eye, last] = [column(0), column(1), column(2), column(3)];
+    const w = 0.5 * eye[3] + last[3];
+    const axis = [0, 1, 2].map((k) => (0.5 * (eye[k] ?? 0) + (last[k] ?? 0)) / w - (eye[k] ?? 0) / eye[3]);
+    const dot = (a: readonly number[], b: readonly number[]) =>
+        (a[0] ?? 0) * (b[0] ?? 0) + (a[1] ?? 0) * (b[1] ?? 0) + (a[2] ?? 0) * (b[2] ?? 0);
+    const length = (a: readonly number[]) => Math.sqrt(dot(a, a));
+    // The image plane at distance 1 from the eye: its half extents, and the source's place in it.
+    const reach = length(axis) * Math.abs(w);
+    const cosTheta = dot(direction, axis) / length(axis);
+    if (!(d + cosTheta > 1e-3) || (d <= 0 && cosTheta <= 0)) return 0;
+    const [x, y] = [dot(direction, across) / length(across), dot(direction, upward) / length(upward)];
+    const radius = (d + 1) / (d + cosTheta);
+    const beyond = Math.max(
+        Math.abs(x * radius) / (length(across) / reach),
+        Math.abs(y * radius) / (length(upward) / reach),
+    );
+    const t = Math.min(Math.max((beyond - 1) / 0.4, 0), 1);
+    return 1 - t * t * (3 - 2 * t);
+}
 
 /** The light meter's directions per cap, `DK_METER_SAMPLES` in frame.wgsl, one per invocation of 128 per workgroup. */
 const METER_SAMPLES = 4096;
@@ -215,7 +268,9 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         debugGrid = false,
         sunDisc = true,
         aureole,
-        veil = 0,
+        veil = LENS_VEIL,
+        solarCorona = true,
+        limbDarkening = true,
         discAlpha = false,
         supersample = true,
         groundLight = true,
@@ -224,6 +279,11 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         darkAdapted = false,
     } = options;
     if (!(veil >= 0)) throw new Error(`dunstkreis: a veil of ${veil}; its strength is 0 or more`);
+    const blades =
+        options.starburst === true ? DEFAULT_STARBURST.blades : options.starburst ? options.starburst.blades : 0;
+    if (blades !== 0 && !(Number.isInteger(blades) && blades >= 3 && blades <= 16)) {
+        throw new Error(`dunstkreis: a starburst of ${blades} blades; an aperture has from 3 to 16`);
+    }
     if (aureole && !(aureole.share >= 0 && aureole.share <= 1 && aureole.g > 0 && aureole.g < 1)) {
         throw new Error(
             "dunstkreis: an aureole takes a share from 0 to 1 of the aerosols' scattering and a g within (0, 1)",
@@ -264,6 +324,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             wgsl.cube,
             wgsl.sun,
             wgsl.glare,
+            wgsl.lens,
             wgsl.whitebalance,
             wgsl.tonemap,
             wgsl.vision,
@@ -396,6 +457,9 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                     debugGrid,
                     sunDisc,
                     veil,
+                    starburst: blades,
+                    solarCorona,
+                    limbDarkening,
                     discAlpha,
                     supersample,
                     moonlight,
@@ -593,6 +657,12 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             sky[39] = params.gridInk;
             sky[40] = params.sunDiscCeiling ?? 0;
             sky[41] = params.moonAngularDiameter > 0 ? Math.cos((params.moonAngularDiameter * Math.PI) / 360) : 2;
+            // The veil and the starburst by how far the Sun is out of the frame, and the veil by the Moon likewise.
+            sky[42] = inFrame(params.inverseViewProjection, params.projectionDistance, apparent.direction);
+            sky[43] =
+                moonShare > 0 && veil > 0
+                    ? inFrame(params.inverseViewProjection, params.projectionDistance, apparentMoon.direction)
+                    : 0;
             const [m0, m1, m2, m3, m4, m5, m6, m7, m8] = params.whiteBalance;
             sky.set([m0, m1, m2, 0, m3, m4, m5, 0, m6, m7, m8], 44);
             device.queue.writeBuffer(skyParams, 0, sky);
@@ -719,6 +789,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                                 cubify,
                                 sunDisc,
                                 veil: 0,
+                                limbDarkening,
                                 moonlight,
                             },
                             { cube: samples },

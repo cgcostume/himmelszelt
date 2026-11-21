@@ -28,7 +28,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
     let view = gridRay(id.xy, size);
     let right = gridRay(id.xy + vec2u(1u, 0u), size);
     let below = gridRay(id.xy + vec2u(0u, 1u), size);
-    let coverage = dkGridCoverage(view, right, below, params.sun, params.sunAngularRadius, params.pixelRatio);
+    let coverage = dkGridCoverage(view, right, below, params.sun, params.sunAngularRadius, params.pixelRatio, 0.0);
     textureStore(output, id.xy, vec4f(vec3f(params.ink * coverage / DK_GRID_FAINT), 0.0));
 }
 `;

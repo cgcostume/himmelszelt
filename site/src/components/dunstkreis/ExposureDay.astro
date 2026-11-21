@@ -1,24 +1,19 @@
 ---
-import Term from "../Term.astro";
 import Try from "../Try.astro";
 import "../sternzeit/sternzeit.css";
 import "./dunstkreis.css";
 import "./exposureday.css";
 ---
 
-<figure class="strip-figure exposureday" id="exposure-day">
-    <div class="strip-panel exposureday-panel">
+<figure class="fig strip-figure exposureday" id="exposure-day">
+    <div class="strip-panel exposureday-panel" data-export="exposure-day">
         <svg aria-label="The exposure over the chosen day: the light meter's reading, the ramp's compensation and the exposure held in its range"></svg>
         <button type="button" class="view-toggle exposureday-reset" data-field="reset" hidden>reset the ramp</button>
     </div>
     <figcaption class="figure-caption">
-        The exposure over the chosen day at the chosen place, in EV<sub>100</sub>, midnight to midnight on the chosen
-        clock: what the light meter reads (gray), the reading with the ramp's compensation (dashed), and the exposure
-        the sky pass takes (the accent), held at its floor of EV 4. Under it, the ramp's compensation over the day, 0 as
-        metered and +1 twice as bright, and the Sun's altitude: day, the golden and the blue hour, then nautical and
-        astronomical <Term of="Twilight">twilight</Term>, each a shade darker, and night. At the bottom the ramp itself
-        by the Sun's altitude, solid for the rising Sun and dashed for the setting one: drag its keys, hollow where the
-        setting Sun has one of its own, and the day above follows. This changes this figure only.
+        The exposure over the chosen day and place: the meter's reading (gray), with the ramp (dashed), and what the sky
+        pass takes, held at its floor (the accent). Below, the ramp by the Sun's altitude, solid rising and dashed
+        setting, its keys draggable for this figure only.
         <Try label="Tromsø at midsummer" set="date=2026-06-21T22:00:00Z&lat=69.65&lon=18.96&h=1" fig="exposure-day">
             the Sun never sets, the exposure about EV 13 at midnight and 16 at noon.
         </Try>

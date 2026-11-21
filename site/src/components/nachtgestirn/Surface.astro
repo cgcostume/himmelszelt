@@ -2,7 +2,6 @@
 import CopyInfo from "../CopyInfo.astro";
 import Icon from "../Icon.astro";
 import Term from "../Term.astro";
-import "../sternzeit/sternzeit.css";
 import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
 import Resolutions from "../Resolutions.astro";
@@ -16,8 +15,8 @@ interface Props {
 const { id = "surface" } = Astro.props;
 ---
 
-<figure class="tiles-figure wide" id={id} data-surface>
-    <div class="tiles-panel as-seen split" style="--count: 5">
+<figure class="fig tiles-figure wide" id={id} data-surface>
+    <div class="tiles-panel as-seen split" style="--count: 5" data-actions="copy">
         <canvas aria-label="The Moon, and a close-up of its terminator drawn from the color map alone, with the relief, with the relief's shadows, and with the relief displaced, rendered with WebGPU"></canvas>
         <span class="tiles-start">
             <Resolutions options={WHOLE_RESOLUTIONS} chosen="4k" />
@@ -27,7 +26,7 @@ const { id = "surface" } = Astro.props;
         <svg class="tiles-overlay" data-field="marker" aria-hidden="true"></svg>
         <span class="tiles-ends">
             <span class="view-buttons"><Rays /></span>
-            <span class="view-buttons">
+            <span class="view-buttons fig-actions">
                 <button type="button" class="view-icon" data-field="download" title="Download the disc and its close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
                 <CopyInfo />
             </span>
@@ -40,7 +39,7 @@ const { id = "surface" } = Astro.props;
         <li><span class="tiles-name">shadows</span> <span class="tiles-value">cast through the heights</span></li>
         <li><span class="tiles-name">displaced</span> <span class="tiles-value">rays marched through the heights</span></li>
     </ul>
-    <div class="tiles-panel tycho-panel" data-export="tycho-slice">
+    <div class="tiles-panel tycho-panel" data-export="tycho-slice" data-actions-in=".fig-actions">
         <span class="view-buttons">
             <button type="button" class="view-toggle" data-field="sliceShadows" aria-pressed="true" title="The shadows: each point's march towards the Sun and the share of the Sun's disc it sees; off, every point sees all of it">shadows</button>
             <button type="button" class="view-toggle" data-field="sliceNormals" aria-pressed="true" title="The normals: each point lit by the cosine of its normal to the Sun; off, by the share of the Sun it sees alone">normals</button>
@@ -57,10 +56,8 @@ const { id = "surface" } = Astro.props;
     <p class="view-status" data-field="note" hidden></p>
     <figcaption class="figure-caption">
         The relief along the <Term of="Terminator">terminator</Term> from the 4K maps: the disc with the close-up
-        marked, and the close-up four times, a stop more open: the color map on a smooth sphere, with the relief shaded,
-        with its shadows, and displaced. Under it, a slice through the crater Tycho from west to east, its heights four
-        times as tall: each texel's normal, bright as far as it sees the Sun, and one point's march towards the Sun drawn
-        out.
+        marked, and the close-up four ways, a stop more open. Below, a slice through Tycho from west to east, four times as
+        tall, each texel bright as far as it sees the Sun, one point's march drawn out.
     </figcaption>
 </figure>
 

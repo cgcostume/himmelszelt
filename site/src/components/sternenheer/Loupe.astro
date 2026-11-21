@@ -2,8 +2,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import Term from "../Term.astro";
-import "../sternzeit/sternzeit.css";
-import "../nachtgestirn/nachtgestirn.css";
 import "./loupe.css";
 import { FILM_STARS } from "./filmstars";
 import StarPicker from "./StarPicker.astro";
@@ -33,9 +31,9 @@ const choices = [...seen.values()];
 const VEGA = 7001;
 ---
 
-<figure class="loupe-figure" id={id} data-loupe data-choices={JSON.stringify(choices)}>
+<figure class="fig loupe-figure" id={id} data-loupe data-choices={JSON.stringify(choices)}>
     <StarPicker label="The star under the loupe" value={VEGA} />
-    <div class="loupe-views">
+    <div class="loupe-views" data-actions="png copy">
         <div class="loupe-grid as-seen">
             <canvas data-field="grid" aria-label="The star's pixels as sternenheer's pass draws them, magnified, rendered with WebGPU"></canvas>
             <span class="view-buttons">
@@ -78,13 +76,10 @@ const VEGA = 7001;
     </label>
     <p class="view-status" data-field="status" aria-live="polite"></p>
     <figcaption class="figure-caption">
-        One star under a loupe, drawn by sternenheer's pass on its own: (a) its pixels, magnified, as a screen shows
-        them, over black; (b) every pixel's luminance over its distance from the star's center, in units of display
-        white on a logarithmic scale, those the halo reaches in gold, dashed the star's <Term of="Point spread function">point
-        spread function</Term> without the knee;
-        (c) the pixels added up from the center out, the core alone dashed, against the star's light at the eye; and
-        under them where that light goes, across the whole target the pass drew, 257 pixels wide. The stars are those
-        films and history made famous, at their magnitude and color from the catalog.
+        One star under a loupe, drawn by sternenheer's pass alone: (a) its pixels, magnified, over black; (b) each
+        pixel's luminance over its distance from the center, on a logarithmic scale, the halo's in gold, dashed the
+        <Term of="Point spread function">point spread function</Term> without the knee; (c) the pixels added up from
+        the center out, against the star's light at the eye.
     </figcaption>
 </figure>
 

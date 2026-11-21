@@ -1,0 +1,41 @@
+---
+import type { CostsResult } from "../bench";
+import Costs from "../Costs.astro";
+import { creditOf, MiB } from "../costs";
+import reference from "./bench.json";
+import { COST_ROWS, type CostKey, CUBE_SIZE } from "./cost-rows";
+
+/**
+ * What rundbild's passes cost: an HDRI made a cube map, as sharp or to light with, its diffuse light, a fade and a panorama, the time
+ * on the GPU, the memory each holds and what each HDRI downloads. The reference is bench.json, written by `pnpm bench
+ * rundbild --write` (scripts/bench.mjs and bench.ts).
+ */
+const measure = reference as CostsResult;
+const LABELS: Record<CostKey, [string, string]> = {
+    hdri1k: ["an HDRI of 1K", "into a cube map 6 × 512², as sharp"],
+    hdri4k: ["an HDRI of 4K", "into a cube map 6 × 2048², as sharp"],
+    light4k: ["an HDRI of 4K, to light", "into a cube map 6 × 256², four lookups a texel"],
+    irradiance: ["diffuse light", `nine coefficients and 6 × 32², from 6 × ${CUBE_SIZE}²`],
+    blend: ["a fade of two environments", `into 6 × ${CUBE_SIZE}², mips`],
+    panorama: ["a panorama laid out", `equirectangular, ${4 * CUBE_SIZE} × ${2 * CUBE_SIZE}`],
+};
+const rows = COST_ROWS.map((key) => {
+    const row = measure.rows[key];
+    const [label, note] = LABELS[key];
+    return {
+        label,
+        note,
+        values: [row?.ms?.median, (row?.memory ?? 0) / MiB, row?.download ? row.download / MiB : "none"],
+    };
+});
+---
+
+<Costs
+    label="Bar charts of the time on the GPU, the GPU memory and the download of rundbild's passes, from HDRIs of 1K and 4K to diffuse light, a fade and a panorama"
+    columns={[{ head: "GPU time, ms" }, { head: "GPU memory, MiB", part: 0 }, { head: "download, MiB", part: 1 }]}
+    rows={rows}
+>
+    What rundbild costs: the time on the GPU, the memory a pass holds with what it writes, an HDRI's in half floats
+    beside its cube map, and the download, Poly Haven's file of the chapter's first HDRI, which loads once and is kept
+    in the browser; {creditOf(measure)}.
+</Costs>

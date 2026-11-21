@@ -1,5 +1,4 @@
 ---
-import "../sternzeit/sternzeit.css";
 import "./nachtgestirn.css";
 
 /** Lambert's law, Oren-Nayar's and Hapke's of 1963 and 2012 from the side: where each sends the light falling on a patch. */
@@ -15,7 +14,7 @@ const LAWS = [
 ] as const;
 ---
 
-<figure class="lobes-figure wide" id={id} data-lobes>
+<figure class="fig lobes-figure wide" id={id} data-lobes>
     <div class="lobes-row" data-export="reflectance" data-export-timeless>
         {LAWS.map(([law, name, what]) => (
             <div class="lobes-panel">

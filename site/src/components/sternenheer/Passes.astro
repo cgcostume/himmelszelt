@@ -1,48 +1,32 @@
 ---
-import "../sternzeit/sternzeit.css";
 import "./passes.css";
 import StarGroups from "./StarGroups.astro";
 
 /**
- * A frame of the stars pass, pass by pass: what each pass leaves for the next, read back from the pass made with
- * `debug`, as lettered sub-figures, and each pass' milliseconds on the GPU's clock. Sliders for the tiles' size and
- * capacity, the catalog's buttons, and switches for nachtgestirn's Moon and dunstkreis' air.
+ * A frame of the stars pass as a frame graph: what the pass reads at the left, a box per dispatch labeled with what it
+ * runs over, and what each leaves for the next as a thumbnail on its arrow, read back from the pass made with `debug`
+ * (passes-graph.ts lays it out). Sliders for the tiles' size and capacity, the catalog's buttons, and switches for
+ * nachtgestirn's Moon and dunstkreis' air.
  */
 interface Props {
     id?: string;
 }
 const { id = "passes" } = Astro.props;
-const PANELS = [
-    { field: "tiles", title: "Tiles", text: "by the stars that reach each, the full ones in the accent" },
-    {
-        field: "lines",
-        title: "Lines",
-        text: "the tiles by the pieces of the constellations' lines in each, past the sixteen a tile holds in the accent",
-    },
-    {
-        field: "points",
-        title: "The halos' grid",
-        text: "as the bin pass leaves it: each star's light past the knee, a point",
-    },
-    { field: "spread", title: "The halos", text: "the grid halved and added back up, each level its share" },
-    { field: "image", title: "The frame", text: "as the last pass composes it, tone mapped" },
+const THUMBS = [
+    ["tiles", "The tile lists, by the stars that reach each tile, the full ones in the accent"],
+    ["points", "The halos' grid as the bin pass leaves it: each star's light past the knee, a point"],
+    ["spread", "The halos: the grid halved and added back up, each level its share"],
+    ["lines", "The lines' tiles, by the pieces of the constellations' lines in each"],
+    ["image", "The frame as the last pass leaves it, tone mapped"],
 ];
 ---
 
-<figure class="eclipse-figure passes-figure" id={id} data-passes>
-    <div class="eclipse-views">
-        {PANELS.map((panel) => (
-            <figure class="eclipse-view">
-                <div class="eclipse-panel as-seen">
-                    <canvas data-field={panel.field} class:list={["passes-canvas", (panel.field === "tiles" || panel.field === "lines") && "passes-blocky"]} aria-label={`${panel.title}: ${panel.text}`}></canvas>
-                </div>
-                <figcaption><span class="subfigure-title">{panel.title}</span>, {panel.text}<span data-field={`${panel.field}Note`}></span></figcaption>
-            </figure>
+<figure class="fig wide passes-figure" id={id} data-passes>
+    <div class="passes-graph" data-actions="png copy">
+        <svg data-field="graph" role="img" aria-label="The passes of a frame of sternenheer's stars, what each reads and what it leaves for the next"></svg>
+        {THUMBS.map(([field, label]) => (
+            <canvas data-field={field} class:list={["passes-canvas", (field === "tiles" || field === "lines") && "passes-blocky"]} aria-label={label}></canvas>
         ))}
-        <figure class="eclipse-view">
-            <svg data-field="times" class="passes-times" aria-label="Each pass' milliseconds on the GPU's clock"></svg>
-            <figcaption><span class="subfigure-title">Milliseconds</span>, each pass' on the GPU's clock, the mean of 64 frames<span data-field="timesNote"></span></figcaption>
-        </figure>
     </div>
     <label class="figure-slider" title="How many pixels a side of a tile spans: wider tiles hold more stars each, and every pixel has more of them to look through">
         <span class="note">tile size</span>
@@ -65,14 +49,9 @@ const PANELS = [
         <span data-field="status" aria-live="polite"></span>
     </p>
     <figcaption class="figure-caption">
-        A frame of sternenheer's pass at the chosen moment and place, 960 by 540 pixels, looking south 35° up, 120° from
-        top to bottom: the stars of the catalogs the buttons pick, over dunstkreis' sky and under nachtgestirn's Moon as
-        the switches add them, or from above the air, over black. Exposed for a moonless night, EV<sub>100</sub> −9, or
-        for the sky where the Sun or the Moon lights it brighter. As the pass leaves it between its passes: (a) the tiles,
-        brighter the more stars reach each; (b) the tiles the constellations' lines cross, likewise; (c) the light past
-        each star's knee, put into the halos' grid at half the target's size; (d) that grid spread into the halos, both
-        as light, in units of display white on the halos' logarithmic curve; (e) the composed frame; and (f) the
-        milliseconds each pass took on this GPU, the sky's and the Moon's among them, measured as the figure draws.
+        The passes of one frame of sternenheer's stars, 960 by 540 pixels, looking south 35° up at the chosen moment and
+        place: what they read at the left, a box per dispatch, and what each leaves for the next on its arrow, the halos
+        on their logarithmic curve. Dimmed, what does not run.
     </figcaption>
 </figure>
 

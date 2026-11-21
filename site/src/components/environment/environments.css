@@ -163,9 +163,9 @@
     right: 8px;
     bottom: 8px;
     max-width: calc(100% - 16px);
-    padding: 2px 6px;
+    padding: 3px 10px;
     overflow: hidden;
-    border-radius: var(--radius-group);
+    border-radius: var(--radius-button);
     background: var(--overlay-surface);
     color: var(--overlay-ink);
     font-size: var(--text-small);

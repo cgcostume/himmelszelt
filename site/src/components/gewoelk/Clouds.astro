@@ -3,6 +3,7 @@ import "../sternzeit/sternzeit.css";
 import "../dunstkreis/dunstkreis.css";
 import "./clouds.css";
 import Choice from "../dunstkreis/Choice.astro";
+import Hdr from "../dunstkreis/Hdr.astro";
 import OptionGroup from "../dunstkreis/OptionGroup.astro";
 import SkyFrame from "../dunstkreis/SkyFrame.astro";
 import Try from "../Try.astro";
@@ -324,7 +325,7 @@ const LAB: LabSlider[] = [
 ];
 ---
 
-<figure class="scene-frame wide" id={id} data-clouds data-lab={lab ? "" : undefined}>
+<figure class="fig scene-frame wide" id={id} data-clouds data-lab={lab ? "" : undefined}>
     <SkyFrame png fly ownHeight grid={false} locked={false} hint="Drag to look around, scroll to zoom. Rendered with WebGPU, the clouds after Nubis3.">
         <canvas data-field="canvas" aria-label="Clouds over the sky at the chosen moment and place"></canvas>
         <div class="cloud-textures" data-field="textures"></div>
@@ -377,6 +378,9 @@ const LAB: LabSlider[] = [
                 <Choice figure={id} {...AIR} />
                 <button type="button" class="view-toggle" data-field="textures.on" aria-pressed="true" title="The textures the figure renders from, down the left of the view: hover one for what it is for">textures</button>
                 <button type="button" class="view-toggle" data-field="ground.grid" aria-pressed="true" title="A grid on the ground, for orientation, speed and height: thin lines every 10 km, 1 km, 100 m and on down to 1 mm, each level showing once its cells are a few pixels across">grid</button>
+            </OptionGroup>
+            <OptionGroup name="HDR (× SDR white)">
+                <Hdr figure={id} />
             </OptionGroup>
         </Fragment>
     </SkyFrame>

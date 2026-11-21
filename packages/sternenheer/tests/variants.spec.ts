@@ -126,7 +126,7 @@ test("the compact and the full catalog draw the same stars on the GPU, five cent
 test("the compact Hipparcos stars draw as the full ones on the GPU, and the brightest so many as deep", async () => {
     const device = await gpuDevice();
     test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
-    test.skip(!existsSync(fileURLToPath(HIPPARCOS.compact)), "no Hipparcos stars: pnpm hipparcos makes them");
+    test.skip(!existsSync(fileURLToPath(HIPPARCOS.compact)), "no Hipparcos stars: pnpm data:hipparcos makes them");
     if (!device) return;
     const catalog = await loadCatalog();
     const faint: [PackedStars, PackedStars] = [await loadFaintStars("full"), await loadFaintStars("compact")];
@@ -168,7 +168,7 @@ test("the compact Hipparcos stars draw as the full ones on the GPU, and the brig
 test("the compact Tycho-2 stars light the target as the full ones do", async () => {
     const device = await gpuDevice();
     test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
-    test.skip(!existsSync(fileURLToPath(TYCHO.compact)), "no Tycho-2 stars: pnpm tycho makes them");
+    test.skip(!existsSync(fileURLToPath(TYCHO.compact)), "no Tycho-2 stars: pnpm data:tycho makes them");
     if (!device) return;
     const catalog = await loadCatalog();
     const deep = [await loadDeepStars("full"), await loadDeepStars("compact")];

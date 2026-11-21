@@ -1,5 +1,4 @@
 ---
-import "../sternzeit/sternzeit.css";
 import "../environment/environments.css";
 import "./helldunkel.css";
 
@@ -14,10 +13,10 @@ const STRIPS = [
 const GRADIENTS = ["dark", "dusk"];
 ---
 
-<figure class="scene-frame" id="banding">
-    <div class="banding-view as-seen">
+<figure class="fig scene-frame" id="banding">
+    <div class="banding-view as-seen" data-actions="png copy" data-export-timeless>
         <canvas data-field="canvas" aria-label="One gradient in five strips, from no noise to blue noise"></canvas>
-        <ol class="banding-names">{STRIPS.map((name) => <li><span class="note">{name}</span></li>)}</ol>
+        <ol class="banding-names">{STRIPS.map((name) => <li><span class="note overlay-label">{name}</span></li>)}</ol>
     </div>
     <p class="hdri-controls">
         <span class="steps" role="radiogroup" aria-label="Gradient">
@@ -50,7 +49,9 @@ const GRADIENTS = ["dark", "dusk"];
         <output data-field="reading"></output>
     </label>
     <figcaption class="figure-caption">
-        One smooth gradient from edge to edge, sRGB encoded, written with as many bits per channel as chosen. On top it is rounded to the nearest step. Below, Bayer's fixed pattern or noise from one of three sources is added first, the three of the same triangular distribution, at the chosen strength. The dark gradient is magnified by default, as 8 bits hide their steps from most screens until a gradient is this slow.
+        One smooth gradient, sRGB encoded, with the chosen bits per channel: on top rounded to the nearest step, below with
+        Bayer's pattern or one of three noises of the same triangular distribution added first. The dark gradient is
+        magnified by default, as 8 bits hide their steps from most screens until a gradient is this slow.
     </figcaption>
 </figure>
 

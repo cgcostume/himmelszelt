@@ -1,6 +1,5 @@
 ---
-import "../sternzeit/sternzeit.css";
-import "../nachtgestirn/nachtgestirn.css";
+import "../costs.css";
 import "./budget.css";
 import reference from "./budget-reference.json";
 import {
@@ -116,7 +115,7 @@ const axes = Object.entries(AXES)
     .join("; ");
 ---
 
-<figure class="budget-figure stars-budget wide" id={id} data-stars-budget>
+<figure class="fig budget-figure stars-budget wide" id={id} data-stars-budget data-actions="copy">
     <div class="budget-legend note" aria-hidden="true">
         <span><i class="budget-swatch budget-part-0"></i>stars</span>
         <span><i class="budget-swatch budget-part-3"></i>constellations</span>

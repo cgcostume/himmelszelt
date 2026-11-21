@@ -79,11 +79,22 @@ export const quality = {
 
 const events = new EventTarget();
 
+// The headroom is the viewer's, remembered across pages and visits; 4 until one is chosen, which an HDR display shows.
+const HEADROOM_KEY = "himmelszelt-headroom";
+const HEADROOMS = [1, 2, 4, 8];
+function storedHeadroom() {
+    try {
+        const stored = Number(localStorage.getItem(HEADROOM_KEY));
+        if (HEADROOMS.includes(stored)) return stored;
+    } catch {}
+    return 4;
+}
+
 /**
  * How the page's figures show the sky on a display, shared by all: the tone curve, "neutral", "agx", "aces" or "clip",
  * and the headroom chosen for an HDR display, how many times SDR white it may show.
  */
-export const display = { toneCurve: "neutral" as ToneCurve, headroom: 4 };
+export const display = { toneCurve: "neutral" as ToneCurve, headroom: storedHeadroom() };
 export const onDisplay = (listener: (current: typeof display) => void) =>
     events.addEventListener("display", () => listener(display));
 
@@ -94,10 +105,13 @@ export const HDR: GPUTextureFormat = "rgba16float";
 export const hdrDisplay = window.matchMedia("(dynamic-range: high)");
 hdrDisplay.addEventListener("change", () => events.dispatchEvent(new Event("display")));
 
-/** Configures a figure's canvas for `format`, extended tone mapping for HDR, to be written by a compute pass. */
-export function configureCanvas(context: GPUCanvasContext, format: GPUTextureFormat) {
+/** Configures a figure's canvas for `format`, extended tone mapping for HDR, by default to be written by a compute pass. */
+export function configureCanvas(
+    context: GPUCanvasContext,
+    format: GPUTextureFormat,
+    usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.STORAGE_BINDING,
+) {
     const toneMapping: GPUCanvasToneMapping = { mode: format === HDR ? "extended" : "standard" };
-    const usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.STORAGE_BINDING;
     context.configure({ device: gpuDevice(), format, alphaMode: "opaque", usage, toneMapping });
 }
 
@@ -115,9 +129,12 @@ function canvasExtended() {
     return extended === true;
 }
 
-/** The format and headroom to render with: HDR where both the display and the canvas can, and a headroom is chosen. */
-export function displayOutput() {
-    const hdr = canvasExtended() && hdrDisplay.matches && display.headroom > 1;
+/**
+ * The format and headroom to render with: HDR where both the display and the canvas can, and a headroom is chosen. A
+ * figure that stays SDR whatever the page chose, one compared with photographs, passes `allowed` false.
+ */
+export function displayOutput(allowed = true) {
+    const hdr = allowed && canvasExtended() && hdrDisplay.matches && display.headroom > 1;
     return { format: hdr ? HDR : SDR, headroom: hdr ? display.headroom : 1 };
 }
 
@@ -152,6 +169,9 @@ export function bindHdr(note: HTMLElement, choice: Element) {
     for (const input of choice.querySelectorAll("input")) {
         input.addEventListener("change", () => {
             display.headroom = Number(input.value);
+            try {
+                localStorage.setItem(HEADROOM_KEY, input.value);
+            } catch {}
             events.dispatchEvent(new Event("display"));
         });
     }
@@ -261,7 +281,8 @@ export const environment: {
     size: 512,
     irradianceSize: 32,
     cubify: false,
-    scaled: false,
+    // Scaled by default: in rgba16float, cd/m² fall below its normal values in deep twilight and posterize, then vanish.
+    scaled: true,
     scale: 1,
     cube: null,
     ibl: null,

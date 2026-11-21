@@ -39,7 +39,7 @@
         "build": "rolldown -c rolldown.config.ts",
         "typecheck": "tsc --noEmit",
         "test": "playwright test",
-        "generate:deltat": "node scripts/deltat-from-iers.mjs"
+        "data:deltat": "node scripts/deltat-from-iers.mjs"
     },
     "devDependencies": {
         "@playwright/test": "^1.62.1",

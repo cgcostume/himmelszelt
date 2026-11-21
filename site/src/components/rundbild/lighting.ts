@@ -27,6 +27,7 @@ import { onDemand } from "../frame";
 import { createDisplay } from "../scene/display";
 import { cameraFrame, createScene } from "../scene/scene";
 import { COMPASS } from "../sternzeit/figure";
+import { skyWhite } from "../white";
 
 const DEG = Math.PI / 180;
 const root = find("#lighting");
@@ -116,6 +117,8 @@ function readySkyPass(luts: AtmosphereLUTs) {
         groundLight: quality.groundLight,
         sunDisc: pressed("sunDisc") && !bloomChosen(),
         aureole: pressed("aureole") ? DEFAULT_AUREOLE : (false as const),
+        // The scene lays the veil itself, over its solids too and behind what hides the Sun.
+        veil: 0,
     };
     const same = (other: object | null) =>
         other !== null &&
@@ -284,6 +287,7 @@ function render() {
         toneCurve: display.toneCurve,
         headroom,
         seconds,
+        whiteBalance: skyWhite(sky.sunDirection),
     });
     if (targets && bloomPass) {
         bloomPass.encode(encoder, targets[0], targets[1], strength);

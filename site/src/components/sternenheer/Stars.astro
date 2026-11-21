@@ -1,9 +1,9 @@
 ---
-import "../sternzeit/sternzeit.css";
 import "../dunstkreis/dunstkreis.css";
 import { CONSTELLATIONS } from "@himmelszelt/sternenheer";
 import Choice from "../dunstkreis/Choice.astro";
 import Hdr from "../dunstkreis/Hdr.astro";
+import Lens from "../dunstkreis/Lens.astro";
 import OptionGroup from "../dunstkreis/OptionGroup.astro";
 import SkyFrame from "../dunstkreis/SkyFrame.astro";
 import Try from "../Try.astro";
@@ -22,7 +22,7 @@ interface Props {
 }
 const {
     id = "stars",
-    caption = "The stars at the chosen moment and place over dunstkreis' sky, with nachtgestirn's Moon: every star of the Yale Bright Star Catalogue, and of Hipparcos and Tycho-2 as the buttons pick, at its light in lux, a point that brightens as you zoom in, the Milky Way from NASA's Deep Star Maps behind them, all lifted, dimmed and reddened by the air near the horizon. The compass directions on the horizon; the grid adds altitude lines every 10°, lines up from the compass directions to 80° high, and the Sun's symbol where it truly is, unbent by the air. Drag to look around, scroll to zoom.",
+    caption = "The stars at the chosen moment and place over dunstkreis' sky, under nachtgestirn's Moon: the catalogs the buttons pick, each star at its light in lux, and NASA's Milky Way, all seen through the air.",
     try: experiment,
 } = Astro.props;
 
@@ -51,7 +51,7 @@ const TONE = {
 };
 ---
 
-<figure class="scene-frame wide" id={id} data-stars>
+<figure class="fig scene-frame wide" id={id} data-stars>
     <SkyFrame png fly ownHeight marks={1} locked={false} lockIcon="moonLock" lockTitle="Keep the view on the Moon; dragging lets go" hint="Drag to look around, scroll to zoom. Rendered with WebGPU, the stars and the Moon over dunstkreis' sky.">
         <canvas data-field="canvas" aria-label="The stars at the chosen moment and place"></canvas>
         <div class="sky-compass" data-field="compassLabels"></div>
@@ -83,6 +83,7 @@ const TONE = {
                 <button type="button" class="view-toggle" data-field="glare" aria-pressed="true" title="The halo around a bright star: the light its core cannot show, spread around it, falling with the cube of the distance, wider the brighter the star">glare</button>
                 <button type="button" class="view-toggle" data-field="eye" aria-pressed="true" title="As the dark-adapted eye sees the night rather than a camera: below some 4 cd/m² the rods take over from the cones, colors fade and what is left shifts towards blue">eye at night</button>
             </OptionGroup>
+            <Lens />
             <OptionGroup name="HDR (× SDR white)">
                 <Hdr figure={id} />
             </OptionGroup>

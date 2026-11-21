@@ -45,8 +45,9 @@ import { gpu, onTables, quality, tables } from "../dunstkreis/atmosphere";
 import { cameraBasis } from "../dunstkreis/skycamera";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
-import { drawSvg, svgText } from "../sternzeit/figure";
+import { drawSvg } from "../sternzeit/figure";
 import { onChange, state } from "../sternzeit/state";
+import { type GraphState, graphSvg, type Thumb } from "./passes-graph";
 import { deepStarsOnce, inverseViewProjection, skyAt } from "./renderer";
 import { bindStarGroups, picked } from "./stargroups";
 
@@ -54,10 +55,8 @@ import { bindStarGroups, picked } from "./stargroups";
 const [WIDTH, HEIGHT] = [960, 540];
 const VIEW = { yaw: Math.PI, pitch: (35 * Math.PI) / 180, fov: (120 * Math.PI) / 180 };
 const EV100 = -9;
-const FRAMES = 64;
 // The halos' logarithmic curve, SH_HALO_KNEE in the pass' params.wgsl.
 const HALO_KNEE = 0.25;
-const PASSES = ["sky", "lines", "bin", "deep", "halo", "compose", "moon"] as const;
 // The sky pass writes cd/m² when its exposure is 1: EV100 of -log2(1.2).
 const UNIT_EV100 = -Math.log2(1.2);
 
@@ -67,12 +66,34 @@ const encode = (v: number) => {
 };
 const thousands = (n: number) => n.toLocaleString("en-US");
 
-/** The passes figure on `root`: a frame of the stars pass made with `debug`, what it leaves between its passes. */
+/** The passes figure on `root`: a frame of the stars pass made with `debug` as a graph, what it leaves between its
+ *  passes on the arrows. */
 export function passesFigure(root: HTMLElement) {
     const field = <T extends Element = HTMLElement>(name: string) => find<T>(`[data-field="${name}"]`, root);
     const canvases = Object.fromEntries(
-        ["tiles", "lines", "points", "spread", "image"].map((name) => [name, field<HTMLCanvasElement>(name)]),
-    );
+        (["tiles", "lines", "points", "spread", "image"] as const).map((name) => [
+            name,
+            field<HTMLCanvasElement>(name),
+        ]),
+    ) as Record<Thumb, HTMLCanvasElement>;
+    const graph = field<SVGSVGElement>("graph");
+    const shown: GraphState = { deep: false, sky: true, moon: true, notes: {}, stars: "", milkyWay: "" };
+    // The graph laid out for the figure's width, the thumbnails placed where it leaves room for them.
+    function drawGraph() {
+        const width = graph.parentElement?.clientWidth || 960;
+        const { svg, height, thumbs } = graphSvg(width, shown);
+        graph.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        graph.style.height = `${height}px`;
+        drawSvg(graph, svg, 1);
+        for (const [name, r] of Object.entries(thumbs) as [Thumb, { x: number; y: number; w: number; h: number }][])
+            Object.assign(canvases[name].style, {
+                left: `${r.x}px`,
+                top: `${r.y}px`,
+                width: `${r.w}px`,
+                height: `${r.h}px`,
+            });
+    }
+    new ResizeObserver(drawGraph).observe(root);
     const sliders = { tileSize: field<HTMLInputElement>("tileSize"), capacity: field<HTMLInputElement>("capacity") };
     const status = field("status");
     const pressed = (name: string) => field(name).getAttribute("aria-pressed") === "true";
@@ -99,41 +120,6 @@ export function passesFigure(root: HTMLElement) {
         "rgba32float",
         GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
     );
-    // The sky's pass and the Moon's timed on the GPU's clock, the sky's by an encoder that adds the timestamps to it.
-    const clock = device.features.has("timestamp-query")
-        ? {
-              queries: device.createQuerySet({ type: "timestamp", count: 4 }),
-              resolved: device.createBuffer({
-                  size: 32,
-                  usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
-              }),
-          }
-        : null;
-    const writes = (at: number) =>
-        clock ? { querySet: clock.queries, beginningOfPassWriteIndex: at, endOfPassWriteIndex: at + 1 } : undefined;
-    const timedEncoder = (encoder: GPUCommandEncoder, at: number) =>
-        new Proxy(encoder, {
-            get(real, key) {
-                if (key === "beginComputePass")
-                    return (descriptor: GPUComputePassDescriptor = {}) =>
-                        real.beginComputePass({ ...descriptor, timestampWrites: writes(at) });
-                const value = Reflect.get(real, key);
-                return typeof value === "function" ? value.bind(real) : value;
-            },
-        });
-    async function bracketed(ran: { sky: boolean; moon: boolean }) {
-        if (!clock || !device) return {};
-        const buffer = device.createBuffer({ size: 32, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-        const encoder = device.createCommandEncoder();
-        encoder.copyBufferToBuffer(clock.resolved, 0, buffer, 0, 32);
-        device.queue.submit([encoder.finish()]);
-        await buffer.mapAsync(GPUMapMode.READ);
-        const ns = new BigInt64Array(buffer.getMappedRange().slice(0));
-        buffer.unmap();
-        buffer.destroy();
-        const ms = (i: number) => Number((ns[i + 1] ?? 0n) - (ns[i] ?? 0n)) / 1e6;
-        return { ...(ran.sky ? { sky: ms(0) } : {}), ...(ran.moon ? { moon: ms(2) } : {}) };
-    }
     const air = (() => {
         let made: { key: string; texture: GPUTexture; horizon: number; table: ReturnType<typeof airTable> } | null =
             null;
@@ -159,6 +145,7 @@ export function passesFigure(root: HTMLElement) {
         loadMilkyWay(device, MILKY_WAY_MAPS.small),
     ]).then(([catalog, faint, lines, milkyWay]) => {
         data = { catalog, faint, lines, milkyWay };
+        shown.milkyWay = `${milkyWay.texture.width} by ${milkyWay.texture.height} texels`;
         request();
     });
     let meter: MeterPass | null = null;
@@ -329,40 +316,23 @@ export function passesFigure(root: HTMLElement) {
                 refraction: airOn ? refractionTable(s.moonDirection, s.moonAngularDiameter, s.bend, s.through) : null,
                 distanceKm: s.distanceKm - model.planet.groundRadiusKm * s.moonDirection[2],
             });
-            // The frames timed, then the last one read back.
-            const sums: Record<string, number> = {};
-            let timed = 0;
-            for (let frame = 0; frame < FRAMES; frame++) {
-                const encoder = device.createCommandEncoder({ label: "sternwarte:passes" });
-                skyPass?.encode(clock ? timedEncoder(encoder, 0) : encoder, background);
-                p.encode(encoder, moonPass ? composed : target, skyPass ? { background } : {});
-                const timestampWrites = writes(2);
-                moonPass?.encode(encoder, target, {
-                    background: composed,
-                    ...(timestampWrites ? { timestampWrites } : {}),
-                });
-                if (clock) encoder.resolveQuerySet(clock.queries, 0, 4, clock.resolved, 0);
-                device.queue.submit([encoder.finish()]);
-                const times = await p.timings();
-                if (!times) break;
-                timed++;
-                const around = await bracketed({ sky: Boolean(skyPass), moon: Boolean(moonPass) });
-                for (const [name, ms] of Object.entries({ ...times, ...around })) sums[name] = (sums[name] ?? 0) + ms;
-            }
+            const encoder = device.createCommandEncoder({ label: "sternwarte:passes" });
+            skyPass?.encode(encoder, background);
+            p.encode(encoder, moonPass ? composed : target, skyPass ? { background } : {});
+            moonPass?.encode(encoder, target, { background: composed });
+            device.queue.submit([encoder.finish()]);
             const inspection = await p.inspect();
             const image = await readTarget();
-            show(
-                inspection,
-                image,
-                timed ? Object.fromEntries(Object.entries(sums).map(([k, v]) => [k, v / timed])) : null,
-                ev100,
-            );
+            Object.assign(shown, { deep: picked(root, "catalog") === "tycho" && Boolean(deep) && deep !== "loading" });
+            Object.assign(shown, { sky: Boolean(skyPass), moon: Boolean(moonPass) });
+            show(inspection, image, ev100);
         } finally {
             busy = false;
-        }
-        if (again) {
-            again = false;
-            draw();
+            // A request that came while this frame waited, also after an early return for what had not loaded yet.
+            if (again) {
+                again = false;
+                draw();
+            }
         }
     }
 
@@ -434,63 +404,30 @@ export function passesFigure(root: HTMLElement) {
         paint(canvas, w, h, rgba);
     }
 
-    function show(inspection: StarsInspection, image: Uint8Array, ms: Record<string, number> | null, ev100: number) {
+    function show(inspection: StarsInspection, image: Uint8Array, ev100: number) {
         const t = inspection.tiles;
         const full = Array.from(t.stars).filter((n) => n > t.capacity).length;
-        const fullest = Math.max(...t.stars);
-        tiles(canvases.tiles as HTMLCanvasElement, t, t.stars, t.capacity);
-        field("tilesNote").textContent =
-            `: ${thousands(t.columns * t.rows)} tiles of ${t.size} pixels, ${thousands(full)} full, the fullest ${thousands(fullest)} stars`;
+        tiles(canvases.tiles, t, t.stars, t.capacity);
         const lineTiles = Array.from(t.lines).filter((n) => n > 0).length;
-        tiles(canvases.lines as HTMLCanvasElement, t, t.lines, t.lineCapacity);
-        field("linesNote").textContent = `: ${thousands(lineTiles)} tiles crossed`;
+        tiles(canvases.lines, t, t.lines, t.lineCapacity);
+        const notes: GraphState["notes"] = {
+            tiles: `${t.capacity} stars a tile, ${thousands(full)} of ${thousands(t.columns * t.rows)} full`,
+            lines: `${thousands(lineTiles)} tiles crossed`,
+            image: `${thousands(inspection.stars.drawn)} stars drawn, EV100 ${ev100 < 0 ? "−" : ""}${Math.abs(ev100).toFixed(1)}`,
+        };
         const halo = inspection.halo;
         const finest = halo?.levels[0];
         if (halo && finest) {
             const margin = halo.margin / halo.scale;
-            light(canvases.points as HTMLCanvasElement, finest, "own", margin);
-            light(canvases.spread as HTMLCanvasElement, finest, "sum", margin);
-            field("pointsNote").textContent =
-                `: ${thousands(inspection.stars.halos)} stars, ${finest.width} by ${finest.height} texels with the margin`;
-            const shares = halo.weights.map((w) => `${(w * 100).toFixed(w < 0.095 ? 1 : 0)}%`).join(", ");
-            field("spreadNote").textContent = `: ${halo.levels.length} levels, their shares ${shares}`;
+            light(canvases.points, finest, "own", margin);
+            light(canvases.spread, finest, "sum", margin);
+            notes.points = `half size, ${thousands(inspection.stars.halos)} stars`;
+            notes.spread = `${halo.levels.length} levels added up`;
         }
-        paint(canvases.image as HTMLCanvasElement, WIDTH, HEIGHT, new Uint8ClampedArray(image.buffer as ArrayBuffer));
-        field("imageNote").textContent =
-            `: ${thousands(inspection.stars.drawn)} of ${thousands(inspection.stars.count)} stars drawn, at EV100 ${ev100 < 0 ? "−" : ""}${Math.abs(ev100).toFixed(1)}`;
-        times(ms);
+        paint(canvases.image, WIDTH, HEIGHT, new Uint8ClampedArray(image.buffer as ArrayBuffer));
+        Object.assign(shown, { notes, stars: `${thousands(inspection.stars.count)} stars` });
+        drawGraph();
         if (deep !== "loading") status.textContent = "";
-    }
-
-    function times(ms: Record<string, number> | null) {
-        const svg = field<SVGSVGElement>("times");
-        if (!ms) {
-            field("timesNote").textContent = ": this browser hands out no GPU clock";
-            drawSvg(svg, "", 1);
-            return;
-        }
-        const width = svg.clientWidth || 320;
-        const rows = PASSES.filter((name) => ms[name] !== undefined);
-        const [left, row, right] = [64, 24, 70];
-        const height = rows.length * row + 8;
-        const most = Math.max(...rows.map((name) => ms[name] ?? 0), 1e-3);
-        svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-        let out = "";
-        rows.forEach((name, i) => {
-            const y = 4 + i * row;
-            const w = ((ms[name] ?? 0) / most) * (width - left - right);
-            out += svgText(left - 6, y + row / 2, name, "figure-label figure-anchor-end");
-            out += `<rect x="${left}" y="${y + 5}" width="${Math.max(w, 1).toFixed(1)}" height="${row - 10}" class="passes-bar"/>`;
-            out += svgText(
-                left + w + 6,
-                y + row / 2,
-                `${(ms[name] ?? 0).toFixed(3)} ms`,
-                "figure-label figure-anchor-start",
-            );
-        });
-        drawSvg(svg, out, 1);
-        const total = rows.reduce((sum, name) => sum + (ms[name] ?? 0), 0);
-        field("timesNote").textContent = `: ${total.toFixed(2)} ms together`;
     }
 
     const request = onDemand(() => {

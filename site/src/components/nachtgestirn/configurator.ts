@@ -6,6 +6,8 @@ import { figureInfo } from "../figure-info";
 import { onDemand } from "../frame";
 import { ownMoment } from "../sternzeit/lunation";
 import { onChange, state } from "../sternzeit/state";
+import reference from "./bench.json";
+import { type BenchResult, BUDGET_ROWS, frameKey, type Maps } from "./budget-rows";
 import { noGpu, orbited } from "./laws";
 import { type MoonAt, moonAt, type ToneCurveName } from "./renderer";
 import { saveFigure } from "./snapshot";
@@ -15,26 +17,31 @@ const DEG = Math.PI / 180;
 // The moment the figure opens at, a waxing crescent six days old, a third lit.
 const START = 2461353.79 + 6;
 
-type Maps = "512" | "1k" | "2k" | "4k" | "8k";
 type Technique = "shadows" | "soft" | "displace" | "rays" | "roughness" | "compress";
 interface Config {
     maps: Maps;
+    /** The whole maps, the far side too, in place of the seen ones. */
+    whole: boolean;
     on: Record<Technique, boolean>;
 }
 
 // Mebibytes, as Figure 17 counts them.
 const MiB = 2 ** 20;
 const WIDTHS: Record<Maps, number> = { "512": 512, "1k": 1024, "2k": 2048, "4k": 4096, "8k": 8192 };
-// The files' sizes in bytes: the package's whole maps, the site's 8K, and the roughness map each set of maps takes.
-const FILES: Record<Maps, number> = {
-    "512": 21_910 + 189_748,
-    "1k": 87_286 + 731_266,
-    "2k": 358_110 + 2_730_346,
-    "4k": 1_339_860 + 10_195_982,
-    "8k": 4_414_010 + 38_099_080,
+const measure = reference as BenchResult;
+// The files' sizes in bytes, the seen maps and the whole ones, as Figure 17 measured them, and the roughness map each
+// set of maps takes.
+const filesOf = (set: "seen" | "whole", maps: Maps) => {
+    const files = measure.loads[set][maps];
+    return files ? files.color + files.heights : 0;
 };
 const ROUGHNESS: Record<Maps, "1k" | "2k" | "4k"> = { "512": "1k", "1k": "1k", "2k": "2k", "4k": "4k", "8k": "4k" };
-const ROUGHNESS_FILES = { "1k": 736_380, "2k": 2_659_164, "4k": 8_026_860 };
+const ROUGHNESS_FILES = {
+    seen: { "1k": 513_340, "2k": 1_850_778, "4k": 5_544_714 },
+    whole: { "1k": 736_380, "2k": 2_659_164, "4k": 8_026_860 },
+};
+// The sets the package ships, seen; every other one it makes on request.
+const SHIPPED = ["512", "1k"];
 const ROUGHNESS_WIDTHS = { "1k": 1024, "2k": 2048, "4k": 4096 };
 // The shadow map's memory in MiB as Figure 17 measured it, by the disc's size, and its cap, 4,194,304 texels of 4 bytes.
 const SHADOW_MAP: [number, number][] = [
@@ -46,13 +53,12 @@ const SHADOW_MAP: [number, number][] = [
 ];
 const SHADOW_CAP = 16;
 // Figure 17's times on an AMD Radeon RX 7900 XT, ms a frame: the defaults and everything on, by the disc's size.
-const REFERENCE: [disc: number, defaults: number, everything: number][] = [
-    [162, 0.051, 0.068],
-    [325, 0.059, 0.122],
-    [651, 0.07, 0.201],
-    [1303, 0.311, 0.361],
-    [2607, 0.266, 0.356],
-];
+const msOf = (key: string) => measure.frameTimes[key]?.ms.median ?? 0;
+const REFERENCE: [disc: number, defaults: number, everything: number][] = BUDGET_ROWS.map(({ disc }) => [
+    disc,
+    msOf(frameKey(disc, "defaults")),
+    msOf(frameKey(disc, "everything")),
+]);
 // The view the benchmark draws into, a full HD screen.
 const BENCH = [1920, 1080] as const;
 // Frames to warm the GPU's clocks up, then frames timed: the mean of the middle 80 percent of 1,000 settles to a few
@@ -63,11 +69,12 @@ const MEASURED = 1000;
 const discOf = (slider: number) => Math.round(8 * 2 ** (slider / 100));
 
 /** What the package's own defaults and thresholds draw a disc `disc` pixels across with, the finest maps `finest`. */
-function recommend(disc: number, finest: Maps): Config {
+function recommend(disc: number, finest: Maps, whole = false): Config {
     const sizes = (Object.keys(WIDTHS) as Maps[]).filter((m) => WIDTHS[m] <= WIDTHS[finest]);
     const maps = sizes.find((m) => WIDTHS[m] >= Math.PI * disc) ?? finest;
     return {
         maps,
+        whole,
         on: {
             shadows: disc >= 128,
             soft: disc >= 128,
@@ -98,9 +105,10 @@ function costs(disc: number, config: Config) {
     const w = WIDTHS[config.maps];
     const texels = (w * w) / 2;
     const rough = ROUGHNESS[config.maps];
+    const set = config.whole ? "whole" : "seen";
     const color = (texels * 4 * 4) / 3 / MiB;
     return {
-        download: (FILES[config.maps] + (config.on.roughness ? ROUGHNESS_FILES[rough] : 0)) / MiB,
+        download: (filesOf(set, config.maps) + (config.on.roughness ? ROUGHNESS_FILES[set][rough] : 0)) / MiB,
         memory: {
             color: config.on.compress ? color / 8 : color,
             relief: (texels * 8 * 4) / 3 / MiB,
@@ -118,27 +126,31 @@ function snippet(disc: number, config: Config) {
     if (!config.on.soft) options.push("softShadowsFrom: Infinity");
     if (config.on.displace !== disc >= 1024) options.push(`displacementFrom: ${config.on.displace ? 0 : "Infinity"}`);
     const names = ["createMoonPass", "loadMoonMaps", ...(config.on.roughness ? ["loadMoonRoughness"] : [])];
+    const suffix = config.whole ? "_WHOLE" : "";
     names.push(
-        ...(config.maps === "8k" ? [] : ["MOON_MAPS_WHOLE"]),
-        ...(config.on.roughness ? ["MOON_ROUGHNESS_WHOLE"] : []),
+        ...(config.maps === "8k" ? [] : [`MOON_MAPS${suffix}`]),
+        ...(config.on.roughness ? [`MOON_ROUGHNESS${suffix}`] : []),
     );
+    const seen = config.whole ? "" : "seen-";
     const files =
         config.maps === "8k"
-            ? '{ color: "moon-color-8k.webp", heights: "moon-height-8k.webp", width: 8192 }'
-            : `MOON_MAPS_WHOLE["${config.maps}"]`;
+            ? `{ color: "moon-color-${seen}8k.webp", heights: "moon-height-${seen}8k.webp", width: 8192 }`
+            : `MOON_MAPS${suffix}["${config.maps}"]`;
     const rough = ROUGHNESS[config.maps];
-    const sizes = [...new Set([config.maps, ...(config.on.roughness ? [rough] : [])])].join(",");
-    const build = `npx @himmelszelt/nachtgestirn data maps${config.on.roughness ? " roughness" : ""} --whole --size ${sizes}`;
+    const sizes = [...new Set([config.maps, ...(config.on.roughness ? [rough] : [])])];
+    const made = config.whole ? sizes : sizes.filter((size) => !SHIPPED.includes(size));
+    const build = `npx @himmelszelt/nachtgestirn data maps${config.on.roughness ? " roughness" : ""}${config.whole ? " --whole" : ""} --size ${made.join(",")}`;
+    const set = config.whole ? "The whole maps" : "The seen maps";
     const lines = [
         `import { ${names.join(", ")} } from "@himmelszelt/nachtgestirn";`,
         "",
-        `// A disc ${disc} px across. ${config.maps === "8k" ? "The 8K maps, yours to host." : `The whole maps: ${build}.`}`,
+        `// A disc ${disc} px across. ${config.maps === "8k" ? "The 8K maps, yours to host." : made.length ? `${set}: ${build}.` : `${set}, shipped.`}`,
         `const maps = await loadMoonMaps(device, ${files}${config.on.compress ? ", { compress: true }" : ""});`,
         `const pass = await createMoonPass(device, { ${options.join(", ")} });`,
     ];
     if (config.on.roughness) {
         lines.push(
-            `const roughness = await loadMoonRoughness(device, MOON_ROUGHNESS_WHOLE["${rough}"]);`,
+            `const roughness = await loadMoonRoughness(device, MOON_ROUGHNESS${suffix}["${rough}"]);`,
             "pass.setRoughness(roughness);",
             "pass.update({ roughness: true });",
         );
@@ -156,6 +168,7 @@ export function configuratorFigure(root: HTMLElement) {
     let level = 635;
     const discValue = find("[data-field=discValue]", root);
     const mapButtons = [...root.querySelectorAll<HTMLButtonElement>("[data-maps]")];
+    const setButtons = [...root.querySelectorAll<HTMLButtonElement>("[data-set]")];
     const techButtons = [...root.querySelectorAll<HTMLButtonElement>("[data-tech]")];
     const code = find("[data-field=code]", root);
     let shownCode = "";
@@ -178,6 +191,8 @@ export function configuratorFigure(root: HTMLElement) {
             b.setAttribute("aria-pressed", String(b.dataset.maps === config.maps));
             b.toggleAttribute("data-recommended", b.dataset.maps === recommended.maps);
         }
+        for (const b of setButtons)
+            b.setAttribute("aria-pressed", String((b.dataset.set === "whole") === config.whole));
         for (const b of techButtons) {
             const t = b.dataset.tech as Technique;
             b.setAttribute("aria-pressed", String(config.on[t]));
@@ -238,6 +253,7 @@ export function configuratorFigure(root: HTMLElement) {
             luts: tables()?.luts as NonNullable<ReturnType<typeof tables>>["luts"],
             toneMap: display.toneCurve as ToneCurveName,
             maps: config.maps,
+            seen: !config.whole,
             ev100: moonEV100(m.phaseAngle, m.lit),
             albedo: true,
             relief: true,
@@ -277,6 +293,13 @@ export function configuratorFigure(root: HTMLElement) {
         view.x = Math.max(-(w * 0.35 + 1), Math.min(w * 0.35 + 1, view.x));
         view.y = Math.max(-(h * 0.35 + 1), Math.min(h * 0.35 + 1, view.y));
     };
+    // The lock, pressed while the Moon shows the face Earth sees, as in Figure 1: a press turns it back, turning lets go.
+    const lock = find("[data-field=lock]", root);
+    lock.addEventListener("click", () => {
+        Object.assign(view, { yaw: 0, pitch: 0 });
+        lock.setAttribute("aria-pressed", "true");
+        requestRender();
+    });
     let dragging: { x: number; y: number } | null = null;
     canvas.addEventListener("pointerdown", (event) => {
         if (event.button !== 0) return;
@@ -294,8 +317,15 @@ export function configuratorFigure(root: HTMLElement) {
             view.y += (event.clientY - dragging.y) * perPx;
             keepInView();
         } else {
-            view.yaw += (event.clientX - dragging.x) * perPx;
-            view.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, view.pitch + (event.clientY - dragging.y) * perPx));
+            // Turned as if the disc filled the view at least, so a small one turns no faster than a large one.
+            const turnPx = Math.min(
+                perPx,
+                2 / Math.min(canvas.clientWidth || 1, canvas.clientHeight || canvas.clientWidth || 1),
+            );
+            if (event.clientX !== dragging.x || event.clientY !== dragging.y)
+                lock.setAttribute("aria-pressed", "false");
+            view.yaw += (event.clientX - dragging.x) * turnPx;
+            view.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, view.pitch + (event.clientY - dragging.y) * turnPx));
         }
         dragging = { x: event.clientX, y: event.clientY };
         requestRender();
@@ -326,6 +356,7 @@ export function configuratorFigure(root: HTMLElement) {
     );
     canvas.addEventListener("dblclick", () => {
         Object.assign(view, { yaw: 0, pitch: 0, x: 0, y: 0 });
+        lock.setAttribute("aria-pressed", "true");
         requestRender();
     });
     function render() {
@@ -371,12 +402,17 @@ export function configuratorFigure(root: HTMLElement) {
 
     function sized() {
         disc = discOf(level);
-        config = recommend(disc, finest);
+        config = recommend(disc, finest, config.whole);
         show();
     }
     for (const b of mapButtons)
         b.addEventListener("click", () => {
             config = { ...config, maps: b.dataset.maps as Maps };
+            show();
+        });
+    for (const b of setButtons)
+        b.addEventListener("click", () => {
+            config = { ...config, whole: b.dataset.set === "whole" };
             show();
         });
     for (const b of techButtons)
@@ -386,7 +422,7 @@ export function configuratorFigure(root: HTMLElement) {
             show();
         });
     find("[data-field=recommended]", root).addEventListener("click", () => {
-        config = recommend(disc, finest);
+        config = recommend(disc, finest, config.whole);
         show();
     });
     find("[data-field=copyCode]", root).addEventListener("click", async (event) => {

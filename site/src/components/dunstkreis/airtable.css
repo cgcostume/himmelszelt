@@ -1,0 +1,85 @@
+/* The air table figure: the texels as wide as the figure, the Moon and its limb under it in flicker.css's panels. */
+.air-table-export {
+    position: relative;
+}
+.air-table-texels {
+    margin-bottom: 1rem;
+}
+.air-table-texels > svg {
+    display: block;
+    width: 100%;
+    overflow: visible;
+    touch-action: pan-y;
+}
+.air-table-image {
+    image-rendering: pixelated;
+}
+.air-table-r {
+    fill: oklch(0.62 0.19 25);
+}
+.air-table-g {
+    fill: oklch(0.62 0.14 145);
+}
+.air-table-b {
+    fill: oklch(0.6 0.16 255);
+}
+.air-table-row {
+    fill: var(--text);
+}
+.air-table-tick {
+    stroke: var(--muted);
+    stroke-width: 1;
+}
+.air-table-mark {
+    stroke: var(--accent);
+    stroke-width: 2;
+}
+.air-table-hover {
+    stroke: oklch(1 0 0 / 0.7);
+    stroke-width: 1;
+}
+/* Words inside the dark stripes, in the render's ink. */
+.air-table-inside {
+    fill: var(--render-ink);
+    font-size: 11px;
+    text-anchor: end;
+    dominant-baseline: middle;
+    opacity: 0.7;
+}
+.air-table-inside-start {
+    text-anchor: start;
+}
+/* The three images add up on black, as light does. */
+.air-table-light {
+    isolation: isolate;
+}
+.air-table-channel {
+    mix-blend-mode: screen;
+}
+.air-table-ground {
+    fill: var(--surface);
+}
+.air-table-true {
+    fill: none;
+    stroke: var(--render-ink);
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
+    opacity: 0.6;
+}
+.air-table-box {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1;
+}
+.air-table-bar {
+    stroke: var(--render-ink);
+    stroke-width: 2;
+}
+.air-table .as-seen .figure-label {
+    fill: var(--render-ink);
+    opacity: 0.75;
+}
+.air-table-render-tick {
+    stroke: var(--render-ink);
+    opacity: 0.5;
+}

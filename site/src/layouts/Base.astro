@@ -3,6 +3,7 @@ import { getCollection } from "astro:content";
 import Cyanometer from "../components/Cyanometer.astro";
 import { CYANOMETER_STEPS, DEFAULT_STEPS, LIGHT_FROM_STEP, STORAGE_KEY, stepColor } from "../lib/cyanometer";
 import "../styles/global.css";
+import "../components/figure.css";
 import "../styles/icons.css";
 import Icon from "../components/Icon.astro";
 
@@ -103,6 +104,9 @@ const colors = Array.from({ length: CYANOMETER_STEPS }, (_, step) => stepColor(s
             // A copy button on every code block, the chapters' own and those a figure builds later: wrapped, so the button
             // stays in the corner while the block scrolls sideways under it.
             import { icon } from "../components/icons";
+
+            // Every figure's download, Copy and full screen at its top right (see figure-actions.ts).
+            if (document.querySelector("[data-actions], [data-export]")) import("../components/figure-actions");
 
             const addCopy = (pre: HTMLPreElement) => {
                 if (pre.parentElement?.classList.contains("code-block")) return;

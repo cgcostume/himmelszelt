@@ -252,7 +252,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
     const sunlight = uniform("gewoelk:sunlight", SUNLIGHT_SIZE);
     const coverage = device.createBuffer({
         label: "gewoelk:coverage",
-        size: 4 * grid.layers,
+        size: 8 * grid.layers,
         usage: GPUBufferUsage.STORAGE,
     });
     // What the deck lets through to the ground on average, the sun's light and the sky's; all of it until measured.
@@ -658,7 +658,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
     };
 
     // What the cloudscape's map, its volume, its light and its ambient light each depend on: a change of the key is a
-    // rebuild of that part. The ambient grid depends on the density too, which the light grid leaves out.
+    // rebuild of that part. Both grids depend on the density too: far clouds shade by the gaps between them.
     const cloudscapeGrowth = (c: CloudscapeParams) => ({
         towers: c.towers ?? 0,
         billows: c.billows ?? 0,
@@ -679,7 +679,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         return {
             map,
             volume,
-            light: `${volume},${c.baseKm},${steppedHeightM(p.observerHeightM)},${p.planetRadiusKm},${p.sunDirection.join(",")}`,
+            light: `${volume},${c.baseKm},${c.extinction},${steppedHeightM(p.observerHeightM)},${p.planetRadiusKm},${p.sunDirection.join(",")}`,
             deck,
             ambient: `${volume},${c.baseKm},${p.planetRadiusKm},${deck}`,
         };

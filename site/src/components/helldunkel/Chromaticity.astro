@@ -1,5 +1,4 @@
 ---
-import "../sternzeit/sternzeit.css";
 import "./helldunkel.css";
 
 const WHITES = [
@@ -9,8 +8,8 @@ const WHITES = [
 ];
 ---
 
-<figure class="scene-frame" id="chromaticity">
-    <div class="chromaticity" data-field="plot">
+<figure class="fig scene-frame" id="chromaticity">
+    <div class="chromaticity" data-field="plot" data-actions="png copy" data-export-timeless>
         <canvas data-field="canvas" aria-label="The colors a screen shows within the CIE 1931 chromaticity diagram"></canvas>
         <div data-field="overlay"></div>
     </div>
@@ -37,9 +36,9 @@ const WHITES = [
         <span class="note" data-field="info"></span>
     </p>
     <figcaption class="figure-caption">
-        Every color the eye can tell apart, by chromaticity, the spectrum's pure colors along the curved edge, computed by
-        Wyman's fit. The triangles are what three primaries can mix: sRGB, Display P3 and Rec. 2020, and the mark is the
-        white point. The colors fill the triangle chosen, P3 only on a screen that shows it, and outside it there is nothing a screen could show right.
+        Every color the eye can tell apart, by chromaticity, the spectrum's pure colors along the curved edge. The triangles
+        are what sRGB, Display P3 and Rec. 2020 can mix, the mark their white point. The colors fill the triangle chosen, P3
+        only on a screen that shows it.
     </figcaption>
 </figure>
 

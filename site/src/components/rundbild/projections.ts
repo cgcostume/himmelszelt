@@ -3,9 +3,21 @@ import { wgsl } from "@himmelszelt/dunstkreis";
 import { createPanoramaPass, type PanoramaPass, wgsl as rundbild } from "@himmelszelt/rundbild";
 import { showCode } from "../code";
 import { find } from "../dom";
-import { currentSky, display, gpu, gpuDevice, onDisplay, onSkyView, type Sky } from "../dunstkreis/atmosphere";
+import {
+    configureCanvas,
+    currentSky,
+    display,
+    displayOutput,
+    gpu,
+    gpuDevice,
+    onDisplay,
+    onSkyView,
+    SDR,
+    type Sky,
+} from "../dunstkreis/atmosphere";
 import { cameraBasis, lookAround, project, type SkyCamera, type Vec3 } from "../dunstkreis/skycamera";
 import { onDemand } from "../frame";
+import { skyWhite } from "../white";
 
 /**
  * The sky in six ways of storing it, in textures of the sizes below, shown texel by texel, bilinearly or bicubically:
@@ -64,6 +76,7 @@ const SOURCE = /* wgsl */ `
 ${wgsl.cube}
 ${rundbild.panorama}
 ${wgsl.tonemap}
+${wgsl.whitebalance}
 ${wgsl.sun}
 ${wgsl.grid}
 struct Params {
@@ -98,13 +111,17 @@ struct Params {
     apparentSun: vec3f,
     sunDisc: u32,
     sunIlluminance: vec3f,
+    // The site's white for the moment, helldunkel's \`whiteBalance\`, on the light as it is exposed.
+    whiteBalance: mat3x3f,
+    // How many times SDR white the canvas may show: 1 for SDR, more on an HDR display, into which Neutral and none go.
+    headroom: f32,
 }
 
 @group(0) @binding(0) var<uniform> params: Params;
 @group(0) @binding(1) var source: texture_2d_array<f32>;
 // The mean log2 luminance over the upper hemisphere, metered first.
 @group(0) @binding(2) var<storage, read_write> metered: f32;
-@group(0) @binding(3) var output: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(3) var output: texture_storage_2d<OUTPUT_FORMAT, write>;
 // The same texture again for the sampler: as a cube for a cube map, its first layer for the others.
 @group(0) @binding(4) var cubeSource: texture_cube<f32>;
 @group(0) @binding(5) var flatSource: texture_2d<f32>;
@@ -406,7 +423,7 @@ fn gridCoverage(position: vec2f, d: vec3f) -> f32 {
     }
     let right = directionAt(position + vec2f(1.0, 0.0)).xyz;
     let below = directionAt(position + vec2f(0.0, 1.0)).xyz;
-    return dkGridCoverage(d, right, below, params.sunDirection, params.sunAngularRadius, params.pixelRatio);
+    return dkGridCoverage(d, right, below, params.sunDirection, params.sunAngularRadius, params.pixelRatio, 0.0);
 }
 
 // Written out, dithered by Jimenez's interleaved gradient noise, an 8-bit step, triangular: no texture to bind.
@@ -415,7 +432,8 @@ fn put(p: vec2u, color: vec3f) {
     if (params.dither != 0u) {
         c = hdDither(c, p, 255.0);
     }
-    textureStore(output, vec2i(p), vec4f(clamp(c, vec3f(0.0), vec3f(1.0)), 1.0));
+    let top = hdEncodeSrgbExtended(vec3f(params.headroom), params.headroom);
+    textureStore(output, vec2i(p), vec4f(clamp(c, vec3f(0.0), top), 1.0));
 }
 
 const THREADS: u32 = 256u;
@@ -452,12 +470,12 @@ fn meter(@builtin(local_invocation_index) index: u32) {
 
 // Exposed so that the metered mean lands where an EV100 meter puts it, 1/9.6 of saturation, as in the sky figure.
 fn toneMap(c: vec3f) -> vec3f {
-    let exposed = c / (9.6 * exp2(metered));
+    let exposed = hdWhiteBalance(c, params.whiteBalance) / (9.6 * exp2(metered));
     switch params.curve {
         case 1u: { return hdToneMapAgx(exposed); }
         case 2u: { return hdToneMapAces(exposed); }
-        case 3u: { return hdToneMapClip(exposed); }
-        default: { return hdToneMapNeutral(exposed); }
+        case 3u: { return hdToneMapClipHdr(exposed, params.headroom); }
+        default: { return hdToneMapNeutralHdr(exposed, params.headroom); }
     }
 }
 
@@ -824,11 +842,14 @@ let pipelines: { meter: GPUComputePipeline; display: GPUComputePipeline; layout:
 let metering: GPUBuffer | null = null;
 let sampler: GPUSampler | null = null;
 let noCube: GPUTexture | null = null;
-// Params: a mat3x3f, twelve scalars, then three vec3f with a scalar after each, padded to 16 bytes.
-const PARAMS_SIZE = 160;
+// Params: a mat3x3f, twelve scalars, three vec3f with a scalar after each, the white's mat3x3f and the headroom, padded.
+const PARAMS_SIZE = 224;
+// The canvases' format, SDR or on an HDR display HDR, which the display pipeline is made for.
+let format = SDR;
 
 function setUp() {
     const device = gpuDevice();
+    format = displayOutput().format;
     const layout = device.createBindGroupLayout({
         entries: [
             { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: "uniform" } },
@@ -841,14 +862,15 @@ function setUp() {
             {
                 binding: 3,
                 visibility: GPUShaderStage.COMPUTE,
-                storageTexture: { format: "rgba8unorm", viewDimension: "2d" },
+                storageTexture: { format, viewDimension: "2d" },
             },
             { binding: 4, visibility: GPUShaderStage.COMPUTE, texture: { viewDimension: "cube" } },
             { binding: 5, visibility: GPUShaderStage.COMPUTE, texture: { viewDimension: "2d" } },
             { binding: 6, visibility: GPUShaderStage.COMPUTE, sampler: { type: "filtering" } },
         ],
     });
-    const module = device.createShaderModule({ label: "sternwarte:projections", code: SOURCE });
+    const code = SOURCE.replace("OUTPUT_FORMAT", format);
+    const module = device.createShaderModule({ label: "sternwarte:projections", code });
     const pipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [layout] });
     const create = (entryPoint: string) =>
         device.createComputePipeline({
@@ -861,12 +883,7 @@ function setUp() {
     const panel = (name: string): Panel => {
         const context = canvasOf(name).getContext("webgpu");
         if (!context) throw new Error("No WebGPU canvas context");
-        context.configure({
-            device,
-            format: "rgba8unorm",
-            alphaMode: "opaque",
-            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.STORAGE_BINDING,
-        });
+        configureCanvas(context, format);
         return {
             context,
             params: device.createBuffer({ size: PARAMS_SIZE, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
@@ -984,8 +1001,12 @@ function draw() {
         camera.yaw = Math.atan2(x, y);
         camera.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, Math.asin(z)));
     }
-    if (!pipelines || !panels || !sampler || !noCube || !metering) setUp();
+    // The page's HDR choice: pipelines and canvases made anew for the other format.
+    const output = displayOutput();
+    if (!pipelines || !panels || !sampler || !noCube || !metering || output.format !== format) setUp();
     if (!pipelines || !panels || !sampler || !noCube || !metering) return;
+    // Dithered by an 8-bit step, which a float canvas does not need.
+    field<HTMLButtonElement>("dither").disabled = format !== SDR;
     const device = gpuDevice();
     const { texture, scale } = built;
     const encoder = device.createCommandEncoder({ label: "sternwarte:projections" });
@@ -1016,13 +1037,16 @@ function draw() {
         floats[25] = dpr;
         floats[26] = (sky.sunAngularDiameter / 2) * DEG;
         floats.set(sky.sunDirection, 28);
-        uints[31] = pressed("dither") ? 1 : 0;
+        uints[31] = pressed("dither") && format === SDR ? 1 : 0;
         floats.set(sky.apparentSun, 32);
         uints[35] = pressed("sunDisc") ? 1 : 0;
         floats.set(
             sunIlluminance.map((lux) => lux * scale),
             36,
         );
+        const balance = skyWhite(sky.sunDirection);
+        for (let col = 0; col < 3; col++) floats.set(balance.slice(col * 3, col * 3 + 3), 40 + col * 4);
+        floats[52] = format === SDR ? 1 : output.headroom;
         device.queue.writeBuffer(params, 0, data);
         const bindGroup = device.createBindGroup({
             layout: pipelines.layout,

@@ -52,13 +52,18 @@ unless the device has "float32-filterable".
 ## Status
 
 `wgsl.ground` puts an image's ground on a plane, so objects stand on it and a camera moves over it, and lifts its horizon.
-`rbStretchedLods` gives the mip levels along u and v where either stretches an equirectangular image, for a lookup
+`rbGroundedDirection(eye, direction, captureHeight, reach, radius)` lays the image on one smooth surface about where it
+was taken: the plane as far as `reach`, about half the dome's radius at most, a sphere of `radius` from the horizon up,
+as three.js' GroundedSkybox and Unreal's HDRI Backdrop have it, and in between the image receding from the one to the
+other. Either can be without end, 1e9: a far dome keeps the sky at infinity over a ground that ends at its reach, and
+both together are the plane without bound.
+`rbStretchedLods` gives the mip levels along u and v where the ground stretches an equirectangular image, for a lookup
 blurred evenly rather than in streaks, from levels halved more along u than along v.
-`rbGroundedDomeDirection` lays the ground on a disc and the sky on a sphere about where the image was taken, as three.js'
-GroundedSkybox and Unreal's HDRI Backdrop do, so nothing stretches without bound.
 
-The horizon band of the original thesis and specular image-based lighting follow. Exposure and tone
-curves are `@himmelszelt/helldunkel`'s.
+The horizon band of the original thesis and specular image-based lighting follow. Exposure, tone
+curves and white balance are `@himmelszelt/helldunkel`'s. Every pass here writes light in the units its source holds and
+none finishes an image for display, so none takes a white balance: whoever exposes the image balances it, once, with
+helldunkel's `hdWhiteBalance`, and the spherical harmonics and the irradiance stay unbalanced, to light with.
 
 The WGSL is tested by executing it via Dawn in-process: `pnpm test:gpu`, since a CI runner has no GPU. Every identifier
 is prefixed `rb`/`RB_`. Part of the [himmelszelt monorepo](https://github.com/cgcostume/himmelszelt).

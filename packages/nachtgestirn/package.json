@@ -53,9 +53,10 @@
         "typecheck": "tsc --noEmit",
         "test": "pnpm build && playwright test",
         "test:gpu": "pnpm build && NACHTGESTIRN_GPU=1 playwright test",
-        "maps": "node scripts/maps.mjs",
-        "roughness": "node scripts/roughness.mjs",
-        "assets": "node scripts/data.mjs assets"
+        "data:maps": "node scripts/maps.mjs",
+        "data:roughness": "node scripts/roughness.mjs",
+        "assets": "node scripts/data.mjs assets",
+        "data": "pnpm data:maps && pnpm data:roughness"
     },
     "peerDependencies": {
         "sharp": "^0.35.4"

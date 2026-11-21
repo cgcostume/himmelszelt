@@ -1,6 +1,8 @@
 // Nubis3's voxel lighting: for every cloud voxel, the density summed along a ray to the sun, stored once per sun rather
 // than marched per pixel and step, and how much of the sky's and the ground's light gets through, once per cloudscape. The profile
-// is the density here, smooth and cheap; the march adds two detailed samples next to each point.
+// is the density here, smooth and cheap; the march adds two detailed samples next to each point. Far along a ray the
+// clouds are taken by their layer's statistics, as clouds with gaps between and not as a fog of their mean density:
+// a low sun finds its way between them to the taller ones' flanks.
 //
 // The slab is a shell around the planet, so the sun stands higher over clouds towards it and lower over clouds away
 // from it, by a degree every 111 km: four slices of the sun's light hold four elevations above the local horizon,
@@ -21,34 +23,56 @@
 // Steps towards the sun, each this much longer than the one before: a voxel's height first, 400 km after 64.
 override GW_LIGHT_STEPS: u32 = 64u;
 const GW_LIGHT_GROWTH: f32 = 1.105;
+// The step, in voxels across, up to which a voxel is read for its own density, and by ever less beyond.
+const GW_LIGHT_NEAR: f32 = 8.0;
+
+// The density from which a voxel counts as cloud, for the gaps between clouds.
+const GW_CLOUD_DENSITY: f32 = 0.05;
 
 var<workgroup> gwPartial: array<f32, 256>;
 var<workgroup> gwPartialSky: array<f32, 256>;
+var<workgroup> gwPartialRuns: array<f32, 256>;
 
-// The mean density of each layer of voxels, which far steps towards the sun take instead of one voxel's.
+// Each layer of voxels as far steps towards the sun take it, instead of one voxel's density: its mean density, and
+// after those the mean gap between its clouds along a row, in voxels: the clear voxels over the clouds a row runs into.
 @compute @workgroup_size(256, 1, 1)
 fn gwCoverageMean(@builtin(local_invocation_index) index: u32, @builtin(workgroup_id) layer: vec3u) {
     let size = textureDimensions(gwModeling);
     var sum = 0.0;
+    var clear = 0.0;
+    var runs = 0.0;
     for (var i = index; i < size.x * size.y; i = i + 256u) {
-        let m = textureLoad(gwModeling, vec3u(i % size.x, i / size.x, layer.x), 0);
+        let at = vec2u(i % size.x, i / size.x);
+        let m = textureLoad(gwModeling, vec3u(at, layer.x), 0);
+        let before = textureLoad(gwModeling, vec3u((at.x + size.x - 1u) % size.x, at.y, layer.x), 0);
+        let cloud = m.r * m.b > GW_CLOUD_DENSITY;
         sum = sum + m.r * m.b;
+        clear = clear + select(1.0, 0.0, cloud);
+        runs = runs + select(0.0, 1.0, cloud && before.r * before.b <= GW_CLOUD_DENSITY);
     }
     gwPartial[index] = sum;
+    gwPartialSky[index] = clear;
+    gwPartialRuns[index] = runs;
     workgroupBarrier();
     for (var stride = 128u; stride > 0u; stride = stride >> 1u) {
         if (index < stride) {
             gwPartial[index] = gwPartial[index] + gwPartial[index + stride];
+            gwPartialSky[index] = gwPartialSky[index] + gwPartialSky[index + stride];
+            gwPartialRuns[index] = gwPartialRuns[index] + gwPartialRuns[index + stride];
         }
         workgroupBarrier();
     }
     if (index == 0u) {
         gwCoverageOut[layer.x] = gwPartial[0] / f32(size.x * size.y);
+        gwCoverageOut[size.z + layer.x] = gwPartialSky[0] / max(gwPartialRuns[0], 1.0);
     }
 }
 
 // The density summed from `start` in the unit cube towards the sun, `heading` east and north, at `elevation` above the
-// local horizon: in km times density, near voxels read one by one, far stretches by their layer's mean.
+// local horizon: in km times density, near voxels read one by one, far stretches by their layer. There a ray gets
+// through a stretch at the odds of meeting no cloud, e^(-stretch / gap) for clouds scattered at a mean gap (a Markov
+// mixture, Levermore and Pomraning 1986): as a density, 1 / (gap * extinction), where that is less than the mean,
+// which would have a field of cumulus as dark at sunset as a fog of the same water.
 fn gwSummedToSun(start: vec3f, heading: vec2f, elevation: f32) -> f32 {
     let volume = gwParams.cloudscape;
     let ground = gwParams.planetRadius;
@@ -81,8 +105,12 @@ fn gwSummedToSun(start: vec3f, heading: vec2f, elevation: f32) -> f32 {
         if (z >= 0.0 && z <= 1.0) {
             let shift = heading * ground * atan2(across, vertical) / volume.extent;
             let m = textureSampleLevel(gwModeling, gwVolumeSampler, vec3f(fract(start.xy + shift), z), 0.0);
-            let mean = gwCoverage[min(u32(z * f32(size.z)), size.z - 1u)];
-            sum = sum + mix(mean, m.r * m.b, clamp(2.0 * cell / step, 0.0, 1.0)) * step;
+            let layer = min(u32(z * f32(size.z)), size.z - 1u);
+            let gap = gwCoverage[size.z + layer] * cell;
+            let far = min(gwCoverage[layer], 1.0 / max(gap * volume.extinction, 1e-6));
+            // A voxel stands for its step while that is a few voxels long: a cloud keeps its own shadow, and its near
+            // neighbors'. Beyond, a step would hit or miss by chance.
+            sum = sum + mix(far, m.r * m.b, clamp(GW_LIGHT_NEAR * cell / step, 0.0, 1.0)) * step;
         }
         s = s + step;
         step = step * GW_LIGHT_GROWTH;

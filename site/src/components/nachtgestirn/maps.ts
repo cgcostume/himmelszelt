@@ -124,15 +124,16 @@ function drawSeen(
         if (x === 0) limb.moveTo(x, py(lat));
         else limb.lineTo(x, py(lat));
     }
-    // The moment, faint under the annotations: hatched what Earth does not see now, densely what it never sees.
+    // The moment, clear alone and faint under the annotations: hatched what Earth does not see now, densely what it never
+    // sees, and the limb as a line.
     const hidden = new Path2D(limb);
     const edge = tanB > 0 ? height : 0;
     hidden.lineTo(width, edge);
     hidden.lineTo(0, edge);
     hidden.closePath();
     for (const [region, step, alpha] of [
-        [hidden, period, 25],
-        [past(), period / 2, 40],
+        [hidden, period, annotated ? 25 : 70],
+        [past(), period / 2, annotated ? 40 : 100],
     ] as const) {
         const pattern = hatch(context, step, line, ink, alpha);
         if (!pattern) continue;
@@ -142,7 +143,10 @@ function drawSeen(
         context.fillRect(0, 0, width, height);
         context.restore();
     }
-    Object.assign(context, { strokeStyle: `rgba(${INK}, 0.25)`, lineWidth: ratio });
+    Object.assign(context, {
+        strokeStyle: `rgba(${INK}, ${annotated ? 0.4 : 0.85})`,
+        lineWidth: (annotated ? 1 : 2) * ratio,
+    });
     context.stroke(limb);
     if (!annotated) {
         stroke(0, 0.15, 1);

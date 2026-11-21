@@ -1,13 +1,13 @@
 // Makes NASA's starless layer of the Deep Star Maps 2020 (svs.gsfc.nasa.gov/4851) as published, the "Milky Way
-// background" without the cleanup sternenheer's `pnpm milkyway` gives it, for the chapter's figure of the Milky Way with
+// background" without the cleanup sternenheer's `pnpm data:milkyway` gives it, for the chapter's figure of the Milky Way with
 // and without its stars: the cap around Deneb of starmap.json, the rest black, in the encoding and at the resolution of
 // sternenheer's own map, a texel of value 1 standing for MILKY_WAY_LUMINANCE as there. The cleanup moves light and keeps
 // it, so the calibration holds for both.
 //
-//     pnpm --filter @himmelszelt/sternwarte starless [--force]
+//     pnpm --filter @himmelszelt/sternwarte data:starless [--force]
 //
 // Writes public/stars/starless-cygnus.webp, 4096 by 2048 texels, each channel's log2 in 8 bits over 12 stops. Needs
-// sharp; downloads 35 MB once, into the cache `pnpm milkyway` uses.
+// sharp; downloads 35 MB once, into the cache `pnpm data:milkyway` uses.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";

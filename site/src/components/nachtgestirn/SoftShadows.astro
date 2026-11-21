@@ -3,7 +3,6 @@ import CopyInfo from "../CopyInfo.astro";
 import Icon from "../Icon.astro";
 import Term from "../Term.astro";
 import Try from "../Try.astro";
-import "../sternzeit/sternzeit.css";
 import "./nachtgestirn.css";
 import Resolutions from "../Resolutions.astro";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
@@ -17,8 +16,8 @@ interface Props {
 const { id = "soft-shadows" } = Astro.props;
 ---
 
-<figure class="tiles-figure" id={id} data-soft-shadows>
-    <div class="tiles-panel as-seen split" style="--count: 2">
+<figure class="fig tiles-figure" id={id} data-soft-shadows>
+    <div class="tiles-panel as-seen split" style="--count: 2" data-actions="copy">
         <canvas aria-label="The Moon, and a close-up of its terminator lit by a point Sun on the undisplaced relief, rendered with WebGPU"></canvas>
         <canvas class="detail-full" data-field="full" aria-label="The close-up as the pass draws it, the Sun's half degree on the displaced relief, rendered with WebGPU"></canvas>
         <svg class="tiles-overlay" data-field="marker" aria-hidden="true"></svg>
@@ -27,7 +26,7 @@ const { id = "soft-shadows" } = Astro.props;
             <span class="view-buttons"><button type="button" class="view-toggle" data-field="albedo" aria-pressed="false" title="NASA's color map of the Moon; off, a uniform surface of the Moon's albedo, so the relief and its shadows show alone">albedo</button><button type="button" class="view-toggle" data-field="roughness" aria-pressed="false" title="The slopes below the maps' texels, where a pixel is finer, as in the close-ups: octaves of noise as steep as LOLA's statistics of the ground say it is at each scale">rough</button></span>
         </span>
         <span class="tiles-ends">
-            <span class="view-buttons">
+            <span class="view-buttons fig-actions">
                 <button type="button" class="view-icon" data-field="download" title="Download the disc and both close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
                 <CopyInfo />
             </span>
@@ -44,11 +43,9 @@ const { id = "soft-shadows" } = Astro.props;
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
         Soft shadows and displacement on a close-up of the <Term of="Terminator">terminator</Term>, a sixteenth of the
-        disc across and a stop more open. Left of the line, a point Sun casts hard shadows on the relief as it lies on the
-        sphere; right of it, as the pass draws it, the Sun's half degree casts soft shadows on the relief displaced.
+        disc across and a stop more open: left of the line a point Sun on the relief as it lies, right of it the pass.
         <Try label="Two days after new moon" set="date=2026-11-11T12:00Z" fig={id}>
-            the close-up at the limb: displaced, the peaks stand up as mountains, and their tops fade, the Sun's disc only
-            partly over their horizon.
+            the limb's peaks stand up, their tops fading under a Sun partly over their horizon.
         </Try>
     </figcaption>
 </figure>

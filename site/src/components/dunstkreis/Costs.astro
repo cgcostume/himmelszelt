@@ -1,0 +1,37 @@
+---
+import type { CostsResult } from "../bench";
+import Costs from "../Costs.astro";
+import { creditOf, MiB } from "../costs";
+import reference from "./bench.json";
+import { COST_ROWS, CUBE_SIZE } from "./cost-rows";
+
+/**
+ * What dunstkreis costs, piece by piece on the clock that runs it: the time on the GPU and the memory each piece holds.
+ * The reference is bench.json, written by `pnpm bench dunstkreis --write` (scripts/bench.mjs and bench.ts).
+ */
+const measure = reference as CostsResult;
+const LABELS: Record<(typeof COST_ROWS)[number], [string, string]> = {
+    tables: ["the tables", "once per atmosphere"],
+    skyView: ["the sky view and its meter", "when the Sun or the observer moves"],
+    sky1080: ["the sky pass, 1920 × 1080", "every frame"],
+    sky2160: ["the sky pass, 3840 × 2160", "every frame"],
+    cube: [`a cube map, 6 × ${CUBE_SIZE}², mips`, "when the sky view changes"],
+    aerial: ["aerial perspective, 32³", "when the camera moves, over 1920 × 1080"],
+};
+const rows = COST_ROWS.map((key) => {
+    const row = measure.rows[key];
+    const [label, note] = LABELS[key];
+    const memory = row?.memory ? row.memory / MiB : "your target";
+    return { label, note, values: [row?.ms?.median, memory] };
+});
+---
+
+<Costs
+    label="Bar charts of the time on the GPU and the GPU memory of dunstkreis' tables, sky view, sky pass at two sizes, cube map and aerial perspective"
+    columns={[{ head: "GPU time, ms" }, { head: "GPU memory, MiB", part: 0 }]}
+    rows={rows}
+>
+    What dunstkreis costs, each piece on its own clock: the time on the GPU and the memory the piece holds. The sky
+    pass writes into a target of yours and holds nothing besides; the cube map is the page's, eight samples a texel.
+    The sky exposed by its meter, dithered; {creditOf(measure)}.
+</Costs>

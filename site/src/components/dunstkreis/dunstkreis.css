@@ -76,9 +76,6 @@
     align-items: center;
     margin-bottom: 1rem;
 }
-.lut-bar .view-toggle {
-    position: static;
-}
 .lut {
     margin-bottom: 2rem;
 }
@@ -243,17 +240,6 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* A figure's readout, right under its view, as the Moon's in sternzeit. */
-.view-status {
-    margin: 0.5rem 0 0;
-    padding-inline: var(--content-inset);
-    font-size: var(--text-meta);
-}
-/* A panel's controls in two groups, what it is computed with and how it is shown, each row led by its role. The buttons
-   sit in the row's flow, not in a corner as over the scenes. */
-.lut-controls .view-toggle {
-    position: static;
-}
 /* Accent colored like the status titles and the "Figure" before a caption: no style of its own. */
 .lut-role {
     min-width: 4.25rem;
@@ -401,6 +387,24 @@
     }
 }
 
+/* Clear of the scale along its right edge. */
+.scattering-panel > .fig-actions {
+    right: 36px;
+}
+/* Lookup's credit line, right-aligned up to its actions, which stand left of its tables. */
+.lookup-scene > .vis-credit {
+    left: auto;
+    right: calc(1.5rem + var(--analemma-width, 38cqh) + 1rem + 76px);
+    text-align: right;
+}
+@media (max-width: 48rem) {
+    .lookup-scene > .vis-credit {
+        top: 0.5rem;
+        left: auto;
+        right: 76px;
+        text-align: right;
+    }
+}
 /* How strongly each wavelength scatters, styled as sternzeit's ΔT: the lines in the muted ink, Rayleigh's solid and
    Mie's dashed, blue and red marked by bubbles, the second scale on the right fainter than the first. A little lower
    than the other strips, the plot ending just over its top row. */
@@ -472,10 +476,6 @@
     align-items: center;
     justify-content: space-between;
     pointer-events: none;
-}
-/* Text switches in the bar sit in their group, not where sternzeit puts a lone switch. */
-.sky-bar .view-toggle {
-    position: static;
 }
 .sky-bar-end {
     display: flex;
@@ -650,7 +650,6 @@
     align-items: center;
 }
 .sky-options .view-toggle {
-    position: static;
     display: inline-flex;
     gap: 5px;
     align-items: center;
@@ -766,12 +765,6 @@
     min-width: 0;
     transform: translate(-50%, -50%);
 }
-/* The figure's readouts and code under a wide view keep to the text's width. */
-.scene-frame.wide > .lut-call {
-    width: calc(var(--measure) - 3rem);
-    max-width: 100%;
-    margin-inline: auto;
-}
 /* From light to pixels: the five panels in one canvas, each stage's name, note and control in a row under it. */
 .stages-view canvas {
     display: block;
@@ -800,9 +793,6 @@
     gap: 4px;
     align-items: center;
     font-size: var(--text-small);
-}
-.stages-control .view-toggle {
-    position: static;
 }
 .stages-ev input {
     width: 6rem;

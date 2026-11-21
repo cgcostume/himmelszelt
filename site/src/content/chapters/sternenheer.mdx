@@ -31,9 +31,8 @@ import Cite from "../../components/Cite.astro";
 import Controls from "../../components/sternzeit/Controls.astro";
 import Term from "../../components/Term.astro";
 import Fig from "../../components/Fig.astro";
-import Flicker from "../../components/dunstkreis/Flicker.astro";
 import Planned from "../../components/Planned.astro";
-import Budget from "../../components/sternenheer/Budget.astro";
+import Costs from "../../components/sternenheer/Costs.astro";
 import ColorIndex from "../../components/sternenheer/ColorIndex.astro";
 import ColorHistogram from "../../components/sternenheer/ColorHistogram.astro";
 import Loupe from "../../components/sternenheer/Loupe.astro";
@@ -79,7 +78,7 @@ follows.
     try={{
         label: "A new moon in August",
         set: "date=2026-08-12T22:00Z&lat=52.52&lon=13.405&h=1",
-        text: "the Milky Way over Berlin from Cygnus overhead down to Sagittarius in the south, no Moon in the sky. Switch the twinkling on, and the low stars flicker in colors.",
+        text: "the Milky Way from Cygnus overhead down to Sagittarius in the south, no Moon in the sky.",
     }}
 />
 
@@ -222,18 +221,23 @@ const color = colorFromColorIndex(1.85); // [1.62, 0.88, 0.36]
 These colors are saturated on purpose. They are what a camera records; what the eye makes of them at night is the
 business of [the eye at night](#the-eye-at-night).
 
-Run the three steps over every index from −0.3 to 2, and the color slides along the locus from blue-white through
-white to orange (<Fig id="colorindex" />). White itself is a choice: linear sRGB calls D65 white, the CIE's daylight at
-6,504 K, and the CIE's other standard whites lie close to the locus, A, a tungsten lamp, on it at 2,856 K, and the
-daylights D50 to D75 a little above it, towards green <Cite id="cie2018" />. Jensen's simpler temperature agrees with Ballesteros' within 5% only from
-0.44 to 0.97, around the Sun; towards both ends the two [part ways](#precise-and-approximate).
+Run the three steps over every index from −0.3 to 2, and the color slides along the locus from blue-white through white
+to orange (<Fig id="colorindex" />). White itself is a choice: linear sRGB calls D65 white, the CIE's daylight at 6,504
+K, and the CIE's other standard whites lie close to the locus, A, a tungsten lamp, on it at 2,856 K, and the daylights
+D50 to D75 a little above it, towards green <Cite id="cie2018" />. Jensen's simpler temperature agrees with Ballesteros'
+within 5% only from 0.44 to 0.97, around the Sun; towards both ends the two [part ways](#precise-and-approximate). Under
+the diagram each index is shown in its color by either formula, scaled so that its strongest channel is full, with Vega,
+Polaris, Sirius and the Sun on the scale.
 
 <ColorIndex />
 
 Sorted by their index, the catalog's stars fall into two crowds, blue-white around 0 and orange around 1, with a gap
 between them where the Sun would stand (<Fig id="star-colors" />). Only one star in 27 lies between 0.6 and 0.8, as
 yellow as the Sun, and one in eight is redder than 1.4. Add the fainter Hipparcos stars, and the gap fills: one in ten
-of them lies between 0.6 and 0.8.
+of them lies between 0.6 and 0.8. The bars hold the 9,093 stars of the Yale catalog, 116,837 with the Hipparcos stars
+and 2.5 million with Tycho-2's, each catalog without its stars that have no measured index. Tycho-2's index is converted
+from its own two bands <Cite id="esa1997" />, and for its typical star, of magnitude 11, it is uncertain by about 0.2,
+four of the bins.
 
 <ColorHistogram />
 
@@ -291,15 +295,15 @@ pass.update({
 
 Together, these steps take one row of the catalog to a few pixels, and two more lie on the way, which later sections
 explain: [the sky's turning](#the-sky-turning) puts the star in its place tonight, and [the air](#through-the-air)
-lifts, dims and reddens it near the horizon. The stars to follow are ones that films made famous, from Vega in Contact
-to Canopus in Dune (<Fig id="onestar" />). Open the exposure stop by stop, and the core's peak stays at the knee while
-the halo takes a larger share of the light.
+lifts, dims and reddens it near the horizon. Each step comes with its numbers and the function that computes it, and the
+stars to follow are ones that films made famous, from Vega in Contact to Canopus in Dune (<Fig id="onestar" />). Open
+the exposure stop by stop, and the core's peak stays at the knee while the halo takes a larger share of the light.
 
 <OneStar
     try={{
         label: "Canopus over Cairo",
         set: "date=2027-02-10T19:00Z&lat=30.044&lon=31.236&h=23&star=2326",
-        text: "Dune's star climbs to only some 7° there, and the air takes two thirds of its light and turns the blue-white star a pale orange.",
+        text: "Dune's star climbs to only some 7°, and the air takes two thirds of its light and turns it pale orange.",
     }}
 />
 
@@ -439,10 +443,7 @@ meters on it where it is brighter than the stars' own light. What the eye makes 
 eye at night](#the-eye-at-night).
 
 How one star's flicker changes with the altitude, the seeing, the lens and the exposure, and why a planet's disc hardly
-flickers, shows <Fig id="flicker" />. Its numbers are dunstkreis' own, from the seeing model and the table of the air
-that the pass takes, explained in [dunstkreis' chapter](../dunstkreis/#light-from-beyond-the-air).
-
-<Flicker />
+flickers, you can try in [dunstkreis' chapter](../dunstkreis/#flicker), next to the table of the air the pass takes.
 
 ## Lines between the stars
 
@@ -503,7 +504,10 @@ Drawn under the same stars, either side of a line, sternenheer's map and NASA's 
 layer every bright star appears twice, a point over a blur, and the band carries the stars' light once more (<Fig
 id="starred" />). Switch the stars off, and the starred map keeps its own. Pick NASA's starless layer instead, as
 published, and zoom in: the points the script takes out, a few hundred around Deneb, stay in it as faint blurred dots
-under the drawn stars.
+under the drawn stars. NASA's layers are 4096 texels around, a texel 5 arcminutes, and sternenheer's map as fine, or
+8192 once a pixel spans less than that. The starred layer is drawn at twice the light a texel, which matches its
+background to sternenheer's, and its Deneb keeps about a twentieth of its light: NASA clipped the layer at 1, scaled it
+for looks and spread each star over a texel.
 
 <Starred />
 
@@ -545,16 +549,17 @@ needs, the moment, the place, the lens and the exposure: the Milky Way over Idah
 wide lenses, Orion through a normal one, a night under a waning Moon in New Zealand, twilight over Slovenia, and the
 Pleiades through a long lens (<Fig id="photos" />). Nothing in the figure is placed by hand. A script finds the stars in
 each photograph, names them from the catalog, and fits where the camera pointed, how it was turned, its focal length and
-its lens' distortion to as many of them as it names, from 85 to 796. What is left between the photograph's stars and the
-catalog's is 0.1 to 3.4 arcminutes, a pixel of these pictures at most: the sky's rotation from sternzeit and the air's
-lift from dunstkreis put every star where the camera found it, down to 4° over the horizon. The exposure is the camera's
-own, its f-number, seconds and ISO as one EV<sub>100</sub>, less the stops by which each photograph's stars outshine
-that: 0.4 for a JPEG straight from the camera, no more than a camera's ISO rating leaves open, within a stop for three
-more, edited as they are, and 2.3 and 3.2 for the two that were processed hard.
+its lens' distortion to as many of them as it names, from 85 to 796, and resamples each photograph to a lens without
+distortion. What is left between the photograph's stars and the catalog's is 0.1 to 3.4 arcminutes, a pixel of these
+pictures at most: the sky's rotation from sternzeit and the air's lift from dunstkreis put every star where the camera
+found it, down to 4° over the horizon. The exposure is the camera's own, its f-number, seconds and ISO as one
+EV<sub>100</sub>, less the stops by which each photograph's stars outshine that: 0.4 for a JPEG straight from the
+camera, no more than a camera's ISO rating leaves open, within a stop for three more, edited as they are, and 2.3 and
+3.2 for the two that were processed hard.
 
 <Photos />
 
-Past the stars' places, the figure measures both pictures alike, and three things hold. A star's light in lux lands on
+Past the stars' places, the script measures both pictures alike, and three things hold. A star's light in lux lands on
 the pixels as a sensor records it. The Milky Way, calibrated to the measured starlight and never to a photograph, adds
 within 0.4 magnitudes of what two of the photographs show against their own stars, and a magnitude more than the
 Watzmann's. And moonlit air comes out blue, as in the photograph, from nothing but the Moon's light and the air. Three
@@ -608,9 +613,12 @@ const milkyWay = await loadMilkyWay(device, MILKY_WAY_MAPS.large);
 const own = createMilkyWay(device, bitmap, { luminance: 1e-3, stops: 0 });
 ```
 
-Magnified at the pole's meter reading, next to the floats as the reference, the sRGB patch breaks into blotches of
-color, while the logarithm's stays as smooth. Switch the `WebP` off, and the sRGB patch, rounded alone, shows how little of it is the rounding
-(<Fig id="store-dark" />).
+Cut from the whole map three ways, the floats as the reference and the two 8-bit files as the package ships them, WebPs
+at quality 95 decoded as `createMilkyWay` reads them, a patch around the north galactic pole shows the difference. At
+its meter reading, magnified, the sRGB patch breaks into blotches of color, while the logarithm's stays as smooth. Make
+it eight times as bright, and the steps stand out; switch the `WebP` off, and the sRGB patch, rounded alone, shows how
+little of it is the rounding (<Fig id="store-dark" />). The sizes under the patches are the whole map's, at 2048 and
+4096 texels around; NASA publishes no EXR at 2048, so that one is computed.
 
 <StoreDark />
 
@@ -693,13 +701,15 @@ moon.encode(encoder, target, { background: starsTexture });
 Everything is also there in pieces, for a renderer that wants the stars inside a pass of its own: the WGSL as strings,
 `wgsl.bin`, `wgsl.compose` and the rest, and `paramsData`, which packs the parameters as the shaders read them.
 
-A frame can also be taken apart. Made with `debug`, the pass keeps what each of its passes leaves for the next and
-hands it out with `inspect`, and times every pass on the GPU's clock where the browser allows it: the tiles and how full
-each one is, the tiles the lines cross, the light past the knee as the bin pass left it in the halos' grid, the halos as
-that grid spreads them, and the frame they make (<Fig id="passes" />). Off, as by default, nothing of it is kept and
-nothing costs. Lower the capacity, and the tiles along the Milky Way fill up and keep only their brightest stars; widen
-the tiles, and every pixel has more stars to look through. Switch the Moon and the air off, and their passes drop out
-of the timings.
+A frame can also be taken apart. Made with `debug`, the pass keeps what each of its passes leaves for the next and hands
+it out with `inspect`, and times every pass on the GPU's clock where the browser allows it. Drawn as a graph, a frame
+reads from left to right: the catalogs, the lines and the maps go in, each dispatch runs over its stars, line pieces,
+levels or pixels, and what it leaves rides on the arrow to the next, the tiles and how full each one is, the light past
+the knee as the bin pass left it in the halos' grid, the halos as that grid spreads them, the tiles the lines cross, and
+the frame they make (<Fig id="passes" />). The figure exposes for a moonless night, EV<sub>100</sub> −9, or for the sky
+where the Sun or the Moon lights it brighter. Off, as by default, nothing of it is kept and nothing costs. Lower the
+capacity, and the tiles along the Milky Way fill up and keep only their brightest stars; widen the tiles, and every
+pixel has more stars to look through. Switch the Moon and the air off, and their passes dim in the graph.
 
 <Passes />
 
@@ -714,29 +724,23 @@ WebGPU blends only with the optional feature `float32-blendable`.
 
 A night sky is a backdrop: whatever else a frame shows stands in front of it, and a renderer has little time to spare
 for what lies behind. The sky this chapter opens with, both catalogs with their halos and the Milky Way through the air,
-takes sternenheer 0.14 ms on a target of 1920 by 1080 pixels, under a hundredth of the 16.7 ms a frame at 60 Hz has. It
-holds 38 MiB on the GPU, less than three half float render targets of that size, and downloads 1.6 MiB.
+takes sternenheer 0.14 ms on a target of 1920 by 1080 pixels, under a hundredth of the 16.7 ms a frame at 60 Hz has. It
+holds 41 MiB on the GPU, less than three half float render targets of that size, and downloads 1.4 MiB.
 
-The time does not go where the stars are. Sorting 118,000 stars into their tiles takes three hundredths of a
-millisecond, a fifth of the frame, and the faint stars, twelve times the catalog's, make the frame two fifths longer.
-Half of it is the last pass, which visits every pixel, and a fifth is the halos' levels, which hold two fifths of the
-memory and are made only while `halo` asks for them. So the cost follows the target, not the sky: 3840 by 2160 pixels,
-four times as many, take three times as long. The air adds a twentieth and the constellations' lines
-a ninth; the twinkling and the 4K map add nothing that shows in the time, though the larger map holds 32 MiB more
-(<Fig id="budget" />).
+The time does not go where the stars are. The catalog alone takes 0.04 ms, and the chapter's sky, with 118,000 stars,
+their halos, the map and the air, only some three times that. Half of a frame is the last pass, which visits every
+pixel, so the cost follows the target, not the sky: 3840 by 2160 pixels, four times as many, take three times as long.
+Twinkling, the constellations' lines and the 4K map together add a seventh, and the larger map holds 32 MiB more
+(<Fig id="costs" />).
 
-<Budget />
+<Costs />
 
-Stars by the million are another matter. With the 2.4 million stars `loadDeepStars` adds, the same sky takes 0.65 ms,
+Stars by the million are another matter. With the 2.4 million stars `loadDeepStars` adds, the same sky takes 0.65 ms,
 over four times as long, seven tenths of it in the pass that adds their light. It holds twice the memory and downloads
 nine times as much, which is one reason the package makes that catalog and does not ship it; [its
-license](#the-data-and-its-scripts) is the other.
-
-A stopwatch around the calls measures none of this: `encode` returns once the commands are recorded, and the GPU draws
-later. The times here come from the GPU's own clock, read around every pass, and a frame runs from its first pass' start
-to its last one's end. A browser hands a page that clock rounded, Chromium to 0.066 ms, longer than most of these passes
-take, so a single reading says nothing and the mean of some hundred frames does. The figure's button measures every row
-that way on your GPU and draws it under the reference's (<Fig id="budget" />).
+license](#the-data-and-its-scripts) is the other. How these times are taken, on the GPU's own clock with the cases in
+turn, is told [with dunstkreis' costs](../dunstkreis/#what-it-costs); with `pnpm dev` running, `pnpm -C site bench
+sternenheer` measures the same on your GPU.
 
 ## The data and its scripts
 
@@ -750,7 +754,7 @@ while what it wrote is newer than what it read. The catalogs leave them gzip com
 first byte of every star, then the second of every star, and so on, so that neighbors' magnitudes and positions, which
 differ little, lie side by side, and the loaders turn them back with the browser's `DecompressionStream`.
 
-`pnpm catalog` reads `data/brightstars.csv`, the Yale catalog with a line per star, 374 KB: the six numbers of [Sirius'
+`pnpm data:catalog` reads `data/brightstars.csv`, the Yale catalog with a line per star, 374 KB: the six numbers of [Sirius'
 row](#nine-thousand-stars). The magnitudes, positions and motions came by way of osgHimmel's source, the color indices
 from the catalog's own file, and the 310 stars without one got the typical index of their spectral type. The script
 turns the hours of right ascension into degrees, runs each index through [the three steps to a
@@ -760,7 +764,7 @@ catalog lists them, the position within a sixth of an arcsecond, finer than the 
 second. NASA's archive lists its copy of the catalog as a work of the U.S. Government, for public use
 <Cite id="hoffleit1991" />.
 
-`pnpm hipparcos` reads `data/hipparcos.csv`, 3.4 MB: the Hipparcos catalogue as NASA's HEASARC serves it
+`pnpm data:hipparcos` reads `data/hipparcos.csv`, 3.4 MB: the Hipparcos catalogue as NASA's HEASARC serves it
 <Cite id="esa1997" />, cut down to what the Yale catalog lacks and sorted brightest first. A line holds the magnitude,
 the position, moved from the catalogue's epoch of 1991.25 to 2000 by the star's own motion, and the color index, the
 Sun's for the 1,139 stars without one. Left out are 263 entries without a position or a magnitude and 9,072 that are
@@ -771,7 +775,7 @@ the package's code. So the npm package carries neither the file nor the CSV, and
 them, accepting ESA's terms: outside the repository the script fetches the catalogue from HEASARC, 15 MB once, and cuts
 it down the same way, to the same stars.
 
-`pnpm tycho` makes the deep stars from the Tycho-2 catalogue <Cite id="hog2000" />, under the same terms: a download of
+`pnpm data:tycho` makes the deep stars from the Tycho-2 catalogue <Cite id="hog2000" />, under the same terms: a download of
 200 MB, once, from which it keeps the 2.4 million stars the two other files lack, sorts them into 384 cells of the sky,
 brightest first in each, and writes them in full, 14.1 MB, and compact, 12.0 MB. No CSV is kept of it, for its size: the
 catalogue as HEASARC serves it is the record.
@@ -782,16 +786,16 @@ degree across 1080 pixels, and less than the median one has moved by its own mot
 holds. Its direction comes from the cell and the place in it, a point on a cube's face made unit length, without a sine
 or a cosine. The Yale file shrinks to less than half and the faint and the deep stars' by about a sixth; on the GPU the deep
 stars hold 4.5 MiB less and the Hipparcos stars 0.4 MiB more, as the pass keeps a slot for every place of their cells'
-blocks. Neither layout draws faster: the time goes to adding up light, not to reading stars (<Fig id="budget" />). The
+blocks. Neither layout draws faster: the time goes to adding up light, not to reading stars. The
 pass takes either layout for each catalog and builds its shaders for the ones it gets, so the decoder of the other costs
 nothing.
 
-`pnpm constellations` reads `data/constellations.csv`, 743 lines in 10 KB: a constellation's abbreviation and the two
+`pnpm data:constellations` reads `data/constellations.csv`, 743 lines in 10 KB: a constellation's abbreviation and the two
 rows of the star file its line joins. The figures are d3-celestial's, by Olaf Frohn, under the BSD 3-Clause license,
 each of their points matched to the catalog's star at that place, all within half an arcminute. The script writes
 triples of 16-bit numbers, 4 KB.
 
-`pnpm milkyway` is the one that works for its result, and the one with needs: ImageMagick with OpenEXR and WebP, and a
+`pnpm data:milkyway` is the one that works for its result, and the one with needs: ImageMagick with OpenEXR and WebP, and a
 download of 36 MB, once, into a cache. It fetches NASA's background layer, reads it as floats, takes the stars out and
 spreads their light, adds up the two catalogs along the calibration's band and prints the scale, as [the Milky
 Way](#the-milky-way) describes. Then it writes the two maps as WebP, with [the logarithm in 8
@@ -807,13 +811,14 @@ installed package's `data` folder, where `loadFaintStars` and `loadDeepStars` lo
 
 ```sh
 cd packages/sternenheer
-pnpm assets          # the Hipparcos and the Tycho-2 stars, the 8K map: 352 MB
-pnpm assets --all    # every file, the shipped ones too
-pnpm catalog         # brightstars.csv to brightstars(-compact).bin.gz
-pnpm hipparcos       # hipparcos.csv to hipparcos(-compact).bin.gz
-pnpm tycho           # HEASARC's Tycho-2 to tycho(-compact).bin.gz
-pnpm constellations  # constellations.csv to constellations.bin
-pnpm milkyway        # NASA's EXR to the two maps and milkyway.json
+pnpm assets               # the Hipparcos and the Tycho-2 stars, the 8K map: 352 MB
+pnpm assets --all         # every file, the shipped ones too
+pnpm data                 # all five below, in turn
+pnpm data:catalog         # brightstars.csv to brightstars(-compact).bin.gz
+pnpm data:hipparcos       # hipparcos.csv to hipparcos(-compact).bin.gz
+pnpm data:tycho           # HEASARC's Tycho-2 to tycho(-compact).bin.gz
+pnpm data:constellations  # constellations.csv to constellations.bin
+pnpm data:milkyway        # NASA's EXR to the two maps and milkyway.json
 
 # Where the package is installed from npm, accepting ESA's terms:
 npx @himmelszelt/sternenheer data hipparcos tycho

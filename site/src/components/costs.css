@@ -1,0 +1,198 @@
+/* What it costs, as every chapter shows it: bars per size across panels, each with its own axis (see the Budget
+   figures of nachtgestirn and sternenheer, and nachtgestirn's configurator). */
+/* The cost figure: per disc size a row of bars across three panels, each with its own axis; the defaults hatched,
+   everything on solid, the memory stacked by what holds it. Labeled cards on a phone. */
+.budget-figure {
+    --budget-0: oklch(0.66 0.12 245);
+    --budget-1: oklch(0.67 0.14 70);
+    --budget-2: oklch(0.62 0.15 300);
+    --budget-ink: var(--muted);
+}
+:root[data-theme="light"] .budget-figure {
+    --budget-0: oklch(0.58 0.13 245);
+    --budget-1: oklch(0.64 0.14 68);
+    --budget-2: oklch(0.52 0.17 300);
+}
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) .budget-figure {
+        --budget-0: oklch(0.58 0.13 245);
+        --budget-1: oklch(0.64 0.14 68);
+        --budget-2: oklch(0.52 0.17 300);
+    }
+}
+.budget-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.3rem 1.2rem;
+    margin-bottom: 0.75rem;
+}
+.budget-swatch {
+    display: inline-block;
+    width: 0.8rem;
+    height: 0.8rem;
+    margin-right: 0.4rem;
+    vertical-align: -0.1rem;
+    border-radius: var(--radius-small);
+    background: var(--budget-ink);
+}
+.budget-grid {
+    display: grid;
+    /* The time, the memory, which needs the room, and the error. */
+    grid-template-columns: max-content 1fr 1.6fr 0.6fr;
+    gap: 0 1.5rem;
+    margin-bottom: 1.25rem;
+}
+.budget-head {
+    padding-bottom: 0.3rem;
+}
+.budget-size {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0.4rem 0;
+    font-size: var(--text-meta);
+    border-top: var(--border);
+}
+.budget-cell {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    padding: 0.4rem 0;
+    border-top: var(--border);
+    background: repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px var(--grid));
+}
+.budget-line {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 0.75rem;
+}
+.budget-bar {
+    flex: none;
+    height: 100%;
+    min-width: 1px;
+    background: var(--budget-ink);
+}
+.budget-line > .budget-bar:last-of-type {
+    border-radius: 0 var(--radius-small) var(--radius-small) 0;
+}
+.budget-part-0 {
+    background: var(--budget-0);
+}
+.budget-part-1 {
+    background: var(--budget-1);
+}
+.budget-part-2 {
+    background: var(--budget-2);
+}
+.budget-part-3 {
+    background: var(--budget-3);
+}
+/* The defaults hatched in their own color: stripes over the panel's background, so the color stays the part's. */
+.budget-defaults {
+    background: repeating-linear-gradient(135deg, var(--budget-fill, var(--budget-ink)) 0 2px, transparent 2px 4.5px);
+    box-shadow: inset 0 0 0 1px var(--budget-fill, var(--budget-ink));
+}
+.budget-defaults.budget-part-0 {
+    --budget-fill: var(--budget-0);
+}
+.budget-defaults.budget-part-1 {
+    --budget-fill: var(--budget-1);
+}
+.budget-defaults.budget-part-2 {
+    --budget-fill: var(--budget-2);
+}
+.budget-value {
+    margin-left: 0.3rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    white-space: nowrap;
+}
+.budget-axis {
+    position: relative;
+    height: 1.2rem;
+    border-top: var(--border);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+}
+.budget-axis > span {
+    position: absolute;
+    top: 0.2rem;
+    transform: translateX(-50%);
+}
+.budget-axis > span:first-child {
+    transform: none;
+}
+@media (max-width: 48rem) {
+    .budget-grid {
+        grid-template-columns: 1fr;
+    }
+    .budget-head,
+    .budget-axis,
+    .budget-grid > span:empty {
+        display: none;
+    }
+    .budget-size {
+        flex-direction: row;
+        justify-content: flex-start;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+    .budget-cell {
+        border-top: 0;
+        background-position: 0 1.1rem;
+        background-repeat: no-repeat;
+        padding: 0.25rem 0;
+    }
+    .budget-cell::before {
+        content: attr(data-label);
+        font-size: 0.7rem;
+        color: var(--muted);
+    }
+}
+/* What BC1 saves of the color map: its outline alone, at the bar's end. */
+.budget-bar.budget-saved,
+.budget-swatch.budget-saved {
+    background: none;
+    box-shadow: inset 0 0 0 1px var(--budget-0);
+}
+/* What the defaults draw a disc with, under its size. */
+.budget-defaults-note {
+    font-size: 0.7rem;
+}
+/* Copy at the top right (see figure-actions.ts), the legend centered clear of it. */
+.budget-figure:has(> .fig-actions) > .budget-legend {
+    padding-inline: 76px;
+}
+@media (max-width: 48rem) {
+    .budget-figure:has(> .fig-actions) > .budget-legend {
+        padding-inline: 0 76px;
+    }
+}
+/* The chapters' compact cost figures (Costs.astro): the last number at the axis' end, inside the panel, and a cell that
+   holds text in place of a bar. */
+.costs-figure .budget-axis > span:last-child {
+    transform: translateX(-100%);
+}
+.costs-figure .costs-none {
+    margin-left: 0;
+    font-family: inherit;
+}
+/* Copy at the top right (see figure-actions.ts), the last panel's head clear of it. */
+.costs-figure .budget-grid {
+    grid-template-columns: max-content repeat(var(--costs-columns, 2), 1fr);
+}
+.costs-figure .budget-head {
+    align-self: end;
+}
+@media (max-width: 48rem) {
+    .costs-figure .budget-grid {
+        grid-template-columns: 1fr;
+    }
+}
+.costs-figure:has(> .fig-actions) .costs-head-last {
+    padding-right: 40px;
+}

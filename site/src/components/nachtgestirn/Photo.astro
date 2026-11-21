@@ -16,9 +16,9 @@ const { id = "photo" } = Astro.props;
 const first = PHOTOS[0];
 ---
 
-<figure class="tiles-figure" id={id} data-photo>
+<figure class="fig tiles-figure" id={id} data-photo>
     <div class="photo-full" data-field="full" style={`--count: ${PHOTOS.length}`}>
-        <div class="tiles-panel as-seen photo-stage" data-field="stage">
+        <div class="tiles-panel as-seen photo-stage" data-field="stage" data-actions="copy">
             <div class="photo-compare" style="--photo-aspect: 1">
                 <div class="photo-disc">
                     <img src={first?.src} alt="A photograph of the Moon" crossorigin="anonymous" decoding="async" draggable="false" />
@@ -39,7 +39,7 @@ const first = PHOTOS[0];
             </span>
             <span class="photo-note" data-field="note"></span>
             <span class="tiles-ends">
-                <span class="view-buttons">
+                <span class="view-buttons fig-actions">
                     <Rays />
                     <button type="button" class="view-icon" data-field="download" title="Download the comparison as shown, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
                     <CopyInfo />
@@ -67,10 +67,8 @@ const first = PHOTOS[0];
     </div>
     <figcaption class="figure-caption">
         Photographs of the Moon left of the line, and right of it nachtgestirn's Moon for each photograph's moment and
-        place, through the air. nachtgestirn's Moon is turned to the photograph, which is scaled and moved until several
-        hundred craters found in both lie on each other. Compare the maria, the craters, the libration and the terminator; the
-        color and the contrast are the camera's. Photographs from Wikimedia Commons, each credited over its
-        tab.
+        place, through the air, laid on each other by several hundred craters found in both. The color and the contrast
+        are the camera's. Photographs from Wikimedia Commons, each credited over its tab.
     </figcaption>
 </figure>
 

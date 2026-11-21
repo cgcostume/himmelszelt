@@ -9,6 +9,19 @@ export function watchView(element: Element, margin: string, onChange: (inView: b
     );
 }
 
+// Every figure's draw by its element, for a download that has to draw a WebGPU canvas again in its own task.
+const draws = new Map<Element, () => void>();
+
+/** Registers how to draw `element` again at once, for a part drawn outside its figure's `onDemand`. */
+export function redrawable(element: Element, draw: () => void) {
+    draws.set(element, draw);
+}
+
+/** Draws at once every figure drawn on demand within `root`, or around it. */
+export function drawNow(root: Element) {
+    for (const [element, draw] of draws) if (root.contains(element) || element.contains(root)) draw();
+}
+
 /**
  * Rendering on demand, for every figure on the site: the returned function schedules `draw` for the next animation
  * frame, at most once however often it is called, and nothing runs while nothing changes. Given the figure's `element`,
@@ -35,6 +48,7 @@ export function onDemand(draw: () => void, element?: Element) {
         });
     };
     if (element) {
+        draws.set(element, draw);
         const resume = () => {
             if (stale && (visible || (near && !drawn))) {
                 stale = false;

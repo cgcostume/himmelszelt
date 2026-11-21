@@ -23,10 +23,22 @@ override DK_DEBUG_GRID: bool = false;
 // 10^9 cd/m² in a few texels would outshine the whole sky in every filtered lookup.
 override DK_SUN_DISC: bool = true;
 
-// The eye's veil around the sun, by CIE's glare equation (glare.wgsl): its strength, 1 for the eye's own, 0 for none.
-// The sun's illuminance at the observer comes from the light meter's buffer, so it needs no tone curve, only that the
-// sky-view table was built. Added to the sky's light before it is exposed, over the disc too.
-override DK_VEIL: f32 = 0.0;
+// The veil around the sun, by CIE's glare equation (glare.wgsl): its strength, 1 for the eye's own, a two-hundredth for
+// a camera's lens, 0 for none. The sun's illuminance at the observer comes from the light meter's buffer, so it needs
+// no tone curve, only that the sky-view table was built. Added to the sky's light before it is exposed, over the disc
+// too, times the uniforms' `sunInFrame`.
+override DK_VEIL: f32 = 0.005;
+
+// A starburst around the sun, the spikes an aperture's blades diffract (lens.wgsl): how many blades, an even count
+// drawing as many spikes and an odd one twice as many; 0 for none.
+override DK_STARBURST: u32 = 0u;
+
+// The Sun's corona and chromosphere around its disc (sun.wgsl), behind the air, the ground and the Moon as the disc is.
+// With DK_SUN_DISC, in the image only. Far below the veil: seen without it.
+override DK_SOLAR_CORONA: bool = true;
+
+// The disc darker and redder towards its limb (sun.wgsl), its light the same.
+override DK_LIMB_DARKENING: bool = true;
 
 // Without a tone curve, write how much of each pixel the disc covers into alpha, 0 off it: a caller that tone maps can
 // then curve the sky and the disc apart and mix them after, as the pass does, rather than whitening every pixel the disc

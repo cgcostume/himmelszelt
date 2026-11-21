@@ -41,6 +41,8 @@ export function colorFigure(root: HTMLElement) {
             law: "hapke2012",
             mapColor: MODES[i] ?? "tinted",
             darkAdapted: false,
+            // Balanced on the Sun: what is left is the Moon's own color, the figure's subject.
+            white: "sun",
         }));
     }
 

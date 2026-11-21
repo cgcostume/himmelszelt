@@ -82,3 +82,7 @@
     fill: var(--bg);
     stroke: var(--accent);
 }
+/* Under the day's "sunny day", which stands in the plot's top right corner. */
+.exposureday-panel > .fig-actions {
+    top: 44px;
+}

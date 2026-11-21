@@ -5,7 +5,6 @@ import { moonSymbol, sunInViewFrame } from "./figure";
 import { onChange, state, update } from "./state";
 import { momentOnClock } from "./timeofday";
 import { clock, DAY_MS, instantOf, wallDayOf } from "./zone";
-import "./export";
 
 // Ten-minute steps: rise and set are then found to the minute by bisection, and the lanes are smooth enough.
 const SAMPLES_PER_DAY = 144;

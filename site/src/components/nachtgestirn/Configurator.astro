@@ -3,7 +3,7 @@ import CopyInfo from "../CopyInfo.astro";
 import Fig from "../Fig.astro";
 import Icon from "../Icon.astro";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
-import "../sternzeit/sternzeit.css";
+import "../costs.css";
 import "./nachtgestirn.css";
 
 /** The pass configured for a disc's size: the package's thresholds as switches, a preview one pixel to a pixel, and
@@ -28,12 +28,12 @@ const TECHNIQUES = [
 ] as const;
 ---
 
-<figure class="config-figure" id={id} data-configurator>
+<figure class="fig config-figure" id={id} data-configurator>
     <div class="config-main">
-        <div class="config-preview as-seen">
+        <div class="config-preview as-seen" data-actions="copy">
             <canvas aria-label="nachtgestirn's Moon as configured, one pixel of the canvas to a pixel of the screen, rendered with WebGPU"></canvas>
-            <span class="tiles-start"><span class="tiles-hint footnote">Rendered with WebGPU</span></span>
-            <span class="view-buttons config-ends"><button type="button" class="view-icon" data-field="download" title="Download the Moon as configured as PNG" aria-label="Download as PNG"><Icon name="download" /></button><CopyInfo /></span>
+            <span class="tiles-start"><span class="view-buttons"><button type="button" class="view-icon" data-field="lock" aria-pressed="true" title="Seen from Earth: turns the Moon back to the face Earth sees; turning it lets go" aria-label="Moon lock"><Icon name="moonLock" /></button></span><span class="tiles-hint footnote">Rendered with WebGPU</span></span>
+            <span class="view-buttons fig-actions config-ends"><button type="button" class="view-icon" data-field="download" title="Download the Moon as configured as PNG" aria-label="Download as PNG"><Icon name="download" /></button><CopyInfo /></span>
             <output class="config-disc-note footnote" data-field="discValue" title="How many pixels across the disc: turn the mouse wheel over the Moon"></output>
         </div>
         <div class="config-settings">
@@ -42,6 +42,12 @@ const TECHNIQUES = [
                     {MAPS.map((maps) => (
                         <button type="button" class="view-toggle" data-maps={maps} aria-pressed="false" title={`The ${NAMES[maps]} maps${maps === "8k" ? ", this site's, not in the package" : ""}`}>{NAMES[maps]}</button>
                     ))}
+                </span>
+            </div>
+            <div class="config-row">
+                <span class="view-buttons">
+                    <button type="button" class="view-toggle" data-set="seen" aria-pressed="true" title="The seen maps, the package's default: the far side Earth never sees its own mean, at no height">seen</button>
+                    <button type="button" class="view-toggle" data-set="whole" aria-pressed="false" title="The whole maps, the far side too, for a globe or a camera that orbits the Moon">whole</button>
                 </span>
             </div>
             {TECHNIQUES.map(([tech, label, title]) => (

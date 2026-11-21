@@ -2,7 +2,7 @@
 // Makes data/constellations.bin from data/constellations.csv, the checked-in source of truth: the constellations'
 // lines as little-endian Uint16 triples, the constellation's index among the abbreviations in sorted order, as
 // `CONSTELLATIONS` in `src/constellations.ts` lists them, and the two stars a line joins, as rows of
-// data/brightstars.csv counted from 0. Rerunnable: `pnpm constellations [--out <dir>] [--force]`, which skips the work
+// data/brightstars.csv counted from 0. Rerunnable: `pnpm data:constellations [--out <dir>] [--force]`, which skips the work
 // while the file is newer than the CSV and the script.
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

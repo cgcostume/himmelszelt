@@ -38,12 +38,12 @@ export function eclipsePhotosFigure(root: HTMLElement) {
     const slider = find<HTMLInputElement>("[data-field=split]", root);
     const cells = [...root.querySelectorAll<HTMLElement>(".eclipse-photo")];
     const requestRender = onDemand(render, root);
-    const tiles = createTiles(canvas, requestRender);
+    const tiles = createTiles(canvas, requestRender, false);
     if (!tiles) noGpu(canvas);
     const moments = ECLIPSE_PHOTOS.map((p) => julianDayUT(fromDate(new Date(p.date))));
     const strip = find<HTMLElement>("[data-field=strip]", root);
     const stripCanvas = find<HTMLCanvasElement>("canvas", strip);
-    const stripTiles = createTiles(stripCanvas, requestRender);
+    const stripTiles = createTiles(stripCanvas, requestRender, false);
     if (!stripTiles) noGpu(stripCanvas);
     const stripMarks = find<SVGSVGElement>("[data-field=stripMarks]", root);
     // The umbra's first and last contact, either side of the photographs' totality.
@@ -109,6 +109,8 @@ export function eclipsePhotosFigure(root: HTMLElement) {
                 eclipse: true,
                 law: "hapke2012",
                 darkAdapted: false,
+                // As the photographs, taken without a white balance of the Moon's: a camera's daylight.
+                white: "sun",
                 // Everything at its finest, as in the photo figure: the relief displaced, the maps read along the footprint.
                 displacementFrom: 0,
                 filter: "anisotropic",
@@ -152,6 +154,7 @@ export function eclipsePhotosFigure(root: HTMLElement) {
             eclipse: true,
             law: "hapke2012",
             darkAdapted: false,
+            white: "sun",
         }));
         markStrip(stripColumns, stripRows);
     }

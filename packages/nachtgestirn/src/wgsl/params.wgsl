@@ -33,7 +33,7 @@ struct NgParams {
     sunAngularRadius: f32,
 
     // The color map, decoded, made normal albedo per channel: its scale, and the Moon's tint, or gray. Without a map
-    // the disc is `albedo` all over.
+    // the disc is `albedo` all over, through the matrix, which then holds the tint alone.
     albedoMatrix: mat3x3f,
     albedo: f32,
 
@@ -71,6 +71,12 @@ struct NgParams {
     // carries them across the sky, in radians a second.
     shimmer: vec4f,
     shimmerParts: vec4f,
+
+    // The Sun's color, linear sRGB at unit luminance, which `sunIlluminance` and `earthshine` are the luminance of.
+    sunColor: vec3f,
+
+    // The white balance, helldunkel's `hdWhiteBalance`, on the composed light before the exposure; the identity for none.
+    whiteBalance: mat3x3f,
 }
 
 // What changes only with the air towards the Moon or with an eclipse: written when it changes.

@@ -1,0 +1,1130 @@
+/* What every figure on the site shares, whichever chapter it is in: its frame, the group of its actions at the top
+   right, the buttons and sliders over and under it, the marks its SVGs draw with, rows of panels and tiles, strips and
+   plots, and photographs laid over a render. A chapter's own CSS holds only what is its own. */
+
+/* Every figure, as wide as the reading column or, `.wide`, breaking out of it centered. Whatever is read as text keeps
+   to the column, under a wide figure too: its caption, status line and sliders. */
+.fig {
+    margin: 1.5rem 0;
+    /* How far the reading column is inset from this figure's edge: zero while the figure is as wide as the text, and
+       half the difference once it breaks out. Everything in the figure that is read as text lines up with it. */
+    --content-inset: max(0px, calc((100% - var(--measure) + 3rem) / 2));
+}
+.fig.wide {
+    margin-left: calc(50% - var(--wide-width) / 2);
+}
+.fig.wide > :is(.figure-caption, .view-status, .figure-slider, .lut-call) {
+    width: calc(var(--measure) - 3rem);
+    max-width: 100%;
+    margin-inline: auto;
+    padding-inline: 0;
+}
+@media (max-width: 48rem) {
+    .fig.wide {
+        width: auto;
+        margin-left: 0;
+    }
+}
+
+/* The figure's actions at its top right, always shown (see figure-actions.ts): its own buttons, the download, Copy and
+   full screen, over the panel they belong to. In a bar of the figure's own they take their place in it. */
+[data-export] {
+    pointer-events: auto;
+}
+:where([data-actions], [data-export]) > .fig-actions {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 5;
+}
+/* In a row of controls above a plot, at its end, as high in the row's flow as the segmented controls beside it. */
+.fig-row {
+    margin-block: -5px;
+    margin-left: auto;
+}
+/* A panel inside another one (the locked views, the analemma): its download shows on hover. */
+.fig-actions-nested {
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+[data-export]:hover > .fig-actions-nested,
+.fig-actions-nested:focus-within {
+    opacity: 1;
+}
+@media (hover: none) {
+    .fig-actions-nested {
+        opacity: 1;
+    }
+}
+
+/* A group of icon buttons over a figure (see SkyFrame.astro), in the page's own theme even over one that stays dark. */
+.view-buttons {
+    --bg: var(--overlay-solid);
+    --surface: var(--overlay-surface);
+    --line: var(--overlay-line);
+    --text: var(--overlay-ink);
+    --muted: var(--overlay-quiet);
+    --accent: var(--overlay-accent);
+    display: flex;
+    flex: none;
+    gap: 4px;
+    padding: 4px;
+    border-radius: var(--radius-group);
+    background: var(--overlay-surface);
+    pointer-events: auto;
+}
+/* A figure's readout, right under its view, in the reading column. */
+.view-status {
+    margin: 0.5rem 0 0;
+    padding-inline: var(--content-inset);
+    font-size: var(--text-meta);
+}
+/* A control's name, beside a slider or in front of a row of buttons. */
+.note {
+    color: var(--muted);
+}
+/* A plate behind the icon shows hover and on; a press shrinks the plate alone, the icon stays where it is. */
+.view-icon {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-button);
+    background: none;
+    color: var(--text);
+    transition: color 0.15s;
+}
+.view-icon[hidden] {
+    display: none;
+}
+/* A name laid over a canvas, such as a tile's or a strip's: 8px in from a corner of the canvas' 16px radius. */
+.overlay-label {
+    padding: 2px 10px;
+    border-radius: var(--radius-button);
+    background: var(--overlay-solid);
+    color: var(--overlay-ink);
+    font-size: 0.9375rem;
+}
+/* Once a view is copied, a word under its button says so, for a moment. */
+.copy-info[data-copied]::after {
+    content: "copied";
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    padding: 2px 6px;
+    border-radius: var(--radius-button);
+    background: var(--overlay-solid);
+    color: var(--overlay-ink);
+    font-size: var(--text-small);
+    white-space: nowrap;
+    pointer-events: none;
+}
+.view-icon::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--plate, transparent);
+    transition:
+        background 0.15s,
+        transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.view-icon:hover {
+    --plate: var(--overlay-hover);
+}
+.view-icon:active::before {
+    transform: scale(0.82);
+    transition-duration: 0.08s;
+}
+.view-icon[aria-pressed="true"] {
+    --plate: var(--overlay-tint);
+    color: var(--accent);
+}
+.view-icon .icon {
+    width: 16px;
+    height: 16px;
+    stroke-width: 0.85;
+}
+/* Text buttons, with or without an icon before or after the word, at the small text's size: a view's switch, a step,
+   a month. Within a group the group is their ground. */
+.view-toggle {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    height: 28px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: var(--radius-button);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: var(--text-small);
+    transition:
+        background 0.15s,
+        color 0.15s;
+}
+.view-toggle:hover:enabled {
+    background: var(--line);
+    color: var(--text);
+}
+.view-toggle[aria-pressed="true"] {
+    background: color-mix(in oklab, var(--accent) 22%, var(--surface));
+    color: var(--accent);
+}
+.view-toggle .icon {
+    width: 14px;
+    height: 14px;
+    stroke-width: 1;
+}
+.view-buttons > .view-toggle:not(:hover, [aria-pressed="true"]) {
+    background: none;
+}
+/* The supersampling switch's "MSAA" runs on from its "4×", across the switch's gap (see Rays.astro). */
+.rays-long {
+    margin-left: -4px;
+}
+/* A switch named in words that turns into its icon where there is no room for them (see Globe.astro). */
+.icon-when-narrow > .icon {
+    display: none;
+}
+@media (max-width: 40rem) {
+    .icon-when-narrow {
+        justify-content: center;
+        width: 28px;
+        padding: 0;
+    }
+    .icon-when-narrow > .switch-text {
+        display: none;
+    }
+    .icon-when-narrow > .icon {
+        display: block;
+        width: 16px;
+        height: 16px;
+    }
+    /* The supersampling switch says "4×" alone (see Rays.astro). */
+    .rays-long {
+        display: none;
+    }
+}
+/* Nothing but an icon: square. */
+.button-square {
+    justify-content: center;
+    width: 28px;
+    padding: 0;
+}
+/* The step sizes as one segmented row of radio buttons, sharing their edges like the stepper does; it wraps rather
+   than overflowing on a narrow screen. */
+.steps {
+    display: flex;
+    flex-wrap: wrap;
+    /* Buttons, not text: a quick double tap must not select a label. */
+    user-select: none;
+}
+.steps input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+.steps label span {
+    display: block;
+    margin-left: -1px;
+    padding: 0.15rem 0.45rem;
+    border: var(--border);
+    border-radius: 0;
+    background: var(--surface);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    line-height: 1.4;
+    cursor: pointer;
+}
+.steps label:first-child span {
+    margin-left: 0;
+    border-radius: var(--radius-button) 0 0 var(--radius-button);
+}
+.steps label:last-child span {
+    border-radius: 0 var(--radius-button) var(--radius-button) 0;
+}
+/* A group's name, first and plain: text, not a button. */
+.steps-heading {
+    padding: 0.15rem 0.45rem;
+    border: var(--border);
+    border-radius: var(--radius-button) 0 0 var(--radius-button);
+    background: var(--surface);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    line-height: 1.4;
+    opacity: 0.7;
+}
+/* Which one is chosen shows in the text, not in a second outline: the group already has enough lines in it. */
+.steps label:hover span {
+    color: var(--text);
+}
+.steps label:has(:disabled) span {
+    color: var(--muted);
+    opacity: 0.45;
+    cursor: default;
+}
+.steps label:has(:checked) span {
+    color: var(--accent);
+}
+.steps label:has(:focus-visible) span {
+    position: relative;
+    z-index: 1;
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+/* A heading's name in the accent, as the moment and place's own. */
+.moment-title {
+    margin-right: 0.4em;
+    color: var(--accent);
+}
+/* A slider under a figure, as wide as it is, its marks under the thumb's travel and its value beside it: the moon
+   calendar's time of day, the Moon's lunation, the eclipses' hours around their moment. */
+.figure-slider {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    margin-top: 0.5rem;
+    font-size: var(--text-meta);
+    line-height: 18px;
+}
+/* A second slider stands off the first and its scale. */
+.figure-slider + .figure-slider {
+    margin-top: 0.75rem;
+}
+.figure-slider-rail {
+    flex: 1;
+}
+/* Without the browser's margin around a slider, so its rail is level with the words either side. */
+.figure-slider input {
+    width: 100%;
+    margin: 0;
+}
+.figure-slider-scale {
+    position: relative;
+    display: block;
+    height: 1em;
+    margin-top: -0.1rem;
+    margin-inline: calc(18px / 2);
+    line-height: 1;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+}
+.figure-slider-mark {
+    position: absolute;
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+/* The Moon's phases on its lunation, drawn rather than named, lit where the Moon is: full, last quarter, new, first. */
+.figure-slider-mark > svg {
+    display: block;
+    width: 10px;
+    height: 10px;
+    margin-top: 0.15em;
+    fill: currentColor;
+}
+.figure-slider-mark .phase-outline {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+/* A mark's unit or hemisphere, hanging after it, so the mark centers on its number under the thumb. */
+.figure-slider-unit {
+    position: absolute;
+    left: 100%;
+}
+/* A mark without a name, its name on hover: the tropics and the polar circles under the latitude. */
+.figure-slider-tick {
+    width: 1px;
+    height: 0.5em;
+    margin-top: 0.15em;
+    background: currentColor;
+}
+/* Sliders stacked under one figure line their rails up: the same room for every name and every value. */
+.figure-slider:has(+ .figure-slider) > .note,
+.figure-slider + .figure-slider > .note {
+    min-width: 4em;
+}
+.figure-slider:has(+ .figure-slider) > output,
+.figure-slider + .figure-slider > output {
+    min-width: 7ch;
+    text-align: right;
+}
+.figure-slider output {
+    min-width: 5ch;
+    font-family: var(--font-mono);
+}
+/* The latitude, as wide as "90.0° S", so the rail stays put. */
+.figure-slider[data-latitude] output {
+    min-width: 7ch;
+    text-align: right;
+}
+/* The days since the new moon, as wide as two digits ever need, so the rail stays put as they drop to one. */
+.figure-slider[data-lunation] output {
+    min-width: 6ch;
+    text-align: right;
+}
+/* An offset from the moment, as wide as "+24:00", so the rail stays put as the hours gain a digit. */
+.figure-slider[data-offset] output {
+    min-width: 6ch;
+    text-align: right;
+}
+/* In days over a lunation, "+12.5 d": a character more, so a one-digit day does not shift the slider. */
+.figure-slider[data-offset="hours"] output,
+.figure-slider[data-zoom] output {
+    min-width: 7ch;
+}
+/* At the top of the scene it belongs to, not the bottom, where it would read as a caption of whatever panel floats
+   over the scene's lower half. */
+.vis-credit {
+    position: absolute;
+    top: 0.5rem;
+    left: var(--content-inset);
+    margin: 0;
+    padding: 0;
+    color: var(--muted);
+    opacity: 0.7;
+    pointer-events: none;
+}
+.vis-credit a {
+    color: inherit;
+    pointer-events: auto;
+}
+/* A scene's switches in the top left corner, the credit line after them. The bar lets a drag through to the scene. */
+.scene-bar {
+    position: absolute;
+    top: 0.5rem;
+    left: var(--content-inset);
+    z-index: 5;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    pointer-events: none;
+}
+.scene-bar > .vis-credit {
+    position: static;
+}
+@media (max-width: 48rem) {
+    .vis-credit,
+    .scene-bar {
+        left: 0;
+    }
+    .scene-bar {
+        right: 2.5rem;
+        flex-wrap: wrap;
+    }
+}
+/* The Sun wherever it stands as a symbol (the locked views, the line off the Moon's bright limb): a white disc with
+   dotted rays. The Moon beside it in the locked views is a muted disc. */
+.figure-sun-ray {
+    stroke: var(--text);
+    stroke-width: var(--sun-stroke);
+    vector-effect: non-scaling-stroke;
+}
+/* A filled disc without an outline, so its radius is the symbol's and the Moon's beside it can be set against it. */
+/* A point to drag in a drawn figure, as a slider's thumb: the accent, ringed in the page's color. */
+.figure-thumb {
+    fill: var(--accent);
+    stroke: var(--bg);
+    stroke-width: 3;
+}
+/* On a split line, which is broken around it instead. */
+.figure-thumb.split-thumb {
+    stroke: none;
+}
+.figure-sun {
+    fill: var(--sun-fill);
+    stroke: var(--sun-edge);
+    stroke-width: var(--body-edge);
+    vector-effect: non-scaling-stroke;
+}
+/* The glow is a copy of the Sun's disc behind it, clipped at the horizon (see sunGlow); Zdog's Sun, a plain path, is
+   tagged by scene.ts and dayarc.ts once it exists. */
+.figure-sun-glow {
+    color: var(--text);
+    filter: var(--sun-glow);
+}
+/* In a drawn figure the filter's lengths are in the figure's own units, so the blur is scaled back to screen pixels. */
+[style*="--units-per-px"] .figure-sun-glow {
+    filter: drop-shadow(0 0 calc(4px * var(--units-per-px)) color-mix(in srgb, currentColor 45%, transparent));
+}
+/* On the light page none, as --sun-glow, except where the figure shows the sky as it is seen. */
+:root[data-theme="light"] .figure-sun-glow:not(.as-seen *) {
+    filter: none;
+}
+.figure-sun-ray {
+    stroke-dasharray: var(--sun-dots);
+    stroke-linecap: round;
+}
+/* The Moon wherever it stands as a symbol: the lit part in the Sun's own shade, the night side in the earthshine it
+   is actually seen by, which is at its bluest around new moon and gone by full moon (--earthshine, 0 to 1). */
+.figure-moon {
+    fill: color-mix(in srgb, var(--accent) calc(var(--earthshine, 0) * 45%), var(--moon-night));
+    stroke: var(--moon-edge);
+    /* Twice as wide: the lit part, drawn over the disc, covers the inner half of it. */
+    stroke-width: calc(2 * var(--body-edge));
+    vector-effect: non-scaling-stroke;
+}
+.figure-moon-lit {
+    fill: var(--moon-lit);
+}
+/* The Moon's equator and prime meridian on the symbol, faint: they only have to show which way it is turned. */
+.figure-moon-graticule {
+    fill: none;
+    stroke: var(--bg);
+    stroke-width: 0.6;
+    opacity: 0.125;
+}
+/* Shared by the figures' SVGs (see figure.js and offpanel.js): the ground drawn beneath, the veil drawn over what the
+   horizon hides, the horizon itself, labels and notes, and the indicator for a body outside the panel. */
+.figure-ground {
+    fill: var(--surface);
+}
+.figure-veil {
+    fill: var(--surface);
+    opacity: 0.8;
+}
+.figure-horizon {
+    stroke: var(--accent);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+.figure-label,
+.figure-note {
+    fill: var(--muted);
+    text-anchor: middle;
+    dominant-baseline: middle;
+}
+.figure-note {
+    fill: var(--text);
+}
+.figure-anchor-start {
+    text-anchor: start;
+}
+.figure-anchor-end {
+    text-anchor: end;
+}
+/* A readout's muted name and its value share one line. On the plain alphabetic baseline, centered by a dy instead
+   (see moonview.js): browsers disagree on whether a tspan inherits a middle baseline, and set the two parts apart. */
+.figure-readout,
+.figure-readout-name {
+    dominant-baseline: alphabetic;
+}
+.figure-readout-name {
+    fill: var(--muted);
+}
+.figure-grid-label {
+    fill: var(--muted);
+    text-anchor: end;
+    dominant-baseline: middle;
+}
+.figure-grid {
+    stroke: var(--line);
+    stroke-width: 1;
+    stroke-dasharray: 1 3;
+    vector-effect: non-scaling-stroke;
+}
+/* The eclipse views: two square panels side by side within the reading column, stacked below 40rem (see there). */
+.eclipse-views {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+.eclipse-view {
+    position: relative;
+    margin: 0;
+}
+.eclipse-view figcaption {
+    margin: 0.5rem 0 0;
+    font-size: var(--text-meta);
+}
+/* The title of a sub-figure's caption: what that panel shows, named at its head, the words to read first. A figure's
+   own status line takes the same look, unlettered. */
+.subfigure-title,
+.status-title {
+    color: var(--accent);
+}
+/* Lettered like a paper's sub-figures, so a caption names them by letter rather than by where the layout puts them. */
+figure[id] {
+    counter-reset: subfigure;
+}
+.subfigure-title::before {
+    counter-increment: subfigure;
+    content: "(" counter(subfigure, lower-alpha) ") ";
+}
+/* The panel proper, without the caption below it: what floats over the figure is placed against this. */
+.eclipse-panel {
+    position: relative;
+}
+/* Too narrow for two panels side by side: the eclipses stack, and are then as wide as every other figure. */
+@media (max-width: 40rem) {
+    .eclipse-views {
+        grid-template-columns: 1fr;
+    }
+}
+/* The flat strips (ΔT over the millennia, the year's daylight, the scattering): SVGs in screen pixels, no frame. */
+/* As tall as the panels over the scenes are wide (1a, 1b, the analemma): 38% of the scene's height, which is 4:3 of the
+   wide width, 16:9 once the page is wide, never over 80vh; never under 9rem, where the scenes turn square and small. */
+.strip-panel > svg {
+    display: block;
+    width: 100%;
+    height: max(9rem, 0.38 * min(80vh, min(var(--wide), 100vw - 3rem) * var(--scene-ratio, 3 / 4)));
+    background: var(--bg);
+    cursor: crosshair;
+}
+.strip-panel {
+    position: relative;
+}
+/* Inside the plot, under its top margin (STRIP_MARGIN), not half over its edge. */
+.strip-panel > .fig-actions {
+    top: 20px;
+    right: 8px;
+}
+/* As flat as the scenes once the page is wide, 16:9. */
+@media (min-width: 64rem) {
+    .strip-panel {
+        --scene-ratio: 9 / 16;
+    }
+}
+/* Broken out of the column, inset as far as the panels floating over the scenes, the analemma's among them. */
+@media (min-width: 48rem) {
+    .wide > .strip-panel {
+        margin-inline: 1.5rem;
+    }
+}
+.strip-band {
+    fill: var(--surface);
+}
+.strip-moment {
+    stroke: var(--text);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    opacity: 0.6;
+}
+.strip-moment-dot {
+    fill: var(--text);
+}
+
+/* The strips' value ticks in the monospace, so their digits and units line up. */
+.strip-tick {
+    font-family: var(--font-mono);
+}
+/* At the left edge, flush with the text. */
+.strip-tick {
+    text-anchor: start;
+}
+/* A row of Moons rendered side by side (see tiles.ts): the canvas as wide as the figure, each disc named under it. */
+.tiles-panel {
+    position: relative;
+    border-radius: var(--radius-canvas);
+    overflow: hidden;
+}
+/* Panels stacked in one figure, a hair apart as the tone tiles are. */
+.tiles-panel + .tiles-panel {
+    margin-top: 4px;
+}
+.tiles-panel > canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+/* Switches in the status line under the tiles, in the line's flow. */
+.tiles-figure .view-status > .view-toggle {
+    margin-right: 0.5rem;
+}
+.tiles-figure .view-status > .view-toggle + .view-toggle {
+    margin-left: -0.25rem;
+}
+/* The names under the tiles, one column each, muted like a readout, with the number under the name. */
+.tiles-labels {
+    display: grid;
+    margin: 0.35rem 0 0;
+    padding: 0;
+    font-size: var(--text-meta);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    list-style: none;
+}
+/* Name and value on one line, told apart by their colors; in a row of tiles too narrow for that, one over the other in
+   every tile alike. */
+.tiles-labels > li {
+    container-type: inline-size;
+    text-wrap: balance;
+}
+@container (max-width: 10rem) {
+    .tiles-labels .tiles-name {
+        display: block;
+    }
+    .tiles-labels .tiles-value {
+        margin-left: 0;
+    }
+}
+.tiles-labels .tiles-name:not([class*="law-"]) {
+    color: var(--accent);
+}
+.tiles-labels .tiles-value {
+    margin-left: 0.2em;
+    color: var(--muted);
+}
+/* A plot under the tiles: the phase curves, or the shadow's light, as the ΔT strip. */
+.tiles-plot {
+    margin-top: 0.75rem;
+}
+.tiles-plot > svg {
+    display: block;
+    width: 100%;
+    height: 180px;
+    overflow: visible;
+}
+.plot-line {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.6;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+}
+/* The shadow's light per channel, in the channel's own hue, muted. */
+.plot-line-red {
+    stroke: oklch(0.62 0.19 25);
+}
+.plot-line-green {
+    stroke: oklch(0.62 0.14 145);
+}
+.plot-line-blue {
+    stroke: oklch(0.6 0.16 255);
+}
+/* A measurement among models: dashed, in the text's ink. */
+.plot-label-measured {
+    fill: var(--muted);
+}
+.plot-line-measured,
+.plot-dot-measured {
+    stroke: var(--muted);
+}
+.plot-line-measured {
+    stroke: var(--text);
+    stroke-dasharray: 4 3;
+    stroke-width: 1.2;
+}
+.plot-mark {
+    stroke: var(--muted);
+    stroke-width: 1;
+    stroke-dasharray: 2 2;
+    vector-effect: non-scaling-stroke;
+}
+.plot-now {
+    stroke: var(--accent);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+.plot-dot {
+    fill: var(--bg);
+    stroke: var(--accent);
+    stroke-width: 1.5;
+}
+.plot-bar {
+    stroke: var(--text);
+    stroke-width: 3;
+    stroke-linecap: butt;
+}
+/* The switches over a panel, at its top left, as over the other figures' scenes. */
+.tiles-panel > .view-buttons:not(.eclipse-jump) {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    z-index: 5;
+}
+.tiles-empty {
+    padding: 2rem 1rem;
+    color: var(--muted);
+    text-align: center;
+}
+/* Tiles split by lines of the page's background between them, both ways, `--count` tiles wide and `--rows` high; the
+   last lines fall outside. The page's background is taken on the figure, outside the dark panel, which has its own. */
+.tiles-figure {
+    --page-bg: var(--bg);
+    --tiles-gap: 2px;
+}
+.tiles-panel.split::after {
+    content: "";
+    position: absolute;
+    inset: 0 calc(-1 * var(--tiles-gap)) calc(-1 * var(--tiles-gap)) 0;
+    background:
+        linear-gradient(to right, transparent calc(100% - var(--tiles-gap)), var(--page-bg) 0) 0 0 /
+        calc(100% / var(--count, 1)) 100%,
+        linear-gradient(to bottom, transparent calc(100% - var(--tiles-gap)), var(--page-bg) 0) 0 0 / 100%
+        calc(100% / var(--rows, 1));
+    pointer-events: none;
+}
+/* The maps' resolutions and the switches for the relief at the top left, each a group of its own, the resolutions first. */
+.tiles-panel > .tiles-start {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    left: 6px;
+    z-index: 5;
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+    pointer-events: none;
+}
+/* Where the switches do not fit in one row, they take a second, and the hint makes way. */
+@media (max-width: 40rem) {
+    .tiles-panel > .tiles-start {
+        flex-wrap: wrap;
+    }
+    .tiles-panel > .tiles-start > .tiles-hint {
+        display: none;
+    }
+}
+/* Clear of the buttons at the top right: the antialiasing switch, the download besides, the full screen too. */
+.tiles-panel:has(> .tiles-ends) > .tiles-start {
+    right: 112px;
+}
+.tiles-panel:has(> .tiles-end, > .fig-actions) > .tiles-start {
+    right: 88px;
+}
+.tiles-panel:has(> .globe-end) > .tiles-start {
+    right: 156px;
+}
+.tiles-panel:has(> .tiles-end > .view-icon) > .tiles-start {
+    right: 122px;
+}
+.tiles-panel:has(> .tiles-ends > :nth-child(2)) > .tiles-start {
+    right: 122px;
+}
+.tiles-panel:has(> .tiles-ends > :nth-child(2)):has(> .tiles-ends [data-field="metered"]) > .tiles-start {
+    right: 154px;
+}
+/* After the switches, how to turn the panel and what renders it, as sternzeit's scenes say it: muted, on no plate, cut
+   short where the panel is narrow. */
+.tiles-hint {
+    min-width: 0;
+    height: 36px;
+    line-height: 36px;
+    padding: 0 0.25rem;
+    overflow: hidden;
+    color: var(--muted);
+    opacity: 0.7;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+/* Alone, without switches before it, as far from the top as from the side: the box trimmed to the capitals and the
+   baseline, so the gap above the letters is the one beside them. */
+.tiles-start > .tiles-hint:only-child {
+    height: auto;
+    padding: 4px;
+    line-height: 1;
+    text-box: trim-both cap alphabetic;
+}
+/* Groups of buttons at the top right side by side: the antialiasing and the meter, the download apart. */
+.tiles-panel > .tiles-ends {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 5;
+    display: flex;
+    gap: 6px;
+}
+/* The globe's full screen button, top right, and the globe full screen: the canvas the screen's size. */
+.tiles-panel > .view-buttons.globe-end,
+.tiles-panel > .view-buttons.tiles-end,
+.tiles-panel > .view-buttons.fig-actions {
+    left: auto;
+    right: 6px;
+}
+.timeline-pointer {
+    fill: var(--accent);
+}
+/* The split's slider out of sight, the line and its thumb dragged on the picture instead; still there for the keyboard
+   and a screen reader. */
+.split-slider {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+/* A photograph with nachtgestirn's Moon laid over it, in a square that keeps its size whatever the photograph: the
+   photograph faded into its sky past the disc, the canvas clipped to the right of a split line, the marks over both; in
+   full screen the stage fills the screen over the gallery, the disc in its middle. */
+.photo-compare {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    cursor: ew-resize;
+    touch-action: pan-y;
+}
+.photo-filter {
+    position: absolute;
+    width: 0;
+    height: 0;
+}
+
+.photo-disc {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: #000;
+}
+.tiles-figure .tiles-panel .photo-disc > img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    max-width: none;
+    transform-origin: 0 0;
+}
+.tiles-figure .tiles-panel .photo-disc > canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.photo-marks {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+.photo-marks .photo-split-line {
+    stroke: var(--line);
+    stroke-width: 1.5;
+}
+/* The moment, the place and what nachtgestirn computed for them, muted along the stage's foot. */
+.photo-note {
+    position: absolute;
+    right: 10px;
+    bottom: 8px;
+    left: 10px;
+    z-index: 5;
+    color: var(--muted);
+    opacity: 0.7;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    text-align: right;
+    text-wrap: pretty;
+    pointer-events: none;
+}
+.photo-marks .photo-north {
+    fill: rgb(255 255 255 / 0.85);
+    font-size: 11px;
+    paint-order: stroke;
+    stroke: rgb(0 0 0 / 0.7);
+    stroke-width: 3px;
+}
+.photo-marks .photo-north {
+    text-anchor: middle;
+}
+/* The face figure's annotations, faint, so the Moon under them stays the thing to look at. */
+.photo-marks .photo-grid {
+    opacity: 0.45;
+}
+.photo-full:fullscreen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-bottom: 0.5rem;
+    background: #000;
+    color-scheme: dark;
+    color: white;
+    --text: white;
+    --muted: #aaa;
+    --surface: oklch(0.22 0.015 267);
+    --line: oklch(0.289 0.021 266);
+    /* The gap around the slider's thumb, in what lies behind it. */
+    --bg: #000;
+}
+.photo-full:fullscreen > .photo-stage {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    border-radius: 0;
+}
+.photo-full:fullscreen .photo-compare {
+    height: 100%;
+    aspect-ratio: auto;
+}
+/* Its thumbnails size themselves by the gallery's width, which a centered column would otherwise shrink to nothing. */
+/* The photographs to compare as tabs under the figure, without names: the chosen one rises into the bar over them,
+   which credits it, its corners into the bar rounded out, and the bar's own corner square where the tab joins it there;
+   in full screen under the stage, as wide as the tabs need. */
+.photo-picker {
+    --tab: color-mix(in oklab, var(--surface), var(--line) 70%);
+    margin: 0.5rem 0;
+}
+.photo-full:fullscreen > :is(.photo-picker, .figure-slider) {
+    width: min(calc(100% - 2rem), calc(var(--count) * 7rem));
+    flex: none;
+}
+.photo-credit {
+    margin: 0;
+    padding: 0.4rem 0.75rem;
+    border-radius: var(--radius-button);
+    background: var(--tab);
+    color: var(--muted);
+    font-size: var(--text-small);
+    line-height: 1.4;
+}
+.photo-credit a {
+    color: inherit;
+}
+.photo-credit-name {
+    color: var(--text);
+}
+.photo-picker:has(.photo-tab:first-child[aria-pressed="true"]) .photo-credit {
+    border-bottom-left-radius: 0;
+}
+.photo-picker:has(.photo-tab:last-child[aria-pressed="true"]) .photo-credit {
+    border-bottom-right-radius: 0;
+}
+.photo-tabs {
+    display: grid;
+    grid-template-columns: repeat(var(--count), 1fr);
+    align-items: start;
+    gap: 4px;
+}
+.photo-tab {
+    position: relative;
+    display: block;
+    min-width: 0;
+    height: auto;
+    margin-top: 6px;
+    padding: 4px;
+    border: none;
+    border-radius: 0 0 var(--radius-button) var(--radius-button);
+    background: none;
+    cursor: pointer;
+    filter: brightness(0.7) saturate(0.6);
+    transition: filter 0.15s;
+}
+.photo-full .photo-tabs .photo-tab > img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    /* Concentric with the tab's corner, its padding in. */
+    border-radius: calc(var(--radius-button) - 4px);
+}
+.photo-tab:hover,
+.photo-tab:focus-visible {
+    filter: none;
+}
+.photo-tab:focus-visible {
+    outline: none;
+}
+.photo-tab:focus-visible:not([aria-pressed="true"]) img {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+.photo-tab[aria-pressed="true"] {
+    margin-top: 0;
+    padding-top: 10px;
+    background: var(--tab);
+    filter: none;
+}
+.photo-tab[aria-pressed="true"]::before,
+.photo-tab[aria-pressed="true"]::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: var(--radius-button);
+    height: var(--radius-button);
+}
+.photo-tab[aria-pressed="true"]::before {
+    right: 100%;
+    background: radial-gradient(
+        circle at 0 100%,
+        transparent calc(var(--radius-button) - 0.5px),
+        var(--tab) var(--radius-button)
+    );
+}
+.photo-tab[aria-pressed="true"]::after {
+    left: 100%;
+    background: radial-gradient(
+        circle at 100% 100%,
+        transparent calc(var(--radius-button) - 0.5px),
+        var(--tab) var(--radius-button)
+    );
+}
+.photo-tab:first-child::before,
+.photo-tab:last-child::after {
+    display: none;
+}
+/* Tables of numbers, in a figure or the text: monospace, the values right-aligned, every other row on the surface. */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 1rem;
+    table-layout: fixed;
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    font-variant-numeric: tabular-nums;
+    border: var(--border);
+}
+th,
+td {
+    border: var(--border);
+    padding: 0.3rem 0.6rem;
+    text-align: left;
+    vertical-align: top;
+    overflow-wrap: break-word;
+}
+th {
+    color: var(--muted);
+    font-weight: 400;
+    background: var(--surface);
+}
+col.name {
+    width: 45%;
+}
+col.unit {
+    width: 10%;
+}
+col.value {
+    width: 45%;
+}
+th.value,
+td.value {
+    text-align: right;
+    padding-right: 1rem;
+    white-space: pre;
+}
+td.missing {
+    opacity: 0.4;
+}
+tbody tr:nth-child(even) {
+    background: var(--surface);
+}
+tbody tr:hover {
+    background: var(--line);
+}
+/* Every table starts folded like the contents, numbered like the figures, only the number in the accent. */
+.table-fold > summary {
+    padding: 0.3rem 0;
+    font-family: var(--font-mono);
+    color: var(--text);
+}
+/* What the table holds in the text's face, the namespace after it in the monospace. */
+.table-caption {
+    font-family: "Roboto", system-ui, sans-serif;
+}
+.table-caption::before {
+    counter-increment: table;
+    content: "Table\a0" counter(table) ". ";
+    color: var(--accent);
+}

@@ -15,7 +15,7 @@
 // a texel of value 1 stands for the same luminance in every map. Its stars are found on the map averaged down to 4096
 // around, by the same rule, so the same stars are taken out at both sizes.
 //
-// Rerunnable: `pnpm milkyway [--size 4k|8k] [--out <dir>] [--cache <dir>] [--force]`, which skips the work while the
+// Rerunnable: `pnpm data:milkyway [--size 4k|8k] [--out <dir>] [--cache <dir>] [--force]`, which skips the work while the
 // maps are newer than the catalogs and the script. Needs sharp, for the WebP; the 4k maps also data/hipparcos.csv,
 // which the repository holds, the 8k map only checks its calibration with it. Downloads 35 MB or 137 MB once into the
 // cache, the asset mirror first, and decodes it in memory, 12 bytes a texel.

@@ -1,0 +1,37 @@
+---
+import type { CostsResult } from "../bench";
+import Costs from "../Costs.astro";
+import { creditOf, MiB } from "../costs";
+import reference from "./bench.json";
+import { COST_ROWS, type CostKey } from "./cost-rows";
+
+/**
+ * What helldunkel's passes cost: the tone curve with its dither, the bloom and the meter, the time on the GPU and the
+ * memory each holds. The reference is bench.json, written by `pnpm bench helldunkel --write` (scripts/bench.mjs and
+ * bench.ts).
+ */
+const measure = reference as CostsResult;
+const LABELS: Record<CostKey, [string, string]> = {
+    tone1080: ["tone curve and dither, 1920 × 1080", "a pass of its own"],
+    tone2160: ["tone curve and dither, 3840 × 2160", "a pass of its own"],
+    bloom1080: ["bloom, 1920 × 1080", "six levels"],
+    bloom2160: ["bloom, 3840 × 2160", "six levels"],
+    meterCube: ["meter, a cube map 6 × 512²", "every texel"],
+    meterHdri: ["meter, an HDRI 4096 × 2048", "every texel"],
+};
+const rows = COST_ROWS.map((key) => {
+    const row = measure.rows[key];
+    const [label, note] = LABELS[key];
+    return { label, note, values: [row?.ms?.median, (row?.memory ?? 0) / MiB] };
+});
+---
+
+<Costs
+    label="Bar charts of the time on the GPU and the GPU memory of helldunkel's tone curve, bloom and light meter"
+    columns={[{ head: "GPU time, ms" }, { head: "GPU memory, MiB", part: 0 }]}
+    rows={rows}
+>
+    What helldunkel costs on the GPU: the tone curve with its blue noise dither, here in a pass to itself, which a
+    renderer folds into its own last pass; the bloom over a half float image; and the meter counting every texel of a
+    sky's cube map and of an HDRI; {creditOf(measure)}.
+</Costs>

@@ -1,5 +1,4 @@
 ---
-import "../sternzeit/sternzeit.css";
 import EnvironmentFrame from "../environment/EnvironmentFrame.astro";
 import "../environment/environments.css";
 import "../helldunkel/helldunkel.css";
@@ -26,44 +25,34 @@ const SLIDERS = [
         marks: ["−20°", "+20°"],
     },
     {
-        name: "radius",
-        label: "dome",
-        title: "The radius of the dome the image's sky lies on, its ground on the disc inside; at the far end, the plane without bound",
+        name: "reach",
+        label: "reach",
+        title: "How far from under the camera that took the image its ground lies flat, about half the dome's radius at most; past it, the image recedes towards the dome",
         min: 0,
         max: 100,
         step: 1,
-        value: 39,
-        marks: ["5", "∞"],
+        value: 21,
+        marks: ["3", "∞"],
     },
     {
-        name: "fade",
-        label: "band",
-        title: "Over how many degrees inside the disc's edge a band of the image's blurred colors fades in, gone a quarter of that past it",
+        name: "radius",
+        label: "dome",
+        title: "The radius of the dome the image's horizon and sky lie on, at least two and a half heights; at the far end, without bound",
         min: 0,
-        max: 15,
-        step: 0.5,
-        value: 5,
-        marks: ["0°", "15°"],
-    },
-    {
-        name: "blend",
-        label: "blend",
-        title: "Over how many degrees around the horizon the ground goes over into the plain lookup",
-        min: 0,
-        max: 30,
+        max: 100,
         step: 1,
-        value: 8,
-        marks: ["0°", "30°"],
+        value: 100,
+        marks: ["5", "∞"],
     },
 ];
 ---
 
-<figure class="scene-frame wide" id="grounded" data-needs-hdri data-loading>
+<figure class="fig scene-frame wide" id="grounded" data-needs-hdri data-loading>
     <EnvironmentFrame fullscreen ownView="Drag to turn around, scroll to move closer. Raytraced with WebGPU.">
         <div class="hdri-view as-seen"><canvas data-field="canvas" aria-label="The five Platonic solids and a sphere, standing on the chosen HDRI's ground"></canvas></div>
     </EnvironmentFrame>
     <div class="env-exposure grounded-controls">
-        <button type="button" class="environments-button" data-field="flat" aria-pressed="true" title="Lay what lies below the horizon on a plane; off, it lies at infinity">flat ground</button>
+        <button type="button" class="environments-button" data-field="flat" aria-pressed="true" title="Lay the image's ground on a plane, as far as its reach; off, all of it lies at infinity">flat ground</button>
         <button type="button" class="environments-button" data-field="even" aria-pressed="true" title="Read the image blurred evenly where the plane stretches it; off, as it is, in streaks">even blur</button>
         {SLIDERS.map(({ name, label, title, min, max, step, value, marks }) => (
             <label class="figure-slider" title={title}>
@@ -78,7 +67,8 @@ const SLIDERS = [
     </div>
     <figcaption class="figure-caption">
         The solids on the chosen image's own ground, lit by its nine coefficients and dimmed where they hide its sky. The image
-        holds no separate Sun, so there is no sharp shadow, only this soft one. Turn the flat ground off, and they float.
+        holds no separate Sun, so there is no sharp shadow, only this soft one. Turn the flat ground off, and they float;
+        push the reach to its far end, and whatever stands below the horizon lies smeared across a plane without end.
     </figcaption>
 </figure>
 

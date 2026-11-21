@@ -118,7 +118,7 @@
     display: flex;
     flex: none;
     width: 100%;
-    aspect-ratio: 1;
+    aspect-ratio: 2;
     border: 2px solid transparent;
     border-radius: var(--radius-button);
     overflow: hidden;

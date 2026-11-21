@@ -1,6 +1,5 @@
 ---
 import Try from "../Try.astro";
-import "../sternzeit/sternzeit.css";
 import "./dunstkreis.css";
 import "./stages.css";
 
@@ -14,8 +13,8 @@ const STAGES = [
 ];
 ---
 
-<figure class="scene-frame wide stages" id="stages">
-    <div class="stages-view">
+<figure class="fig scene-frame wide stages" id="stages">
+    <div class="stages-view" data-actions="png copy">
         <canvas data-field="canvas" aria-label="A patch of sky around the Sun after each stage from light to pixel"></canvas>
     </div>
     <div class="stages-row">
@@ -75,16 +74,9 @@ const STAGES = [
         <output data-field="offsetValue" />
     </label>
     <figcaption class="figure-caption">
-        One patch of the sky around the Sun, from the light in the tables to a pixel on the screen, each stage with its one
-        choice, and under it the sky straight below and above the Sun, from the horizon to the zenith, from light to code
-        value. Its luminance in cd/m² runs across on a logarithmic scale and the code value it is written as up, both
-        counted along the edges in bars of equal width. The curves are the chain for a gray light: the exposure moves it
-        sideways, the sRGB transfer curve lifts the darks, dashed, above the light written linearly, dotted, and the tone
-        curve rolls off the highlights. The dots are the slice every degree in its own colors, each at the code value of
-        a gray as bright as its pixel: a gray light lies on the curve, a colored one off it by what the tone curve does to
-        its color.
-        Every choice is passed on: clip the gamut, and the exposed, tone mapped and encoded sky inherit it. Four bits are
-        never used; they only magnify the bands that eight bits leave in a smooth gradient.
+        One patch of sky around the Sun after each stage from the tables' light to a pixel, and under it the sky through
+        the Sun from the horizon to the zenith, cd/m² to code value, its pixels as dots in their own colors. Four bits
+        only magnify the bands eight bits leave.
         <Try label="The setting Sun" set="date=2026-04-06T17:50:00Z&lat=52.395&lon=13.085&h=1" fig="stages">
             the sky hatched outside sRGB; with the wavelengths as RGB, the sunset pales.
         </Try>

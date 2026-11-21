@@ -1,7 +1,16 @@
 import { readFileSync } from "node:fs";
+import { DEFAULT_ATMOSPHERE_MODEL, lightThroughAir } from "@himmelszelt/dunstkreis";
+import { MOON_WHITE, SUN_WHITE, whiteBalance } from "@himmelszelt/helldunkel";
 import { expect, test } from "@playwright/test";
-import { PARAMS_SIZE, paramsData, TABLES_SIZE, tablesData } from "../dist/index.js";
-import { moonOrientation, phaseLaw, type RefractionTable, refractionTable } from "../src/orientation.js";
+import { MOON_COLOR, PARAMS_SIZE, paramsData, TABLES_SIZE, tablesData } from "../dist/index.js";
+import {
+    moonOrientation,
+    phaseLaw,
+    type RefractionTable,
+    refractionTable,
+    SUN_COLOR,
+    SUN_ILLUMINANCE,
+} from "../src/orientation.js";
 import { moonOutput } from "../src/wgsl/output.js";
 import { compileWgsl, gpuDevice } from "./gpu.js";
 
@@ -14,6 +23,7 @@ function wgslSource(name: string): string {
             cube: "../../rundbild/src/wgsl",
             tonemap: helldunkel,
             vision: helldunkel,
+            whitebalance: helldunkel,
         }[name] ?? "../src/wgsl";
     const read = (file: string) => readFileSync(new URL(`${owner}/${file}`, import.meta.url), "utf8");
     try {
@@ -25,7 +35,7 @@ function wgslSource(name: string): string {
 
 // Each pass with exactly the fragments its header names, so none grows a dependency it does not declare.
 // The Moon pass takes any law that defines `ngReflectance`: Hapke's of 2012, or of 1963.
-const MOON = ["params", "surface", "reflectance", "camera", "tonemap", "vision", "moon"];
+const MOON = ["params", "surface", "reflectance", "camera", "whitebalance", "tonemap", "vision", "moon"];
 const PASSES: Record<string, readonly string[]> = {
     moon: MOON,
     "moon with Hapke's law of 1963": MOON.map((name) => (name === "reflectance" ? "hapke1963" : name)),
@@ -53,6 +63,8 @@ test("the params and tables pack to the uniforms' sizes with the flags where the
         angularDiameter: 0.5,
         sunDirection: [1, 0, 0],
         sunIlluminance: 128_000,
+        sunColor: SUN_COLOR,
+        whiteBalance: whiteBalance(MOON_WHITE),
         exposureCompensation: 0,
         earthshine: 10,
         orientation: moonOrientation({
@@ -90,6 +102,11 @@ test("the params and tables pack to the uniforms' sizes with the flags where the
     // Earth's center from the Moon due north on the horizon: south, a degree below.
     expect(f[37]).toBeCloseTo(-1, 3);
     expect(f[38]).toBeCloseTo(-6371 / 384_400, 3);
+    // The Sun's color after the shimmer's rows, and the white balance a column to a row.
+    expect([...f.subarray(100, 103)]).toEqual([...new Float32Array(SUN_COLOR)]);
+    const balance = whiteBalance(MOON_WHITE);
+    for (let col = 0; col < 3; col++)
+        for (let row = 0; row < 3; row++) expect(f[104 + col * 4 + row]).toBeCloseTo(balance[col * 3 + row] ?? 0, 6);
     // Away from Earth's shadow the eclipse is left out.
     const away = paramsData({ ...params, eclipse: { ...params.eclipse, moonCenterKm: [30_000, 0, 384_400] } }, null);
     expect(new Uint32Array(away)[61]).toBe(16 | 32);
@@ -97,6 +114,17 @@ test("the params and tables pack to the uniforms' sizes with the flags where the
     const tables = tablesData(params);
     expect(tables.byteLength).toBe(TABLES_SIZE);
     expect(new Float32Array(tables)[0]).toBeCloseTo(0.5 * (Math.PI / 180), 6);
+});
+
+test("the Sun's color is dunstkreis' and helldunkel's, and the Moon's white the Sun's as the Moon reflects it", () => {
+    const luminance = ([r, g, b]: readonly number[]) => 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0);
+    expect(luminance(SUN_COLOR)).toBeCloseTo(1, 3);
+    expect([...SUN_COLOR]).toEqual([...SUN_WHITE]);
+    // Above the air, where dunstkreis' Sun is what its spectrum makes it.
+    const above = lightThroughAir(DEFAULT_ATMOSPHERE_MODEL, [0, 0, 1], 200_000);
+    for (const [i, c] of above.entries()) expect(c / SUN_ILLUMINANCE).toBeCloseTo(SUN_COLOR[i] ?? 0, 3);
+    const moon = SUN_COLOR.map((c, i) => c * (MOON_COLOR[i] ?? 1));
+    for (const [i, c] of moon.entries()) expect(c / luminance(moon)).toBeCloseTo(MOON_WHITE[i] ?? 0, 3);
 });
 
 /**
@@ -130,9 +158,11 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
         earthshine: number,
         refraction: RefractionTable | null = null,
         through = pass,
+        balance = whiteBalance([1, 1, 1]),
     ) => {
         through.update({
             refraction,
+            whiteBalance: balance,
             direction: [0, 1, 0],
             angularDiameter,
             sunDirection,
@@ -149,12 +179,11 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
         staging.unmap();
         return pixels;
     };
-    const at = (pixels: Float32Array, x: number, y: number) => pixels[(y * size + x) * 4] ?? 0;
-    const alpha = (pixels: Float32Array, x: number, y: number) => pixels[(y * size + x) * 4 + 3] ?? 0;
-    const luminance = (pixels: Float32Array, x: number, y: number) => {
-        const i = (y * size + x) * 4;
-        return 0.2126 * (pixels[i] ?? 0) + 0.7152 * (pixels[i + 1] ?? 0) + 0.0722 * (pixels[i + 2] ?? 0);
-    };
+    const channel = (pixels: Float32Array, x: number, y: number, c: number) => pixels[(y * size + x) * 4 + c] ?? 0;
+    const alpha = (pixels: Float32Array, x: number, y: number) => channel(pixels, x, y, 3);
+    const luminance = (pixels: Float32Array, x: number, y: number) =>
+        0.2126 * channel(pixels, x, y, 0) + 0.7152 * channel(pixels, x, y, 1) + 0.0722 * channel(pixels, x, y, 2);
+    const at = luminance;
 
     // The Sun from behind the viewer, the Moon full: a Lambert disc of albedo 0.12 in 128,000 lux.
     const full = await render([0, -1, 0], 0);
@@ -167,11 +196,24 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
     expect(limb).toBeGreaterThan(center * 0.95);
     expect(alpha(full, 32, 32)).toBe(1);
     expect(alpha(full, 1, 1)).toBe(0);
+    // Without maps a rock of the Moon's color in the Sun's; balanced on the Sun the Moon's own color, on the Moon gray,
+    // both within a percent, as Bradford's adaptation is not a division per channel.
+    const lum = (v: readonly number[]) => 0.2126 * (v[0] ?? 0) + 0.7152 * (v[1] ?? 0) + 0.0722 * (v[2] ?? 0);
+    const tint = MOON_COLOR.map((c) => c / lum(MOON_COLOR));
+    const lit = tint.map((t, c) => t * (SUN_COLOR[c] ?? 0));
+    for (const c of [0, 1, 2]) expect(channel(full, 32, 32, c) / center).toBeCloseTo((lit[c] ?? 0) / lum(lit), 3);
+    const onSun = await render([0, -1, 0], 0, null, pass, whiteBalance(SUN_WHITE));
+    const sunCenter = at(onSun, 32, 32);
+    for (const c of [0, 1, 2]) expect(channel(onSun, 32, 32, c) / sunCenter).toBeCloseTo(tint[c] ?? 0, 1);
+    const onMoon = await render([0, -1, 0], 0, null, pass, whiteBalance(MOON_WHITE));
+    const moonCenter = at(onMoon, 32, 32);
+    for (const c of [0, 1, 2]) expect(channel(onMoon, 32, 32, c) / moonCenter).toBeCloseTo(1, 1);
 
     // The Sun behind the Moon: its disc dark but for a full Earth's 13 lux, bluer than sunlight, as bright.
     const dark = await render([0, 1, 0], 13);
     const night = luminance(dark, 32, 32);
-    expect(dark[(32 * size + 32) * 4 + 2] ?? 0).toBeGreaterThan(at(dark, 32, 32));
+    const blueOverRed = (pixels: Float32Array) => channel(pixels, 32, 32, 2) / channel(pixels, 32, 32, 0);
+    expect(blueOverRed(dark)).toBeGreaterThan(blueOverRed(full));
     expect(night).toBeGreaterThan(0);
     expect(night).toBeLessThan(expected * 2e-4);
     expect(night).toBeCloseTo((0.12 * 13) / Math.PI, 1);
@@ -216,7 +258,7 @@ test("a full Moon is flat and as bright as its albedo says, a new Moon dark but 
     const mean = (pixels: Float32Array) => {
         let [sum, covered] = [0, 0];
         for (let i = 0; i < size * size; i++) {
-            sum += pixels[i * 4] ?? 0;
+            sum += pixels[i * 4 + 1] ?? 0;
             covered += pixels[i * 4 + 3] ?? 0;
         }
         return sum / covered;

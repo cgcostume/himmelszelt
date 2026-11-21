@@ -12,8 +12,8 @@ interface Props {
 const { id = "eclipse-row" } = Astro.props;
 ---
 
-<figure class="tiles-figure" id={id} data-shadow>
-    <div class="tiles-panel as-seen shadow-big">
+<figure class="fig tiles-figure" id={id} data-shadow>
+    <div class="tiles-panel as-seen shadow-big" data-actions="png copy">
         <canvas data-field="big" aria-label="The Moon in Earth's shadow at the slider's moment, rendered with WebGPU"></canvas>
         <svg class="tiles-overlay" data-field="outline" aria-hidden="true"></svg>
         <span class="tiles-start">
@@ -27,10 +27,11 @@ const { id = "eclipse-row" } = Astro.props;
                 <Rays />
                 <button type="button" class="view-icon" data-field="metered" aria-pressed="true" title="Meter the big Moon and each disc of the row on its own, rather than all at the uneclipsed Moon's exposure, where the umbra's red is barely there" aria-label="Metered"><Icon name="meter" /></button>
             </span>
+            <span class="view-buttons fig-actions"></span>
         </span>
         <span class="eclipse-jump view-buttons">
-            <button type="button" class="button-xs" data-jump="-1" title="The lunar eclipse before the one shown" aria-label="The lunar eclipse before the one shown"><Icon name="earlier" />earlier</button>
-            <button type="button" class="button-xs" data-jump="1" title="The lunar eclipse after the one shown" aria-label="The lunar eclipse after the one shown">later<Icon name="later" /></button>
+            <button type="button" class="view-toggle" data-jump="-1" title="The lunar eclipse before the one shown" aria-label="The lunar eclipse before the one shown"><Icon name="earlier" />earlier</button>
+            <button type="button" class="view-toggle" data-jump="1" title="The lunar eclipse after the one shown" aria-label="The lunar eclipse after the one shown">later<Icon name="later" /></button>
         </span>
     </div>
     <label class="figure-slider" data-offset title="The moment through the eclipse, four hours either way from its greatest: drag, or turn the mouse wheel for a minute a notch">
@@ -51,12 +52,10 @@ const { id = "eclipse-row" } = Astro.props;
     </ul>
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        Through Earth's shadow, from Earth's center with north up: (a) the Moon at a moment of the eclipse shown, the
-        edge of the <Term of="Umbra">umbra</Term> solid and that of the <Term of="Penumbra">penumbra</Term> dashed; (b)
-        the lunar eclipses of twelve years either side, a bar each as tall as the umbral{" "}
-        <Term of="Eclipse magnitude">magnitude</Term>, total past the dashed line, the one shown in the accent; (c) seven
-        moments from the umbra's first contact to its last. The big Moon and each disc metered on its own, or all at the
-        uneclipsed Moon's exposure.
+        Through Earth's shadow, from Earth's center with north up: (a) the Moon at a moment of the eclipse, the{" "}
+        <Term of="Umbra">umbra</Term>'s edge solid, the <Term of="Penumbra">penumbra</Term>'s dashed; (b) twelve years of
+        lunar eclipses either side, bars as tall as the umbral <Term of="Eclipse magnitude">magnitude</Term>, total past
+        the dashed line, this one in the accent; (c) seven moments from the umbra's first contact to its last.
     </figcaption>
 </figure>
 

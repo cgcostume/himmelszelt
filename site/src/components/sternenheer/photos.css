@@ -45,41 +45,6 @@
     text-align: right;
     font-variant-numeric: tabular-nums;
 }
-/* What was measured in both pictures, and what it says: a table of a few rows, then two short paragraphs, in the
-   column, as the caption is. */
-.starphoto-findings {
-    max-width: calc(var(--measure) - 3rem);
-    margin: 0.75rem auto 0;
-    font-size: var(--text-small);
-    line-height: 1.5;
-}
-.starphoto-findings table {
-    width: 100%;
-    margin: 0 0 0.6rem;
-    border-collapse: collapse;
-    font-variant-numeric: tabular-nums;
-}
-.starphoto-findings :is(th, td) {
-    padding: 0.2rem 0.75rem 0.2rem 0;
-    border-bottom: 1px solid var(--line);
-    text-align: left;
-    vertical-align: baseline;
-}
-.starphoto-findings thead th {
-    color: var(--muted);
-    font-weight: normal;
-}
-.starphoto-findings tbody th {
-    font-weight: normal;
-}
-.starphoto-findings p {
-    margin: 0.35rem 0 0;
-    color: var(--muted);
-    text-wrap: pretty;
-}
-.starphoto-findings p > span {
-    color: var(--text);
-}
 /* Six photographs, not the Moon's seven: tabs of a fixed size at the bar's left end, not a sixth of the figure each. */
 [data-star-photos] .photo-tabs {
     grid-template-columns: repeat(var(--count), minmax(0, 6rem));
@@ -95,11 +60,6 @@
     margin: 0;
     padding: 0.5rem 1rem;
     text-shadow: 0 0 4px #000;
-}
-/* The starred figure's choice of NASA's map, at the top right, over the side it picks for. */
-.tiles-panel > .view-buttons.starred-maps {
-    left: auto;
-    right: 6px;
 }
 /* On a phone the exposure's reading under its slider, which it would otherwise squeeze to nothing. */
 @media (max-width: 40rem) {

@@ -203,6 +203,8 @@ export function shadowFigure(root: HTMLElement) {
             eclipse: true,
             law: "hapke2012",
             darkAdapted: false,
+            // A camera's daylight, as the photographs of the eclipse and the plot of the umbra's light.
+            white: "sun",
         }));
         labels.forEach((label, i) => {
             const m = moons[i];
@@ -301,6 +303,7 @@ export function shadowFigure(root: HTMLElement) {
                 eclipse: true,
                 law: "hapke2012",
                 darkAdapted: false,
+                white: "sun",
             }),
         );
         outline.setAttribute("viewBox", `0 0 ${cssW} ${cssH}`);

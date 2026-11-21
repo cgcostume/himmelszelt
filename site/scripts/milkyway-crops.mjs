@@ -5,8 +5,8 @@
 // The map goes through sternenheer's `scripts/milkyway.mjs` first, its stars taken out as there, and both 8-bit maps are
 // encoded whole as that script writes them, WebP at quality 95, and the patches cut from their decoded pixels, so they
 // hold what a renderer gets. Writes them losslessly, as WebP, and the whole maps' sizes into the figure's JSON.
-// Rerunnable: `pnpm milkyway-crops [--force]` from site/, skipped while its outputs are newer than the script and the
-// EXR. Needs sharp, and the EXR in sternenheer's download cache, where `pnpm milkyway` puts it, or downloads it, 35 MB.
+// Rerunnable: `pnpm data:milkyway-crops [--force]` from site/, skipped while its outputs are newer than the script and the
+// EXR. Needs sharp, and the EXR in sternenheer's download cache, where `pnpm data:milkyway` puts it, or downloads it, 35 MB.
 import { mkdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

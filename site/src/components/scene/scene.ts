@@ -1,4 +1,5 @@
 import { wgsl } from "@himmelszelt/dunstkreis";
+import { NO_WHITE_BALANCE, type WhiteBalance } from "@himmelszelt/helldunkel";
 import blueNoiseUrl from "./bluenoise.bin?url";
 import { GOLDEN_SET_8, GOLDEN_SET_64 } from "./goldenset";
 import scene from "./scene.comp.wgsl";
@@ -28,8 +29,8 @@ const source = [
  */
 
 const DEG = Math.PI / 180;
-// Params: 129 scalars, rounded up to a multiple of 16 bytes.
-const PARAMS_SIZE = 528;
+// Params: 130 scalars, then the white balance's three columns, each padded to four.
+const PARAMS_SIZE = 576;
 
 /** Rotation about a unit axis by an angle, as a column-major 3x3 matrix padded to WGSL's mat3x3f: 12 floats. */
 function rotation([x, y, z]: Vec3, angle: number) {
@@ -119,6 +120,7 @@ export type SceneOptions = {
     skyScale?: number;
     headroom?: number;
     linearOutput?: boolean;
+    whiteBalance?: WhiteBalance;
 };
 
 export function createScene(device: GPUDevice) {
@@ -173,6 +175,7 @@ export function createScene(device: GPUDevice) {
          * the planet's horizon as the camera sees it, hides the disc below it, -1 by default for none. `dither`, on by
          * default, dithers the 8-bit output against banding. `toneCurve`, "neutral" by default, "agx", "aces" or "clip", as dunstkreis'.
          * `headroom`, 1 by default, how many times SDR white an HDR display shows, which Neutral and "clip" go up to.
+         * `whiteBalance`, helldunkel's `whiteBalance(white)`, on everything before the exposure, none by default.
          */
         encode(
             encoder: GPUCommandEncoder,
@@ -210,6 +213,8 @@ export function createScene(device: GPUDevice) {
             data[127] = rest.skyScale ?? 1;
             data[128] = rest.headroom ?? 1;
             flags[129] = rest.linearOutput ? 1 : 0;
+            const balance = rest.whiteBalance ?? NO_WHITE_BALANCE;
+            for (let col = 0; col < 3; col++) data.set(balance.slice(col * 3, col * 3 + 3), 132 + col * 4);
             device.queue.writeBuffer(params, 0, data);
 
             const pipeline = pipelineFor(target.format);

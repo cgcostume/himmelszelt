@@ -3,8 +3,8 @@
 // (CIE 146:2002, after Vos and van den Berg), measured on people: the veil's luminance per lux the source throws into
 // the eye, by the angle to it in degrees, from 0.1° to 100°, the eye's age in years and its pigment, 0 for very dark
 // eyes, 0.5 brown, 1 blue-green, 1.2 light blue. A camera's lens veils likewise, with a flare and a tail of its own that
-// no one equation fits; scaled down, this stands in for it. Binding-free. A point source only: a bright place of some
-// size is bloom's, in bloom.comp.wgsl.
+// no one equation fits; scaled down to a two-hundredth, this stands in for it. Binding-free. A point source only: a
+// bright place of some size is bloom's, in bloom.comp.wgsl.
 
 // The veil in cd/m² per lux at the eye, at `angle` degrees from the source.
 fn hdVeilingGlare(angle: f32, age: f32, pigment: f32) -> f32 {

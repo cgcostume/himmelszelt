@@ -1,5 +1,4 @@
 ---
-import "../sternzeit/sternzeit.css";
 import Choice from "../dunstkreis/Choice.astro";
 import Hdr from "../dunstkreis/Hdr.astro";
 import OptionGroup from "../dunstkreis/OptionGroup.astro";
@@ -80,7 +79,7 @@ const group = (name: keyof typeof GROUPS) => ({ name, ...GROUPS[name] });
 const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
 ---
 
-<figure class="scene-frame wide" id="lighting">
+<figure class="fig scene-frame wide" id="lighting">
     <SkyFrame locked={false} hint="Drag to turn around, scroll to move closer or far out. Raytraced with WebGPU." lockTitle="Look towards the Sun, the solids against its light; dragging lets go" grid={false}>
         <canvas data-field="canvas" aria-label="The five Platonic solids and a sphere, lit by the sky and the Sun at the chosen moment and place"></canvas>
         <div class="sky-compass" data-field="compassLabels"></div>
@@ -101,7 +100,7 @@ const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
             </OptionGroup>
             <OptionGroup name="sky map">
                 <button type="button" class="view-toggle" data-cubify aria-pressed="false" title="The sky map as the environment figure builds it: cubified, its texels spread evenly over the sphere, sampled through the inverse mapping. The same switch as there">cubified</button>
-                <button type="button" class="view-toggle" data-scaled aria-pressed="false" title="The sky map as the environment figure builds it: scaled, times a power of two that follows the Sun, divided by it again here. The same switch as there">scaled</button>
+                <button type="button" class="view-toggle" data-scaled aria-pressed="true" title="The sky map as the environment figure builds it: scaled, times a power of two that follows the Sun, divided by it again here. The same switch as there">scaled</button>
             </OptionGroup>
             <OptionGroup name="solids">
                 <button type="button" class="view-toggle" data-field="rotate" aria-pressed="false" title="Turn the solids slowly, and send them round the sphere on slightly tilted orbits">rotate</button>
@@ -118,7 +117,7 @@ const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
     <figcaption class="figure-caption">
         {
             caption ??
-                "The five Platonic solids, on a pentagon around a sphere, lit by the sky above: the Sun as a light of its own, with its shadows, soft from rays spread over its disc, and the sky's light from its nine coefficients, dimmed where the solids hide the sky. Raytraced, not a triangle in it, four rays per pixel. Every surface is white but the ground, a darker gray; the colors are the light's. The ground is the backdrop's own below the horizon, with their shadows taken out of it. Exposed like the sky."
+                "The five Platonic solids around a sphere, lit by the Sun, its shadows soft from rays spread over its disc, and by the sky's nine coefficients, dimmed where the solids hide the sky. Every surface is white but the gray ground, so the colors are the light's. Raytraced, four rays per pixel, exposed like the sky."
         }
     </figcaption>
 </figure>

@@ -1,7 +1,7 @@
 import { clampObserverHeight } from "@himmelszelt/dunstkreis";
 import Zdog from "zdog";
 import { find } from "../dom";
-import { onDemand } from "../frame";
+import { onDemand, redrawable } from "../frame";
 import { paintRange } from "../range";
 import { COMPASS, themeColor, themeColors } from "../sternzeit/figure";
 import { onChange, state } from "../sternzeit/state";
@@ -420,6 +420,9 @@ if (gpu.error) {
         textures[name] = texture;
         paint(name);
     };
+    redrawable(find(".lookup-panel", root), () => {
+        for (const name of Object.keys(textures) as TableName[]) paint(name);
+    });
     const showTables = () => {
         const table = tables();
         if (!table) return;

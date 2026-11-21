@@ -31,6 +31,41 @@ export {
 export type { Weather, WeatherName } from "./weather.js";
 export { mixWeather, WEATHER } from "./weather.js";
 
+// The layered model's sky: its numbers, the kinds of cloud for each of its places, and blends between two.
+export type { CloudLayer, DeepLayer, HighSheet, LayeredParams, LayeredSky, Sky, SkyDials } from "./layers.js";
+export {
+    CLOUD_TYPES,
+    DEFAULT_DEEP_LAYER,
+    DEFAULT_HIGH_SHEET,
+    DEFAULT_LAYERED_PARAMS,
+    DEFAULT_LAYERED_SKY,
+    DEFAULT_LOW_LAYER,
+    DEFAULT_MIDDLE_LAYER,
+    layeredSky,
+    mixLayeredSky,
+} from "./layers.js";
+
+// The layered model as passes: the marched layers, the high sheet, and both composed over a background.
+export type {
+    LayerEncodeOptions,
+    LayerMarch,
+    LayerMarchOptions,
+    LayerMarchSettings,
+    LayerUpdateOptions,
+} from "./layerpass.js";
+export { createLayerMarch, DEFAULT_LAYER_MARCH } from "./layerpass.js";
+export type { HighSheetEncodeOptions, HighSheetOptions, HighSheetPass, HighSheetUpdateOptions } from "./highsheet.js";
+export { createHighSheet } from "./highsheet.js";
+export type {
+    LayeredCloudParams,
+    LayeredCloudPass,
+    LayeredCloudPassOptions,
+    LayeredEncodeOptions,
+    LayeredUpdateOptions,
+    LayeredQuality,
+} from "./layered.js";
+export { createLayeredCloudPass, LAYERED_QUALITY } from "./layered.js";
+
 export type {
     AerialPerspective,
     CloudPass,

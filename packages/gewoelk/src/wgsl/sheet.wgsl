@@ -164,16 +164,23 @@ fn gwFaded(layer: GwLayer, air: GwAir) -> GwLayer {
     return GwLayer(layer.luminance * air.transmittance + air.luminance * (1.0 - layer.transmittance), layer.transmittance);
 }
 
-// The air's light along a ray, what far clouds fade into: the sky behind the pixel where there is one, held below a
-// few times the horizon's so the sun's disc and its glare do not shine through a distant cloud; the horizon's else.
-fn gwAirLight(behind: vec3f, hasBehind: bool) -> vec3f {
+// The air's light along the ray `v` from `o`, what far clouds fade into without an aerial perspective volume: the sky
+// behind the pixel where there is one, held below a few times the horizon's so the sun's disc and its glare do not
+// shine through a distant cloud; the horizon's else. Towards the horizon it turns into the horizon's, and stays that
+// for a ray into the ground, whose pixel holds the ground and not the air in front of it: else the horizon's line
+// shows through every far cloud that crosses it.
+fn gwAirLight(o: vec3f, v: vec3f, behind: vec3f, hasBehind: bool) -> vec3f {
     let horizon = gwParams.horizonLuminance;
     if (!hasBehind) {
         return horizon;
     }
     let weights = vec3f(0.2126, 0.7152, 0.0722);
     let cap = max(4.0 * dot(horizon, weights), 1e-3);
-    return behind * min(1.0, cap / max(dot(behind, weights), 1e-6));
+    let capped = behind * min(1.0, cap / max(dot(behind, weights), 1e-6));
+    // The sine of the ray's height over the horizon as the observer sees it, dipped by their own height: 3° to the sky's.
+    let up = o / length(o);
+    let dip = sqrt(max(1.0 - pow(gwParams.planetRadius / length(o), 2.0), 0.0));
+    return mix(horizon, capped, smoothstep(0.0, 0.05, dot(v, up) + dip));
 }
 
 // A sheet where the ray crosses its sphere: the map's value as an optical depth, thicker at a slant, lit by the sun

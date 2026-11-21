@@ -21,6 +21,10 @@ const camera = { yaw: 150 * DEG, pitch: 12 * DEG, distance: 6, fov: 50 * DEG };
 // they begin, a few degrees above its horizon so that they fade in before it.
 const RIPS = 6;
 const BAND = 0.47;
+// As good as without end, for the ground's reach and the dome's radius, and over how many degrees either side of a
+// lifted horizon the stretch below it goes over into the one above.
+const FAR = 1e9;
+const LIFT_BLEND = 8 * DEG;
 
 // What the scene shows behind its solids: the image through its camera, in the file's relative units. Where the ground
 // or the lifted horizon stretch it, it is read from levels blurred more along u than along v, built for the image's
@@ -28,7 +32,7 @@ const BAND = 0.47;
 const BACKDROP = /* wgsl */ `
 ${wgsl.panorama}
 ${wgsl.ground}
-struct Params { right: vec3f, tx: f32, up: vec3f, ty: f32, forward: vec3f, height: f32, eye: vec3f, lift: f32, flat: u32, blend: f32, size: vec2f, band: f32, even: u32, radius: f32, fade: f32 }
+struct Params { right: vec3f, tx: f32, up: vec3f, ty: f32, forward: vec3f, height: f32, eye: vec3f, lift: f32, flat: u32, reach: f32, size: vec2f, band: f32, even: u32, radius: f32 }
 @group(0) @binding(0) var<uniform> params: Params;
 @group(0) @binding(1) var image: texture_2d<f32>;
 @group(0) @binding(2) var imageSampler: sampler;
@@ -39,12 +43,10 @@ ${Array.from({ length: RIPS }, (_, k) => `@group(0) @binding(${5 + k}) var rip${
 fn lookup(pixel: vec2f, size: vec2f) -> vec3f {
     let uv = pixel / size * 2.0 - 1.0;
     var direction = normalize(params.forward + params.right * (uv.x * params.tx) - params.up * (uv.y * params.ty));
-    if (params.flat != 0u && params.radius > 0.0) {
-        direction = rbGroundedDomeDirection(params.eye, direction, params.height, params.radius);
-    } else if (params.flat != 0u) {
-        direction = rbFlatGroundDirection(params.eye, direction, params.height, params.blend);
+    if (params.flat != 0u) {
+        direction = rbGroundedDirection(params.eye, direction, params.height, params.reach, params.radius);
     }
-    return rbLiftedHorizonDirection(direction, params.lift, params.blend);
+    return rbLiftedHorizonDirection(direction, params.lift, ${LIFT_BLEND});
 }
 
 // The image at a mip level, its first level and the coarser ones from half its size on.
@@ -89,15 +91,6 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
     }
     if (params.even == 0u) {
         light = textureSampleLevel(image, imageSampler, uv, 0.0).rgb;
-    }
-    // A band of the image's colors, blurred as wide as the band, over the disc's edge: across \`fade\` on the disc, where
-    // the image is stretched, and gone a quarter of that past the edge, so that the dome's sky stays as it is.
-    if (params.flat != 0u && params.radius > 0.0 && params.fade > 0.0) {
-        let rim = -asin(min(params.height / params.radius, 1.0));
-        let edge = asin(rbLiftedHorizonDirection(vec3f(cos(rim), 0.0, sin(rim)), params.lift, params.blend).z);
-        let above = asin(clamp(direction.z, -1.0, 1.0)) - edge;
-        let w = 1.0 - smoothstep(0.0, select(params.fade, 0.25 * params.fade, above > 0.0), abs(above));
-        light = mix(light, isotropic(uv, log2(params.fade * params.size.y / 3.141592653589793)), w);
     }
     textureStore(output, vec2i(id.xy), vec4f(min(light, vec3f(6e4)), 1.0));
 }`;
@@ -195,8 +188,13 @@ if (gpu.error) {
     });
 
     const slider = (name: string) => Number(field<HTMLInputElement>(name).value);
-    // The dome's radius from 5 to 500 on a logarithmic slider, its last step 0: the plane, without bound.
-    const domeRadius = () => (slider("radius") >= 100 ? 0 : 5 * 100 ** (slider("radius") / 99));
+    // The dome's radius from 5 to 500 and the ground's reach from 3 to 300 on logarithmic sliders, the last step of
+    // each without end. The dome holds the scene whatever the height, and the ground reaches as far as the library
+    // lets it, about half the dome's radius.
+    const far = (name: string, from: number) => (slider(name) >= 100 ? FAR : from * 100 ** (slider(name) / 99));
+    const domeRadius = () => Math.max(far("radius", 5), 2.5 * slider("height"));
+    const groundReach = () => Math.min(far("reach", 3), Math.sqrt(domeRadius() ** 2 / 4 - slider("height") ** 2));
+    const reading = (length: number) => (length >= FAR ? "∞" : length.toFixed(length < 10 ? 1 : 0));
     const pressed = (name: string) => field(name).getAttribute("aria-pressed") === "true";
 
     const texture = (label: string, width: number, height: number) =>
@@ -288,7 +286,7 @@ if (gpu.error) {
             litBy = hdri.texture;
             build(encoder, hdri.texture);
         }
-        if (pressed("flat") && domeRadius() > 0) camera.distance = Math.min(camera.distance, 0.8 * domeRadius());
+        if (pressed("flat")) camera.distance = Math.min(camera.distance, 0.8 * domeRadius());
         const { eye, forward, right, up } = cameraFrame(camera);
         const ty = Math.tan(camera.fov / 2);
         const data = new ArrayBuffer(96);
@@ -303,10 +301,10 @@ if (gpu.error) {
             slider("lift") * DEG,
         ]);
         new Uint32Array(data)[16] = pressed("flat") ? 1 : 0;
-        new Float32Array(data)[17] = slider("blend") * DEG;
+        new Float32Array(data)[17] = groundReach();
         new Float32Array(data).set([hdri.texture.width, hdri.texture.height, top / hdri.texture.height], 18);
         new Uint32Array(data)[21] = pressed("even") ? 1 : 0;
-        new Float32Array(data).set([domeRadius(), slider("fade") * DEG], 22);
+        new Float32Array(data)[22] = domeRadius();
         device.queue.writeBuffer(params, 0, data);
         const pass = encoder.beginComputePass({ label: "sternwarte:groundedBackdrop" });
         pass.setPipeline(backdrop);
@@ -342,15 +340,14 @@ if (gpu.error) {
         device.queue.submit([encoder.finish()]);
         field("heightReading").textContent = slider("height").toFixed(1);
         field("liftReading").textContent = `${slider("lift").toFixed(1)}°`;
-        field("blendReading").textContent = `${slider("blend").toFixed(0)}°`;
-        field("radiusReading").textContent = domeRadius() > 0 ? domeRadius().toFixed(0) : "∞";
-        field("fadeReading").textContent = `${slider("fade").toFixed(1)}°`;
+        field("reachReading").textContent = reading(groundReach());
+        field("radiusReading").textContent = reading(domeRadius());
     }
     const request = onDemand(render, canvas);
 
     onHdri(request);
     new ResizeObserver(request).observe(canvas);
-    for (const name of ["height", "lift", "blend", "radius", "fade"]) field(name).addEventListener("input", request);
+    for (const name of ["height", "lift", "reach", "radius"]) field(name).addEventListener("input", request);
     for (const name of ["flat", "even"]) {
         field(name).addEventListener("click", () => {
             field(name).setAttribute("aria-pressed", String(!pressed(name)));

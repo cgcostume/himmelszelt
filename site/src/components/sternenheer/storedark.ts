@@ -4,12 +4,12 @@ import { createMilkyWay, MILKY_WAY_LUMINANCE } from "@himmelszelt/sternenheer";
 import { find } from "../dom";
 import { display, gpu, gpuDevice, onDisplay } from "../dunstkreis/atmosphere";
 import { onDemand, watchView } from "../frame";
-import { paintRange } from "../range";
 import { drawSvg, svgText } from "../sternzeit/figure";
 
 type Kind = "srgb" | "log" | "float";
 type Patch = { low: number; median: number; high: number };
 const KINDS: Kind[] = ["float", "srgb", "log"];
+const pressed = (button: HTMLElement) => button.getAttribute("aria-pressed") === "true";
 const CURVES: Record<ToneCurve, number> = { neutral: 1, agx: 2, aces: 3, clip: 4 };
 const PLOT = { height: 92, top: 6, bottom: 18, left: 36, right: 4, doublings: 11 };
 
@@ -106,8 +106,7 @@ export function storeDarkFigure(root: HTMLElement) {
     const base = root.dataset.base ?? "";
     const stops = Number(root.dataset.stops ?? 12);
     const patches = JSON.parse(root.dataset.patches ?? "{}") as Record<string, Patch>;
-    const exposure = find<HTMLInputElement>("[data-field=exposure]", root);
-    const exposureValue = find("[data-field=exposureValue]", root);
+    const bright = find<HTMLButtonElement>("[data-field=bright]", root);
     const zoom = find<HTMLButtonElement>("[data-field=zoom]", root);
     const compressed = find<HTMLButtonElement>("[data-field=webp]", root);
     const pipeline = device.createComputePipeline({
@@ -222,8 +221,8 @@ export function storeDarkFigure(root: HTMLElement) {
         const patch = patches[name];
         if (!patch) return;
         for (const panel of panels) plotLevels(panel, patch);
-        const ev100 = -Number(exposure.value);
-        exposureValue.textContent = `${ev100 < 0 ? "−" : ""}${Math.abs(ev100).toFixed(1)}`;
+        // The patch's meter reading, its median texel at a tenth of saturation, or three stops brighter.
+        const ev100 = ev100FromLuminance(2 ** patch.median * MILKY_WAY_LUMINANCE) - (pressed(bright) ? 3 : 0);
         if (current?.name !== name) {
             if (near)
                 load(name).then((textures) => {
@@ -240,7 +239,7 @@ export function storeDarkFigure(root: HTMLElement) {
             const scale = window.devicePixelRatio || 1;
             const side = Math.max(1, Math.round(panel.canvas.clientWidth * scale));
             if (panel.canvas.width !== side) Object.assign(panel.canvas, { width: side, height: side });
-            const webp = compressed.getAttribute("aria-pressed") === "true" || panel.kind === "float";
+            const webp = pressed(compressed) || panel.kind === "float";
             const {
                 texture,
                 sampler: filter,
@@ -248,7 +247,7 @@ export function storeDarkFigure(root: HTMLElement) {
             } = current.textures[webp ? panel.kind : panel.kind === "srgb" ? "srgbRounded" : "logRounded"];
             const data = new ArrayBuffer(16);
             const shown = MILKY_WAY_LUMINANCE * exposureFromEV100(ev100);
-            new Float32Array(data).set([shown, encoded, zoom.getAttribute("aria-pressed") === "true" ? 4 : 1]);
+            new Float32Array(data).set([shown, encoded, pressed(zoom) ? 4 : 1]);
             new Uint32Array(data)[3] = CURVES[display.toneCurve];
             device.queue.writeBuffer(panel.params, 0, data);
             pass.setBindGroup(
@@ -270,23 +269,10 @@ export function storeDarkFigure(root: HTMLElement) {
     };
     const request = onDemand(draw, root);
 
-    // A patch chosen sets the exposure to its meter reading: its median texel at a tenth of saturation.
-    const meter = () => {
-        const patch = patches[chosen()];
-        if (!patch) return;
-        exposure.value = (-ev100FromLuminance(2 ** patch.median * MILKY_WAY_LUMINANCE)).toFixed(1);
-        paintRange(exposure);
-    };
-    meter();
-    for (const radio of root.querySelectorAll("input[type=radio]"))
-        radio.addEventListener("change", () => {
-            meter();
-            request();
-        });
-    exposure.addEventListener("input", request);
-    for (const button of [zoom, compressed])
+    for (const radio of root.querySelectorAll("input[type=radio]")) radio.addEventListener("change", request);
+    for (const button of [bright, zoom, compressed])
         button.addEventListener("click", () => {
-            button.setAttribute("aria-pressed", String(button.getAttribute("aria-pressed") !== "true"));
+            button.setAttribute("aria-pressed", String(!pressed(button)));
             request();
         });
     onDisplay(request);

@@ -18,10 +18,13 @@ import {
 import { fromJulianDay, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
 import {
+    bindHdr,
     configureCanvas,
     currentSky,
+    displayOutput,
     gpuDevice,
     needEnvironment,
+    onDisplay,
     onEnvironment,
     onTables,
     quality,
@@ -37,6 +40,7 @@ import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
+import { skyWhite } from "../white";
 import { changeLab } from "./change";
 import { SHOW, texturePanel } from "./textures";
 
@@ -145,7 +149,7 @@ export function cloudsFigure(root: HTMLElement) {
         const context = canvas.getContext("webgpu");
         if (!context) return null;
         configureCanvas(context, SDR);
-        return { device: gpuDevice(), context, adapterName: shared.adapterName };
+        return { device: gpuDevice(), context, format: SDR, adapterName: shared.adapterName };
     }
     const gpu = setup();
 
@@ -201,6 +205,8 @@ export function cloudsFigure(root: HTMLElement) {
             autoExposure: false,
             groundLight: quality.groundLight,
             dither: false,
+            // No veil of a Sun the clouds may hide.
+            veil: 0,
             // The air in front of the clouds, out to the farthest cloud in sight.
             aerialPerspective: { maxDistanceKm: reach },
         }).then((pass) => {
@@ -219,6 +225,7 @@ export function cloudsFigure(root: HTMLElement) {
         grid: { layers: number; size?: number },
         luts: AtmosphereLUTs,
         keyframes = false,
+        output: { format: GPUTextureFormat; headroom: number } = { format: SDR, headroom: 1 },
     ) {
         if (!gpu || cloudsBuilding === key) return;
         cloudsBuilding = key;
@@ -229,7 +236,10 @@ export function cloudsFigure(root: HTMLElement) {
             sampler,
             apparentElevation: (altitudeKm: number, elevation: number) => lifted(model, altitudeKm, elevation),
         };
-        const options = { format: SDR, dither: true, scale, maxSteps, grid, atmosphere, keyframes, ...lab?.created };
+        // On an HDR display into the page's headroom, dithered only in 8 bits.
+        const { format, headroom } = output;
+        const dither = format === SDR;
+        const options = { format, headroom, dither, scale, maxSteps, grid, atmosphere, keyframes, ...lab?.created };
         createCloudPass(gpu.device, options).then((pass) => {
             if (cloudsBuilding !== key) return pass.destroy();
             clouds?.pass.destroy();
@@ -425,10 +435,15 @@ export function cloudsFigure(root: HTMLElement) {
         const maxSteps = Number(choice("steps")) || 128;
         const layers = Number(choice("layers")) || 64;
         const grid = lab ? { layers, size: lab.gridSize } : { layers };
-        const key = `${scale},${maxSteps},${layers},${lutsId(table.luts)},${lab?.keyframes},${lab?.gridSize}`;
+        const output = displayOutput();
+        const key = `${scale},${maxSteps},${layers},${lutsId(table.luts)},${lab?.keyframes},${lab?.gridSize},${output.format},${output.headroom}`;
         if (clouds?.key !== key) {
-            buildClouds(key, scale, maxSteps, grid, table.luts, lab?.keyframes);
+            buildClouds(key, scale, maxSteps, grid, table.luts, lab?.keyframes, output);
             return;
+        }
+        if (output.format !== gpu.format) {
+            configureCanvas(gpu.context, output.format);
+            gpu.format = output.format;
         }
         lab?.tick();
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -491,6 +506,8 @@ export function cloudsFigure(root: HTMLElement) {
             projectionDistance: basis.d,
             planetRadiusKm: table.luts.model.planet.groundRadiusKm,
             ...cloudParams(),
+            // Once, by the pass that composes the clouds over the sky and finishes the frame.
+            whiteBalance: skyWhite(sunDirection),
         };
         const encoder = gpu.device.createCommandEncoder({ label: "sternwarte:clouds" });
         if (lab) lab.update(clouds.pass, params, encoder);
@@ -620,6 +637,8 @@ export function cloudsFigure(root: HTMLElement) {
         if (sky0) requestRender();
         onChange(requestRender);
         onTables(requestRender);
+        onDisplay(requestRender);
+        bindHdr(find('[data-hdr="note"]', root), find('[data-hdr="choice"]', root));
         new ResizeObserver(requestRender).observe(canvas);
         for (const input of sliders) {
             paintRange(input);

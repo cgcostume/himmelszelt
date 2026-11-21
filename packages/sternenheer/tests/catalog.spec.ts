@@ -206,7 +206,7 @@ test("the compact Hipparcos and Tycho-2 stars stand where the full ones do, with
 });
 
 test("the Hipparcos stars are the ones the catalog lacks, brightest first, and pack to a 13th of an arcsecond", async () => {
-    test.skip(!existsSync(fileURLToPath(HIPPARCOS.full)), "no Hipparcos stars: pnpm hipparcos makes them");
+    test.skip(!existsSync(fileURLToPath(HIPPARCOS.full)), "no Hipparcos stars: pnpm data:hipparcos makes them");
     const faint = await loadFaintStars("full");
     expect(faint.count).toBe(108_883);
     expect(packedStarAt(faint, 0).magnitude).toBeGreaterThan(5.9);

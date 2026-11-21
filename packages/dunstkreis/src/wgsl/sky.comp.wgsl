@@ -1,6 +1,6 @@
 // The sky pass: a compute pass that turns the precomputed tables into pixels, one invocation per pixel of the target,
 // with no rasterization. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`, `sampling.wgsl`, `raymarch.wgsl`,
-// `camera.wgsl`, `cube.wgsl`, `sun.wgsl`, `glare.wgsl`, `whitebalance.wgsl`, `tonemap.wgsl`, `vision.wgsl`, `grid.wgsl`, `frame.wgsl`, `quality.wgsl` and
+// `camera.wgsl`, `cube.wgsl`, `sun.wgsl`, `glare.wgsl`, `lens.wgsl`, `whitebalance.wgsl`, `tonemap.wgsl`, `vision.wgsl`, `grid.wgsl`, `frame.wgsl`, `quality.wgsl` and
 // `features.wgsl`, plus the output
 // at group 1, `dkOutputSize` and `dkOutputStore`, declared by whoever builds the pipeline since its format has to be
 // spelled out: `skyOutput(format)` for an image, `skyCubeOutput(format)` for a cube map's six faces.
@@ -28,9 +28,9 @@ fn dkR2(i: u32) -> vec2f {
 }
 
 // The grid in white, over the sky (see grid.wgsl).
-fn dkDebugOverlay(color: vec3f, view: vec3f, right: vec3f, below: vec3f) -> vec3f {
+fn dkDebugOverlay(color: vec3f, view: vec3f, right: vec3f, below: vec3f, ground: f32) -> vec3f {
     let sun = dkParams.sunDirection;
-    return dkGridOverlay(color, view, right, below, vec3f(dkParams.gridInk), sun, dkParams.sunAngularRadius, dkParams.pixelRatio);
+    return dkGridOverlay(color, view, right, below, vec3f(dkParams.gridInk), sun, dkParams.sunAngularRadius, dkParams.pixelRatio, ground);
 }
 
 // The exposure luminance in cd/m² is multiplied by. Metered, it is the light meter's EV100, log2(L * 100 / 12.5) for
@@ -164,7 +164,10 @@ fn dkSkySunLuminance(sky: DkSkySample) -> vec3f {
         return vec3f(0.0);
     }
     let illuminance = dkToRgb(dkAtmosphere, dkSkySunTransmittance(sky) * dkAtmosphere.solarIlluminance);
-    let luminance = dkSunDiscLuminance(illuminance, dkParams.sunAngularRadius);
+    var luminance = dkSunDiscLuminance(illuminance, dkParams.sunAngularRadius);
+    if (DK_LIMB_DARKENING) {
+        luminance = luminance * dkSunLimbDarkening(sky.direction, dkParams.sunDirection, dkParams.sunAngularRadius);
+    }
     let brightest = max(luminance.r, max(luminance.g, luminance.b));
     if (dkParams.sunDiscCeiling > 0.0 && brightest > dkParams.sunDiscCeiling) {
         return luminance * (dkParams.sunDiscCeiling / brightest);
@@ -223,18 +226,57 @@ fn dkAureoleOf(view: vec3f, light: vec3f, apparent: vec3f) -> vec3f {
     return dkToRgb(a, column * a.solarIlluminance) * (DK_AUREOLE_SHARE * phase * fade);
 }
 
-// The eye's veil along a view ray, from glare.wgsl, by the illuminance the light meter wrote of the Sun and, with
-// DK_MOONLIGHT, of the Moon: for an eye of thirty years, blue-green, times DK_VEIL. An effect of the eye, so centered
-// on where each shows, in the view's directions.
+// The veil along a view ray, from glare.wgsl, by the illuminance the light meter wrote of the Sun and, with
+// DK_MOONLIGHT, of the Moon, so it dims and reddens with each through the air and goes out behind the planet: for an
+// eye of thirty years, blue-green, times DK_VEIL. An effect of the eye or the lens, so centered on where each shows, in
+// the view's directions, and only of what is looked at: times the uniforms' `sunInFrame` and `moonInFrame`.
 fn dkSkyVeil(view: vec3f) -> vec3f {
     if (DK_VEIL <= 0.0) {
         return vec3f(0.0);
     }
-    var veil = hdVeil(view, dkParams.apparentSunDirection, dkMetering.sunIlluminance, 30.0, 1.0);
+    var veil = hdVeil(view, dkParams.apparentSunDirection, dkMetering.sunIlluminance, 30.0, 1.0) * dkParams.sunInFrame;
     if (DK_MOONLIGHT) {
-        veil = veil + hdVeil(view, dkParams.apparentMoonDirection, dkMetering.moonIlluminance, 30.0, 1.0);
+        veil = veil
+            + hdVeil(view, dkParams.apparentMoonDirection, dkMetering.moonIlluminance, 30.0, 1.0) * dkParams.moonInFrame;
     }
     return veil * DK_VEIL;
+}
+
+// A starburst around the Sun along a view ray, from lens.wgsl, in cd/m²: lit by the Sun's illuminance at the observer
+// and centered on where it shows, as the veil is, times the uniforms' `sunInFrame`. Laid out in the image plane, by the
+// matrix's own rectilinear projection, at the true angle from the Sun: its lines straight, and fixed to the camera.
+fn dkSkyStarburst(view: vec3f) -> vec3f {
+    if (DK_STARBURST == 0u || dkParams.sunInFrame <= 0.0) {
+        return vec3f(0.0);
+    }
+    let sun = dkParams.apparentSunDirection;
+    let chord = length(view - sun);
+    // The camera's axes run along the matrix's first two columns.
+    let right = normalize(dkParams.inverseViewProjection[0].xyz);
+    let up = normalize(dkParams.inverseViewProjection[1].xyz);
+    let forward = cross(up, right);
+    let at = vec2f(dot(view, right), dot(view, up)) / max(dot(view, forward), 0.05);
+    let center = vec2f(dot(sun, right), dot(sun, up)) / max(dot(sun, forward), 0.05);
+    let across = at - center;
+    let offset = across * (chord / max(length(across), 1e-9));
+    return dkMetering.sunIlluminance * hdStarburst(offset, dkParams.sunAngularRadius, DK_STARBURST) * dkParams.sunInFrame;
+}
+
+// The Sun's corona and chromosphere along a sampled ray, from sun.wgsl, in cd/m²: shares of the disc's luminance, so
+// behind the air, the ground and the Moon as the disc is, looked up only within the corona's reach of the Sun.
+fn dkSkySunCorona(sky: DkSkySample, ground: f32, footprint: f32) -> vec3f {
+    if (!DK_SOLAR_CORONA || !DK_SUN_DISC || ground >= 1.0) {
+        return vec3f(0.0);
+    }
+    let radius = dkParams.sunAngularRadius;
+    let near = length(sky.direction - dkParams.sunDirection) < DK_SUN_CORONA_REACH * radius;
+    if (!near || dot(sky.direction, dkParams.moonDirection) > dkParams.moonDiscCos) {
+        return vec3f(0.0);
+    }
+    let illuminance = dkToRgb(dkAtmosphere, dkSkySunTransmittance(sky) * dkAtmosphere.solarIlluminance);
+    let share = vec3f(dkSunCorona(sky.direction, dkParams.sunDirection, radius))
+        + dkSunChromosphere(sky.direction, dkParams.sunDirection, radius, footprint);
+    return share * dkSunDiscLuminance(illuminance, radius) * (1.0 - ground);
 }
 
 // Rays through a pixel the disc's edge or the horizon crosses, with DK_SUPERSAMPLE.
@@ -437,8 +479,8 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
         }
     }
 
-    // The aureole and the eye's veil, both smooth enough for the center ray.
-    luminance = luminance + dkSkyAureole(view) + dkSkyVeil(view);
+    // The aureole, the veil, the starburst and the Sun's corona, all smooth enough for the center ray.
+    luminance = luminance + dkSkyAureole(view) + dkSkyVeil(view) + dkSkyStarburst(view) + dkSkySunCorona(sky, ground, footprint);
     if (DK_DARK_ADAPTED) {
         luminance = hdDarkAdaptedEye(luminance);
     }
@@ -471,7 +513,7 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
 
     if (DK_DEBUG_GRID) {
         let below = dkPixelRay(id.xy + vec2u(0u, 1u), size);
-        color = dkDebugOverlay(color, view, right, below);
+        color = dkDebugOverlay(color, view, right, below, ground);
     }
     if (DK_TONE_MAP != 0u && DK_DITHER) {
         color = clamp(hdDitherBlue(color, id.xy, 255.0, dkBlueNoise), vec3f(0.0), hdEncodeSrgbExtended(vec3f(DK_HEADROOM), DK_HEADROOM));

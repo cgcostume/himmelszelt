@@ -7,7 +7,7 @@ times cos δ), all by way of osgHimmel's `brightstars.cpp`, and the color index 
 lists no B-V for 310 of the stars: theirs is the typical one of their spectral type, a giant's from G on where the
 type says so.
 
-`brightstars.bin.gz` is made from it by `pnpm catalog`: a flat little-endian `Float32Array` of eight fields per star,
+`brightstars.bin.gz` is made from it by `pnpm data:catalog`: a flat little-endian `Float32Array` of eight fields per star,
 the first five as listed with the right ascension in degrees, then the star's linear sRGB color at unit luminance from
 its B-V, as `colorFromColorIndex` computes it. Rerun it whenever the CSV changes. Beside it the script writes
 `brightstars-compact.bin.gz`, the layout `loadCatalog` fetches by default: three little-endian Uint32 a star, 12 bytes,
@@ -25,7 +25,7 @@ catalogue as NASA's HEASARC serves it) that `brightstars.csv` does not: the John
 and declination in degrees, ICRS, moved from the catalogue's epoch J1991.25 to J2000.0 by the proper motion, and B-V,
 0.65 for the 1,139 stars without one. Brightest first. Left out are the 263 entries without a position or a magnitude
 and the 9,072 within half an arcminute of a star of `brightstars.csv`, or within 1.5 arcminutes and 0.3 magnitudes of
-one. `hipparcos.bin.gz` is made from it by `pnpm hipparcos`: two little-endian Uint32 a star, the right ascension in
+one. `hipparcos.bin.gz` is made from it by `pnpm data:hipparcos`: two little-endian Uint32 a star, the right ascension in
 24 bits and the magnitude in 8, the declination in 24 bits and B-V in 8, as `packStars` lays them out, records of 8
 bytes. `hipparcos-compact.bin.gz`, the layout `loadFaintStars` fetches by default, sorts the same stars into cells as
 `tycho-compact.bin.gz` below, 6 bytes a star, 579 KB. Neither is checked in nor in the npm package, for ESA's terms, CC BY-NC 3.0 IGO (`LICENSE.md`); the CSV is
@@ -33,7 +33,7 @@ kept here as the record, and outside the repository the script makes the same st
 (heasarc_hipparcos.tdat.gz, 15 MB, cached), byte for byte the CSV with `--download --csv`.
 
 `tycho.bin.gz` and `tycho-compact.bin.gz` are not checked in, for their size, 14.1 and 12.0 MB, and not in the npm
-package, for ESA's terms: `pnpm tycho` makes
+package, for ESA's terms: `pnpm data:tycho` makes
 it from the Tycho-2 catalogue (Høg et al. 2000, as NASA's HEASARC serves it, 200 MB cached in
 `node_modules/.cache/sternenheer/tycho2`), and `.gitignore` here leaves it out. It holds the 2,420,098 stars of Tycho-2
 that are neither Hipparcos stars nor within 5 arcseconds of a star of the two files above: Johnson's V and B-V from
@@ -55,11 +55,11 @@ the stars NASA's Milky Way map leaves out, 1.37 million in 11.0 MB: the map hold
 `constellations.csv` (743 lines: `constellation,from,to`) holds the constellations' lines: the IAU abbreviation and the
 two stars a line joins, as rows of `brightstars.csv` counted from 0. The figures are d3-celestial's
 (https://github.com/ofrohn/d3-celestial, Olaf Frohn, BSD 3-Clause), each of its points matched to the catalog's star
-there, all within half an arcminute. `constellations.bin` is made from it by `pnpm constellations`: little-endian
+there, all within half an arcminute. `constellations.bin` is made from it by `pnpm data:constellations`: little-endian
 Uint16 triples, the constellation's index among the sorted abbreviations and the two stars.
 d3-celestial's license is in `LICENSE-d3-celestial.txt`.
 
-`milkyway-4k.webp` and `milkyway-2k.webp` are made by `pnpm milkyway` from NASA's Deep Star Maps 2020
+`milkyway-4k.webp` and `milkyway-2k.webp` are made by `pnpm data:milkyway` from NASA's Deep Star Maps 2020
 (https://svs.gsfc.nasa.gov/4851), credit NASA's Scientific Visualization Studio: its Milky Way background layer, the
 light of the stars of Gaia DR2 fainter than the Hipparcos and Tycho stars, in J2000 equatorial coordinates, plate
 carrée with right ascension increasing to the left. Each channel holds its logarithm in 8 bits, 12 stops below 1, so
@@ -70,7 +70,7 @@ matching the map, the catalog and the Hipparcos stars along the band of declinat
 starlight Masana et al. (2021) give for the zenith of 40° N over a year. The Hipparcos stars are a quarter of the
 starlight there: a renderer that draws none shows a sky that much short.
 
-`milkyway-8k.webp` (8192 by 4096, 18.5 MB) is made on request by `pnpm milkyway --size 8k` from NASA's own 8K file of
+`milkyway-8k.webp` (8192 by 4096, 18.5 MB) is made on request by `pnpm data:milkyway --size 8k` from NASA's own 8K file of
 the same layer, 137 MB, and is neither checked in nor in the npm package; `.gitignore` here leaves it out. NASA's
 texels hold the light that falls into them, so the mean of a map halves twice from one size to the next: the script
 scales each texel by its area against the 4K map's, and a texel of value 1 stands for the same luminance in both maps,

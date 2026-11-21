@@ -9,7 +9,9 @@ import {
     type MeterFocus,
     type MeterHistogram,
     meteredLuminance,
+    NO_WHITE_BALANCE,
     type ToneCurve,
+    type WhiteBalance,
     wgsl,
 } from "@himmelszelt/helldunkel";
 import { decodeRgbe, wgsl as rundbild } from "@himmelszelt/rundbild";
@@ -454,7 +456,8 @@ export async function load(entry: Pick<Entry, "id" | "name" | "authors">) {
 // The panorama exposed and linear, as stored or through a camera from inside: what bloom goes over.
 const SAMPLE = /* wgsl */ `
 ${rundbild.panorama}
-struct Params { right: vec3f, tx: f32, up: vec3f, ty: f32, forward: vec3f, exposure: f32, projected: u32 }
+${wgsl.whitebalance}
+struct Params { right: vec3f, tx: f32, up: vec3f, ty: f32, forward: vec3f, exposure: f32, projected: u32, whiteBalance: mat3x3f }
 @group(0) @binding(0) var<uniform> params: Params;
 @group(0) @binding(1) var image: texture_2d<f32>;
 @group(0) @binding(2) var imageSampler: sampler;
@@ -472,7 +475,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
         let down = (1.0 - uv.y * 2.0) * params.ty;
         uv = rbEquirectangularUv(normalize(params.forward + params.right * across + params.up * down), 0.0);
     }
-    let light = textureSampleLevel(image, imageSampler, uv, 0.0).rgb * params.exposure;
+    let light = hdWhiteBalance(textureSampleLevel(image, imageSampler, uv, 0.0).rgb, params.whiteBalance) * params.exposure;
     textureStore(output, vec2i(id.xy), vec4f(min(light, vec3f(1e4)), 1.0));
 }`;
 
@@ -569,11 +572,16 @@ function bloomFor(device: GPUDevice, width: number, height: number) {
     return blooms.get(key) ?? null;
 }
 
-/** Draws the shared HDRI into a canvas, as the page's switches and exposure say, through a tone curve. */
+/** Draws the shared HDRI into a canvas, as the page's switches and exposure say, through a tone curve: as shot unless
+ *  given a white balance, helldunkel's `whiteBalance(white)`, applied with the exposure. */
 export function draw(
     canvas: HTMLCanvasElement,
     target: GPUCanvasContext,
-    { curve = "clip", bloom: strength = 0 }: { curve?: ToneCurve; bloom?: number } = {},
+    {
+        curve = "clip",
+        bloom: strength = 0,
+        whiteBalance = NO_WHITE_BALANCE,
+    }: { curve?: ToneCurve; bloom?: number; whiteBalance?: WhiteBalance } = {},
 ) {
     if (!hdri.texture || gpu.error) return;
     const device = gpuDevice();
@@ -605,9 +613,11 @@ export function draw(
     const right = [Math.cos(yaw), -Math.sin(yaw), 0];
     const up = [-Math.sin(pitch) * Math.sin(yaw), -Math.sin(pitch) * Math.cos(yaw), Math.cos(pitch)];
     const ty = Math.tan(fov / 2);
-    const sample = new ArrayBuffer(64);
-    new Float32Array(sample).set([...right, ty * (width / height), ...up, ty, ...forward, 1 / (1.2 * 2 ** hdri.ev100)]);
+    const sample = new ArrayBuffer(112);
+    const sampleFloats = new Float32Array(sample);
+    sampleFloats.set([...right, ty * (width / height), ...up, ty, ...forward, 1 / (1.2 * 2 ** hdri.ev100)]);
     new Uint32Array(sample)[12] = view.projected ? 1 : 0;
+    for (let col = 0; col < 3; col++) sampleFloats.set(whiteBalance.slice(col * 3, col * 3 + 3), 16 + col * 4);
     const showData = new ArrayBuffer(32);
     new Uint32Array(showData).set([
         { neutral: 1, agx: 2, aces: 3, clip: 4 }[curve],

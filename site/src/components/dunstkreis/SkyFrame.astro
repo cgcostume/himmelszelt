@@ -1,5 +1,6 @@
 ---
 import CopyInfo from "../CopyInfo.astro";
+import "./dunstkreis.css";
 import Icon from "../Icon.astro";
 
 /**
@@ -12,7 +13,7 @@ import Icon from "../Icon.astro";
 interface Props {
     /** How to navigate the view, after the switches. */
     hint?: string;
-    /** Whether the view offers a PNG of itself. */
+    /** Whether the view saves a PNG of its own (see sky.ts); otherwise figure-actions.ts saves what it shows. */
     png?: boolean;
     /** Classes and a panel name of the view itself, for the figure's own styles and script. */
     viewClass?: string;
@@ -72,7 +73,7 @@ const named: Record<number, string> = { 0: "1 m", 3: "1 km", 5: "100 km" }
 ---
 
 <div class="sky-stage" data-sky-frame data-own-height={ownHeight ? "" : undefined}>
-    <div class={`sky-view as-seen ${viewClass}`} data-panel={panel}>
+    <div class={`sky-view as-seen ${viewClass}`} data-panel={panel} data-actions={png ? "copy" : "png copy"}>
         <slot />
         <div class="sky-bar">
             <span class="sky-bar-start">
@@ -87,11 +88,11 @@ const named: Record<number, string> = { 0: "1 m", 3: "1 km", 5: "100 km" }
             <span class="sky-bar-end">
             <slot name="bar" />
             {fly && <span class="view-buttons"><button type="button" class="view-icon" data-field="fly" aria-pressed="false" title="Fly, or F over the view: the mouse is captured and turns the view, W A S D move, E up and Q down, at a speed of the height over the ground per second, Shift faster, over a grid on the ground. F lands" aria-label="Fly"><Icon name="fly" /></button></span>}
-            <span class="view-buttons">
+            <span class="view-buttons fig-actions">
                 <button type="button" class="view-icon" data-field="play" aria-pressed="false" title="Play: the moment runs on, an hour in 10 seconds, half a day in 2 minutes" aria-label="Play"><Icon name="play" /></button>
                 {options && <button type="button" class="view-icon" data-field="options" aria-pressed="true" title="Show or hide this figure's options" aria-label="Options"><Icon name="options" /></button>}
                 {png && <button type="button" class="view-icon" data-field="png" title="Download the view as PNG" aria-label="Download the view as PNG"><Icon name="download" /></button>}
-                {png && <CopyInfo />}
+                <CopyInfo />
                 <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
             </span>
             </span>
@@ -118,11 +119,7 @@ const named: Record<number, string> = { 0: "1 m", 3: "1 km", 5: "100 km" }
 </div>
 
 <script>
-    import { figureInfo } from "../figure-info";
     import { skyFrames } from "./skyframe";
 
     skyFrames();
-    for (const frame of document.querySelectorAll<HTMLElement>("[data-sky-frame]")) {
-        if (frame.querySelector("[data-field=copyInfo]")) figureInfo(frame.closest<HTMLElement>("figure") ?? frame);
-    }
 </script>

@@ -1,5 +1,5 @@
 import { viewFrame } from "@himmelszelt/nachtgestirn";
-import { displayOutput, gpuDevice, gpu as shared } from "../dunstkreis/atmosphere";
+import { configureCanvas, displayOutput, gpuDevice, gpu as shared } from "../dunstkreis/atmosphere";
 import { raysOf } from "./rays";
 import { createMoonRenderer, inverseViewProjection, type MoonAt, type MoonFrame } from "./renderer";
 
@@ -31,7 +31,8 @@ export const pxPerRadian = (degreesAcross: number, tilePx: number) => tilePx / (
 /**
  * A row of Moons in one canvas, for the figures that compare discs: each is rendered by nachtgestirn's pass into a
  * tile of its own, from Earth's center with the Moon's north up and no air, and copied into the canvas side by side.
- * The canvas follows the page's display choice, HDR where the display and the canvas can (`displayOutput`).
+ * The canvas follows the page's display choice, HDR where the display and the canvas can (`displayOutput`), unless
+ * `hdr` is false: SDR for a figure compared with photographs.
  * `requestRender` is called whenever something a tile waited for arrived.
  */
 const normalize = (v: readonly number[]) => {
@@ -107,7 +108,7 @@ function half(h: number) {
     return sign * (1 + mantissa / 1024) * 2 ** (exponent - 15);
 }
 
-export function createTiles(canvas: HTMLCanvasElement, requestRender: () => void) {
+export function createTiles(canvas: HTMLCanvasElement, requestRender: () => void, hdr = true) {
     const context = shared.error ? null : canvas.getContext("webgpu");
     if (!context) return null;
     const device = gpuDevice();
@@ -117,13 +118,7 @@ export function createTiles(canvas: HTMLCanvasElement, requestRender: () => void
     function configure(format: GPUTextureFormat) {
         if (configured === format) return;
         configured = format;
-        context?.configure({
-            device,
-            format,
-            alphaMode: "opaque",
-            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST,
-            toneMapping: { mode: format === "rgba16float" ? "extended" : "standard" },
-        });
+        if (context) configureCanvas(context, format, GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST);
     }
     const renderer = createMoonRenderer(device, requestRender);
     let scratch: GPUTexture | null = null;
@@ -195,7 +190,7 @@ export function createTiles(canvas: HTMLCanvasElement, requestRender: () => void
         draw(layout: TileLayout, frame: (i: number) => TileFrame) {
             if (!context) return null;
             const { count, rows = 1, width: tileW, height: tileH = layout.width, degreesAcross } = layout;
-            const { format, headroom } = displayOutput();
+            const { format, headroom } = displayOutput(hdr);
             configure(format);
             const width = count * tileW;
             const height = rows * tileH;
@@ -278,7 +273,7 @@ export function createTiles(canvas: HTMLCanvasElement, requestRender: () => void
             warmup = 100,
             frames = 1000,
         ) {
-            const { format, headroom } = displayOutput();
+            const { format, headroom } = displayOutput(hdr);
             const target = device.createTexture({
                 label: "sternwarte:moonMeasure",
                 size: [width, height],

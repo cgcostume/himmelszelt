@@ -43,6 +43,11 @@ struct DkSkyParams {
     sunDiscCeiling: f32,
     // The cosine of the Moon's angular radius, whose disc hides the sun disc behind it; above 1 for none.
     moonDiscCos: f32,
+    // How much of the veil and the starburst around the Sun shows, 0 to 1: all of it while the Sun is in the frame, none
+    // once it is well out of it, a lens being shaded by its barrel and an eye by its brow.
+    sunInFrame: f32,
+    // The same for the veil around the Moon.
+    moonInFrame: f32,
     // The white balance, helldunkel's `hdWhiteBalance`, applied wherever the exposure is: the identity for none.
     whiteBalance: mat3x3f,
 }

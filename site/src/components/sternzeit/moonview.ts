@@ -17,7 +17,6 @@ import {
 import { arrowAround, offPanelArrowSvg } from "./offpanel";
 import { drawParallax } from "./parallax";
 import { ephemerisDay, onChange, state } from "./state";
-import "./export";
 
 const DEG = precise.DEG_TO_RAD;
 // The Moon's disc at perigee gets this radius in the 200 x 200 viewBox; smaller at any other distance.

@@ -1,13 +1,13 @@
 ---
 import Icon from "../Icon.astro";
 import Resolutions from "../Resolutions.astro";
-import "../sternzeit/sternzeit.css";
 import "../dunstkreis/dunstkreis.css";
 import "./environments.css";
 
 /**
  * The frame every figure showing the HDRI shares, its bar the same on all and their switches one for the page: the map as
- * stored or the view from inside, what clips, and the file's resolution.
+ * stored or the view from inside, what clips, and the file's resolution; at its end the figure's actions (see
+ * figure-actions.ts): PNG, Copy and full screen.
  */
 interface Props {
     /** Whether the figure offers full screen. */
@@ -30,7 +30,7 @@ const RESOLUTIONS = [
 ---
 
 <div class="env-frame" data-env-frame data-mode="map" data-own-view={ownView}>
-    <div class="env-stage">
+    <div class="env-stage" data-actions="png copy" data-export-timeless>
     <slot />
     {author && <span class="env-author" data-env="author"></span>}
     <div class="env-bar">
@@ -45,12 +45,10 @@ const RESOLUTIONS = [
         </Fragment>)}
         <Resolutions options={RESOLUTIONS} chosen="1k" />
         <span class="sky-hint footnote" data-env="hint"></span>
-        {(fullscreen || options) && (
-            <span class="view-buttons env-end">
-                {options && <button type="button" class="view-icon" data-env="options" aria-pressed="true" title="Show or hide this figure's options" aria-label="Options"><Icon name="options" /></button>}
-                {fullscreen && <button type="button" class="view-icon" data-env="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>}
-            </span>
-        )}
+        <span class="view-buttons env-end fig-actions">
+            {options && <button type="button" class="view-icon" data-env="options" aria-pressed="true" title="Show or hide this figure's options" aria-label="Options"><Icon name="options" /></button>}
+            {fullscreen && <button type="button" class="view-icon" data-env="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>}
+        </span>
     </div>
     {options && <div class="sky-options" data-env="optionsPanel"><Fragment set:html={optionsHtml} /></div>}
     </div>

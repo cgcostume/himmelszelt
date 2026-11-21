@@ -1,7 +1,6 @@
 ---
 import Term from "../Term.astro";
 import Try from "../Try.astro";
-import "../sternzeit/sternzeit.css";
 import "./nachtgestirn.css";
 
 /** The light of the whole disc over the phase angle under each law, against the Moon's measured light. */
@@ -11,7 +10,7 @@ interface Props {
 const { id = "phases" } = Astro.props;
 ---
 
-<figure class="plot-figure" id={id} data-phases>
+<figure class="fig plot-figure" id={id} data-phases>
     <div class="tiles-plot" data-export="phase-law" data-export-timeless>
         <svg style="height: 306px" role="img" aria-label="The light of the whole disc over the phase angle under three reflectance laws, and the Moon's as measured by ROLO and by Allen"></svg>
     </div>
@@ -24,9 +23,8 @@ const { id = "phases" } = Astro.props;
     </label>
     <figcaption class="figure-caption">
         The light of the whole disc over the <Term of="Phase angle">phase angle</Term>, in{" "}
-        <Term of="Stop">stops</Term> below a full Moon: three laws as plain discs, and the Moon as measured, the ROLO model
-        dashed, Allen's phase law dotted, alone in the shaded band past ROLO's last angle. Sunlight only, without
-        earthshine. Marked are the half Moon at 90°, Danjon's limit at 173° and the Moon's phase angle at the chosen moment.
+        <Term of="Stop">stops</Term> below a full Moon, sunlight only: three laws as plain discs, ROLO's measured Moon
+        dashed, Allen's phase law dotted, alone in the shaded band past ROLO's last angle.
         <Try label="A day after new moon" set="date=2026-11-10T12:00Z" fig={id}>
             Hapke 2012 three stops under Allen, its slopes shading each other.
         </Try>

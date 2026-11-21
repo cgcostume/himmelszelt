@@ -21,12 +21,18 @@ struct LabView {
     grid: array<vec4f, 4>,
     // How much brighter a grid line makes the ground, 0 for no grid.
     gridStrength: f32,
-    pad0: f32,
-    pad1: f32,
-    pad2: f32,
+    // What the stand-in sun's light is multiplied by: 1, or the Moon's share of it where the Moon is the light.
+    lightScale: f32,
+    // The luminance in cd/m² the stand-in sky's colors are brought to for the clouds' ambient light: a real sky's, where
+    // the figure has one behind its clouds; 0 for the stand-in's own.
+    skyLuminance: f32,
+    // How many times SDR white the display may show: 1, or more on an HDR display.
+    headroom: f32,
 }
 
 const LAB_PI: f32 = 3.141592653589793;
+// How much of the ground's light a cloud's full shadow takes, the rest being the sky's.
+const LAB_SHADOW: f32 = 0.7;
 
 fn labRay(view: LabView, position: vec2f, size: vec2u) -> vec3f {
     let uv = position / vec2f(size);
@@ -71,6 +77,25 @@ fn labSunlight(sine: f32, altitude: f32) -> vec3f {
     return 128000.0 * exp(-vec3f(0.085, 0.15, 0.33) * mass) * up;
 }
 
+// The light of the view's sun, or of whatever stands in its place.
+fn labLight(view: LabView, sine: f32, altitude: f32) -> vec3f {
+    return labSunlight(sine, altitude) * view.lightScale;
+}
+
+// A color of the stand-in sky as the clouds' ambient light: at the real sky's luminance where the view has one.
+fn labAmbient(view: LabView, color: vec3f) -> vec3f {
+    if (view.skyLuminance <= 0.0) {
+        return color;
+    }
+    return color * view.skyLuminance / max(dot(color, vec3f(0.2126, 0.7152, 0.0722)), 1e-6);
+}
+
+// What a layer of cloud of the optical depth `tau` lets through of the light on it, scattered or not, where it scatters
+// forwards with the asymmetry `g`: two streams. A shadow on the ground is as deep as this is small.
+fn labPassed(tau: f32, g: f32) -> f32 {
+    return 1.0 / (1.0 + 0.75 * (1.0 - g) * tau);
+}
+
 // A clear sky's luminance along `v`: blue overhead, pale at the horizon, a glow about the sun, the ground below
 // `horizon`, the height of the horizon as a ray's z.
 fn labSkyOver(v: vec3f, sun: vec3f, horizon: f32) -> vec3f {
@@ -97,9 +122,19 @@ fn labSkyFrom(view: LabView, v: vec3f, sun: vec3f) -> vec3f {
     return labSkyOver(v, sun, -sqrt(view.observer * (2.0 * view.planetRadius + view.observer)) / r);
 }
 
-// Exposed and tone mapped for an 8-bit target, as the site's other figures: helldunkel's Neutral.
-fn labDisplay(luminance: vec3f, exposure: f32) -> vec4f {
-    return vec4f(hdToneMapNeutral(luminance * exposure), 1.0);
+// The air's color in front of what lies along `v`, from the observer's height: the sky's there, and for a ray that
+// ends on the ground the sky's at the horizon, since the air in front of the ground is no darker than the air beside it.
+fn labAirFrom(view: LabView, v: vec3f, sun: vec3f) -> vec3f {
+    let r = view.planetRadius + view.observer;
+    let horizon = -sqrt(view.observer * (2.0 * view.planetRadius + view.observer)) / r;
+    let level = vec3f(normalize(v.xy + vec2f(1e-9)) * sqrt(1.0 - horizon * horizon), horizon);
+    return labSkyOver(select(v, level, v.z < horizon), sun, horizon);
+}
+
+// Exposed and tone mapped for the canvas, as the site's other figures: helldunkel's Neutral, towards `headroom` times
+// SDR white.
+fn labDisplay(luminance: vec3f, exposure: f32, headroom: f32) -> vec4f {
+    return vec4f(hdToneMapNeutralHdr(luminance * exposure, headroom), 1.0);
 }
 
 // Interleaved gradient noise (Jimenez 2014), another frame of it each frame.

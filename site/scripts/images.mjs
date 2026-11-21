@@ -1,6 +1,6 @@
 // Makes the site's two photographs for the web from their originals in src/data: the corona, gray, 1024 pixels square,
 // and the sunrise from the ISS, 1536 wide, with Gaussian noise of two 8-bit levels added before it is rounded to 8 bits,
-// so its smooth gradients do not band. Rerunnable: `pnpm images`. Needs sharp.
+// so its smooth gradients do not band. Rerunnable: `pnpm data:images`. Needs sharp.
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";

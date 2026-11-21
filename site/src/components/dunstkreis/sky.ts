@@ -5,6 +5,7 @@ import {
     createSkyPass,
     DEFAULT_AUREOLE,
     DEFAULT_AUTO_EXPOSURE_KEYS,
+    LENS_VEIL,
     precomputeAtmosphere,
 } from "@himmelszelt/dunstkreis";
 import { fromJulianDay, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
@@ -13,6 +14,7 @@ import { onDemand, watchView } from "../frame";
 import { paintRange } from "../range";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
+import { skyWhite } from "../white";
 import {
     bindHdr,
     bindModelChoice,
@@ -233,8 +235,8 @@ export function skyFigure(root: HTMLElement) {
         const astronomyMs = performance.now() - started;
 
         const debugGrid = marks() === 2;
-        // The figure with every option follows the page's display choices; the other shows SDR, Neutral, as a reader meets it.
-        const { format, headroom } = full ? displayOutput() : { format: SDR, headroom: 1 };
+        // Every sky follows the page's headroom; only the figure with every option chooses the tone curve, the others Neutral.
+        const { format, headroom } = displayOutput();
         // Half floats need no dither: their steps are far finer than 8 bits'.
         const dither = pressed("dither") && format === SDR;
         const ditherButton = maybe<HTMLButtonElement>("dither");
@@ -265,6 +267,9 @@ export function skyFigure(root: HTMLElement) {
             headroom,
             // On in every figure; the one with the air's parts switches it.
             aureole: pressed("aureole") ? DEFAULT_AUREOLE : false,
+            // Off in the figures without the switch.
+            starburst: maybe("starburst")?.getAttribute("aria-pressed") === "true",
+            veil: pressed("veil") ? LENS_VEIL : 0,
             ...(parts ? { scattering: scattering() } : {}),
         };
         if (!pass || !holds(passFor, settings)) {
@@ -283,6 +288,7 @@ export function skyFigure(root: HTMLElement) {
             pixelRatio: dpr,
             ev100: evOfSlider(),
             autoExposureKeys: pressed("ramp") ? DEFAULT_AUTO_EXPOSURE_KEYS : [],
+            whiteBalance: skyWhite(sunDirection),
         });
         const skyViewKey = `${state.jd},${state.latitude},${state.longitude},${air.height()}`;
         if (primary && (skyViewKey !== skyViewFor || pass !== notified)) {
@@ -298,17 +304,13 @@ export function skyFigure(root: HTMLElement) {
         placeCompass(basis, canvas.clientWidth, canvas.clientHeight);
         const encoder = gpu.device.createCommandEncoder();
         const target = gpu.context.getCurrentTexture();
-        if (air.flying()) {
-            // The sky into a texture like the canvas', and from there with the grid onto the canvas.
-            groundPass ??= groundGrid(gpu.device);
-            const drawn = groundPass.skyFor(target);
-            pass.encode(encoder, drawn);
-            const view = { inverseViewProjection: inverseViewProjection(basis), projectionDistance: basis.d };
-            const radiusKm = table.luts.model.planet.groundRadiusKm;
-            groundPass.encode(encoder, drawn, { ...view, heightM: air.height(), radiusKm, flown: air.flown }, target);
-        } else {
-            pass.encode(encoder, target);
-        }
+        // The sky into a texture like the canvas', and from there with the grid on the ground onto the canvas.
+        groundPass ??= groundGrid(gpu.device);
+        const drawn = groundPass.skyFor(target);
+        pass.encode(encoder, drawn);
+        const view = { inverseViewProjection: inverseViewProjection(basis), projectionDistance: basis.d };
+        const radiusKm = table.luts.model.planet.groundRadiusKm;
+        groundPass.encode(encoder, drawn, { ...view, heightM: air.height(), radiusKm, flown: air.flown }, target);
         gpu.device.queue.submit([encoder.finish()]);
         const submitted = performance.now();
         showTiming(astronomyMs, submitted - skyStarted, submitted);
@@ -352,8 +354,8 @@ export function skyFigure(root: HTMLElement) {
             bindToneCurveChoice(root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-tone"]`));
             bindModelChoice(root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-model"]`));
             bindHdr(find('[data-hdr="note"]', root), find('[data-hdr="choice"]', root));
-            onDisplay(requestRender);
         }
+        onDisplay(requestRender);
         onChange(requestRender);
         onTables(() => {
             maybe("refraction")?.setAttribute("aria-pressed", String(quality.refraction));
@@ -368,6 +370,8 @@ export function skyFigure(root: HTMLElement) {
             "refraction",
             "dither",
             "aureole",
+            "starburst",
+            "veil",
             ...INGREDIENTS,
             ...Object.keys(ORDERS),
         ]) {

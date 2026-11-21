@@ -5,7 +5,6 @@ import { onDemand } from "../frame";
 import { ARROWHEAD_PX, SUN_SYMBOL, sunRays, themeColor, themeColors } from "./figure";
 import { ephemerisDay, onChange, state } from "./state";
 import { type Point, type Rotation, turn, viewToScene, zdogBody, zdogMoon, zdogSun } from "./zdogmoon";
-import "./export";
 
 const { Illustration, Anchor, Shape } = Zdog;
 const DEG = precise.DEG_TO_RAD;

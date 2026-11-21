@@ -12,6 +12,13 @@
     gap: 0.4rem;
     justify-content: space-between;
 }
+/* The switches at the right, the figure's actions after them. */
+.colorhist-bar > .view-buttons:not(.fig-actions) {
+    margin-left: auto;
+}
+.colorhist-bar > .fig-row {
+    margin: 0;
+}
 .colorhist-panel > svg {
     display: block;
     width: 100%;

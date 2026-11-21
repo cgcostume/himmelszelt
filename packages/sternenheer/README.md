@@ -123,8 +123,9 @@ That writes them into the installed package's `data/`, where `loadFaintStars` an
 <dir>` writes them elsewhere for a server to host, `--cache <dir>` keeps the downloads, by default in
 `node_modules/.cache/sternenheer`, and each run prints the terms and the credit. The catalogs are byte planes, gzip
 compressed, which the loaders unpack with `DecompressionStream`; serve the `.gz` files as they are. In the repository
-`pnpm assets` makes the files not checked in, `pnpm assets --all` every one, and `pnpm catalog`, `hipparcos`, `tycho`,
-`constellations` and `milkyway` each its own; a script does nothing while its output is newer than its inputs.
+`pnpm assets` makes the files not checked in, `pnpm assets --all` every one, `pnpm data` remakes the shipped ones, and
+`pnpm data:catalog`, `data:hipparcos`, `data:tycho`, `data:constellations` and `data:milkyway` each its own; a script does
+nothing while its output is newer than its inputs.
 
 The Milky Way ships at 2048 and 4096 texels around. NASA's own 8K map makes a larger one, not shipped, fetched from the
 asset mirror (github.com/cgcostume/himmelszelt-assets), or with `--build` built with `sharp` (`npm install sharp`):

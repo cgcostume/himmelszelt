@@ -1,0 +1,70 @@
+---
+import "./costs.css";
+import { axisFor, formatValue, ticksOf } from "./costs";
+
+/**
+ * A chapter's "What it costs", in the design of nachtgestirn's budget: a row per case, a panel per measure, each with its
+ * own axis, the value at the bar's end. A value given as text stands in its cell in place of a bar, for what holds or
+ * takes nothing. The caption comes in as the slot.
+ */
+export interface CostsColumn {
+    /** The panel's head, with its unit. */
+    head: string;
+    /** The bar's color: the ink, or one of the budget's parts. */
+    part?: 0 | 1 | 2;
+}
+export interface CostsLine {
+    label: string;
+    note?: string;
+    values: (number | string | undefined)[];
+}
+interface Props {
+    id?: string;
+    label: string;
+    columns: CostsColumn[];
+    rows: CostsLine[];
+}
+const { id = "costs", label, columns, rows } = Astro.props;
+const axes = columns.map((_, c) =>
+    axisFor(Math.max(...rows.map((row) => (typeof row.values[c] === "number" ? (row.values[c] as number) : 0)))),
+);
+const pct = (v: number, c: number) => `${((100 * v) / (axes[c]?.end ?? 1)).toFixed(3)}%`;
+const grid = (c: number) => `--grid: ${(100 * (axes[c]?.step ?? 1)) / (axes[c]?.end ?? 1)}%`;
+---
+
+<figure class="fig budget-figure costs-figure" id={id} data-actions="copy">
+    <div class="budget-grid" role="img" aria-label={label} style={`--costs-columns: ${columns.length}`}>
+        <span></span>
+        {columns.map((column, c) => <span class:list={["budget-head note", c === columns.length - 1 && "costs-head-last"]}>{column.head}</span>)}
+        {rows.map((row) => (
+            <>
+                <span class="budget-size">
+                    <span>{row.label}</span>
+                    {row.note && <span class="budget-defaults-note note">{row.note}</span>}
+                </span>
+                {columns.map((column, c) => {
+                    const v = row.values[c];
+                    return (
+                        <span class="budget-cell" style={grid(c)} data-label={column.head}>
+                            {typeof v === "number" ? (
+                                <span class="budget-line" title={`${row.label}: ${v} (${column.head})`}>
+                                    <i class:list={["budget-bar", column.part !== undefined && `budget-part-${column.part}`]} style={`width: ${pct(v, c)}`}></i>
+                                    <span class="budget-value">{formatValue(v)}</span>
+                                </span>
+                            ) : (
+                                <span class="budget-line"><span class="budget-value costs-none">{v ?? ""}</span></span>
+                            )}
+                        </span>
+                    );
+                })}
+            </>
+        ))}
+        <span></span>
+        {axes.map((axis, c) => (
+            <span class="budget-axis note" aria-hidden="true">
+                {ticksOf(axis).map((t) => <span style={`left: ${pct(t, c)}`}>{t}</span>)}
+            </span>
+        ))}
+    </div>
+    <figcaption class="figure-caption"><slot /></figcaption>
+</figure>

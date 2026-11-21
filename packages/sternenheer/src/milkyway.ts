@@ -24,7 +24,7 @@ export const MILKY_WAY_STOPS = 12;
 const SHIPPED = { luminance: MILKY_WAY_LUMINANCE, stops: MILKY_WAY_STOPS };
 
 /**
- * The package's maps, made by `pnpm milkyway` from NASA's Deep Star Maps 2020: the light of the stars fainter than the
+ * The package's maps, made by `pnpm data:milkyway` from NASA's Deep Star Maps 2020: the light of the stars fainter than the
  * Hipparcos and Tycho stars, from Gaia DR2, in J2000 equatorial coordinates, plate carrée with right ascension
  * increasing to the left, each channel's logarithm in 8 bits, the stars that stood out as points taken out and their
  * light spread around them. Shipped: `small` 2048 texels around, 810 KB, a texel 10 arcminutes, enough for a view of
@@ -39,7 +39,7 @@ export const MILKY_WAY_MAPS = {
         url: new URL("../data/milkyway-8k.webp", import.meta.url),
         width: 8192,
         ...SHIPPED,
-        build: "npx @himmelszelt/sternenheer data milkyway --size 8k, or pnpm milkyway --size 8k in the repository",
+        build: "npx @himmelszelt/sternenheer data milkyway --size 8k, or pnpm data:milkyway --size 8k in the repository",
     },
 } as const satisfies Readonly<Record<string, MilkyWayFiles>>;
 

@@ -2,7 +2,7 @@
 // Ulichney's void-and-cluster method (1993) as helldunkel's scripts/bluenoise.mjs has it, from fixed seeds, so every run
 // writes the same file. The first channel is the noise helldunkel ships for its dither.
 //
-//     pnpm --filter @himmelszelt/sternwarte bluenoise
+//     pnpm --filter @himmelszelt/sternwarte data:bluenoise
 //
 // Writes src/components/scene/bluenoise.bin: 64 x 64 x 2 bytes, row by row, the two channels interleaved, each texel's
 // rank among all 4096 scaled to 0..255.

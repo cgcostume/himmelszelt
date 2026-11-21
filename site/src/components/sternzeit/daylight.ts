@@ -5,7 +5,6 @@ import { onDemand } from "../frame";
 import { drawSvg, LABEL_GAP, STRIP_MARGIN, stripMoment, svgText } from "./figure";
 import { onChange, state, update } from "./state";
 import { clockOffsetMs, DAY_MS, wallDayOf } from "./zone";
-import "./export";
 
 // Ten-minute rows: a pixel or so each at the strip's height. The approximate Sun is a few thousandths of a degree off,
 // far below that. A new year or place is sampled half-hourly first, on every fourth day with the days between drawn in,

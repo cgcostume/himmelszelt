@@ -46,7 +46,6 @@ import Phases from "../../components/nachtgestirn/Phases.astro";
 import Maps from "../../components/nachtgestirn/Maps.astro";
 import Surface from "../../components/nachtgestirn/Surface.astro";
 import SoftShadows from "../../components/nachtgestirn/SoftShadows.astro";
-import Shimmer from "../../components/nachtgestirn/Shimmer.astro";
 import Color from "../../components/nachtgestirn/Color.astro";
 import Shadow from "../../components/nachtgestirn/Shadow.astro";
 import UmbraLight from "../../components/nachtgestirn/UmbraLight.astro";
@@ -472,10 +471,9 @@ night, and more the more air the light crosses <Cite id="fried1966" /> <Cite id=
 by the same air it dims the Moon by, so a Moon on the horizon, seen through some forty times the air overhead,
 trembles most, and one seen from a mountain less. The air also bends blue a little more than red, and lifts the blue
 image over the red by a hundredth of the refraction, tens of arcseconds on the horizon <Cite id="edlen1966" />
-<Cite id="filippenko1982" /> (<Fig id="shimmer" />). `shimmer` sets the seeing and the clock. It is a camera's view
-of the air, one short exposure at a time; the eye sees the Moon's limb tremble the same way on a warm night.
-
-<Shimmer />
+<Cite id="filippenko1982" />. `shimmer` sets the seeing and the clock. It is a camera's view of the air, one short
+exposure at a time; the eye sees the Moon's limb tremble the same way on a warm night, and
+[dunstkreis' chapter](../dunstkreis/#shimmer) shows it live, next to the table of the air.
 
 ## The Moon tonight
 
@@ -562,9 +560,10 @@ the pass takes four, `terminatorSamples`. The rest is a choice: `typicalUmbra` i
 for colors a hundredth of a stop off. The maps are read anisotropically, so the poles and the limb come out as sharp as
 the center; `filter` switches the cheaper filters on.
 
-Everything on, with the next finer maps, costs a disc up to four times the time, still under a millisecond, and four
-times the memory. What the defaults leave out shows on about one in a hundred of the disc's pixels, most of them
-crater rims along the terminator drawn a pixel off, where the relief is not displaced (<Fig id="budget" />).
+Everything on, with the next finer maps, costs a disc up to almost three times the time, under half a millisecond, and
+four times the memory; the seen maps download a third less than the whole ones and load nearly a fifth faster. What
+the defaults leave out shows on about one in a hundred of the disc's pixels, most of them crater rims along the
+terminator drawn a pixel off, where the relief is not displaced (<Fig id="budget" />).
 
 <Budget />
 

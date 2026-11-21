@@ -1,8 +1,6 @@
 ---
-import "../sternzeit/sternzeit.css";
 import "./dunstkreis.css";
 import "./clocks.css";
-import Fig from "../Fig.astro";
 
 const SKY = [
     ["live", "Live sky", "The sky pass every frame and the sky view whenever the Sun moves"],
@@ -27,7 +25,7 @@ const ASKED = [
 ];
 ---
 
-<figure class="strip-figure" id="clocks">
+<figure class="fig strip-figure" id="clocks">
     <div class="clocks-bar">
         <span class="steps" role="radiogroup" aria-label="The sky">
             {
@@ -50,20 +48,15 @@ const ASKED = [
             }
         </span>
     </div>
-    <div class="strip-panel clocks-panel">
+    <div class="strip-panel clocks-panel" data-export="clocks" data-export-timeless>
         <svg role="img" aria-label="The pieces of dunstkreis, what each reads, how large it is and when it runs"></svg>
     </div>
     <p class="clocks-measured note" data-field="measured"></p>
     <figcaption class="figure-caption">
-        Four pieces, four clocks: every texture and buffer dunstkreis computes, each in the lane of what makes it run
-        again. A box shows what it holds, read from this page's own textures and shown as in the figures that explain
-        them, the aerial perspective by its last slice, 32 km out, then its size in texels and its memory, textures at
-        four half floats per texel. An arrow leads to what reads it, and every pass below the tables reads both, but
-        the one computing the coefficients. Dashed, what is yours. The choices light up what runs: a live sky runs the
-        sky pass, a static sky is a cube map written once and drawn by your frame; indirect light adds the coefficients;
-        direct light costs nothing more, the meter reads it with the sky view. The timings are measured on this GPU as the page loaded, at the sizes the
-        tables (<Fig id="tables" />) and the cube map (<Fig id="environment" />) are set to, the sky pass into a full HD
-        frame; under the figure, their sums for each occasion.
+        Every texture and buffer dunstkreis computes, in the lane of what makes it run again: what it holds, its size
+        and memory, and arrows to what reads it; dashed, what is yours. The choices light up what runs for a live or a
+        static sky and for indirect light. Timings measured on this GPU as the page loaded, at the tables' sizes, the
+        sky pass into a full HD frame.
     </figcaption>
 </figure>
 

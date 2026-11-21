@@ -11,19 +11,24 @@ function words(element: Element) {
 const nameOf = (element: Element) =>
     words(element) || element.getAttribute("aria-label") || element.getAttribute("title") || "control";
 
+type Source = { root: HTMLElement; extra: () => Record<string, unknown>; link: () => string };
+const sources = new WeakMap<HTMLElement, Source>();
+
 /**
  * Wires the figure's `[data-field=copyInfo]` button: a click copies, as JSON, all it takes to see the figure again,
  * its number, its caption, a link to its moment and place, its switches, sliders and status lines, and what `extra`
- * adds; `link` replaces the plain link, for a figure that reads more of its state from it.
+ * adds; `link` replaces the plain link, for a figure that reads more of its state from it. A figure's own call with
+ * `extra` or `link` wins over the plain one figure-actions.ts makes for every figure, whichever comes first.
  */
-export function figureInfo(
-    root: HTMLElement,
-    extra: () => Record<string, unknown> = () => ({}),
-    link: () => string = () => momentLink(root.id),
-) {
+export function figureInfo(root: HTMLElement, extra?: () => Record<string, unknown>, link?: () => string) {
     const button = root.querySelector<HTMLElement>("[data-field=copyInfo]");
     if (!button) return;
+    const wired = sources.get(button);
+    if (wired && !extra && !link) return;
+    sources.set(button, { root, extra: extra ?? (() => ({})), link: link ?? (() => momentLink(root.id)) });
+    if (wired) return;
     button.addEventListener("click", async () => {
+        const { root, extra, link } = sources.get(button) as Source;
         const captions = [...document.querySelectorAll(".figure-caption")];
         const caption = root.querySelector(".figure-caption");
         const switches: Record<string, boolean> = {};

@@ -6,8 +6,8 @@
  * but for `noise`, which writes the roughness' 3D texture at group 0 itself.
  * Every identifier is prefixed `ng`/`NG_`, for nachtgestirn.
  *
- * `camera` is dunstkreis' and `tonemap` and `vision` helldunkel's, bundled at build time: one source, nothing else to
- * install.
+ * `camera` is dunstkreis' and `tonemap`, `vision` and `whitebalance` helldunkel's, bundled at build time: one source,
+ * nothing else to install.
  */
 import bc1 from "./bc1.comp.wgsl";
 import hapke1963 from "./hapke1963.wgsl";
@@ -22,6 +22,6 @@ import shimmer from "./shimmer.comp.wgsl";
 import surface from "./surface.wgsl";
 
 export { camera } from "@himmelszelt/dunstkreis/wgsl";
-export { tonemap, vision } from "@himmelszelt/helldunkel/wgsl";
+export { tonemap, vision, whitebalance } from "@himmelszelt/helldunkel/wgsl";
 export { moonOutput } from "./output.js";
 export { bc1, hapke1963, mips, moon, noise, params, reflectance, relief, shadow, shimmer, surface };

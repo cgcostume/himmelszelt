@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Dev script: writes src/data/deltat.json, the observed ΔT on January 1 of each year since 1962, from the IERS:
-// ΔT = 32.184 s + (TAI - UTC) - (UT1 - UTC). Run via `pnpm generate:deltat`, e.g. once a year.
+// ΔT = 32.184 s + (TAI - UTC) - (UT1 - UTC). Run via `pnpm data:deltat`, e.g. once a year.
 
 import { writeFileSync } from "node:fs";
 

@@ -1,0 +1,217 @@
+/* The moment and place controls (see Controls.astro), on every chapter page: the fields and their steppers in a grid, the
+   set folded behind its summary line, and its copy button in the corner. */
+/* Julian Day / Latitude / Longitude as a grid, so the label and input columns line up regardless of label width. */
+.input-grid {
+    display: grid;
+    grid-template-columns: max-content max-content 1fr;
+    gap: 0.5rem 0.75rem;
+    align-items: baseline;
+    margin-bottom: 1rem;
+}
+/* Labels and the notes of their button groups share one column, right-aligned, against the controls they name. */
+.input-grid > label,
+.input-grid > .note {
+    grid-column: 1;
+    justify-self: end;
+}
+/* As large as the notes in the button rows they stand in front of. */
+.input-grid > .note {
+    font-size: var(--text-meta);
+}
+/* A minus and a plus around the input, so a value can be stepped by finger as well as by arrow key or wheel. The
+   three are one control: no gaps, shared borders, rounded only on the outside. */
+.stepper {
+    grid-column: 2;
+    display: flex;
+    align-items: center;
+}
+.stepper > button[data-step],
+.stepper > button[data-field="geolocate"] {
+    width: 1.9rem;
+    padding: 0;
+}
+.stepper > input {
+    border-radius: 0;
+    margin: 0 -1px;
+}
+.stepper > button[data-step="-1"] {
+    border-radius: var(--radius-button) 0 0 var(--radius-button);
+}
+.stepper > button[data-step="1"] {
+    border-radius: 0 var(--radius-button) var(--radius-button) 0;
+}
+/* "now" and the location pin act on their own, so they stand apart from the stepping group. */
+.stepper > button[data-field] {
+    margin-left: 0.4rem;
+}
+/* Whichever is hovered or focused draws its whole outline, over the neighbor it shares an edge with. */
+.stepper > :hover,
+.stepper > :focus-visible {
+    position: relative;
+    z-index: 1;
+}
+/* "now" follows the clock, "animate" steps on by itself; both are toggles, and both take their width from their word. */
+.stepper button[data-field="live"],
+.stepper button[data-field="animate"] {
+    padding: 0.15rem 0.5rem;
+}
+.stepper button[aria-pressed="true"] {
+    color: var(--accent);
+}
+/* The map pin that fills in latitude and longitude, and the height that goes with them. */
+.stepper button[data-field="geolocate"] {
+    display: grid;
+    place-items: center;
+}
+.stepper svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.95;
+    stroke-linejoin: round;
+}
+.input-grid-extra,
+.input-grid-subrow {
+    font-size: var(--text-meta);
+    display: flex;
+    gap: 0.75rem;
+    align-items: baseline;
+    flex-wrap: wrap;
+}
+.input-grid-extra label {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+}
+/* Column 2, not 1 (the label): sits under the input box it acts on. */
+.input-grid-subrow {
+    grid-column: 2 / -1;
+}
+/* One width for every field, so the columns of digits line up down the whole set. */
+.moment input[data-field="jd"],
+.moment input.latlong {
+    width: 17ch;
+}
+/* A set of moment-and-place controls, foldable behind a one-line summary of the current values. No box around it,
+   just a rule down its left saying how far it reaches, the same one a jumped-to reference gets. It sits in the
+   margin, so the controls still line up with the text. */
+.moment {
+    position: relative;
+    margin: 1rem 0 1.5rem;
+    border-left: 2px solid var(--accent);
+    margin-left: -0.9rem;
+    padding-left: 0.9rem;
+}
+/* Folded away, the controls step back like every fold (see .fold in global.css). */
+.moment:not([open]) {
+    opacity: 0.55;
+    transition: opacity 0.15s;
+}
+.moment:not([open]):is(:hover, :has(:focus-visible)) {
+    opacity: 1;
+}
+.moment[open] .input-grid {
+    margin: 0.75rem 0 0.25rem;
+}
+.moment summary {
+    cursor: pointer;
+    list-style: none;
+    /* Clear of the copy button in the corner. */
+    padding-right: 2rem;
+}
+.moment summary::-webkit-details-marker {
+    display: none;
+}
+.moment summary::before {
+    content: "+";
+    display: inline-block;
+    width: 1.2em;
+    color: var(--muted);
+}
+.moment[open] summary::before {
+    content: "\2212";
+}
+/* The copy button of the moment and place, in the corner of its summary line, shown on hover or focus. */
+.icon-button {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 5;
+    display: grid;
+    place-items: center;
+    width: 1.65rem;
+    padding: 0;
+    color: var(--muted);
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.icon-button:hover {
+    color: var(--accent);
+}
+.icon-button svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.05;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+/* No box around the controls any more, so their copy button sits in the corner of the summary line itself. It is
+   inside the summary element, not a child of the set, hence the descendant selector. */
+.moment .icon-button {
+    top: 0;
+    right: 0;
+}
+.moment:hover .icon-button,
+.icon-button:focus-visible {
+    opacity: 1;
+}
+@media (hover: none) {
+    .icon-button {
+        opacity: 1;
+    }
+}
+@media (max-width: 48rem) {
+    /* Two columns, labels and notes right-aligned in the first as on a wide screen: a field stays on the line of its
+       label, and what does not fit beside it (now, animate) wraps under it. */
+    .input-grid {
+        grid-template-columns: max-content 1fr;
+        gap: 0.3rem 0.4rem;
+    }
+    .input-grid-extra {
+        grid-column: 1 / -1;
+    }
+    .stepper,
+    .input-grid-subrow {
+        grid-column: 2;
+    }
+    .stepper {
+        flex-wrap: wrap;
+        row-gap: 0.3rem;
+    }
+    /* Room for -179.9999999, no more. */
+    .moment input.latlong {
+        width: 13ch;
+    }
+    /* As small as the notes and the step buttons beside them, so the fields and their steps read as one block; the
+       labels keep the text's color, the notes stay quiet. Inputs sized in ch narrow with their text. */
+    .input-grid > label {
+        font-size: var(--text-meta);
+    }
+    .stepper button,
+    .stepper input {
+        height: 1.75rem;
+        font-size: var(--text-small);
+    }
+    .stepper > button[data-step],
+    .stepper > button[data-field="geolocate"] {
+        width: 2rem;
+    }
+    /* Taller for a finger, but narrow enough that the seven Julian Day steps stay one unbroken row beside their note. */
+    .steps label span,
+    .steps-heading {
+        padding: 0.3rem 0.2rem;
+    }
+}

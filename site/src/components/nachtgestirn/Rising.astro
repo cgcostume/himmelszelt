@@ -1,6 +1,5 @@
 ---
 import Term from "../Term.astro";
-import "../sternzeit/sternzeit.css";
 import "./nachtgestirn.css";
 
 /** A full Moon rising in the east over dunstkreis' sky, its disc above the air and through it, side by side. */
@@ -10,8 +9,8 @@ interface Props {
 const { id = "rising" } = Astro.props;
 ---
 
-<figure class="tiles-figure" id={id} data-rising>
-    <div class="tiles-panel as-seen split" style="--count: 2">
+<figure class="fig tiles-figure" id={id} data-rising>
+    <div class="tiles-panel as-seen split" style="--count: 2" data-actions="png copy">
         <canvas aria-label="A full Moon rising through the air, its rays straight and bent by refraction, rendered with WebGPU"></canvas>
         <svg class="tiles-overlay" data-field="outline" aria-hidden="true"></svg>
         <span class="tiles-start">
@@ -47,11 +46,9 @@ const { id = "rising" } = Astro.props;
     </label>
     <p class="view-status" data-field="note"></p>
     <figcaption class="figure-caption">
-        A full Moon rising due east over dunstkreis' sky, the Sun just set opposite, through the air twice: as if its
-        rays went straight, dimmed and reddened but where it truly stands, and as they go, bent by{" "}
-        <Term of="Atmospheric refraction">refraction</Term>, its lower limb lifted more than its upper; dashed, where it
-        truly stands. Both at one exposure. The altitude is the center's true one over the horizon, which sinks as the
-        observer climbs.
+        A full Moon rising due east over dunstkreis' sky, the Sun just set opposite, at one exposure: as if its rays went
+        straight, and bent by <Term of="Atmospheric refraction">refraction</Term>, dashed where it truly stands. The
+        altitude is the center's true one over the horizon.
     </figcaption>
 </figure>
 

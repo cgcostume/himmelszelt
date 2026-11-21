@@ -56,8 +56,8 @@ fn dkSunSymbol(view: vec3f, sun: vec3f, pixel: f32, disc: f32, ratio: f32) -> f3
 // over its own marks, such as texel edges, rather than under. `right` and `below` are the rays of the neighboring
 // pixels: a compute pass has no fwidth, so the lines' widths come from how much the angles change from one pixel to
 // the next. `sun` is the Sun's true direction, `sunAngularRadius` its disc's radius in radians, `pixelRatio` device
-// pixels per CSS pixel.
-fn dkGridCoverage(view: vec3f, right: vec3f, below: vec3f, sun: vec3f, sunAngularRadius: f32, pixelRatio: f32) -> f32 {
+// pixels per CSS pixel, `ground` how much of the pixel is ground, where only the horizon and the Sun's symbol show.
+fn dkGridCoverage(view: vec3f, right: vec3f, below: vec3f, sun: vec3f, sunAngularRadius: f32, pixelRatio: f32, ground: f32) -> f32 {
     let altitude = dkAltitudeDeg(view);
     let azimuth = dkAzimuthDeg(view);
     // The lines about a device pixel thin, from the angle a pixel spans across and down; the symbol's size and the
@@ -82,7 +82,7 @@ fn dkGridCoverage(view: vec3f, right: vec3f, below: vec3f, sun: vec3f, sunAngula
     let gap = smoothstep(9.0, 12.0, crossing);
 
     // Faint, the Sun as strong as the horizon.
-    let grid = max(max(0.1 * altitudeLine, 0.3 * horizonLine), 0.15 * compassLine) * gap;
+    let grid = max(max(0.1 * altitudeLine, 0.15 * compassLine) * (1.0 - ground), 0.3 * horizonLine) * gap;
     return max(grid, 0.3 * symbol);
 }
 
@@ -96,6 +96,7 @@ fn dkGridOverlay(
     sun: vec3f,
     sunAngularRadius: f32,
     pixelRatio: f32,
+    ground: f32,
 ) -> vec3f {
-    return mix(color, ink, dkGridCoverage(view, right, below, sun, sunAngularRadius, pixelRatio) / DK_GRID_FAINT);
+    return mix(color, ink, dkGridCoverage(view, right, below, sun, sunAngularRadius, pixelRatio, ground) / DK_GRID_FAINT);
 }

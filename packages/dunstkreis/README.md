@@ -131,22 +131,43 @@ The Sun is drawn per pixel over the sky, never stored in a table, and in parts a
   a pixel. `sunDiscCeiling` stops its luminance at a value in cd/m², for a linear output a later pass tone maps:
   without it every pixel of the rim lies far above white there and the rim comes out hard. Off by default.
   `moonAngularDiameter` hides it behind the Moon's disc at `moonDirection`, a solar eclipse; 0 by default, no Moon.
+  `limbDarkening`, on by default, darkens and reddens it towards its limb by Hestroffer and Magnan's power law (1998),
+  mu^alpha with alpha = -0.023 + 0.292 / wavelength in micrometers, at 610, 550 and 465 nm, over its mean across the
+  disc: the limb shows a third of the center's light, and the disc's light stays what it was. It shows once the exposure
+  is short enough for the disc not to burn out, some EV100 32.
+- The corona and the chromosphere, `solarCorona`, the Sun's own light beyond its limb, on by default with the disc:
+  Baumbach's fit to the corona (1937), 0.0532 / r^2.5 + 1.425 / r^7 + 2.565 / r^17 millionths of the disc's center, r
+  in solar radii, out to 40 of them, and under it the chromosphere, a pink shell of 2,500 km. Five millionths of the
+  disc at the limb, some 9,000 cd/m²: lost in the sky by day and, above the air, in a lens's veil, some forty times
+  brighter there, as in any camera. It shows from above the air with `veil: 0`, close in or at a long exposure. Behind
+  the air, the ground and the Moon as the disc is, but a total eclipse does not show it yet: the sky, the aureole and
+  the veil do not dim with the covered Sun. In the image only, not in a cube map.
 - The aureole, `aureole`, the air's glow of about a degree around it: aerosols scatter sunlight far more sharply forward
   than the tables' one Cornette-Shanks lobe says, so a share of their scattering, `DEFAULT_AUREOLE`'s 5 % at g 0.98,
   goes into a narrow Henyey-Greenstein lobe the tables leave out and the sky pass adds per pixel where the lobe is above
   a five-thousandth of its peak, within 20° of the Sun at g 0.98, less for a sharper lobe, never more:
   the aerosols' sunlit scattering marched along the same bent path as the sky, dimmed by the air in front, times the
   lobe, centered on where the Sun shows. The cube map gets it too. `false` for Bruneton's one lobe alone.
-- The veil, `veil`, the eye's own glare: CIE's equation (CIE 146:2002) from the Sun's illuminance at the observer, which
-  the light meter writes, 1 for the eye's, which washes out some 10° around the Sun by day, a two-hundredth for a lens, 0
-  by default. With `moonlight` around the Moon as well: the moonlit sky is the day's at the Moon's share, so its veil
-  outshines it as far out as the Sun's does by day. From `@himmelszelt/helldunkel`'s `glare.wgsl`, bundled.
+- The veil, `veil`, the glow an eye or a lens lays around the Sun: CIE's equation (CIE 146:2002) from the Sun's
+  illuminance at the observer, which the light meter writes. Its strength is `LENS_VEIL` by default, a two-hundredth,
+  for a camera's lens: it burns out about a degree around the disc at a day's exposure, a good quarter more with every
+  stop the exposure opens, and keeps the disc from standing as a bare white circle on black above the haze. 1 is the
+  eye's own, which washes out some 10° around the Sun by day, 0 none. A lens or an eye veils only of what it looks at:
+  the veil fades as the Sun leaves the frame and is gone 40 % of the image's half extent beyond its edge. With
+  `moonlight` around the Moon as well, from its illuminance at the observer: a faint glow around a full Moon high at
+  night, next to none around a crescent or a low Moon, lost in the sky by day. From `@himmelszelt/helldunkel`'s
+  `glare.wgsl`, bundled.
+- The starburst, `starburst`, a camera's: the spikes the blades of its aperture diffract the Sun into, fixed to the
+  camera, `true` for six blades or `{ blades }` from 3 to 16, an even count drawing as many spikes and an odd one twice
+  as many. Off by default. It leaves the frame with the Sun as the veil does. From helldunkel's `lens.wgsl`, bundled.
 
 Bloom is the lens's and needs the image, helldunkel's `createBloomPass` over the exposed frame; god rays need something
-that casts a shadow, which the sky alone has not. The four add up without counting each other twice: the aureole is
-light in the air, the veil and bloom what the eye or the lens spreads of all that reaches it. `wgsl.sun` holds the disc
-binding-free, `wgsl.raymarch` the aureole's march, `dkRaymarchAerosol`, and `wgsl.common` its lobe, for a renderer's
-own sky.
+that casts a shadow, which the sky alone has not. They add up without counting each other twice: the aureole is
+light in the air, the corona the Sun's own, the veil, the starburst and bloom what the eye or the lens spreads of all
+that reaches it. The veil and the starburst know of nothing in front of the Sun but the planet: a renderer with clouds
+or terrain turns them off and adds `hdVeil` and `hdStarburst` with the light that gets through. `wgsl.sun` holds
+the disc, `dkSunLimbDarkening`, `dkSunCorona` and `dkSunChromosphere` binding-free, `wgsl.raymarch` the aureole's
+march, `dkRaymarchAerosol`, and `wgsl.common` its lobe, for a renderer's own sky.
 
 ## Moonlight
 

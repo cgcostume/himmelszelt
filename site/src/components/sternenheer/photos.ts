@@ -1,5 +1,4 @@
 import { type AirTable, liftedDirection } from "@himmelszelt/dunstkreis";
-import { surfaceBrightnessFromLuminance } from "@himmelszelt/sternenheer";
 import { fromDate, julianDayUT, stars } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
 import {
@@ -16,9 +15,9 @@ import { save } from "../dunstkreis/download";
 import { figureInfo } from "../figure-info";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
-import { drawSvg, escapeText, splitLine } from "../sternzeit/figure";
+import { drawSvg, splitLine } from "../sternzeit/figure";
 import { linkedSearch } from "../sternzeit/state";
-import { ev100Of, type Measured, PHOTOS, type StarPhoto } from "./photo-options";
+import { ev100Of, PHOTOS, type StarPhoto } from "./photo-options";
 import { createStarsRenderer, inverseViewProjection, type SkyAt, skyAt, type ToneCurveName } from "./renderer";
 import { bindStarGroups, picked } from "./stargroups";
 
@@ -98,59 +97,6 @@ const dot = (a: ArrayLike<number>, b: ArrayLike<number>) =>
     (a[0] ?? 0) * (b[0] ?? 0) + (a[1] ?? 0) * (b[1] ?? 0) + (a[2] ?? 0) * (b[2] ?? 0);
 
 const minus = (text: string) => text.replace(/-/g, "−");
-const brightness = (luminance: number) => `${f(surfaceBrightnessFromLuminance(luminance))} mag/arcsec²`;
-const tint = ([red, blue]: readonly [number, number]) => `${red.toFixed(2)}, ${blue.toFixed(2)}`;
-
-// What the measurements' table shows, row by row: a name, what it says on hover, and the value as text.
-const ROWS: readonly (readonly [string, string, (m: Measured, p: StarPhoto) => string])[] = [
-    [
-        "Faintest stars",
-        "The magnitude at which half of the catalog's stars in the frame still stand out of their surroundings, by four times the noise around them and by 2.5 of a display's 255 steps at least",
-        (m) => (m.limitingMagnitude > 0 ? `magnitude ${f(m.limitingMagnitude)}` : "none found"),
-    ],
-    [
-        "Sky between the stars",
-        "The darkest tenth of the frame's sky as a surface brightness, scaled by the light of the stars in the same picture: a larger number is a darker sky, five magnitudes a hundred times",
-        (m) => (m.sky > 0 ? brightness(m.sky) : "below a display's step"),
-    ],
-    [
-        "Its red and blue, of its green",
-        "That sky's color in linear sRGB: 1 and 1 a gray",
-        (m) => (m.sky > 0 ? tint(m.skyColor) : ""),
-    ],
-    [
-        "Milky Way's brightest part",
-        "What the frame's brightest fiftieth of the Milky Way adds to the sky between the stars, the same blocks read in both pictures",
-        (m) => (m.milkyWay > 0 ? brightness(m.milkyWay) : "not in the frame"),
-    ],
-    [
-        "Sky low over the horizon",
-        "The sky from 3° to 8° over the horizon, where no tree or hill stands in it, scaled as the sky between the stars is: twilight, a town's glow, the Moon's light in the haze",
-        (m) => (m.horizon > 0 ? brightness(m.horizon) : "not in the frame"),
-    ],
-    [
-        "Its red and blue, of its green",
-        "The low sky's color in linear sRGB",
-        (m) => (m.horizon > 0 ? tint(m.horizonColor) : ""),
-    ],
-    [
-        "Stars' colors",
-        "How far a star's blue falls behind its red for each magnitude of its color index B-V, in magnitudes: 0 for stars all of one color",
-        // None measured where too few stars are colored and unsaturated, as through a long lens.
-        (m) => (Number.isFinite(m.starColor) ? `${m.starColor.toFixed(2)} mag per B-V` : ""),
-    ],
-    [
-        "A star's image",
-        "The width of a faint star's image, as the standard deviation of a Gaussian, in arcminutes",
-        (m, p) => `${f(m.sharpness * ((p.fieldOfView * 60) / p.width))}′ wide`,
-    ],
-    [
-        "Brightest star's halo",
-        "The radius at which the light around the frame's brightest star has fallen to a twentieth of display white over the sky",
-        (m) => (m.halo > 0 ? `${f(m.halo)}′` : "none"),
-    ],
-];
-
 /** The photographs figure on `root`: photographs of the night sky under sternenheer's sky for their moments, places,
  *  lenses and exposures, one at a time. */
 export function photosFigure(root: HTMLElement) {
@@ -163,7 +109,6 @@ export function photosFigure(root: HTMLElement) {
     const exposure = find<HTMLInputElement>("[data-field=exposure]", root);
     const haloStrength = find<HTMLInputElement>("[data-field=halo]", root);
     const note = find("[data-field=note]", root);
-    const findings = find("[data-field=findings]", root);
     const pressed = (name: string) => find(`[data-field=${name}]`, root).getAttribute("aria-pressed") === "true";
     const requestRender = onDemand(render, root);
 
@@ -207,28 +152,6 @@ export function photosFigure(root: HTMLElement) {
             link(p.licenseUrl, p.license),
         );
     }
-    // What was measured in both pictures, and what it says.
-    function measurements(p: StarPhoto) {
-        // A row with nothing to say in either picture, the color of a sky the frame does not hold, is left out.
-        const rows = ROWS.map(([name, title, text]) => [
-            name,
-            title,
-            text(p.measured.photo, p),
-            text(p.measured.drawn, p),
-        ])
-            .filter(([, , photograph, drawn]) => photograph || drawn)
-            .map(
-                ([name, title, photograph, drawn]) =>
-                    `<tr title="${escapeText(title ?? "")}"><th scope="row">${name}</th><td>${escapeText(photograph ?? "")}</td><td>${escapeText(drawn ?? "")}</td></tr>`,
-            );
-        const lines = [
-            ["Matches", p.matches],
-            ["Differs", p.differs],
-        ].filter(([, text]) => text);
-        findings.innerHTML =
-            `<table><thead><tr><th scope="col">Measured in both</th><th scope="col">photograph</th><th scope="col">sternenheer</th></tr></thead><tbody>${rows.join("")}</tbody></table>` +
-            lines.map(([name, text]) => `<p><span>${name}.</span> ${escapeText(text ?? "")}</p>`).join("");
-    }
     function pick(i: number) {
         chosen = i;
         const p = photo();
@@ -238,7 +161,6 @@ export function photosFigure(root: HTMLElement) {
         exposure.value = "0";
         paintRange(exposure);
         credits(p);
-        measurements(p);
         requestRender();
     }
 

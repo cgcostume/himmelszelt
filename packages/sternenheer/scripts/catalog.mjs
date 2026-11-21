@@ -9,7 +9,7 @@
 // ascension in 22 bits, a third of an arcsecond, and the magnitude in 10, hundredths from -2; the declination in 23
 // bits, a 13th of an arcsecond, and B-V in 9, hundredths from -0.5; the two proper motions as Int16 in milliarcseconds a
 // year. The CSV's magnitudes, colors and proper motions to the last digit, its positions to a sixth of an arcsecond,
-// under the catalog's own rounding of a second. Rerunnable: `pnpm catalog [--out <dir>] [--force]`, which skips the
+// under the catalog's own rounding of a second. Rerunnable: `pnpm data:catalog [--out <dir>] [--force]`, which skips the
 // work while the files are newer than the CSV and the script.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

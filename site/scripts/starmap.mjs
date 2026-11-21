@@ -2,10 +2,10 @@
 // Milky Way with and without its stars: a cap of sky around Deneb, the rest black, in the encoding and at the
 // resolution of sternenheer's own map, so the pass reads it the same way. NASA's starred layer is its two others added
 // up, the Hipparcos and Tycho stars plus half the Milky Way background, clipped at 1, to within 1e-5 a texel:
-// built here from those two, cached by sternenheer's `pnpm milkyway`. Its background is half the Milky Way layer's,
+// built here from those two, cached by sternenheer's `pnpm data:milkyway`. Its background is half the Milky Way layer's,
 // so a texel of value 1 stands for twice MILKY_WAY_LUMINANCE, and the background matches sternenheer's map.
 //
-//     pnpm --filter @himmelszelt/sternwarte starmap [--force]
+//     pnpm --filter @himmelszelt/sternwarte data:starmap [--force]
 //
 // Writes public/stars/starmap-cygnus.webp, 4096 by 2048 texels, each channel's log2 in 8 bits over 12 stops, and
 // src/components/sternenheer/starmap.json. Needs sharp; downloads 57 MB once, from the asset mirror first.

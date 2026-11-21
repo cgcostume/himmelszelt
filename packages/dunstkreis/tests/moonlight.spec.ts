@@ -158,3 +158,48 @@ test("the sky pass compiles with night vision, and turns the moonlit sky bluer",
     target.destroy();
     luts.destroy();
 });
+
+test("the Moon's veil grows with its strength, lit by the Moon at the observer, and is gone at 0", async () => {
+    const device = await gpuDevice();
+    test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
+    if (!device) return;
+    const luts = await precomputeAtmosphere(device);
+    const target = device.createTexture({
+        size: [4, 4],
+        format: "rgba32float",
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC,
+    });
+    // Looking straight up, a narrow view, the Moon in it a fifth of a degree off the zenith.
+    const up = new Float32Array([0.01, 0, 0, 0, 0, 0.01, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0]);
+    const frame = async (veil: number, moonIlluminance: number) => {
+        const sky = await createSkyPass(device, {
+            luts,
+            format: "rgba32float",
+            toneMap: false,
+            moonlight: true,
+            veil,
+        });
+        sky.update({
+            sunDirection: at(-30, 330),
+            moonDirection: at(89.8, 0),
+            moonIlluminance,
+            observerHeightM: 100,
+            inverseViewProjection: up,
+            ev100: -Math.log2(1.2),
+        });
+        const encoder = device.createCommandEncoder();
+        sky.encode(encoder, target);
+        device.queue.submit([encoder.finish()]);
+        const { data } = await readTexture(device, target, 0);
+        sky.destroy();
+        return data[1] ?? 0;
+    };
+    const none = await frame(0, 0.3);
+    const gentle = (await frame(0.005, 0.3)) - none;
+    expect(gentle).toBeGreaterThan(5 * none);
+    expect(((await frame(0.01, 0.3)) - none) / gentle).toBeCloseTo(2, 2);
+    // A crescent's tenth of the light, a tenth of the veil.
+    expect(((await frame(0.005, 0.03)) - (await frame(0, 0.03))) / gentle).toBeCloseTo(0.1, 2);
+    target.destroy();
+    luts.destroy();
+});

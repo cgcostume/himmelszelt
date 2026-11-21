@@ -65,7 +65,7 @@ fn gwCompose(@builtin(global_invocation_id) id: vec3u) {
             behind = max(behind - (gwAirAt(uv, far, behind).luminance - gwAirUnderDeck(uv, o, v, far, behind).luminance), vec3f(0.0));
         }
     }
-    let sheets = gwSheets(o, v, normalize(gwParams.sunDirection), spread, uv, gwAirLight(behind, GW_BACKGROUND));
+    let sheets = gwSheets(o, v, normalize(gwParams.sunDirection), spread, uv, gwAirLight(o, v, behind, GW_BACKGROUND));
     // The sheets lie above the cloudscape, unless the observer is above them too.
     var clouds = gwOver(GwLayer(low.rgb, low.a), sheets);
     if (gwParams.sheets > 0u && gwParams.observerAltitude > gwParams.sheet[0].altitude) {

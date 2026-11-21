@@ -1,0 +1,74 @@
+{
+    "gpu": "amd rdna-3",
+    "rounds": 9,
+    "frames": 1000,
+    "warmup": 400,
+    "rows": {
+        "hdri1k": {
+            "ms": {
+                "median": 0.0557,
+                "p10": 0.0506,
+                "p90": 0.0576,
+                "rounds": 9
+            },
+            "memory": 20971504,
+            "download": 1629114
+        },
+        "hdri4k": {
+            "ms": {
+                "median": 1.0043,
+                "p10": 1.0038,
+                "p90": 1.0059,
+                "rounds": 9
+            },
+            "memory": 335544304,
+            "download": 25640286
+        },
+        "light4k": {
+            "ms": {
+                "median": 0.0845,
+                "p10": 0.0842,
+                "p90": 0.086,
+                "rounds": 9
+            },
+            "memory": 71303152,
+            "download": 25640286
+        },
+        "irradiance": {
+            "ms": {
+                "median": 0.0291,
+                "p10": 0.0258,
+                "p90": 0.0353,
+                "rounds": 9
+            },
+            "memory": 65664
+        },
+        "blend": {
+            "ms": {
+                "median": 0.0589,
+                "p10": 0.057,
+                "p90": 0.0617,
+                "rounds": 9
+            },
+            "memory": 16777216
+        },
+        "panorama": {
+            "ms": {
+                "median": 0.0258,
+                "p10": 0.0245,
+                "p90": 0.0274,
+                "rounds": 9
+            },
+            "memory": 16777216
+        }
+    },
+    "code": 14737,
+    "hdri": "golden_gate_hills",
+    "browser": "Chromium 153",
+    "date": "2026-11-21",
+    "machine": {
+        "busyBefore": [15, 16, 15, 15, 18, 28, 25, 16, 16, 18],
+        "otherBrowsers": 4,
+        "desktop": 2
+    }
+}

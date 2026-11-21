@@ -1,12 +1,10 @@
 ---
-import "../sternzeit/sternzeit.css";
-import Try from "../Try.astro";
 import Choice from "./Choice.astro";
 import "./dunstkreis.css";
 import "./wavelengths.css";
 ---
 
-<figure class="strip-figure wide" id="wavelengths">
+<figure class="fig strip-figure wide" id="wavelengths">
     <div class="wavelengths-bar">
         <Choice
             figure="wavelengths"
@@ -30,12 +28,12 @@ import "./wavelengths.css";
                         ["A", "variant A"],
                         ["B", "variant B"],
                     ]}
-                    checked="B"
+                    checked="A"
                 />
             )
         }
     </div>
-    <div class="strip-panel wavelengths-strip">
+    <div class="strip-panel wavelengths-strip" data-export="wavelengths" data-export-timeless>
         <svg aria-label="The visible spectrum, the eye's three weights over it, and the wavelengths, draggable"></svg>
     </div>
     <div class="wavelengths-skies" role="radiogroup" aria-label="Skies"></div>
@@ -54,15 +52,10 @@ import "./wavelengths.css";
         </div>
     </div>
     <figcaption class="figure-caption">
-        The wavelengths a sky is computed at, on the visible spectrum under the eye's weights for linear red, green and
-        blue, each a sum over the whole spectrum; shaded, the spectrum of the sky chosen below. Under it, eight skies,
-        each as its true color, left, and the color from the samples alone, right, with how far apart they are: with
-        four, by a matrix fitted to sky spectra, refitted at once; with Bruneton's three, the samples taken as they are.
-        Underneath, the whole sky overhead at the chosen moment, the Sun at the bottom, at dunstkreis' four and at the
-        chosen wavelengths.
-        <Try label="Twilight over Potsdam" set="date=2026-04-06T18:20:00Z&lat=52.395&lon=13.085&h=1" fig="wavelengths">
-            with Bruneton's three, the whole sky turns pink and violet.
-        </Try>
+        The wavelengths a sky is computed at, draggable, on the visible spectrum under the eye's weights for linear red,
+        green and blue; shaded, the spectrum of the chosen sky. Under it, eight skies as their true color, left, and from
+        the samples alone, right, with how far apart they are: with four by a matrix refitted at once, with Bruneton's
+        three taken as they are.
     </figcaption>
 </figure>
 

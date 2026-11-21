@@ -8,7 +8,7 @@
 // its cell to 0.4 arcseconds. A header names the cells: `deepStarsFromBuffer` reads it. Written as byte planes, gzip
 // compressed, as `loadDeepStars` reads them. ESA's terms, CC BY-NC 3.0 IGO, keep the file out of the MIT package: each
 // user makes it, here or by `npx @himmelszelt/sternenheer data tycho`, after `data hipparcos`, whose stars it leaves
-// out. Rerunnable: `pnpm tycho [--limit <magnitude>] [--out <dir>] [--cache <dir>] [--force]`. Downloads 200 MB once
+// out. Rerunnable: `pnpm data:tycho [--limit <magnitude>] [--out <dir>] [--cache <dir>] [--force]`. Downloads 200 MB once
 // into the cache. No CSV is kept: the catalogue is the source of truth, and 60 MB of it are too much for the repository.
 import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";

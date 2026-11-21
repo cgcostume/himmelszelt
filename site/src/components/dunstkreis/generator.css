@@ -23,9 +23,6 @@
 .generator-settings .lut-controls {
     margin: 0;
 }
-.generator-settings .view-toggle {
-    position: static;
-}
 .generator-tables {
     display: grid;
     grid-template-columns: max-content max-content max-content;
@@ -68,9 +65,6 @@
 }
 .generator-name {
     white-space: nowrap;
-}
-.generator-files .lut-downloads .view-toggle {
-    position: static;
 }
 .generator-thumb {
     display: none;

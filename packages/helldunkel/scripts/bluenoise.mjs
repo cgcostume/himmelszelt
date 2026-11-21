@@ -2,7 +2,7 @@
 // fixed seed, so every run writes the same file. Blue noise holds little energy at low frequencies: added before a color
 // is quantized, it reads as fine, even grain rather than clumps or a pattern.
 //
-//     pnpm --filter @himmelszelt/helldunkel bluenoise
+//     pnpm --filter @himmelszelt/helldunkel data:bluenoise
 //
 // Writes src/bluenoise-data.ts: the 64 x 64 bytes, row by row, each texel's rank among all 4096 scaled to 0..255, as
 // base64. The site's scripts/bluenoise.mjs takes `voidAndCluster` from here for its scene's two channels; this one is

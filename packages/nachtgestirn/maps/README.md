@@ -1,6 +1,6 @@
 # The Moon's maps
 
-Made by `scripts/maps.mjs` and `scripts/roughness.mjs`, in the repository `pnpm maps` and `pnpm roughness`, where the
+Made by `scripts/maps.mjs` and `scripts/roughness.mjs`, in the repository `pnpm data:maps` and `pnpm data:roughness`, where the
 package is installed `npx @himmelszelt/nachtgestirn data maps` and `data roughness`, each with `--size
 512,1k,2k,4k[,8k]` and `--whole` or `--seen`. The package ships the seen 512 and 1K; the whole ones up to 4K are checked
 in for the site; the seen ones from 2K and every 8K are ignored by git, and `data` fetches them built from the asset

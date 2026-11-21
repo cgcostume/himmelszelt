@@ -1,12 +1,8 @@
 ---
 import Icon from "./Icon.astro";
 
-/** The button that copies all it takes to see its figure again, as JSON (see figure-info.ts); to the right of the
- *  download. With `besideDownload`, export.ts moves it there, beside the download it adds. */
-interface Props {
-    besideDownload?: boolean;
-}
-const { besideDownload = false } = Astro.props;
+/** The button that copies all it takes to see its figure again, as JSON (see figure-info.ts); figure-actions.ts puts it
+ *  in the figure's actions, after the download. */
 ---
 
-<button type="button" class="view-icon copy-info" data-field="copyInfo" data-beside-download={besideDownload ? "" : undefined} title="Copy this view: a link to it, its caption and every setting it shows, as JSON" aria-label="Copy this view"><Icon name="copy" /></button>
+<button type="button" class="view-icon copy-info" data-field="copyInfo" title="Copy this view: a link to it, its caption and every setting it shows, as JSON" aria-label="Copy this view"><Icon name="copy" /></button>

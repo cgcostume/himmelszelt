@@ -1,8 +1,5 @@
 ---
-import Cite from "../Cite.astro";
 import Term from "../Term.astro";
-import "../sternzeit/sternzeit.css";
-import "../dunstkreis/dunstkreis.css";
 import "../dunstkreis/wavelengths.css";
 import "./colorindex.css";
 import StarPicker from "./StarPicker.astro";
@@ -17,9 +14,9 @@ const at = (bv: number) => (((bv + 0.3) / 2.3) * 100).toFixed(2);
 const COLUMNS = ["T", "x", "y", "R", "G", "B"];
 ---
 
-<figure class="eclipse-figure colorindex-figure" id={id} data-colorindex>
+<figure class="fig eclipse-figure colorindex-figure" id={id} data-colorindex>
     <div class="eclipse-panel colorindex-panel">
-        <div class="colorindex-plot">
+        <div class="colorindex-plot" data-export="color-index" data-export-timeless>
             <svg data-field="diagram" role="img" aria-label="The Planckian locus in the CIE 1931 chromaticity diagram, magnified, with temperatures, the CIE's white points, sRGB's triangle and a marker at the chosen color index"></svg>
             <figure class="eclipse-view colorindex-inset">
                 <svg class="colorindex-whole" data-field="whole" role="img" aria-label="The whole CIE 1931 chromaticity diagram, the spectrum around it, sRGB's triangle and the magnified part outlined"></svg>
@@ -55,14 +52,9 @@ const COLUMNS = ["T", "x", "y", "R", "G", "B"];
     <StarPicker label="Stars, from films and history" sun />
     <figcaption class="figure-caption">
         From a <Term of="Color index">color index</Term> to a color: the <Term of="Planckian locus">Planckian
-        locus</Term> <Cite id="kang2002" /> in the CIE 1931 <Term of="Chromaticity">chromaticity</Term> diagram,
-        magnified, with temperatures in kelvin along it, the CIE's white points <Cite id="cie2018" />, A a tungsten
-        lamp, D50 to D75 daylight, D65 sRGB's white and E equal energy, and sRGB's triangle dashed; in bold, the part that
-        B−V from −0.3 to 2 reaches by Ballesteros' temperature <Cite id="ballesteros2012" />, which the catalog uses, dashed by Jensen et al.'s older approximation <Cite id="jensen2001" />, osgHimmel's. (a) The whole
-        diagram, the spectrum around it and the magnified part outlined. Under the locus, each color index as its color
-        by either formula in linear sRGB at a luminance of 1, scaled so that its strongest channel is full, on the
-        slider's scale; under the slider, stars that films and history name, among
-        them Vega, Polaris and Sirius, and the Sun. Spectral locus from CIE 018:2019, CC BY-SA 4.0.
+        locus</Term> in the CIE 1931 <Term of="Chromaticity">chromaticity</Term> diagram, magnified, with the CIE's white
+        points and sRGB's triangle dashed; in bold, what B−V from −0.3 to 2 reaches by Ballesteros' temperature, dashed
+        by Jensen et al.'s; (a) the whole diagram. Spectral locus from CIE 018:2019, CC BY-SA 4.0.
     </figcaption>
 </figure>
 

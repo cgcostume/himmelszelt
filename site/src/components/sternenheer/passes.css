@@ -1,21 +1,71 @@
-/* A frame pass by pass: sternzeit's sub-figures, sliders and status; what remains has no shared rule. */
-.passes-canvas {
+/* A frame as a graph, in Clocks' visual language (dunstkreis/clocks.css): the SVG draws boxes, arrows and labels, the
+   thumbnails are canvases placed over it by passes-graph.ts. */
+.passes-graph {
+    position: relative;
+    margin-bottom: 0.75rem;
+}
+.passes-graph > svg {
     display: block;
     width: 100%;
-    aspect-ratio: 16 / 9;
+    font-size: 0.75rem;
+    overflow: visible;
+}
+.passes-canvas {
+    position: absolute;
+    display: block;
     background: #000;
+    border-radius: 2px;
 }
 /* The tiles as the squares they are, not blurred into each other. */
 .passes-blocky {
     image-rendering: pixelated;
 }
-.passes-times {
-    display: block;
-    width: 100%;
-    font-size: var(--text-small);
+.passes-thumb {
+    fill: oklch(0.159 0.011 268);
 }
-.passes-bar {
+.passes-frame {
+    fill: var(--bg);
+    stroke: var(--line);
+    stroke-width: 1;
+}
+.passes-box.input .passes-frame {
+    fill: var(--surface);
+}
+.passes-box:not(.on) {
+    opacity: 0.4;
+}
+.passes-box:not(.on) .passes-frame {
+    stroke-dasharray: var(--line-dashes);
+}
+.passes-box.pass.on .passes-frame {
+    stroke: var(--accent);
+}
+.passes-name {
+    font-weight: 500;
+}
+.passes-sub {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+}
+.passes-title {
     fill: var(--accent);
+}
+.passes-label.off {
+    opacity: 0.4;
+}
+.passes-arrow {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 1.2;
+}
+.passes-arrow.on {
+    stroke: var(--text);
+}
+.passes-head {
+    fill: var(--line);
+}
+.passes-head-on {
+    fill: var(--text);
 }
 /* The catalog's group and the Moon and air switches in a row before the status. */
 .passes-switches {

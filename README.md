@@ -30,7 +30,7 @@ Building images needs only `sharp`, installed with the workspace. Each script pr
 both of ESA's catalogues are [CC BY-NC 3.0 IGO](https://creativecommons.org/licenses/by-nc/3.0/igo/), free for
 non-commercial use with the credit "ESA", which is why the MIT packages do not carry them. The site runs without them,
 with a note in the figures that need them. `pnpm assets --all` remakes every data file, the checked-in ones too; a
-package's own scripts, such as `pnpm --filter @himmelszelt/sternenheer tycho`, make one file each.
+package's own scripts, such as `pnpm --filter @himmelszelt/sternenheer data:tycho`, make one file each.
 
 ## License
 

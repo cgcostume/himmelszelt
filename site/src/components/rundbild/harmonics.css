@@ -10,9 +10,6 @@
     gap: 6px;
     margin: 0;
 }
-.harmonics-variants .view-toggle {
-    position: static;
-}
 .harmonics-pyramid {
     position: relative;
     display: grid;

@@ -437,6 +437,20 @@ export const references: Record<string, Reference> = {
         year: 1941,
         note: "The phase function clouds and haze are lit with.",
     },
+    baumbach1937: {
+        authors: "S. Baumbach",
+        title: "Strahlung, Ergiebigkeit und Elektronendichte der Sonnenkorona",
+        venue: "Astronomische Nachrichten 263",
+        year: 1937,
+        note: "The corona's mean brightness over its distance from the Sun, fitted to the eclipses of 1905 to 1929.",
+    },
+    hestroffer1998: {
+        authors: "Daniel Hestroffer, Christian Magnan",
+        title: "Wavelength dependency of the Solar limb darkening",
+        venue: "Astronomy and Astrophysics 333",
+        year: 1998,
+        note: "The Sun's limb darkening as a power law whose exponent follows the wavelength.",
+    },
     beer1852: {
         authors: "August Beer",
         title: "Bestimmung der Absorption des rothen Lichts in farbigen Flüssigkeiten",

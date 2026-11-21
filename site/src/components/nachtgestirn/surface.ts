@@ -1,8 +1,7 @@
 import { moonEV100, type Vec3 } from "@himmelszelt/nachtgestirn";
 import { find } from "../dom";
-import { figureInfo } from "../figure-info";
-import "../sternzeit/export";
 import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
+import { figureInfo } from "../figure-info";
 import { onDemand } from "../frame";
 import { drawSvg } from "../sternzeit/figure";
 import { ownMoment } from "../sternzeit/lunation";

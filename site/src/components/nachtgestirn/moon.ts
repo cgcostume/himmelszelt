@@ -20,7 +20,14 @@ import { paintRange } from "../range";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
 import { raysOf } from "./rays";
-import { createMoonRenderer, inverseViewProjection, moonAt, onUmbraTable, type ToneCurveName } from "./renderer";
+import {
+    createMoonRenderer,
+    inverseViewProjection,
+    moonAt,
+    onUmbraTable,
+    type ToneCurveName,
+    type White,
+} from "./renderer";
 
 const DEG = Math.PI / 180;
 
@@ -40,7 +47,7 @@ export function moonFigure(root: HTMLElement) {
         root.querySelector<HTMLInputElement>(`input[name="${root.id}-${name}"]:checked`)?.value ?? "";
 
     const camera = { yaw: 0, pitch: 0, fov: 1.5 * DEG };
-    // Flight, with a grid on the ground while it lasts, and the height the figure is seen from: its own.
+    // Flight, with a grid on the ground, and the height the figure is seen from: its own.
     const air = flightIn(root, canvas, camera, () => requestRender());
     const marks = () => Number(field("marks").dataset.level);
     field("marks").addEventListener("click", () => requestRender());
@@ -150,7 +157,7 @@ export function moonFigure(root: HTMLElement) {
             projectionDistance: basis.d,
             pixelRatio: dpr,
             grid: marks() === 2,
-            ground: air.flying() ? air.flown : null,
+            ground: air.flown,
             discPixels: ((angularDiameter * DEG) / camera.fov) * height,
             maps: "auto",
             air: true,
@@ -163,6 +170,9 @@ export function moonFigure(root: HTMLElement) {
             eclipse: pressed("eclipse"),
             law: "hapke2012",
             darkAdapted: pressed("night"),
+            veil: maybe("veil") ? pressed("veil") : true,
+            starburst: maybe("starburst") ? pressed("starburst") : false,
+            white: (choice("white") || "auto") as White,
             shimmer: pressed("shimmer") ? { time: performance.now() / 1000, dispersion: 1 } : null,
             ...rays(),
         });
@@ -198,6 +208,8 @@ export function moonFigure(root: HTMLElement) {
 
     if (gpu) {
         bindToneCurveChoice(root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-tone"]`));
+        for (const input of root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-white"]`))
+            input.addEventListener("change", requestRender);
         bindHdr(find('[data-hdr="note"]', root), find('[data-hdr="choice"]', root));
         // Refraction for the whole page: the tables traced anew, the Moon lifted by them.
         const refraction = maybe("refraction");
@@ -212,7 +224,18 @@ export function moonFigure(root: HTMLElement) {
         onUmbraTable(requestRender);
         new ResizeObserver(requestRender).observe(canvas);
         maybe("exposure")?.addEventListener("input", requestRender);
-        for (const name of ["shimmer", "auto", "lock", "sunLock", "airDisc", "night", "earthshine", "eclipse"]) {
+        for (const name of [
+            "shimmer",
+            "auto",
+            "lock",
+            "sunLock",
+            "airDisc",
+            "night",
+            "earthshine",
+            "eclipse",
+            "veil",
+            "starburst",
+        ]) {
             maybe(name)?.addEventListener("click", () => {
                 const on = !pressed(name);
                 field(name).setAttribute("aria-pressed", String(on));

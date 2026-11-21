@@ -11,6 +11,7 @@ export {
     EARTH_RADIUS_KM,
     MOON_GEOMETRIC_ALBEDO,
     MOON_RADIUS_KM,
+    SUN_COLOR,
     SUN_ILLUMINANCE,
     earthshineIlluminance,
     ev100ForLuminance,

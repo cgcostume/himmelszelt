@@ -12,13 +12,19 @@
 @group(0) @binding(3) var labSampler: sampler;
 @group(0) @binding(4) var<uniform> V: LabView;
 @group(0) @binding(5) var labMap: texture_2d<f32>;
-@group(1) @binding(0) var labCanvas: texture_storage_2d<rgba8unorm, write>;
+@group(1) @binding(0) var labCanvas: texture_storage_2d<rgba16float, write>;
+@group(1) @binding(1) var labLayer: texture_storage_2d<rgba16float, write>;
 
 const TAU: f32 = 6.283185307179586;
 // The largest lumps of the billows' noise across the tile.
 const BILLOW_CELLS: i32 = 32;
 // How many levels of the map up the softest puffs are read from.
 const SOFT_LEVELS: f32 = 3.5;
+// The distance at which the air has hidden the ground's shadows to 1/e, in km, and the angle the sun's disc spans.
+const GROUND_AIR_KM: f32 = 90.0;
+const SUN_ANGLE: f32 = 0.0093;
+// A puff's thickness over its width.
+const LUMP: f32 = 0.35;
 
 // Gradient noise that tiles over the map and loops with the evolution, every 8 of it.
 fn cirrusNoise(p: vec2f, period: vec2i, seed: u32) -> f32 {
@@ -173,6 +179,93 @@ fn cirrusDensity(g: vec2f, lod: f32) -> f32 {
     return clamp(dense + left.y * (1.0 - 0.6 * dense), 0.0, 1.0);
 }
 
+// How much of the sheet's coverage is left over the ground point `g`: less towards the clearing, as of the clouds under it.
+fn cirrusKept(g: vec2f) -> f32 {
+    if (C.clearing <= 0.0) {
+        return 1.0;
+    }
+    return 1.0 - smoothstep(min(C.clearFrom, 0.99 * C.clearing), C.clearing, length(g - V.flown));
+}
+
+// How much of its light the ground at `at` loses to the sheet's shadow, seen along `v` from `far` km: the sheet read
+// where the way to the sun crosses it, as blurred as the pixel's footprint and the sun's disc make it, for what a layer
+// that scatters forwards lets through of the light on it.
+fn cirrusShadow(at: vec3f, v: vec3f, far: f32) -> f32 {
+    let sun = normalize(V.sun);
+    let up = normalize(at);
+    let rise = dot(sun, up);
+    if (rise <= 0.0) {
+        return 0.0;
+    }
+    let reach = labSphere(at, sun, V.planetRadius + C.altitude).y;
+    let p = at + sun * reach;
+    let g = labGround(normalize(p)) * (V.planetRadius + C.altitude) + V.flown;
+    let wide = max(far * V.pixelAngle / max(abs(dot(v, up)), 0.03), reach * SUN_ANGLE);
+    let tau = C.opticalDepth * cirrusDensity(g, max(log2(wide * C.mapSize / C.tile), 0.0)) * cirrusKept(g);
+    let passed = labPassed(tau / max(rise, 0.05), C.forwardG);
+    return LAB_SHADOW * smoothstep(0.0, 0.12, rise) * (1.0 - passed) * exp(-far / GROUND_AIR_KM);
+}
+
+// The sheet along the ray `v` through a pixel: its light in cd/m² as it reaches the eye, and what it lets through of
+// what lies behind, 1 where there is none, less where its shadow lies on the ground.
+fn cirrusSheet(v: vec3f) -> vec4f {
+    let sun = normalize(V.sun);
+    let o = vec3f(0.0, 0.0, V.planetRadius + V.observer);
+    let shell = labSphere(o, v, V.planetRadius + C.altitude);
+    let below = V.observer < C.altitude;
+    let t = select(shell.x, shell.y, below);
+    let ground = labSphere(o, v, V.planetRadius);
+    // Where the ray ends on the ground, the sheet's shadow there takes from what the ground sends.
+    var lit = 1.0;
+    if (ground.x > 0.0) {
+        lit = 1.0 - cirrusShadow(o + v * ground.x, v, ground.x);
+    }
+    if (t <= 0.0 || (ground.x > 0.0 && ground.x < t)) {
+        return vec4f(0.0, 0.0, 0.0, lit);
+    }
+    let p = o + v * t;
+    let up = normalize(p);
+    // Where on the ground the point lies over, by the arc from the observer.
+    let g = labGround(up) * (V.planetRadius + C.altitude) + V.flown;
+    let mu = max(abs(dot(v, up)), 0.03);
+    let texel = C.tile / C.mapSize;
+    let lod = max(log2(t * V.pixelAngle / texel) + 0.5 * log2(1.0 / mu), 0.0);
+    let density = cirrusDensity(g, lod) * cirrusKept(g);
+    let tau = C.opticalDepth * density;
+    let through = exp(-tau / mu);
+    let sine = dot(sun, up);
+    let mu0 = max(sine, 0.03);
+    // A puff is a lump more than a slab: a low sun's light crosses no more of it than its width.
+    let across = max(mu0, LUMP * sqrt(max(1.0 - sine * sine, 0.0)));
+    let light = labLight(V, sine, C.altitude);
+    // The cloud between the point and the sun, a puff's width on: its sunward neighbors shade it.
+    let reach = min(sqrt(max(1.0 - mu0 * mu0, 0.0)) / mu0, 4.0) * 0.15;
+    let toSun = normalize(sun.xy + vec2f(1e-9));
+    let sunward = cirrusDensity(g + toSun * reach, lod + 1.0);
+    // And lump by lump: brighter where the cloud falls away towards the sun, darker behind a lump. What the neighbors
+    // let through is scattered light too, as under the sheet: a high cloud is thin, and has next to no shading.
+    let slope = density - cirrusDensity(g + toSun * 0.05, lod);
+    let shade = labPassed(C.relief * C.opticalDepth * sunward * min(reach / 0.15, 2.0), C.forwardG) * clamp(1.0 + C.relief * 0.9 * slope, 0.45, 1.7);
+    // Light scattered once on its way through a thin layer, lit from above and seen from below or above.
+    let phase = 0.78 * labHenyeyGreenstein(dot(v, sun), C.forwardG) + 0.22 * labHenyeyGreenstein(dot(v, sun), -0.2);
+    let sameSide = (dot(v, up) > 0.0) == below;
+    var once = tau / mu * through;
+    if (abs(across - mu) > 1e-3) {
+        once = across / (across - mu) * (exp(-tau / across) - through);
+    }
+    if (!sameSide) {
+        once = across / (across + mu) * (1.0 - exp(-tau / across - tau / mu));
+    }
+    // And many times: what a thick puff still lets through, or sends back, as diffuse light.
+    let passed = labPassed(tau, C.forwardG);
+    let many = mu0 / LAB_PI * select(1.0 - passed, max(passed - exp(-tau / across), 0.0), sameSide);
+    let sky = 0.6 * labAmbient(V, labSky(vec3f(0.0, 0.0, 1.0), sun)) + 0.4 * labAmbient(V, labSky(vec3f(v.xy, 0.05), sun));
+    let cloud = light * shade * (phase * once + many) + sky * (1.0 - through) * 0.9;
+    // The air in between takes the far sheet into the sky's color.
+    let near = exp(-t / 220.0);
+    return vec4f(cloud * near, (1.0 - (1.0 - through) * near) * lit);
+}
+
 @compute @workgroup_size(8, 8, 1)
 fn cirrusSky(@builtin(global_invocation_id) id: vec3u) {
     let size = textureDimensions(labCanvas);
@@ -184,55 +277,21 @@ fn cirrusSky(@builtin(global_invocation_id) id: vec3u) {
     if (C.viewMode > 0.5) {
         let p = (vec2f(id.xy) - 0.5 * vec2f(size)) / f32(size.y) * C.tile;
         let d = cirrusDensity(vec2f(p.x, -p.y) + V.flown, log2(max(C.tile / f32(size.y) / (C.tile / C.mapSize), 1.0)));
-        textureStore(labCanvas, vec2i(id.xy), labDisplay(mix(vec3f(700.0, 1700.0, 4600.0), vec3f(16000.0), d), V.exposure));
+        textureStore(labCanvas, vec2i(id.xy), labDisplay(mix(vec3f(700.0, 1700.0, 4600.0), vec3f(16000.0), d), V.exposure, V.headroom));
         return;
     }
     let v = labRay(V, vec2f(id.xy) + 0.5, size);
-    let o = vec3f(0.0, 0.0, V.planetRadius + V.observer);
-    var color = labSkyFrom(V, v, sun) * (1.0 + V.gridStrength * labGrid(V, vec2f(id.xy) + 0.5, size));
-    let shell = labSphere(o, v, V.planetRadius + C.altitude);
-    let below = V.observer < C.altitude;
-    let t = select(shell.x, shell.y, below);
-    let ground = labSphere(o, v, V.planetRadius);
-    if (t > 0.0 && (ground.x < 0.0 || !(ground.x > 0.0 && ground.x < t))) {
-        let p = o + v * t;
-        let up = normalize(p);
-        // Where on the ground the point lies over, by the arc from the observer.
-        let g = labGround(up) * (V.planetRadius + C.altitude) + V.flown;
-        let mu = max(abs(dot(v, up)), 0.03);
-        let texel = C.tile / C.mapSize;
-        let lod = max(log2(t * V.pixelAngle / texel) + 0.5 * log2(1.0 / mu), 0.0);
-        let density = cirrusDensity(g, lod);
-        let tau = C.opticalDepth * density;
-        let through = exp(-tau / mu);
-        let sine = dot(sun, up);
-        let mu0 = max(sine, 0.03);
-        let light = labSunlight(sine, C.altitude);
-        // The cloud between the point and the sun, a puff's width on: its sunward neighbors shade it.
-        let reach = min(sqrt(max(1.0 - mu0 * mu0, 0.0)) / mu0, 4.0) * 0.15;
-        let toSun = normalize(sun.xy + vec2f(1e-9));
-        let sunward = cirrusDensity(g + toSun * reach, lod + 1.0);
-        // And lump by lump: brighter where the cloud falls away towards the sun, darker behind a lump.
-        let slope = density - cirrusDensity(g + toSun * 0.05, lod);
-        let shade = exp(-C.relief * C.opticalDepth * sunward * min(reach / 0.15, 2.0) * 0.4) * clamp(1.0 + C.relief * 0.9 * slope, 0.45, 1.7);
-        // Light scattered once on its way through a thin layer, lit from above and seen from below or above.
-        let phase = 0.78 * labHenyeyGreenstein(dot(v, sun), C.forwardG) + 0.22 * labHenyeyGreenstein(dot(v, sun), -0.2);
-        let sameSide = (dot(v, up) > 0.0) == below;
-        var once = tau / mu * through;
-        if (abs(mu0 - mu) > 1e-3) {
-            once = mu0 / (mu0 - mu) * (exp(-tau / mu0) - through);
-        }
-        if (!sameSide) {
-            once = mu0 / (mu0 + mu) * (1.0 - exp(-tau / mu0 - tau / mu));
-        }
-        // And many times: what a thick puff still lets through, or sends back, as diffuse light.
-        let passed = 1.0 / (1.0 + 0.75 * (1.0 - C.forwardG) * tau);
-        let many = mu0 / LAB_PI * select(1.0 - passed, max(passed - exp(-tau / mu0), 0.0), sameSide);
-        let ambient = (0.6 * labSky(vec3f(0.0, 0.0, 1.0), sun) + 0.4 * labSky(vec3f(v.xy, 0.05), sun)) * (1.0 - through) * 0.9;
-        let cloud = light * shade * (phase * once + many) + ambient;
-        // The air in between takes the far sheet into the sky's color.
-        let near = exp(-t / 220.0);
-        color = color * (1.0 - (1.0 - through) * near) + cloud * near;
+    let sky = labSkyFrom(V, v, sun) * (1.0 + V.gridStrength * labGrid(V, vec2f(id.xy) + 0.5, size));
+    let sheet = cirrusSheet(v);
+    textureStore(labCanvas, vec2i(id.xy), labDisplay(sky * sheet.a + sheet.rgb, V.exposure, V.headroom));
+}
+
+// The sheet alone, for a figure that composes it over a sky of its own.
+@compute @workgroup_size(8, 8, 1)
+fn cirrusLayer(@builtin(global_invocation_id) id: vec3u) {
+    let size = textureDimensions(labLayer);
+    if (id.x >= size.x || id.y >= size.y) {
+        return;
     }
-    textureStore(labCanvas, vec2i(id.xy), labDisplay(color, V.exposure));
+    textureStore(labLayer, vec2i(id.xy), cirrusSheet(labRay(V, vec2f(id.xy) + 0.5, size)));
 }

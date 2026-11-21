@@ -4,7 +4,6 @@ import { resolve } from "node:path";
 import Cite from "../Cite.astro";
 import CopyInfo from "../CopyInfo.astro";
 import Icon from "../Icon.astro";
-import "../sternzeit/sternzeit.css";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
 import "./nachtgestirn.css";
 
@@ -39,8 +38,8 @@ const sizes = (kind: string) =>
     }).join(", ");
 ---
 
-<figure class="tiles-figure" id={id} data-maps>
-    <div class="maps-panel as-seen">
+<figure class="fig tiles-figure" id={id} data-maps>
+    <div class="maps-panel as-seen" data-actions="copy">
         <img data-field="color" alt="NASA's color map of the Moon, an equirectangular mosaic from the Lunar Reconnaissance Orbiter's wide angle camera, the far side past what Earth ever sees its mean" />
         <canvas data-field="heights" aria-label="The Moon's heights from the Lunar Orbiter Laser Altimeter, as gray, low to high, the far side past what Earth ever sees at the mean radius" hidden></canvas>
         <canvas data-field="roughness" aria-label="How steep the Moon's ground is over 57 m, from the Lunar Orbiter Laser Altimeter's tracks, as gray, smooth to rough, the far side past what Earth ever sees smooth" hidden></canvas>
@@ -50,7 +49,7 @@ const sizes = (kind: string) =>
             <button type="button" class="view-toggle" data-map="heights" aria-pressed="false" title="The heights, as gray from the lowest ground to the highest">heights</button>
             <button type="button" class="view-toggle" data-map="roughness" aria-pressed="false" title="The roughness, the median slope over 57 m as gray, from flat to 15° and steeper, which the pass adds below the texels where a pixel is finer">roughness</button>
         </span>
-        <span class="view-buttons maps-end">
+        <span class="view-buttons fig-actions maps-end">
             <button type="button" class="view-icon" data-field="annotations" aria-pressed="false" title="The annotations over the map, over the hatching of the moment: the edge of what Earth ever sees, the diurnal libration included, and past it the 2° margin and the 4° feather into the mean color, no height and no slope" aria-label="Annotations"><Icon name="labels" /></button>
             <button type="button" class="view-icon" data-field="download" title="Download the map shown, with what Earth sees or the annotations, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
             <CopyInfo />
@@ -58,14 +57,15 @@ const sizes = (kind: string) =>
     </div>
     <LunationSlider />
     <p class="view-status" data-field="note" hidden></p>
+    <p class="view-status">
+        The files, whole to seen, at 512, 1K, 2K, 4K and 8K texels around: the color ({sizes("color")}), the heights
+        ({sizes("height")}) and the roughness ({sizes("roughness")}, no 8K).
+    </p>
     <figcaption class="figure-caption">
-        nachtgestirn's maps laid out flat as the package loads them by default, 1024 texels around: NASA's color or the
-        heights in gray, from the CGI Moon Kit <Cite id="svs4720" />, or the roughness below them, the median slope over
-        57 m from the laser altimeter's tracks <Cite id="rosenburg2011" />. Past what Earth ever sees, the color holds its
-        mean, the heights and the roughness none. Inside the line what Earth sees at the chosen moment, hatched what it does not, densely what it never
-        sees; annotated, also the edge of what it ever sees, the diurnal libration included, and the 2° margin past it before
-        a 4° feather into it. The files, whole to seen, at 512, 1K, 2K, 4K and 8K texels around: the color
-        ({sizes("color")}), the heights ({sizes("height")}) and the roughness ({sizes("roughness")}, no 8K).
+        nachtgestirn's maps laid out flat as the package loads them by default, 1024 texels around: NASA's color or
+        heights from the CGI Moon Kit <Cite id="svs4720" />, or the roughness from the laser altimeter's tracks
+        <Cite id="rosenburg2011" />. Inside the line what Earth sees at the chosen moment, hatched what it does not,
+        densely what it never sees.
     </figcaption>
 </figure>
 

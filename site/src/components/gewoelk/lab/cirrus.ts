@@ -1,4 +1,4 @@
-import { SHOW, texturePanel } from "../textures";
+import { SHOW, type Shown, texturePanel } from "../textures";
 import shader from "./cirrus.comp.wgsl";
 import { createLab, floatStruct, type Lab, labPipeline, NOISE, type Presets } from "./lab";
 
@@ -9,12 +9,12 @@ const FIELDS = [
     ...["altitude", "opticalDepth", "tile", "windTo", "drift", "coverage", "patchKm", "bandStretch", "bandAngle"],
     ...["edge", "cells", "cellKm", "rows", "elongation", "grain", "ripples", "rippleKm", "curve", "ribs", "ribKm"],
     ...["veil", "striation", "stretch", "streaks", "bend", "combStep", "relief", "forwardG", "phase", "seed"],
-    ...["mapSize", "viewMode", "billows", "billowKm", "billowShift", "soft"],
+    ...["mapSize", "viewMode", "billows", "billowKm", "billowShift", "soft", "clearFrom", "clearing"],
 ] as const;
 // What is read per pixel and not baked: a change of these leaves the map as it is.
 const UNBAKED = new Set<string>([
     ...["altitude", "opticalDepth", "windTo", "drift", "coverage", "patchKm", "bandStretch", "bandAngle", "edge"],
-    ...["relief", "forwardG", "viewMode", "billows", "billowKm", "billowShift", "soft"],
+    ...["relief", "forwardG", "viewMode", "billows", "billowKm", "billowShift", "soft", "clearFrom", "clearing"],
 ]);
 const STRUCT = floatStruct("CirrusLab", FIELDS);
 
@@ -51,21 +51,19 @@ export const CIRRUS_PRESETS: Presets = {
     },
 };
 
-/** The cirrus research figure on `root`, a `figure[data-cirrus-lab]`: the map baked when its sliders change, the
- *  sheet read from it per pixel over a stand-in sky. */
-export async function cirrusFigure(root: HTMLElement) {
-    let draw: (lab: Lab) => void = () => {};
-    const lab = createLab(root, (current) => draw(current), {
-        presets: CIRRUS_PRESETS,
-        camera: { yaw: 20 * DEG, pitch: 48 * DEG, fov: 85 * DEG },
-    });
-    if (!lab) return;
-    const { device } = lab;
+/**
+ * The high sheet's passes for the figure `lab`: its map baked when its sliders change, and the sheet read from it per
+ * pixel, over the stand-in sky into the canvas or alone into a layer for a figure with a sky of its own.
+ */
+export async function cirrusPasses(lab: Lab) {
+    const { device, root } = lab;
     const code = `${NOISE}\n${STRUCT.wgsl}\n${shader}`;
-    const [bake, comb, mip, sky] = await Promise.all(
-        ["cirrusBake", "cirrusComb", "cirrusMip", "cirrusSky"].map((entry) => labPipeline(device, entry, code, entry)),
+    const [bake, comb, mip, sky, layer] = await Promise.all(
+        ["cirrusBake", "cirrusComb", "cirrusMip", "cirrusSky", "cirrusLayer"].map((entry) =>
+            labPipeline(device, entry, code, entry),
+        ),
     );
-    if (!bake || !comb || !mip || !sky) return;
+    if (!bake || !comb || !mip || !sky || !layer) return null;
     const uniform = device.createBuffer({ size: STRUCT.size, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const sampler = device.createSampler({
         addressModeU: "repeat",
@@ -87,6 +85,7 @@ export async function cirrusFigure(root: HTMLElement) {
         const other = device.createTexture({ size: [size, size], format: "rgba16float", usage });
         const level = (i: number) => map.createView({ baseMipLevel: i, mipLevelCount: 1 });
         const linear = { binding: 3, resource: sampler };
+        const read = [params, linear, view, { binding: 5, resource: map.createView() }];
         return {
             size,
             levels,
@@ -109,47 +108,76 @@ export async function cirrusFigure(root: HTMLElement) {
                     { binding: 2, resource: level(i) },
                 ]),
             ),
-            sky: group(sky as GPUComputePipeline, [params, linear, view, { binding: 5, resource: map.createView() }]),
+            sky: group(sky as GPUComputePipeline, read),
+            layer: group(layer as GPUComputePipeline, read),
         };
     }
-    const textures = texturePanel(root, device);
-    lab.timed = textures.refresh;
     let map: ReturnType<typeof createMap> | null = null;
     let baked = "";
     const outputs = new WeakMap<GPUTexture, GPUBindGroup>();
-
-    lab.status = () => {
-        const ms = (name: string) => (lab.timer.ms[name] === undefined ? "?" : lab.timer.ms[name]?.toFixed(2));
-        return `map ${map?.size ?? 0}², bake ${ms("bake")} ms, sheet ${ms("sheet")} ms on the GPU`;
+    // A target's group: the canvas for the sky, binding 0, or a float texture for the layer, binding 1.
+    const output = (pipeline: GPUComputePipeline, binding: number, target: GPUTexture) => {
+        let made = outputs.get(target);
+        if (!made) {
+            made = device.createBindGroup({
+                layout: pipeline.getBindGroupLayout(1),
+                entries: [{ binding, resource: target.createView() }],
+            });
+            outputs.set(target, made);
+        }
+        return made;
     };
+    function read(
+        encoder: GPUCommandEncoder,
+        pipeline: GPUComputePipeline,
+        bound: GPUBindGroup,
+        out: GPUBindGroup,
+        target: GPUTexture,
+    ) {
+        const timestampWrites = lab.timer.writes("sheet");
+        const pass = encoder.beginComputePass({
+            label: "cirrusLab:sheet",
+            ...(timestampWrites && { timestampWrites }),
+        });
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, bound);
+        pass.setBindGroup(1, out);
+        pass.dispatchWorkgroups(Math.ceil(target.width / 8), Math.ceil(target.height / 8));
+        pass.end();
+    }
 
-    draw = () => {
-        const { width, height } = lab.size();
-        const size = Number(lab.choice("size")) || 2048;
-        if (map?.size !== size) {
-            for (const texture of map?.textures ?? []) texture.destroy();
-            map = createMap(size);
-            baked = "";
-        }
-        const values: Record<string, number> = { mapSize: size, combStep: (3 * size) / 2048 };
-        for (const field of FIELDS) {
-            const input = root.querySelector<HTMLInputElement>(`input[data-param="c.${field}"]`);
-            if (input) values[field] = Number(input.value);
-        }
-        const tile = values.tile ?? 32;
-        values.windTo = (lab.value("wind.from") + 180) * DEG;
-        values.drift = ((lab.value("wind.speed") * lab.clock) / 1000) % tile;
-        values.bandAngle = (values.bandAngle ?? 0) * DEG;
-        values.phase = (lab.value("phase") + (lab.value("change") * lab.clock) / 3600) % 8;
-        values.viewMode = lab.choice("view") === "map" ? 1 : 0;
-        values.billowShift = (lab.value("billowSpeed") * lab.clock) / 1000;
-        device.queue.writeBuffer(uniform, 0, STRUCT.pack(values));
+    return {
+        get size() {
+            return map?.size ?? 0;
+        },
+        /** The sliders into the uniform, and the map baked again where they changed it. */
+        bake(encoder: GPUCommandEncoder) {
+            const size = Number(lab.choice("size")) || 2048;
+            if (map?.size !== size) {
+                for (const texture of map?.textures ?? []) texture.destroy();
+                map = createMap(size);
+                baked = "";
+            }
+            const values: Record<string, number> = { mapSize: size, combStep: (3 * size) / 2048 };
+            for (const field of FIELDS) {
+                const input = root.querySelector<HTMLInputElement>(`input[data-param="c.${field}"]`);
+                if (input) values[field] = Number(input.value);
+            }
+            const tile = values.tile ?? 32;
+            values.windTo = (lab.value("wind.from") + 180) * DEG;
+            values.drift = ((lab.value("wind.speed") * lab.clock) / 1000) % tile;
+            values.bandAngle = (values.bandAngle ?? 0) * DEG;
+            values.phase = (lab.value("phase") + (lab.value("change") * lab.clock) / 3600) % 8;
+            values.viewMode = lab.choice("view") === "map" ? 1 : 0;
+            values.billowShift = (lab.value("billowSpeed") * lab.clock) / 1000;
+            values.clearFrom = lab.value("clearFrom");
+            values.clearing = lab.value("clearing");
+            device.queue.writeBuffer(uniform, 0, STRUCT.pack(values));
 
-        const encoder = device.createCommandEncoder({ label: "sternwarte:cirrusLab" });
-        // Combed an even number of times, so the last step lands in the map.
-        const combs = 2 * Math.round(lab.value("comb") / 2);
-        const key = JSON.stringify([FIELDS.filter((f) => !UNBAKED.has(f)).map((f) => values[f]), combs]);
-        if (key !== baked) {
+            // Combed an even number of times, so the last step lands in the map.
+            const combs = 2 * Math.round(lab.value("comb") / 2);
+            const key = JSON.stringify([FIELDS.filter((f) => !UNBAKED.has(f)).map((f) => values[f]), combs]);
+            if (key === baked) return;
             baked = key;
             const timestampWrites = lab.timer.writes("bake");
             const pass = encoder.beginComputePass({
@@ -172,31 +200,30 @@ export async function cirrusFigure(root: HTMLElement) {
                 pass.dispatchWorkgroups(level, level);
             });
             pass.end();
-        }
-        const target = lab.context.getCurrentTexture();
-        let output = outputs.get(target);
-        if (!output) {
-            output = device.createBindGroup({
-                layout: (sky as GPUComputePipeline).getBindGroupLayout(1),
-                entries: [{ binding: 0, resource: target.createView() }],
-            });
-            outputs.set(target, output);
-        }
-        const timestampWrites = lab.timer.writes("sheet");
-        const pass = encoder.beginComputePass({
-            label: "cirrusLab:sheet",
-            ...(timestampWrites && { timestampWrites }),
-        });
-        pass.setPipeline(sky as GPUComputePipeline);
-        pass.setBindGroup(0, map.sky);
-        pass.setBindGroup(1, output);
-        pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
-        pass.end();
-        const [texture] = map.textures;
-        if (texture) {
+        },
+        /** The sheet over the stand-in sky, into the canvas' texture. */
+        sky(encoder: GPUCommandEncoder, target: GPUTexture) {
+            if (map)
+                read(encoder, sky as GPUComputePipeline, map.sky, output(sky as GPUComputePipeline, 0, target), target);
+        },
+        /** The sheet alone, its light and what it lets through, into an rgba16float texture. */
+        layer(encoder: GPUCommandEncoder, target: GPUTexture) {
+            if (map)
+                read(
+                    encoder,
+                    layer as GPUComputePipeline,
+                    map.layer,
+                    output(layer as GPUComputePipeline, 1, target),
+                    target,
+                );
+        },
+        /** The map's channels for the texture panel. */
+        shown(): Shown[] {
+            const [texture] = map?.textures ?? [];
+            if (!texture) return [];
             // One bake fills all four channels, combs them and halves the levels.
             const common = { texture, kind: "2d" as const, ms: () => lab.timer.ms.bake, timed: "all four" };
-            textures.show([
+            return [
                 {
                     ...common,
                     label: "puffs",
@@ -224,8 +251,37 @@ export async function cirrusFigure(root: HTMLElement) {
                     mode: SHOW.alpha,
                     at: 0.25,
                 },
-            ]);
-        }
+            ];
+        },
+    };
+}
+
+/** The cirrus research figure on `root`, a `figure[data-cirrus-lab]`: the map baked when its sliders change, the
+ *  sheet read from it per pixel over a stand-in sky. */
+export async function cirrusFigure(root: HTMLElement) {
+    let draw: (lab: Lab) => void = () => {};
+    const lab = createLab(root, (current) => draw(current), {
+        presets: CIRRUS_PRESETS,
+        camera: { yaw: 20 * DEG, pitch: 48 * DEG, fov: 85 * DEG },
+    });
+    if (!lab) return;
+    const { device } = lab;
+    const passes = await cirrusPasses(lab);
+    if (!passes) return;
+    const textures = texturePanel(root, device);
+    lab.timed = textures.refresh;
+
+    lab.status = () => {
+        const ms = (name: string) => (lab.timer.ms[name] === undefined ? "?" : lab.timer.ms[name]?.toFixed(2));
+        return `map ${passes.size}², bake ${ms("bake")} ms, sheet ${ms("sheet")} ms on the GPU`;
+    };
+
+    draw = () => {
+        lab.size();
+        const encoder = device.createCommandEncoder({ label: "sternwarte:cirrusLab" });
+        passes.bake(encoder);
+        passes.sky(encoder, lab.context.getCurrentTexture());
+        textures.show(passes.shown());
         textures.encode(encoder, lab.pressed("textures.on"));
         lab.timer.resolve(encoder);
         device.queue.submit([encoder.finish()]);

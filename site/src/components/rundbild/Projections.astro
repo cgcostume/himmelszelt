@@ -1,5 +1,4 @@
 ---
-import "../sternzeit/sternzeit.css";
 import Choice from "../dunstkreis/Choice.astro";
 import Try from "../Try.astro";
 import "../dunstkreis/dunstkreis.css";
@@ -59,7 +58,7 @@ const FILTER = {
 };
 ---
 
-<figure class="scene-frame wide" id="projections">
+<figure class="fig scene-frame wide" id="projections">
     <SkyFrame viewClass="projections-view" panel="inside" locked={false} lockTitle="Look towards the Sun's true direction; dragging lets go" compassTitle="The compass directions on the horizon, the zenith and the nadir">
         <canvas aria-label="The sky's texels seen from inside, looking around"></canvas>
         <div class="projections-marks" aria-hidden="true"></div>
@@ -91,14 +90,8 @@ const FILTER = {
     <p class="view-status"><span data-field="info"></span> <span data-field="timing"></span></p>
     <div class="lut-call" data-field="call"></div>
     <figcaption class="figure-caption">
-        One sky in six projections, from XS to L each in a texture of about as many texels, at HD and UHD in the sizes maps
-        commonly come in, shown texel by texel, filtered bilinearly
-        by the hardware or bicubically by hand: seen from inside, as from the ground, in perspective, and in the corner
-        the texture as stored, a cube map as its six faces in a row, north, east, south and west upright as seen from
-        inside, then the zenith and the nadir, with what the view shows outlined and the rest dimmed. Below the horizon,
-        the fisheye shows the ground it stores in its corner. With the density on, every direction is colored by how many texels the
-        projection packs there against the same texels spread evenly over what it covers, in ColorBrewer's RdBu: blue
-        where they are sparse, red where dense.
+        One sky in six projections from XS to UHD, seen from inside and in the corner as stored, a cube's faces north to
+        west, then zenith and nadir. The density against an even spread in ColorBrewer's RdBu: blue sparse, red dense.
         <Try label="Midnight sun" set="date=2026-06-21T22:46:00Z&lat=69.65&lon=18.96&h=1" fig="projections">
             the low Sun split between the equirectangular's edges, whole in the fisheye.
         </Try>

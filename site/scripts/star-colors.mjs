@@ -3,11 +3,11 @@
 // the Hipparcos stars it lacks, then the Tycho-2 stars neither holds. Per bin of 0.05 and class of magnitude the stars
 // and their share of the light, per bin its brightest five, the median, and the magnitude and B-V of the film stars.
 // The Yale stars from sternenheer's brightstars.csv; the others from the catalogues as NASA's HEASARC serves them, in
-// the cache sternenheer's `pnpm hipparcos` and `pnpm tycho` download them to, cut as those scripts cut them. A star
+// the cache sternenheer's `pnpm data:hipparcos` and `pnpm data:tycho` download them to, cut as those scripts cut them. A star
 // without a measured index is left out, where the renderer gives it the typical one; Tycho-2's two bands become
 // Johnson's V and B-V by the conversion of the Hipparcos and Tycho Catalogues (ESA 1997, vol. 1, sect. 1.3).
 //
-//     pnpm --filter @himmelszelt/sternwarte star-colors [--force]
+//     pnpm --filter @himmelszelt/sternwarte data:star-colors [--force]
 //
 // Writes public/stars/colors-yale.json, colors-hipparcos.json and colors-tycho.json, some 9 kB each. The ESA data come
 // under CC BY-NC 3.0 IGO, credit "ESA". Downloads 215 MB once, from the asset mirror first.

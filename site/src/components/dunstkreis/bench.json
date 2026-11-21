@@ -1,0 +1,79 @@
+{
+    "gpu": "amd rdna-3",
+    "rounds": 9,
+    "frames": 1000,
+    "warmup": 400,
+    "rows": {
+        "tables": {
+            "ms": {
+                "median": 0.9916,
+                "p10": 0.6057,
+                "p90": 1.0817,
+                "rounds": 9
+            },
+            "memory": 196800
+        },
+        "skyView": {
+            "ms": {
+                "median": 0.214,
+                "p10": 0.1446,
+                "p90": 0.2146,
+                "rounds": 9
+            },
+            "memory": 300336
+        },
+        "sky1080": {
+            "ms": {
+                "median": 0.1746,
+                "p10": 0.1708,
+                "p90": 0.1796,
+                "rounds": 9
+            },
+            "memory": 0
+        },
+        "sky2160": {
+            "ms": {
+                "median": 0.6698,
+                "p10": 0.667,
+                "p90": 0.6752,
+                "rounds": 9
+            },
+            "memory": 0
+        },
+        "cube": {
+            "ms": {
+                "median": 0.3604,
+                "p10": 0.3579,
+                "p90": 0.3613,
+                "rounds": 9
+            },
+            "memory": 16777200
+        },
+        "aerial": {
+            "ms": {
+                "median": 0.1032,
+                "p10": 0.1032,
+                "p90": 0.1034,
+                "rounds": 9
+            },
+            "memory": 524288
+        },
+        "skyBare": {
+            "ms": {
+                "median": 0.0608,
+                "p10": 0.059,
+                "p90": 0.0625,
+                "rounds": 9
+            },
+            "memory": 0
+        }
+    },
+    "code": 106391,
+    "browser": "Chromium 153",
+    "date": "2026-11-21",
+    "machine": {
+        "busyBefore": [35, 76, 54, 39, 5, 5, 5, 5, 6, 6],
+        "otherBrowsers": 0,
+        "desktop": 2
+    }
+}

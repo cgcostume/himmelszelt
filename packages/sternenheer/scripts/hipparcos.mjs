@@ -11,7 +11,7 @@
 // with astrometry and a magnitude, moved from the epoch J1991.25 to J2000.0 by their proper motion, B-V 0.65 where
 // none is given, and none within half an arcminute of a star of data/brightstars.csv, or within 1.5 arcminutes and 0.3
 // magnitudes of one. `--csv` writes that reduction to data/hipparcos.csv.
-// Rerunnable: `pnpm hipparcos [--out <dir>] [--cache <dir>] [--download] [--csv] [--force]`.
+// Rerunnable: `pnpm data:hipparcos [--out <dir>] [--cache <dir>] [--download] [--csv] [--force]`.
 import { createReadStream, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";

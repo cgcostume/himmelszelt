@@ -1,0 +1,76 @@
+{
+    "gpu": "amd rdna-3",
+    "rounds": 21,
+    "frames": 128,
+    "warmup": 16,
+    "rows": {
+        "catalog": {
+            "ms": {
+                "median": 0.0438,
+                "p10": 0.0426,
+                "p90": 0.0447,
+                "rounds": 21
+            },
+            "memory": 3280152,
+            "download": 89087
+        },
+        "air": {
+            "ms": {
+                "median": 0.1433,
+                "p10": 0.14,
+                "p90": 0.144,
+                "rounds": 21
+            },
+            "memory": 42919392,
+            "download": 1480866
+        },
+        "large": {
+            "ms": {
+                "median": 0.1649,
+                "p10": 0.1601,
+                "p90": 0.1666,
+                "rounds": 21
+            },
+            "memory": 76770624,
+            "download": 4628848
+        },
+        "720p": {
+            "ms": {
+                "median": 0.1008,
+                "p10": 0.0982,
+                "p90": 0.1029,
+                "rounds": 21
+            },
+            "memory": 29795632,
+            "download": 1480866
+        },
+        "2160p": {
+            "ms": {
+                "median": 0.4383,
+                "p10": 0.4314,
+                "p90": 0.4401,
+                "rounds": 21
+            },
+            "memory": 111414016,
+            "download": 1480866
+        },
+        "deep": {
+            "ms": {
+                "median": 0.6519,
+                "p10": 0.6456,
+                "p90": 0.6543,
+                "rounds": 21
+            },
+            "memory": 82699016,
+            "download": 13517021
+        }
+    },
+    "code": 53419,
+    "browser": "Chromium 153",
+    "date": "2026-11-21",
+    "machine": {
+        "busyBefore": [12, 5, 7, 7, 8, 7, 5, 5, 5, 5],
+        "otherBrowsers": 6,
+        "desktop": 2
+    }
+}

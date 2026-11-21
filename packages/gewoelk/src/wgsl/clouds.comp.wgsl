@@ -184,7 +184,19 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
                 let slice = clamp((elevation - volume.lightElevations.x) / max(volume.lightElevations.y - volume.lightElevations.x, 1e-6), 0.0, 1.0) * 3.0;
                 // Read a voxel on towards the sun: the near samples below cover the first one, the grid the rest.
                 let beyond = gwVolumeCoordinate(gwPointAt(p + sun * cell));
-                let toSun = sample.kept * dot(textureSampleLevel(gwLight, gwVolumeSampler, beyond, 0.0), max(1.0 - abs(slice - vec4f(0.0, 1.0, 2.0, 3.0)), vec4f(0.0)));
+                // The clouds on the way to the sun thin out towards the clearing as those in sight do: a clearing on the
+                // sun's side lets its light in under the deck. The grid holds them all, so its sum counts by the mean
+                // of what the clearing leaves along the way through the slab, against what it leaves here.
+                let rise = dot(sun, up);
+                let run = sqrt(max(1.0 - rise * rise, 1e-6));
+                let way = min(select(x.height, volume.height - x.height, rise > 0.0) * run / max(abs(rise), 1e-3), 2.0 * volume.clearing);
+                let heading = normalize(sun.xy + vec2f(0.0, 1e-6));
+                var towards = 0.0;
+                for (var k = 0u; k < 4u; k = k + 1u) {
+                    towards = towards + 0.25 * gwClearingOver(x.ground + heading * way * (f32(k) + 0.5) / 4.0);
+                }
+                let cleared = min(1.0, towards / max(left, 0.05));
+                let toSun = sample.kept * cleared * dot(textureSampleLevel(gwLight, gwVolumeSampler, beyond, 0.0), max(1.0 - abs(slice - vec4f(0.0, 1.0, 2.0, 3.0)), vec4f(0.0)));
                 // What the thinning leaves of the clouds around lets through more of the sky's and the ground's light.
                 let open = mix(vec2f(1.0), textureSampleLevel(gwAmbient, gwVolumeSampler, q, 0.0).rg, sample.kept);
                 // Nubis3's two detailed samples towards the sun, within the first voxel: a quarter and three quarters
@@ -199,18 +211,28 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
                 // The sun's light scattered once, and the orders after it as octaves (Wrenninge 2013, Hillaire 2016):
                 // order k with a^k of the scattering, through b^k of the depth, with c^k of the lobe. Energy is kept
                 // for a <= b only, so the depth's factor is never below the share's.
+                // A sun that grazes the layer lights a level face of it, a base from below once it has set, through a
+                // skin of 1 / sine of its height less depth than the sums along its ray have: far thinner than a voxel,
+                // so the grid holds such a face as dark. The same light spread over the depth the grid resolves, the
+                // sine of it through the sine of the depth, keeps the face's light: taken where it leaves more.
+                let level = max(abs(dot(sun, up)), 0.0047);
+                let grazing = level * (1.0 - smoothstep(0.1, 0.3, level));
                 var orders = 0.0;
+                var faced = 0.0;
                 var share = 1.0;
                 var depth = 1.0;
                 let thinning = max(0.5, volume.multiScatter);
                 for (var k = 0u; k < min(GW_SCATTERING_OCTAVES, 8u); k = k + 1u) {
                     orders = orders + share * exp(-tauSun * depth) * phases[k];
+                    faced = faced + share * exp(-tauSun * level * depth) * phases[k];
                     share = share * volume.multiScatter;
                     depth = depth * thinning;
                 }
+                orders = max(orders, grazing * faced);
                 // Deep inside, the octaves die out long before the light does: it diffuses, isotropic by then.
                 if (volume.multiScatter > 0.0) {
-                    orders = max(orders, volume.multiScatter * gwDiffused(tauSun, volume.forwardG) / (4.0 * GW_PI));
+                    let diffused = max(gwDiffused(tauSun, volume.forwardG), grazing * gwDiffused(tauSun * level, volume.forwardG));
+                    orders = max(orders, volume.multiScatter * diffused / (4.0 * GW_PI));
                 }
                 let sunlight = mix(gwSunAt(0u, elevation), gwSunAt(1u, elevation), clamp(q.z, 0.0, 1.0));
                 let direct = sunlight * orders;
@@ -271,7 +293,7 @@ fn gwClouds(@builtin(global_invocation_id) id: vec3u) {
                 let at = min(vec2u((vec2f(id.xy) + 0.5) / vec2f(size) * vec2f(full)), full - 1u);
                 behind = textureLoad(gwBackground, at, 0).rgb;
             }
-            let sky = gwAirLight(behind, GW_BACKGROUND);
+            let sky = gwAirLight(o, v, behind, GW_BACKGROUND);
             let uv = (vec2f(id.xy) + 0.5) / vec2f(size);
             result = gwCloudscape(o, v, sun, shell.near, t1, gwJitter(id.xy, gwParams.frame), uv, sky);
         }

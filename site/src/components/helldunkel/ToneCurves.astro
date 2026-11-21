@@ -1,5 +1,4 @@
 ---
-import "../sternzeit/sternzeit.css";
 import EnvironmentFrame from "../environment/EnvironmentFrame.astro";
 import "./helldunkel.css";
 
@@ -11,13 +10,13 @@ const CURVES = [
 ];
 ---
 
-<figure class="scene-frame wide" id="tones" data-needs-hdri data-loading>
+<figure class="fig scene-frame wide" id="tones" data-needs-hdri data-loading>
     <EnvironmentFrame fullscreen author={false}>
         <div class="tone-tiles as-seen">
             {CURVES.map(([curve, name]) => (
                 <figure class="tone-tile">
                     <canvas data-curve={curve} aria-label={`The chosen HDRI through ${name}`}></canvas>
-                    <figcaption class="note">{name}</figcaption>
+                    <figcaption class="note overlay-label">{name}</figcaption>
                 </figure>
             ))}
             <span class="env-author" data-env="author"></span>

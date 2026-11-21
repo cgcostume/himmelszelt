@@ -1,10 +1,7 @@
 ---
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import Term from "../Term.astro";
 import Try from "../Try.astro";
-import "../sternzeit/sternzeit.css";
-import "../nachtgestirn/nachtgestirn.css";
 import "./onestar.css";
 import { FILM_STARS } from "./filmstars";
 import StarPicker from "./StarPicker.astro";
@@ -40,7 +37,7 @@ const STAGES = [
 ];
 ---
 
-<figure class="onestar-figure wide" id={id} data-one-star data-choices={JSON.stringify(choices)} data-header={header}>
+<figure class="fig onestar-figure wide" id={id} data-one-star data-choices={JSON.stringify(choices)} data-header={header} data-actions="copy">
     <StarPicker label="The star to follow" class="onestar-pick" />
     <ol class="onestar-strip">
         {STAGES.map((stage, i) => (
@@ -67,13 +64,8 @@ const STAGES = [
         </span>
     </div>
     <figcaption class="figure-caption">
-        One star of the Yale Bright Star Catalogue followed to the screen, in the steps the stars pass takes, each with
-        its numbers and the function that computes it: its row, its place in the sky at the chosen moment and place in
-        azimuth and altitude, north up and east left, its light above the air, its <Term of="Color index">color
-        index</Term> as a temperature on the <Term of="Planckian locus">Planckian locus</Term>, what the air lifts,
-        dims and reddens, and its pixels as sternenheer's pass draws them, at 2 arcminutes a pixel, magnified, over
-        black. Under them, the brightness across the star's middle row on a logarithmic scale, the knee dashed. The
-        stars are those films and history made famous.
+        One star of the Yale catalog followed step by step to the screen, its pixels magnified, 2 arcminutes each;
+        under them, its middle row's brightness on a logarithmic scale, the knee dashed.
         {experiment && <Try label={experiment.label} set={experiment.set} fig={id}>{experiment.text}</Try>}
     </figcaption>
 </figure>

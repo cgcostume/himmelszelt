@@ -2,7 +2,6 @@ import { rayleighAt, rgbOfSpectrum, solarIrradianceAt } from "@himmelszelt/dunst
 import { find } from "../dom";
 import { onDemand } from "../frame";
 import { drawSvg, SUN_SYMBOL, sunGlow, sunRays, svgText, THUMB_RADIUS } from "../sternzeit/figure";
-import "../sternzeit/export";
 
 // Why the sky is blue, not to scale: a planet half as wide as Earth under air drawn four times as thick, all of it in the
 // drawing's own km, so every ray is straight. Seven rays of sunlight fade as the air scatters them; dots all over the

@@ -1,0 +1,190 @@
+---
+import "../../sternzeit/sternzeit.css";
+import "../../dunstkreis/dunstkreis.css";
+import "../clouds.css";
+import Choice from "../../dunstkreis/Choice.astro";
+import Hdr from "../../dunstkreis/Hdr.astro";
+import OptionGroup from "../../dunstkreis/OptionGroup.astro";
+import SkyFrame from "../../dunstkreis/SkyFrame.astro";
+import StarGroups from "../../sternenheer/StarGroups.astro";
+import LabSliders from "./LabSliders.astro";
+import type { LabSlider } from "./sliders";
+import * as all from "./sliders";
+
+/**
+ * A research figure for the whole sky: the formation figure's three layers and the cirrus figure's sheet as they stand
+ * there, over dunstkreis' sky with the stars and the Moon, at the page's moment and place. It shows weathers and what
+ * they cost; the clouds' sliders are the other two figures', and here only held, hidden, at their starts. The stars are
+ * the Yale catalog's and Hipparcos', their light and the Milky Way's off or brighter by stops, as in the stars figures.
+ */
+interface Props {
+    id?: string;
+    caption?: string;
+}
+const {
+    id = "weather-lab",
+    caption = "The research's clouds together under a real sky: three marched layers and a sheet of high cloud over dunstkreis' air, sternenheer's stars and nachtgestirn's Moon, exposed by the stars figure's meter. The clouds' own light is still a stand-in for the Sun's, and by night the Moon's share of it.",
+} = Astro.props;
+
+// Every slider of the two figures, once: held hidden, so the weathers set them as they do there.
+const SHOWN = new Set(["clearFrom", "clearing"]);
+const HELD = [
+    ...new Map(
+        Object.values(all)
+            .flatMap((sliders) => sliders as LabSlider[])
+            .map((slider) => [slider[0], slider]),
+    ).values(),
+].filter(([param]) => !SHOWN.has(param) && param !== "view.ev");
+const CLEARING: LabSlider[] = [
+    ["clearFrom", "clear from", 0, 200, 5, 40, "The distance from which the clouds thin out, in km"],
+    [
+        "clearing",
+        "clearing",
+        0,
+        400,
+        10,
+        160,
+        "The distance at which the last cloud is gone, in km, so the horizon stays clear and a low sun shines in under the clouds: 0 for clouds all the way",
+    ],
+];
+const kinds = (i: number, options: string[][], checked: string) => ({
+    name: `kind${i}`,
+    label: "Kind",
+    title: "What the layer's map is made of",
+    options,
+    checked,
+});
+const TOWERS = ["2", "towers", "A few cells of many grow tall and spread into anvils"];
+const FRONTS = [
+    "3",
+    "front",
+    "A band placed in the world: a wall of towers behind its leading edge, a shield of cloud to the rear",
+];
+const PRESET = {
+    name: "preset",
+    label: "Weather",
+    title: "Weathers to start from: a click eases the sliders over to one and sets the layers' kinds",
+    options: [
+        ["fair", "fair"],
+        ["towering", "towering"],
+        ["front", "front ahead"],
+        ["rain", "under the front"],
+        ["alto", "altocumulus"],
+    ],
+    checked: "towering",
+};
+const SKY = {
+    name: "sky",
+    label: "High cloud",
+    title: "Skies to start from, after photographs: a click eases the sliders over to one",
+    options: [
+        ["mackerel", "mackerel"],
+        ["ripples", "ripple patch"],
+        ["ribbed", "ribbed band"],
+        ["mixed", "puffs and veil"],
+        ["veil", "veil"],
+    ],
+    checked: "mackerel",
+};
+const SIZE = {
+    name: "size",
+    label: "Map size",
+    title: "Texels across the baked map",
+    options: [
+        ["1024", "1024"],
+        ["2048", "2048"],
+        ["4096", "4096"],
+    ],
+    checked: "2048",
+};
+const choice = (name: string, label: string, title: string, options: string[][], checked: string) => ({
+    name,
+    label,
+    title,
+    options,
+    checked,
+});
+const SCALE = choice(
+    "scale",
+    "Render scale",
+    "The share of the frame's pixels the clouds are marched at",
+    [
+        ["1", "full"],
+        ["0.5", "half"],
+        ["0.25", "quarter"],
+    ],
+    "0.5",
+);
+const STEPS = choice(
+    "steps",
+    "Steps",
+    "Steps a ray takes at most",
+    [
+        ["64", "64"],
+        ["128", "128"],
+        ["256", "256"],
+    ],
+    "128",
+);
+const SPEED = choice(
+    "speed",
+    "Speed",
+    "How fast the figure's clock runs while its animation does",
+    [
+        ["1", "1x"],
+        ["60", "60x"],
+        ["600", "600x"],
+    ],
+    "60",
+);
+---
+
+<figure class="fig scene-frame wide" id={id} data-weather-lab>
+    <SkyFrame fly ownHeight grid={false} locked={false} hint="Drag to look around, scroll to zoom. The sky is dunstkreis', at the page's moment and place.">
+        <canvas data-field="canvas" aria-label="The research's clouds over a real sky"></canvas>
+        <div class="cloud-textures" data-field="textures"></div>
+        <div class="sky-compass" data-field="compassLabels"></div>
+        <Fragment slot="bar">
+            <StarGroups catalog={null} />
+        </Fragment>
+        <Fragment slot="options">
+            <OptionGroup name="weather">
+                <Choice figure={id} {...PRESET} />
+                <Choice figure={id} {...SKY} />
+            </OptionGroup>
+            <OptionGroup name="layers">
+                <button type="button" class="view-toggle" data-field="l0.enabled" aria-pressed="true" title="The low layer">low</button>
+                <button type="button" class="view-toggle" data-field="l1.enabled" aria-pressed="true" title="The deep layer: towers or a front">deep</button>
+                <button type="button" class="view-toggle" data-field="l2.enabled" aria-pressed="true" title="The middle layer">middle</button>
+                <button type="button" class="view-toggle" data-field="sheet.on" aria-pressed="true" title="The sheet of high cloud">high</button>
+                <LabSliders sliders={CLEARING} />
+            </OptionGroup>
+            <OptionGroup name="time">
+                <button type="button" class="view-toggle" data-field="animate" aria-pressed="false" title="Runs the figure's clock: the layers drift, the billows creep and the maps change, baked again every frame">animate</button>
+                <Choice figure={id} {...SPEED} />
+            </OptionGroup>
+            <OptionGroup name="render">
+                <Choice figure={id} {...SCALE} />
+                <Choice figure={id} {...STEPS} />
+                <Choice figure={id} {...SIZE} />
+                <button type="button" class="view-toggle" data-field="textures.on" aria-pressed="false" title="The textures the figure renders from, down the left of the view: hover one for what it is for">textures</button>
+                <button type="button" class="view-toggle" data-field="ground.grid" aria-pressed="true" title="A grid on the ground, for orientation, speed and height: thin lines every 10 km, 1 km, 100 m and on down to 1 mm, each level showing once its cells are a few pixels across">grid</button>
+            </OptionGroup>
+            <OptionGroup name="HDR (× SDR white)">
+                <Hdr figure={id} />
+            </OptionGroup>
+            <div hidden>
+                <Choice figure={id} {...kinds(1, [TOWERS, FRONTS], "2")} />
+                <LabSliders sliders={HELD} />
+            </div>
+        </Fragment>
+    </SkyFrame>
+    <p class="view-status"><span class="sky-timing" data-field="timing"></span></p>
+    <figcaption class="figure-caption">{caption}</figcaption>
+</figure>
+
+<script>
+    import { weatherFigure } from "./weather";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-weather-lab]")) weatherFigure(root);
+</script>

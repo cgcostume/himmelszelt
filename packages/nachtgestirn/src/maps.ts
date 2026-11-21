@@ -25,10 +25,11 @@ export interface MoonMaps {
 
 /**
  * The Moon's color, its reflectance per channel of linear sRGB relative to green: redder than the sunlight it reflects,
- * a B-V of 0.92 against the Sun's 0.65, which makes blue 0.78 of green and red, by the same slope, 1.155. Outside the
- * air a full Moon is a warm gray.
+ * by a quarter of a magnitude in B-V (Thejll et al. 2014; 0.92 against the Sun's 0.65 in Allen's), which its
+ * reflectance, rising towards red, makes red 1.21 and blue 0.79 of green through the CIE's color matching functions.
+ * Outside the air a full Moon is a warm gray, and with the Sun's own color, `SUN_COLOR`, about 4,750 K.
  */
-export const MOON_COLOR: Vec3 = [1.155, 1, 0.78];
+export const MOON_COLOR: Vec3 = [1.21, 1, 0.79];
 
 export interface MoonMapsOptions {
     /** The color map, decoded; `createImageBitmap` of its file with `colorSpaceConversion: "none"`. */
@@ -161,7 +162,7 @@ export interface LoadMoonMapsOptions extends Omit<MoonMapsOptions, "color" | "he
     onProgress?: (loaded: number, total: number) => void;
 }
 
-// The near side's mean, as `pnpm maps` printed it, the same for the seen and the whole maps.
+// The near side's mean, as `pnpm data:maps` printed it, the same for the seen and the whole maps.
 const SHIPPED = {
     meanReflectance: 0.396,
     meanColor: Object.freeze([0.4125, 0.3924, 0.3828]) as Vec3,
@@ -173,7 +174,7 @@ const shipped = (color: URL, heights: URL, width: number): Readonly<MoonMapFiles
 const UNSHIPPED = "; maps the package does not ship are made by `npx @himmelszelt/nachtgestirn data`";
 
 /**
- * The seen maps, the default: made by `pnpm maps` from NASA's CGI Moon Kit, the color map and the heights from LOLA's 64
+ * The seen maps, the default: made by `pnpm data:maps` from NASA's CGI Moon Kit, the color map and the heights from LOLA's 64
  * texels per degree, where the part of the Moon no libration ever turns to Earth is that part's own mean color at no height, which makes
  * them a third smaller. For views from Earth or a low orbit around it; a globe, a camera that orbits the Moon, or anything
  * else that shows the far side takes `MOON_MAPS_WHOLE`. By how many texels around: "512", 142 KiB, for a disc up to 163 pixels across,
@@ -434,7 +435,7 @@ function compressBc1(device: GPUDevice, texture: GPUTexture): GPUTexture {
 }
 
 /**
- * The roughness maps, made by `pnpm roughness` from Rosenburg et al. 2011's LOLA maps: red the median slope over 57 m in
+ * The roughness maps, made by `pnpm data:roughness` from Rosenburg et al. 2011's LOLA maps: red the median slope over 57 m in
  * tenths of a degree, green the Hurst exponent from 57 m to 2.7 km, 0.5 to 1 over 0 to 255. Optional, for a pass that
  * draws the slopes below the relief's texels. Seen, as `MOON_MAPS`, and whole, as `MOON_MAPS_WHOLE`, by the same
  * reasoning: the seen "512", 129 KiB, and "1k", 501 KiB, shipped; the seen "2k" and "4k" and every whole one made on

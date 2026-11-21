@@ -1,7 +1,7 @@
 // The Moon's disc along every pixel's ray: linear and premultiplied with its coverage in alpha, or over a background in
 // cd/m², exposed and tone mapped like dunstkreis' sky. Requires `params.wgsl`, `surface.wgsl`, `reflectance.wgsl` or a
-// law of one's own, `camera.wgsl` (dunstkreis'), `tonemap.wgsl` and `vision.wgsl` (helldunkel's), and the output
-// binding from `moonOutput`.
+// law of one's own, `camera.wgsl` (dunstkreis'), `whitebalance.wgsl`, `tonemap.wgsl` and `vision.wgsl` (helldunkel's),
+// and the output binding from `moonOutput`.
 
 // Bindings ------------------------------------------------------------------------------------------------------------
 
@@ -140,10 +140,10 @@ fn ngSampleMap(map: texture_2d<f32>, detail: texture_2d<f32>, point: vec3f, foot
     return ngSampleIn(map, uv, dx, dy);
 }
 
-// The normal albedo at a point, per channel: the color map's, or the one given.
+// The normal albedo at a point, per channel: the color map's, or the one given, in the Moon's tint.
 fn ngAlbedoAt(point: vec3f, footprint: NgFootprint) -> vec3f {
     if (!ngHas(NG_FLAG_COLOR)) {
-        return vec3f(ngParams.albedo);
+        return ngParams.albedoMatrix * vec3f(ngParams.albedo);
     }
     let encoded = ngSampleMap(ngColorMap, ngDetailColor, point, footprint);
     return ngParams.albedoMatrix * ngSrgbToLinear(encoded);
@@ -629,10 +629,10 @@ fn ngMoon(view: vec3f, ray: NgRay, hit: vec4f, pixelAngle: f32) -> NgMoon {
     }
     let muView = dot(normal, toViewer);
 
-    // Sunlight, as much as the terrain's shadows and Earth's leave of it.
+    // Sunlight, in the Sun's color, as much as the terrain's shadows and Earth's leave of it.
     let sun = ngParams.sunDirection;
     let muSun = dot(normal, sun);
-    var sunlight = vec3f(ngParams.sunIlluminance * ngReflectance(muSun, muView, dot(sun, toViewer)));
+    var sunlight = ngParams.sunColor * (ngParams.sunIlluminance * ngReflectance(muSun, muView, dot(sun, toViewer)));
     if (ngHas(NG_FLAG_SHADOWS) && muSun > 0.0) {
         sunlight = sunlight * ngTerrainShadow(point);
     }
@@ -646,7 +646,7 @@ fn ngMoon(view: vec3f, ray: NgRay, hit: vec4f, pixelAngle: f32) -> NgMoon {
     if (ngHas(NG_FLAG_EARTHSHINE)) {
         let earth = ngParams.earthDirection;
         let reflected = ngReflectance(dot(normal, earth), muView, dot(earth, toViewer));
-        light = light + NG_EARTHLIGHT * (ngParams.earthshine * reflected);
+        light = light + ngParams.sunColor * NG_EARTHLIGHT * (ngParams.earthshine * reflected);
     }
     return NgMoon(albedo * ngTransmittance(view) * light, hit.w);
 }
@@ -764,7 +764,7 @@ fn ngToneMap(exposed: vec3f) -> vec3f {
 }
 
 // The disc's light, premultiplied, at a pixel made what the target shows: over the background where there is one, as
-// the eye sees it at night if asked, exposed, tone mapped and dithered, or left linear.
+// the eye sees it at night if asked, white balanced, exposed, tone mapped and dithered, or left linear.
 fn ngFinish(luminance: vec3f, coverage: f32, pixel: vec2u) -> vec4f {
     var color = luminance * ngParams.discGain;
     var alpha = coverage;
@@ -778,7 +778,7 @@ fn ngFinish(luminance: vec3f, coverage: f32, pixel: vec2u) -> vec4f {
             color = seen + (hdDarkAdaptedEye(behind + luminance) - seen) * ngParams.discGain;
         }
     }
-    color = color * ngParams.exposure;
+    color = hdWhiteBalance(color, ngParams.whiteBalance) * ngParams.exposure;
     if (NG_TONE_MAP != 0u) {
         color = ngToneMap(color);
         if (NG_DITHER) {

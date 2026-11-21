@@ -11,6 +11,11 @@ import cloudmap from "./cloudmap.comp.wgsl";
 import clouds from "./clouds.comp.wgsl";
 import compose from "./compose.comp.wgsl";
 import detail from "./detail.comp.wgsl";
+import highmap from "./highmap.comp.wgsl";
+import highsheet from "./highsheet.comp.wgsl";
+import layered from "./layered.comp.wgsl";
+import layermap from "./layermap.comp.wgsl";
+import layers from "./layers.comp.wgsl";
 import light from "./light.comp.wgsl";
 import morph from "./morph.comp.wgsl";
 import noise from "./noise.wgsl";
@@ -22,6 +27,24 @@ import voxel from "./voxel.comp.wgsl";
 export { aerial, camera } from "@himmelszelt/dunstkreis/wgsl";
 export { tonemap, whitebalance } from "@himmelszelt/helldunkel/wgsl";
 export { cloudOutput } from "./output.js";
-export { cloudmap, clouds, compose, detail, light, morph, noise, params, sheet, sunlight, voxel };
+// The layered model's passes: a layer's map, the layers' march, the high sheet's map and its read, and their composition.
+export {
+    cloudmap,
+    clouds,
+    compose,
+    detail,
+    highmap,
+    highsheet,
+    layered,
+    layermap,
+    layers,
+    light,
+    morph,
+    noise,
+    params,
+    sheet,
+    sunlight,
+    voxel,
+};
 
 export const airLookup = [atmosphere, common, lut, sampling].join("\n");

@@ -9,7 +9,7 @@ import {
     refractionAngle,
     seeingUniformData,
 } from "@himmelszelt/dunstkreis";
-import type { MeterPass } from "@himmelszelt/helldunkel";
+import type { MeterPass, WhiteBalance } from "@himmelszelt/helldunkel";
 import {
     adaptEV100,
     createMeterPass,
@@ -17,6 +17,7 @@ import {
     localAdaptation,
     lowLightCompensation,
     meteredLuminance,
+    NO_WHITE_BALANCE,
     veilingGlare,
 } from "@himmelszelt/helldunkel";
 import type { MoonMaps, MoonPass } from "@himmelszelt/nachtgestirn";
@@ -192,6 +193,10 @@ export interface StarsFrame {
     /** The halos around bright stars, and their strength, the share of the light past the knee they show, 1 by default. */
     glare: boolean;
     halo?: number;
+    /** A starburst around the Sun, the spikes a camera's six aperture blades draw; off by default. */
+    starburst?: boolean;
+    /** A lens's veil around the Sun and the Moon, dunstkreis' default; on by default. */
+    veil?: boolean;
     /** Artistic offsets in stops on the stars' and the Milky Way's light, 0 by default, physical. */
     starCompensation?: number;
     milkyWayCompensation?: number;
@@ -201,8 +206,24 @@ export interface StarsFrame {
     constellations: readonly string[] | null;
     /** dunstkreis' grid over the sky: altitude lines every 10°, the compass directions and the Sun's symbol. */
     grid?: boolean;
-    /** A grid on the ground under the air, for a view in flight: how far it has flown, in km east and north. */
+    /** A grid on the ground under the air: how far the view has flown, in km east and north. */
     ground?: { east: number; north: number } | null;
+    /** The white balance of the whole frame, sky, stars and Moon alike, applied once by the Moon pass, which finishes it:
+     *  none by default. */
+    whiteBalance?: WhiteBalance;
+    /**
+     * Something to put over the sky, the stars and the Moon before the display: clouds. The Moon pass then writes the
+     * frame exposed but linear into a float texture, and this records what composes that into `target` with a tone
+     * curve of its own, into the frame's encoder.
+     */
+    over?: (encoder: GPUCommandEncoder, exposed: GPUTexture, target: GPUTexture, light: FrameLight) => void;
+}
+
+/** What a frame is exposed by and lit by, for whatever is drawn over it. */
+export interface FrameLight {
+    ev100: number;
+    /** The whole sky's luminance as metered, in cd/m²; 0 until it is. */
+    skyLuminance: number;
 }
 
 /**
@@ -237,8 +258,8 @@ export function pixelAngle(inverseViewProjection: Float32Array, height: number):
 
 export function createStarsRenderer(device: GPUDevice, requestRender: () => void) {
     let adapted: { ev100: number; at: number } | null = null;
-    let sky: { pass: SkyPass; luts: AtmosphereLUTs; grid: boolean } | null = null;
-    let skyBuilding: { luts: AtmosphereLUTs; grid: boolean } | null = null;
+    let sky: { pass: SkyPass; luts: AtmosphereLUTs; lens: string } | null = null;
+    let skyBuilding: { luts: AtmosphereLUTs; lens: string } | null = null;
     let gridPass: ReturnType<typeof createGridPass> | null = null;
     let starsPass: { pass: StarsPass; key: string } | null = null;
     let starsBuilding = "";
@@ -256,6 +277,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
     let background: GPUTexture | null = null;
     let groundPass: ReturnType<typeof groundGrid> | null = null;
     let composed: GPUTexture | null = null;
+    let exposed: GPUTexture | null = null;
     let skyEV100 = Number.NEGATIVE_INFINITY;
     let skyMeteredFor = "";
     // What the camera sees, metered: the frame's sky and stars in cd/m², the ground and the Moon's disc left out.
@@ -297,9 +319,11 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
         requestRender();
     });
 
-    function buildSky(luts: AtmosphereLUTs, grid: boolean) {
-        if (skyBuilding?.luts === luts && skyBuilding.grid === grid) return;
-        const building = { luts, grid };
+    // The pass is made anew for the grid, the starburst and the veil, keyed as `lens`.
+    function buildSky(luts: AtmosphereLUTs, grid: boolean, starburst: boolean, veil: boolean) {
+        const lens = `${grid} ${starburst} ${veil}`;
+        if (skyBuilding?.luts === luts && skyBuilding.lens === lens) return;
+        const building = { luts, lens };
         skyBuilding = building;
         createSkyPass(device, {
             debugGrid: grid,
@@ -310,10 +334,12 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             moonlight: true,
             groundLight: quality.groundLight,
             dither: false,
+            starburst,
+            ...(veil ? {} : { veil: 0 }),
         }).then((pass) => {
             if (skyBuilding !== building) return pass.destroy();
             sky?.pass.destroy();
-            sky = { pass, luts, grid };
+            sky = { pass, luts, lens };
             skyBuilding = null;
             skyMeteredFor = "";
             requestRender();
@@ -341,15 +367,15 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             requestRender();
         });
     }
-    function buildMoon(key: string, { format, headroom, toneMap, darkAdapted }: StarsFrame) {
+    function buildMoon(key: string, { format, headroom, toneMap, darkAdapted, over }: StarsFrame) {
         if (moonBuilding === key) return;
         moonBuilding = key;
         createMoonPass(device, {
-            format,
+            format: over ? "rgba16float" : format,
             headroom,
-            toneMap,
+            toneMap: over ? false : toneMap,
             // Over the night sky's gradients: dithered for an 8-bit target.
-            dither: format === "rgba8unorm",
+            dither: !over && format === "rgba8unorm",
             background: true,
             maps: moonMaps,
             darkAdapted,
@@ -403,8 +429,10 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
         draw(target: GPUTexture, frame: StarsFrame) {
             const { sky: s, luts, width, height } = frame;
             const grid = frame.grid ?? false;
-            if (!sky || sky.luts !== luts || sky.grid !== grid) {
-                buildSky(luts, grid);
+            const starburst = frame.starburst ?? false;
+            const lensVeil = frame.veil ?? true;
+            if (!sky || sky.luts !== luts || sky.lens !== `${grid} ${starburst} ${lensVeil}`) {
+                buildSky(luts, grid, starburst, lensVeil);
                 if (!sky || sky.luts !== luts) return null;
             }
             loadMaps(frame.maps === "auto" ? mapForPixel(pixelAngle(frame.inverseViewProjection, height)) : frame.maps);
@@ -414,7 +442,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 buildStars(starsKey);
                 if (!starsPass) return null;
             }
-            const moonKey = `${frame.format} ${frame.headroom} ${frame.toneMap} ${frame.darkAdapted} ${moonMaps ? "maps" : "plain"}`;
+            const moonKey = `${frame.format} ${frame.headroom} ${frame.toneMap} ${frame.darkAdapted} ${moonMaps ? "maps" : "plain"} ${frame.over ? "linear" : ""}`;
             if (!moonPass || moonPass.key !== moonKey) {
                 buildMoon(moonKey, frame);
                 return null;
@@ -426,6 +454,15 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 composed = texture("sternwarte:starsComposed", width, height);
             }
             if (!composed) return null;
+            if (frame.over && (exposed?.width !== width || exposed.height !== height)) {
+                exposed?.destroy();
+                exposed = device.createTexture({
+                    label: "sternwarte:starsExposed",
+                    size: [width, height],
+                    format: "rgba16float",
+                    usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+                });
+            }
 
             // The air over the sky, rebuilt when the air or the observer changed.
             const theAir = frame.air ? airFor(s.heightM, s.model) : null;
@@ -532,6 +569,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 relief: true,
                 shadows: true,
                 eclipse: null,
+                whiteBalance: frame.whiteBalance ?? NO_WHITE_BALANCE,
                 sunAngularDiameter: s.sunAngularDiameter,
                 refraction,
                 distanceKm: s.distanceKm - s.model.planet.groundRadiusKm * s.moonDirection[2],
@@ -568,7 +606,11 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                     .end();
             }
             starsPass.pass.encode(encoder, composed, { background: behind });
-            moonPass.pass.encode(encoder, target, { background: composed });
+            if (frame.over && exposed) {
+                moonPass.pass.encode(encoder, exposed, { background: composed });
+                const skyLuminance = Number.isFinite(skyEV100) ? 2 ** (skyEV100 - 3) : 0;
+                frame.over(encoder, exposed, target, { ev100, skyLuminance });
+            } else moonPass.pass.encode(encoder, target, { background: composed });
             device.queue.submit([encoder.finish()]);
             const passesMs = performance.now() - started;
             if (meter && !metering && frame.ev100 === null) {

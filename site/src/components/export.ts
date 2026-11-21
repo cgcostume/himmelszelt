@@ -1,12 +1,9 @@
-// A download button on every figure panel marked `data-export="<name>"`: its SVGs (and HTML labels marked
-// `data-export-text`) composed into one standalone SVG file, styles inlined, so it opens anywhere as it looks here.
-// Nested panels (the locked views over the armillary sphere, the analemma over the sun path) are exported on their
-// own, not twice. Each file is signed with the moment and place it shows, unless marked `data-export-timeless`. Beside
-// each download a button that copies the figure's view (figure-info.ts).
+// A figure panel marked `data-export="<name>"` as one standalone SVG file: its SVGs (and HTML labels marked
+// `data-export-text`) composed, styles inlined, so it opens anywhere as it looks here. Nested panels (the locked views
+// over the armillary sphere, the analemma over the sun path) are exported on their own, not twice. Each file is signed
+// with the moment and place it shows, unless marked `data-export-timeless`. The buttons are figure-actions.ts'.
 
-import { figureInfo } from "../figure-info";
-import { icon } from "../icons";
-import { momentAndPlace, momentStamp } from "./state";
+import { momentAndPlace, momentStamp } from "./sternzeit/state";
 
 // The properties the figures' CSS and Zdog set; inlined from the computed style, since the file carries no stylesheet.
 const PROPERTIES = [
@@ -55,7 +52,7 @@ function oklabToSrgb(l: number, a: number, b: number) {
     ].map((c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055));
 }
 
-const plainColors = (value: string) =>
+export const plainColors = (value: string) =>
     value.replace(COLOR, (_, space: string, x: string, y: string, z: string, alpha: string | undefined) => {
         const [p, q, r] = [fraction(x), Number.parseFloat(y), Number.parseFloat(z)];
         const rgb =
@@ -80,6 +77,9 @@ function inlineStyles(original: Element, clone: Element) {
             PROPERTIES.map((name) => `${name}:${plainColors(computed.getPropertyValue(name))}`).join(";"),
         );
         target.removeAttribute("class");
+        // Colors given as attributes in the page's terms (Zdog's var() and color-mix()), which the style above replaces.
+        for (const name of ["fill", "stroke", "stop-color"])
+            if (/var\(|color-mix|okl/.test(target.getAttribute(name) ?? "")) target.removeAttribute(name);
     });
 }
 
@@ -102,7 +102,7 @@ async function embedImages(clone: Element) {
 function frame(svg: SVGSVGElement, box: Box, index: number) {
     const style = getComputedStyle(svg);
     const border = Number.parseFloat(style.borderTopWidth) || 0;
-    const background = style.backgroundColor;
+    const background = plainColors(style.backgroundColor);
     const opaque = background !== "rgba(0, 0, 0, 0)" && background !== "transparent";
     const rect = (attributes: Record<string, string | number>) => {
         const element = document.createElementNS(SVG_NS, "rect");
@@ -120,9 +120,19 @@ function frame(svg: SVGSVGElement, box: Box, index: number) {
         ? rect({ x: box.x + inset, y: box.y + inset, width: box.width - border, height: box.height - border })
         : null;
     outline?.setAttribute("fill", "none");
-    outline?.setAttribute("stroke", style.borderTopColor);
+    outline?.setAttribute("stroke", plainColors(style.borderTopColor));
     outline?.setAttribute("stroke-width", String(border));
     return { clip, fill, outline };
+}
+
+// The page's muted ink as an SVG viewer reads it: the custom property holds an unresolved color-mix().
+function mutedOf(root: HTMLElement) {
+    const probe = Object.assign(document.createElement("span"), { hidden: true });
+    probe.style.color = "var(--muted)";
+    root.append(probe);
+    const color = plainColors(getComputedStyle(probe).color);
+    probe.remove();
+    return color;
 }
 
 // The height of the row the moment and place are written in, under the figure.
@@ -155,12 +165,15 @@ async function compose(root: HTMLElement) {
     out.setAttribute("height", f(height));
     out.setAttribute("viewBox", `0 0 ${f(width)} ${f(height)}`);
     const page = getComputedStyle(document.body);
+    // The panel's own ground where it has one (a figure that stays dark), else the page's.
+    const own = getComputedStyle(root).backgroundColor;
+    const ground = own !== "rgba(0, 0, 0, 0)" && own !== "transparent" ? own : page.backgroundColor;
     out.setAttribute("style", `font-family:${page.fontFamily};font-weight:${page.fontWeight}`);
     const background = document.createElementNS(SVG_NS, "rect");
     for (const [name, value] of [
         ["width", f(width)],
         ["height", f(height)],
-        ["fill", page.backgroundColor],
+        ["fill", plainColors(ground)],
     ])
         background.setAttribute(name, value);
     out.append(background);
@@ -189,7 +202,7 @@ async function compose(root: HTMLElement) {
         text.setAttribute("y", f(r.top + r.height / 2 - top));
         text.setAttribute(
             "style",
-            `fill:${style.color};font-size:${style.fontSize};text-anchor:middle;dominant-baseline:middle`,
+            `fill:${plainColors(style.color)};font-size:${style.fontSize};text-anchor:middle;dominant-baseline:middle`,
         );
         out.append(text);
     }
@@ -198,7 +211,7 @@ async function compose(root: HTMLElement) {
         text.textContent = stamp;
         text.setAttribute("x", "0");
         text.setAttribute("y", f(height - STAMP_ROW / 3));
-        text.setAttribute("style", `fill:${getComputedStyle(root).getPropertyValue("--muted")};font-size:12px`);
+        text.setAttribute("style", `fill:${mutedOf(root)};font-size:12px`);
         out.append(text);
     }
     // What the SVGs reference from elsewhere on the page, as the calendar's days do its hatching.
@@ -215,7 +228,7 @@ async function compose(root: HTMLElement) {
     return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(out)}`;
 }
 
-async function download(root: HTMLElement) {
+export async function downloadSvg(root: HTMLElement) {
     const blob = new Blob([await compose(root)], { type: "image/svg+xml" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -225,41 +238,14 @@ async function download(root: HTMLElement) {
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }
 
-for (const root of document.querySelectorAll<HTMLElement>("[data-export]")) {
-    if (root.querySelector(":scope > .svg-download")) continue;
-    // In a row of the figure's own, a small button there; otherwise a group of its own over the figure.
-    const row = root.dataset.downloadIn ? root.querySelector(root.dataset.downloadIn) : null;
-    const group = document.createElement("span");
-    group.className = "view-buttons svg-download";
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = row ? "button-xs button-square" : "view-icon";
-    button.title = "Download this panel as SVG";
-    button.setAttribute("aria-label", button.title);
-    button.innerHTML = icon("download");
-    button.addEventListener("click", (event) => {
-        event.stopPropagation();
-        download(root);
-    });
-    button.addEventListener("pointerdown", (event) => event.stopPropagation());
-    // A figure's copy button, to the right of the download; one made here for a figure that has none.
-    const figure = root.closest<HTMLElement>("figure") ?? root;
-    let copy = root.querySelector<HTMLElement>("[data-beside-download]");
-    if (!copy && !figure.querySelector("[data-field=copyInfo]")) {
-        copy = Object.assign(document.createElement("button"), {
-            type: "button",
-            className: `${row ? "button-xs button-square" : "view-icon"} copy-info`,
-            title: "Copy this view: a link to it, its caption and every setting it shows, as JSON",
-            innerHTML: icon("copy"),
-        });
-        copy.dataset.field = "copyInfo";
-        copy.setAttribute("aria-label", "Copy this view");
-        copy.addEventListener("pointerdown", (event) => event.stopPropagation());
-    }
-    if (row) row.append(button, ...(copy ? [copy] : []));
-    else {
-        group.append(button, ...(copy ? [copy] : []));
-        root.append(group);
-    }
-    if (copy && !copy.hasAttribute("data-beside-download")) figureInfo(figure);
+/** One SVG of the page as a standalone document, styles inlined, `width` by `height`: to draw it into an image. */
+export async function standaloneSvg(svg: SVGSVGElement, width: number, height: number) {
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    inlineStyles(svg, clone);
+    clone.setAttribute("xmlns", SVG_NS);
+    if (!clone.hasAttribute("viewBox")) clone.setAttribute("viewBox", `0 0 ${f(width)} ${f(height)}`);
+    clone.setAttribute("width", f(width));
+    clone.setAttribute("height", f(height));
+    await embedImages(clone);
+    return new XMLSerializer().serializeToString(clone);
 }

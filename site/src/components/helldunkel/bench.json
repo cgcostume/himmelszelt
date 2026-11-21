@@ -1,0 +1,70 @@
+{
+    "gpu": "amd rdna-3",
+    "rounds": 9,
+    "frames": 1000,
+    "warmup": 400,
+    "rows": {
+        "tone1080": {
+            "ms": {
+                "median": 0.0227,
+                "p10": 0.0225,
+                "p90": 0.0248,
+                "rounds": 9
+            },
+            "memory": 4096
+        },
+        "tone2160": {
+            "ms": {
+                "median": 0.1675,
+                "p10": 0.1674,
+                "p90": 0.1681,
+                "rounds": 9
+            },
+            "memory": 4096
+        },
+        "bloom1080": {
+            "ms": {
+                "median": 0.0647,
+                "p10": 0.0642,
+                "p90": 0.0811,
+                "rounds": 9
+            },
+            "memory": 11054416
+        },
+        "bloom2160": {
+            "ms": {
+                "median": 0.4356,
+                "p10": 0.435,
+                "p90": 0.4371,
+                "rounds": 9
+            },
+            "memory": 44224336
+        },
+        "meterCube": {
+            "ms": {
+                "median": 0.436,
+                "p10": 0.4357,
+                "p90": 0.4367,
+                "rounds": 9
+            },
+            "memory": 41037
+        },
+        "meterHdri": {
+            "ms": {
+                "median": 1.1776,
+                "p10": 1.1768,
+                "p90": 1.1783,
+                "rounds": 9
+            },
+            "memory": 41037
+        }
+    },
+    "code": 24239,
+    "browser": "Chromium 153",
+    "date": "2026-11-21",
+    "machine": {
+        "busyBefore": [35, 29, 14, 24, 11, 10, 13, 15, 16, 16],
+        "otherBrowsers": 4,
+        "desktop": 2
+    }
+}

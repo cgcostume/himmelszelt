@@ -49,8 +49,14 @@ export interface Features {
     autoExposure: boolean;
     debugGrid: boolean;
     sunDisc: boolean;
-    /** The eye's veil around the sun, its strength: 1 the eye's own, 0 none. */
+    /** The veil around the sun, its strength: 1 the eye's own, `LENS_VEIL` a camera's lens, 0 none. */
     veil: number;
+    /** A starburst around the sun: how many blades the aperture has, 0 for none. */
+    starburst: number;
+    /** The Sun's corona and chromosphere around its disc. */
+    solarCorona: boolean;
+    /** The disc darker and redder towards its limb. */
+    limbDarkening: boolean;
     discAlpha: boolean;
     supersample: boolean;
     cube: boolean;
@@ -66,6 +72,9 @@ export interface Features {
     darkAdapted: boolean;
 }
 
+/** The veil of a camera's lens as a share of the eye's own, CIE's: a two-hundredth. */
+export const LENS_VEIL = 0.005;
+
 export const DEFAULT_FEATURES: Features = {
     toneMap: "neutral",
     headroom: 1,
@@ -73,7 +82,10 @@ export const DEFAULT_FEATURES: Features = {
     autoExposure: false,
     debugGrid: false,
     sunDisc: true,
-    veil: 0,
+    veil: LENS_VEIL,
+    starburst: 0,
+    solarCorona: true,
+    limbDarkening: true,
     discAlpha: false,
     supersample: true,
     cube: false,
@@ -96,6 +108,9 @@ export function featureConstants(features: Partial<Features> = {}): Record<strin
         DK_DEBUG_GRID: Number(f.debugGrid),
         DK_SUN_DISC: Number(f.sunDisc),
         DK_VEIL: f.veil,
+        DK_STARBURST: f.starburst,
+        DK_SOLAR_CORONA: Number(f.solarCorona),
+        DK_LIMB_DARKENING: Number(f.limbDarkening),
         DK_DISC_ALPHA: Number(f.discAlpha),
         DK_SUPERSAMPLE: Number(f.supersample),
         DK_CUBE: Number(f.cube),
@@ -136,6 +151,15 @@ export interface Aureole {
 }
 
 export const DEFAULT_AUREOLE: Aureole = { share: 0.05, g: 0.98 };
+
+/** A starburst around the sun: the spikes the blades of a camera's aperture diffract its light into. */
+export interface Starburst {
+    /** How many blades the aperture has, from 3 to 16: an even count draws as many spikes, an odd one twice as many. */
+    blades: number;
+}
+
+/** Six blades, six spikes. */
+export const DEFAULT_STARBURST: Starburst = { blades: 6 };
 
 /** `common.wgsl`'s aureole overrides, for every pass that marches the air and the sky pass that adds it. */
 export const aureoleConstants = (aureole: Aureole | false = DEFAULT_AUREOLE) => ({

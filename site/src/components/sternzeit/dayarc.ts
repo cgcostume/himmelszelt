@@ -19,7 +19,6 @@ import {
 } from "./figure";
 import { onChange, state } from "./state";
 import { zdogMoon, zdogSun } from "./zdogmoon";
-import "./export";
 
 const { Illustration, Anchor, Shape, Ellipse, Vector } = Zdog;
 const DEG = precise.DEG_TO_RAD;

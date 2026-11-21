@@ -21,7 +21,12 @@ package.
   builds the same matrix on the GPU, for a white metered there. The whites: `whiteFromChromaticity([x, y])`,
   `planckianWhite(kelvin)` (Kang et al. 2002), `daylightWhite(kelvin)` (the CIE daylight locus, D65 at 6,504 K), all at
   unit luminance, `D65_WHITE`, whose balance is `NO_WHITE_BALANCE`, the identity, which changes nothing, and the CIE's
-  standard white points A, D50, D55, D65, D75 and E as chromaticities, `WHITE_POINTS` (CIE 15:2018).
+  standard white points A, D50, D55, D65, D75 and E as chromaticities, `WHITE_POINTS` (CIE 15:2018). For a sky,
+  `SUN_WHITE`, the Sun above the air, about 6,000 K, a camera's daylight, and `MOON_WHITE`, the Moon above the air,
+  about 4,750 K, on which the Moon is a neutral gray high in the sky and only the air colors it lower down.
+  `whiteBalance(white, degree)` goes only part of the way, as an eye does: `adaptationDegree(luminance, surround)` is
+  CIECAM02's degree of adaptation, 1 by day and about two thirds for the Moon in a night sky, and
+  `hdWhiteBalanceBy(white, degree)` its matrix on the GPU.
 - `wgsl.tonemap`, also as `@himmelszelt/helldunkel/wgsl`: exposed, scene-linear Rec. 709 to sRGB-encoded values, by
   `hdToneMapNeutral` (Khronos PBR Neutral), `hdToneMapAgx` (Sobotka's AgX in Wrensch's fit), `hdToneMapAces` (Narkowicz's
   ACES fit) or `hdToneMapClip`, none. `hdToneMapNeutralHdr` and `hdToneMapClipHdr` compress into a display's headroom,
@@ -33,7 +38,7 @@ package.
   in dark, flat areas. `hdDitherBy(color, noise, levels)` takes noise of your own, and `hdBayer(pixel)` gives Bayer's
   8x8 thresholds. Every identifier is prefixed `hd`/`HD_`.
 - `blueNoiseTexture(device)`: the blue noise as a 64x64 r8unorm texture, made once per device and shared, from 4 KB of
-  ranks carried in the code (`blueNoiseData()`, `pnpm bluenoise` regenerates them).
+  ranks carried in the code (`blueNoiseData()`, `pnpm data:bluenoise` regenerates them).
 
 ```js
 import { exposureFromEV100, wgsl } from "@himmelszelt/helldunkel";
@@ -55,7 +60,12 @@ fn show(luminance: vec3f, exposure: f32) -> vec3f {
   Jimenez 2014, before the tone curve. It moves light rather than adding it.
 - `veilingGlare(angle, age, pigment)` and `hdVeil` in `wgsl.glare`: the eye's veil around a bright point source, CIE's
   general disability glare equation (CIE 146:2002), in cd/m² per lux at the eye, to add before the exposure. The Sun's
-  veil in a sky, where bloom knows only the image.
+  veil in a sky, where bloom knows only the image. At a two-hundredth of its strength it is a camera lens's.
+- `hdStarburst(offset, radius, blades)` in `wgsl.lens`: the spikes an aperture's straight blades diffract a bright
+  point source into, falling with the square of the angle along each and longer in red than in blue, laid out in the
+  image plane, in cd/m² per lux at the lens, to add before the exposure; `starburstSpikes(blades)` counts them, as many
+  as blades for an even count, twice as many for an odd one. Like the veil a point spread of the whole source: whoever
+  has something in front of it, or the source out of the frame, dims the illuminance.
 - `darkAdaptedEye(rgb)` and `hdDarkAdaptedEye` in `wgsl.vision`: linear sRGB in cd/m² as the eye sees it at night, Jensen et
   al.'s blue shift (Night Rendering, 2000) on Larson et al.'s scotopic luminance. Below 0.01 cd/m² the rods see alone,
   above 4 the cones, `coneShare` between; the rods' light takes the chromaticity (0.25, 0.25), so colors fade and the

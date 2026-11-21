@@ -1,5 +1,4 @@
 ---
-import "../sternzeit/sternzeit.css";
 import {
     type AtmosphereModel,
     DEFAULT_ATMOSPHERE_MODEL,
@@ -9,6 +8,7 @@ import {
 import Try from "../Try.astro";
 import Choice from "./Choice.astro";
 import Hdr from "./Hdr.astro";
+import Lens from "./Lens.astro";
 import OptionGroup from "./OptionGroup.astro";
 import SkyFrame from "./SkyFrame.astro";
 import "./dunstkreis.css";
@@ -72,12 +72,12 @@ const {
     full = false,
     primary = false,
     parts = false,
-    caption = "The sky at the chosen moment and place: every pixel one lookup into a table of the whole sky, rebuilt whenever the Sun or the observer moves. Altitude lines every 10°, the compass directions on the horizon, and the Sun's symbol where it truly is, unbent by the air: near the horizon its disc shows above it.",
+    caption = "The sky at the chosen moment and place, every pixel one lookup into a table of the whole sky. Altitude lines every 10°, the compass on the horizon, and the Sun's symbol where it truly is, unbent by the air: near the horizon its disc shows above it.",
     try: experiment,
 } = Astro.props;
 ---
 
-<figure class="scene-frame wide" id={id} data-sky data-full={full ? "" : undefined} data-primary={primary ? "" : undefined} data-parts={parts ? "" : undefined}>
+<figure class="fig scene-frame wide" id={id} data-sky data-full={full ? "" : undefined} data-primary={primary ? "" : undefined} data-parts={parts ? "" : undefined}>
     <SkyFrame png refraction fly ownHeight={!primary}>
         <canvas data-field="canvas" aria-label="The sky at the chosen moment and place"></canvas>
         <div class="sky-compass" data-field="compassLabels"></div>
@@ -94,6 +94,7 @@ const {
                         <button type="button" class="view-toggle" data-field="single" aria-pressed="true" title="Light scattered once, straight from the Sun">single</button>
                         <button type="button" class="view-toggle" data-field="multiple" aria-pressed="true" title="Light scattered more than once: the shadow side of the sky, twilight">multiple</button>
                     </OptionGroup>
+                    {!full && <Lens />}
                 </Fragment>
             )
         }
@@ -105,6 +106,7 @@ const {
                         <button type="button" class="view-toggle" data-field="auto" aria-pressed="true" title="Expose by a light meter reading the whole sky">auto</button>
                         <button type="button" class="view-toggle" data-field="ramp" aria-pressed="true" title="Shape the metered exposure over the day by the Sun's altitude: night and the minutes around sunrise and sunset darker, the blue hour lifted. Off, the light meter's reading as it is, for the tone curve alone">ramp</button>
                     </OptionGroup>
+                    <Lens />
                     <OptionGroup name="tone mapping">
                         <Choice figure={id} {...TONE} />
                     </OptionGroup>

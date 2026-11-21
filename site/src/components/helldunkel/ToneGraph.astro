@@ -1,5 +1,4 @@
 ---
-import "../sternzeit/sternzeit.css";
 import "./helldunkel.css";
 
 const CURVES = [
@@ -16,7 +15,7 @@ const COLORS = [
 ];
 ---
 
-<figure class="scene-frame" id="curves">
+<figure class="fig scene-frame" id="curves">
     <p class="hdri-controls">
         <span class="steps" role="radiogroup" aria-label="The light's color">
             <span class="steps-heading" aria-hidden="true">light</span>
@@ -37,7 +36,7 @@ const COLORS = [
             ))}
         </span>
     </p>
-    <div class="curves-plot"><svg data-field="plot" aria-label="What the chosen tone curve makes of each channel of the chosen light"></svg></div>
+    <div class="curves-plot" data-export="tone-curves" data-export-timeless data-actions-in=".hdri-controls"><svg data-field="plot" aria-label="What the chosen tone curve makes of each channel of the chosen light"></svg></div>
     <div class="curves-strips">
         {CURVES.map(([value, name]) => (
             <Fragment>
@@ -47,10 +46,9 @@ const COLORS = [
         ))}
     </div>
     <figcaption class="figure-caption">
-        One color of light growing brighter from left to right, in stops from white. The plot shows what the chosen curve writes
-        for each channel, computed by the shaders themselves, and the strips show that color through every curve. Where a
-        channel's line flattens at 1 it has clipped, and the others go on without it, which is what shifts a hue. On gray the
-        three lines lie on one another, and only the shape of the curve is left.
+        One color of light growing brighter from left to right, in stops from white: what the chosen curve writes for each
+        channel, computed by the shaders themselves, and that color through every curve in the strips. A line flat at 1 has
+        clipped.
     </figcaption>
 </figure>
 

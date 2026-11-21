@@ -10,6 +10,7 @@
         "typecheck": "pnpm -r typecheck",
         "test": "pnpm -r test",
         "assets": "pnpm -r --if-present assets",
+        "data": "pnpm -r --if-present data",
         "format": "biome format --write .",
         "lint": "biome check .",
         "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist packages/dunstkreis/static/bundle.js site/node_modules site/dist site/.astro"

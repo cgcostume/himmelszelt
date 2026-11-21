@@ -69,6 +69,8 @@ struct Params {
     headroom: f32,
     // Nonzero to write the exposed light, linear, rather than tone mapped, for bloom to go over.
     linearOutput: u32,
+    // The white balance, helldunkel's `whiteBalance`, on the light before the exposure, the disc's too: the identity for none.
+    whiteBalance: mat3x3f,
 }
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -473,10 +475,11 @@ fn render(@builtin(global_invocation_id) id: vec3u) {
     if (params.veil > 0.0 && params.discIlluminance.g > 0.0) {
         luminance = luminance + veil(center);
     }
+    luminance = params.whiteBalance * luminance;
     if (params.linearOutput != 0u) {
         var light = luminance;
         if (disc > 0.0) {
-            light = light + disc * dkSunDiscLuminance(params.discIlluminance, params.sunAngularRadius);
+            light = light + disc * (params.whiteBalance * dkSunDiscLuminance(params.discIlluminance, params.sunAngularRadius));
         }
         textureStore(output, vec2i(id.xy), vec4f(min(light * params.exposure, vec3f(1e4)), 1.0));
         return;
@@ -486,7 +489,7 @@ fn render(@builtin(global_invocation_id) id: vec3u) {
     // how much of the pixel it covers, so its edge is smooth rather than a pixel's worth of white wherever it touches.
     // A disc no light reaches adds nothing: it never darkens the sky.
     if (disc > 0.0) {
-        let sun = dkSunDiscLuminance(params.discIlluminance, params.sunAngularRadius);
+        let sun = params.whiteBalance * dkSunDiscLuminance(params.discIlluminance, params.sunAngularRadius);
         color = mix(color, toneMap((luminance + sun) * params.exposure), disc);
     }
     // Triangular dither of one 8-bit step, the difference of the two channels.

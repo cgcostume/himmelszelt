@@ -8,7 +8,8 @@ import "./stargroups.css";
  * light of the Milky Way and of the stars, off or brighter by stops. Each a radio group: one tab stop, arrows pick.
  */
 interface Props {
-    catalog?: "yale" | "hipparcos" | "tycho";
+    /** The catalog picked at first, or null for a figure that offers no choice of catalog. */
+    catalog?: "yale" | "hipparcos" | "tycho" | null;
     offsets?: readonly ("milkyWay" | "stars")[];
     /** The steps the offset groups offer: off, as measured, +2 and +4 stops by default. */
     steps?: readonly ("off" | "0" | "2" | "4")[];
@@ -53,11 +54,13 @@ const stepIcon = (icon: string, pick: string) =>
 ---
 
 <span class="star-groups">
-    <span class="view-buttons pick-group" role="radiogroup" aria-label="Star catalog" data-group="catalog">
-        {CATALOGS.map((c) => (
-            <button type="button" class="view-icon" data-pick={c.pick} aria-pressed={c.pick === catalog ? "true" : "false"} tabindex={c.pick === catalog ? 0 : -1} title={c.title} aria-label={c.label}><Icon name={c.icon} /></button>
-        ))}
-    </span>
+    {catalog && (
+        <span class="view-buttons pick-group" role="radiogroup" aria-label="Star catalog" data-group="catalog">
+            {CATALOGS.map((c) => (
+                <button type="button" class="view-icon" data-pick={c.pick} aria-pressed={c.pick === catalog ? "true" : "false"} tabindex={c.pick === catalog ? 0 : -1} title={c.title} aria-label={c.label}><Icon name={c.icon} /></button>
+            ))}
+        </span>
+    )}
     {offsets.map((name) => (
         <span class="view-buttons pick-group" role="radiogroup" aria-label={OFFSETS[name].label} data-group={name}>
             {steps.map((pick) => (

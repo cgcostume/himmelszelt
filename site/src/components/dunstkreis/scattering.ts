@@ -2,7 +2,6 @@ import { DEFAULT_ATMOSPHERE_MODEL, rayleighAt, rgbOfSpectrum, solarIrradianceAt 
 import { find } from "../dom";
 import { onDemand } from "../frame";
 import { drawSvg, LABEL_GAP as GAP, STRIP_MARGIN as MARGIN, stripMoment, svgText } from "../sternzeit/figure";
-import "../sternzeit/export";
 
 // The visible spectrum and a little of the ultraviolet and infrared on either side, faded out where the eye stops seeing.
 const FIRST_NM = 360;

@@ -1,11 +1,14 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import {
+    adaptationDegree,
     applyWhiteBalance,
     D65_WHITE,
     daylightWhite,
+    MOON_WHITE,
     NO_WHITE_BALANCE,
     planckianWhite,
+    SUN_WHITE,
     whiteBalance,
     whiteFromChromaticity,
 } from "../src/white.js";
@@ -15,8 +18,8 @@ type Rgb = [number, number, number];
 const wgsl = (name: string) => readFileSync(new URL(`../src/wgsl/${name}.wgsl`, import.meta.url), "utf8");
 const luminance = ([r, g, b]: readonly number[]) =>
     0.212639006 * (r ?? 0) + 0.715168679 * (g ?? 0) + 0.0721923154 * (b ?? 0);
-// The Moon above the air and the Sun above it, the site's reference whites, and some lamps and skies.
-const WHITES: Rgb[] = [[1.21, 1, 0.79], [1.119, 1, 0.982], [0.3, 0.2, 0.1], planckianWhite(2856), daylightWhite(12000)];
+// The Moon above the air and the Sun above it, and some lamps and skies.
+const WHITES: Rgb[] = [[...MOON_WHITE], [...SUN_WHITE], [0.3, 0.2, 0.1], planckianWhite(2856), daylightWhite(12000)];
 
 test("the matrix shows the reference white as D65 at its own luminance", () => {
     for (const white of WHITES) {
@@ -51,6 +54,39 @@ test("balancing on one white and back on its image round trips", () => {
     for (const c of applyWhiteBalance(white, whiteBalance(white))) expect(c).toBeCloseTo(1, 9);
 });
 
+test("the Sun's and the Moon's whites have unit luminance, the Moon's the Sun's as a redder rock reflects it", () => {
+    expect(luminance(SUN_WHITE)).toBeCloseTo(1, 3);
+    expect(luminance(MOON_WHITE)).toBeCloseTo(1, 3);
+    // Red 1.21 and blue 0.79 of green, over the Sun's.
+    expect(MOON_WHITE[0] / MOON_WHITE[1] / (SUN_WHITE[0] / SUN_WHITE[1])).toBeCloseTo(1.21, 2);
+    expect(MOON_WHITE[2] / MOON_WHITE[1] / (SUN_WHITE[2] / SUN_WHITE[1])).toBeCloseTo(0.79, 2);
+});
+
+test("a degree of adaptation mixes each gain with 1: none at 0, all at 1, the white's color in between", () => {
+    const white: Rgb = [...MOON_WHITE];
+    expect(whiteBalance(white, 0)).toEqual(NO_WHITE_BALANCE);
+    expect(whiteBalance(white, 1)).toEqual(whiteBalance(white));
+    const [full, none] = [whiteBalance(white), NO_WHITE_BALANCE];
+    // Linear in the degree, since the gains are.
+    for (const [i, m] of whiteBalance(white, 0.25).entries())
+        expect(m).toBeCloseTo(0.25 * (full[i] ?? 0) + 0.75 * (none[i] ?? 0), 12);
+    // Two thirds of the way the Moon keeps a third of its color: red over blue between the white's and gray's.
+    const seen = applyWhiteBalance(white, whiteBalance(white, 2 / 3));
+    expect(seen[0] / seen[2]).toBeGreaterThan(1.1);
+    expect(seen[0] / seen[2]).toBeLessThan(1.3);
+});
+
+test("the eye's degree of adaptation is CIECAM02's: full by day, two thirds in the dark", () => {
+    expect(adaptationDegree(1000)).toBeCloseTo(1, 4);
+    expect(adaptationDegree(0)).toBeCloseTo(1 - Math.exp(-42 / 92) / 3.6, 12);
+    expect(adaptationDegree(0.5, "dark")).toBeCloseTo(0.66, 2);
+    expect(adaptationDegree(20, "dim")).toBeCloseTo(0.9 * (1 - Math.exp(-62 / 92) / 3.6), 12);
+    for (const l of [0, 1, 100, 1e5]) {
+        expect(adaptationDegree(l, "dark")).toBeLessThanOrEqual(0.8);
+        expect(adaptationDegree(l)).toBeGreaterThan(adaptationDegree(l, "dim"));
+    }
+});
+
 test("the loci: D65 at 6504 K on the daylight locus, illuminant A at 2856 K on the Planckian, warm whites red", () => {
     for (const c of daylightWhite(6504)) expect(c).toBeCloseTo(1, 2);
     // Illuminant A, x 0.44758, y 0.40745 (CIE 15:2018).
@@ -75,11 +111,18 @@ test("whitebalance.wgsl compiles and agrees with its TypeScript twin", async () 
         [0, 0, 0],
     ];
     // Per case: the white in, the color in; out, the matrix from hdWhiteBalanceFor applied to the color, and the white.
-    const cases = WHITES.flatMap((white) => colors.map((color) => [white, color] as const));
+    const cases = WHITES.flatMap((white) =>
+        colors.flatMap((color) => [1, 0.66].map((degree) => [white, color, degree] as const)),
+    );
     const code = `${wgsl("whitebalance")}
 @group(0) @binding(0) var<storage, read_write> data: array<vec4f>;
 @compute @workgroup_size(1) fn main(@builtin(global_invocation_id) id: vec3u) {
-    let balance = hdWhiteBalanceFor(data[2u * id.x].rgb);
+    // The white's alpha is the degree; 1 goes through hdWhiteBalanceFor.
+    let degree = data[2u * id.x].a;
+    var balance = hdWhiteBalanceFor(data[2u * id.x].rgb);
+    if (degree < 1.0) {
+        balance = hdWhiteBalanceBy(data[2u * id.x].rgb, degree);
+    }
     data[2u * id.x] = vec4f(hdWhiteBalance(data[2u * id.x].rgb, balance), 0.0);
     data[2u * id.x + 1u] = vec4f(hdWhiteBalance(data[2u * id.x + 1u].rgb, balance), 0.0);
 }`;
@@ -90,7 +133,7 @@ test("whitebalance.wgsl compiles and agrees with its TypeScript twin", async () 
     const size = cases.length * 32;
     const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST;
     const buffer = device.createBuffer({ size, usage });
-    device.queue.writeBuffer(buffer, 0, new Float32Array(cases.flatMap(([w, c]) => [...w, 0, ...c, 0])));
+    device.queue.writeBuffer(buffer, 0, new Float32Array(cases.flatMap(([w, c, d]) => [...w, d, ...c, 0])));
     const staging = device.createBuffer({ size, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
     const encoder = device.createCommandEncoder();
     const pass = encoder.beginComputePass();
@@ -108,8 +151,8 @@ test("whitebalance.wgsl compiles and agrees with its TypeScript twin", async () 
     device.queue.submit([encoder.finish()]);
     await staging.mapAsync(GPUMapMode.READ);
     const out = new Float32Array(staging.getMappedRange().slice(0));
-    cases.forEach(([white, color], i) => {
-        const m = whiteBalance(white);
+    cases.forEach(([white, color, degree], i) => {
+        const m = whiteBalance(white, degree);
         for (const [k, expected] of [applyWhiteBalance(white, m), applyWhiteBalance(color, m)].entries()) {
             for (let c = 0; c < 3; c++) {
                 const e = expected[c] ?? 0;

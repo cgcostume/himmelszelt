@@ -1,10 +1,11 @@
-import type { ToneCurve } from "@himmelszelt/helldunkel";
-import type { MoonMaps } from "./maps.js";
+import type { ToneCurve, WhiteBalance } from "@himmelszelt/helldunkel";
+import { MOON_COLOR, type MoonMaps } from "./maps.js";
 import {
     EARTH_RADIUS_KM,
     MOON_RADIUS_KM,
     REFRACTION_SAMPLES,
     type RefractionTable,
+    SUN_COLOR,
     SUN_ILLUMINANCE,
     type Vec3,
 } from "./orientation.js";
@@ -163,6 +164,9 @@ export interface MoonParams {
     sunDirection: Vec3;
     /** The Sun's illuminance at the Moon, in lux, 128,000 by default. */
     sunIlluminance: number;
+    /** The Sun's color in linear sRGB at unit luminance, `SUN_COLOR` by default, a little warmer than D65, as dunstkreis
+     *  lights its sky: the Moon and its earthshine are lit by it. [1, 1, 1] takes the Sun for white. */
+    sunColor: Vec3;
     /** Earth's illuminance at the Moon, in lux, from `earthshineIlluminance`, drawn a little bluer than sunlight; 0 by
      *  default, no earthshine. */
     earthshine: number;
@@ -182,6 +186,12 @@ export interface MoonParams {
      *  both as a camera has. Negative for the eye, which adapts to the Moon it looks at: helldunkel's
      *  `localAdaptation` of `ev100` and `moonEV100`. */
     exposureCompensation: number;
+    /** A white balance, `@himmelszelt/helldunkel`'s `whiteBalance(white)`: a 3x3 matrix over linear sRGB, column-major,
+     *  on the disc and the background together, before the exposure. None by default, the light's colors against D65,
+     *  in which the Moon is a tan gray: `whiteBalance(MOON_WHITE)` shows it neutral where it stands high, as photographs
+     *  and the eye do, and `whiteBalance(SUN_WHITE)` as a camera set to daylight. The linear layer for a renderer that
+     *  composites itself, without `toneMap` and `background`, is balanced too. */
+    whiteBalance: WhiteBalance;
     /** The z below which a ray hits the ground and the Moon is hidden, `horizonZ`; -1 by default, drawn everywhere. */
     horizonZ: number;
     /** Draw the color map, true by default where there is one, the relief from the heights, and the shadows the relief
@@ -257,8 +267,8 @@ const NOISE_FORMAT: GPUTextureFormat = "rgba8snorm";
 const SHADOW_FORMAT: GPUTextureFormat = "rgba8unorm";
 const EIGHT_BIT = ["rgba8unorm", "bgra8unorm"];
 const TONE_CURVES: Record<string, number> = { neutral: 1, agx: 2, aces: 3, clip: 4 };
-/** Byte size of NgParams in params.wgsl: 25 rows of 16 bytes. */
-export const PARAMS_SIZE = 400;
+/** Byte size of NgParams in params.wgsl: 29 rows of 16 bytes. */
+export const PARAMS_SIZE = 464;
 /** Byte size of NgTables in params.wgsl: the bends four to a row, the air's transmittances and the umbra's table. */
 export const TABLES_SIZE = (REFRACTION_SAMPLES / 4 + REFRACTION_SAMPLES + UMBRA_SAMPLES) * 16;
 const DEFAULT_UMBRA = typicalUmbra();
@@ -279,6 +289,8 @@ const DEFAULTS: MoonParams = {
     angularDiameter: 0.518,
     sunDirection: [1, 0, 0],
     sunIlluminance: SUN_ILLUMINANCE,
+    sunColor: SUN_COLOR,
+    whiteBalance: [1, 0, 0, 0, 1, 0, 0, 0, 1],
     exposureCompensation: 0,
     earthshine: 0,
     orientation: new Float32Array([0, 0, -1, 1, 0, 0, 0, 1, 0]),
@@ -351,9 +363,12 @@ export function paramsData(params: MoonParams, maps: MoonMaps | null, detail?: M
     f[46] = MOON_RADIUS_KM;
     f[47] = (params.sunAngularDiameter / 2) * DEG;
 
-    // The color map made normal albedo: scaled, and tinted to the Moon's color, as published, or gray.
-    const scale = maps?.albedoScale ?? 1;
-    const tint = params.mapColor === "tinted" ? (maps?.albedoTint ?? [1, 1, 1]) : [1, 1, 1];
+    // The color map made normal albedo: scaled, and tinted to the Moon's color, as published, or gray. Without the map
+    // the uniform albedo takes the Moon's color itself, its luminance kept, so a white balance on the Moon leaves it gray.
+    const mapped = params.albedoMap && maps;
+    const scale = mapped ? maps.albedoScale : 1;
+    const plain = MOON_COLOR.map((c) => c / (0.2126 * MOON_COLOR[0] + 0.7152 * MOON_COLOR[1] + 0.0722 * MOON_COLOR[2]));
+    const tint = params.mapColor === "tinted" ? (mapped ? maps.albedoTint : plain) : [1, 1, 1];
     for (let col = 0; col < 3; col++) {
         for (let row = 0; row < 3; row++) {
             const gray = (LUMINANCE[col] ?? 0) * scale;
@@ -397,6 +412,10 @@ export function paramsData(params: MoonParams, maps: MoonMaps | null, detail?: M
         f.set([tilt, shimmer.time, spread, cell], 92);
         f.set([shimmer.motion ?? 1, shimmer.boiling ?? 1, drift], 96);
     }
+
+    // The Sun's color, and the white balance, a column to a row.
+    f.set(params.sunColor, 100);
+    for (let col = 0; col < 3; col++) f.set(params.whiteBalance.slice(col * 3, col * 3 + 3), 104 + col * 4);
     return data;
 }
 
@@ -449,7 +468,16 @@ export async function createMoonPass(device: GPUDevice, options: MoonPassOptions
     if (!storable && !(format === "bgra8unorm" && device.features.has("bgra8unorm-storage"))) {
         throw new Error(`nachtgestirn: the pass writes ${format} as a storage texture, which this device cannot`);
     }
-    const shared = [wgsl.params, wgsl.surface, reflectance, wgsl.camera, wgsl.tonemap, wgsl.vision, wgsl.moon];
+    const shared = [
+        wgsl.params,
+        wgsl.surface,
+        reflectance,
+        wgsl.camera,
+        wgsl.whitebalance,
+        wgsl.tonemap,
+        wgsl.vision,
+        wgsl.moon,
+    ];
     const constants = {
         NG_TONE_MAP: toneMap === false ? 0 : (TONE_CURVES[toneMap] ?? 1),
         NG_HEADROOM: headroom,

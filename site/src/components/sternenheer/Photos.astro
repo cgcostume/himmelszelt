@@ -1,15 +1,13 @@
 ---
 import CopyInfo from "../CopyInfo.astro";
 import Icon from "../Icon.astro";
-import "../sternzeit/sternzeit.css";
-import "../nachtgestirn/nachtgestirn.css";
 import "./photos.css";
 import { PHOTOS } from "./photo-options";
 import StarGroups from "./StarGroups.astro";
 
 /**
  * Photographs of the night sky, one at a time, each with sternenheer's stars over dunstkreis' sky for its moment, place,
- * lens and exposure over it, a split line between; under them what was measured in both pictures and what it says.
+ * lens and exposure over it, a split line between.
  */
 interface Props {
     id?: string;
@@ -19,9 +17,9 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
 const first = PHOTOS[0];
 ---
 
-<figure class="tiles-figure" id={id} data-star-photos data-base={`${base}stars/`}>
+<figure class="fig tiles-figure" id={id} data-star-photos data-base={`${base}stars/`}>
     <div class="photo-full" data-field="full" style={`--count: ${PHOTOS.length}`}>
-        <div class="tiles-panel as-seen photo-stage" data-field="stage">
+        <div class="tiles-panel as-seen photo-stage" data-field="stage" data-actions="copy">
             <div class="starphoto-stage" style={`--aspect: ${first ? first.width / first.height : 1.5}`}>
                 <div class="starphoto-frame" data-field="frame">
                     <img src={first && `${base}stars/${first.file}`} alt="A photograph of the night sky" decoding="async" draggable="false" />
@@ -42,7 +40,7 @@ const first = PHOTOS[0];
             </span>
             <span class="photo-note" data-field="note"></span>
             <span class="tiles-ends">
-                <span class="view-buttons">
+                <span class="view-buttons fig-actions">
                     <button type="button" class="view-icon" data-field="download" title="Download the comparison as shown, at the photograph's pixels, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
                     <CopyInfo />
                     <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
@@ -81,13 +79,10 @@ const first = PHOTOS[0];
             </div>
         </div>
     </div>
-    <div class="starphoto-findings" data-field="findings" aria-live="polite"></div>
     <figcaption class="figure-caption">
-        Photographs of the night sky left of the line, and right of it sternenheer's stars, of the catalogs the buttons
-        pick, and its Milky Way over dunstkreis' sky for each photograph's moment, place, lens and exposure. The camera's direction, its turn and its focal length
-        are fitted to the stars found in the photograph, from 85 to 796, which is resampled to a lens without distortion; the
-        exposure is the camera's own, less what the photograph's stars show its processing added. Under them what
-        was measured in both pictures alike. Photographs from Wikimedia Commons, each credited over its tab.
+        Photographs of the night sky left of the line, and right of it sternenheer's stars and Milky Way over
+        dunstkreis' sky, for each photograph's moment, place, lens and exposure, the camera fitted to the stars it
+        shows. Photographs from Wikimedia Commons, each credited over its tab.
     </figcaption>
 </figure>
 

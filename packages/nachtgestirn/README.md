@@ -55,8 +55,15 @@ other package at runtime: the astronomy comes in as directions and angles, from
   the cells shrinking with it, blue lifted over red by a hundredth of the refraction. `shimmerScales` gives the numbers.
 - **Night vision**: `darkAdapted` on the pass turns the composed Moon and sky into what the eye sees, helldunkel's
   blue shift for the rods: the moonlit sky blue, the disc, far brighter, as it is.
-- **The color**: the map scaled to normal albedo and tinted to the Moon's own color, B-V 0.92, its variations kept;
-  `mapColor` reads it as published or as gray instead.
+- **The color**: the map scaled to normal albedo and tinted to the Moon's own color, `MOON_COLOR`, a quarter of a
+  magnitude redder in B-V than the sunlight it reflects, its variations kept; `mapColor` reads it as published or as
+  gray instead. The Sun lights it in its own color, `sunColor`, `SUN_COLOR` by default, a little warmer than D65 as
+  dunstkreis' sky has it, so above the air the Moon is a tan gray of about 4,750 K, and the air reddens it further.
+- **The white**: a photograph and an eye in the dark show the Moon nearly white all the same, since they take their
+  white from what they see. `whiteBalance` takes helldunkel's matrix for that, on the disc and the background together,
+  before the exposure: `whiteBalance(MOON_WHITE)` shows the Moon neutral where it stands high and leaves the air's
+  red where it rises, `whiteBalance(SUN_WHITE)` is a camera set to daylight, and none, the default, the light's colors
+  against D65.
 - **Cheap**: one ray per pixel by default (`samples`), four along the terminator and a displaced limb
   (`terminatorSamples`), where a crater rim turns from lit to dark within a pixel; the maps are filtered over the
   whole pixel's footprint whatever the count, so the rays sharpen the shading and never alias the maps, and read by a cubic
@@ -103,13 +110,13 @@ npx @himmelszelt/nachtgestirn data maps --size 8k --whole --out public/moon   # 
 8K 240 MB more, the roughness 41 MB from the PDS), and the work is skipped while the output is newer than its inputs.
 The maps not shipped, the seen ones from 2K and every 8K, come built from the asset mirror
 (github.com/cgcostume/himmelszelt-assets), checked against their SHA-256; `--build` makes them here, which needs `sharp`
-(`npm install sharp`), and its downloads come from the mirror first too. In the repository `pnpm maps` and `pnpm
-roughness` build with the same options, and `pnpm assets` makes the whole maps the site draws, `--all` the shipped ones
+(`npm install sharp`), and its downloads come from the mirror first too. In the repository `pnpm data:maps` and `pnpm
+data:roughness` build with the same options, and `pnpm assets` makes the whole maps the site draws, `--all` the shipped ones
 too.
 
 The color map is balanced to look right, not to measure, and nearly neutral: `createMoonMaps` takes the near side's mean
 color the script prints, scales the map to normal albedo, so the drawn disc averages the geometric albedo, and tints it
-to `MOON_COLOR`, the Moon's B-V of 0.92, a warm gray. The mean is the near side's, the same for both variants, and every
+to `MOON_COLOR`, red 1.21 and blue 0.79 of green, a warm gray. The mean is the near side's, the same for both variants, and every
 set carries it along. `loadMoonMaps` loads `MOON_MAPS["1k"]` by default, or any set laid out the same way.
 
 ## Use

@@ -21,7 +21,6 @@ import { arrowAround, offPanelArrowSvg } from "./offpanel";
 import { ephemerisDay, onChange, state } from "./state";
 import { zdogMoon, zdogSun } from "./zdogmoon";
 import { clockOffsetMs } from "./zone";
-import "./export";
 
 const { Illustration, Anchor, Shape, Ellipse, Vector } = Zdog;
 const DEG = precise.DEG_TO_RAD;

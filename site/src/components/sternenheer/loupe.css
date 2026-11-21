@@ -1,8 +1,5 @@
 /* A star under the loupe: the star picked over the figure, its magnified pixels left of its two plots, stacked where the
    column is narrow, and where its light goes as one bar under them. */
-.loupe-figure {
-    margin: 1.5rem 0;
-}
 .loupe-views {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);

@@ -2,7 +2,6 @@
 import CopyInfo from "../CopyInfo.astro";
 import Icon from "../Icon.astro";
 import Term from "../Term.astro";
-import "../sternzeit/sternzeit.css";
 import "./nachtgestirn.css";
 import LunationSlider from "../sternzeit/LunationSlider.astro";
 
@@ -13,14 +12,14 @@ interface Props {
 const { id = "earthshine-crescent" } = Astro.props;
 ---
 
-<figure class="tiles-figure" id={id} data-earthshine>
-    <div class="tiles-panel as-seen split" style="--count: 2">
+<figure class="fig tiles-figure" id={id} data-earthshine>
+    <div class="tiles-panel as-seen split" style="--count: 2" data-actions="copy">
         <canvas aria-label="The Moon without earthshine and with it, rendered with WebGPU"></canvas>
         <span class="tiles-start">
             <span class="tiles-hint footnote">Rendered with WebGPU</span>
         </span>
         <span class="tiles-ends">
-            <span class="view-buttons">
+            <span class="view-buttons fig-actions">
                 <button type="button" class="view-icon" data-field="download" title="Download both discs as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
                 <CopyInfo />
             </span>

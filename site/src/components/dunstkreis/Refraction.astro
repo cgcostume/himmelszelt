@@ -1,13 +1,12 @@
 ---
-import "../sternzeit/sternzeit.css";
 import "./dunstkreis.css";
 import "./refraction.css";
 
 const PHOTO = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/images/sunrise-2015-07-30-iss.webp`;
 ---
 
-<figure class="scene-frame refraction" id="refraction">
-    <div class="refraction-views">
+<figure class="fig scene-frame refraction" id="refraction">
+    <div class="refraction-views" data-actions="png copy" data-export-timeless>
         <figure class="refraction-view">
             <div class="sky-view refraction-render as-seen">
                 <canvas data-field="canvas" aria-label="The Sun rising over the planet's rim, seen from 408 km up, rendered"></canvas>
@@ -24,11 +23,9 @@ const PHOTO = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/images/sunrise-201
         </figure>
     </div>
     <figcaption class="figure-caption">
-        The Sun rising over the planet's rim, seen from the International Space Station 408 km up, both at the field of
-        view of a 500 mm lens. (a) Rendered for a Sun 0.6° below the rim: the air lifts its lower limb by about 1° and its
-        upper one by half that, squeezing the disc to a fifth of its height. The circle is where the Sun truly is, behind
-        the planet; on the left, the altitude below the station's level. The glow is the lens's, not the air's. (b)
-        Photographed on July 30, 2015, at the exposure the rendering uses, the disc squeezed to a sixth.
+        The Sun rising over the planet's rim from the International Space Station, 408 km up, through a 500 mm lens.
+        (a) Rendered for a Sun 0.6° below the rim, the circle where it truly is: the air lifts the disc and squeezes it
+        to a fifth of its height; the glow is the lens's. (b) Photographed on July 30, 2015, squeezed to a sixth.
         Courtesy NASA, image{" "}
         <a href="https://commons.wikimedia.org/wiki/File:ISS-44_Sunrise_seen_from_the_ISS.jpg" target="_blank" rel="noopener">ISS044-E-25484</a>.
     </figcaption>

@@ -482,7 +482,7 @@ function showVariant(variant: string) {
     if (!liveEl.hidden && !live) live = createLive();
 }
 for (const input of variants) input.addEventListener("change", () => showVariant(input.value));
-showVariant(variants.find((input) => input.checked)?.value ?? "B");
+showVariant(variants.find((input) => input.checked)?.value ?? "A");
 
 new ResizeObserver(requestRender).observe(svgEl);
 render();

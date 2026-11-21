@@ -1,5 +1,4 @@
 ---
-import "../sternzeit/sternzeit.css";
 import "./dunstkreis.css";
 import "./generator.css";
 import { DEFAULT_ATMOSPHERE_MODEL, OSGHIMMEL_ATMOSPHERE_MODEL, RGB_ATMOSPHERE_MODEL } from "@himmelszelt/dunstkreis";
@@ -130,7 +129,7 @@ const FILES = [
 const dev = import.meta.env.DEV;
 ---
 
-<figure class="scene-frame generator" id="generator" data-variant="a">
+<figure class="fig scene-frame generator" id="generator" data-variant="a">
     {
         dev && (
             <p class="generator-variant">
@@ -141,7 +140,7 @@ const dev = import.meta.env.DEV;
             </p>
         )
     }
-    <div class="generator-preview">
+    <div class="generator-preview" data-actions="copy">
         <div class="lut-plot">
             <span class="lut-axis lut-y">
                 <span>zenith</span>
@@ -159,7 +158,7 @@ const dev = import.meta.env.DEV;
         </div>
     </div>
     <div class="generator-recipe" data-field="recipe"></div>
-    <details class="fold generator-fold" open>
+    <details class="fold generator-fold">
         <summary><span class="moment-title">Settings</span> <span class="note" data-field="summary"></span></summary>
         <div class="generator-settings">
             <span class="lut-role">air</span>
@@ -191,7 +190,7 @@ const dev = import.meta.env.DEV;
                     {SIZES.sky.map((n) => <label><input type="radio" name="generator-sky-size" value={n} data-size="sky" /><span>{short(n)}</span></label>)}
                 </span>
                 <button type="button" class="view-toggle" data-cubify aria-pressed="false" title="Texels spread evenly over the sphere, as osgHimmel's CubeMappedHimmel did. Whoever samples the sky cube follows">cubified</button>
-                <button type="button" class="view-toggle" data-scaled aria-pressed="false" title="The luminance times a power of two that follows the Sun rather than in cd/m². The files are in cd/m² either way">scaled</button>
+                <button type="button" class="view-toggle" data-scaled aria-pressed="true" title="The luminance times a power of two that follows the Sun rather than in cd/m². The files are in cd/m² either way">scaled</button>
             </p>
             <span class="lut-role">irradiance</span>
             <p class="lut-controls">
@@ -227,9 +226,8 @@ const dev = import.meta.env.DEV;
         }
     </ul>
     <figcaption class="figure-caption">
-        The generator: the settings of every figure above in one panel, a preview of what they make, tone mapped by its
-        own scale, and the files a renderer takes the sky from. Tables, cube maps and coefficients are those of the
-        chosen moment and place, in cd/m² and lux whatever the encoding.
+        The generator: a preview of the sky cube map at the chosen moment and place, the settings of every figure above,
+        and the files a renderer takes the sky from, in cd/m² and lux whatever the encoding.
         <Try label="Civil twilight" set="date=2026-04-06T18:15:00Z&lat=52.395&lon=13.085&h=1" fig="generator">
             the Sun 4° down, and the sky alone still lights the ground with some 44 lux.
         </Try>

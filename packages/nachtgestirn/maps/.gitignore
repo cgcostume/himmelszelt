@@ -1,4 +1,5 @@
-# Built on request by `pnpm maps` and `pnpm roughness`: the seen maps from 2K up and every 8K. The whole maps to 4K stay in
+# Built on request by `pnpm data:maps` and `pnpm data:roughness`: the seen maps from 2K up and every 8K. The whole maps
+# to 4K stay in
 # git, since the site's figures need them and `pnpm dev` should show them without `pnpm assets`; the npm package ships only
 # the seen 512 and 1K (see `files` in package.json).
 moon-*-seen-2k.webp

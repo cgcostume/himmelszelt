@@ -1,7 +1,5 @@
 ---
-import "../sternzeit/sternzeit.css";
 import Try from "../Try.astro";
-import "../dunstkreis/dunstkreis.css";
 import "./harmonics.css";
 
 // The nine real spherical harmonics in ENU, band by band, m from -l to l: their polynomials, and what each says of a sky.
@@ -37,8 +35,8 @@ const BUILD = [
 ];
 ---
 
-<figure class="scene-frame" id="harmonics">
-    <div class="harmonics-panel" data-variant="both">
+<figure class="fig scene-frame" id="harmonics">
+    <div class="harmonics-panel" data-variant="both" data-actions="png copy">
         {
             import.meta.env.DEV && (
                 <p class="harmonics-variants">
@@ -98,15 +96,9 @@ const BUILD = [
         <output data-field="offsetValue" />
     </label>
     <figcaption class="figure-caption">
-        The nine spherical harmonics and the sky held in them. (a) The basis, band by band, each function as its classic
-        lobes, reaching as far in every direction as its magnitude there: the accent where it is positive, orange where it
-        is negative. Like overtones over a fundamental, each band turns faster around the sphere than the one before;
-        beside it, the share of it a diffuse surface receives, nothing at all of band 3. Under each, the sky's coefficient
-        in red, green and blue, all to one scale. (b) The sky's irradiance as one such shape, reaching as far in every
-        direction as the light on a surface facing it, in its color: from the first band, a sphere, the first two, and all
-        three, next to the whole sky's from the cube map, with the horizon at the farthest reach for scale and the Sun's
-        direction on it, and how far each is off at worst. (c) The same along the vertical circle through the Sun, from the zenith down to the nadir
-        and up again. Drag to rotate.
+        The nine spherical harmonics and the sky held in them: (a) the basis as lobes, the accent positive, orange
+        negative, under each the sky's coefficients; (b) the sky's irradiance from one, two and three bands and from the
+        whole sky; (c) the same along the vertical circle through the Sun. Drag to rotate.
         <Try label="Evening" set="date=2026-04-06T17:30:00Z&lat=52.395&lon=13.085&h=1" fig="harmonics">
             the shape leans west to the Sun, up's coefficient positive: the sky outshines the ground.
         </Try>

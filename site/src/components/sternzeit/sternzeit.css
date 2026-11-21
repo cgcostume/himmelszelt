@@ -1,262 +1,6 @@
-.scene-frame {
-    margin-top: 0;
-    margin-right: 0;
-    margin-bottom: 1.5rem;
-    /* How far the reading column is inset from this figure's edge: zero while the figure is as wide as the text,
-       and half the difference once it breaks out. Everything in the figure that is read as text lines up with it. */
-    --content-inset: max(0px, calc((100% - var(--measure) + 3rem) / 2));
-}
-/* A scene that stays in the reading column starts at the text's left edge, not at the browser's figure margin. */
-.scene-frame:not(.wide) {
-    margin-left: 0;
-}
-/* Space above and below, none at the sides, and never wider than the text: a caption is read like a paragraph, so it
-   keeps the reading column's width and its place, centered, even under a figure that breaks out of it. The space
-   above matters as much as the one below, since what precedes it may be a sub-figure's own caption. */
-.scene-frame .figure-caption {
-    width: calc(var(--measure) - 3rem);
-    max-width: 100%;
-    margin-inline: auto;
-    padding: 0.75rem 0;
-}
-/* Its time slider likewise keeps the reading column's width, under a scene that breaks out of it. */
-.scene-frame > .figure-slider {
-    width: calc(var(--measure) - 3rem);
-    max-width: 100%;
-    margin-inline: auto;
-}
-.eclipse-figure {
-    margin: 1.5rem 0;
-}
-/* At the top of the scene it belongs to, not the bottom, where it would read as a caption of whatever panel floats
-   over the scene's lower half. */
-.vis-credit {
-    position: absolute;
-    top: 0.5rem;
-    left: var(--content-inset);
-    margin: 0;
-    padding: 0;
-    color: var(--muted);
-    opacity: 0.7;
-    pointer-events: none;
-}
-.vis-credit a {
-    color: inherit;
-    pointer-events: auto;
-}
-/* Julian Day / Latitude / Longitude as a grid, so the label and input columns line up regardless of label width. */
-.input-grid {
-    display: grid;
-    grid-template-columns: max-content max-content 1fr;
-    gap: 0.5rem 0.75rem;
-    align-items: baseline;
-    margin-bottom: 1rem;
-}
-/* Placed by hand rather than by flow, since not every row fills all three columns. */
-.note {
-    color: var(--muted);
-}
-/* Labels and the notes of their button groups share one column, right-aligned, against the controls they name. */
-.input-grid > label,
-.input-grid > .note {
-    grid-column: 1;
-    justify-self: end;
-}
-/* As large as the notes in the button rows they stand in front of. */
-.input-grid > .note {
-    font-size: var(--text-meta);
-}
-/* A minus and a plus around the input, so a value can be stepped by finger as well as by arrow key or wheel. The
-   three are one control: no gaps, shared borders, rounded only on the outside. */
-.stepper {
-    grid-column: 2;
-    display: flex;
-    align-items: center;
-}
-.stepper > button[data-step],
-.stepper > button[data-field="geolocate"] {
-    width: 1.9rem;
-    padding: 0;
-}
-.stepper > input {
-    border-radius: 0;
-    margin: 0 -1px;
-}
-.stepper > button[data-step="-1"] {
-    border-radius: var(--radius-button) 0 0 var(--radius-button);
-}
-.stepper > button[data-step="1"] {
-    border-radius: 0 var(--radius-button) var(--radius-button) 0;
-}
-/* "now" and the location pin act on their own, so they stand apart from the stepping group. */
-.stepper > button[data-field] {
-    margin-left: 0.4rem;
-}
-/* Whichever is hovered or focused draws its whole outline, over the neighbor it shares an edge with. */
-.stepper > :hover,
-.stepper > :focus-visible {
-    position: relative;
-    z-index: 1;
-}
-/* "now" follows the clock, "animate" steps on by itself; both are toggles, and both take their width from their word. */
-.stepper button[data-field="live"],
-.stepper button[data-field="animate"] {
-    padding: 0.15rem 0.5rem;
-}
-.stepper button[aria-pressed="true"],
-.calendar-title[aria-pressed="true"] {
-    color: var(--accent);
-}
-/* The map pin that fills in latitude and longitude, and the height that goes with them. */
-.stepper button[data-field="geolocate"] {
-    display: grid;
-    place-items: center;
-}
-.stepper svg {
-    width: 14px;
-    height: 14px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 0.95;
-    stroke-linejoin: round;
-}
-/* The step sizes as one segmented row of radio buttons, sharing their edges like the stepper does; it wraps rather
-   than overflowing on a narrow screen. */
-.steps {
-    display: flex;
-    flex-wrap: wrap;
-    /* Buttons, not text: a quick double tap must not select a label. */
-    user-select: none;
-}
-.steps input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
-    pointer-events: none;
-}
-.steps label span {
-    display: block;
-    margin-left: -1px;
-    padding: 0.15rem 0.45rem;
-    border: var(--border);
-    border-radius: 0;
-    background: var(--surface);
-    color: var(--muted);
-    font-family: var(--font-mono);
-    font-size: var(--text-small);
-    line-height: 1.4;
-    cursor: pointer;
-}
-.steps label:first-child span {
-    margin-left: 0;
-    border-radius: var(--radius-button) 0 0 var(--radius-button);
-}
-.steps label:last-child span {
-    border-radius: 0 var(--radius-button) var(--radius-button) 0;
-}
-/* A group's name, first and plain: text, not a button. */
-.steps-heading {
-    padding: 0.15rem 0.45rem;
-    border: var(--border);
-    border-radius: var(--radius-button) 0 0 var(--radius-button);
-    background: var(--surface);
-    color: var(--muted);
-    font-family: var(--font-mono);
-    font-size: var(--text-small);
-    line-height: 1.4;
-    opacity: 0.7;
-}
-/* Which one is chosen shows in the text, not in a second outline: the group already has enough lines in it. */
-.steps label:hover span {
-    color: var(--text);
-}
-.steps label:has(:disabled) span {
-    color: var(--muted);
-    opacity: 0.45;
-    cursor: default;
-}
-.steps label:has(:checked) span {
-    color: var(--accent);
-}
-.steps label:has(:focus-visible) span {
-    position: relative;
-    z-index: 1;
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
-}
-.input-grid-extra,
-.input-grid-subrow {
-    font-size: var(--text-meta);
-    display: flex;
-    gap: 0.75rem;
-    align-items: baseline;
-    flex-wrap: wrap;
-}
-.input-grid-extra label {
-    display: flex;
-    gap: 0.35rem;
-    align-items: center;
-}
-/* Column 2, not 1 (the label): sits under the input box it acts on. */
-.input-grid-subrow {
-    grid-column: 2 / -1;
-}
-/* One width for every field, so the columns of digits line up down the whole set. */
-.moment input[data-field="jd"],
-.moment input.latlong {
-    width: 17ch;
-}
-table {
-    border-collapse: collapse;
-    width: 100%;
-    margin-bottom: 1rem;
-    table-layout: fixed;
-    font-family: var(--font-mono);
-    font-size: var(--text-meta);
-    font-variant-numeric: tabular-nums;
-    border: var(--border);
-}
-th,
-td {
-    border: var(--border);
-    padding: 0.3rem 0.6rem;
-    text-align: left;
-    vertical-align: top;
-    overflow-wrap: break-word;
-}
-th {
-    color: var(--muted);
-    font-weight: 400;
-    background: var(--surface);
-}
 /* The value tables a size smaller, so the longest name, ATMOSPHERE_THICKNESS_NON_UNIFORM_KM, fits on one line. */
 .sternzeit-table table {
     font-size: var(--text-small);
-}
-col.name {
-    width: 45%;
-}
-col.unit {
-    width: 10%;
-}
-col.value {
-    width: 45%;
-}
-th.value,
-td.value {
-    text-align: right;
-    padding-right: 1rem;
-    white-space: pre;
-}
-td.missing {
-    opacity: 0.4;
-}
-tbody tr:nth-child(even) {
-    background: var(--surface);
-}
-tbody tr:hover {
-    background: var(--line);
 }
 /* The two big scenes, the armillary sphere and the day-arc dome: 4:3 on a phone or a narrow window, 16:9 where the
    page is wide enough for it (see the media query at the end). Dragging one rotates it, so it neither scrolls the
@@ -373,67 +117,6 @@ tbody tr:hover {
 .analemma-panel > svg {
     aspect-ratio: 3 / 5;
 }
-/* The Sun wherever it stands as a symbol (the locked views, the line off the Moon's bright limb): a white disc with
-   dotted rays. The Moon beside it in the locked views is a muted disc. */
-.figure-sun-ray {
-    stroke: var(--text);
-    stroke-width: var(--sun-stroke);
-    vector-effect: non-scaling-stroke;
-}
-/* A filled disc without an outline, so its radius is the symbol's and the Moon's beside it can be set against it. */
-/* A point to drag in a drawn figure, as a slider's thumb: the accent, ringed in the page's color. */
-.figure-thumb {
-    fill: var(--accent);
-    stroke: var(--bg);
-    stroke-width: 3;
-}
-/* On a split line, which is broken around it instead. */
-.figure-thumb.split-thumb {
-    stroke: none;
-}
-.figure-sun {
-    fill: var(--sun-fill);
-    stroke: var(--sun-edge);
-    stroke-width: var(--body-edge);
-    vector-effect: non-scaling-stroke;
-}
-/* The glow is a copy of the Sun's disc behind it, clipped at the horizon (see sunGlow); Zdog's Sun, a plain path, is
-   tagged by scene.ts and dayarc.ts once it exists. */
-.figure-sun-glow {
-    color: var(--text);
-    filter: var(--sun-glow);
-}
-/* In a drawn figure the filter's lengths are in the figure's own units, so the blur is scaled back to screen pixels. */
-[style*="--units-per-px"] .figure-sun-glow {
-    filter: drop-shadow(0 0 calc(4px * var(--units-per-px)) color-mix(in srgb, currentColor 45%, transparent));
-}
-/* On the light page none, as --sun-glow, except where the figure shows the sky as it is seen. */
-:root[data-theme="light"] .figure-sun-glow:not(.as-seen *) {
-    filter: none;
-}
-.figure-sun-ray {
-    stroke-dasharray: var(--sun-dots);
-    stroke-linecap: round;
-}
-/* The Moon wherever it stands as a symbol: the lit part in the Sun's own shade, the night side in the earthshine it
-   is actually seen by, which is at its bluest around new moon and gone by full moon (--earthshine, 0 to 1). */
-.figure-moon {
-    fill: color-mix(in srgb, var(--accent) calc(var(--earthshine, 0) * 45%), var(--moon-night));
-    stroke: var(--moon-edge);
-    /* Twice as wide: the lit part, drawn over the disc, covers the inner half of it. */
-    stroke-width: calc(2 * var(--body-edge));
-    vector-effect: non-scaling-stroke;
-}
-.figure-moon-lit {
-    fill: var(--moon-lit);
-}
-/* The Moon's equator and prime meridian on the symbol, faint: they only have to show which way it is turned. */
-.figure-moon-graticule {
-    fill: none;
-    stroke: var(--bg);
-    stroke-width: 0.6;
-    opacity: 0.125;
-}
 /* The caption of a panel floating over a scene, below the panel and as wide as it, so it wraps within the panel's
    width rather than across the scene. It carries the page's background: without it the scene's lines and labels
    would show through the lines of text. */
@@ -450,96 +133,6 @@ tbody tr:hover {
     top: calc(100% + 0.3em);
     left: 0;
     width: 100%;
-}
-/* Every table starts folded like the contents, numbered like the figures, only the number in the accent. */
-.table-fold > summary {
-    padding: 0.3rem 0;
-    font-family: var(--font-mono);
-    color: var(--text);
-}
-/* What the table holds in the text's face, the namespace after it in the monospace. */
-.table-caption {
-    font-family: "Roboto", system-ui, sans-serif;
-}
-.table-caption::before {
-    counter-increment: table;
-    content: "Table\a0" counter(table) ". ";
-    color: var(--accent);
-}
-/* A set of moment-and-place controls, foldable behind a one-line summary of the current values. No box around it,
-   just a rule down its left saying how far it reaches, the same one a jumped-to reference gets. It sits in the
-   margin, so the controls still line up with the text. */
-.moment {
-    position: relative;
-    margin: 1rem 0 1.5rem;
-    border-left: 2px solid var(--accent);
-    margin-left: -0.9rem;
-    padding-left: 0.9rem;
-}
-/* Folded away, the controls step back like every fold (see .fold in global.css). */
-.moment:not([open]) {
-    opacity: 0.55;
-    transition: opacity 0.15s;
-}
-.moment:not([open]):is(:hover, :has(:focus-visible)) {
-    opacity: 1;
-}
-.moment[open] .input-grid {
-    margin: 0.75rem 0 0.25rem;
-}
-.moment summary {
-    cursor: pointer;
-    list-style: none;
-    /* Clear of the copy button in the corner. */
-    padding-right: 2rem;
-}
-.moment summary::-webkit-details-marker {
-    display: none;
-}
-.moment summary::before {
-    content: "+";
-    display: inline-block;
-    width: 1.2em;
-    color: var(--muted);
-}
-.moment[open] summary::before {
-    content: "\2212";
-}
-.moment-title {
-    margin-right: 0.4em;
-    color: var(--accent);
-}
-/* The eclipse views: two square panels side by side within the reading column, stacked below 40rem (see there). */
-.eclipse-views {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-    margin-bottom: 0.75rem;
-}
-.eclipse-view {
-    margin: 0;
-}
-.eclipse-view figcaption {
-    margin: 0.5rem 0 0;
-    font-size: var(--text-meta);
-}
-/* The title of a sub-figure's caption: what that panel shows, named at its head, the words to read first. A figure's
-   own status line takes the same look, unlettered. */
-.subfigure-title,
-.status-title {
-    color: var(--accent);
-}
-/* Lettered like a paper's sub-figures, so a caption names them by letter rather than by where the layout puts them. */
-figure[id] {
-    counter-reset: subfigure;
-}
-.subfigure-title::before {
-    counter-increment: subfigure;
-    content: "(" counter(subfigure, lower-alpha) ") ";
-}
-/* The panel proper, without the caption below it: what floats over the figure is placed against this. */
-.eclipse-panel {
-    position: relative;
 }
 /* Over the foot of its panel, where the figure is empty anyway: the step to the nearest eclipse either way. */
 .eclipse-jump {
@@ -614,44 +207,6 @@ g.eclipse-corona {
     stroke-width: 0.6;
     stroke-dasharray: 2 2;
 }
-/* Shared by the figures' SVGs (see figure.js and offpanel.js): the ground drawn beneath, the veil drawn over what the
-   horizon hides, the horizon itself, labels and notes, and the indicator for a body outside the panel. */
-.figure-ground {
-    fill: var(--surface);
-}
-.figure-veil {
-    fill: var(--surface);
-    opacity: 0.8;
-}
-.figure-horizon {
-    stroke: var(--accent);
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-}
-.figure-label,
-.figure-note {
-    fill: var(--muted);
-    text-anchor: middle;
-    dominant-baseline: middle;
-}
-.figure-note {
-    fill: var(--text);
-}
-.figure-anchor-start {
-    text-anchor: start;
-}
-.figure-anchor-end {
-    text-anchor: end;
-}
-/* A readout's muted name and its value share one line. On the plain alphabetic baseline, centered by a dy instead
-   (see moonview.js): browsers disagree on whether a tspan inherits a middle baseline, and set the two parts apart. */
-.figure-readout,
-.figure-readout-name {
-    dominant-baseline: alphabetic;
-}
-.figure-readout-name {
-    fill: var(--muted);
-}
 .off-panel {
     color: var(--muted);
     fill: currentColor;
@@ -722,21 +277,6 @@ g.eclipse-corona {
 /* The month dots in the line's own color: they mark points along it, not something else. */
 .analemma-tick {
     fill: var(--text);
-}
-.figure-grid-label {
-    fill: var(--muted);
-    text-anchor: end;
-    dominant-baseline: middle;
-}
-.figure-grid {
-    stroke: var(--line);
-    stroke-width: 1;
-    stroke-dasharray: 1 3;
-    vector-effect: non-scaling-stroke;
-}
-/* The Moon as seen from the chosen place: one square panel in the reading column, its numbers below. */
-.moon-figure {
-    margin: 1.5rem 0;
 }
 .moon-view {
     margin: 0;
@@ -960,214 +500,8 @@ g.eclipse-corona {
     stroke-width: 1.5px;
     vector-effect: non-scaling-stroke;
 }
-/* The download button on every figure panel (see export.js): in its top right corner, shown on hover or focus. */
-[data-export] {
-    pointer-events: auto;
-}
-.eclipse-view,
 .moon-view {
     position: relative;
-}
-.svg-download,
-.icon-button {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    z-index: 5;
-    display: grid;
-    place-items: center;
-    width: 1.65rem;
-    padding: 0;
-    color: var(--muted);
-    opacity: 0;
-    transition: opacity 0.15s;
-}
-.icon-button:hover {
-    color: var(--accent);
-}
-/* A group of icon buttons over a figure (see SkyFrame.astro), in the page's own theme even over one that stays dark. */
-.view-buttons {
-    --bg: var(--overlay-solid);
-    --surface: var(--overlay-surface);
-    --line: var(--overlay-line);
-    --text: var(--overlay-ink);
-    --muted: var(--overlay-quiet);
-    --accent: var(--overlay-accent);
-    display: flex;
-    flex: none;
-    gap: 4px;
-    padding: 4px;
-    border-radius: var(--radius-group);
-    background: var(--overlay-surface);
-    pointer-events: auto;
-}
-/* A plate behind the icon shows hover and on; a press shrinks the plate alone, the icon stays where it is. */
-.view-icon {
-    position: relative;
-    isolation: isolate;
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-button);
-    background: none;
-    color: var(--text);
-    transition: color 0.15s;
-}
-.view-icon[hidden] {
-    display: none;
-}
-/* Once a view is copied, a word under its button says so, for a moment. */
-.copy-info[data-copied]::after {
-    content: "copied";
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    padding: 2px 6px;
-    border-radius: var(--radius-button);
-    background: var(--overlay-solid);
-    color: var(--overlay-ink);
-    font-size: var(--text-small);
-    white-space: nowrap;
-    pointer-events: none;
-}
-.view-icon::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: inherit;
-    background: var(--plate, transparent);
-    transition:
-        background 0.15s,
-        transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
-}
-.view-icon:hover {
-    --plate: var(--overlay-hover);
-}
-.view-icon:active::before {
-    transform: scale(0.82);
-    transition-duration: 0.08s;
-}
-.view-icon[aria-pressed="true"] {
-    --plate: var(--overlay-tint);
-    color: var(--accent);
-}
-.view-icon .icon {
-    width: 16px;
-    height: 16px;
-    stroke-width: 0.85;
-}
-.svg-download {
-    width: auto;
-    padding: 4px;
-    display: flex;
-}
-.icon-button svg,
-.calendar-lock svg {
-    width: 14px;
-    height: 14px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.05;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-/* Text buttons, with or without an icon before or after the word, at the small text's size. A view switch is one, over
-   the figure unless it says otherwise; within a group the group is its ground. */
-.button-xs,
-.view-toggle {
-    display: inline-flex;
-    gap: 4px;
-    align-items: center;
-    height: 28px;
-    padding: 0 6px;
-    border: 0;
-    border-radius: var(--radius-button);
-    background: var(--surface);
-    color: var(--muted);
-    font-size: var(--text-small);
-    transition:
-        background 0.15s,
-        color 0.15s;
-}
-.button-xs:hover:enabled,
-.view-toggle:hover {
-    background: var(--line);
-    color: var(--text);
-}
-.button-xs[aria-pressed="true"],
-.view-toggle[aria-pressed="true"] {
-    background: color-mix(in oklab, var(--accent) 22%, var(--surface));
-    color: var(--accent);
-}
-.button-xs .icon,
-.view-toggle .icon {
-    width: 14px;
-    height: 14px;
-    stroke-width: 1;
-}
-/* The supersampling switch's "MSAA" runs on from its "4×", across the switch's gap (see Rays.astro). */
-.rays-long {
-    margin-left: -4px;
-}
-/* A switch named in words that turns into its icon where there is no room for them (see Globe.astro). */
-.icon-when-narrow > .icon {
-    display: none;
-}
-@media (max-width: 40rem) {
-    .icon-when-narrow {
-        justify-content: center;
-        width: 28px;
-        padding: 0;
-    }
-    .icon-when-narrow > .switch-text {
-        display: none;
-    }
-    .icon-when-narrow > .icon {
-        display: block;
-        width: 16px;
-        height: 16px;
-    }
-    /* The supersampling switch says "4×" alone (see Rays.astro). */
-    .rays-long {
-        display: none;
-    }
-}
-/* Nothing but an icon: square. */
-.button-square {
-    justify-content: center;
-    width: 28px;
-    padding: 0;
-}
-.view-buttons > .button-xs:not(:hover, [aria-pressed="true"]) {
-    background: none;
-}
-.view-toggle {
-    position: absolute;
-    top: 6px;
-    left: 6px;
-    z-index: 5;
-}
-/* The parallax figure's switch between Earth's center and the place, in the Moon's own row of buttons. */
-.view-buttons > .view-toggle {
-    position: static;
-}
-/* A scene's switches in the top left corner, the credit line after them. The bar lets a drag through to the scene. */
-.scene-bar {
-    position: absolute;
-    top: 0.5rem;
-    left: var(--content-inset);
-    z-index: 5;
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    pointer-events: none;
-}
-.scene-bar > .vis-credit {
-    position: static;
 }
 .frame-scene.over-body {
     cursor: pointer;
@@ -1175,47 +509,26 @@ g.eclipse-corona {
 .frame-scene.labels-off .frame-label:not(.frame-axis, .frame-compass) {
     visibility: hidden;
 }
-/* No box around the controls any more, so their copy button sits in the corner of the summary line itself. It is
-   inside the summary element, not a child of the set, hence the descendant selector. */
-.moment .icon-button {
-    top: 0;
-    right: 0;
-}
-/* The big scenes have no panel frame to hang the button off, so it lines up with the figure's own content instead: top
-   right in the gutter the credit line and the caption use, or just short of the panels floating there. Always shown. */
-:where(#scene, .dome-scene, .orbit-scene, .frame-scene) > .svg-download {
+/* The big scenes have no panel frame to hang the actions off, so they line up with the figure's own content instead:
+   top right in the gutter the credit line and the caption use, or just short of the panels floating there. */
+:where(#scene, .dome-scene, .orbit-scene, .frame-scene) > .fig-actions {
     top: 0.5rem;
     right: var(--content-inset);
-    opacity: 1;
 }
 #scene {
     container-type: size;
 }
-#scene > .svg-download {
+#scene > .fig-actions {
     right: calc(1.5rem + 38cqh + 1rem);
 }
-.dome-scene > .svg-download {
+.dome-scene > .fig-actions {
     right: calc(1.5rem + var(--analemma-width, 38cqh) + 1rem);
 }
-/* Lookup's credit line, right-aligned up to its tables. */
-.lookup-scene > .vis-credit {
-    left: auto;
-    right: calc(1.5rem + var(--analemma-width, 38cqh) + 1rem);
-    text-align: right;
-}
-[data-export]:hover > .svg-download,
-.svg-download:focus-within,
-.moment:hover .icon-button,
-.icon-button:focus-visible {
-    opacity: 1;
-}
-/* Nothing to hover with: the buttons that would otherwise appear on hover are simply always there. */
 /* The moon calendar: a month in whole weeks, a Moon per day, and under each week the lanes of the Moon and the Sun. */
 .moon-calendar {
     /* The Moon low in the sky, yellowed by the long path through the air. */
     --moon-low: oklch(0.791 0.131 75);
     --calendar-lanes-height: 10px;
-    margin: 1.5rem 0;
 }
 :root[data-theme="light"] .moon-calendar {
     --moon-low: oklch(0.62 0.13 70);
@@ -1242,7 +555,19 @@ g.eclipse-corona {
 .calendar-other-year {
     opacity: 0.55;
 }
-/* The shown month, highlighted like a pressed toggle (see .stepper), with nothing to pick. */
+.calendar-lock svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.05;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+/* The shown month, highlighted like a pressed toggle, with nothing to pick. */
+.calendar-title[aria-pressed="true"] {
+    color: var(--accent);
+}
 .calendar-title {
     cursor: default;
 }
@@ -1295,97 +620,9 @@ g.eclipse-corona {
 .calendar-week {
     margin-bottom: 0.4rem;
 }
-/* A slider under a figure, as wide as it is, its marks under the thumb's travel and its value beside it: the moon
-   calendar's time of day, the Moon's lunation, the eclipses' hours around their moment. */
-.figure-slider {
-    display: flex;
-    gap: 0.75rem;
-    align-items: flex-start;
-    margin-top: 0.5rem;
-    font-size: var(--text-meta);
-    line-height: 18px;
-}
 /* The calendar's rows run close, so its slider stands further off them. */
 .calendar > .figure-slider {
     margin-top: 1.25rem;
-}
-/* A second slider stands off the first and its scale. */
-.figure-slider + .figure-slider {
-    margin-top: 0.75rem;
-}
-.figure-slider-rail {
-    flex: 1;
-}
-/* Without the browser's margin around a slider, so its rail is level with the words either side. */
-.figure-slider input {
-    width: 100%;
-    margin: 0;
-}
-.figure-slider-scale {
-    position: relative;
-    display: block;
-    height: 1em;
-    margin-top: -0.1rem;
-    margin-inline: calc(18px / 2);
-    line-height: 1;
-    color: var(--muted);
-    font-family: var(--font-mono);
-    font-size: var(--text-small);
-}
-.figure-slider-mark {
-    position: absolute;
-    transform: translateX(-50%);
-    white-space: nowrap;
-}
-/* The Moon's phases on its lunation, drawn rather than named, lit where the Moon is: full, last quarter, new, first. */
-.figure-slider-mark > svg {
-    display: block;
-    width: 10px;
-    height: 10px;
-    margin-top: 0.15em;
-    fill: currentColor;
-}
-.figure-slider-mark .phase-outline {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-}
-/* A mark's unit or hemisphere, hanging after it, so the mark centers on its number under the thumb. */
-.figure-slider-unit {
-    position: absolute;
-    left: 100%;
-}
-/* A mark without a name, its name on hover: the tropics and the polar circles under the latitude. */
-.figure-slider-tick {
-    width: 1px;
-    height: 0.5em;
-    margin-top: 0.15em;
-    background: currentColor;
-}
-/* The latitude, as wide as "90.0° S", so the rail stays put. */
-.figure-slider[data-latitude] output {
-    min-width: 7ch;
-    text-align: right;
-}
-/* Sliders stacked under one figure line their rails up: the same room for every name and every value. */
-.figure-slider:has(+ .figure-slider) > .note,
-.figure-slider + .figure-slider > .note {
-    min-width: 4em;
-}
-.figure-slider:has(+ .figure-slider) > output,
-.figure-slider + .figure-slider > output {
-    min-width: 7ch;
-    text-align: right;
-}
-/* The days since the new moon, as wide as two digits ever need, so the rail stays put as they drop to one. */
-.figure-slider[data-lunation] output {
-    min-width: 6ch;
-    text-align: right;
-}
-.figure-slider output {
-    min-width: 5ch;
-    font-family: var(--font-mono);
 }
 /* A button like any other on the page, only without its fixed height and, until hovered, its outline. */
 .calendar-day {
@@ -1464,12 +701,6 @@ g.eclipse-corona {
 .calendar-day .term-tip {
     top: calc(100% + var(--calendar-lanes-height) + 0.4rem);
 }
-@media (hover: none) {
-    .svg-download,
-    .icon-button {
-        opacity: 1;
-    }
-}
 /* Wide enough for the table: the variant toggle sits in its heading. */
 .table-note {
     display: none;
@@ -1516,7 +747,7 @@ g.eclipse-corona {
     #scene .altaz-panel {
         height: 42.75%;
     }
-    #scene > .svg-download {
+    #scene > .fig-actions {
         right: calc(1.5rem + 42.75cqh + 1rem);
     }
     #scene .altaz-panel-sun {
@@ -1524,9 +755,6 @@ g.eclipse-corona {
     }
     #scene .altaz-panel-moon {
         top: 52%;
-    }
-    .strip-panel {
-        --scene-ratio: 9 / 16;
     }
     /* The sun path diagram only as tall as the analemma beside it, which keeps the locked panels' width (38% of the
        armillary sphere's height) rather than following its own scene's height: what a dome seen from above would
@@ -1546,33 +774,15 @@ g.eclipse-corona {
    with the layers stacked and absolute, so a pseudo element reserves their height in the column. Touch still rotates
    in both axes (touch-action stays none on all but the panels), so a drag on a scene turns it rather than scrolling. */
 @media (max-width: 48rem) {
-    .scene-frame.wide {
-        width: auto;
-        margin-left: 0;
-    }
-    .vis-credit,
-    .scene-bar {
-        left: 0;
-    }
     #scene {
         container-type: normal;
     }
     /* The panels have moved below, and the bar wraps short of the download. */
-    :is(#scene, .dome-scene, .orbit-scene, .frame-scene) > .svg-download {
+    :is(#scene, .dome-scene, .orbit-scene, .frame-scene) > .fig-actions {
         right: 0;
-    }
-    .scene-bar {
-        right: 2.5rem;
-        flex-wrap: wrap;
     }
     .dome-scene > .vis-credit {
         right: 2.5rem;
-    }
-    .lookup-scene > .vis-credit {
-        top: 0.5rem;
-        left: auto;
-        right: 0;
-        text-align: right;
     }
     .moon-view {
         max-width: none;
@@ -1648,46 +858,6 @@ g.eclipse-corona {
         width: 100%;
         margin: 0.75rem 0 0;
     }
-    /* Two columns, labels and notes right-aligned in the first as on a wide screen: a field stays on the line of its
-       label, and what does not fit beside it (now, animate) wraps under it. */
-    .input-grid {
-        grid-template-columns: max-content 1fr;
-        gap: 0.3rem 0.4rem;
-    }
-    .input-grid-extra {
-        grid-column: 1 / -1;
-    }
-    .stepper,
-    .input-grid-subrow {
-        grid-column: 2;
-    }
-    .stepper {
-        flex-wrap: wrap;
-        row-gap: 0.3rem;
-    }
-    /* Room for -179.9999999, no more. */
-    .moment input.latlong {
-        width: 13ch;
-    }
-    /* As small as the notes and the step buttons beside them, so the fields and their steps read as one block; the
-       labels keep the text's color, the notes stay quiet. Inputs sized in ch narrow with their text. */
-    .input-grid > label {
-        font-size: var(--text-meta);
-    }
-    .stepper button,
-    .stepper input {
-        height: 1.75rem;
-        font-size: var(--text-small);
-    }
-    .stepper > button[data-step],
-    .stepper > button[data-field="geolocate"] {
-        width: 2rem;
-    }
-    /* Taller for a finger, but narrow enough that the seven Julian Day steps stay one unbroken row beside their note. */
-    .steps label span,
-    .steps-heading {
-        padding: 0.3rem 0.2rem;
-    }
     .sternzeit-table table {
         table-layout: auto;
         border: 0;
@@ -1737,77 +907,10 @@ g.eclipse-corona {
         font-size: var(--text-meta);
     }
 }
-/* Too narrow for two panels side by side: the eclipses stack, and are then as wide as every other figure. */
-@media (max-width: 40rem) {
-    .eclipse-views {
-        grid-template-columns: 1fr;
-    }
-}
 
-/* The flat strips: ΔT over the millennia and the year's daylight. Their SVGs draw in screen pixels, without a frame. */
-.strip-figure {
-    margin-top: 1.5rem;
-    margin-bottom: 1.5rem;
-}
-/* One that stays in the column fills it, without the browser's figure indent. */
-.strip-figure:not(.wide) {
-    margin-inline: 0;
-}
-/* As tall as the panels over the scenes are wide (1a, 1b, the analemma): 38% of the scene's height, which is 4:3 of the
-   wide width, 16:9 once the page is wide, never over 80vh; never under 9rem, where the scenes turn square and small. */
-.strip-panel > svg {
-    display: block;
-    width: 100%;
-    height: max(9rem, 0.38 * min(80vh, min(var(--wide), 100vw - 3rem) * var(--scene-ratio, 3 / 4)));
-    background: var(--bg);
-    cursor: crosshair;
-}
-.strip-panel {
-    position: relative;
-}
-/* Inside the plot, under its top margin (STRIP_MARGIN), not half over its edge. */
-.strip-panel > .svg-download {
-    top: 20px;
-    right: 8px;
-}
-/* Clear of the scale along its right edge. */
-.scattering-panel > .svg-download {
-    right: 36px;
-}
-/* Broken out of the column, inset as far as the panels floating over the scenes, the analemma's among them. */
-@media (min-width: 48rem) {
-    .wide > .strip-panel {
-        margin-inline: 1.5rem;
-    }
-}
-/* The caption keeps to the text column, which the wide figure is centered on. */
-.strip-figure > figcaption {
-    max-width: calc(var(--measure) - 3rem);
-    margin: 0.75rem auto 0;
-}
-.strip-band {
-    fill: var(--surface);
-}
-.strip-moment {
-    stroke: var(--text);
-    stroke-width: 1;
-    stroke-dasharray: 2 3;
-    opacity: 0.6;
-}
-.strip-moment-dot {
-    fill: var(--text);
-}
 /* Nothing to click on ΔT, only to hover. */
 .deltat-panel > svg {
     cursor: default;
-}
-/* The strips' value ticks in the monospace, so their digits and units line up. */
-.strip-tick {
-    font-family: var(--font-mono);
-}
-/* At the left edge, flush with the text. */
-.strip-tick {
-    text-anchor: start;
 }
 .deltat-axis {
     stroke: var(--line);
@@ -1948,16 +1051,6 @@ span.daylight-day {
 }
 :root[data-theme="light"] .moon-orbit.line-behind {
     opacity: 0.4;
-}
-/* An offset from the moment, as wide as "+24:00", so the rail stays put as the hours gain a digit. */
-.figure-slider[data-offset] output {
-    min-width: 6ch;
-    text-align: right;
-}
-/* In days over a lunation, "+12.5 d": a character more, so a one-digit day does not shift the slider. */
-.figure-slider[data-offset="hours"] output,
-.figure-slider[data-zoom] output {
-    min-width: 7ch;
 }
 /* The greatest eclipse over the solar panel, what and how far away, a link there; the degrees and the time below it
    are dimmed, as figure labels are. */

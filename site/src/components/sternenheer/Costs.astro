@@ -1,0 +1,36 @@
+---
+import type { CostsResult } from "../bench";
+import Costs from "../Costs.astro";
+import { creditOf, MiB } from "../costs";
+import reference from "./bench.json";
+import { COST_ROWS, type CostKey } from "./cost-rows";
+
+/**
+ * What the stars pass costs, six configurations of the budget's: the time a frame on the GPU, the memory the pass holds
+ * and the files it downloads. The reference is bench.json, written by `pnpm bench sternenheer --write`
+ * (scripts/bench.mjs and bench.ts, which measures through budget-bench.ts).
+ */
+const measure = reference as CostsResult;
+const LABELS: Record<CostKey, [string, string]> = {
+    catalog: ["the catalog alone", "9,093 stars as points, 1920 × 1080"],
+    "720p": ["the chapter's sky, 1280 × 720", "both catalogs, halos, the 2K map, the air"],
+    air: ["the chapter's sky, 1920 × 1080", "both catalogs, halos, the 2K map, the air"],
+    "2160p": ["the chapter's sky, 3840 × 2160", "both catalogs, halos, the 2K map, the air"],
+    large: ["everything on, 1920 × 1080", "twinkling, constellations, the 4K map"],
+    deep: ["with the deep stars, 1920 × 1080", "2.4 million more"],
+};
+const rows = COST_ROWS.map((key) => {
+    const row = measure.rows[key];
+    const [label, note] = LABELS[key];
+    return { label, note, values: [row?.ms?.median, (row?.memory ?? 0) / MiB, (row?.download ?? 0) / MiB] };
+});
+---
+
+<Costs
+    label="Bar charts of the time a frame takes, the GPU memory and the download of the stars pass, from the catalog alone to the deep stars"
+    columns={[{ head: "time a frame, ms" }, { head: "GPU memory, MiB", part: 0 }, { head: "download, MiB", part: 1 }]}
+    rows={rows}
+>
+    What sternenheer's sky costs: the time a frame takes on the GPU, the memory the pass holds and the files it
+    downloads. A new moon in August over Berlin, the view south, 120° tall; {creditOf(measure)}.
+</Costs>

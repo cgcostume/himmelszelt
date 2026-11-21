@@ -102,6 +102,10 @@ export function selenographic(body: Vec3): { longitude: number; latitude: number
 /** The Sun's illuminance above the atmosphere, in lux, as `@himmelszelt/dunstkreis` has it. */
 export const SUN_ILLUMINANCE = 128_000;
 
+/** The Sun's color above the atmosphere, in linear sRGB at unit luminance: a little warmer than D65, about 6,000 K, as
+ *  `@himmelszelt/dunstkreis` lights its sky and `@himmelszelt/helldunkel` has it as `SUN_WHITE`. */
+export const SUN_COLOR: Vec3 = [1.091, 0.9771, 0.9589];
+
 /** The Moon's geometric albedo, 0.12, and mean radius in km, after NASA's fact sheet. */
 export const MOON_GEOMETRIC_ALBEDO = 0.12;
 export const MOON_RADIUS_KM = 1737.4;

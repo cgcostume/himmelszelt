@@ -9,11 +9,14 @@ export { ev100FromLuminance, exposureFromEV100, localAdaptation, lowLightCompens
 // White balance, before the exposure: a reference white shown as D65.
 export type { WhiteBalance } from "./white.js";
 export {
+    adaptationDegree,
     applyWhiteBalance,
     D65_WHITE,
     daylightWhite,
+    MOON_WHITE,
     NO_WHITE_BALANCE,
     planckianWhite,
+    SUN_WHITE,
     whiteBalance,
     WHITE_POINTS,
     whiteFromChromaticity,
@@ -48,6 +51,9 @@ export {
 
 // The veil of a bright point source, the eye's own glare.
 export { veilingGlare } from "./glare.js";
+
+// A lens's starburst around a bright point source.
+export { starburstSpikes } from "./lens.js";
 
 // The eye at night: the rods' blue shift, before the exposure.
 export { coneShare, darkAdaptedEye } from "./vision.js";

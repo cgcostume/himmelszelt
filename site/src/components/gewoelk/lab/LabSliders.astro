@@ -1,14 +1,6 @@
 ---
-/** A research figure's sliders, one a row: the parameter's name, its label, range, step, start and what it does. */
-export type LabSlider = [
-    param: string,
-    label: string,
-    min: number,
-    max: number,
-    step: number,
-    value: number,
-    title: string,
-];
+import type { LabSlider } from "./sliders";
+
 interface Props {
     sliders: LabSlider[];
 }

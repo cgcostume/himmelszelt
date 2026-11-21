@@ -1,8 +1,6 @@
 ---
 import Icon from "../Icon.astro";
 import Term from "../Term.astro";
-import "../sternzeit/sternzeit.css";
-import "../nachtgestirn/nachtgestirn.css";
 import "./dunstkreis.css";
 import "./flicker.css";
 import { FILM_STARS } from "../sternenheer/filmstars";
@@ -26,8 +24,8 @@ const EXPOSURE = { min: -3.5, max: 0 };
 const APERTURE = { min: -2.7, max: -0.3 };
 ---
 
-<figure class="scene-frame flicker" id={id} data-flicker data-choices={JSON.stringify(choices)}>
-    <div class="eclipse-views">
+<figure class="fig scene-frame flicker" id={id} data-flicker data-choices={JSON.stringify(choices)}>
+    <div class="eclipse-views" data-actions="png copy">
         <figure class="eclipse-view">
             <div class="flicker-panel as-seen">
                 <canvas data-field="star-canvas" aria-label="The star, enlarged, its light as the air leaves it right now"></canvas>
@@ -122,13 +120,9 @@ const APERTURE = { min: -2.7, max: -0.3 };
     <p class="view-status" data-field="note" aria-live="polite"></p>
     <figcaption class="figure-caption">
         A star's flicker through the air, the <Term of="Scintillation">scintillation</Term>, at the chosen altitude, in
-        the star's own color. (a) The star, enlarged, at the moment at the right end of (b). (b) Its light over the last
-        two seconds, red, green and blue, in multiples of its mean on a logarithmic scale, and under it the same light
-        as a strip of color. (c) How strongly it twinkles, the spread of its light's logarithm, over the apparent
-        altitude, the horizon end stretched: through the chosen lens and exposure (accent), and unaveraged, through a
-        lens far smaller than a patch of the pattern in an instant (dashed). (d) The pattern of light and shade the
-        turbulence casts on the ground there, slowed down, the lens on it, and the same pattern under a planet's disc
-        30 arcseconds wide, whose points each cast it a little shifted. The stars are those films and history made famous.
+        the star's own color. (b) Its light in multiples of its mean, log scale. (c) How strongly it twinkles over the
+        apparent altitude, through the chosen lens and exposure (accent) and unaveraged (dashed). (d) The pattern on the
+        ground, slowed down, under the lens and under a planet's disc 30 arcseconds wide.
     </figcaption>
 </figure>
 

@@ -1,5 +1,4 @@
 ---
-import "../sternzeit/sternzeit.css";
 import "./dunstkreis.css";
 import Try from "../Try.astro";
 import Shown from "./Shown.astro";
@@ -61,8 +60,8 @@ const SKY = TABLES[2] ?? TABLES[0];
 const TICKS = [0.1, 1, 10, 100];
 ---
 
-<figure class="scene-frame" id="tables">
-    <div class="lut-bar">
+<figure class="fig scene-frame" id="tables">
+    <div class="lut-bar" data-actions="copy">
         <button type="button" class="view-toggle" data-field="reset" title="Back to dunstkreis' defaults">defaults</button>
         <span class="note" data-field="timing"></span>
         <button type="button" class="view-toggle" data-field="starve-toggle" aria-pressed="false" title="Each table against a reference with many more texels and samples, as a heat map of the difference">vs. reference</button>
@@ -89,7 +88,6 @@ const TICKS = [0.1, 1, 10, 100];
                 <p class="lut-head">
                     <strong>{table.title}</strong> <span class="note">{table.axes}</span>
                 </p>
-                <div class="lut-call" data-field="call" />
                 <div class="lut-plot">
                     <span class="lut-axis lut-y">
                         {table.y.map((label, i) => (
@@ -114,6 +112,7 @@ const TICKS = [0.1, 1, 10, 100];
                     <summary>
                         <span class="moment-title">Settings</span> <span class="note" data-field="summary" />
                     </summary>
+                    <div class="lut-call" data-field="call" />
                     <p class="lut-controls">
                         <span class="lut-role">computed</span>
                         <input
@@ -170,12 +169,9 @@ const TICKS = [0.1, 1, 10, 100];
         ))
     }
     <figcaption class="figure-caption">
-        The tables behind the sky above, as they are right now, and what they are computed with. Transmittance and
-        multiple scattering change only with the air; the sky view with every move of the Sun or the observer. Shown
-        tone mapped, each by its own scale; point at a texel to read what it stands for. Against the reference, each a
-        heat map of how far it lies from one with many more texels and samples, on a log scale from dark, 0.1% or less,
-        to light, 100%, black where too dark to measure; under it that difference, and the one it makes in the sky view
-        with every other table at the reference.
+        The three tables behind the sky as they are right now, each tone mapped by its own scale. Transmittance and
+        multiple scattering change only with the air, the sky view with every move of the Sun or the observer. Against
+        the reference, how far each lies from one with many more texels and samples, from 0.1% or less to 100%.
         <Try label="Potsdam in twilight" set="date=2026-04-06T19:10Z&lat=52.395&lon=13.085&h=1" fig="tables">
             multiple scattering moves the sky almost 1%, more than both other tables.
         </Try>

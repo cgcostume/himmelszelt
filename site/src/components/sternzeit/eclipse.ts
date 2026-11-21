@@ -7,7 +7,6 @@ import { arrowAround, offPanelArrowSvg } from "./offpanel";
 import { offsetSliders } from "./offset";
 import { ephemerisDay, onChange, state, update } from "./state";
 import { clock } from "./zone";
-import "./export";
 
 // Both panels share a 200 x 200 viewBox centered on the origin: the Sun, or the axis of Earth's shadow, sits in the middle.
 const HALF = 100;

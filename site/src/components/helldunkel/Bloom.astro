@@ -1,5 +1,4 @@
 ---
-import "../sternzeit/sternzeit.css";
 import EnvironmentFrame from "../environment/EnvironmentFrame.astro";
 import "./helldunkel.css";
 
@@ -10,7 +9,7 @@ const STRENGTHS = [
 ];
 ---
 
-<figure class="scene-frame wide" id="glow" data-needs-hdri data-loading>
+<figure class="fig scene-frame wide" id="glow" data-needs-hdri data-loading>
     <EnvironmentFrame fullscreen>
         <div class="hdri-view as-seen"><canvas data-field="canvas" aria-label="The chosen HDRI with bloom"></canvas></div>
     </EnvironmentFrame>

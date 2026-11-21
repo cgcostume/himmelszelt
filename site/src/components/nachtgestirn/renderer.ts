@@ -17,6 +17,7 @@ import {
     liftedDirection,
     loadMoonMaps,
     loadMoonRoughness,
+    MOON_MAPS,
     MOON_MAPS_WHOLE,
     MOON_ROUGHNESS_WHOLE,
     mapWidthFor,
@@ -40,6 +41,7 @@ import {
 } from "@himmelszelt/sternzeit";
 import { quality, SDR } from "../dunstkreis/atmosphere";
 import { groundGrid } from "../dunstkreis/groundgrid";
+import { skyWhite, type WhiteChoice } from "../white";
 import lambert from "./laws/lambert.wgsl";
 import orenNayar from "./laws/oren-nayar.wgsl";
 import stripes from "./stripes.comp.wgsl";
@@ -56,6 +58,11 @@ const UNIT_EV100 = -Math.log2(1.2);
 const skyKeyOf = (m: MoonAt) => `${m.jd},${m.trueDirection.join(",")},${m.heightM}`;
 
 export type ToneCurveName = "neutral" | "agx" | "aces" | "clip";
+/** The white a frame is balanced on, sky and Moon alike: "auto", the site's one white for the moment, `skyWhite`, the
+ *  Sun's by day and the Moon's at night; "moon", the Moon above the air, which then is a neutral gray high in the sky,
+ *  as photographs and the eye at night show it, reddened only by the air; "sun", the Sun above the air, a camera set to
+ *  daylight, which shows the Moon's own color; "none", the light's colors as they are. */
+export type White = WhiteChoice;
 /** Which of nachtgestirn's maps: "auto" the smallest that shows the disc at a texel per pixel, never a smaller one
  *  than before. */
 export type MapSize = "auto" | keyof typeof MOON_MAPS_WHOLE | FineMaps;
@@ -282,26 +289,32 @@ function sharedRoughness(device: GPUDevice, maps: string, ready: () => void) {
     return null;
 }
 
-// The maps once per page, however many figures draw the Moon.
+const mapsKey = (size: string, seen: boolean) => (seen && !(size in FINE_MAPS) ? `${size}-seen` : size);
+// The maps once per page, however many figures draw the Moon: the whole ones, or `seen`, the package's seen ones, which
+// the site does not host at 8K.
 const loadedMaps = new Map<string, Promise<MoonMaps>>();
-function sharedMaps(device: GPUDevice, size: Exclude<MapSize, "auto">) {
-    let maps = loadedMaps.get(size);
+function sharedMaps(device: GPUDevice, size: Exclude<MapSize, "auto">, seen = false) {
+    const key = mapsKey(size, seen);
+    let maps = loadedMaps.get(key);
     if (!maps) {
-        const files = size in FINE_MAPS ? FINE_MAPS[size as FineMaps] : MOON_MAPS_WHOLE[size as (typeof SIZES)[number]];
+        const files =
+            size in FINE_MAPS
+                ? FINE_MAPS[size as FineMaps]
+                : (seen ? MOON_MAPS : MOON_MAPS_WHOLE)[size as (typeof SIZES)[number]];
         const changed = () => progressEvents.dispatchEvent(new Event("change"));
-        mapsProgress.set(size, { loaded: 0, total: 0 });
+        mapsProgress.set(key, { loaded: 0, total: 0 });
         changed();
         maps = loadMoonMaps(device, files, {
             onProgress: (loaded, total) => {
-                mapsProgress.set(size, { loaded, total });
+                mapsProgress.set(key, { loaded, total });
                 changed();
             },
         });
         maps.finally(() => {
-            mapsProgress.delete(size);
+            mapsProgress.delete(key);
             changed();
         });
-        loadedMaps.set(size, maps);
+        loadedMaps.set(key, maps);
     }
     return maps;
 }
@@ -329,6 +342,8 @@ export interface MoonFrame {
     /** How many pixels across the disc shows, for choosing the maps, and which. */
     discPixels: number;
     maps: MapSize;
+    /** The package's seen maps, which fade past what Earth ever sees, in place of the whole ones; not at 8K. */
+    seen?: boolean;
     /** The sky behind, the air's dimming and bending and the horizon; without, the Moon from Earth's center, in black. */
     air: boolean;
     /** Whether the air acts on the disc too, true by default: its dimming, its bending and its shimmer. Off, the Moon
@@ -352,6 +367,8 @@ export interface MoonFrame {
     mapColor?: "tinted" | "untinted" | "gray";
     /** As the eye sees it at night, rather than a camera. */
     darkAdapted: boolean;
+    /** The white the frame is balanced on, "moon" by default. */
+    white?: White;
     /** Without the air, what lies behind the Moon, in cd/m²: black by default, or a plain daytime sky. */
     background?: readonly [number, number, number];
     /** Rays per pixel, the pass' defaults of 1 and 4 along the terminator and a displaced limb unless given: the pass
@@ -373,7 +390,10 @@ export interface MoonFrame {
     headroom?: number;
     /** dunstkreis' grid over the sky: altitude lines every 10°, the compass directions and the Sun's symbol. */
     grid?: boolean;
-    /** A grid on the ground under the air, for a view in flight: how far it has flown, in km east and north. */
+    /** A lens's veil around the Sun and the Moon, dunstkreis' default, on by default, and its starburst, off by default. */
+    veil?: boolean;
+    starburst?: boolean;
+    /** A grid on the ground under the air: how far the view has flown, in km east and north. */
     ground?: { east: number; north: number } | null;
     /** How the maps are filtered, "anisotropic" by default, as the package does. */
     filter?: MapFilter;
@@ -388,7 +408,7 @@ export interface MoonFrame {
  * waited for arrived.
  */
 export function createMoonRenderer(device: GPUDevice, requestRender: () => void) {
-    let sky: { pass: SkyPass; luts: AtmosphereLUTs; grid: boolean } | null = null;
+    let sky: { pass: SkyPass; luts: AtmosphereLUTs; lens: string } | null = null;
     let skyBuilding: AtmosphereLUTs | null = null;
     let skyBuildingGrid = "";
     // One pass per combination of options, kept, since a row of tiles may ask for several in turn.
@@ -398,6 +418,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     // The pair bound, and the one on its way or bound.
     let mapsBound = "";
     let mapsWanted = "";
+    let mapsSet = "";
     let background: GPUTexture | null = null;
     let groundPass: ReturnType<typeof groundGrid> | null = null;
     // dunstkreis' meter on the sky, read back once per sky the tiles show, as several tiles may show different ones: by
@@ -408,8 +429,8 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     // between, and with the Moon down, its light gone, the exposure would flash open for a frame.
     let lastSky = Number.NEGATIVE_INFINITY;
 
-    function buildSky(luts: AtmosphereLUTs, grid: boolean) {
-        const wanted = `${grid}`;
+    function buildSky(luts: AtmosphereLUTs, grid: boolean, veil: boolean, starburst: boolean) {
+        const wanted = `${grid} ${veil} ${starburst}`;
         if (skyBuilding === luts && skyBuildingGrid === wanted) return;
         skyBuilding = luts;
         skyBuildingGrid = wanted;
@@ -422,10 +443,12 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             moonlight: true,
             groundLight: quality.groundLight,
             dither: false,
+            ...(veil ? {} : { veil: 0 }),
+            starburst,
         }).then((pass) => {
             if (skyBuilding !== luts || skyBuildingGrid !== wanted) return pass.destroy();
             sky?.pass.destroy();
-            sky = { pass, luts, grid };
+            sky = { pass, luts, lens: wanted };
             skyBuilding = null;
             skyMeters.clear();
             requestRender();
@@ -479,13 +502,15 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
         for (const pass of moonPasses.values()) pass.destroy();
         moonPasses.clear();
     }
-    function loadMaps(size: Exclude<MapSize, "auto">) {
-        if (mapsWanted === size) return;
-        mapsWanted = size;
-        sharedMaps(device, size).then((loaded) => {
-            if (mapsWanted !== size) return;
+    function loadMaps(size: Exclude<MapSize, "auto">, seen: boolean) {
+        const wanted = mapsKey(size, seen);
+        if (mapsWanted === wanted) return;
+        mapsWanted = wanted;
+        sharedMaps(device, size, seen).then((loaded) => {
+            if (mapsWanted !== wanted) return;
             maps = loaded;
             mapsBound = size;
+            mapsSet = wanted;
             // The passes bind the maps when they are made: made anew with them.
             dropMoonPasses();
             requestRender();
@@ -570,8 +595,10 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     function render(target: GPUTexture, frame: MoonFrame, alone: boolean) {
         const { moon: m, luts, width, height } = frame;
         const grid = frame.grid ?? false;
-        if (!sky || sky.luts !== luts || sky.grid !== grid) {
-            buildSky(luts, grid);
+        const veil = frame.veil ?? true;
+        const starburst = frame.starburst ?? false;
+        if (!sky || sky.luts !== luts || sky.lens !== `${grid} ${veil} ${starburst}`) {
+            buildSky(luts, grid, veil, starburst);
             if (!sky || sky.luts !== luts) return null;
         }
         // The maps asked for, or the smallest that shows the disc sharply, but never smaller than the ones bound.
@@ -585,8 +612,8 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
                 : mapsBound in FINE_MAPS
                   ? (mapsBound as FineMaps)
                   : (SIZES[Math.max(SIZES.indexOf(needed), kept)] ?? "4k");
-        loadMaps(size);
-        const key = `${alone} ${frame.law} ${frame.toneMap} ${maps ? mapsBound : "plain"} ${frame.darkAdapted} ${frame.format ?? SDR} ${frame.headroom ?? 1} ${frame.samples} ${frame.terminatorSamples} ${frame.displacementFrom} ${frame.softShadowsFrom} ${frame.shadowsFrom} ${frame.filter ?? "anisotropic"}`;
+        loadMaps(size, frame.seen ?? false);
+        const key = `${alone} ${frame.law} ${frame.toneMap} ${maps ? mapsSet : "plain"} ${frame.darkAdapted} ${frame.format ?? SDR} ${frame.headroom ?? 1} ${frame.samples} ${frame.terminatorSamples} ${frame.displacementFrom} ${frame.softShadowsFrom} ${frame.shadowsFrom} ${frame.filter ?? "anisotropic"}`;
         const moonPass = moonPasses.get(key);
         if (!moonPass) {
             buildMoon(key, frame, alone);
@@ -663,6 +690,8 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             angularDiameter: frame.air ? m.angularDiameter : m.geocentricDiameter,
             sunDirection: m.moonSunDirection,
             sunIlluminance: SUN_ILLUMINANCE,
+            // One balance for the sky and the Moon: the sky lies in the background, in cd/m², which the pass balances.
+            whiteBalance: skyWhite(m.sunDirection, frame.white ?? "moon"),
             earthshine: frame.earthshine ? m.earthshine : 0,
             orientation: m.orientation,
             ev100,
