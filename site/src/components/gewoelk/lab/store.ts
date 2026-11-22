@@ -1,4 +1,4 @@
-import type { Design } from "./kinds";
+import type { Designed } from "./kinds";
 
 /**
  * The reader's own kinds of cloud and weathers, kept in the browser: a designer's sliders saved under a name, and a
@@ -27,11 +27,11 @@ export interface OwnWeather {
     places: Record<"low" | "deep" | "middle" | "high", OwnPlace>;
 }
 interface Stored {
-    designs: Record<Design, OwnKind[]>;
+    designs: Record<Designed, OwnKind[]>;
     weathers: OwnWeather[];
 }
 
-const DESIGNS: Design[] = ["low", "towers", "front", "middle", "high"];
+const DESIGNS: Designed[] = ["low", "towers", "front", "middle", "high", "voxel"];
 const named = (list: unknown): { name: string }[] =>
     Array.isArray(list) ? list.filter((item) => typeof item?.name === "string").slice(0, MOST) : [];
 
@@ -41,7 +41,7 @@ function read(): Stored {
         stored = JSON.parse(localStorage.getItem(KEY) ?? "{}") ?? {};
     } catch {}
     const designs = Object.fromEntries(DESIGNS.map((design) => [design, named(stored.designs?.[design])]));
-    return { designs: designs as Record<Design, OwnKind[]>, weathers: named(stored.weathers) as OwnWeather[] };
+    return { designs: designs as Record<Designed, OwnKind[]>, weathers: named(stored.weathers) as OwnWeather[] };
 }
 
 function write(stored: Stored) {
@@ -63,16 +63,16 @@ function put<T extends { name: string }>(list: T[], item: T) {
 
 export type Saved = "saved" | "full" | "failed";
 
-export const ownKinds = (design: Design) => read().designs[design];
+export const ownKinds = (design: Designed) => read().designs[design];
 export const ownWeathers = () => read().weathers;
 
-export function saveKind(design: Design, kind: OwnKind): Saved {
+export function saveKind(design: Designed, kind: OwnKind): Saved {
     const stored = read();
     const list = put(stored.designs[design], kind);
     if (!list) return "full";
     return write({ ...stored, designs: { ...stored.designs, [design]: list } }) ? "saved" : "failed";
 }
-export function deleteKind(design: Design, name: string) {
+export function deleteKind(design: Designed, name: string) {
     const stored = read();
     const list = stored.designs[design].filter((kind) => kind.name !== name);
     write({ ...stored, designs: { ...stored.designs, [design]: list } });

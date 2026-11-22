@@ -27,6 +27,11 @@ export interface Shown {
     /** The layer of an array; of a volume the height of a level slice, 0 to 1, or -1 for an upright cut east to west;
      *  of a plain texture the share of its tile across the thumbnail, all of it by default. */
     at?: number;
+    /**
+     * For a volume's level slice: how many slices of it stand beside the thumbnail as a small stack to pick from. They
+     * are examples, evenly up the volume, not its every level.
+     */
+    slices?: number;
     /** The channel `shade` reads. */
     channel?: number;
     /** What the texture last took to compute on the GPU, in ms, once known, and what else that time covers. */
@@ -126,6 +131,8 @@ function pipelinesOf(device: GPUDevice) {
     return made;
 }
 
+/** What a texture is, said before its format: a volume, one layer of an array, or a plain one. */
+const DIMENSIONS = { "2d": "2D", array: "2D array", "3d": "3D" } as const;
 const CHANNELS: Record<number, string> = {
     [SHOW.red]: "R",
     [SHOW.green]: "G",
@@ -133,11 +140,70 @@ const CHANNELS: Record<number, string> = {
     [SHOW.alpha]: "A",
 };
 
+const SVG = "http://www.w3.org/2000/svg";
+
+/**
+ * A volume as a stack of `count` level slices, seen from above its corner: a click on one picks its height, 0 to 1,
+ * and the one nearest `at` is marked as picked.
+ */
+function sliceStack(count: number, at: number, pick: (at: number) => void) {
+    // In a square as large as a thumbnail, the slices as far apart as fills it.
+    const [height, half, flat] = [100, 48, 15];
+    const rise = (height - 2 * flat - 2) / Math.max(count - 1, 1);
+    const svg = document.createElementNS(SVG, "svg");
+    svg.setAttribute("viewBox", `0 0 ${2 * half + 4} ${height}`);
+    svg.setAttribute("class", "volume-slices");
+    svg.setAttribute("role", "group");
+    svg.setAttribute("aria-label", "Slices of the volume, from its bottom to its top");
+    const heights = Array.from({ length: count }, (_, k) => (k + 0.5) / count);
+    const nearest = heights.reduce(
+        (best, h, k) => (Math.abs(h - at) < Math.abs((heights[best] ?? 0) - at) ? k : best),
+        0,
+    );
+    const slices = heights.map((h, k) => {
+        const y = height - flat - 1 - k * rise;
+        const slice = svg.appendChild(document.createElementNS(SVG, "polygon"));
+        slice.setAttribute("points", `2,${y} ${half + 2},${y - flat} ${2 * half + 2},${y} ${half + 2},${y + flat}`);
+        slice.setAttribute("role", "button");
+        slice.setAttribute("tabindex", "0");
+        slice.setAttribute("aria-pressed", String(k === nearest));
+        slice.appendChild(document.createElementNS(SVG, "title")).textContent =
+            `The slice at ${Math.round(h * 100)} % of the volume's height`;
+        slice.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            choose(k);
+        });
+        return slice;
+    });
+    let chosen = nearest;
+    const choose = (k: number) => {
+        if (k === chosen) return;
+        chosen = k;
+        for (const [i, slice] of slices.entries()) slice.setAttribute("aria-pressed", String(i === k));
+        pick(heights[k] ?? 0);
+    };
+    // A press picks the slice whose front edge is under the pointer, and held, the pointer runs through them.
+    const under = (event: PointerEvent) => {
+        const box = svg.getBoundingClientRect();
+        const y = ((event.clientY - box.top) / box.height) * height;
+        choose(Math.min(Math.max(Math.round((height - 1 - y) / rise), 0), count - 1));
+    };
+    svg.addEventListener("pointerdown", (event) => {
+        svg.setPointerCapture(event.pointerId);
+        under(event);
+    });
+    svg.addEventListener("pointermove", (event) => {
+        if (svg.hasPointerCapture(event.pointerId)) under(event);
+    });
+    return svg;
+}
+
 /**
  * The panel in `root`'s `[data-field="textures"]`: `show` what to draw, `encode` into the figure's frame. Its
  * thumbnails are `size` texels across, a multiple of 8.
  */
-export function texturePanel(root: HTMLElement, device: GPUDevice, size = SIZE) {
+export function texturePanel(root: HTMLElement, device: GPUDevice, size = SIZE, onChange?: () => void) {
     const holder = root.querySelector<HTMLElement>('[data-field="textures"]');
     const sampler = device.createSampler({
         addressModeU: "repeat",
@@ -164,6 +230,8 @@ export function texturePanel(root: HTMLElement, device: GPUDevice, size = SIZE) 
         }
     };
     let key = "";
+    // The slice picked of each volume shown with a stack, by its group and label: kept where the panel is remade.
+    const picked = new Map<string, number>();
     const outputs = new WeakMap<GPUTexture, GPUBindGroup>();
 
     return {
@@ -171,7 +239,9 @@ export function texturePanel(root: HTMLElement, device: GPUDevice, size = SIZE) 
         show(list: Shown[]) {
             if (!holder) return;
             const next = list
-                .map((s) => [s.label, s.group, s.drawn, idOf(s.texture), s.mode, s.scale, s.at, s.channel].join(":"))
+                .map((s) =>
+                    [s.label, s.group, s.drawn, idOf(s.texture), s.mode, s.scale, s.at, s.channel, s.slices].join(":"),
+                )
                 .join("|");
             if (next === key) return;
             key = next;
@@ -183,7 +253,7 @@ export function texturePanel(root: HTMLElement, device: GPUDevice, size = SIZE) 
                 to.appendChild(Object.assign(document.createElement("span"), { textContent }));
             // What a texture is and takes, with its time kept up to date where the figure times it.
             const facts = (to: HTMLElement, s: Shown) => {
-                span(to, `${s.texture.format} ${sizeOf(s.texture, s.kind)}`);
+                span(to, `${DIMENSIONS[s.kind]} ${s.texture.format} ${sizeOf(s.texture, s.kind)}`);
                 const memory = memoryOf(s.texture, s.kind);
                 if (s.ms) times.push({ note: span(to, memory), memory, ms: s.ms, timed: s.timed ?? "" });
                 else span(to, memory);
@@ -211,9 +281,17 @@ export function texturePanel(root: HTMLElement, device: GPUDevice, size = SIZE) 
                 const canvas = figure.appendChild(document.createElement("canvas"));
                 Object.assign(canvas, { width: size, height: size });
                 const caption = figure.appendChild(document.createElement("figcaption"));
-                span(caption, s.label);
+                const label = span(caption, s.label);
+                // The channel shown, in its color: beside the label in a gallery, after it over a view.
+                const channel = s.drawn ? undefined : CHANNELS[s.mode ?? SHOW.rgb];
+                if (channel) {
+                    const letter = Object.assign(document.createElement("b"), { textContent: channel });
+                    letter.className = "texture-channel";
+                    letter.dataset.channel = channel;
+                    if (s.group === undefined) label.append(" ", letter);
+                    else caption.append(letter);
+                }
                 if (s.group === undefined) facts(caption, s);
-                else if (CHANNELS[s.mode ?? SHOW.rgb] && !s.drawn) span(caption, CHANNELS[s.mode ?? SHOW.rgb] ?? "");
                 const context = canvas.getContext("webgpu");
                 const pipeline = made[s.kind];
                 if (!context || !pipeline) return [];
@@ -222,8 +300,18 @@ export function texturePanel(root: HTMLElement, device: GPUDevice, size = SIZE) 
                     size: 16,
                     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
                 });
-                const values = [s.mode ?? SHOW.rgb, s.scale ?? 1, s.at ?? 0, s.channel ?? 0];
+                const name = `${s.group}:${s.label}`;
+                const values = [s.mode ?? SHOW.rgb, s.scale ?? 1, picked.get(name) ?? s.at ?? 0, s.channel ?? 0];
                 device.queue.writeBuffer(uniform, 0, new Float32Array(values));
+                if (s.slices && s.kind === "3d") {
+                    into.append(
+                        sliceStack(s.slices, values[2] ?? 0, (at) => {
+                            picked.set(name, at);
+                            device.queue.writeBuffer(uniform, 8, new Float32Array([at]));
+                            onChange?.();
+                        }),
+                    );
+                }
                 const view = s.texture.createView(s.kind === "array" ? { dimension: "2d-array" } : {});
                 const group = device.createBindGroup({
                     layout: pipeline.getBindGroupLayout(0),

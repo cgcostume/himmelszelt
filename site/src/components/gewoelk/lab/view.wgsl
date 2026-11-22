@@ -136,9 +136,3 @@ fn labAirFrom(view: LabView, v: vec3f, sun: vec3f) -> vec3f {
 fn labDisplay(luminance: vec3f, exposure: f32, headroom: f32) -> vec4f {
     return vec4f(hdToneMapNeutralHdr(luminance * exposure, headroom), 1.0);
 }
-
-// Interleaved gradient noise (Jimenez 2014), another frame of it each frame.
-fn labJitter(pixel: vec2u, frame: f32) -> f32 {
-    let p = vec2f(pixel) + 5.588238 * (frame % 64.0);
-    return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y));
-}

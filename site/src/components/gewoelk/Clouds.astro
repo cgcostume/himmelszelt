@@ -313,15 +313,15 @@ const LAB: LabSlider[] = [
             <OptionGroup name="weather">
                 <Choice figure={id} {...WEATHER} />
             </OptionGroup>
-            <OptionGroup name="cloudscape">
-                <button type="button" class="view-toggle" data-field="cloudscape.enabled" aria-pressed="true" title="The low clouds, a voxel volume marched by its distance field">low clouds</button>
+            <OptionGroup name="cloudscape · 3D">
+                <button type="button" class="view-toggle" data-field="cloudscape.enabled" aria-pressed="true" title="The low clouds, a voxel volume marched by its distance field: 3D, any shape its grid can hold">low clouds</button>
                 <button type="button" class="view-toggle" data-copy="cloudscape" title="Copies the low clouds' sliders as a preset for gewoelk's WEATHER">copy</button>
                 {CLOUDSCAPE.map(([param, label, min, max, step, value, title]) => (
                     <label class="sky-ev clouds-slider" title={title}>{label} <input data-param={param} type="range" min={min} max={max} step={step} value={value} /> <output /></label>
                 ))}
             </OptionGroup>
-            <OptionGroup name="sheet">
-                <button type="button" class="view-toggle" data-field="sheet.enabled" aria-pressed="true" title="A thin sheet of high cloud from a baked map, read once where a ray crosses it">high cloud</button>
+            <OptionGroup name="sheet · 2D">
+                <button type="button" class="view-toggle" data-field="sheet.enabled" aria-pressed="true" title="A thin sheet of high cloud from a baked map, read once where a ray crosses it: 2D">high cloud</button>
                 <Choice figure={id} {...HIGH} />
                 {SHEET.map(([param, label, min, max, step, value, title]) => (
                     <label class="sky-ev clouds-slider" title={title}>{label} <input data-param={param} type="range" min={min} max={max} step={step} value={value} /> <output /></label>

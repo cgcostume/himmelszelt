@@ -3,7 +3,7 @@ import Zdog from "zdog";
 import { find } from "../../dom";
 import { onDemand } from "../../frame";
 import { themeColor, themeColors } from "../../sternzeit/figure";
-import type { Design } from "./kinds";
+import type { Designed, VoxelNumbers } from "./kinds";
 
 /**
  * What a kind of cloud is to gewoelk's layered model, drawn beside its designer: a marched layer as a map of columns
@@ -12,7 +12,7 @@ import type { Design } from "./kinds";
  * again only when one of them changes.
  */
 
-const { Illustration, Anchor, Shape, Cylinder } = Zdog;
+const { Illustration, Anchor, Shape, Cylinder, Box } = Zdog;
 const DEG = Math.PI / 180;
 const INK = themeColor("--text");
 const MUTED = themeColor("--muted");
@@ -149,6 +149,19 @@ function scene(stage: HTMLElement, turned: number) {
                 backface: INK,
             });
         },
+        /** A voxel of cloud: a box about `at`, `wide` across and `tall` high. */
+        box(at: Km, wide: number, tall: number) {
+            new Box({
+                addTo: clouds,
+                width: wide,
+                height: tall,
+                depth: wide,
+                translate: enu(at),
+                stroke: false,
+                color: MUTED,
+                topFace: INK,
+            });
+        },
         /** A square on the level `up`, `wide` across, about the middle. */
         square(wide: number, up: number, color = MUTED, dash: string | null = null, opacity = 1) {
             const h = wide / 2;
@@ -222,7 +235,7 @@ function scene(stage: HTMLElement, turned: number) {
 type Scene = ReturnType<typeof scene>;
 
 /** The slab of a layer over a ground `wide` across, with its base and depth marked up one corner. */
-function slab(s: Scene, wide: number, base: number, depth: number, heights = 1) {
+function slab(s: Scene, wide: number, base: number, depth: number, heights = 1, what = "depth") {
     const h = wide / 2;
     const [low, high] = [base * heights, (base + depth) * heights];
     s.ground(wide);
@@ -245,7 +258,7 @@ function slab(s: Scene, wide: number, base: number, depth: number, heights = 1) 
             0.6,
         );
     s.label([-h, -h, low / 2], `base ${km(base)}`, "frame-angle", -8);
-    s.label([-h, -h, (low + high) / 2], `depth ${km(depth)}`, "frame-angle", -8);
+    s.label([-h, -h, (low + high) / 2], `${what} ${km(depth)}`, "frame-angle", -8);
 }
 
 /** The wind out of `tail`, in a scene `wide` km across: an arrow where it blows to, the longer the stronger, with its speed. */
@@ -312,6 +325,47 @@ function heaps(s: Scene, layer: CloudLayer, windFrom: number, windSpeed: number)
     s.label([0, wide / 2, 0], "the map", "frame-axis", 0, -10);
     wind(s, [-0.62 * wide, 0.2 * wide, 0], wide, windFrom, windSpeed);
     ray(s, wide, base, base + depth);
+}
+
+/**
+ * The voxel cloudscape: a grid over the ground, its voxels filled as high as the cloud map's columns stand, some grown
+ * into towers through the slab, and a ray that strides through the clear air and steps inside a cloud. The voxels are
+ * drawn far larger than the grid's, which has 256 across.
+ */
+function voxels(s: Scene, c: VoxelNumbers, windFrom: number, windSpeed: number) {
+    const tall = c.heightKm * Math.max(1, c.towerScale);
+    const [across, levels] = [8, 5];
+    const wide = Math.max(4 * c.size, 1.6 * tall);
+    s.begin(wide, c.baseKm + tall);
+    slab(s, wide, c.baseKm, tall, 1, "height");
+    const cell = wide / across;
+    const rise = tall / levels;
+    for (let i = 0; i < across; i++) {
+        for (let j = 0; j < across; j++) {
+            const [e, n] = [(i + 0.5) * cell - wide / 2, (j + 0.5) * cell - wide / 2];
+            const spread = clamp((field(e / (1.2 * c.size) + 9, n / (1.2 * c.size) + 9) - 0.5) * 2.4 + 0.5);
+            const value = clamp((spread - (1 - c.coverage)) / Math.max(c.coverage, 1e-3));
+            if (value < 0.05) continue;
+            // The ordinary clouds fill their own layer, the lowest share of the slab: a tower grows through the rest.
+            const tower = random(i >> 1, j >> 1, 4) < c.towers && value > 0.4;
+            const top = tower ? 0.6 + 0.4 * value : (1 - (1 - value) ** 2) / Math.max(1, c.towerScale);
+            const filled = Math.max(1, Math.round(top * levels));
+            const h = cell / 2;
+            const corners: Km[] = [
+                [e - h, n - h, 0],
+                [e + h, n - h, 0],
+                [e + h, n + h, 0],
+                [e - h, n + h, 0],
+            ];
+            s.area(corners, 0.15 + 0.6 * value);
+            for (let k = 0; k < filled; k++) s.box([e, n, c.baseKm + (k + 0.5) * rise], 0.9 * cell, 0.9 * rise);
+        }
+    }
+    const front = -wide / 2;
+    s.measure([-cell / 2, front, 0], [cell / 2, front, 0], "a voxel");
+    s.label([0, wide / 2, 0], "the map", "frame-axis", 0, -10);
+    wind(s, [-0.62 * wide, 0.2 * wide, 0], wide, windFrom, windSpeed);
+    ray(s, wide, c.baseKm, c.baseKm + tall);
 }
 
 /** The outline of an ellipse on the level `up`, its half axes `along` the direction `to` and `across` it. */
@@ -398,7 +452,7 @@ function towers(s: Scene, deep: DeepLayer, windFrom: number, windSpeed: number) 
 
 /** A front: one band placed by a distance and a bearing from the observer, a wall behind its edge, a shield to the rear. */
 function front(s: Scene, deep: DeepLayer, windFrom: number, windSpeed: number) {
-    const { baseKm: base, depthKm: depth, coverage, frontKm, frontDepthKm, frontBearing, rain } = deep;
+    const { baseKm: base, depthKm: depth, coverage, frontKm, frontDepthKm, frontBearing, rain, anvil } = deep;
     // What is shown along the bearing: from the observer, or the edge behind them, to the front's back.
     const [near, far] = [Math.min(frontKm, 0) - 10, Math.max(frontKm + frontDepthKm, 0) + 10];
     const wide = far - near;
@@ -434,6 +488,20 @@ function front(s: Scene, deep: DeepLayer, windFrom: number, windSpeed: number) {
     s.label(place(frontKm, -across, 0), "leading edge", "frame-angle", 0, -10);
     s.label(place(frontKm + WALL.at * frontDepthKm, -across, base + depth), "wall of towers", "frame-axis", 0, -12);
     s.label(place(frontKm + 0.6 * frontDepthKm, -across, base + 0.5 * depth), "shield", "frame-axis", 0, -12);
+    // The wall's tallest towers under their anvils, drawn downwind as the towers' are: a tower to each twelfth of the front.
+    if (anvil > 0.05) {
+        const spacing = frontDepthKm / 12;
+        const to: [number, number] = [Math.sin((windFrom + 180) * DEG), Math.cos((windFrom + 180) * DEG)];
+        const top = (base + ANVIL_TOP * depth) * FRONT_HEIGHTS;
+        [-0.6, 0, 0.6].forEach((y, k) => {
+            const [e, n] = place(frontKm + WALL.at * frontDepthKm, y * across, 0);
+            const center: [number, number] = [e + to[0] * anvil * 0.5 * spacing, n + to[1] * anvil * 0.5 * spacing];
+            const rim = ellipse(center, top, to, (0.5 + 0.6 * anvil) * spacing, 0.5 * spacing);
+            s.area(rim, 0.35);
+            s.line(rim, INK, 1, null, 0.7);
+            if (k === 0) s.label(rim[0] as Km, "anvil", "frame-axis", 8);
+        });
+    }
     if (rain > 0) {
         for (const y of [-0.75, -0.25, 0.25, 0.75]) {
             const x = frontKm + WALL.at * frontDepthKm;
@@ -516,10 +584,10 @@ function sheet(s: Scene, high: HighSheet, windFrom: number, windSpeed: number) {
     s.label([-h, -h, up / 2], `altitude ${km(up)}`, "frame-angle", -8);
 }
 
-export type ModelNumbers = CloudLayer | DeepLayer | HighSheet;
+export type ModelNumbers = CloudLayer | DeepLayer | HighSheet | VoxelNumbers;
 
 /** The model's graphic in `root`'s `[data-field="model"]` for `design`: `update` draws it for the numbers given. */
-export function cloudModel(root: HTMLElement, design: Design) {
+export function cloudModel(root: HTMLElement, design: Designed) {
     const stage = root.querySelector<HTMLElement>('[data-field="model"]');
     if (!stage) return null;
     // A front lies along its bearing, north by east at first: turned so that it runs across the scene.
@@ -529,7 +597,8 @@ export function cloudModel(root: HTMLElement, design: Design) {
     const build = () => {
         if (!drawn || stage.clientWidth === 0) return;
         const { numbers, windFrom, windSpeed } = drawn;
-        if (design === "high") sheet(s, numbers as HighSheet, windFrom, windSpeed);
+        if (design === "voxel") voxels(s, numbers as VoxelNumbers, windFrom, windSpeed);
+        else if (design === "high") sheet(s, numbers as HighSheet, windFrom, windSpeed);
         else if (design === "front") front(s, numbers as DeepLayer, windFrom, windSpeed);
         else if (design === "towers") towers(s, numbers as DeepLayer, windFrom, windSpeed);
         else heaps(s, numbers as CloudLayer, windFrom, windSpeed);

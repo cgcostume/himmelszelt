@@ -122,6 +122,8 @@ export interface LayerMarch {
 
 const LAYERS = 3;
 const DETAIL_SIZE = 128;
+// Texels a side of the tile a workgroup bakes of a layer's map, `GW_LAYER_MAP_TILE` in layermap.comp.wgsl.
+const LAYER_MAP_TILE = 15;
 // Byte sizes of `GwLayerModel` in layermap.comp.wgsl, and of `GwLayered` and a `GwCloudLayer` in layers.comp.wgsl.
 const MODEL_SIZE = 56;
 export const LAYERED_SIZE = 272;
@@ -209,7 +211,7 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
             },
         });
     const read = [wgsl.params, wgsl.camera, wgsl.rainbow, wgsl.layerread];
-    const march = [...read, wgsl.cloudOutput("rgba16float"), layers, godrays];
+    const march = [wgsl.noise, ...read, wgsl.cloudOutput("rgba16float"), layers, godrays];
     const constants = {
         GW_LAYER_MAX_STEPS: maxSteps,
         GW_GOD_RAYS: godRays ? 1 : 0,
@@ -412,7 +414,7 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
             pass.setPipeline(mapPipeline);
             for (const i of changedMaps) {
                 pass.setBindGroup(0, mapGroups[i] as GPUBindGroup);
-                pass.dispatchWorkgroups(dispatch(mapSize, 8), dispatch(mapSize, 8));
+                pass.dispatchWorkgroups(dispatch(mapSize, LAYER_MAP_TILE), dispatch(mapSize, LAYER_MAP_TILE));
             }
             if (pyramidPipeline) {
                 pass.setPipeline(pyramidPipeline);

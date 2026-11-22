@@ -84,6 +84,12 @@ and what it takes from the Sun and what it adds is one lookup into its cloud map
 <Term of="Phase function">phase function</Term> <Cite id="henyey1941" />, which is why the Sun behind cirrus has a
 glow. The heaps are volumes, and the rest of this chapter is about them.
 
+gewoelk renders clouds by three models, told apart here by the dimensions each holds. A sheet is 2D: one map on a
+shell at one height, read once. A height field is 2.5D: a map again, but every texel of it is a column of cloud with
+a bottom and a top, and a ray steps through the columns. It holds no overhang, only what noise heaps onto its
+surface. A voxel volume is 3D: a grid of densities that holds any shape, and pays for it in memory. The figures carry
+these marks, 2D, 2.5D and 3D, wherever they offer a cloud.
+
 ## From a map to a volume
 
 osgHimmel modeled its clouds as a height field: octaves of Perlin's gradient noise <Cite id="perlin2002" /> summed
@@ -183,12 +189,21 @@ Nubis³ shipped at 2.2 to 4 ms at 960 by 540 pixels on a PlayStation 5, from the
 the two-pass split is on its list. Set the render scale and the steps in the figure and watch the time on the line
 under it.
 
+The voxel volume has a figure of its own, where its numbers are set on a patch of it alone
+(<Fig id="design-voxel" />): a drawing of the model, the patch seen from a camera that turns about it, the sliders,
+and under them the cloud map and the volumes built from it, each a slice at a time. Raise the towers, and columns of
+the grid grow through the slab while the map stays as it was.
+
+<Designer place="voxel" />
+
+<Controls />
+
 ## A kind of cloud for each place
 
 Weather observers sort clouds by where they stand: low heaps and decks, towers that grow through every level, a middle
 layer, and the ice clouds on top. gewoelk's layered model has these four places. It marches the first three as one
-density, with nothing built but a map for each, and reads the fourth as a sheet. For each place the library names a
-handful of kinds, `CLOUD_TYPES`, each a few numbers over the place's defaults. The five figures of this section are
+density, with nothing built but a map for each, 2.5D, and reads the fourth as a sheet, 2D. For each place the library
+names a handful of kinds, `CLOUD_TYPES`, each a few numbers over the place's defaults. The five figures of this section are
 where a kind is made. Each has three parts: a drawing of the model that kind of cloud is rendered by, a patch of the
 cloud alone, seen from above, and its numbers as sliders, and under them the textures it is rendered from, each with
 its format, its size and what it takes on the GPU. The patch stands under the
@@ -286,7 +301,8 @@ afternoon, and nothing once the Sun is higher than 42° (<Fig id="bow-place" />)
 into the ground, the primary gone with the Sun 42° up and the secondary at 51°. That is why rainbows belong to mornings
 and evenings: on June 21 in Potsdam the Sun is too high for a primary bow from 9:46 to 16:33 local time. The rest of
 the circle lies under the horizon, and only an observer with rain beneath, on a mountain or in a plane, has drops there
-to see it in.
+to see it in. Drag the Sun down to the horizon instead, and the rendered bow turns red: the air has taken the blue out
+of the light that makes it.
 
 <BowPlace />
 

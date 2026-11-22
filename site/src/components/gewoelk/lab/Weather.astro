@@ -83,10 +83,10 @@ const WEATHERS = {
 };
 // The places of the sky, each with a kind of cloud to choose: the library's, or one saved in a designer.
 const PLACES = [
-    ["low", "low", "The low layer: heaps or a deck"],
-    ["deep", "deep", "The deep layer: towers or a front"],
-    ["middle", "middle", "The middle layer"],
-    ["high", "high", "The sheet of high cloud"],
+    ["low", "low", "The low layer, heaps or a deck: a height field, 2.5D", "2.5D"],
+    ["deep", "deep", "The deep layer, towers or a front: a height field, 2.5D", "2.5D"],
+    ["middle", "middle", "The middle layer: a height field, 2.5D", "2.5D"],
+    ["high", "high", "The sheet of high cloud: 2D", "2D"],
 ];
 const SIZE = {
     name: "size",
@@ -154,7 +154,7 @@ const SPEED = choice(
                 <Choice figure={id} {...WEATHERS} />
             </OptionGroup>
             <OptionGroup name="a kind for each place">
-                {PLACES.map(([place, label, title]) => <label class="composer-place" title={title}>{label} <select data-place={place} aria-label={title}></select></label>)}
+                {PLACES.map(([place, label, title, model]) => <label class="composer-place" title={title}>{label} <select data-place={place} aria-label={title}></select> <span class="cloud-model">{model}</span></label>)}
             </OptionGroup>
             <OptionGroup name="your weathers">
                 <span class="own-weathers" data-field="ownWeathers"></span>

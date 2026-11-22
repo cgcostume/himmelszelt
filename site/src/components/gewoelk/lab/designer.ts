@@ -4,7 +4,7 @@ import { paintRange } from "../../range";
 import { onChange, state } from "../../sternzeit/state";
 import { momentOnClock } from "../../sternzeit/timeofday";
 import { DAY_MS, instantOf } from "../../sternzeit/zone";
-import { type Design, placeOf, presetOf } from "./kinds";
+import type { Designed } from "./kinds";
 import { type Lab, ORBIT_HEIGHT_KM, type Orbit } from "./lab";
 import { deleteKind, ownKinds, ownList, saveKind } from "./store";
 
@@ -21,16 +21,17 @@ const MINUTE_MS = 60_000;
  * The patch a designer shows: its radius over the ground in km, and for a front how far along its bearing the patch's
  * middle lies from where the front is placed from, so the leading edge and most of the shield fall inside it.
  */
-export const PATCH: Record<Design, { radiusKm: number; aheadKm: number }> = {
+export const PATCH: Record<Designed, { radiusKm: number; aheadKm: number }> = {
     low: { radiusKm: 8, aheadKm: 0 },
     towers: { radiusKm: 40, aheadKm: 0 },
     front: { radiusKm: 115, aheadKm: 60 },
     middle: { radiusKm: 8, aheadKm: 0 },
     high: { radiusKm: 6, aheadKm: 0 },
+    voxel: { radiusKm: 10, aheadKm: 0 },
 };
 
 /** The camera a designer starts with: from the south-west, over the patch itself, 35° up or, for a front, whose wall would lie flat from there, 20°. */
-export function designerOrbit(design: Design): Orbit {
+export function designerOrbit(design: Designed): Orbit {
     const { radiusKm } = PATCH[design];
     return {
         center: { east: 0, north: 0 },
@@ -80,6 +81,19 @@ export function designerSwap(root: HTMLElement) {
     };
     swap.addEventListener("click", () => show(stage.dataset.main === "view" ? "model" : "view"));
     show("view");
+    designerScreen(root);
+}
+
+/** A designer's full screen: its stage, the patch and the model's drawing, by the figure's button. */
+export function designerScreen(root: HTMLElement) {
+    const stage = find('[data-field="stage"]', root);
+    const button = find('[data-field="fullscreen"]', root);
+    button.addEventListener("click", () =>
+        document.fullscreenElement ? document.exitFullscreen() : stage.requestFullscreen(),
+    );
+    document.addEventListener("fullscreenchange", () =>
+        button.setAttribute("aria-pressed", String(document.fullscreenElement === stage)),
+    );
 }
 
 /**
@@ -148,12 +162,17 @@ export function designerTime(root: HTMLElement, request: () => void) {
 
 /**
  * The reader's own kinds for the designer of `design` in `root`'s `[data-field="own"]`: saved from `numbers`, the
- * designed place's as they stand, and loaded into the sliders as the library's kinds are.
+ * designed cloud's as they stand, and loaded into the sliders as the library's kinds are, by `preset`.
  */
-export function designerKinds(root: HTMLElement, design: Design, lab: Lab, numbers: () => object) {
+export function designerKinds(
+    root: HTMLElement,
+    design: Designed,
+    lab: Lab,
+    numbers: () => object,
+    preset: (numbers: Record<string, number | string>) => Record<string, number>,
+) {
     const holder = root.querySelector<HTMLElement>('[data-field="own"]');
     if (!holder) return;
-    const place = placeOf(design);
     const kinds = () => root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-preset"]`);
     const list = ownList(holder, {
         what: "the sliders as they stand",
@@ -162,7 +181,7 @@ export function designerKinds(root: HTMLElement, design: Design, lab: Lab, numbe
             const kind = ownKinds(design).find((own) => own.name === name);
             if (!kind) return;
             for (const input of kinds()) input.checked = false;
-            lab.apply("preset", presetOf(place, kind.numbers));
+            lab.apply("preset", preset(kind.numbers));
         },
         save(name) {
             const rounded = Object.entries(numbers()).map(([key, value]) => [

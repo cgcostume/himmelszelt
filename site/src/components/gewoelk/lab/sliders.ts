@@ -25,8 +25,24 @@ export const CLEARING: LabSlider[] = [
 
 // The sliders of the cirrus figure, group by group.
 export const CIRRUS_SHEET: LabSlider[] = [
-    ["c.altitude", "altitude", 4, 12, 0.1, 7, "The sheet's height, in km"],
-    ["c.opticalDepth", "depth", 0.1, 4, 0.1, 0.6, "The sheet's optical depth where the map reads 1"],
+    [
+        "c.altitude",
+        "altitude",
+        4,
+        18,
+        0.1,
+        7,
+        "The sheet's height, in km: high clouds stand between 5 and 13 km in the middle latitudes, lower towards the poles and higher in the tropics",
+    ],
+    [
+        "c.opticalDepth",
+        "depth",
+        0.1,
+        4,
+        0.1,
+        0.6,
+        "The sheet's optical depth where the map reads 1: a veil the Sun shines through has under 1, the densest cirrus about 3",
+    ],
     ["c.tile", "tile", 8, 80, 1, 32, "One tile of the map, in km: larger tiles, coarser texels"],
     [
         "c.reach",
@@ -143,13 +159,51 @@ export const CIRRUS_LIGHT: LabSlider[] = [
 ];
 
 // The sliders of the formation figure: a layer's, and the figure's own.
-const layer = (i: number, v: number[], what: string, lumps: string): LabSlider[] => [
+// What a layer's clouds can be, with a little to spare: where its base stands, how deep it is and how dense, as extinction
+// per km, which for droplets is 1.5 times the liquid water in g/m³ over their radius in mm.
+interface Physical {
+    base: [min: number, max: number, where: string];
+    depth: [min: number, max: number, how: string];
+    density: [min: number, max: number, which: string];
+}
+const LOW: Physical = {
+    base: [0.2, 2.5, "low clouds stand below 2 km"],
+    depth: [0.2, 3, "a fair-weather heap is a km deep, a swelling one two or three"],
+    density: [5, 130, "a thin deck has 10 to 20, a heap 30 to 80"],
+};
+const DEEP: Physical = {
+    base: [0.3, 3, "towers stand on the low clouds' level, higher over dry land"],
+    depth: [2, 16, "to the tropopause at most, 12 km up in the middle latitudes and 17 in the tropics"],
+    density: [10, 160, "a tower's core has 50 to 150, and the coarse map stands for less"],
+};
+const MIDDLE: Physical = {
+    base: [2, 8, "middle clouds stand between 2 and 7 km, to 8 in the tropics"],
+    depth: [0.2, 3, "altocumulus is a few hundred m deep, altostratus up to a few km"],
+    density: [2, 60, "thin and partly ice: 5 to 30"],
+};
+const layer = (i: number, v: number[], what: string, lumps: string, is: Physical): LabSlider[] => [
     [`l${i}.coverage`, "coverage", 0, 1, 0.01, v[0] ?? 0, `How much of the sky ${what} cover: 0 for none`],
-    [`l${i}.base`, "base", 0.2, 10, 0.1, v[1] ?? 0, "The layer's base, in km"],
-    [`l${i}.depth`, "depth", 0.2, 12, 0.1, v[2] ?? 0, "How deep the layer is, in km: its tallest clouds"],
+    [`l${i}.base`, "base", is.base[0], is.base[1], 0.1, v[1] ?? 0, `The layer's base, in km: ${is.base[2]}`],
+    [
+        `l${i}.depth`,
+        "depth",
+        is.depth[0],
+        is.depth[1],
+        0.1,
+        v[2] ?? 0,
+        `How deep the layer is, in km, its tallest clouds: ${is.depth[2]}`,
+    ],
     [`l${i}.feature`, "size", 0.3, 40, 0.1, v[3] ?? 0, "A cloud's size across, in km"],
     [`l${i}.tile`, "tile", 8, 400, 4, v[4] ?? 0, "One tile of the layer's map, in km: it repeats beyond"],
-    [`l${i}.extinction`, "density", 2, 100, 1, v[5] ?? 0, "Extinction per km of full density"],
+    [
+        `l${i}.extinction`,
+        "density",
+        is.density[0],
+        is.density[1],
+        1,
+        v[5] ?? 0,
+        `Extinction per km of full density: ${is.density[2]}`,
+    ],
     [`l${i}.detail`, "detail", 0, 1, 0.05, v[6] ?? 0, "How far the detail noise's billows heap the surface out"],
     [`l${i}.sharp`, "sharpness", 0, 1, 0.05, v[7] ?? 0, "How hard the map's edges are"],
     [`l${i}.lumps`, "lumps", 0, 1, 0.05, v[8] ?? 0, lumps],
@@ -157,9 +211,15 @@ const layer = (i: number, v: number[], what: string, lumps: string): LabSlider[]
 ];
 const CELLS = "How deep the cells on top cut: the turrets of a heap, the pillows of a deck, apart at 1";
 const TURRETS = "How deep the turrets on a tower's top cut";
-export const FORMATION_LOW = layer(0, [0.36, 1.2, 1.4, 2.5, 24, 40, 0.6, 0.4, 0.5, 0.4], "the low clouds", CELLS);
-export const FORMATION_DEEP = layer(1, [0, 1.2, 9, 14, 112, 25, 0.5, 0.3, 0.7, 0.6], "the deep clouds", TURRETS);
-export const FORMATION_MIDDLE = layer(2, [0.25, 4.5, 0.7, 1.6, 28, 10, 0.5, 0.3, 0.6, 0.2], "the middle clouds", CELLS);
+export const FORMATION_LOW = layer(0, [0.36, 1.2, 1.4, 2.5, 24, 40, 0.6, 0.4, 0.5, 0.4], "the low clouds", CELLS, LOW);
+export const FORMATION_DEEP = layer(1, [0, 1.2, 9, 14, 112, 25, 0.5, 0.3, 0.7, 0.6], "the deep clouds", TURRETS, DEEP);
+export const FORMATION_MIDDLE = layer(
+    2,
+    [0.25, 4.5, 0.7, 1.6, 28, 10, 0.5, 0.3, 0.6, 0.2],
+    "the middle clouds",
+    CELLS,
+    MIDDLE,
+);
 export const FORMATION_ANVIL: LabSlider[] = [
     [
         "anvil",
@@ -223,4 +283,43 @@ export const FORMATION_MARCH: LabSlider[] = [
     ["fadeKm", "air", 20, 300, 5, 90, "The distance at which a cloud has faded to 1/e into the sky, in km"],
     ["noiseKm", "noise tile", 0.3, 6, 0.1, 1.6, "One tile of the detail noise, in km"],
     ["mapKm", "map extent", 40, 800, 20, 300, "How many km the view from above is tall"],
+];
+
+// The sliders of the voxel cloudscape's designer.
+export const VOXEL: LabSlider[] = [
+    ["v.coverage", "coverage", 0, 1, 0.01, 0.42, "How much of the sky the clouds cover"],
+    ["v.sharpness", "sharpness", 0, 0.9, 0.01, 0.35, "How hard the cloud map's edges are"],
+    [
+        "v.size",
+        "size",
+        0.5,
+        3,
+        0.05,
+        1,
+        "How much larger the clouds are, every length of them but the base's height: the voxels grow with them",
+    ],
+    ["v.baseKm", "base", LOW.base[0], LOW.base[1], 0.1, 1.2, `The layer's base, in km: ${LOW.base[2]}`],
+    ["v.heightKm", "height", 0.4, 4, 0.1, 2.4, "How tall the ordinary clouds' layer is, in km"],
+    ["v.offset", "offset", 0, 0.9, 0.01, 0.25, "The share of the height the bottoms dip below the base's level"],
+    [
+        "v.extinction",
+        "density",
+        LOW.density[0],
+        LOW.density[1],
+        1,
+        32,
+        `Extinction per km of full density: ${LOW.density[2]}`,
+    ],
+    ["v.towers", "towers", 0, 1, 0.01, 0.3, "How much of the layer grows into towers that rise through it"],
+    ["v.towerScale", "tower height", 1, 4, 0.1, 1.5, "How many times taller than the layer the towers grow"],
+    [
+        "v.billows",
+        "billows",
+        0,
+        1,
+        0.01,
+        0.12,
+        "How deep billows heap up the voxels' surface, as a share of the height",
+    ],
+    ["v.detail", "detail", 0, 1, 0.05, 0.55, "How far the detail noise erodes the voxels' shape, at every step"],
 ];

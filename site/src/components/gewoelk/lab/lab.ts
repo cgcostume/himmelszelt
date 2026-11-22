@@ -11,7 +11,7 @@ import {
     SDR,
     gpu as shared,
 } from "../../dunstkreis/atmosphere";
-import { flightIn } from "../../dunstkreis/flight";
+import { flight, flightIn } from "../../dunstkreis/flight";
 import { GRID_STRENGTH, GRID_WGSL, gridOffsets } from "../../dunstkreis/groundgrid";
 import { type Basis, cameraBasis, lookAround, project, type SkyCamera } from "../../dunstkreis/skycamera";
 import { onDemand } from "../../frame";
@@ -126,10 +126,11 @@ export interface Orbit {
     /** The nearest and the farthest the wheel zooms to. */
     reachKm: readonly [number, number];
 }
-const ORBIT_ELEVATION = [3 * DEG, 89 * DEG] as const;
+// Below the point it looks at too, as far as the ground lets it: from under a cloud, up at its base.
+const ORBIT_ELEVATION = [-80 * DEG, 89 * DEG] as const;
 const ORBIT_LEAST_HEIGHT_KM = 0.02;
 /** The heights an orbit's camera looks at, in km. */
-export const ORBIT_HEIGHT_KM = [0, 16] as const;
+export const ORBIT_HEIGHT_KM = [0, 18] as const;
 const EARTH_KM = 6360;
 
 /** Where an orbit's camera stands: how far along the ground from its center, how high, and the pitch it looks at it by. */
@@ -159,13 +160,16 @@ function orbitAround(canvas: HTMLCanvasElement, orbit: Orbit, onChange: () => vo
         const [a, b] = [...pointers.values()];
         return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
     };
+    // In flight the camera is the flight's: the orbit rests until it has landed.
+    const aloft = () => canvas.hasAttribute("data-flying");
     canvas.addEventListener("pointerdown", (event) => {
+        if (aloft()) return;
         canvas.setPointerCapture(event.pointerId);
         pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     });
     canvas.addEventListener("pointermove", (event) => {
         const last = pointers.get(event.pointerId);
-        if (!last) return;
+        if (!last || aloft()) return;
         const before = spread();
         pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
         if (pointers.size > 1) return before > 0 ? zoom(before / Math.max(spread(), 1)) : undefined;
@@ -185,6 +189,7 @@ function orbitAround(canvas: HTMLCanvasElement, orbit: Orbit, onChange: () => vo
     canvas.addEventListener(
         "wheel",
         (event) => {
+            if (aloft()) return;
             event.preventDefault();
             zoom(Math.exp(event.deltaY * 0.001));
         },
@@ -240,7 +245,8 @@ export function createLab(
     let orbitHeightM = 1;
     const seenFrom = flying?.height ?? (() => orbitHeightM);
     function placeOrbit() {
-        if (!orbit) return;
+        // In flight the camera stays where it has flown to: landed, it is back on its orbit.
+        if (!orbit || canvas.hasAttribute("data-flying")) return;
         const { groundKm, heightKm, pitch } = orbitCamera(orbit);
         flown.east = orbit.center.east + groundKm * Math.sin(orbit.azimuth);
         flown.north = orbit.center.north + groundKm * Math.cos(orbit.azimuth);
@@ -436,8 +442,22 @@ export function createLab(
     maybe("marks")?.addEventListener("click", lab.request);
     onChange(lab.request);
     new ResizeObserver(lab.request).observe(canvas);
-    if (orbit) orbitAround(canvas, orbit, lab.request);
-    else lookAround(canvas, camera, { onChange: lab.request });
+    if (orbit) {
+        orbitAround(canvas, orbit, lab.request);
+        // Flight from where the orbit's camera stands, over the figure's own ground: the page's place stays.
+        flight(canvas, camera, {
+            button: maybe("fly"),
+            height: () => orbitHeightM,
+            move(eastKm, northKm, heightM) {
+                flown.east += eastKm;
+                flown.north += northKm;
+                orbitHeightM = heightM;
+                lab.request();
+            },
+            look: lab.request,
+            hint: root.querySelector('.fig-hint[data-for="view"]'),
+        });
+    } else lookAround(canvas, camera, { onChange: lab.request });
     // The checked preset's values over the sliders' own, so the two never disagree at the start.
     for (const group of Object.keys(presets)) {
         const first = lab.choice(group);

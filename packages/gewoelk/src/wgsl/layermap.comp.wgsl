@@ -33,63 +33,6 @@ struct GwLayerModel {
 const GW_LAYER_WALL_AT: f32 = 0.09;
 const GW_LAYER_WALL_WIDE: f32 = 0.06;
 
-fn gwLayerMapRandom(cell: vec2i, period: vec2i, seed: u32) -> vec4f {
-    let h = gwLattice(vec3i(cell, 0), vec3i(period, 1), seed);
-    return vec4f(gwUnit(h), gwUnit(gwHash(vec3u(h, 1u, 2u))), gwUnit(gwHash(vec3u(h, 3u, 4u))), gwUnit(gwHash(vec3u(h, 5u, 6u))));
-}
-
-// Pillows that touch, as the cells of a closed deck do: one per lattice cell, each a dome of its own height, with a
-// crease where it meets its neighbors.
-fn gwLayerMapPillows(p: vec2f, period: vec2i, seed: u32) -> f32 {
-    let cell = vec2i(floor(p));
-    let f = p - floor(p);
-    // The nearest point's distance, the second nearest's, and the nearest's own height.
-    var near = vec3f(8.0, 8.0, 0.0);
-    for (var j = -1; j <= 1; j = j + 1) {
-        for (var i = -1; i <= 1; i = i + 1) {
-            let o = vec2i(i, j);
-            let r = gwLayerMapRandom(cell + o, period, seed);
-            let d = length(vec2f(o) + 0.5 + (r.xy - 0.5) * 0.9 - f);
-            if (d < near.x) {
-                near = vec3f(d, near.x, r.z);
-            } else if (d < near.y) {
-                near.y = d;
-            }
-        }
-    }
-    return (0.55 + 0.45 * near.z) * (1.0 - 0.5 * near.x * near.x) * mix(0.35, 1.0, smoothstep(0.0, 0.3, near.y - near.x));
-}
-
-// Towers, one per lattice cell where `share` of the cells have one: x the tallest tower's height at `p`, steep at its
-// flanks and rounded on top, y the skirt of a tall one's anvil, an ellipse carried and stretched by `reach` cells, round
-// without a wind and none without a reach set.
-// With `column` 0 or more, only the cells of that column have towers: a row of them.
-fn gwLayerMapTowers(p: vec2f, period: vec2i, share: f32, reach: vec2f, column: i32, seed: u32) -> vec2f {
-    let cell = vec2i(floor(p));
-    let f = p - floor(p);
-    let far = length(reach);
-    let along = select(vec2f(1.0, 0.0), reach / max(far, 1e-4), far > 1e-4);
-    var best = vec2f(0.0);
-    for (var j = -2; j <= 2; j = j + 1) {
-        for (var i = -2; i <= 2; i = i + 1) {
-            let o = vec2i(i, j);
-            let r = gwLayerMapRandom(cell + o, period, seed);
-            if (r.w > share || (column >= 0 && cell.x + i != column)) {
-                continue;
-            }
-            let rel = f - (vec2f(o) + 0.5 + (r.xy - 0.5) * 0.8);
-            let tall = 0.45 + 0.55 * r.z;
-            let q = length(rel) / (0.3 + 0.14 * r.z);
-            let body = sqrt(max(1.0 - q * q * q * q, 0.0)) * (1.0 - 0.25 * q * q) * tall;
-            let off = rel - reach * 0.5;
-            let e = vec2f(dot(off, along) / (0.5 + 0.6 * far), dot(off, vec2f(-along.y, along.x)) / 0.5);
-            let skirt = max(1.0 - dot(e, e), 0.0) * smoothstep(0.8, 0.95, tall) * smoothstep(0.0, 0.1, gwLayerModel.anvils);
-            best = max(best, vec2f(body, skirt));
-        }
-    }
-    return best;
-}
-
 // The map at `uv`: x a column's value, y the skirt of an anvil, z how far a front shades what lies under it.
 fn gwLayerMapValue(uv: vec2f) -> vec3f {
     let seed = gwLayerModel.seed;
@@ -112,7 +55,7 @@ fn gwLayerMapValue(uv: vec2f) -> vec3f {
         value = 1.0 - (1.0 - value) * (1.0 - value);
         // Cells on top, of two sizes: the turrets of a heap, the pillows of a deck.
         let q = p + pull * 0.6;
-        let tops = gwLayerMapPillows(q * 2.0, vec2i(2 * cells), seed + 7u) * (0.75 + 0.25 * gwLayerMapPillows(q * 5.0, vec2i(5 * cells), seed + 8u));
+        let tops = gwPillows(q * 2.0, vec2i(2 * cells), seed + 7u) * (0.75 + 0.25 * gwPillows(q * 5.0, vec2i(5 * cells), seed + 8u));
         return vec3f(value * (1.0 - lumps * (1.0 - tops)), 0.0, 0.0);
     }
     // A front, x from its leading edge to its back, y along it, its line swaying with the field: its towers are those
@@ -125,9 +68,11 @@ fn gwLayerMapValue(uv: vec2f) -> vec3f {
         period = vec2i(12, cells);
     }
     let q = at + pull * 0.35;
-    let towers = gwLayerMapTowers(q, period, select(coverage, 0.9, kind == 3u), reach, select(-1, 1, kind == 3u), seed + 9u);
+    // An anvil's skirt where its reach is set: none at 0, and in full from 0.1 on.
+    let towers = gwTowers(q, period, select(coverage, 0.9, kind == 3u), reach, select(-1, 1, kind == 3u), seed + 9u) *
+        vec2f(1.0, smoothstep(0.0, 0.1, gwLayerModel.anvils));
     // Turrets on a tower, of two sizes, the taller ones towards its middle.
-    let turrets = gwLayerMapPillows(q * 4.0, 4 * period, seed + 12u) * (0.65 + 0.35 * gwLayerMapPillows(q * 10.0, 10 * period, seed + 13u));
+    let turrets = gwPillows(q * 4.0, 4 * period, seed + 12u) * (0.65 + 0.35 * gwPillows(q * 10.0, 10 * period, seed + 13u));
     let tower = towers.x * (0.8 + 0.4 * spread) * (1.0 - 0.45 * lumps * (1.0 - turrets));
     // An anvil is drawn out into fibers along the wind, a field averaged along it: they thin it, and fray its rim.
     let far = length(reach);
@@ -151,17 +96,24 @@ fn gwLayerMapValue(uv: vec2f) -> vec3f {
     return vec3f(clamp(value, 0.0, 1.0), frayed, shield);
 }
 
-@compute @workgroup_size(8, 8, 1)
-fn gwLayerMap(@builtin(global_invocation_id) id: vec3u) {
+// A workgroup bakes a tile of GW_LAYER_MAP_TILE texels square, its invocations one texel more each way: each computes
+// its texel's value once, and the slope comes from its neighbors' in workgroup memory.
+const GW_LAYER_MAP_TILE: u32 = 15u;
+var<workgroup> gwLayerMapHeights: array<f32, 256>;
+
+@compute @workgroup_size(16, 16, 1)
+fn gwLayerMap(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) local: vec3u) {
     let size = textureDimensions(gwLayerMapOut).xy;
-    if (id.x >= size.x || id.y >= size.y) {
+    let texel = group.xy * GW_LAYER_MAP_TILE + local.xy;
+    let here = gwLayerMapValue((vec2f(texel) + 0.5) / vec2f(size));
+    gwLayerMapHeights[local.y * 16u + local.x] = here.x;
+    workgroupBarrier();
+    if (any(local.xy == vec2u(GW_LAYER_MAP_TILE)) || any(texel >= size)) {
         return;
     }
-    let uv = (vec2f(id.xy) + 0.5) / vec2f(size);
-    let texel = 1.0 / vec2f(size);
-    let here = gwLayerMapValue(uv);
     // How steep the columns' tops are, per km: the march turns a height over a top into a distance from it.
-    let km = gwLayerModel.extent * texel;
-    let rise = vec2f(gwLayerMapValue(uv + vec2f(texel.x, 0.0)).x, gwLayerMapValue(uv + vec2f(0.0, texel.y)).x) - here.x;
-    textureStore(gwLayerMapOut, vec2i(id.xy), i32(gwLayerModel.layer), vec4f(here, length(rise / km)));
+    let km = gwLayerModel.extent / vec2f(size);
+    let at = local.y * 16u + local.x;
+    let rise = vec2f(gwLayerMapHeights[at + 1u], gwLayerMapHeights[at + 16u]) - here.x;
+    textureStore(gwLayerMapOut, vec2i(texel), i32(gwLayerModel.layer), vec4f(here, length(rise / km)));
 }

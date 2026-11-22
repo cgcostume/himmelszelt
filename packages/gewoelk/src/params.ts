@@ -126,6 +126,9 @@ export interface CloudscapeParams {
      *  `clearingKm` by default; beyond, they grow fewer steadily towards it. */
     clearingKm?: number;
     clearingFromKm?: number;
+    /** Where the clearing is centered, in km east and north of the observer, [0, 0] by default: a patch of clouds that
+     *  stays where it is while a camera moves about it. */
+    clearingCenterKm?: readonly [number, number];
     /** How much of the cloudscape grows into towers that rise through the slab and spread at the top, 0 to 1, and how
      *  deep billows heap up its surface, as a share of its height, each about `billowKm` across: 0 keeps the map's
      *  smooth mounds. */
@@ -307,7 +310,7 @@ export const DEFAULT_CLOUD_PARAMS: CloudParams = {
 export const EVOLUTION_PERIOD = 8;
 
 /** Byte sizes of the uniform structs in params.wgsl. */
-export const PARAMS_SIZE = 608;
+export const PARAMS_SIZE = 624;
 export const SUNLIGHT_SIZE = 64 + 128 * 16;
 export const CLOUDSCAPE_SIZE = 112;
 export const SHEET_SIZE = 128;
@@ -318,6 +321,7 @@ export const AERIAL_OFFSET = CLOUDSCAPE_OFFSET + 88;
 const SHEETS_OFFSET = 272;
 const WHITE_BALANCE_OFFSET = 528;
 const MOON_OFFSET = 576;
+const CLEARING_CENTER_OFFSET = 608;
 export const MAX_SHEETS = 2;
 
 const wrap = (value: number, period: number) => ((value % period) + period) % period;
@@ -521,5 +525,6 @@ export function paramsData(p: CloudParams, frame: number): ArrayBuffer {
     f.set([m0, m1, m2, 0, m3, m4, m5, 0, m6, m7, m8], WHITE_BALANCE_OFFSET / 4);
     f.set([...(p.moonDirection ?? [0, 0, 1]), corona ? corona.spread : 0], MOON_OFFSET / 4);
     f.set(p.moonIlluminance ?? [0, 0, 0], MOON_OFFSET / 4 + 4);
+    f.set(p.cloudscape.clearingCenterKm ?? [0, 0], CLEARING_CENTER_OFFSET / 4);
     return buffer;
 }

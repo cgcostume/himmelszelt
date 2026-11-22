@@ -98,9 +98,13 @@
     font-family: var(--font-mono);
 }
 /* Where a bow stands: two panels of one shape, the ground under both. */
-.bowplace-panel > svg {
+.bowplace-panel > :is(svg, canvas) {
     aspect-ratio: 4 / 3;
     border-radius: var(--radius-button);
+}
+.bowplace-panel > canvas {
+    display: block;
+    width: 100%;
 }
 /* The Sun in the side view is dragged: a press on it does not scroll the page, one elsewhere does. */
 .bowplace-panel > svg[data-panel="side"] {

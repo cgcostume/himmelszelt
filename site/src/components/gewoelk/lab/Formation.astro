@@ -121,18 +121,18 @@ const SPEED = choice(
                 <Choice figure={id} {...PRESET} />
                 <button type="button" class="view-toggle" data-copy title="Copies every slider as a preset, to paste into the figure's list">copy</button>
             </OptionGroup>
-            <OptionGroup name="low">
+            <OptionGroup name="low · 2.5D">
                 <button type="button" class="view-toggle" data-field="l0.enabled" aria-pressed="true" title="The low layer: scattered heaps at a low coverage, a closed deck at a high one">low</button>
                 <LabSliders sliders={FORMATION_LOW} />
             </OptionGroup>
-            <OptionGroup name="deep">
+            <OptionGroup name="deep · 2.5D">
                 <button type="button" class="view-toggle" data-field="l1.enabled" aria-pressed="true" title="The deep layer, from near the ground to the top of the weather">deep</button>
                 <Choice figure={id} {...kinds(1, [TOWERS, FRONTS], "2")} />
                 <LabSliders sliders={FORMATION_DEEP} />
                 <LabSliders sliders={FORMATION_ANVIL} />
                 <LabSliders sliders={FORMATION_FRONT} />
             </OptionGroup>
-            <OptionGroup name="middle">
+            <OptionGroup name="middle · 2.5D">
                 <button type="button" class="view-toggle" data-field="l2.enabled" aria-pressed="true" title="The middle layer">middle</button>
                 <LabSliders sliders={FORMATION_MIDDLE} />
             </OptionGroup>

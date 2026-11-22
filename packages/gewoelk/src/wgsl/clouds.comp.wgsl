@@ -79,12 +79,6 @@ override GW_SCATTERING_OCTAVES: u32 = 8u;
 // Below this transmittance a ray is done.
 const GW_MIN_TRANSMITTANCE: f32 = 0.01;
 
-// Interleaved gradient noise (Jimenez 2014), a different frame of it each frame.
-fn gwJitter(pixel: vec2u, frame: u32) -> f32 {
-    let p = vec2f(pixel) + 5.588238 * f32(frame % 64u);
-    return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y));
-}
-
 struct GwSample {
     // The up-rezzed density, 0 to 1, and the profile's, for the lighting.
     full: f32,
@@ -209,12 +203,19 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
             break;
         }
         let p = o + v * t;
-        // Beyond the clearing nothing is left, and a ray from the observer only gets farther from it.
+        // Beyond the clearing nothing is left. A ray that leaves it only gets farther from it; one that starts outside
+        // a clearing centered elsewhere strides on to its edge, as far as it is off over the ground at least.
         let x = gwPointAt(p);
         let left = gwClearingOver(x.ground);
         if (left <= 0.0) {
-            ended = true;
-            break;
+            let off = x.ground - gwParams.clearingCenter;
+            if (dot(off, v.xy) >= 0.0) {
+                ended = true;
+                break;
+            }
+            within = false;
+            t = t + max(length(off) - gwParams.cloudscape.clearing, max(volume.stepMin, volume.stepGrowth * sqrt(max(t, 0.0))));
+            continue;
         }
         let q = gwVolumeCoordinate(x);
         let m = gwModelingAt(q);

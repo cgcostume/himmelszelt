@@ -1,10 +1,13 @@
 import {
     CLOUD_TYPES,
     type CloudLayer,
+    type CloudscapeParams,
+    DEFAULT_CLOUDSCAPE,
     DEFAULT_LAYERED_SKY,
     type DeepLayer,
     type HighSheet,
     type LayeredSky,
+    WEATHER,
 } from "@himmelszelt/gewoelk";
 import type { Presets } from "./lab";
 
@@ -16,6 +19,8 @@ import type { Presets } from "./lab";
 export type Place = keyof LayeredSky;
 /** What a designer figure designs: a place of the sky, the deep one as its towers or as a front. */
 export type Design = "low" | "towers" | "front" | "middle" | "high";
+/** What a designer figure shows: one of those, or the voxel cloudscape, which is no place of the layered sky. */
+export type Designed = Design | "voxel";
 export const placeOf = (design: Design): Place => (design === "towers" || design === "front" ? "deep" : design);
 
 const MARCHED = ["low", "deep", "middle"] as const;
@@ -125,5 +130,51 @@ export function kindSource(sky: LayeredSky, place: Place): string {
     const fields = Object.entries(sky[place]).map(
         ([key, value]) => `${key}: ${typeof value === "number" ? Number(value.toFixed(3)) : JSON.stringify(value)}`,
     );
+    return `{ ${fields.join(", ")} }`;
+}
+
+// The voxel cloudscape's numbers a designer sets, by their names in the library: the sliders are "v." and the name.
+const VOXEL = [
+    "coverage",
+    "sharpness",
+    "size",
+    "extinction",
+    "towers",
+    "towerScale",
+    "billows",
+    "baseKm",
+    "heightKm",
+    "offset",
+    "detail",
+] as const;
+export type VoxelNumbers = Record<(typeof VOXEL)[number], number>;
+
+/** The library's weathers a voxel designer offers as kinds of cloud: their cloudscapes, by the names it shows. */
+export const VOXEL_KINDS: Record<string, Partial<CloudscapeParams>> = {
+    fair: WEATHER.fair.cloudscape,
+    scattered: WEATHER.scattered.cloudscape,
+    towering: WEATHER.towering.cloudscape,
+    deck: WEATHER.overcast.cloudscape,
+};
+
+/** The cloudscape as the sliders have it, read by `value`. */
+export const voxelFrom = (value: (param: string) => number) =>
+    Object.fromEntries(VOXEL.map((key) => [key, value(`v.${key}`)])) as VoxelNumbers;
+
+/** A cloudscape's `numbers` over the library's defaults, as a preset of the sliders. */
+export function voxelPreset(numbers: Record<string, unknown>): Record<string, number> {
+    const whole: Record<string, unknown> = { size: 1, towerScale: 1, ...DEFAULT_CLOUDSCAPE, ...numbers };
+    return Object.fromEntries(
+        VOXEL.flatMap((key) => (typeof whole[key] === "number" ? [[`v.${key}`, whole[key]]] : [])),
+    );
+}
+
+/** The voxel designer's kinds as presets of the sliders. */
+export const voxelPresets = (): Presets =>
+    Object.fromEntries(Object.entries(VOXEL_KINDS).map(([name, kind]) => [name, voxelPreset(kind)]));
+
+/** What the sliders hold for the cloudscape, as the `cloudscape` of an entry of the library's `WEATHER`. */
+export function voxelSource(numbers: VoxelNumbers): string {
+    const fields = Object.entries(numbers).map(([key, value]) => `${key}: ${Number(value.toFixed(3))}`);
     return `{ ${fields.join(", ")} }`;
 }

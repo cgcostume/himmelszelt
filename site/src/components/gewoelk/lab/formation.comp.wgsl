@@ -74,62 +74,6 @@ const WALL_WIDE: f32 = 0.06;
 @group(1) @binding(0) var formOut: texture_storage_2d<rgba16float, write>;
 @group(1) @binding(1) var formCanvas: texture_storage_2d<rgba16float, write>;
 
-fn formRandom(cell: vec2i, period: vec2i, seed: u32) -> vec4f {
-    let h = gwLattice(vec3i(cell, 0), vec3i(period, 1), seed);
-    return vec4f(gwUnit(h), gwUnit(gwHash(vec3u(h, 1u, 2u))), gwUnit(gwHash(vec3u(h, 3u, 4u))), gwUnit(gwHash(vec3u(h, 5u, 6u))));
-}
-
-// Pillows that touch, as the cells of a closed deck do: one per lattice cell, each a dome of its own height, with a
-// crease where it meets its neighbors.
-fn formPillows(p: vec2f, period: vec2i, seed: u32) -> f32 {
-    let cell = vec2i(floor(p));
-    let f = p - floor(p);
-    // The nearest point's distance, the second nearest's, and the nearest's own height.
-    var near = vec3f(8.0, 8.0, 0.0);
-    for (var j = -1; j <= 1; j = j + 1) {
-        for (var i = -1; i <= 1; i = i + 1) {
-            let o = vec2i(i, j);
-            let r = formRandom(cell + o, period, seed);
-            let d = length(vec2f(o) + 0.5 + (r.xy - 0.5) * 0.9 - f);
-            if (d < near.x) {
-                near = vec3f(d, near.x, r.z);
-            } else if (d < near.y) {
-                near.y = d;
-            }
-        }
-    }
-    return (0.55 + 0.45 * near.z) * (1.0 - 0.5 * near.x * near.x) * mix(0.35, 1.0, smoothstep(0.0, 0.3, near.y - near.x));
-}
-
-// Towers, one per lattice cell where `share` of the cells have one: x the tallest tower's height at `p`, steep at its
-// flanks and rounded on top, y the skirt of a tall one's anvil, an ellipse carried and stretched by `reach` cells.
-// With `column` 0 or more, only the cells of that column have towers: a row of them.
-fn formTowers(p: vec2f, period: vec2i, share: f32, reach: vec2f, column: i32, seed: u32) -> vec2f {
-    let cell = vec2i(floor(p));
-    let f = p - floor(p);
-    let far = length(reach);
-    let along = select(vec2f(1.0, 0.0), reach / max(far, 1e-4), far > 1e-4);
-    var best = vec2f(0.0);
-    for (var j = -2; j <= 2; j = j + 1) {
-        for (var i = -2; i <= 2; i = i + 1) {
-            let o = vec2i(i, j);
-            let r = formRandom(cell + o, period, seed);
-            if (r.w > share || (column >= 0 && cell.x + i != column)) {
-                continue;
-            }
-            let rel = f - (vec2f(o) + 0.5 + (r.xy - 0.5) * 0.8);
-            let tall = 0.45 + 0.55 * r.z;
-            let q = length(rel) / (0.3 + 0.14 * r.z);
-            let body = sqrt(max(1.0 - q * q * q * q, 0.0)) * (1.0 - 0.25 * q * q) * tall;
-            let off = rel - reach * 0.5;
-            let e = vec2f(dot(off, along) / (0.5 + 0.6 * far), dot(off, vec2f(-along.y, along.x)) / 0.5);
-            let skirt = max(1.0 - dot(e, e), 0.0) * smoothstep(0.8, 0.95, tall);
-            best = max(best, vec2f(body, skirt));
-        }
-    }
-    return best;
-}
-
 // A layer's map at `uv`: x a column's value, y the skirt of an anvil, z how far a front shades what lies under it.
 fn formValue(layer: u32, uv: vec2f) -> vec3f {
     let l = L[layer];
@@ -150,7 +94,7 @@ fn formValue(layer: u32, uv: vec2f) -> vec3f {
         value = 1.0 - (1.0 - value) * (1.0 - value);
         // Cells on top, of two sizes: the turrets of a heap, the pillows of a deck.
         let q = p + pull * 0.6;
-        let tops = formPillows(q * 2.0, vec2i(2 * cells), seed + 7u) * (0.75 + 0.25 * formPillows(q * 5.0, vec2i(5 * cells), seed + 8u));
+        let tops = gwPillows(q * 2.0, vec2i(2 * cells), seed + 7u) * (0.75 + 0.25 * gwPillows(q * 5.0, vec2i(5 * cells), seed + 8u));
         return vec3f(value * (1.0 - l.lumps * (1.0 - tops)), 0.0, 0.0);
     }
     // A front, x from its leading edge to its back, y along it, its line swaying with the field: its towers are those
@@ -163,9 +107,9 @@ fn formValue(layer: u32, uv: vec2f) -> vec3f {
         period = vec2i(12, cells);
     }
     let q = at + pull * 0.35;
-    let towers = formTowers(q, period, select(l.coverage, 0.9, kind == 3u), reach, select(-1, 1, kind == 3u), seed + 9u);
+    let towers = gwTowers(q, period, select(l.coverage, 0.9, kind == 3u), reach, select(-1, 1, kind == 3u), seed + 9u);
     // Turrets on a tower, of two sizes, the taller ones towards its middle.
-    let turrets = formPillows(q * 4.0, 4 * period, seed + 12u) * (0.65 + 0.35 * formPillows(q * 10.0, 10 * period, seed + 13u));
+    let turrets = gwPillows(q * 4.0, 4 * period, seed + 12u) * (0.65 + 0.35 * gwPillows(q * 10.0, 10 * period, seed + 13u));
     let tower = towers.x * (0.8 + 0.4 * spread) * (1.0 - 0.45 * l.lumps * (1.0 - turrets));
     // An anvil is drawn out into fibers along the wind, a field averaged along it: they thin it, and fray its rim.
     let far = length(reach);
@@ -423,7 +367,7 @@ fn formMarch(@builtin(global_invocation_id) id: vec3u) {
         let lit = 1.0 - exp(-max(farthest, 0.0) / F.fadeKm);
         var shade = vec2f(0.0);
         for (var k = 0u; k < AIR_STEPS; k = k + 1u) {
-            let part = (f32(k) + labJitter(id.xy, V.frame)) / f32(AIR_STEPS);
+            let part = (f32(k) + gwJitter(id.xy, u32(V.frame))) / f32(AIR_STEPS);
             let p = o + v * (-F.fadeKm * log(1.0 - part * lit));
             let thin = exp(-max(length(p) - V.planetRadius, 0.0) / 8.0);
             shade = shade + thin * vec2f(formShade(p, sun), 1.0);
@@ -433,7 +377,7 @@ fn formMarch(@builtin(global_invocation_id) id: vec3u) {
         let murk = AIR_UNDER * mix(around, vec3f(dot(around, vec3f(0.2126, 0.7152, 0.0722))), 0.7);
         let haze = mix(labAmbient(V, labAirFrom(V, v, sun)), murk, shaded);
         // Jittered by a whole stride, so the bands a fixed start would draw turn into grain.
-        var t = t0 + labJitter(id.xy, V.frame) * F.stepKm * (1.0 + max(t0, 0.0) * F.stepGrowth) * 2.5;
+        var t = t0 + gwJitter(id.xy, u32(V.frame)) * F.stepKm * (1.0 + max(t0, 0.0) * F.stepGrowth) * 2.5;
         // Striding through clear air; at the first cloud a stride back, and on in steps until the air has been clear
         // for a few of them.
         var striding = true;
@@ -504,7 +448,7 @@ fn formMarch(@builtin(global_invocation_id) id: vec3u) {
             if (rise > 0.0) {
                 let slant = 1.0 / max(rise, 0.05);
                 // Jittered alike at every step: the box the frame is composed through evens that out.
-                let offset = labJitter(id.xy, V.frame);
+                let offset = gwJitter(id.xy, u32(V.frame));
                 var tau = 0.0;
                 for (var i = 0u; i < FORM_LAYERS; i = i + 1u) {
                     // A flat layer by its column, which has no grain; towers and a front sampled up their height, so

@@ -19,7 +19,7 @@ function wgslSource(name: string): string {
 const PASSES: Record<string, readonly string[]> = {
     layermap: ["noise", "layermap"],
     layerpyramid: ["layerpyramid"],
-    layers: ["params", "camera", "rainbow", "layerread", "layers", "godrays"],
+    layers: ["noise", "params", "camera", "rainbow", "layerread", "layers", "godrays"],
 };
 const OUTPUTS: Record<string, string> = { layers: cloudOutput("rgba16float") };
 
@@ -70,7 +70,8 @@ test("the layers bake their maps and march into a texture of finite light, some 
     const size = 48;
     const render = () => {
         const encoder = device.createCommandEncoder();
-        const baked = march.update({ ...DEFAULT_LAYERED_PARAMS, sky }, encoder);
+        // Whether a tower's rain falls in so small a view is the seed's chance: this one has one.
+        const baked = march.update({ ...DEFAULT_LAYERED_PARAMS, seed: 3, sky }, encoder);
         march.encode(encoder, { params, sunlight, width: size, height: size });
         device.queue.submit([encoder.finish()]);
         return baked;

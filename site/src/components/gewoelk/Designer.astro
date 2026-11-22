@@ -6,7 +6,7 @@ import Choice from "../dunstkreis/Choice.astro";
 import Hdr from "../dunstkreis/Hdr.astro";
 import OptionGroup from "../dunstkreis/OptionGroup.astro";
 import Icon from "../Icon.astro";
-import { type Design, KIND_VALUE, kindsOf, placeOf } from "./lab/kinds";
+import { type Designed, KIND_VALUE, kindsOf, placeOf, VOXEL_KINDS } from "./lab/kinds";
 import LabSliders from "./lab/LabSliders.astro";
 import type { LabSlider } from "./lab/sliders";
 import * as all from "./lab/sliders";
@@ -16,58 +16,73 @@ import * as all from "./lab/sliders";
  * that orbits it, a drawing of the model that kind of cloud is rendered by, small in the patch's corner until a click
  * changes the two over, and beside them what it is rendered by, its numbers as sliders; under them a gallery of the textures it is rendered from, each with its format, size and memory on the GPU. The library's kinds of cloud for it are presets, and the reader
  * saves their own beside them; the numbers copy as a kind of the library's `CLOUD_TYPES`. The time of day and the
- * clock are the figure's own. The deep layer has two designers, one for its towers and one for a front.
+ * clock are the figure's own. The deep layer has two designers, one for its towers and one for a front, and the voxel
+ * cloudscape, which is no place of the layered sky, has one of the same make.
  */
 interface Props {
-    place: Design;
+    place: Designed;
     id?: string;
     caption?: string;
 }
 const { place } = Astro.props;
 const marched = place !== "high";
+const layered = place !== "voxel";
 
 // What a designer is, in words: its view, its model's drawing, its caption, and the kind it starts with.
-const DESIGNS: Record<Design, { label: string; model: string; caption: string; checked: string }> = {
+const DESIGNS: Record<Designed, { label: string; model: string; caption: string; checked: string }> = {
+    voxel: {
+        label: "A patch of the voxel cloudscape, 20 km across, seen from above",
+        model: "The voxel volume's model: a grid of voxels over the ground, filled as high as the cloud map's columns stand, some grown into towers, and a ray stepping through",
+        caption:
+            "The voxel cloudscape, the low clouds as a volume: cumulus from the heaps of a fair day to towering cumulus, and stratocumulus as a deck. (a) Its model: a grid of voxels, filled as high as the cloud map's columns stand, some grown into towers through the slab, and a ray (accent) that asks the way to the Sun (dashed) at every step. (b) A patch 20 km across. (c) Its numbers. Below, what it is rendered from: the cloud map, the voxels' shape and the distance to the nearest cloud, the light summed towards the Sun and from the sky, and the detail noise, each volume a slice at a time. The model's voxels are drawn far larger than the grid's.",
+        checked: "scattered",
+    },
     low: {
         label: "A patch of the low layer of cloud, 16 km across, seen from above",
         model: "The low layer's model: a map on the ground, a column of cloud over each of its cells between the layer's base and its top, and a ray stepping through the slab",
         caption:
-            "The low layer in three parts. (a) Its model: the map gives each column of cloud its height in the layer's slab, and a ray (accent) steps through, asking the way to the Sun (dashed) at every step. (b) A patch of the layer, 16 km across, on the chosen date and at the chosen place. (c) Its numbers. Below, what it is rendered from: the map's heights, the brighter the taller, the steepness of the tops, and the noise that heaps the surface. The model is to scale.",
+            "The low layer: cumulus, the heaps of a fair day, and with more of the sky covered a deck of stratocumulus. (a) Its model: the map gives each column of cloud its height in the layer's slab, and a ray (accent) steps through, asking the way to the Sun (dashed) at every step. (b) A patch of the layer, 16 km across, on the chosen date and at the chosen place. (c) Its numbers. Below, what it is rendered from: the map's heights, the brighter the taller, the steepness of the tops, and the noise that heaps the surface. The model is to scale.",
         checked: "fair",
     },
     towers: {
         label: "A patch of the deep layer's towers, 80 km across, seen from above",
         model: "The towers' model: a tower in some of the map's cells, turrets on top, the tallest under an anvil drawn downwind, rain under each",
         caption:
-            "The deep layer as towers. (a) Its model: a tower in a share of the map's cells, turrets on top, the tallest under an anvil drawn downwind, rain (dashed) under each. (b) A patch 80 km across. (c) Its numbers. Below, what it is rendered from: the towers' heights, the anvils' skirts, the steepness of the tops, and the noise. The model is to scale.",
+            "The deep layer as towers: towering cumulus, and cumulonimbus, the thundercloud, under its anvil. (a) Its model: a tower in a share of the map's cells, turrets on top, the tallest under an anvil drawn downwind, rain (dashed) under each. (b) A patch 80 km across. (c) Its numbers. Below, what it is rendered from: the towers' heights, the anvils' skirts, the steepness of the tops, and the noise. The model is to scale.",
         checked: "towers",
     },
     front: {
         label: "A patch of the deep layer as a front, 230 km across, seen from above",
         model: "The front's model: one band placed by a distance and a bearing from the observer, a wall of towers behind its leading edge and a shield to the rear",
         caption:
-            "The deep layer as a front. (a) Its model: one band, placed from the observer by a distance and a bearing (accent), a wall of towers behind its leading edge and a shield to the rear. (b) A patch 230 km across, its middle 60 km ahead of the observer. (c) Its numbers. Below, the map from the leading edge at its left to its back: heights, anvils, the front's shade and the tops' steepness. Heights in the model are drawn four times.",
+            "The deep layer as a front: a wall of cumulonimbus at its leading edge and nimbostratus, the rain cloud, as the shield behind it. (a) Its model: one band, placed from the observer by a distance and a bearing (accent), a wall of towers behind its leading edge and a shield to the rear. (b) A patch 230 km across, its middle 60 km ahead of the observer. (c) Its numbers. Below, the map from the leading edge at its left to its back: heights, anvils, the front's shade and the tops' steepness. Heights in the model are drawn four times.",
         checked: "frontAhead",
     },
     middle: {
         label: "A patch of the middle layer of cloud, 16 km across, seen from above",
         model: "The middle layer's model: a map on the ground, a column of cloud over each of its cells between the layer's base and its top, and a ray stepping through the slab",
         caption:
-            "The middle layer. (a) Its model, the low layer's, higher and thinner: columns in a slab, by a map. (b) A patch 16 km across. (c) Its numbers. Below, its map and the noise. The model is to scale.",
+            "The middle layer: altocumulus in flakes, patches and fields, and closed into a deck altostratus. (a) Its model, the low layer's, higher and thinner: columns in a slab, by a map. (b) A patch 16 km across. (c) Its numbers. Below, its map and the noise. The model is to scale.",
         checked: "altocumulus",
     },
     high: {
         label: "A patch of the sheet of high cloud, 12 km across, seen from above",
         model: "The sheet's model: one shell at its altitude, the map's tile laid along the wind and repeated, a patch of the broad field, and a ray that reads the map once where it crosses",
         caption:
-            "The sheet of high cloud. (a) Its model: one shell, the map's tile repeated along the wind, a patch of the broad field (filled), and a ray (accent) that reads the map once where it crosses. (b) A patch 12 km across. (c) Its numbers. Below, the map channel by channel: puffs, veil, the broad field for the patches and flakes, and the fine noise of billows and fibers. The model is to scale.",
+            "The sheet of high cloud: cirrocumulus in puffs and ripples, cirrostratus as a veil, and cirrus in the trails combed out of both. (a) Its model: one shell, the map's tile repeated along the wind, a patch of the broad field (filled), and a ray (accent) that reads the map once where it crosses. (b) A patch 12 km across. (c) Its numbers. Below, the map channel by channel: puffs, veil, the broad field for the patches and flakes, and the fine noise of billows and fibers. The model is to scale.",
         checked: "mackerel",
     },
 };
 const { id = `design-${place}`, caption = DESIGNS[place].caption } = Astro.props;
 
 // The library's kinds by name: what a button reads, and what the kind is, after `CLOUD_TYPES`.
-const KINDS: Record<Design, Record<string, [label: string, title: string]>> = {
+const KINDS: Record<Designed, Record<string, [label: string, title: string]>> = {
+    voxel: {
+        fair: ["fair", "Fair-weather cumulus: small, flat, spread out"],
+        scattered: ["scattered", "Scattered cumulus, some of it growing"],
+        towering: ["towering", "Towering cumulus: tall, heaped, an afternoon in summer"],
+        deck: ["deck", "A closed deck of stratocumulus"],
+    },
     low: {
         few: ["few", "A few small heaps, far apart"],
         fair: ["fair", "Fair-weather cumulus: small and flat"],
@@ -107,7 +122,10 @@ const PRESET = {
     name: "preset",
     label: "Kind",
     title: "The library's kinds of cloud for this place of the sky: a click eases the sliders over to one",
-    options: kindsOf(place).map((name) => [name, ...(KINDS[place][name] ?? [name])]),
+    options: (place === "voxel" ? Object.keys(VOXEL_KINDS) : kindsOf(place)).map((name) => [
+        name,
+        ...(KINDS[place][name] ?? [name]),
+    ]),
     checked: DESIGNS[place].checked,
 };
 
@@ -116,7 +134,8 @@ const without = (sliders: LabSlider[], ...params: string[]) => sliders.filter(([
 // The deep layer's maps do not read the sharpness: its slider is held with the hidden ones.
 const DEEP = without(all.FORMATION_DEEP, "l1.sharp");
 // The designed place's sliders, group by group.
-const GROUPS: Record<Design, [name: string, sliders: LabSlider[]][]> = {
+const GROUPS: Record<Designed, [name: string, sliders: LabSlider[]][]> = {
+    voxel: [["cloudscape", all.VOXEL]],
     low: [["low", all.FORMATION_LOW]],
     towers: [["towers", [...DEEP, ...all.FORMATION_ANVIL, ...all.FORMATION_RAIN]]],
     front: [
@@ -135,7 +154,7 @@ const GROUPS: Record<Design, [name: string, sliders: LabSlider[]][]> = {
 };
 const starting = (sliders: LabSlider[], param: string, value: number) =>
     sliders.map((s): LabSlider => (s[0] === param ? [s[0], s[1], s[2], s[3], s[4], value, s[6]] : s));
-const time = marched ? all.FORMATION_TIME : without(all.FORMATION_TIME, "shear");
+const time = marched && layered ? all.FORMATION_TIME : without(all.FORMATION_TIME, "shear");
 // The towers start on a seed that stands a tower with its anvil in view.
 const TIME = place === "towers" ? starting(time, "seed", 13) : time;
 
@@ -148,7 +167,7 @@ const HELD = [
             .flatMap((sliders) => sliders as LabSlider[])
             .map((slider) => [slider[0], slider]),
     ).values(),
-].filter(([param]) => !SHOWN.has(param) && param !== "view.ev");
+].filter(([param]) => layered && !SHOWN.has(param) && param !== "view.ev" && !param.startsWith("v."));
 
 const choice = (name: string, label: string, title: string, options: string[][], checked: string) => ({
     name,
@@ -189,6 +208,17 @@ const STEPS = choice(
     ],
     "128",
 );
+const VOXEL_STEPS = choice(
+    "steps",
+    "Steps",
+    "Steps a ray takes at most",
+    [
+        ["128", "128"],
+        ["256", "256"],
+        ["512", "512"],
+    ],
+    "256",
+);
 const SIZE = choice(
     "size",
     "Map size",
@@ -200,6 +230,19 @@ const SIZE = choice(
     ],
     "2048",
 );
+// Which of gewoelk's models renders the designed cloud, as its mark in the view and what it means.
+const MODEL = {
+    field: [
+        "2.5D · height field",
+        "A height field: a map whose every texel is a column of cloud with a bottom and a top, which a ray steps through. No overhangs but what the noise heaps onto its surface, and the anvils",
+    ],
+    sheet: ["2D · sheet", "A sheet: one map on a shell at one height, read once where a ray crosses it"],
+    volume: [
+        "3D · voxel volume",
+        "A voxel volume: a grid of densities over the ground that holds any shape, with the distance to the nearest cloud beside it, by which a ray strides through clear air",
+    ],
+} as const;
+const model = !layered ? "volume" : marched ? "field" : "sheet";
 // How fast the figure's clock runs while it plays.
 const SPEEDS = [
     { speed: 1, icon: "speedClock", title: "As fast as a clock" },
@@ -223,14 +266,21 @@ const SPEEDS = [
                 <button type="button" class="designer-swap" data-field="swap"></button>
                 <div class="fig-bar">
                     <span class="fig-bar-start">
+                        <span class="cloud-model footnote" title={MODEL[model][1]}>{MODEL[model][0]}</span>
                         <span class="fig-hint footnote" data-for="view">Drag to turn, with shift for height, scroll to zoom.</span>
                         <span class="fig-hint footnote" data-for="model">Drag to rotate. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.</span>
                     </span>
                     <span class="fig-bar-end">
                         <span class="view-buttons">
+                            <button type="button" class="view-icon" data-field="fly" aria-pressed="false" title="Fly, or F over the view: the mouse is captured and turns the view, W A S D move, E up and Q down, at a speed of the height over the ground per second, Shift faster. F lands, back on the camera's orbit" aria-label="Fly"><Icon name="fly" /></button>
+                        </span>
+                        <span class="view-buttons">
                             <button type="button" class="view-icon" data-field="animate" aria-pressed="false" title="Play: the figure's own clock runs, the clouds drift and change, and the time of day goes with it" aria-label="Play"><Icon name="play" /></button>
                             <button type="button" class="view-icon" data-field="timeLock" aria-pressed="false" title="Hold the time of day while the figure plays: the clouds drift and change, the Sun stays where it is" aria-label="Hold the time of day"><Icon name="timeLock" /></button>
                             {SPEEDS.map(({ speed, icon, title }) => <button type="button" class="view-icon" data-speed={speed} aria-pressed={speed === 60 ? "true" : "false"} title={title} aria-label={title}><Icon name={icon} /></button>)}
+                        </span>
+                        <span class="view-buttons">
+                            <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
                         </span>
                     </span>
                 </div>
@@ -246,8 +296,8 @@ const SPEEDS = [
             <label class="figure-slider" title="The height the camera looks at, in km: it starts at the middle of the cloud. Dragging the view with shift held sets it too">
                 <span class="note">Height</span>
                 <span class="figure-slider-rail">
-                    <input type="range" data-field="lookAt" min="0" max="16" step="0.1" value="2" aria-label="The height the camera looks at, in km" />
-                    <span class="figure-slider-scale" aria-hidden="true">{["0", "4", "8", "12", "16"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 25}%`}>{mark}</span>)}</span>
+                    <input type="range" data-field="lookAt" min="0" max="18" step="0.1" value="2" aria-label="The height the camera looks at, in km" />
+                    <span class="figure-slider-scale" aria-hidden="true">{["0", "6", "12", "18"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${(i * 100) / 3}%`}>{mark}</span>)}</span>
                 </span>
                 <output data-field="lookAtValue"></output>
             </label>
@@ -266,14 +316,14 @@ const SPEEDS = [
             </OptionGroup>
             <OptionGroup name="render">
                 <Choice figure={id} {...SCALE} />
-                {marched ? <Choice figure={id} {...STEPS} /> : <Choice figure={id} {...SIZE} />}
+                {!layered ? <Choice figure={id} {...VOXEL_STEPS} /> : marched ? <Choice figure={id} {...STEPS} /> : <Choice figure={id} {...SIZE} />}
                 <button type="button" class="view-toggle" data-field="ground.grid" aria-pressed="true" title="A grid on the ground under the patch: thin lines every 10 km, 1 km, 100 m and on down, each level showing once its cells are a few pixels across">grid</button>
             </OptionGroup>
             <OptionGroup name="HDR (× SDR white)">
                 <Hdr figure={id} />
             </OptionGroup>
             <div hidden>
-                {placeOf(place) === "deep" && <Choice figure={id} {...KIND} />}
+                {place !== "voxel" && placeOf(place) === "deep" && <Choice figure={id} {...KIND} />}
                 <LabSliders sliders={HELD} />
             </div>
         </div>
@@ -284,7 +334,11 @@ const SPEEDS = [
 </figure>
 
 <script>
+    import { voxelFigure } from "./lab/voxel";
     import { weatherFigure } from "./lab/weather";
 
-    for (const root of document.querySelectorAll<HTMLElement>("figure[data-cloud-designer]")) weatherFigure(root);
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-cloud-designer]")) {
+        if (root.dataset.design === "voxel") voxelFigure(root);
+        else weatherFigure(root);
+    }
 </script>

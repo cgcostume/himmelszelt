@@ -3,11 +3,12 @@ import Slider from "../../Slider.astro";
 import Term from "../../Term.astro";
 import "./rainbow.css";
 
-/** Where a bow can stand: the cones of the two bows around the antisolar point, for a Sun of the figure's own. */
+/** Where a bow can stand: the cones of the two bows around the antisolar point, for a Sun of the figure's own, and the
+ *  same view rendered on the GPU (bowview.ts). */
 ---
 
-<figure class="fig" id="bow-place">
-    <div class="fig-row" style="--gap: 1rem" data-export="bow-place" data-export-timeless>
+<figure class="fig wide" id="bow-place">
+    <div class="fig-row" style="--count: 3; --gap: 1rem" data-actions="png copy" data-export-timeless>
         <figure class="fig-tile">
             <div class="bowplace-panel"><svg data-panel="side" role="img" aria-label="An observer from the side, the Sun behind, and the lines of sight to the two bows in the rain ahead"></svg></div>
             <figcaption><span class="subfigure-title">from the side</span>, the Sun behind you</figcaption>
@@ -15,6 +16,10 @@ import "./rainbow.css";
         <figure class="fig-tile">
             <div class="bowplace-panel"><svg data-panel="sky" role="img" aria-label="The sky opposite the Sun: the two bows as circles around the antisolar point, cut off by the horizon"></svg></div>
             <figcaption><span class="subfigure-title">as seen</span>, looking away from the Sun</figcaption>
+        </figure>
+        <figure class="fig-tile">
+            <div class="bowplace-panel as-seen"><canvas data-panel="rendered" role="img" aria-label="The same sky rendered: the two bows in a shower of rain under a dark cloud"></canvas></div>
+            <figcaption><span class="subfigure-title">rendered</span>, the same view of a shower</figcaption>
         </figure>
     </div>
     <Slider
@@ -36,7 +41,9 @@ import "./rainbow.css";
         sight 42° and 51° from the line to the <Term of="Antisolar point">antisolar point</Term>, dashed where the ground
         is in the way, and the sunlight on the drops they meet, parallel to the light reaching you. (b) The bows as circles around that point, in five wavelengths by gewoelk's{" "}
         <code>bowDirection</code>, each top as high as <code>bowTop</code> gives it; a stereographic projection, in which
-        circles stay circles. Symbols, not to scale.
+        circles stay circles. (c) The same view rendered, in the same projection: a shower of 5 mm/h ahead under a dark cloud,
+        its light read from <code>rainbowTable</code>, under the sunlight the air lets through at the Sun's height, the
+        cloud and the ground plain grays. Symbols in (a), not to scale.
     </figcaption>
 </figure>
 

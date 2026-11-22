@@ -31,33 +31,6 @@ fn cirrusNoise(p: vec2f, period: vec2i, seed: u32) -> f32 {
     return gwPerlin(vec3f(p, C.phase), vec3i(period, 8), seed);
 }
 
-// Bumps: one per lattice cell, its center off the middle by `jitter` of the cell, its size its own, both swelling
-// and fading with the evolution, neighbors melting into one another. At `p`, in cells: 0 outside all of them.
-fn cirrusBumps(p: vec2f, period: vec2i, jitter: f32, seed: u32) -> f32 {
-    let cell = vec2i(floor(p));
-    let f = p - floor(p);
-    var sum = 0.0;
-    for (var j = -1; j <= 1; j = j + 1) {
-        for (var i = -1; i <= 1; i = i + 1) {
-            let o = vec2i(i, j);
-            let h = gwLattice(vec3i(cell + o, 0), vec3i(period, 1), seed);
-            let r = vec3f(gwUnit(h), gwUnit(gwHash(vec3u(h, 1u, 2u))), gwUnit(gwHash(vec3u(h, 3u, 4u))));
-            let life = 0.5 + 0.5 * sin(TAU * (C.phase / 8.0 * (1.0 + floor(r.z * 3.0)) + r.x));
-            let center = vec2f(o) + 0.5 + (r.xy - 0.5) * jitter;
-            let radius = mix(0.45, 0.95, r.z * r.z) * (0.65 + 0.35 * life);
-            let d = length(f - center) / radius;
-            // A smooth maximum: where two bumps meet they join instead of creasing.
-            sum = sum + pow(max(1.0 - d * d, 0.0), 6.0);
-        }
-    }
-    return pow(sum, 1.0 / 6.0);
-}
-
-// Lumps: bumps of three sizes, each half the last, for a puff's cauliflower surface.
-fn cirrusLumps(p: vec2f, period: vec2i, seed: u32) -> f32 {
-    return 0.55 * cirrusBumps(p * 2.0, period * 2, 1.0, seed) + 0.3 * cirrusBumps(p * 4.0, period * 4, 1.0, seed + 1u) + 0.15 * cirrusBumps(p * 8.0, period * 8, 1.0, seed + 2u);
-}
-
 // Whole lattice cells across the tile for features `km` wide.
 fn cirrusCells(km: f32) -> i32 {
     return max(1, i32(round(C.tile / max(km, 1e-3))));
@@ -84,8 +57,8 @@ fn cirrusBake(@builtin(global_invocation_id) id: vec3u) {
     let coarse = max(vec2i(vec2f(lattice) * 0.7 + 0.5), vec2i(1));
     let shove = vec2f(cirrusNoise(q * vec2f(coarse), coarse, seed + 5u), cirrusNoise(q * vec2f(coarse), coarse, seed + 6u));
     let shaped = at + (1.0 - 0.6 * C.rows) * 0.55 * shove;
-    let mounds = cirrusBumps(shaped, lattice, 1.0 - 0.7 * C.rows, seed + 10u);
-    let lumps = cirrusLumps(shaped, lattice, seed + 11u);
+    let mounds = gwBumps(shaped, lattice, 1.0 - 0.7 * C.rows, C.phase, seed + 10u);
+    let lumps = gwLumps(shaped, lattice, C.phase, seed + 11u);
     let eaten = (1.0 - lumps) * C.grain;
     var puffs = clamp((mounds - eaten) / max(1.0 - eaten, 0.05), 0.0, 1.0);
     let fine = gwFbm(vec3f(uv * f32(across * 6), C.phase), vec3i(vec2i(across * 6), 8), 3u, seed + 14u);
@@ -115,7 +88,7 @@ fn cirrusBake(@builtin(global_invocation_id) id: vec3u) {
     // The broad field, for the patches: its own slow octaves.
     let broad = gwFbm(vec3f(uv * 4.0, C.phase * 0.5), vec3i(4, 4, 8), 4u, seed + 40u);
     // The billows' noise: 1 between lumps of three sizes, the largest a sixteenth of the tile, 0 on top of them.
-    let billows = 1.0 - cirrusLumps(uv * f32(BILLOW_CELLS / 2), vec2i(BILLOW_CELLS / 2), seed + 60u);
+    let billows = 1.0 - gwLumps(uv * f32(BILLOW_CELLS / 2), vec2i(BILLOW_CELLS / 2), C.phase, seed + 60u);
     textureStore(labOut, vec2i(id.xy), vec4f(clamp(C.cells * puffs, 0.0, 1.0), clamp(C.veil * veil, 0.0, 1.0), broad, billows));
 }
 

@@ -127,6 +127,8 @@ struct GwParams {
     // The Moon's illuminance at the observer, per channel in lux: zero for no Moon.
     moonIlluminance: vec3f,
     pad: f32,
+    // Where the cloudscape's clearing is centered, in km east and north of the observer.
+    clearingCenter: vec2f,
 }
 
 // The sun's illuminance in lux by its elevation above the local horizon, which grows by a degree every 111 km towards

@@ -28,10 +28,10 @@ fn gwSunAt(row: u32, elevation: f32) -> vec3f {
 // Where a sheet's strands run at `w`, km along and across the wind: lines across it swept along a broad flow and
 // curled into hooks by a smaller one, as the shear draws the fall streaks of ice out.
 fn gwFlow(w: vec2f, sheet: GwSheet) -> vec2f {
-    let period = vec3i(1 << 20);
+    let period = vec2i(1 << 20);
     let width = sheet.fiberScale;
-    let sweep = gwPerlin(vec3f(w / (25.0 * width), 0.5), period, sheet.seed) * 4.0 * width * sheet.sweep;
-    let hook = gwPerlin(vec3f(w / (5.0 * width), 1.5), period, sheet.seed + 1u) * 0.8 * width * sheet.hook;
+    let sweep = gwPerlin2(w / (25.0 * width), period, sheet.seed) * 4.0 * width * sheet.sweep;
+    let hook = gwPerlin2(w / (5.0 * width), period, sheet.seed + 1u) * 0.8 * width * sheet.hook;
     return vec2f(w.x, w.y + sweep + hook);
 }
 
@@ -39,14 +39,14 @@ fn gwFlow(w: vec2f, sheet: GwSheet) -> vec2f {
 // `stretch` times as long as wide at first, raised to `power` to thin them, each faded where a pixel's `footprint` is
 // wider than it.
 fn gwFibers(p: vec2f, width: f32, power: f32, stretch0: f32, footprint: f32, seed: u32) -> f32 {
-    let period = vec3i(1 << 20);
+    let period = vec2i(1 << 20);
     var sum = 0.0;
     var total = 0.0;
     var weight = 0.5;
     var size = width;
     for (var k = 0u; k < 5u; k = k + 1u) {
         let stretch = stretch0 * (1.0 + 0.4 * f32(k));
-        let ridge = pow(1.0 - abs(gwPerlin(vec3f(p.x / (stretch * size), p.y / size, f32(k) * 7.1), period, seed + 2u + k)), power);
+        let ridge = pow(1.0 - abs(gwPerlin2(vec2f(p.x / (stretch * size), p.y / size), period, seed + 2u + k)), power);
         sum = sum + weight * mix(ridge, 0.35, smoothstep(0.1 * size, 0.4 * size, footprint));
         total = total + weight;
         weight = weight * 0.75;
@@ -58,12 +58,12 @@ fn gwFibers(p: vec2f, width: f32, power: f32, stretch0: f32, footprint: f32, see
 // Flocks at `p`, km over the ground: two octaves of turbulence, |gradient noise|, round tufts between thin creases
 // `size` and 0.4 of it across, 1 on a tuft, each octave faded where a pixel's `footprint` is wider than it.
 fn gwFlocks(p: vec2f, size0: f32, footprint: f32, seed: u32) -> f32 {
-    let period = vec3i(1 << 20);
+    let period = vec2i(1 << 20);
     var sum = 0.0;
     var size = size0;
     var weight = 0.65;
     for (var k = 0u; k < 2u; k = k + 1u) {
-        let tuft = clamp(abs(gwPerlin(vec3f(p / size, 6.3 + f32(k)), period, seed + 20u + k)) * 2.2, 0.0, 1.0);
+        let tuft = clamp(abs(gwPerlin2(p / size, period, seed + 20u + k)) * 2.2, 0.0, 1.0);
         sum = sum + weight * mix(tuft, 0.6, smoothstep(0.15 * size, 0.6 * size, footprint));
         size = size * 0.4;
         weight = 0.35;
@@ -74,14 +74,14 @@ fn gwFlocks(p: vec2f, size0: f32, footprint: f32, seed: u32) -> f32 {
 // Grain at `p`, km over the ground: four octaves of gradient noise from `size` down, each turned by 37° against the
 // one before so no lattice shows, in [0, 1], each faded to the middle where a pixel's `footprint` is wider than it.
 fn gwGrain(p: vec2f, size0: f32, footprint: f32, seed: u32) -> f32 {
-    let period = vec3i(1 << 20);
+    let period = vec2i(1 << 20);
     var sum = 0.0;
     var total = 0.0;
     var weight = 1.0;
     var size = size0;
     var q = p;
     for (var k = 0u; k < 4u; k = k + 1u) {
-        let n = gwPerlin(vec3f(q / size, 9.7 + f32(k)), period, seed + 40u + k);
+        let n = gwPerlin2(q / size, period, seed + 40u + k);
         sum = sum + weight * mix(n, 0.0, smoothstep(0.15 * size, 0.6 * size, footprint));
         total = total + weight;
         q = vec2f(0.7986 * q.x - 0.6018 * q.y, 0.6018 * q.x + 0.7986 * q.y);
@@ -93,13 +93,13 @@ fn gwGrain(p: vec2f, size0: f32, footprint: f32, seed: u32) -> f32 {
 
 // Ripples of cirrocumulus along the flow `p`: crests across the wind, bent and broken into cells, 1 where a crest is.
 fn gwRipples(p: vec2f, width: f32, footprint: f32, seed: u32) -> f32 {
-    let period = vec3i(1 << 20);
+    let period = vec2i(1 << 20);
     let wavelength = 0.5 * width;
-    let bend = 6.0 * gwPerlin(vec3f(p / (8.0 * width), 2.5), period, seed + 9u);
+    let bend = 6.0 * gwPerlin2(p / (8.0 * width), period, seed + 9u);
     let crest = 0.5 + 0.5 * sin(6.2831853 * p.x / wavelength + bend);
     // Each crest a row of cloudlets, and rows strong and weak by turns.
-    let lumps = 0.5 + 0.5 * gwPerlin(vec3f(p.x / wavelength, p.y / (1.3 * wavelength), 3.3), period, seed + 10u);
-    let rows = 0.5 + 0.5 * gwPerlin(vec3f(p / (4.0 * width), 4.1), period, seed + 11u);
+    let lumps = 0.5 + 0.5 * gwPerlin2(vec2f(p.x / wavelength, p.y / (1.3 * wavelength)), period, seed + 10u);
+    let rows = 0.5 + 0.5 * gwPerlin2(p / (4.0 * width), period, seed + 11u);
     let ripple = smoothstep(0.3, 0.9, crest) * smoothstep(0.25, 0.7, lumps) * smoothstep(0.2, 0.6, rows) * 1.8;
     return mix(ripple, 0.35, smoothstep(0.08 * wavelength, 0.3 * wavelength, footprint));
 }
@@ -152,7 +152,7 @@ fn gwAirUnderDeck(uv: vec2f, o: vec3f, v: vec3f, distance: f32, sky: vec3f) -> G
     var under = min(distance, gwSphere(o, v, gwParams.planetRadius + top).far);
     if (volume.clearing > 0.0) {
         let halfway = 0.5 * (min(volume.clearingFrom, volume.clearing) + volume.clearing);
-        under = min(under, halfway / max(length(v.xy), 1e-3));
+        under = min(under, (halfway + length(gwParams.clearingCenter)) / max(length(v.xy), 1e-3));
     }
     let shaded = gwAirAt(uv, under, sky).luminance;
     return GwAir(air.transmittance, max(air.luminance - lost * shaded, vec3f(0.0)));
@@ -222,7 +222,7 @@ fn gwSheet(index: u32, o: vec3f, v: vec3f, sun: vec3f, spread: f32, distance: pt
     let flow = gwFlow(wind, sheet);
     // The strands gather in bundles, feathers with the sky between them, `bundleSize` across, 3.3 times as long.
     let across = max(sheet.bundleSize, 0.01);
-    let bundle = 0.5 + 0.5 * gwPerlin(vec3f(flow.x / (3.3 * across), flow.y / across, 5.7), vec3i(1 << 20), sheet.seed + 12u);
+    let bundle = 0.5 + 0.5 * gwPerlin2(vec2f(flow.x / (3.3 * across), flow.y / across), vec2i(1 << 20), sheet.seed + 12u);
     let fiber = gwFibers(flow, sheet.fiberScale, max(sheet.fiberPower, 0.5), max(sheet.fiberStretch, 1.0), footprint, sheet.seed) * mix(1.0, smoothstep(0.45, 0.8, bundle), sheet.bundles);
     // A veil the strands run through: eroded at its thin edges, and modulated within; or broken into ripples.
     let eroding = (1.0 - fiber) * sheet.detail * 0.9;
@@ -232,7 +232,7 @@ fn gwSheet(index: u32, o: vec3f, v: vec3f, sun: vec3f, spread: f32, distance: pt
     }
     // Over it all, denser and thinner by turns over `broadSize`, broken into flocks in the small, and grained finer
     // still, so neither the flocks' cells nor smooth stretches show.
-    let broad = gwPerlin(vec3f(ground / max(sheet.broadSize, 0.1), 8.9), vec3i(1 << 20), sheet.seed + 30u);
+    let broad = gwPerlin2(ground / max(sheet.broadSize, 0.1), vec2i(1 << 20), sheet.seed + 30u);
     let flocks = gwFlocks(ground, max(sheet.flockSize, 0.005), footprint, sheet.seed);
     let flocking = (1.0 - flocks) * sheet.flocks;
     n = clamp((n - flocking) / max(1.0 - flocking, 1e-3), 0.0, 1.0);
@@ -274,7 +274,7 @@ fn gwGround(p: vec3f) -> vec2f {
 }
 
 
-// What is left of the clouds over the point `ground` from the observer towards the clearing, 1 to 0: the cloudscape's,
+// What is left of the clouds over the point `ground`, km from the observer, towards the clearing's edge: the cloudscape's,
 // which the sheets share.
 fn gwClearingOver(ground: vec2f) -> f32 {
     let clearing = gwParams.cloudscape.clearing;
@@ -282,7 +282,7 @@ fn gwClearingOver(ground: vec2f) -> f32 {
         return 1.0;
     }
     let start = min(gwParams.cloudscape.clearingFrom, 0.99 * clearing);
-    return 1.0 - smoothstep(start, clearing, length(ground));
+    return 1.0 - smoothstep(start, clearing, length(ground - gwParams.clearingCenter));
 }
 
 // The sheets along the ray, farthest first, each faded into the sky by the air before it.

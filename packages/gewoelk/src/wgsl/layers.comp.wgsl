@@ -4,7 +4,7 @@
 // march that samples towards the sun. Written as the voxel march writes its cloudscape: light in cd/m², premultiplied,
 // with what the layers let through of what lies behind, their shadow on the ground in it where a ray ends there.
 // Under the deep layer's tall columns rain falls, and where the sun reaches it, it sends back the bows of `rainbow.wgsl`.
-// Requires `params.wgsl`, dunstkreis' `camera.wgsl`, `rainbow.wgsl`, `layerread.wgsl`, `godrays.comp.wgsl` and the output
+// Requires `noise.wgsl`, `params.wgsl`, dunstkreis' `camera.wgsl`, `rainbow.wgsl`, `layerread.wgsl`, `godrays.comp.wgsl` and the output
 // binding.
 // With GW_LAYER_ADAPTIVE it strides by the maps' max pyramids, which `layerpyramid.comp.wgsl` fills. It also writes how
 // far away what each pixel shows is, for whoever composes the layers with something else by depth.
@@ -86,15 +86,14 @@ fn gwLayerRay(position: vec2f, size: vec2u) -> vec3f {
     return dkProjectRay(gwParams.inverseViewProjection, ndc, clamp(gwParams.projectionDistance, 0.0, 1.0));
 }
 
-// The march's jitter for a ray: interleaved gradient noise (Jimenez 2014), a different frame of it each frame, or the
-// blue noise, each texel's rank at the middle of its step and the same every frame, as nothing sums the frames up.
+// The march's jitter for a ray: interleaved gradient noise, `gwJitter`, or the blue noise, each texel's rank at the
+// middle of its step and the same every frame, as nothing sums the frames up.
 fn gwLayerJitter(pixel: vec2u, frame: u32) -> f32 {
     if (gwLayered.blueNoise != 0u) {
         let rank = textureLoad(gwLayerBlueNoise, vec2i(pixel % textureDimensions(gwLayerBlueNoise)), 0).r * 255.0;
         return (rank + 0.5) / 256.0;
     }
-    let p = vec2f(pixel) + 5.588238 * f32(frame % 64u);
-    return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y));
+    return gwJitter(pixel, frame);
 }
 
 // The sun's illuminance from `row` of the sunlight table at `elevation`.

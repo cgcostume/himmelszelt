@@ -3,11 +3,12 @@ import { find } from "../../dom";
 import { onDemand } from "../../frame";
 import { paintRange } from "../../range";
 import { drawSvg, LABEL_GAP as GAP, SUN_SYMBOL, sunGlow, sunRays, svgText } from "../../sternzeit/figure";
+import { type BowProjection, createBowView } from "./bowview";
 import { WAVELENGTHS, wavelengthColor } from "./spectrum";
 
 // Where a bow can stand, for a Sun of the figure's own, set by its slider or dragged in the side view: from the side,
 // the lines of sight that make the library's angles with the line to the antisolar point, and as seen, the two circles
-// around that point over the horizon.
+// around that point over the horizon, and beside them the same view rendered, a bow in a shower under that Sun.
 
 const DEG = Math.PI / 180;
 const ORDERS = [1, 2] as const;
@@ -16,12 +17,15 @@ type Vec3 = readonly [number, number, number];
 const root = find<HTMLElement>("#bow-place");
 const sideEl = find<SVGSVGElement>('svg[data-panel="side"]', root);
 const skyEl = find<SVGSVGElement>('svg[data-panel="sky"]', root);
+const renderedEl = find<HTMLCanvasElement>('canvas[data-panel="rendered"]', root);
 const slider = find<HTMLInputElement>('[data-field="elevation"]', root);
 const sliderValue = find<HTMLElement>('[data-field="elevationValue"]', root);
 const readout = find<HTMLElement>('[data-field="readout"]', root);
 
 // The side view as last laid out, for the pointer: the observer, and the Sun with how far around it a press takes it.
 const side = { you: 0, ground: 0, sun: [0, 0] as readonly [number, number] };
+// The sky as seen and as rendered, in one projection: 65 degrees to either side of the middle.
+const SKY: BowProjection = { horizon: 0.58, halfWidth: 65 };
 const SUN_REACH = SUN_SYMBOL.radius + SUN_SYMBOL.gap + SUN_SYMBOL.length;
 
 const f = (n: number) => n.toFixed(1);
@@ -126,9 +130,8 @@ function drawSide(elevation: number) {
 function drawSky(elevation: number) {
     const [width, height] = [skyEl.clientWidth || 336, skyEl.clientHeight || 252];
     skyEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
-    const horizon = 0.58 * height;
-    // 65 degrees to either side of the middle.
-    const scale = width / (4 * Math.tan(32.5 * DEG));
+    const horizon = SKY.horizon * height;
+    const scale = width / (4 * Math.tan((SKY.halfWidth / 2) * DEG));
     const sunDirection = sunBehind(elevation);
     /** Looking along y, away from the Sun, x to the right. */
     const project = (d: Vec3) => {
@@ -205,6 +208,7 @@ let elevation = Number(slider.value);
 function render() {
     drawSide(elevation);
     drawSky(elevation);
+    rendered?.draw(elevation);
     sliderValue.textContent = `${elevation.toFixed(1)}°`;
     const [primary, secondary] = [bowTop(elevation, 1), bowTop(elevation, 2)];
     readout.textContent =
@@ -217,6 +221,7 @@ function render() {
 }
 
 const requestRender = onDemand(render, root);
+const rendered = createBowView(renderedEl, SKY, requestRender);
 slider.addEventListener("input", () => {
     elevation = Number(slider.value);
     requestRender();
@@ -252,4 +257,5 @@ for (const type of ["pointerup", "pointercancel"])
         grabbed = null;
         sideEl.classList.remove("dragging");
     });
-new ResizeObserver(requestRender).observe(sideEl);
+const resized = new ResizeObserver(requestRender);
+for (const panel of [sideEl, renderedEl]) resized.observe(panel);

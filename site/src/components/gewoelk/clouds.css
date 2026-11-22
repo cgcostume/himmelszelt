@@ -55,6 +55,22 @@
 .cloud-texture figcaption span + span {
     color: oklch(1 0 0 / 0.6);
 }
+/* The channel a thumbnail shows, in that channel's color, alpha in gray. */
+.texture-channel {
+    font-weight: 600;
+}
+.texture-channel[data-channel="R"] {
+    color: oklch(0.68 0.2 25);
+}
+.texture-channel[data-channel="G"] {
+    color: oklch(0.72 0.19 145);
+}
+.texture-channel[data-channel="B"] {
+    color: oklch(0.68 0.16 255);
+}
+.texture-channel[data-channel="A"] {
+    color: var(--muted);
+}
 .cloud-texture figcaption span:empty {
     display: none;
 }
@@ -89,6 +105,16 @@
 .designer-stage > .designer-model {
     background: var(--bg);
 }
+/* Full screen, the stage fills it, square at its corners. */
+.designer-stage:fullscreen {
+    width: 100vw;
+    height: 100vh;
+    aspect-ratio: auto;
+    background: oklch(0 0 0);
+}
+.designer-stage:fullscreen > :is(.sky-view, .designer-model) {
+    border-radius: 0;
+}
 /* The small one and the button over it, which takes its clicks. */
 .designer-stage[data-main="view"] > .designer-model,
 .designer-stage[data-main="model"] > .sky-view,
@@ -111,6 +137,27 @@
 }
 .designer-stage[data-main="view"] .fig-hint {
     color: oklch(1 0 0 / 0.65);
+}
+/* Which model renders a cloud, 2D, 2.5D or 3D: a mark in a designer's bar and beside a place of the composer. */
+.cloud-model {
+    flex: none;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.fig-bar .cloud-model {
+    height: 36px;
+    padding: 0 0.25rem;
+    font-weight: 600;
+    line-height: 36px;
+    pointer-events: auto;
+    cursor: help;
+}
+.designer-stage[data-main="view"] .cloud-model {
+    color: oklch(1 0 0 / 0.85);
+}
+.composer-place {
+    grid-template-columns: 3.5rem minmax(0, 1fr) 2.2rem;
 }
 .designer-swap {
     position: absolute;
@@ -168,6 +215,32 @@
 .asset-tiles {
     display: flex;
     gap: 0.4rem;
+}
+/* A volume's slices to pick from, beside its thumbnail: a stack seen from above its corner, the picked one filled. */
+.volume-slices {
+    flex: none;
+    width: 6rem;
+    height: 6rem;
+    overflow: visible;
+    touch-action: none;
+    cursor: ns-resize;
+}
+.volume-slices polygon {
+    fill: var(--surface);
+    stroke: var(--muted);
+    stroke-width: 1;
+    cursor: pointer;
+}
+.volume-slices polygon {
+    outline: none;
+}
+.volume-slices polygon:focus-visible,
+.volume-slices polygon:hover {
+    stroke: var(--accent);
+}
+.volume-slices polygon[aria-pressed="true"] {
+    fill: var(--accent);
+    stroke: var(--accent);
 }
 .designer-gallery .cloud-texture {
     width: 6rem;
