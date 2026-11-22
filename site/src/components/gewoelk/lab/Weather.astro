@@ -24,7 +24,7 @@ interface Props {
 }
 const {
     id = "weather-lab",
-    caption = "A weather composed, a kind of cloud for each place of the sky: three marched layers and a sheet of high cloud over dunstkreis' air, sternenheer's stars and nachtgestirn's Moon, exposed by the stars figure's meter. Reach, sampling and motion are gewoelk's three dials of quality, and the contrails fly five invented routes over the place. The clouds' own light is still a stand-in for the Sun's, and by night the Moon's share of it.",
+    caption = "A weather composed, a kind of cloud for each place of the sky: three marched layers and a sheet of high cloud over dunstkreis' air, sternenheer's stars and nachtgestirn's Moon, exposed by the stars figure's meter. Reach, sampling and motion are gewoelk's three dials of quality, and the contrails fly eight invented routes over the place. The clouds' own light is still a stand-in for the Sun's, and by night the Moon's share of it.",
 } = Astro.props;
 
 // Every slider of the two figures, once: held hidden, so the weathers set them as they do there.
@@ -167,7 +167,7 @@ const SPEED = choice(
                 <LabSliders sliders={CLEARING} />
             </OptionGroup>
             <OptionGroup name="contrails">
-                <button type="button" class="view-toggle" data-field="contrails.on" aria-pressed="false" title="Contrails behind aircraft on five invented routes over the place, at the high sheet's altitude: run the clock to see them fly">contrails</button>
+                <button type="button" class="view-toggle" data-field="contrails.on" aria-pressed="false" title="Contrails behind aircraft on eight invented routes over the place, at the high sheet's altitude: run the clock to see them fly">contrails</button>
                 <LabSliders sliders={all.CONTRAIL} />
             </OptionGroup>
             <OptionGroup name="time">

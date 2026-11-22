@@ -30,6 +30,7 @@ credited where the site shows it.
 |---|---|---|
 | `public/eclipse-2008/` | Theodore Yapo and Barbara Cutler, from their paper on rendering lunar eclipses (2009) | © the authors |
 | `public/images/corona-2023-04-20-exmouth.webp` | Phil Hart | © the photographer |
+| `src/components/hero/plane.webp` | schauhi, a photograph of an aircraft and its contrail, Pixabay 7206856; the aircraft cut out of the sky and scaled down | Pixabay Content License |
 | `public/images/sunrise-2015-07-30-iss.webp` | NASA, ISS044-E-025484, Scott Kelly | public domain |
 | `public/images/glossary-astrolabe.webp` | The Metropolitan Museum of Art, Open Access | CC0 |
 | `public/stars/milky-way-2017-08-18-inferno-cone.webp` and its `-thumb` | NPS / Jacob W. Frank, [Milky Way From Inferno Cone](https://commons.wikimedia.org/wiki/File:Milky_Way_From_Inferno_Cone_(4fc3421b-c931-4347-a4f6-7b5806c41456).jpg), Wikimedia Commons from NPGallery; resampled to a lens without distortion and scaled down | public domain |

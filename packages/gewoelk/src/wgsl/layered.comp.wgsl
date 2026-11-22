@@ -87,8 +87,10 @@ fn gwLayeredCompose(@builtin(global_invocation_id) id: vec3u) {
         color = color + textureLoad(gwBackground, vec2i(id.xy), 0).rgb * alpha;
         alpha = 1.0;
     }
-    // The corona of the Sun and of the Moon, where the clouds let some of their light through.
-    if (gwParams.coronaRadius > 0.0 && through < 1.0) {
+    // The corona of the Sun and of the Moon, where the clouds let some of their light through: not along a ray that
+    // ends on the ground, which a Sun under the horizon would shine through.
+    let level = gwParams.planetRadius / (gwParams.planetRadius + max(gwParams.observerAltitude, 0.0));
+    if (gwParams.coronaRadius > 0.0 && through < 1.0 && v.z > -sqrt(max(1.0 - level * level, 0.0))) {
         let sun = gwCorona(v, normalize(gwParams.sunDirection), gwParams.sunIlluminance, through, gwParams.coronaRadius, gwParams.coronaSpread);
         let moon = gwCorona(v, normalize(gwParams.moonDirection), gwParams.moonIlluminance, through, gwParams.coronaRadius, gwParams.coronaSpread);
         color = color + sun + moon;

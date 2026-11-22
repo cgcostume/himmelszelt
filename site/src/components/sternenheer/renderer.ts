@@ -137,7 +137,12 @@ export type SkyAt = ReturnType<typeof skyAt>;
 // stays small in a view of the whole sky.
 // The faint stars null where `pnpm assets` has not made them: the package does not ship ESA's catalogues.
 let sharedCatalog: Promise<[StarCatalog, ConstellationLines, PackedStars | null]> | null = null;
-let sharedMoonMaps: Promise<MoonMaps> | null = null;
+const sharedMoonMaps = new Map<MoonMapSize, Promise<MoonMaps | null>>();
+export type MoonMapSize = keyof typeof MOON_MAPS_WHOLE;
+
+/** The Moon's maps a disc `pixels` across needs, a texel to a pixel at its middle: the sizes `MOON_MAPS_WHOLE` names. */
+export const moonMapsForDisc = (pixels: number): MoonMapSize =>
+    pixels <= 163 ? "512" : pixels <= 326 ? "1k" : pixels <= 652 ? "2k" : "4k";
 // The deep stars, 14 MB, fetched when a figure first asks for them: null where `pnpm assets` has not made them.
 let sharedDeepStars: Promise<DeepStars | null> | null = null;
 /** The deep stars, fetched once a page for every figure that asks; null where `pnpm assets` has not made them. */
@@ -205,6 +210,11 @@ export interface StarsFrame {
     milkyWayCompensation?: number;
     darkAdapted: boolean;
     moon: boolean;
+    /** The Moon's maps: "512" by default, as the disc stays small in a view of the whole sky, or "auto" for the size the
+     *  disc's pixels need, fetched once the view has zoomed that far in. */
+    moonMaps?: MoonMapSize | "auto";
+    /** Rays per pixel on and around the Moon's disc, 4 by default. */
+    moonSamples?: number;
     /** The constellations to draw the lines of, by abbreviation; null for all, empty for none. */
     constellations: readonly string[] | null;
     /** dunstkreis' grid over the sky: altitude lines every 10°, the compass directions and the Sun's symbol. */
@@ -266,7 +276,9 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
     let gridPass: ReturnType<typeof createGridPass> | null = null;
     let starsPass: { pass: StarsPass; key: string } | null = null;
     let starsBuilding = "";
-    let moonPass: { pass: MoonPass; key: string } | null = null;
+    let moonPass: { pass: MoonPass; key: string; target: string } | null = null;
+    let moonSize: MoonMapSize | "" = "";
+    let moonWanted: MoonMapSize | "" = "";
     let moonBuilding = "";
     let catalog: StarCatalog | null = null;
     let constellations: ConstellationLines | null = null;
@@ -303,14 +315,20 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
         return air;
     }
 
-    sharedMoonMaps ??= loadMoonMaps(device, MOON_MAPS_WHOLE["512"]);
-    sharedMoonMaps.then((loaded) => {
-        moonMaps = loaded;
-        moonPass?.pass.destroy();
-        moonPass = null;
-        moonBuilding = "";
-        requestRender();
-    });
+    // The pass drawing the maps before keeps drawing until the one with the maps wanted is made.
+    function loadMoon(size: MoonMapSize) {
+        if (moonWanted === size) return;
+        moonWanted = size;
+        const maps = sharedMoonMaps.get(size) ?? loadMoonMaps(device, MOON_MAPS_WHOLE[size]).catch(() => null);
+        sharedMoonMaps.set(size, maps);
+        maps.then((loaded) => {
+            if (moonWanted !== size || !loaded) return;
+            moonMaps = loaded;
+            moonSize = size;
+            requestRender();
+        });
+    }
+    loadMoon("512");
     sharedCatalog ??= Promise.all([loadCatalog(), loadConstellations(), loadFaintStars().catch(() => null)]);
     sharedCatalog.then(([loaded, lines, faint]) => {
         catalog = loaded;
@@ -369,7 +387,8 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             requestRender();
         });
     }
-    function buildMoon(key: string, { format, headroom, toneMap, darkAdapted, over }: StarsFrame) {
+    function buildMoon(key: string, target: string, frame: StarsFrame) {
+        const { format, headroom, toneMap, darkAdapted, over } = frame;
         if (moonBuilding === key) return;
         moonBuilding = key;
         createMoonPass(device, {
@@ -381,11 +400,11 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             background: true,
             maps: moonMaps,
             darkAdapted,
-            samples: 4,
+            samples: frame.moonSamples ?? 4,
         }).then((pass) => {
             if (moonBuilding !== key) return pass.destroy();
             moonPass?.pass.destroy();
-            moonPass = { pass, key };
+            moonPass = { pass, key, target };
             moonBuilding = "";
             requestRender();
         });
@@ -443,10 +462,14 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 buildStars(starsKey);
                 if (!starsPass) return null;
             }
-            const moonKey = `${frame.format} ${frame.headroom} ${frame.toneMap} ${frame.darkAdapted} ${moonMaps ? "maps" : "plain"} ${frame.over ? "linear" : ""}`;
+            const discPixels = (s.moonAngularDiameter * DEG) / pixelAngle(frame.inverseViewProjection, height);
+            loadMoon(frame.moonMaps === "auto" ? moonMapsForDisc(discPixels) : (frame.moonMaps ?? "512"));
+            // What the pass writes, and by what: other maps or samples are drawn by the pass before until theirs is made.
+            const moonTarget = `${frame.format} ${frame.headroom} ${frame.toneMap} ${frame.darkAdapted} ${frame.over ? "linear" : ""}`;
+            const moonKey = `${moonTarget} ${moonSize} ${frame.moonSamples ?? 4}`;
             if (!moonPass || moonPass.key !== moonKey) {
-                buildMoon(moonKey, frame);
-                return null;
+                buildMoon(moonKey, moonTarget, frame);
+                if (moonPass?.target !== moonTarget) return null;
             }
             if (!background || background.width !== width || background.height !== height) {
                 background?.destroy();

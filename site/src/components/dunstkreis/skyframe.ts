@@ -63,8 +63,9 @@ export function skyFrames() {
         const seenFrom = frameHeight(frame);
         height.addEventListener("input", () => seenFrom.set(heightOf(Number(height.value))));
         let pageHeight = state.heightM;
-        const playButton = field("play");
-        playButton.addEventListener("click", () => play(!state.animate));
+        // A figure that plays by a clock of its own has no play of the page's.
+        const playButton = frame.querySelector<HTMLElement>('[data-field="play"]');
+        playButton?.addEventListener("click", () => play(!state.animate));
         const sync = () => {
             // The page's height has changed: the frame's own gives way to it.
             if (state.heightM !== pageHeight) delete frame.dataset.heightM;
@@ -76,8 +77,8 @@ export function skyFrames() {
             // How far along the time slider is, for its value riding the rail in full screen.
             const span = Number(offset.max) - Number(offset.min);
             time?.style.setProperty("--at", String((Number(offset.value) - Number(offset.min)) / span));
-            playButton.setAttribute("aria-pressed", String(state.animate));
-            playButton.setAttribute("aria-label", state.animate ? "Pause" : "Play");
+            playButton?.setAttribute("aria-pressed", String(state.animate));
+            playButton?.setAttribute("aria-label", state.animate ? "Pause" : "Play");
         };
         onChange(sync);
         frame.addEventListener("skyheight", sync);

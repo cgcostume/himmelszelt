@@ -6,8 +6,8 @@ export interface Corona {
     spread: number;
 }
 
-/** Droplets of 10 µm, varying by 15 %: a glow out to 2° with a red rim and one faint ring. */
-export const DEFAULT_CORONA: Corona = { dropletRadiusUm: 10, spread: 0.15 };
+/** Droplets of 10 µm, varying by 25 %, an ordinary cloud's: a glow out to 2° with a brownish red rim, and no ring. */
+export const DEFAULT_CORONA: Corona = { dropletRadiusUm: 10, spread: 0.25 };
 
 /** The wavelengths in nanometers the corona is drawn at for red, green and blue. */
 export const CORONA_WAVELENGTHS = [610, 550, 465] as const;

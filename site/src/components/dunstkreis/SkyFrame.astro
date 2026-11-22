@@ -39,6 +39,8 @@ interface Props {
     fly?: boolean;
     /** Whether the height is the figure's own once its scale or a flight has set it, and no longer the page's. */
     ownHeight?: boolean;
+    /** Whether the figure plays by a clock of its own, with buttons in its `bar` slot: the frame then has no play. */
+    ownPlay?: boolean;
 }
 const {
     hint = "Drag to look around, scroll to zoom. Rendered with WebGPU.",
@@ -55,6 +57,7 @@ const {
     refraction = false,
     fly = false,
     ownHeight = false,
+    ownPlay = false,
     marks = grid ? 2 : 1,
 } = Astro.props;
 // The marks' button steps through off, the compass, and the compass with the grid where the view has one (see skyframe.ts).
@@ -89,7 +92,7 @@ const named: Record<number, string> = { 0: "1 m", 3: "1 km", 5: "100 km" }
             <slot name="bar" />
             {fly && <span class="view-buttons"><button type="button" class="view-icon" data-field="fly" aria-pressed="false" title="Fly, or F over the view: the mouse is captured and turns the view, W A S D move, E up and Q down, at a speed of the height over the ground per second, Shift faster, over a grid on the ground. F lands" aria-label="Fly"><Icon name="fly" /></button></span>}
             <span class="view-buttons fig-actions">
-                <button type="button" class="view-icon" data-field="play" aria-pressed="false" title="Play: the moment runs on, an hour in 10 seconds, half a day in 2 minutes" aria-label="Play"><Icon name="play" /></button>
+                {!ownPlay && <button type="button" class="view-icon" data-field="play" aria-pressed="false" title="Play: the moment runs on, an hour in 10 seconds, half a day in 2 minutes" aria-label="Play"><Icon name="play" /></button>}
                 {options && <button type="button" class="view-icon" data-field="options" aria-pressed="true" title="Show or hide this figure's options" aria-label="Options"><Icon name="options" /></button>}
                 {png && <button type="button" class="view-icon" data-field="png" title="Download the view as PNG" aria-label="Download the view as PNG"><Icon name="download" /></button>}
                 <CopyInfo />

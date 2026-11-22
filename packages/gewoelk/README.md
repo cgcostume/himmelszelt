@@ -104,7 +104,7 @@ cost at creation.
 
 Thin cloud lays a corona around the Sun and the Moon: its droplets diffract their light into a glow of a degree or two,
 bluish white inside and red at its rim, where the clouds let some of that light through. `corona`, `DEFAULT_CORONA` by
-default, sets the droplets' radius, 10 µm, and how far their sizes vary, 0.15, which leaves one faint ring; `false`
+default, sets the droplets' radius, 10 µm, and how far their sizes vary, 0.25, which leaves no ring; `false`
 turns it off. The Sun's is lit by `sunIlluminance`, the Moon's by `moonDirection` and `moonIlluminance`, none by
 default; the clouds themselves are lit by the Sun alone. `diffractionLobe` and `coronaShare` are the same numbers in
 TypeScript, and `wgsl.corona` holds the binding-free functions, `gwCorona` and `gwCoronaLobe`.

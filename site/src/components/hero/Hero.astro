@@ -1,0 +1,123 @@
+---
+import "../sternzeit/sternzeit.css";
+import "../dunstkreis/dunstkreis.css";
+import "../gewoelk/clouds.css";
+import Choice from "../dunstkreis/Choice.astro";
+import Hdr from "../dunstkreis/Hdr.astro";
+import OptionGroup from "../dunstkreis/OptionGroup.astro";
+import SkyFrame from "../dunstkreis/SkyFrame.astro";
+import Icon from "../Icon.astro";
+
+/**
+ * The landing page's figure: everything the libraries draw at once, at the page's moment and place. dunstkreis' sky,
+ * sternenheer's stars, nachtgestirn's Moon and gewoelk's clouds, with their sheet of high cloud, contrails and the
+ * rain's bows, in the shared frame at the reading column's width.
+ */
+interface Props {
+    id?: string;
+    caption?: string;
+}
+const {
+    id = "sky",
+    caption = "The sky at the chosen moment and place, by every library at once: dunstkreis' air, sternenheer's stars, nachtgestirn's Moon and gewoelk's clouds, with contrails over eight invented routes.",
+} = Astro.props;
+
+// How fast the figure's clock runs while it plays.
+const SPEEDS = [
+    { speed: 1, icon: "speedClock", title: "As fast as a clock" },
+    { speed: 60, icon: "speedMinute", title: "A minute a second" },
+    { speed: 3600, icon: "speedHour", title: "An hour a second" },
+] as const;
+const WEATHER = {
+    name: "weather",
+    label: "Weather",
+    title: "gewoelk's weathers: each names a kind of cloud for every place of the sky",
+    options: [
+        ["clear", "clear", "Blue sky, a few wisps"],
+        ["fair", "fair", "Fair-weather cumulus: small, flat, spread out"],
+        ["scattered", "scattered", "Scattered cumulus, some of it growing"],
+        ["towering", "towering", "Towering cumulus: tall, heaped, an afternoon in summer"],
+        ["overcast", "overcast", "A deck of stratocumulus under a veil of cirrostratus"],
+        ["mackerel", "mackerel", "A mackerel sky over a few low clouds"],
+        ["cirrus", "cirrus", "High cloud ahead of a front, over a few low clouds"],
+        ["altocumulus", "altocumulus", "A sky of altocumulus over a few low heaps"],
+        ["showers", "showers", "Showers under an open sky: rain under every tower, and its bows opposite a low Sun"],
+        ["frontAhead", "front ahead", "A front coming on: its shield ahead, the low clouds thinning out under it"],
+        ["underFront", "under the front", "Under the front: a closed, dark sky, ragged cloud hanging low"],
+    ],
+    checked: "frontAhead",
+};
+const MODEL = {
+    name: "model",
+    label: "Cloud model",
+    title: "Which of gewoelk's two models draws the low clouds: both under the same sheet of high cloud",
+    options: [
+        [
+            "voxel",
+            "voxels",
+            "A voxel volume marched by its distance field, 3D: clouds to fly through, a front marched beside them",
+        ],
+        [
+            "layered",
+            "layers",
+            "Three layers marched as height fields, 2.5D: every kind of cloud to the horizon, rain and its bows",
+        ],
+    ],
+    checked: "voxel",
+};
+const QUALITY = {
+    name: "quality",
+    label: "Quality",
+    title: "gewoelk's three dials of quality at one level: how far the clouds reach, how finely they are marched and stored, and how their shape changes",
+    options: [
+        ["low", "low", "Clouds out to 40 km, a third of the frame, no change of shape"],
+        ["medium", "medium", "Clouds out to 150 km, half the frame"],
+        ["high", "high", "Clouds to the horizon, the whole frame"],
+        ["ultra", "ultra", "Clouds to the horizon, the whole frame, the finest volumes and maps"],
+    ],
+    checked: "medium",
+};
+---
+
+<figure class="fig scene-frame" id={id} data-hero>
+    <SkyFrame fly ownHeight ownPlay marks={1} locked={false} lockIcon="moonLock" sunLock lockTitle="Keep the view on the Moon; dragging lets go" gridTitle="Grid: lines of altitude every 10° and of azimuth over the hemisphere, and the Sun's symbol where it truly is" compassTitle="The compass directions on the horizon, and the Sun's and the Moon's names under them" hint="Drag to look around, scroll to zoom.">
+        <canvas data-field="canvas" aria-label="The sky at the chosen moment and place, with clouds, stars and the Moon"></canvas>
+        <div class="sky-compass" data-field="compassLabels"></div>
+        <div class="sky-compass" data-field="bodyLabels"></div>
+        <Fragment slot="bar">
+            <span class="view-buttons">
+                <button type="button" class="view-icon" data-field="geolocate" title="Use the browser's location as the place" aria-label="Use the browser's location"><Icon name="locate" /></button>
+            </span>
+            <span class="view-buttons">
+                <button type="button" class="view-icon" data-field="animate" aria-pressed="false" title="Play: the clouds drift and change, the aircraft fly, and the moment runs on with them" aria-label="Play"><Icon name="play" /></button>
+                <button type="button" class="view-icon" data-field="timeLock" aria-pressed="false" title="Hold the moment while the figure plays: the clouds drift and change, the Sun, the Moon and the stars stay where they are" aria-label="Hold the moment"><Icon name="timeLock" /></button>
+                {SPEEDS.map(({ speed, icon, title }) => <button type="button" class="view-icon" data-speed={speed} aria-pressed={speed === 60 ? "true" : "false"} title={title} aria-label={title}><Icon name={icon} /></button>)}
+            </span>
+        </Fragment>
+        <Fragment slot="options">
+            <OptionGroup name="weather">
+                <Choice figure={id} {...WEATHER} />
+            </OptionGroup>
+            <OptionGroup name="clouds">
+                <Choice figure={id} {...MODEL} />
+                <button type="button" class="view-toggle" data-field="contrails.on" aria-pressed="true" title="Contrails behind aircraft on eight invented routes over the place, at the high sheet's altitude: play to see them fly">contrails</button>
+            </OptionGroup>
+            <OptionGroup name="quality">
+                <Choice figure={id} {...QUALITY} />
+                <button type="button" class="view-toggle" data-field="smooth.on" aria-pressed="true" title="Antialiasing: the Moon's disc by four rays a pixel, and the layered clouds brought to the frame's size by a box of three texels. The passes are compute passes, which have no MSAA: each smooths its own edges">antialiasing</button>
+                <button type="button" class="view-toggle" data-field="ground.grid" aria-pressed="true" title="A grid on the ground, for orientation, speed and height: thin lines every 10 km, 1 km, 100 m and on down, each level showing once its cells are a few pixels across">ground grid</button>
+            </OptionGroup>
+            <OptionGroup name="HDR (× SDR white)">
+                <Hdr figure={id} />
+            </OptionGroup>
+        </Fragment>
+    </SkyFrame>
+    <p class="view-status"><span data-field="place"></span> <span class="sky-timing" data-field="timing"></span></p>
+    <figcaption class="figure-caption">{caption}</figcaption>
+</figure>
+
+<script>
+    import { heroFigure } from "./hero";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-hero]")) heroFigure(root);
+</script>

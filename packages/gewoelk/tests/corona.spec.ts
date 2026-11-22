@@ -6,7 +6,7 @@ import { gpuDevice } from "./gpu.js";
 const DEG = Math.PI / 180;
 
 test("the lobe holds all of the diffracted light, whatever the droplets' spread", () => {
-    for (const spread of [0, 0.15, 0.3]) {
+    for (const spread of [0, DEFAULT_CORONA.spread, 0.3]) {
         // Over the plane, in rings of a thousandth of a degree out to 60°.
         let sum = 0;
         for (let angle = 0.0005; angle < 60; angle += 0.001)
@@ -50,11 +50,12 @@ test("corona.wgsl compiles on its own and agrees with its TypeScript twin", asyn
     test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
     if (!device) return;
     const angles = [0, 0.5, 1.5, 1.92, 2.6, 4, 7];
+    const spread = DEFAULT_CORONA.spread;
     const cases = [
-        ...angles.map((angle) => `gwCoronaLobe(${angle}, 10.0, 0.15)`),
+        ...angles.map((angle) => `gwCoronaLobe(${angle}, 10.0, ${spread})`),
         "vec3f(gwCoronaShare(1.0), gwCoronaShare(0.6), gwCoronaShare(0.05))",
-        "gwCorona(vec3f(0.0, 0.0, 1.0), vec3f(0.0, sin(0.02), cos(0.02)), vec3f(0.25), 0.6, 10.0, 0.15)",
-        "gwCoronaLobe(40.0, 10.0, 0.15)",
+        `gwCorona(vec3f(0.0, 0.0, 1.0), vec3f(0.0, sin(0.02), cos(0.02)), vec3f(0.25), 0.6, 10.0, ${spread})`,
+        `gwCoronaLobe(40.0, 10.0, ${spread})`,
     ];
     const code = `${readFileSync(new URL("../src/wgsl/corona.wgsl", import.meta.url), "utf8")}
 @group(0) @binding(0) var<storage, read_write> results: array<vec4f, ${cases.length}>;

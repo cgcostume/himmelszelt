@@ -122,8 +122,10 @@ fn gwCompose(@builtin(global_invocation_id) id: vec3u) {
         color = behind * clouds.transmittance + clouds.luminance;
         alpha = 1.0;
     }
-    // The corona of the Sun and of the Moon, where the clouds let some of their light through.
-    if (gwParams.coronaRadius > 0.0 && clouds.transmittance < 1.0) {
+    // The corona of the Sun and of the Moon, where the clouds let some of their light through: not along a ray that
+    // ends on the ground, which a Sun under the horizon would shine through.
+    let level = gwParams.planetRadius / (gwParams.planetRadius + max(gwParams.observerAltitude, 0.0));
+    if (gwParams.coronaRadius > 0.0 && clouds.transmittance < 1.0 && v.z > -sqrt(max(1.0 - level * level, 0.0))) {
         let sun = gwCorona(v, normalize(gwParams.sunDirection), gwParams.sunIlluminance, clouds.transmittance, gwParams.coronaRadius, gwParams.coronaSpread);
         let moon = gwCorona(v, normalize(gwParams.moonDirection), gwParams.moonIlluminance, clouds.transmittance, gwParams.coronaRadius, gwParams.coronaSpread);
         color = color + sun + moon;

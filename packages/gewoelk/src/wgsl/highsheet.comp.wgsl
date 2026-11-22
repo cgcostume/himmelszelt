@@ -69,8 +69,14 @@ struct GwContrails {
     streak: array<GwContrail, GW_CONTRAILS>,
 }
 @group(0) @binding(5) var<uniform> gwContrails: GwContrails;
-// A trail's lumps, from crest to crest, in widths of its young end: the wingtip vortices' own instability, after Crow.
-const GW_CONTRAIL_LUMPS: f32 = 14.0;
+// A young trail is two: one behind each wing's engines, this far apart in widths of the young end, each half as wide.
+// They are one once they have spread past that.
+const GW_CONTRAIL_APART: f32 = 1.5;
+// Behind the engines the exhaust is too hot for ice: the trail begins this far back, in km, and is whole twice as far.
+const GW_CONTRAIL_GAP: f32 = 0.05;
+// A trail's puffs, as it ages: their size in widths of the trail where they are, and how far they thin and bulge it.
+const GW_CONTRAIL_PUFF: f32 = 1.3;
+const GW_CONTRAIL_PUFFED: f32 = 0.8;
 // How fast a trail thins as it widens, as a power of its width: 1 would keep the ice it was laid with, but a trail
 // that lasts takes up the moist air's vapor as it spreads, and stays visible kilometers wide.
 const GW_CONTRAIL_THINNING: f32 = 0.25;
@@ -216,28 +222,57 @@ fn gwHighKept(over: vec2f) -> f32 {
     return 1.0 - smoothstep(min(gwHigh.clearingFrom, 0.99 * gwHigh.clearing), gwHigh.clearing, length(over - gwHigh.clearingCenter));
 }
 
-// The optical depth of the contrails over the ground point `over`, for a footprint `wide` km across: each streak as
-// thick across as a bell curve, thinner as it spreads, broken into lumps as it ages and fading out over its last
-// third. No map is read.
+// Value noise over the plane, 0 to 1, for the trails' puffs.
+fn gwContrailNoise(p: vec2f) -> f32 {
+    let c = floor(p);
+    let f = p - c;
+    let u = f * f * (3.0 - 2.0 * f);
+    var corner: array<f32, 4>;
+    for (var k = 0; k < 4; k = k + 1) {
+        let q = vec2u(vec2i(c) + vec2i(k & 1, k >> 1));
+        var h = (q.x * 1597334677u) ^ (q.y * 3812015801u);
+        h = (h ^ (h >> 16u)) * 2246822519u;
+        corner[k] = f32((h ^ (h >> 13u)) >> 8u) / 16777216.0;
+    }
+    return mix(mix(corner[0], corner[1], u.x), mix(corner[2], corner[3], u.x), u.y);
+}
+
+// The optical depth of the contrails over the ground point `over`, for a footprint `wide` km across: each streak two
+// lines that begin a little behind its aircraft and spread into one, puffier the older, fading out over its last third.
 fn gwContrailDepth(over: vec2f, wide: f32) -> f32 {
     var tau = 0.0;
     for (var i = 0u; i < gwContrails.count; i = i + 1u) {
         let ends = gwContrails.streak[i].ends;
         let along = ends.zw - ends.xy;
         let span = max(dot(along, along), 1e-6);
-        let s = clamp(dot(over - ends.xy, along) / span, 0.0, 1.0);
+        let run = sqrt(span);
+        let u = dot(over - ends.xy, along) / span;
+        let s = clamp(u, 0.0, 1.0);
         let young = max(gwContrails.streak[i].fromWidth, 1e-3);
         // Never narrower than the footprint, and as much thinner: a far streak stays a line and does not flicker.
-        let spread = max(mix(young, gwContrails.streak[i].toWidth, s), young);
+        let spread = max(mix(0.5 * young, gwContrails.streak[i].toWidth, s), 0.5 * young);
         let width = max(spread, wide);
-        let d = length(over - ends.xy - along * s) / width;
-        if (d > 2.5) {
+        let across = dot(over - ends.xy, vec2f(-along.y, along.x)) / run;
+        let past = (u - s) * run;
+        if (max(abs(across) - GW_CONTRAIL_APART * young, abs(past)) > 3.0 * width) {
             continue;
         }
-        let period = GW_CONTRAIL_LUMPS * young;
-        let crest = 0.5 + 0.5 * cos(6.283185307179586 * s * sqrt(span) / period);
-        let lumps = mix(1.0, 0.4 + 1.2 * crest * crest, s * (1.0 - clamp(2.0 * wide / period, 0.0, 1.0)));
-        tau = tau + gwContrails.streak[i].opticalDepth * pow(young / spread, GW_CONTRAIL_THINNING) * spread / width * exp(-2.0 * d * d) * lumps * (1.0 - smoothstep(0.67, 1.0, s));
+        // Puffs as large as the trail is wide there, from the trail's old end, which drifts with it: two sizes a factor
+        // of two apart, blended as the trail widens, so they grow with it without a seam. None a footprint would blur.
+        let size = log2(GW_CONTRAIL_PUFF * spread);
+        let old = (over - ends.zw) + 7.3 * f32(i);
+        // Each size reads the noise from a place of its own, the same whichever of the two it is in the blend.
+        let level = floor(size);
+        let puff = mix(gwContrailNoise(old / exp2(level) + 3.7 * level), gwContrailNoise(old / exp2(level + 1.0) + 3.7 * (level + 1.0)), fract(size));
+        let puffed = GW_CONTRAIL_PUFFED * smoothstep(0.0, 0.35, s) * (1.0 - clamp(wide / (0.5 * GW_CONTRAIL_PUFF * spread), 0.0, 1.0));
+        let bulged = width * (1.0 + puffed * (puff - 0.5));
+        let aside = 0.5 * GW_CONTRAIL_APART * young;
+        let one = vec2f(across - aside, past) / bulged;
+        let two = vec2f(across + aside, past) / bulged;
+        let lines = 0.5 * (exp(-2.0 * dot(one, one)) + exp(-2.0 * dot(two, two)));
+        let begun = smoothstep(GW_CONTRAIL_GAP, 2.0 * GW_CONTRAIL_GAP, s * run) + clamp(wide / GW_CONTRAIL_GAP - 1.0, 0.0, 1.0);
+        let thinned = 1.0 + 2.0 * puffed * (puff - 0.5);
+        tau = tau + gwContrails.streak[i].opticalDepth * pow(0.5 * young / spread, GW_CONTRAIL_THINNING) * spread / width * lines * thinned * min(begun, 1.0) * (1.0 - smoothstep(0.67, 1.0, s));
     }
     return tau;
 }
