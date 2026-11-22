@@ -140,6 +140,10 @@ export {
     shimmerShows,
 } from "./shimmer.js";
 
+// The ground's grid, for orientation in a view one flies through, drawn over the sky's ground.
+export type { GroundGridPass, GroundGridView } from "./groundgrid.js";
+export { createGroundGridPass, GROUND_GRID_STRENGTH, groundGridOffsets } from "./groundgrid.js";
+
 // Reading a LUT back to the CPU, for inspecting or exporting one.
 export type { TexturePixels } from "./readback.js";
 export { readTexture } from "./readback.js";

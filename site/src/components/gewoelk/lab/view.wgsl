@@ -1,5 +1,6 @@
 // What the research figures share: the view, a stand-in sky and sun, and the way to the display. Binding-free; requires
-// dunstkreis' `camera.wgsl`, helldunkel's `tonemap.wgsl` and the site's `groundgrid.wgsl`. Lengths in km, directions ENU, light in lux and cd/m².
+// dunstkreis' `camera.wgsl` and `groundgrid.wgsl`, helldunkel's `tonemap.wgsl` and gewoelk's `phase`. Lengths in km,
+// directions ENU, light in lux and cd/m².
 // The sky here is a gradient, not dunstkreis': these figures are for the clouds' shape, and stand alone.
 
 struct LabView {
@@ -60,14 +61,9 @@ fn labGround(up: vec3f) -> vec2f {
     return up.xy * select(1.0, atan2(s, up.z) / max(s, 1e-12), s > 1e-6);
 }
 
-// The ground's grid through the pixel at `position`, 0 to 1 (see groundgrid.wgsl).
+// The ground's grid through the pixel at `position`, 0 to 1 (see dunstkreis' groundgrid.wgsl).
 fn labGrid(view: LabView, position: vec2f, size: vec2u) -> f32 {
-    return gridLines(view.inverseViewProjection, view.projectionDistance, view.observer, view.planetRadius, view.grid, position, size);
-}
-
-fn labHenyeyGreenstein(cosTheta: f32, g: f32) -> f32 {
-    let g2 = g * g;
-    return (1.0 - g2) / (4.0 * LAB_PI * pow(max(1.0 + g2 - 2.0 * g * cosTheta, 1e-4), 1.5));
+    return dkGroundGrid(view.inverseViewProjection, view.projectionDistance, view.observer, view.planetRadius, view.grid, position, size);
 }
 
 // The sun's illuminance at `altitude` km for a sun `sine` of its elevation up: reddened by the air mass in the way.
@@ -106,7 +102,7 @@ fn labSkyOver(v: vec3f, sun: vec3f, horizon: f32) -> vec3f {
     let pale = vec3f(0.42, 0.58, 0.85) * 14000.0 * (0.1 + 0.9 * day) * warm;
     let t = pow(clamp((v.z - horizon) / (1.0 - horizon), 0.0, 1.0), 0.38);
     var sky = mix(pale, zenith, t);
-    sky = sky + labSunlight(sun.z, 0.0) * 0.006 * labHenyeyGreenstein(dot(v, sun), 0.76);
+    sky = sky + labSunlight(sun.z, 0.0) * 0.006 * gwHenyeyGreenstein(dot(v, sun), 0.76);
     let ground = pale * vec3f(0.42, 0.4, 0.36);
     return mix(ground, sky, smoothstep(-0.004, 0.0, v.z - horizon));
 }

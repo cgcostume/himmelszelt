@@ -1,3 +1,4 @@
+import { wgsl as dunstkreis, GROUND_GRID_STRENGTH, groundGridOffsets } from "@himmelszelt/dunstkreis";
 import { wgsl as gewoelk } from "@himmelszelt/gewoelk";
 import { fromJulianDay, sun } from "@himmelszelt/sternzeit";
 import { find } from "../../dom";
@@ -12,7 +13,6 @@ import {
     gpu as shared,
 } from "../../dunstkreis/atmosphere";
 import { flight, flightIn } from "../../dunstkreis/flight";
-import { GRID_STRENGTH, GRID_WGSL, gridOffsets } from "../../dunstkreis/groundgrid";
 import { type Basis, cameraBasis, lookAround, project, type SkyCamera } from "../../dunstkreis/skycamera";
 import { onDemand } from "../../frame";
 import { paintRange } from "../../range";
@@ -54,12 +54,15 @@ export function viewData(view: {
     data.set([...view.sun, d], 16);
     data.set([Math.max(view.heightM, 1) / 1000, view.radiusKm, 1 / (1.2 * 2 ** view.ev100), view.pixelAngle], 20);
     data.set([view.clock ?? 0, view.frame ?? 0, view.flown.east, view.flown.north], 24);
-    data.set(gridOffsets(view.flown), 28);
-    data.set([view.grid ? GRID_STRENGTH : 0, view.lightScale ?? 1, view.skyLuminance ?? 0, view.headroom ?? 1], 44);
+    data.set(groundGridOffsets(view.flown), 28);
+    data.set(
+        [view.grid ? GROUND_GRID_STRENGTH : 0, view.lightScale ?? 1, view.skyLuminance ?? 0, view.headroom ?? 1],
+        44,
+    );
     return data;
 }
-/** The shader prelude every research pass starts with: the camera's rays, the tone curves, the ground's grid and the view. */
-export const PRELUDE = [gewoelk.camera, gewoelk.tonemap, GRID_WGSL, view].join("\n");
+/** What every research pass starts with: camera rays, tone curves, phase functions, the ground's grid, the view. */
+export const PRELUDE = [gewoelk.camera, gewoelk.tonemap, gewoelk.phase, dunstkreis.groundgrid, view].join("\n");
 export const NOISE = gewoelk.noise;
 
 export type Presets = Record<string, Record<string, number>>;

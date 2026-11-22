@@ -63,12 +63,14 @@ export {
     voxel,
 };
 
+/** reisszeug's phase functions under the prefix `gw`, `gwHenyeyGreenstein`, alone: `params` holds them too. */
+export const phase = prefixed(rzPhase, "gw");
+
+/** What every pass reads, binding-free: the parameters' structs and the geometry, with `phase`. */
+export const params = [phase, paramsSource].join("\n");
+
 /** The noise, reisszeug's hashes and noises under the prefix `gw`, with the cell patterns the maps are drawn from and
  *  the jitter a march starts its rays by: `gwPerlin`, `gwPerlin2`, `gwFbm`, `gwAlligator`, `gwCurl`, `gwBumps`. */
-/** What every pass reads, binding-free: the parameters' structs and the geometry, with reisszeug's phase functions under
- *  the prefix `gw`. */
-export const params = [prefixed(rzPhase, "gw"), paramsSource].join("\n");
-
 export const noise = [prefixed(rzHash, "gw"), prefixed(rzNoise, "gw"), cells].join("\n");
 
 export const airLookup = [atmosphere, common, lut, sampling].join("\n");

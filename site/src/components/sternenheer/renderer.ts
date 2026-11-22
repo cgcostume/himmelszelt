@@ -1,9 +1,10 @@
-import type { AirTable, AtmosphereLUTs, AtmosphereModel, SkyPass } from "@himmelszelt/dunstkreis";
+import type { AirTable, AtmosphereLUTs, AtmosphereModel, GroundGridPass, SkyPass } from "@himmelszelt/dunstkreis";
 import {
     airTable,
     airTransmittance,
     clampObserverHeight,
     createAirTexture,
+    createGroundGridPass,
     createSkyPass,
     discUncovered,
     liftedDirection,
@@ -55,7 +56,6 @@ import {
 } from "@himmelszelt/sternenheer";
 import { apparentSiderealTime, fromJulianDay, julianEphemerisDay, moon, stars, sun } from "@himmelszelt/sternzeit";
 import { quality } from "../dunstkreis/atmosphere";
-import { groundGrid } from "../dunstkreis/groundgrid";
 import { createGridPass } from "./grid";
 
 // The sky pass writes cd/m² when its exposure is 1: EV100 of -log2(1.2).
@@ -278,7 +278,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
     let mapsBound: MapSize | "" = "";
     let mapsWanted: MapSize | "" = "";
     let background: GPUTexture | null = null;
-    let groundPass: ReturnType<typeof groundGrid> | null = null;
+    let groundPass: GroundGridPass | null = null;
     let composed: GPUTexture | null = null;
     let exposed: GPUTexture | null = null;
     let skyEV100 = Number.NEGATIVE_INFINITY;
@@ -582,7 +582,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             if (frame.air) {
                 sky.pass.encode(encoder, background);
                 if (frame.ground) {
-                    groundPass ??= groundGrid(device);
+                    groundPass ??= createGroundGridPass(device);
                     const radiusKm = s.model.planet.groundRadiusKm;
                     behind = groundPass.encode(encoder, background, {
                         inverseViewProjection: frame.inverseViewProjection,

@@ -1,5 +1,11 @@
 import type { AtmosphereLUTs, AtmosphereModel, SkyPass } from "@himmelszelt/dunstkreis";
-import { apparentDirection, clampObserverHeight, createSkyPass, refractionAngle } from "@himmelszelt/dunstkreis";
+import {
+    apparentDirection,
+    clampObserverHeight,
+    createGroundGridPass,
+    createSkyPass,
+    refractionAngle,
+} from "@himmelszelt/dunstkreis";
 import type {
     CloudParams,
     CloudPass,
@@ -41,7 +47,6 @@ import {
     tables,
 } from "../dunstkreis/atmosphere";
 import { flightIn } from "../dunstkreis/flight";
-import { groundGrid } from "../dunstkreis/groundgrid";
 import { PHOTO_RAMP } from "../dunstkreis/ramps";
 import { type Basis, cameraBasis, lookAround, project } from "../dunstkreis/skycamera";
 import { onDemand } from "../frame";
@@ -359,7 +364,7 @@ export function cloudsFigure(root: HTMLElement) {
     }
 
     const textures = gpu ? texturePanel(root, gpu.device) : null;
-    const groundPass = gpu ? groundGrid(gpu.device) : null;
+    const groundPass = gpu ? createGroundGridPass(gpu.device) : null;
     // Flight, and the height and the place over the ground the figure is seen from: its own, no other figure follows.
     const { flown, height: heightM } = flightIn(root, canvas, camera, () => requestRender());
     // Each layer's motion as last drawn: a new wind or evolution goes on from where the clouds stand.

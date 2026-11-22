@@ -1,5 +1,11 @@
-import type { AtmosphereLUTs, AtmosphereModel, SkyPass } from "@himmelszelt/dunstkreis";
-import { airTransmittance, clampObserverHeight, createSkyPass, refractionAngle } from "@himmelszelt/dunstkreis";
+import type { AtmosphereLUTs, AtmosphereModel, GroundGridPass, SkyPass } from "@himmelszelt/dunstkreis";
+import {
+    airTransmittance,
+    clampObserverHeight,
+    createGroundGridPass,
+    createSkyPass,
+    refractionAngle,
+} from "@himmelszelt/dunstkreis";
 import type {
     EarthShadow,
     MapFilter,
@@ -40,7 +46,6 @@ import {
     sun,
 } from "@himmelszelt/sternzeit";
 import { quality, SDR } from "../dunstkreis/atmosphere";
-import { groundGrid } from "../dunstkreis/groundgrid";
 import { skyWhite, type WhiteChoice } from "../white";
 import lambert from "./laws/lambert.wgsl";
 import orenNayar from "./laws/oren-nayar.wgsl";
@@ -422,7 +427,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     let mapsWanted = "";
     let mapsSet = "";
     let background: GPUTexture | null = null;
-    let groundPass: ReturnType<typeof groundGrid> | null = null;
+    let groundPass: GroundGridPass | null = null;
     // dunstkreis' meter on the sky, read back once per sky the tiles show, as several tiles may show different ones: by
     // day the sky sets the exposure.
     const skyMeters = new Map<string, number>();
@@ -726,7 +731,7 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
         if (frame.air) {
             sky.pass.encode(encoder, background);
             if (frame.ground) {
-                groundPass ??= groundGrid(device);
+                groundPass ??= createGroundGridPass(device);
                 const radiusKm = m.model.planet.groundRadiusKm;
                 underneath = groundPass.encode(encoder, background, {
                     inverseViewProjection: frame.inverseViewProjection,

@@ -34,6 +34,8 @@ import exposure from "./exposure.comp.wgsl";
 import features from "./features.wgsl";
 import frame from "./frame.wgsl";
 import grid from "./grid.wgsl";
+import groundgrid from "./groundgrid.wgsl";
+import groundgridlayer from "./groundgridlayer.comp.wgsl";
 import lut from "./lut.wgsl";
 import mipmap from "./mipmap.comp.wgsl";
 import multiscattering from "./multiscattering.comp.wgsl";
@@ -69,6 +71,8 @@ export {
     features,
     frame,
     grid,
+    groundgrid,
+    groundgridlayer,
     lut,
     mipmap,
     multiscattering,

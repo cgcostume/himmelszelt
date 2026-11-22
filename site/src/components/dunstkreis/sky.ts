@@ -1,7 +1,8 @@
-import type { AtmosphereLUTs, AtmosphereModel, SkyPass, SkyPassOptions } from "@himmelszelt/dunstkreis";
+import type { AtmosphereLUTs, AtmosphereModel, GroundGridPass, SkyPass, SkyPassOptions } from "@himmelszelt/dunstkreis";
 import {
     apparentDirection,
     clampObserverHeight,
+    createGroundGridPass,
     createSkyPass,
     DEFAULT_AUREOLE,
     LENS_VEIL,
@@ -33,7 +34,6 @@ import {
     tables,
 } from "./atmosphere";
 import { flightIn } from "./flight";
-import { groundGrid } from "./groundgrid";
 import { PHOTO_RAMP } from "./ramps";
 import { type Basis, cameraBasis, lookAround, project } from "./skycamera";
 
@@ -131,7 +131,7 @@ export function skyFigure(root: HTMLElement) {
     // Flight, with a grid on the ground while it lasts, and the height the figure is seen from: its own, but for the
     // primary's, which is the page's, since the other figures take their sky from it.
     const air = flightIn(root, canvas, camera, () => requestRender());
-    let groundPass: ReturnType<typeof groundGrid> | null = null;
+    let groundPass: GroundGridPass | null = null;
 
     function setup() {
         const context = shared.error ? null : canvas.getContext("webgpu");
@@ -296,7 +296,7 @@ export function skyFigure(root: HTMLElement) {
         const encoder = gpu.device.createCommandEncoder();
         const target = gpu.context.getCurrentTexture();
         // The sky into a texture like the canvas', and from there with the grid on the ground onto the canvas.
-        groundPass ??= groundGrid(gpu.device);
+        groundPass ??= createGroundGridPass(gpu.device);
         const drawn = groundPass.skyFor(target);
         pass.encode(encoder, drawn);
         const view = { inverseViewProjection: inverseViewProjection(basis), projectionDistance: basis.d };

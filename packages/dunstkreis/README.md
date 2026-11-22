@@ -209,6 +209,12 @@ cosine-weighted solid angle it covers, and the lower half is built with it. `gro
 leaves the Sun alone, a dispatch cheaper per rebuild. The sky is read from the observer's altitude, which is close
 enough near the ground and too dark high up.
 
+For a view one flies through, `createGroundGridPass` draws a grid on that ground, for orientation, speed and height:
+thin lines every 10 km, 1 km, 100 m and on down to 1 mm, each level there once its cells are a few pixels across. It
+brightens the sky pass' picture along the lines, into a target of any storage format, or into a texture of its own that
+it returns. How far the observer has flown is worked out per level in doubles (`groundGridOffsets`), so a millimeter
+still shows 100 km out. `wgsl.groundgrid` is the same, binding-free, for a pass that draws its own ground.
+
 ## Lighting a scene
 
 The Sun and the sky light a scene apart, the usual split for image-based lighting:

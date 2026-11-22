@@ -417,7 +417,7 @@ fn formMarch(@builtin(global_invocation_id) id: vec3u) {
             var depth = 1.0;
             var lobe = 1.0;
             for (var k = 0u; k < 4u; k = k + 1u) {
-                let phase = 0.8 * labHenyeyGreenstein(cosTheta, 0.8 * lobe) + 0.2 * labHenyeyGreenstein(cosTheta, -0.15 * lobe);
+                let phase = 0.8 * gwHenyeyGreenstein(cosTheta, 0.8 * lobe) + 0.2 * gwHenyeyGreenstein(cosTheta, -0.15 * lobe);
                 orders = orders + share * exp(-tau * depth) * phase;
                 share = share * F.multiple;
                 depth = depth * max(F.multiple, 0.5);

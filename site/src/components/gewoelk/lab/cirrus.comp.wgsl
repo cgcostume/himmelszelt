@@ -220,7 +220,7 @@ fn cirrusSheet(v: vec3f) -> vec4f {
     let slope = density - cirrusDensity(g + toSun * 0.05, lod);
     let shade = labPassed(C.relief * C.opticalDepth * sunward * min(reach / 0.15, 2.0), C.forwardG) * clamp(1.0 + C.relief * 0.9 * slope, 0.45, 1.7);
     // Light scattered once on its way through a thin layer, lit from above and seen from below or above.
-    let phase = 0.78 * labHenyeyGreenstein(dot(v, sun), C.forwardG) + 0.22 * labHenyeyGreenstein(dot(v, sun), -0.2);
+    let phase = 0.78 * gwHenyeyGreenstein(dot(v, sun), C.forwardG) + 0.22 * gwHenyeyGreenstein(dot(v, sun), -0.2);
     let sameSide = (dot(v, up) > 0.0) == below;
     var once = tau / mu * through;
     if (abs(across - mu) > 1e-3) {
