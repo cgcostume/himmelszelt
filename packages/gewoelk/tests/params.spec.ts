@@ -125,3 +125,15 @@ test("a sunlight table keeps the rows it was made for, the current ones without 
     const current = rowOf(sunlightData({ ...p, sunlight: table }));
     expect(current[0]).toBeCloseTo(sunlightRows(p)[0]?.fromRad ?? Number.NaN, 6);
 });
+
+test("a quality is one level for all three dials or one for each, and stepped time holds between its steps", async () => {
+    const { cloudQuality } = await import("../src/quality.js");
+    const { steppedS } = await import("../src/params.js");
+    expect(cloudQuality()).toEqual(cloudQuality("medium"));
+    const mixed = cloudQuality({ sampling: "low", motion: "ultra" });
+    expect(mixed.voxel.grid).toEqual({ size: 128, layers: 32 });
+    expect(mixed.clearing).toEqual(cloudQuality("medium").clearing);
+    expect([mixed.evolves, mixed.voxel.keyframes, mixed.evolutionEveryS]).toEqual([true, false, 0]);
+    expect(cloudQuality("low").evolves).toBe(false);
+    expect([steppedS(7.9, 2), steppedS(8, 2), steppedS(7.9), steppedS(7.9, 0)]).toEqual([6, 8, 7.9, 7.9]);
+});

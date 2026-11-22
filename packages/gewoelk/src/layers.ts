@@ -4,6 +4,7 @@
  * Lengths in km, angles in degrees. Every kind of cloud has presets, `CLOUD_TYPES`, and a sky names one for each of
  * its four places, see `Weather`.
  */
+import type { Contrail } from "./contrails.js";
 
 /** A layer of cloud from `baseKm` up, shaped by a map of its own: scattered heaps or a closed deck, by its coverage. */
 export interface CloudLayer {
@@ -387,6 +388,9 @@ export interface LayeredParams {
     evolution: number;
     /** Where the evolution stands at time 0, none by default: to go on from where the maps stood. */
     evolutionOffset?: number;
+    /** The seconds between two changes of the maps, 0 by default for one every frame: the maps are baked that often, and
+     *  drift and billows go on between, free. */
+    evolutionEveryS?: number;
     seed: number;
     /** The distance at which the last cloud is gone, so the horizon stays clear, 0 for clouds all the way, and from where they thin out. */
     clearingKm: number;
@@ -398,6 +402,8 @@ export interface LayeredParams {
     clearingCenterKm?: readonly [number, number];
     /** The time the drift and the evolution are taken at, in seconds. */
     timeS: number;
+    /** Contrails at the high sheet's altitude, none by default, `MAX_CONTRAILS` at most: drawn with a sheet or without. */
+    contrails?: readonly Contrail[];
 }
 
 export const DEFAULT_LAYERED_PARAMS: LayeredParams = {

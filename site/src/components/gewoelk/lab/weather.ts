@@ -1,8 +1,10 @@
 import {
+    cloudQuality,
     createLayeredCloudPass,
     type LayeredCloudPass,
     type LayeredQuality,
     type LayeredSky,
+    type QualityLevel,
 } from "@himmelszelt/gewoelk";
 import { HDR, onTables, tables } from "../../dunstkreis/atmosphere";
 import { createStarsRenderer, type FrameLight, skyAt } from "../../sternenheer/renderer";
@@ -15,6 +17,7 @@ import { designerHeight, designerKinds, designerOrbit, designerSwap, designerTim
 import { type Design, KIND_VALUE, kindPresets, kindSource, type Place, placeOf, presetOf, skyFrom } from "./kinds";
 import { createLab, type Lab, labPipeline } from "./lab";
 import { cloudModel } from "./model";
+import { routeTrails } from "./routes";
 import shader from "./weather.comp.wgsl";
 
 const DEG = Math.PI / 180;
@@ -199,13 +202,23 @@ export async function weatherFigure(root: HTMLElement) {
     // The pass of the chosen quality and options, made when it is first asked for: its maps' sizes, its steps, god rays and
     // the adaptive stride are fixed at creation. Blue noise and the box filter are switched from frame to frame.
     const passes = new Map<string, LayeredCloudPass | Promise<LayeredCloudPass>>();
-    const quality = (): LayeredQuality => ({
-        scale: Number(lab.choice("scale")) || 0.5,
-        maxSteps: Number(lab.choice("steps")) || 128,
+    // The figure's dials of quality, gewoelk's: a designer has none and is "medium".
+    const level = (dial: string) => (lab.choice(dial) || "medium") as QualityLevel;
+    const quality = (): LayeredQuality => {
+        const chosen = cloudQuality({ sampling: level("sampling") }).layered;
         // A designer keeps the maps it does not show small.
-        mapSize: designed === "high" ? 64 : 512,
-        highMapSize: designed && designed !== "high" ? 256 : Number(lab.choice("size")) || 2048,
-    });
+        if (!designed) return chosen;
+        return { ...chosen, mapSize: designed === "high" ? 64 : 512, ...(designed !== "high" && { highMapSize: 256 }) };
+    };
+    // The reach sets the sliders it stands for, which stay the reader's to move.
+    const reach = (eased: boolean) => {
+        const { clearing, march } = cloudQuality({ reach: level("reach") });
+        const values = { clearing: clearing.clearingKm, clearFrom: clearing.clearingFromKm, reachKm: march.reachKm };
+        lab.apply("reach", values, eased);
+    };
+    const reaches = root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-reach"]`);
+    for (const input of reaches) input.addEventListener("change", () => reach(true));
+    if (reaches.length > 0) reach(false);
     const clouds = () => {
         const chosen = quality();
         const godRays = lab.pressed("rays.on");
@@ -335,13 +348,17 @@ export async function weatherFigure(root: HTMLElement) {
                     wind,
                     highWind: wind,
                     shear: lab.value("shear"),
-                    evolution: lab.value("change"),
+                    evolution: cloudQuality({ motion: level("motion") }).evolves ? lab.value("change") : 0,
+                    evolutionEveryS: cloudQuality({ motion: level("motion") }).evolutionEveryS,
                     evolutionOffset: lab.value("phase"),
                     seed: lab.value("seed"),
                     clearingKm: patch ? radiusKm : lab.value("clearing"),
                     clearingFromKm: patch ? PATCH_FROM * radiusKm : lab.value("clearFrom"),
                     clearingCenterKm: centerKm,
                     timeS: lab.clock,
+                    contrails: lab.pressed("contrails.on")
+                        ? routeTrails(lab.clock, wind, 60 * lab.value("contrails.minutes"))
+                        : [],
                     observerKm: [lab.flown.east, lab.flown.north],
                     march: {
                         stepKm: lab.value("stepKm"),

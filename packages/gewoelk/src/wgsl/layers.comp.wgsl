@@ -28,6 +28,8 @@
 
 // Steps a ray takes at most.
 override GW_LAYER_MAX_STEPS: u32 = 128u;
+// Orders of scattering of the sun's light, as the voxel march's `GW_SCATTERING_OCTAVES`.
+const GW_LAYER_SCATTERING_OCTAVES: u32 = 8u;
 // Whether the march asks the pyramids how far the air ahead is clear and strides that far at once. Without, and where
 // cloud may be near, it strides blindly through clear air, 2.5 steps at a time, and steps back at the first cloud.
 override GW_LAYER_ADAPTIVE: bool = false;
@@ -499,7 +501,7 @@ fn gwLayers(@builtin(global_invocation_id) id: vec3u) {
             var share = 1.0;
             var depth = 1.0;
             var lobe = 1.0;
-            for (var k = 0u; k < 4u; k = k + 1u) {
+            for (var k = 0u; k < GW_LAYER_SCATTERING_OCTAVES; k = k + 1u) {
                 let phase = 0.8 * gwHenyeyGreenstein(cosTheta, GW_LAYER_FORWARD_G * lobe) + 0.2 * gwHenyeyGreenstein(cosTheta, GW_LAYER_BACKWARD_G * lobe);
                 orders = orders + share * exp(-tau * depth) * phase;
                 share = share * gwLayered.multiScatter;

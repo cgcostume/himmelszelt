@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { expect, test } from "@playwright/test";
+import { type Contrail, contrailBehind } from "../src/contrails.js";
 import { DEFAULT_LAYERED_PARAMS } from "../src/layers.js";
 import { DEFAULT_CLOUD_PARAMS, paramsData, sunlightData } from "../src/params.js";
 import { cloudOutput } from "../src/wgsl/output.js";
@@ -76,7 +77,7 @@ test("the high sheet bakes its map once and covers some of the sky overhead", as
     pass.encode(encoder, { params, sunlight, width, height });
     device.queue.submit([encoder.finish()]);
     expect([pass.texture.width, pass.texture.height]).toEqual([width, height]);
-    expect(pass.memoryBytes).toBeGreaterThan(2 * 1024 * 1024 * 8);
+    expect(pass.memoryBytes).toBeGreaterThan(1024 * 1024 * 4);
 
     const { data } = await readTexture(device, pass.texture);
     // A clearing centered far off leaves no sheet overhead; centered on the observer it keeps it.
@@ -92,6 +93,18 @@ test("the high sheet bakes its map once and covers some of the sky overhead", as
     };
     expect(await cleared([0, 0])).toBeLessThan(0.9);
     expect(await cleared([40, 0])).toBe(1);
+    // Without a sheet the sky overhead is clear, until a contrail crosses it.
+    const none = { ...DEFAULT_LAYERED_PARAMS.sky, high: { ...DEFAULT_LAYERED_PARAMS.sky.high, coverage: 0 } };
+    const streaked = async (contrails: readonly Contrail[]) => {
+        const encoder = device.createCommandEncoder();
+        pass.update({ ...DEFAULT_LAYERED_PARAMS, sky: none, contrails }, encoder);
+        pass.encode(encoder, { params, sunlight, width, height });
+        device.queue.submit([encoder.finish()]);
+        return Math.min(...(await readTexture(device, pass.texture)).data.filter((_, i) => i % 4 === 3));
+    };
+    expect(await streaked([])).toBe(1);
+    const overhead = { fromKm: [-5, 0], toKm: [5, 0], fromWidthKm: 0.5, toWidthKm: 1, opticalDepth: 0.5 } as const;
+    expect(await streaked([overhead])).toBeLessThan(0.95);
     expect(await device.popErrorScope()).toBeNull();
     expect(data.every(Number.isFinite)).toBe(true);
     const through = data.filter((_, i) => i % 4 === 3);
@@ -103,4 +116,16 @@ test("the high sheet bakes its map once and covers some of the sky overhead", as
     pass.destroy();
     params.destroy();
     sunlight.destroy();
+});
+
+test("a contrail lies behind its aircraft, as long as it flew while the trail lasted, less the wind's drift", () => {
+    const north = { atKm: [3, 4], headingDeg: 0, speedMps: 200 } as const;
+    const still = contrailBehind(north, { persistenceS: 100 });
+    expect(still.fromKm).toEqual([3, 4]);
+    expect(still.toKm[0]).toBeCloseTo(3, 9);
+    expect(still.toKm[1]).toBeCloseTo(4 - 20, 9);
+    expect(still.toWidthKm).toBeGreaterThan(still.fromWidthKm);
+    // A tailwind as fast as the aircraft carries the trail along with it; a crosswind turns it off the heading.
+    expect(contrailBehind(north, { persistenceS: 100, wind: [0, 200] }).toKm[1]).toBeCloseTo(4, 9);
+    expect(contrailBehind(north, { persistenceS: 100, wind: [50, 0] }).toKm[0]).toBeCloseTo(3 + 5, 9);
 });

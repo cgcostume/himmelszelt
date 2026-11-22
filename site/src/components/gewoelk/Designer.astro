@@ -34,8 +34,8 @@ const DESIGNS: Record<Designed, { label: string; model: string; caption: string;
         label: "A patch of the voxel cloudscape, 20 km across, seen from above",
         model: "The voxel volume's model: a grid of voxels over the ground, filled as high as the cloud map's columns stand, some grown into towers, and a ray stepping through",
         caption:
-            "The voxel cloudscape, the low clouds as a volume: cumulus from the heaps of a fair day to towering cumulus, and stratocumulus as a deck. (a) Its model: a grid of voxels, filled as high as the cloud map's columns stand, some grown into towers through the slab, and a ray (accent) that asks the way to the Sun (dashed) at every step. (b) A patch 20 km across. (c) Its numbers. Below, what it is rendered from: the cloud map, the voxels' shape and the distance to the nearest cloud, the light summed towards the Sun and from the sky, and the detail noise, each volume a slice at a time. The model's voxels are drawn far larger than the grid's.",
-        checked: "scattered",
+            "The voxel cloudscape, the low clouds as a volume: cumulus from the heaps of a fair day to towering cumulus, stratocumulus as a deck, and stratus. (a) Its model: a grid of voxels, filled as high as the cloud map's columns stand, some grown into towers through the slab, and a ray (accent) that asks the way to the Sun (dashed) at every step. (b) A patch 20 km across. (c) Its numbers. Below, what it is rendered from: the cloud map, the voxels' shape and the distance to the nearest cloud, the light summed towards the Sun and from the sky, and the detail noise, each volume a slice at a time. The model's voxels are drawn far larger than the grid's.",
+        checked: "mediocris",
     },
     low: {
         label: "A patch of the low layer of cloud, 16 km across, seen from above",
@@ -78,10 +78,11 @@ const { id = `design-${place}`, caption = DESIGNS[place].caption } = Astro.props
 // The library's kinds by name: what a button reads, and what the kind is, after `CLOUD_TYPES`.
 const KINDS: Record<Designed, Record<string, [label: string, title: string]>> = {
     voxel: {
-        fair: ["fair", "Fair-weather cumulus: small, flat, spread out"],
-        scattered: ["scattered", "Scattered cumulus, some of it growing"],
-        towering: ["towering", "Towering cumulus: tall, heaped, an afternoon in summer"],
-        deck: ["deck", "A closed deck of stratocumulus"],
+        humilis: ["humilis", "Cumulus humilis: small, flat heaps of fair weather"],
+        mediocris: ["mediocris", "Cumulus mediocris: scattered heaps, some of them growing"],
+        congestus: ["congestus", "Cumulus congestus: tall, heaped towers, an afternoon in summer"],
+        stratocumulus: ["stratocumulus", "A closed, lumpy deck of stratocumulus"],
+        stratus: ["stratus", "A low, even layer with next to no relief"],
     },
     low: {
         few: ["few", "A few small heaps, far apart"],

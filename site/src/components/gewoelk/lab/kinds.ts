@@ -1,5 +1,6 @@
 import {
     CLOUD_TYPES,
+    CLOUDSCAPE_TYPES,
     type CloudLayer,
     type CloudscapeParams,
     DEFAULT_CLOUDSCAPE,
@@ -7,7 +8,6 @@ import {
     type DeepLayer,
     type HighSheet,
     type LayeredSky,
-    WEATHER,
 } from "@himmelszelt/gewoelk";
 import type { Presets } from "./lab";
 
@@ -149,13 +149,10 @@ const VOXEL = [
 ] as const;
 export type VoxelNumbers = Record<(typeof VOXEL)[number], number>;
 
-/** The library's weathers a voxel designer offers as kinds of cloud: their cloudscapes, by the names it shows. */
-export const VOXEL_KINDS: Record<string, Partial<CloudscapeParams>> = {
-    fair: WEATHER.fair.cloudscape,
-    scattered: WEATHER.scattered.cloudscape,
-    towering: WEATHER.towering.cloudscape,
-    deck: WEATHER.overcast.cloudscape,
-};
+/** The library's kinds of voxel cloudscape, which a voxel designer offers: their shapes, by their names. */
+export const VOXEL_KINDS: Record<string, Partial<CloudscapeParams>> = Object.fromEntries(
+    Object.entries(CLOUDSCAPE_TYPES).map(([name, kind]) => [name, kind.shape]),
+);
 
 /** The cloudscape as the sliders have it, read by `value`. */
 export const voxelFrom = (value: (param: string) => number) =>

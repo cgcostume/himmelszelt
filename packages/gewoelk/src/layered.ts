@@ -38,9 +38,9 @@ export interface LayeredQuality {
 
 /** Qualities to pick from by name: for a phone, a laptop, and a desktop's graphics card. */
 export const LAYERED_QUALITY = {
-    low: { scale: 1 / 3, maxSteps: 64, mapSize: 256, highMapSize: 1024 },
-    medium: { scale: 0.5, maxSteps: 128, mapSize: 512, highMapSize: 2048 },
-    high: { scale: 1, maxSteps: 256, mapSize: 1024, highMapSize: 4096 },
+    low: { scale: 1 / 3, maxSteps: 64, mapSize: 256, highMapSize: 512 },
+    medium: { scale: 0.5, maxSteps: 128, mapSize: 512, highMapSize: 1024 },
+    high: { scale: 1, maxSteps: 256, mapSize: 1024, highMapSize: 2048 },
 } satisfies Record<string, LayeredQuality>;
 
 export interface LayeredCloudPassOptions {
@@ -234,7 +234,7 @@ export async function createLayeredCloudPass(
             });
             const marched = [sky.low, sky.deep, sky.middle].filter((layer) => layer.coverage > NONE);
             there.layers = marched.length > 0;
-            there.high = sky.high.coverage > NONE;
+            there.high = sky.high.coverage > NONE || (rest.contrails?.length ?? 0) > 0;
             // The sunlight table's rows stand at a cloudscape's base and top and at a sheet's altitude: those of the layers.
             const base = Math.min(...marched.map((layer) => layer.baseKm), sky.low.baseKm);
             const top = Math.max(
@@ -291,6 +291,8 @@ export async function createLayeredCloudPass(
                 clearingKm,
                 clearingFromKm,
                 ...(clearingCenterKm && { clearingCenterKm }),
+                ...(rest.contrails && { contrails: rest.contrails }),
+                ...(rest.evolutionEveryS && { evolutionEveryS: rest.evolutionEveryS }),
                 timeS: light.timeS,
             };
             const { maps, highMap } = timestampWrites ?? {};

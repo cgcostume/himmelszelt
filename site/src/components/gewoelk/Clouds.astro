@@ -153,27 +153,30 @@ const HIGH = {
     ],
     checked: "puffsAndVeil",
 };
-const SCALE = {
-    name: "scale",
-    label: "Render scale",
-    title: "The share of the frame's pixels the clouds are marched at, then composed bilinearly: a quarter costs a quarter",
+// Two of gewoelk's dials of quality, `cloudQuality`'s: each a level of four.
+const REACH = {
+    name: "reach",
+    label: "Reach",
+    title: "How far the clouds are seen: sets the clearing's sliders",
     options: [
-        ["1", "full"],
-        ["0.5", "half"],
-        ["0.25", "quarter"],
+        ["low", "low", "Clouds out to 40 km"],
+        ["medium", "medium", "Clouds out to 150 km"],
+        ["high", "high", "Clouds to the horizon"],
+        ["ultra", "ultra", "Clouds to the horizon"],
     ],
-    checked: "0.5",
+    checked: "medium",
 };
-const STEPS = {
-    name: "steps",
-    label: "Steps",
-    title: "Steps a ray takes at most through the cloudscape",
+const SAMPLING = {
+    name: "sampling",
+    label: "Sampling",
+    title: "How finely the clouds are marched and stored: the share of the frame, a ray's steps, the voxels and the noise",
     options: [
-        ["128", "128"],
-        ["256", "256"],
-        ["512", "512"],
+        ["low", "low", "A third of the frame, 128 steps, 128 x 128 x 32 voxels"],
+        ["medium", "medium", "Half the frame, 256 steps, 256 x 256 x 64 voxels"],
+        ["high", "high", "The whole frame, 256 steps, 256 x 256 x 64 voxels"],
+        ["ultra", "ultra", "The whole frame, 512 steps, 384 x 384 x 96 voxels"],
     ],
-    checked: "256",
+    checked: "medium",
 };
 const WEATHER = {
     name: "weather",
@@ -209,19 +212,6 @@ const AIR = {
         ["blend", "blend"],
     ],
     checked: "volume",
-};
-const LAYERS = {
-    name: "layers",
-    label: "Voxel layers",
-    title: "Layers of voxels over the slab's height: towers several times the layer's height need more, at more memory",
-    options: [
-        ["32", "32"],
-        ["48", "48"],
-        ["64", "64"],
-        ["96", "96"],
-        ["128", "128"],
-    ],
-    checked: "64",
 };
 // The lab's choices and sliders: how the cloudscape changes, how fast, and how much of a keyframe a frame may build.
 const MODE = {
@@ -332,10 +322,13 @@ const LAB: LabSlider[] = [
                 <button type="button" class="view-toggle" data-field="light.multi" aria-pressed="true" title="The orders of scattering after the first, as octaves: each a share of the one before, through less cloud, with a wider lobe">multiple</button>
                 <button type="button" class="view-toggle" data-field="light.ambient" aria-pressed="true" title="The sky's light from above and the ground's from below, fading with depth">ambient</button>
             </OptionGroup>
+            <OptionGroup name="reach">
+                <Choice figure={id} {...REACH} />
+            </OptionGroup>
+            <OptionGroup name="sampling">
+                <Choice figure={id} {...SAMPLING} />
+            </OptionGroup>
             <OptionGroup name="render">
-                <Choice figure={id} {...SCALE} />
-                <Choice figure={id} {...STEPS} />
-                <Choice figure={id} {...LAYERS} />
                 {lab && <Choice figure={id} {...GRID} />}
                 <Choice figure={id} {...AIR} />
                 <button type="button" class="view-toggle" data-field="textures.on" aria-pressed="false" title="The textures the figure renders from, down the left of the view: hover one for what it is for">textures</button>

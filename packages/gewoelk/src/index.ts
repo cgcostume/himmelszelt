@@ -28,8 +28,8 @@ export {
 } from "./params.js";
 
 // Weather as presets of the clouds' shape, and blends between them.
-export type { Weather, WeatherName } from "./weather.js";
-export { mixWeather, WEATHER } from "./weather.js";
+export type { CloudscapeType, CloudscapeTypeName, Weather, WeatherName } from "./weather.js";
+export { CLOUDSCAPE_TYPES, mixWeather, WEATHER } from "./weather.js";
 
 // The layered model's sky: its numbers, the kinds of cloud for each of its places, and blends between two.
 export type { CloudLayer, DeepLayer, HighSheet, LayeredParams, LayeredSky, Sky, SkyDials } from "./layers.js";
@@ -55,6 +55,10 @@ export type {
 } from "./layerpass.js";
 export { createLayerMarch, DEFAULT_LAYER_MARCH } from "./layerpass.js";
 export type { HighSheetEncodeOptions, HighSheetOptions, HighSheetPass, HighSheetUpdateOptions } from "./highsheet.js";
+export type { CloudQuality, QualityLevel, ResolvedQuality } from "./quality.js";
+export { cloudQuality } from "./quality.js";
+export type { Aircraft, Contrail, ContrailAir } from "./contrails.js";
+export { contrailBehind, MAX_CONTRAILS } from "./contrails.js";
 export { createHighSheet } from "./highsheet.js";
 export type {
     LayeredCloudParams,

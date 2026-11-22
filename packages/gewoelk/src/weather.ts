@@ -18,6 +18,92 @@ export interface Weather {
     layers?: Sky;
 }
 
+/**
+ * A kind of voxel cloudscape: the numbers of its shape, and the volume that holds it without waste, voxels east and
+ * north and levels up. A pass is made with one volume: `createCloudPass({ grid })` takes the largest of the kinds it
+ * is to show.
+ */
+export interface CloudscapeType {
+    shape: Numeric<CloudscapeParams>;
+    grid: { size: number; layers: number };
+}
+
+/** Kinds of low cloud for the voxel model, by their genus and species, as `CLOUD_TYPES` holds the layered model's. */
+export const CLOUDSCAPE_TYPES = {
+    /** Cumulus humilis: small, flat heaps of fair weather. */
+    humilis: {
+        shape: {
+            coverage: 0.32,
+            sharpness: 0.45,
+            towers: 0.1,
+            towerScale: 1.2,
+            billows: 0.12,
+            baseKm: 1.2,
+            heightKm: 1.6,
+            offset: 0.2,
+        },
+        grid: { size: 256, layers: 32 },
+    },
+    /** Cumulus mediocris: scattered heaps, some of them growing. */
+    mediocris: {
+        shape: {
+            coverage: 0.42,
+            sharpness: 0.35,
+            towers: 0.3,
+            towerScale: 1.5,
+            billows: 0.12,
+            baseKm: 1.2,
+            heightKm: 2.4,
+            offset: 0.25,
+        },
+        grid: { size: 256, layers: 32 },
+    },
+    /** Cumulus congestus: tall, heaped towers, which need the most levels. */
+    congestus: {
+        shape: {
+            coverage: 0.4,
+            sharpness: 0.3,
+            towers: 0.8,
+            towerScale: 2.5,
+            billows: 0.22,
+            baseKm: 1,
+            heightKm: 2.4,
+            offset: 0.2,
+        },
+        grid: { size: 256, layers: 48 },
+    },
+    /** Stratocumulus: a closed, lumpy deck, flat enough for half the levels. */
+    stratocumulus: {
+        shape: {
+            coverage: 0.85,
+            sharpness: 0.1,
+            towers: 0,
+            towerScale: 1,
+            billows: 0.06,
+            baseKm: 0.8,
+            heightKm: 1.2,
+            offset: 0.1,
+        },
+        grid: { size: 256, layers: 16 },
+    },
+    /** Stratus: a low, even layer with next to no relief, which a coarse volume holds. */
+    stratus: {
+        shape: {
+            coverage: 0.95,
+            sharpness: 0.05,
+            towers: 0,
+            towerScale: 1,
+            billows: 0.03,
+            baseKm: 0.4,
+            heightKm: 0.6,
+            offset: 0.05,
+        },
+        grid: { size: 128, layers: 8 },
+    },
+} satisfies Record<string, CloudscapeType>;
+
+export type CloudscapeTypeName = keyof typeof CLOUDSCAPE_TYPES;
+
 /** Presets, from a clear sky to a closed deck. Coverage 0 stands for none, so a layer blends in and out. */
 export const WEATHER = {
     /** Blue sky, a few wisps. */
@@ -28,61 +114,25 @@ export const WEATHER = {
     },
     /** Fair-weather cumulus: small, flat, spread out. */
     fair: {
-        cloudscape: {
-            coverage: 0.32,
-            sharpness: 0.45,
-            towers: 0.1,
-            towerScale: 1.2,
-            billows: 0.12,
-            baseKm: 1.2,
-            heightKm: 1.6,
-            offset: 0.2,
-        },
+        cloudscape: CLOUDSCAPE_TYPES.humilis.shape,
         sheet: { coverage: 0.15, opticalDepth: 0.3, ripples: 0 },
         layers: { low: "fair", middle: "patches", high: "mackerel" },
     },
     /** Scattered cumulus, some of it growing. */
     scattered: {
-        cloudscape: {
-            coverage: 0.42,
-            sharpness: 0.35,
-            towers: 0.3,
-            towerScale: 1.5,
-            billows: 0.12,
-            baseKm: 1.2,
-            heightKm: 2.4,
-            offset: 0.25,
-        },
+        cloudscape: CLOUDSCAPE_TYPES.mediocris.shape,
         sheet: { coverage: 0.35, opticalDepth: 0.5, ripples: 0 },
         layers: { low: "heaps", middle: "few", high: "puffsAndVeil" },
     },
     /** Towering cumulus, congestus: tall, heaped, an afternoon in summer. */
     towering: {
-        cloudscape: {
-            coverage: 0.4,
-            sharpness: 0.3,
-            towers: 0.8,
-            towerScale: 2.5,
-            billows: 0.22,
-            baseKm: 1,
-            heightKm: 2.4,
-            offset: 0.2,
-        },
+        cloudscape: CLOUDSCAPE_TYPES.congestus.shape,
         sheet: { coverage: 0.25, opticalDepth: 0.6, ripples: 0 },
         layers: { low: "heaps", deep: "towers", middle: "few", high: "mackerel" },
     },
     /** A deck of stratocumulus under a veil of cirrostratus. */
     overcast: {
-        cloudscape: {
-            coverage: 0.85,
-            sharpness: 0.1,
-            towers: 0,
-            towerScale: 1,
-            billows: 0.06,
-            baseKm: 0.8,
-            heightKm: 1.2,
-            offset: 0.1,
-        },
+        cloudscape: CLOUDSCAPE_TYPES.stratocumulus.shape,
         sheet: { coverage: 0.7, opticalDepth: 1.5, ripples: 0 },
         layers: { low: "deck", middle: "deck", high: "veil" },
     },

@@ -1,6 +1,6 @@
 import { blueNoiseTexture } from "@himmelszelt/helldunkel";
 import type { CloudLayer, LayeredParams } from "./layers.js";
-import { drift, evolutionAt } from "./params.js";
+import { drift, evolutionAt, steppedS } from "./params.js";
 import { rainbowTable, rainExtinction } from "./rainbow.js";
 import godrays from "./wgsl/godrays.comp.wgsl";
 import * as wgsl from "./wgsl/index.js";
@@ -342,7 +342,11 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
             const speed = Math.hypot(wind[0], wind[1]);
             // Where the wind blows to. Without one the clouds stand upright and the anvils spread evenly.
             const along = speed > 0 ? ([wind[0] / speed, wind[1] / speed] as const) : ([0, 0] as const);
-            const evolution = evolutionAt(params.evolution, timeS, params.evolutionOffset);
+            const evolution = evolutionAt(
+                params.evolution,
+                steppedS(timeS, params.evolutionEveryS),
+                params.evolutionOffset,
+            );
             const bearing = sky.deep.frontBearing * DEG;
             const heading = [Math.sin(bearing), Math.cos(bearing)] as const;
 

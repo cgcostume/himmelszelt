@@ -1,8 +1,18 @@
 import type { AtmosphereLUTs, AtmosphereModel, SkyPass } from "@himmelszelt/dunstkreis";
 import { apparentDirection, clampObserverHeight, createSkyPass, refractionAngle } from "@himmelszelt/dunstkreis";
-import type { CloudParams, CloudPass, DeepLayer, LayerMotion, Weather, WeatherName } from "@himmelszelt/gewoelk";
+import type {
+    CloudParams,
+    CloudPass,
+    DeepLayer,
+    LayerMotion,
+    QualityLevel,
+    ResolvedQuality,
+    Weather,
+    WeatherName,
+} from "@himmelszelt/gewoelk";
 import {
     CLOUD_TYPES,
+    cloudQuality,
     continuedMotion,
     createCloudPass,
     DEFAULT_CLOUDSCAPE,
@@ -17,6 +27,7 @@ import {
     bindHdr,
     configureCanvas,
     currentSky,
+    display,
     displayOutput,
     gpuDevice,
     needEnvironment,
@@ -209,9 +220,7 @@ export function cloudsFigure(root: HTMLElement) {
     }
     function buildClouds(
         key: string,
-        scale: number,
-        maxSteps: number,
-        grid: { layers: number; size?: number },
+        sampling: ResolvedQuality["voxel"],
         luts: AtmosphereLUTs,
         keyframes = false,
         output: { format: GPUTextureFormat; headroom: number } = { format: SDR, headroom: 1 },
@@ -231,10 +240,9 @@ export function cloudsFigure(root: HTMLElement) {
         const options = {
             format,
             headroom,
+            toneMap: display.toneCurve,
             dither,
-            scale,
-            maxSteps,
-            grid,
+            ...sampling,
             atmosphere,
             keyframes,
             high: true,
@@ -322,6 +330,21 @@ export function cloudsFigure(root: HTMLElement) {
         };
         weatherFrame = requestAnimationFrame(step);
     }
+
+    // The reach sets the clearing's sliders, which stay the reader's to move.
+    const reaches = root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-reach"]`);
+    const reach = () => {
+        const { clearingKm, clearingFromKm } = cloudQuality({
+            reach: (choice("reach") || "medium") as QualityLevel,
+        }).clearing;
+        for (const [param, value] of Object.entries({ clearingKm, clearingFromKm })) {
+            const input = sliders.find((s) => s.dataset.param === `cloudscape.${param}`);
+            if (!input) continue;
+            input.value = String(value);
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+    };
+    for (const input of reaches) input.addEventListener("change", reach);
 
     // A layer's sliders as a preset for gewoelk's WEATHER, to paste: the shape only, without the wind and the time.
     const UNSHAPED = new Set(["windSpeed", "windFrom", "evolution"]);
@@ -436,14 +459,13 @@ export function cloudsFigure(root: HTMLElement) {
         }
         // A new reach keeps the sky it has until the next one is made.
         if (sky.reach !== reach) buildSky(table.luts, reach);
-        const scale = Number(choice("scale")) || 1;
-        const maxSteps = Number(choice("steps")) || 128;
-        const layers = Number(choice("layers")) || 64;
-        const grid = lab ? { layers, size: lab.gridSize } : { layers };
+        const level = (choice("sampling") || "medium") as QualityLevel;
+        const sampling = cloudQuality({ sampling: level }).voxel;
+        if (lab) sampling.grid = { ...sampling.grid, size: lab.gridSize };
         const output = displayOutput();
-        const key = `${scale},${maxSteps},${layers},${lutsId(table.luts)},${lab?.keyframes},${lab?.gridSize},${output.format},${output.headroom}`;
+        const key = `${level},${lutsId(table.luts)},${lab?.keyframes},${lab?.gridSize},${output.format},${output.headroom},${display.toneCurve}`;
         if (clouds?.key !== key) {
-            buildClouds(key, scale, maxSteps, grid, table.luts, lab?.keyframes, output);
+            buildClouds(key, sampling, table.luts, lab?.keyframes, output);
             return;
         }
         if (output.format !== gpu.format) {

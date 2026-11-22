@@ -64,7 +64,7 @@ export interface CloudPassOptions {
      *  as the sun moves: dunstkreis' `AtmosphereLUTs` as they are. A `sunlight` table given to `update` overrides it. */
     atmosphere?: SunlightAtmosphere;
     /** Whether the pass has the layered model's sheet of high cloud, set with `high` in `update`, false by default: its
-     *  map is baked at `mapSize` texels across, 2048 where not given, and held with its levels twice over. */
+     *  map is baked at `mapSize` texels across, 1024 where not given, and held with its levels. */
     high?: boolean | { mapSize?: number };
     /** Whether the pass has the layered model's deep layer, set with `deep` in `update`, false by default: a front or
      *  towers too wide and too tall for the cloudscape's voxels, marched apart from a map `mapSize` texels across, 512
@@ -949,7 +949,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
 
             // The high sheet's map, baked where its shape changed.
             const high = current.high ?? { ...DEFAULT_HIGH_SHEET, coverage: 0 };
-            highThere = highSheet !== null && high.coverage > 0.005;
+            highThere = highSheet !== null && (high.coverage > 0.005 || (current.contrails?.length ?? 0) > 0);
             device.queue.writeBuffer(highPlaced, 0, new Float32Array([high.altitudeKm, highThere ? 1 : 0, 0, 0]));
             if (highSheet) {
                 const encoder = frameEncoder ?? device.createCommandEncoder({ label: "gewoelk:highMap" });
@@ -963,6 +963,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                         clearingKm: c.clearingKm ?? 0,
                         clearingFromKm: c.clearingFromKm ?? (c.clearingKm ?? 0) / 2,
                         timeS,
+                        ...(current.contrails && { contrails: current.contrails }),
                     },
                     encoder,
                     { observerKm: current.observerKm ?? [0, 0] },

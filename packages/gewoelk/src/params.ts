@@ -1,4 +1,5 @@
 import { NO_WHITE_BALANCE, type WhiteBalance } from "@himmelszelt/helldunkel";
+import type { Contrail } from "./contrails.js";
 import { type Corona, DEFAULT_CORONA } from "./corona.js";
 import type { DeepLayer, HighSheet } from "./layers.js";
 
@@ -231,6 +232,8 @@ export interface CloudParams {
     observerKm?: readonly [number, number];
     highEvolution?: number;
     highSeed?: number;
+    /** Contrails at the high sheet's altitude, for a pass made with `high`: none by default, drawn with a sheet or without. */
+    contrails?: readonly Contrail[];
     /** The layered model's deep layer with the cloudscape, for a pass made with `deep`: a front or towers, none by
      *  default, and `null` takes it away. It drifts with the cloudscape's wind and clears with it; `deepSeed` is
      *  another layer of the same kind. A front stands where its numbers place it at `deepSinceS`, a time as `timeS`,
@@ -335,6 +338,9 @@ export function drift(wind: readonly [number, number], timeS: number, offsetKm: 
     const at = (i: 0 | 1) => wrap(offsetKm[i] + (wind[i] * timeS) / 1000, DRIFT_PERIOD_KM);
     return [at(0), at(1)] as [number, number];
 }
+
+/** `timeS` held at the last of the moments `everyS` apart, or as it is without a step. */
+export const steppedS = (timeS: number, everyS = 0) => (everyS > 0 ? Math.floor(timeS / everyS) * everyS : timeS);
 
 /** The map's third coordinate at `timeS` for a layer evolving at `evolution` changes per hour, from `offset`. */
 export const evolutionAt = (evolution: number, timeS: number, offset = 0) =>

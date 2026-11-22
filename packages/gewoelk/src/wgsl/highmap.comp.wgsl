@@ -1,8 +1,9 @@
 // The high sheet's map, baked when its shape changes and read once per pixel by `highsheet.comp.wgsl`. It is made in the
 // wind's frame, x along the wind and y across, one tile of `tile` km: puffs in rows, cut into lanes by ripples, a veil
 // with striations, ribs across a band, and trails combed out of all of it along the wind. Red holds the puffs as a
-// height, not a density: the sheet eats billows out of it and softens what is left, pixel by pixel, so both move for
-// free. Green is the veil, alpha the billows' noise, and blue a broad field, read again at a larger scale and another
+// height, not a density, and at their full height, as green holds the veil, 8 bits each: how much of the sheet either
+// is, the sheet reads them by. It eats billows out of the puffs and softens what is left, pixel by pixel, so both move
+// for free. Alpha is the billows' noise, and blue a broad field, read again at a larger scale and another
 // angle for the patches and bands the sheet comes in, so the tile's repetition hides. Requires `wgsl.noise`.
 
 // What the map is made from: a change of any of it is a new bake. Sizes in km.
@@ -13,9 +14,8 @@ struct GwHighModel {
     seed: u32,
     // How far upwind a step of combing reaches, in texels.
     combStep: f32,
-    // How much of the sheet is puffs, a puff's size across the wind, how many times as long along it, how regular the
+    // A puff's size across the wind, how many times as long along it, how regular the
     // puffs stand, 0 scattered to 1 in rows, and how far lumps and a fine grain break each.
-    puffs: f32,
     puffSize: f32,
     elongation: f32,
     rows: f32,
@@ -27,18 +27,16 @@ struct GwHighModel {
     // How far billows across a band break it into ribs, and their spacing.
     ribs: f32,
     ribSize: f32,
-    // How much of the sheet is a veil, how far it is drawn into lines along the wind, and how long for their width.
-    veil: f32,
+    // How far the veil is drawn into lines along the wind, and how long for their width.
     striation: f32,
     stretch: f32,
     // How slowly a combed trail fades, and how far it bends off the wind.
     trails: f32,
     trailBend: f32,
-    pad: f32,
 }
 
 @group(0) @binding(0) var<uniform> gwHighModel: GwHighModel;
-@group(0) @binding(1) var gwHighMapOut: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(1) var gwHighMapOut: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(2) var gwHighMapIn: texture_2d<f32>;
 @group(0) @binding(3) var gwHighMapSampler: sampler;
 
@@ -138,7 +136,7 @@ fn gwHighMapBake(@builtin(global_invocation_id) id: vec3u) {
     let broad = gwFbm(vec3f(uv * 4.0, evolution * 0.5), vec3i(4, 4, 8), 4u, seed + 40u);
     // The billows' noise: 1 between lumps of three sizes, the largest a sixteenth of the tile, 0 on top of them.
     let billows = 1.0 - gwLumps(uv * f32(GW_HIGH_MAP_BILLOWS), vec2i(GW_HIGH_MAP_BILLOWS), gwHighModel.evolution, seed + 60u);
-    textureStore(gwHighMapOut, vec2i(id.xy), vec4f(clamp(gwHighModel.puffs * puffs, 0.0, 1.0), clamp(gwHighModel.veil * veil, 0.0, 1.0), broad, billows));
+    textureStore(gwHighMapOut, vec2i(id.xy), vec4f(puffs, veil, broad, billows));
 }
 
 // One step of combing: what lies upwind, fainter, wherever it is more than what is here. Step after step the puffs

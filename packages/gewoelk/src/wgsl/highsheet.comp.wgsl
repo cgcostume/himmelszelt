@@ -40,8 +40,12 @@ struct GwHighSheet {
     stretch: f32,
     // The distance over the ground at which the sheet has thinned out to none, 0 for a sheet to the horizon.
     reach: f32,
+    // How much of the sheet is puffs: what the map's red is read by, which holds them at their full height.
+    puffs: f32,
     // Where the clearing is centered, east and north of the observer: around the observer at 0.
     clearingCenter: vec2f,
+    // How much of the sheet is a veil: what the map's green is read by.
+    veil: f32,
 }
 
 @group(0) @binding(0) var<uniform> gwParams: GwParams;
@@ -50,13 +54,33 @@ struct GwHighSheet {
 @group(0) @binding(3) var gwHighMap: texture_2d<f32>;
 @group(0) @binding(4) var gwHighMapSampler: sampler;
 
+// A contrail: a streak over the ground from its young end to its old one, east and north of the observer in km, its
+// width at either end, and the optical depth straight through its middle at the young end.
+struct GwContrail {
+    ends: vec4f,
+    fromWidth: f32,
+    toWidth: f32,
+    opticalDepth: f32,
+    pad: f32,
+}
+const GW_CONTRAILS: u32 = 16u;
+struct GwContrails {
+    count: u32,
+    streak: array<GwContrail, GW_CONTRAILS>,
+}
+@group(0) @binding(5) var<uniform> gwContrails: GwContrails;
+// A trail's lumps, from crest to crest, in widths of its young end: the wingtip vortices' own instability, after Crow.
+const GW_CONTRAIL_LUMPS: f32 = 14.0;
+
 // The row of the sunlight table that holds the sun's light at the sheet's altitude: the first sheet's.
 override GW_HIGH_SUNLIGHT_ROW: u32 = 2u;
 
 // The largest lumps of the billows' noise across the map's tile, as baked.
 const GW_HIGH_BILLOW_CELLS: f32 = 32.0;
-// How many levels of the map up the softest puffs are read from.
+// How many levels up the softest puffs are read from, of a map of `GW_HIGH_SOFT_TEXELS` across: a blur in km, the same
+// in a map of any size, so a smaller map draws the same puffs wherever they are softened past its own texels.
 const GW_HIGH_SOFT_LEVELS: f32 = 3.5;
+const GW_HIGH_SOFT_TEXELS: f32 = 2048.0;
 // The distances at which the air has hidden the ground's shadows and the sheet to 1/e, in km, and the angle the sun's
 // disc spans.
 const GW_HIGH_GROUND_AIR: f32 = 90.0;
@@ -109,13 +133,14 @@ fn gwHighCut(x: f32, toe: f32) -> f32 {
     return t * t * (1.0 + toe) / (t + max(toe, 1e-4));
 }
 
-// The sheet's density over a point of the ground, `over` km east and north of the observer, for a footprint of `lod`
-// levels of the map: the tile read in the wind's frame, thinned to the patches of the broad field.
-fn gwHighDensity(over: vec2f, lod: f32) -> f32 {
+// The sheet's density over a point of the ground, `over` km east and north of the observer, for a footprint of `level`
+// levels of the map, below 0 where it is smaller than a texel: the tile read in the wind's frame, thinned to the
+// patches of the broad field. Nothing more is read where a patch leaves none of it, or of a part the sheet has none of.
+fn gwHighDensity(over: vec2f, level: f32) -> f32 {
+    let lod = max(level, 0.0);
     let g = over + gwHigh.offset;
     let along = gwHigh.wind;
     let w = vec2f(dot(g, along), dot(g, vec2f(along.y, -along.x)));
-    let detail = textureSampleLevel(gwHighMap, gwHighMapSampler, w / gwHigh.tile, lod);
     // The bands lie at their own angle to the wind, stretched along it.
     let c = cos(gwHigh.bandAngle);
     let s = sin(gwHigh.bandAngle);
@@ -125,39 +150,57 @@ fn gwHighDensity(over: vec2f, lod: f32) -> f32 {
     let soft = 0.02 + 0.3 * gwHigh.edge;
     // The last twentieth of the coverage fades what the field's peaks would keep, so a sheet blends out to none.
     let patched = smoothstep(1.0 - gwHigh.coverage - soft, 1.0 - gwHigh.coverage + soft, broad) * smoothstep(0.0, 0.05, gwHigh.coverage);
-    // Flakes: the same field read again, smaller and turned, opens sky inside the patches and frays their edges.
-    let f = vec2f(0.454 * w.x - 0.891 * w.y, 0.891 * w.x + 0.454 * w.y) / (4.0 * gwHigh.flakeSize);
-    let flake = textureSampleLevel(gwHighMap, gwHighMapSampler, f + 0.37, max(lod - log2(4.0 * gwHigh.flakeSize / gwHigh.tile), 0.0)).b;
     // Far out the patches go one by one, long before the horizon, where a tile would repeat in rows.
     let within = select(1.0, 1.0 - smoothstep(GW_HIGH_REACH_FROM * gwHigh.reach, gwHigh.reach, length(over)), gwHigh.reach > 0.0);
-    let stays = patched * mix(1.0, smoothstep(0.3, 0.7, flake), gwHigh.flakes) * within;
-    // Softness: the puffs read from a coarser level of the map, a blur that spreads each one past its rim.
-    let blurred = textureSampleLevel(gwHighMap, gwHighMapSampler, w / gwHigh.tile, lod + gwHigh.softness * GW_HIGH_SOFT_LEVELS).r * (1.0 + 0.4 * gwHigh.softness);
+    if (patched * within <= 0.0) {
+        return 0.0;
+    }
+    // Flakes: the same field read again, smaller and turned, opens sky inside the patches and frays their edges.
+    var flaked = 1.0;
+    if (gwHigh.flakes > 0.0) {
+        let f = vec2f(0.454 * w.x - 0.891 * w.y, 0.891 * w.x + 0.454 * w.y) / (4.0 * gwHigh.flakeSize);
+        let flake = textureSampleLevel(gwHighMap, gwHighMapSampler, f + 0.37, max(lod - log2(4.0 * gwHigh.flakeSize / gwHigh.tile), 0.0)).b;
+        flaked = mix(1.0, smoothstep(0.3, 0.7, flake), gwHigh.flakes);
+    }
+    let stays = patched * flaked * within;
+    if (stays <= 0.0) {
+        return 0.0;
+    }
     // Towards a patch's edge the puffs shrink a little and thin a lot: cut alone, the last of each would stand as a
     // hard dot. The veil thins out as a whole, and only its faintest lines are cut.
     let gone = 1.0 - stays;
     let toe = GW_HIGH_TOE * gone;
     let cut = GW_HIGH_VEIL_CUT * gone;
-    let left = vec2f(
-        gwHighCut((blurred - GW_HIGH_SHRINK * gone) / (1.0 - GW_HIGH_SHRINK * gone), toe) * stays,
-        gwHighCut((detail.g - cut) / (1.0 - cut), toe) * stays,
-    );
-    // Billows: the noise read twice, at two sizes and creeping two ways, so its lumps change as they go. It eats into
-    // the puffs from their rims, as the detail noise erodes a volume's profile, and gives the blur its lumps back.
     let size = GW_HIGH_BILLOW_CELLS * gwHigh.billowSize;
     let fine = max(lod + log2(gwHigh.tile / size), 0.0);
     let creep = vec2f(0.8, 0.6) * gwHigh.billowShift;
-    let one = textureSampleLevel(gwHighMap, gwHighMapSampler, (w + creep) / size, fine).a;
-    let two = textureSampleLevel(gwHighMap, gwHighMapSampler, (vec2f(w.y, -w.x) + creep) / (size * 1.62), max(fine - 0.7, 0.0)).a;
-    // A puff is a mound, as dense as it is tall: no level top, no rim. The billows cut into it lump by lump, most where
-    // it is thin, at the noise's own resolution, finer than the map's, and over a toe, so no outline.
-    let whole = left.x;
-    let eaten = GW_HIGH_EATEN * gwHigh.billows;
-    let dense = gwHighCut(whole * (1.0 + eaten) - eaten * (0.6 * one + 0.4 * two), GW_HIGH_TOE);
-    // The veil's fibers: the same noise drawn out along the wind, cutting its thin places into lines.
-    let drawn = vec2f(w.x / max(gwHigh.stretch, 1.0), w.y) + creep;
-    let fiber = textureSampleLevel(gwHighMap, gwHighMapSampler, drawn / (size * GW_HIGH_FIBER), max(fine - log2(GW_HIGH_FIBER), 0.0)).a;
-    let veil = left.y * (1.0 - 0.7 * gwHigh.striation * fiber * (1.0 - 0.5 * left.y));
+    var dense = 0.0;
+    if (gwHigh.puffs > 0.0) {
+        // Softness: the puffs read from a coarser level of the map, a blur that spreads each one past its rim.
+        let coarser = max(level, log2(f32(textureDimensions(gwHighMap).x) / GW_HIGH_SOFT_TEXELS)) + gwHigh.softness * GW_HIGH_SOFT_LEVELS;
+        let blurred = textureSampleLevel(gwHighMap, gwHighMapSampler, w / gwHigh.tile, coarser).r * gwHigh.puffs * (1.0 + 0.4 * gwHigh.softness);
+        let whole = gwHighCut((blurred - GW_HIGH_SHRINK * gone) / (1.0 - GW_HIGH_SHRINK * gone), toe) * stays;
+        // Billows: the noise read twice, at two sizes and creeping two ways, so its lumps change as they go. It eats
+        // into the puffs from their rims, as the detail noise erodes a volume's profile, and gives the blur its lumps
+        // back.
+        let one = textureSampleLevel(gwHighMap, gwHighMapSampler, (w + creep) / size, fine).a;
+        let two = textureSampleLevel(gwHighMap, gwHighMapSampler, (vec2f(w.y, -w.x) + creep) / (size * 1.62), max(fine - 0.7, 0.0)).a;
+        // A puff is a mound, as dense as it is tall: no level top, no rim. The billows cut into it lump by lump, most
+        // where it is thin, at the noise's own resolution, finer than the map's, and over a toe, so no outline.
+        let eaten = GW_HIGH_EATEN * gwHigh.billows;
+        dense = gwHighCut(whole * (1.0 + eaten) - eaten * (0.6 * one + 0.4 * two), GW_HIGH_TOE);
+    }
+    var veil = 0.0;
+    if (gwHigh.veil > 0.0) {
+        let thin = min(gwHigh.veil * textureSampleLevel(gwHighMap, gwHighMapSampler, w / gwHigh.tile, lod).g, 1.0);
+        veil = gwHighCut((thin - cut) / (1.0 - cut), toe) * stays;
+        if (veil > 0.0 && gwHigh.striation > 0.0) {
+            // The veil's fibers: the billows' noise drawn out along the wind, cutting its thin places into lines.
+            let drawn = vec2f(w.x / max(gwHigh.stretch, 1.0), w.y) + creep;
+            let fiber = textureSampleLevel(gwHighMap, gwHighMapSampler, drawn / (size * GW_HIGH_FIBER), max(fine - log2(GW_HIGH_FIBER), 0.0)).a;
+            veil = veil * (1.0 - 0.7 * gwHigh.striation * fiber * (1.0 - 0.5 * veil));
+        }
+    }
     return clamp(dense + veil * (1.0 - 0.6 * dense), 0.0, 1.0);
 }
 
@@ -168,6 +211,31 @@ fn gwHighKept(over: vec2f) -> f32 {
         return 1.0;
     }
     return 1.0 - smoothstep(min(gwHigh.clearingFrom, 0.99 * gwHigh.clearing), gwHigh.clearing, length(over - gwHigh.clearingCenter));
+}
+
+// The optical depth of the contrails over the ground point `over`, for a footprint `wide` km across: each streak as
+// thick across as a bell curve, thinner as it spreads, since it holds what it was laid with, broken into lumps as it
+// ages and fading out over its last third. No map is read.
+fn gwContrailDepth(over: vec2f, wide: f32) -> f32 {
+    var tau = 0.0;
+    for (var i = 0u; i < gwContrails.count; i = i + 1u) {
+        let ends = gwContrails.streak[i].ends;
+        let along = ends.zw - ends.xy;
+        let span = max(dot(along, along), 1e-6);
+        let s = clamp(dot(over - ends.xy, along) / span, 0.0, 1.0);
+        let young = max(gwContrails.streak[i].fromWidth, 1e-3);
+        // Never narrower than the footprint, and as much thinner: a far streak stays a line and does not flicker.
+        let width = max(max(mix(young, gwContrails.streak[i].toWidth, s), young), wide);
+        let d = length(over - ends.xy - along * s) / width;
+        if (d > 2.5) {
+            continue;
+        }
+        let period = GW_CONTRAIL_LUMPS * young;
+        let crest = 0.5 + 0.5 * cos(6.283185307179586 * s * sqrt(span) / period);
+        let lumps = mix(1.0, 0.4 + 1.2 * crest * crest, s * (1.0 - clamp(2.0 * wide / period, 0.0, 1.0)));
+        tau = tau + gwContrails.streak[i].opticalDepth * young / width * exp(-2.0 * d * d) * lumps * (1.0 - smoothstep(0.67, 1.0, s));
+    }
+    return tau;
 }
 
 // How much of its light the ground at `at` loses to the sheet's shadow, seen along `v` from `far` km, a pixel there
@@ -185,7 +253,7 @@ fn gwHighShadow(at: vec3f, v: vec3f, far: f32, spread: f32) -> f32 {
     let over = gwHighGround(normalize(at + sun * reach)) * r;
     let wide = max(far * spread / max(abs(dot(v, up)), 0.03), reach * GW_HIGH_SUN_ANGLE);
     let texels = f32(textureDimensions(gwHighMap).x) / gwHigh.tile;
-    let tau = gwHigh.opticalDepth * gwHighDensity(over, max(log2(wide * texels), 0.0)) * gwHighKept(over);
+    let tau = gwHigh.opticalDepth * gwHighDensity(over, log2(wide * texels)) * gwHighKept(over) + gwContrailDepth(over, wide);
     let passed = gwDiffused(tau / max(rise, 0.05), gwHigh.forwardG);
     return GW_HIGH_SHADOW * smoothstep(0.0, 0.12, rise) * (1.0 - passed) * exp(-far / GW_HIGH_GROUND_AIR);
 }
@@ -217,9 +285,13 @@ fn gwHighAlong(v: vec3f, spread: f32) -> vec4f {
     let over = gwHighGround(up) * r;
     let mu = max(abs(dot(v, up)), 0.03);
     let texel = gwHigh.tile / f32(textureDimensions(gwHighMap).x);
-    let lod = max(log2(t * spread / texel) + 0.5 * log2(1.0 / mu), 0.0);
+    let lod = log2(t * spread / texel) + 0.5 * log2(1.0 / mu);
     let density = gwHighDensity(over, lod) * gwHighKept(over);
-    let tau = gwHigh.opticalDepth * density;
+    let tau = gwHigh.opticalDepth * density + gwContrailDepth(over, t * spread / mu);
+    // No cloud here: nothing of its own, and nothing held back.
+    if (tau <= 0.0) {
+        return vec4f(0.0, 0.0, 0.0, lit);
+    }
     let through = exp(-tau / mu);
     let sine = dot(sun, up);
     let mu0 = max(sine, 0.03);
@@ -229,7 +301,7 @@ fn gwHighAlong(v: vec3f, spread: f32) -> vec4f {
     // The cloud between the point and the sun, a puff's width on: its sunward neighbors shade it.
     let reach = min(sqrt(max(1.0 - mu0 * mu0, 0.0)) / mu0, 4.0) * 0.15;
     let toSun = normalize(sun.xy + vec2f(1e-9));
-    let sunward = gwHighDensity(over + toSun * reach, lod + 1.0);
+    let sunward = gwHighDensity(over + toSun * reach, max(lod, 0.0) + 1.0);
     // And lump by lump: brighter where the cloud falls away towards the sun, darker behind a lump. What the neighbors
     // let through is scattered light too, as under the sheet: a high cloud is thin, and has next to no shading.
     let slope = density - gwHighDensity(over + toSun * 0.05, lod);
@@ -262,7 +334,7 @@ fn gwHighSheet(@builtin(global_invocation_id) id: vec3u) {
     if (id.x >= size.x || id.y >= size.y) {
         return;
     }
-    if (gwHigh.coverage <= 0.0) {
+    if (gwHigh.coverage <= 0.0 && gwContrails.count == 0u) {
         gwOutputStore(id.xy, vec4f(0.0, 0.0, 0.0, 1.0));
         return;
     }

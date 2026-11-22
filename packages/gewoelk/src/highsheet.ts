@@ -1,12 +1,14 @@
+import { CONTRAILS_SIZE, contrailsData } from "./contrails.js";
 import type { HighSheet, LayeredParams } from "./layers.js";
-import { DRIFT_PERIOD_KM, drift, evolutionAt } from "./params.js";
+import { DRIFT_PERIOD_KM, drift, evolutionAt, steppedS } from "./params.js";
 import highmap from "./wgsl/highmap.comp.wgsl";
 import highsheet from "./wgsl/highsheet.comp.wgsl";
 import { camera, cloudOutput, noise, params as paramsWgsl } from "./wgsl/index.js";
 
 /** What a high sheet's pass is made with. */
 export interface HighSheetOptions {
-    /** Texels across the map, a power of two, 2048 by default: its levels halve down to one. */
+    /** Texels across the map, a power of two, 1024 by default: its levels halve down to one. Softened puffs look the
+     *  same at any size, as their blur is in km; sharp ones and the veil's lines get finer with it. */
     mapSize?: number;
     /** How fast the billows creep, in m/s, 0.5 by default: free, as the map is not baked again for it. */
     billowSpeed?: number;
@@ -36,11 +38,12 @@ export interface HighSheetPass {
     /** The sheet as last read, rgba16float: its light in cd/m² as it reaches the eye, and in alpha what it lets through
      *  of what lies behind, less where its shadow lies on the ground. Another texture after a change of size. */
     readonly texture: GPUTexture;
-    /** The baked map with its levels, rgba16float, in the wind's frame: puffs, veil, broad field and billows' noise. */
+    /** The baked map with its levels, rgba8unorm, in the wind's frame: puffs, veil, broad field and billows' noise. */
     readonly map: GPUTexture;
     /** `GwHighSheet` as the sheet is read by, `wgsl.highsheet`'s: for a pass that reads the map itself. */
     readonly uniforms: GPUBuffer;
-    /** Bytes of the textures the pass holds: the map with its levels, the one it is combed through, and the output. */
+    /** Bytes of the textures the pass holds: the map with its levels, the one it is combed through once a sheet is
+     *  combed, and the output. */
     readonly memoryBytes: number;
     /** Writes the uniforms and records the map's bake into `encoder` where its shape changed; returns whether so. */
     update(params: LayeredParams, encoder: GPUCommandEncoder, options?: HighSheetUpdateOptions): boolean;
@@ -50,19 +53,20 @@ export interface HighSheetPass {
 }
 
 /** Byte sizes of `GwHighModel` in highmap.comp.wgsl and `GwHighSheet` in highsheet.comp.wgsl. */
-const MODEL_SIZE = 80;
-const SHEET_SIZE = 112;
-const TEXEL_BYTES = 8;
+const MODEL_SIZE = 68;
+const SHEET_SIZE = 120;
+const MAP_TEXEL_BYTES = 4;
+const OUTPUT_TEXEL_BYTES = 8;
 const dispatch = (n: number) => Math.ceil(n / 8);
 
 /** `GwHighModel` packed: all the map is baked from. */
 function modelData(s: HighSheet, p: LayeredParams, combStep: number): ArrayBuffer {
     const buffer = new ArrayBuffer(MODEL_SIZE);
     const f = new Float32Array(buffer);
-    f.set([s.tileKm, evolutionAt(p.evolution, p.timeS, p.evolutionOffset)], 0);
+    f.set([s.tileKm, evolutionAt(p.evolution, steppedS(p.timeS, p.evolutionEveryS), p.evolutionOffset)], 0);
     new Uint32Array(buffer)[2] = p.seed >>> 0;
-    f.set([combStep, s.puffs, s.puffKm, s.elongation, s.rows, s.grain, s.ripples, s.rippleKm, s.curve], 3);
-    f.set([s.ribs, s.ribKm, s.veil, s.striation, s.stretch, s.trails, s.trailBend], 12);
+    f.set([combStep, s.puffKm, s.elongation, s.rows, s.grain, s.ripples, s.rippleKm, s.curve], 3);
+    f.set([s.ribs, s.ribKm, s.striation, s.stretch, s.trails, s.trailBend], 11);
     return buffer;
 }
 
@@ -81,14 +85,15 @@ function sheetData(s: HighSheet, p: LayeredParams, observerKm: readonly [number,
         [crept, s.relief, s.forwardG, p.clearingKm, p.clearingFromKm, s.flakes, s.flakeKm, s.striation, s.stretch],
         15,
     );
-    f[24] = s.reachKm;
+    f.set([s.reachKm, s.puffs], 24);
     f.set(p.clearingCenterKm ?? [0, 0], 26);
+    f[28] = s.veil;
     return f;
 }
 
 /** The pass of the high sheet of a layered sky on `device`: `update` it with the sky, then `encode` it for a frame. */
 export async function createHighSheet(device: GPUDevice, options: HighSheetOptions = {}): Promise<HighSheetPass> {
-    const { mapSize = 2048, billowSpeed = 0.5, sunlightRow = 2 } = options;
+    const { mapSize = 1024, billowSpeed = 0.5, sunlightRow = 2 } = options;
     if (!Number.isInteger(Math.log2(mapSize))) throw new Error("gewoelk: the high sheet's map is a power of two");
 
     const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC;
@@ -96,16 +101,9 @@ export async function createHighSheet(device: GPUDevice, options: HighSheetOptio
     const map = device.createTexture({
         label: "gewoelk:highMap",
         size: [mapSize, mapSize],
-        format: "rgba16float",
+        format: "rgba8unorm",
         usage,
         mipLevelCount: levels,
-    });
-    // What the map is combed into and back from.
-    const combed = device.createTexture({
-        label: "gewoelk:highMapCombed",
-        size: [mapSize, mapSize],
-        format: "rgba16float",
-        usage,
     });
     const sampler = device.createSampler({
         addressModeU: "repeat",
@@ -118,6 +116,7 @@ export async function createHighSheet(device: GPUDevice, options: HighSheetOptio
         device.createBuffer({ label, size, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const model = uniform("gewoelk:highModel", MODEL_SIZE);
     const sheet = uniform("gewoelk:highSheet", SHEET_SIZE);
+    const streaks = uniform("gewoelk:contrails", CONTRAILS_SIZE);
 
     const mapModule = device.createShaderModule({ label: "gewoelk:highMap", code: [noise, highmap].join("\n") });
     const sheetModule = device.createShaderModule({
@@ -142,18 +141,28 @@ export async function createHighSheet(device: GPUDevice, options: HighSheetOptio
     const level = (i: number) => map.createView({ baseMipLevel: i, mipLevelCount: 1 });
     const modelEntry = { binding: 0, resource: { buffer: model } };
     const bakeGroup = bindGroup(bakePipeline, [modelEntry, { binding: 1, resource: level(0) }]);
-    // There and back: an even number of steps ends in the map.
-    const combGroups = [
-        [level(0), combed.createView()],
-        [combed.createView(), level(0)],
-    ].map(([read, written]) =>
-        bindGroup(combPipeline, [
-            modelEntry,
-            { binding: 1, resource: written as GPUTextureView },
-            { binding: 2, resource: read as GPUTextureView },
-            { binding: 3, resource: sampler },
-        ]),
-    );
+    // What the map is combed into and back from, made once a sheet is combed: an even number of steps ends in the map.
+    let combed: { texture: GPUTexture; groups: GPUBindGroup[] } | null = null;
+    const combing = () => {
+        const texture = device.createTexture({
+            label: "gewoelk:highMapCombed",
+            size: [mapSize, mapSize],
+            format: "rgba8unorm",
+            usage,
+        });
+        const groups = [
+            [level(0), texture.createView()],
+            [texture.createView(), level(0)],
+        ].map(([read, written]) =>
+            bindGroup(combPipeline, [
+                modelEntry,
+                { binding: 1, resource: written as GPUTextureView },
+                { binding: 2, resource: read as GPUTextureView },
+                { binding: 3, resource: sampler },
+            ]),
+        );
+        return { texture, groups };
+    };
     const mipGroups = Array.from({ length: levels - 1 }, (_, i) =>
         bindGroup(mipPipeline, [
             { binding: 1, resource: level(i + 1) },
@@ -178,15 +187,16 @@ export async function createHighSheet(device: GPUDevice, options: HighSheetOptio
         map,
         uniforms: sheet,
         get memoryBytes() {
-            let texels = mapSize * mapSize + output.width * output.height;
+            let texels = combed ? mapSize * mapSize : 0;
             for (let i = 0; i < levels; i++) texels += (mapSize >> i) ** 2;
-            return texels * TEXEL_BYTES;
+            return texels * MAP_TEXEL_BYTES + output.width * output.height * OUTPUT_TEXEL_BYTES;
         },
 
         update(p, encoder, updateOptions = {}) {
             const { observerKm = [0, 0], timestampWrites } = updateOptions;
             const s = p.sky.high;
             device.queue.writeBuffer(sheet, 0, sheetData(s, p, observerKm, billowSpeed));
+            device.queue.writeBuffer(streaks, 0, contrailsData(p.contrails ?? [], observerKm));
             // No sheet, no map: it is baked once there is one to read it.
             if (!(s.coverage > 0)) return false;
             const data = modelData(s, p, (3 * mapSize) / 2048);
@@ -202,9 +212,10 @@ export async function createHighSheet(device: GPUDevice, options: HighSheetOptio
             pass.setPipeline(bakePipeline);
             pass.setBindGroup(0, bakeGroup);
             pass.dispatchWorkgroups(dispatch(mapSize), dispatch(mapSize));
+            if (combs > 0) combed ??= combing();
             pass.setPipeline(combPipeline);
             for (let i = 0; i < combs; i++) {
-                pass.setBindGroup(0, combGroups[i % 2] as GPUBindGroup);
+                pass.setBindGroup(0, combed?.groups[i % 2] as GPUBindGroup);
                 pass.dispatchWorkgroups(dispatch(mapSize), dispatch(mapSize));
             }
             pass.setPipeline(mipPipeline);
@@ -232,6 +243,7 @@ export async function createHighSheet(device: GPUDevice, options: HighSheetOptio
                     { binding: 2, resource: { buffer: sheet } },
                     { binding: 3, resource: mapView },
                     { binding: 4, resource: sampler },
+                    { binding: 5, resource: { buffer: streaks } },
                 ]);
             }
             const pass = encoder.beginComputePass({
@@ -246,8 +258,8 @@ export async function createHighSheet(device: GPUDevice, options: HighSheetOptio
         },
 
         destroy() {
-            for (const texture of [map, combed, output]) texture.destroy();
-            for (const buffer of [model, sheet]) buffer.destroy();
+            for (const texture of [map, combed?.texture, output]) texture?.destroy();
+            for (const buffer of [model, sheet, streaks]) buffer.destroy();
         },
     };
 }
