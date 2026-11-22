@@ -1,4 +1,7 @@
 ---
+import EnvironmentFrame from "../environment/EnvironmentFrame.astro";
+import "../environment/environments.css";
+import "../helldunkel/helldunkel.css";
 import "../sternzeit/sternzeit.css";
 
 // The sliders of the grounded figure, with its ranges and defaults, but a dome of some 15 m rather than one without end.
@@ -43,34 +46,57 @@ const SLIDERS = [
         value: 24,
         marks: ["5", "∞"],
     },
+    {
+        name: "rounding",
+        label: "foot",
+        title: "How the dome's foot goes over into the ground: a hard corner at the left end, a wall that curves into the ground from as high as the horizon at the right",
+        min: -1,
+        max: 1,
+        step: 0.05,
+        value: 0,
+        marks: ["corner", "round"],
+    },
 ];
 ---
 
-<figure class="fig scene-frame" id="ground-geometry">
-    <div class="frame-scene" data-export="ground-geometry" data-export-timeless>
-        <svg class="dome-layer zdog" data-layer="ground" aria-hidden="true"></svg>
-        <svg class="dome-layer zdog" data-layer="above" aria-label="The ground, the dome and the blend between them around where the image was taken, and two rays from a camera"></svg>
-        <div class="frame-labels" aria-hidden="true"></div>
-        <div class="scene-bar">
-            <p class="vis-credit footnote">
-                Drag to rotate. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
-            </p>
-        </div>
+<figure class="fig scene-frame wide" id="ground-geometry" data-needs-hdri data-loading>
+    <div class="fig-row">
+        <figure class="fig-tile">
+            <div class="frame-scene" style="aspect-ratio: 4 / 3" data-export="ground-geometry" data-export-timeless>
+                <svg class="dome-layer zdog" data-layer="ground" style="height: 100%; aspect-ratio: auto" aria-hidden="true"></svg>
+                <svg class="dome-layer zdog" data-layer="above" style="height: 100%; aspect-ratio: auto" aria-label="The ground, the dome and the blend between them around where the image was taken, and two rays from a camera"></svg>
+                <div class="frame-labels" aria-hidden="true"></div>
+                <div class="scene-bar">
+                    <p class="vis-credit footnote">
+                        Drag to rotate. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
+                    </p>
+                </div>
+            </div>
+            <figcaption><span class="subfigure-title">the surface</span>, to scale in meters</figcaption>
+        </figure>
+        <figure class="fig-tile">
+            <EnvironmentFrame fullscreen exposure={false} ownView="Drag to turn the camera. Raytraced with WebGPU.">
+                <div class="hdri-view as-seen"><canvas data-field="canvas" style="aspect-ratio: 4 / 3" aria-label="The chosen HDRI laid on that surface, as the diagram's camera sees it"></canvas></div>
+            </EnvironmentFrame>
+            <figcaption><span class="subfigure-title">the image</span> on it, from the camera</figcaption>
+        </figure>
     </div>
-    {SLIDERS.map(({ name, label, title, min, max, step, value, marks }) => (
-        <label class="figure-slider" title={title}>
-            <span class="note">{label}</span>
-            <span class="figure-slider-rail">
-                <input type="range" data-field={name} min={min} max={max} step={step} value={value} aria-label={title} />
-                <span class="figure-slider-scale" aria-hidden="true">{marks.map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 100}%`}>{mark}</span>)}</span>
-            </span>
-            <output data-field={`${name}Reading`}></output>
-        </label>
-    ))}
+    <div class="fig-controls env-exposure grounded-controls">
+        {SLIDERS.map(({ name, label, title, min, max, step, value, marks }) => (
+            <label class="figure-slider" title={title}>
+                <span class="note">{label}</span>
+                <span class="figure-slider-rail">
+                    <input type="range" data-field={name} min={min} max={max} step={step} value={value} aria-label={title} />
+                    <span class="figure-slider-scale" aria-hidden="true">{marks.map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 100}%`}>{mark}</span>)}</span>
+                </span>
+                <output data-field={`${name}Reading`}></output>
+            </label>
+        ))}
+    </div>
     <figcaption class="figure-caption">
-        The surface an image is laid on around where it was taken: flat out to the reach, a dome from the ground's level
-        up, and the one rounded into the other between. Where a ray from the camera (accent) lands, the image is looked up from the capture point (dashed);
-        a lifted horizon shows as a dashed ring. To scale, in meters.
+        The surface an image is laid on: (a) flat out to the reach, a dome from the ground's level up, the one rounded into
+        the other between. Where a ray from the camera (accent) lands, the image is looked up from the capture point
+        (dashed); a lifted horizon shows as a dashed ring. (b) The chosen image on it, as that camera sees it.
     </figcaption>
 </figure>
 

@@ -17,30 +17,37 @@ const directionOf = ([, , azimuth, altitude]: Vec4): Vec3 => [
 const DIRECTION =
     "vec3f(cos(radians(input.w)) * sin(radians(input.z)), cos(radians(input.w)) * cos(radians(input.z)), sin(radians(input.w)))";
 
-async function grounded(reach: number, radius: number, rays: Vec4[]) {
+/** The lookups `rbGroundedDirection` gives for `rays`, or with a `rounding` of the dome's foot `rbGroundedDirectionRounded`. */
+async function grounded(reach: number, radius: number, rays: Vec4[], rounding?: number) {
     const device = await gpuDevice();
     test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
     if (!device) return [];
-    const call = `rbGroundedDirection(vec3f(input.x, 0.0, input.y), ${DIRECTION}, ${HEIGHT}.0, ${reach}, ${radius})`;
+    const args = `vec3f(input.x, 0.0, input.y), ${DIRECTION}, ${HEIGHT}.0, ${reach}, ${radius}`;
+    const call =
+        rounding === undefined
+            ? `rbGroundedDirection(${args})`
+            : `rbGroundedDirectionRounded(${args}, ${rounding.toFixed(6)})`;
     return evaluateWgsl(device, source, `vec4f(${call}, 0.0)`, rays);
 }
 
 /** How far along a lookup the surface lies, in the scene's units: the twin of what `rbGroundedGap` fades. */
-function surfaceDistance(lookup: Vec3, reach: number, radius: number) {
+function surfaceDistance(lookup: Vec3, reach: number, radius: number, rounding = 0) {
     const dome = HEIGHT / radius;
-    const edge = Math.max(HEIGHT / Math.hypot(HEIGHT, reach), 2 * dome);
+    const reached = Math.max(HEIGHT / Math.hypot(HEIGHT, reach), 2 * dome);
+    const foot = dome * (1 - Math.max(rounding, 0));
+    const edge = rounding < 0 ? dome + (reached - dome) * (1 + rounding) : reached;
     const down = -lookup[2];
     if (down >= edge) return HEIGHT / down;
-    const t = Math.min(Math.max((down - dome) / (edge - dome), 0), 1);
-    return HEIGHT / (dome + (edge - dome) * t * t * (2 - t));
+    const t = Math.min(Math.max((down - foot) / Math.max(edge - foot, 1e-30), 0), 1);
+    return HEIGHT / (dome + t * t * ((edge - dome) * (3 - 2 * t) + (edge - foot) * (t - 1)));
 }
 
 /**
  * How far the surface's point along a lookup lies off the ray, as an angle seen from where the image was taken, in
  * radians: by so much the lookup misses what the ray meets.
  */
-function miss([east, up]: Vec4, direction: Vec3, lookup: Vec3, reach: number, radius: number) {
-    const distance = surfaceDistance(lookup, reach, radius);
+function miss([east, up]: Vec4, direction: Vec3, lookup: Vec3, reach: number, radius: number, rounding = 0) {
+    const distance = surfaceDistance(lookup, reach, radius, rounding);
     const fromEye: Vec3 = [distance * lookup[0] - east, distance * lookup[1], distance * lookup[2] + HEIGHT - up];
     const along = fromEye[0] * direction[0] + fromEye[1] * direction[1] + fromEye[2] * direction[2];
     expect(along).toBeGreaterThan(0);
@@ -150,6 +157,125 @@ test("the lookup goes over from the ground to the horizon without a jump", async
             const step = (altitudes[i] as number) - (altitudes[i - 1] as number);
             expect(step, `reach ${reach}, radius ${radius}, step ${i}`).toBeGreaterThan(0);
             expect(step, `reach ${reach}, radius ${radius}, step ${i}`).toBeLessThan(1.5);
+        }
+    }
+});
+
+const ROUNDINGS = [-1, -0.5, 0.5, 1];
+
+test("a rounded foot stays within the dome and under where it begins, and a sharp one at the plane's level", () => {
+    for (const [reach, radius] of [
+        [8, 30],
+        [3, 200],
+        [6, 15],
+        [1e9, 30],
+    ]) {
+        for (const rounding of [...ROUNDINGS, 0.1]) {
+            const where = `reach ${reach}, radius ${radius}, rounding ${rounding}`;
+            const dome = HEIGHT / (radius as number);
+            const foot = dome * (1 - Math.max(rounding, 0));
+            let last = Number.POSITIVE_INFINITY;
+            for (let depression = 0; depression <= 90; depression += 0.125) {
+                const lookup: Vec3 = [Math.cos(depression * DEG), 0, -Math.sin(depression * DEG)];
+                const distance = surfaceDistance(lookup, reach as number, radius as number, rounding);
+                const z = HEIGHT + distance * lookup[2];
+                expect(distance, where).toBeLessThanOrEqual((radius as number) * (1 + 1e-12));
+                // Drawing in towards straight down, never back out.
+                expect(distance, where).toBeLessThanOrEqual(last * (1 + 1e-12));
+                last = distance;
+                if (-lookup[2] <= foot) expect(distance, where).toBeCloseTo(radius as number, 9);
+                else if (rounding > 0) expect(z, where).toBeLessThanOrEqual(rounding * HEIGHT + 1e-9);
+                else if (-lookup[2] >= dome) expect(z, where).toBeLessThanOrEqual(1e-9);
+            }
+        }
+    }
+});
+
+test("a foot rounded to -1 is the hard corner of plane and dome, and the default is the cubic it always was", () => {
+    for (let depression = 0; depression <= 90; depression += 0.25) {
+        const lookup: Vec3 = [Math.cos(depression * DEG), 0, -Math.sin(depression * DEG)];
+        const down = Math.sin(depression * DEG);
+        expect(surfaceDistance(lookup, 8, 30, -1)).toBeCloseTo(Math.min(30, HEIGHT / down), 9);
+        const dome = HEIGHT / 30;
+        const edge = Math.max(HEIGHT / Math.hypot(HEIGHT, 8), 2 * dome);
+        const t = Math.min(Math.max((down - dome) / (edge - dome), 0), 1);
+        const cubic = down >= edge ? HEIGHT / down : HEIGHT / (dome + (edge - dome) * t * t * (2 - t));
+        expect(surfaceDistance(lookup, 8, 30)).toBeCloseTo(cubic, 9);
+    }
+});
+
+test("the rounded foot leaves the dome and meets the plane at their slopes", () => {
+    // The inverse distance over the lookup's part downwards: flat on the dome, of slope 1 on the plane.
+    const h = 1e-7;
+    for (const rounding of [0, 0.5, 1]) {
+        const inverse = (down: number) => 1 / surfaceDistance([Math.sqrt(1 - down * down), 0, -down], 8, 30, rounding);
+        const dome = HEIGHT / 30;
+        const foot = dome * (1 - rounding);
+        const edge = Math.max(HEIGHT / Math.hypot(HEIGHT, 8), 2 * dome);
+        expect((inverse(foot + h) - inverse(foot)) / h).toBeCloseTo(0, 4);
+        expect((inverse(edge) - inverse(edge - h)) / h).toBeCloseTo(1 / HEIGHT, 4);
+    }
+});
+
+test("rounded either way, a ray meets the one surface", async () => {
+    const rays: Vec4[] = [];
+    for (const [east, up] of [
+        [0.5, 1.2],
+        [4, 0.3],
+        [6, 1.85],
+        [6, 9],
+        [-15, 4],
+        [-26, 0.5],
+        [25, 1.5],
+    ]) {
+        for (const azimuth of [90, 30, -120]) {
+            for (const altitude of [-60, -25, -12, -6, -2, -0.5, 0, 1, 4, 10]) {
+                rays.push(ray(east as number, up as number, azimuth, altitude));
+            }
+        }
+    }
+    for (const rounding of ROUNDINGS) {
+        for (const [reach, radius] of [
+            [8, 30],
+            [3, 200],
+            [1e9, 30],
+            [8, 1e9],
+        ]) {
+            const lookups = await grounded(reach as number, radius as number, rays, rounding);
+            if (lookups.length === 0) return;
+            rays.forEach((r, i) => {
+                // An eye in the room the fillet takes from the dome is outside the surface, where no ray starts.
+                const [east, up] = r;
+                const fromCapture = Math.hypot(east, up - HEIGHT);
+                const towards: Vec3 = [east / fromCapture, 0, (up - HEIGHT) / fromCapture];
+                if (fromCapture >= surfaceDistance(towards, reach as number, radius as number, rounding)) return;
+                const lookup = lookups[i]?.slice(0, 3) as Vec3;
+                const where = `reach ${reach}, radius ${radius}, rounding ${rounding}, ray ${r}`;
+                expect(Math.hypot(...lookup), where).toBeCloseTo(1, 5);
+                const off = miss(r, directionOf(r), lookup, reach as number, radius as number, rounding);
+                expect(off, where).toBeLessThan(1e-4);
+            });
+        }
+    }
+});
+
+test("a rounding of 0 is rbGroundedDirection, and rounded the lookup still goes over to the horizon without a jump", async () => {
+    const rays = Array.from({ length: 180 }, (_, i) => ray(2, 3, 90, -89.5 + i * 0.5));
+    const plain = await grounded(8, 30, rays);
+    if (plain.length === 0) return;
+    const zero = await grounded(8, 30, rays, 0);
+    plain.forEach((l, i) => {
+        l.forEach((v, k) => {
+            expect(zero[i]?.[k]).toBe(v);
+        });
+    });
+    for (const rounding of ROUNDINGS) {
+        const lookups = await grounded(8, 30, rays, rounding);
+        const altitudes = lookups.map((l) => Math.asin(l[2]) / DEG);
+        for (let i = 1; i < altitudes.length; ++i) {
+            const step = (altitudes[i] as number) - (altitudes[i - 1] as number);
+            expect(step, `rounding ${rounding}, step ${i}`).toBeGreaterThanOrEqual(0);
+            expect(step, `rounding ${rounding}, step ${i}`).toBeLessThan(1.5);
         }
     }
 });

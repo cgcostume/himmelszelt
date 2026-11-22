@@ -74,13 +74,16 @@ const normalized = (v: Vec3): Vec3 => {
     return [v[0] / length, v[1] / length, v[2] / length];
 };
 
-/** Where an orbiting `camera` stands and how it is turned: it looks at the solids' center, 0.6 above the ground. */
-/** An orbiting camera: yaw from north through east, pitch, distance, and the vertical field of view, in radians. */
-export type Camera = { yaw: number; pitch: number; distance: number; fov: number };
+/**
+ * An orbiting camera: yaw from north through east, pitch, distance, and the vertical field of view, in radians, around
+ * `center`, the solids' center 0.6 above the ground unless given.
+ */
+export type Camera = { yaw: number; pitch: number; distance: number; fov: number; center?: Vec3 };
 
-export function cameraFrame({ yaw, pitch, distance }: Omit<Camera, "fov">) {
+/** Where an orbiting `camera` stands and how it is turned, looking at its center. */
+export function cameraFrame({ yaw, pitch, distance, center = [0, 0, 0.6] }: Omit<Camera, "fov">) {
     const forward: Vec3 = [-Math.cos(pitch) * Math.sin(yaw), -Math.cos(pitch) * Math.cos(yaw), -Math.sin(pitch)];
-    const eye: Vec3 = [-forward[0] * distance, -forward[1] * distance, 0.6 - forward[2] * distance];
+    const eye: Vec3 = center.map((c, i) => c - (forward[i] as number) * distance) as Vec3;
     const right = normalized([forward[1], -forward[0], 0]);
     const up: Vec3 = [
         right[1] * forward[2] - right[2] * forward[1],
@@ -103,6 +106,7 @@ export type SceneOptions = {
     ev100: number;
     sunDisc?: boolean;
     occlusionRays?: number;
+    solids?: boolean;
     seconds?: number;
     shadowRays?: number;
     background?: GPUTexture | null;
@@ -163,7 +167,7 @@ export function createScene(device: GPUDevice) {
         /**
          * Records the scene into `target` (rgba8unorm, or rgba16float for an HDR canvas, storage). `camera` orbits the scene's center: yaw from north
          * through east, pitch, distance, vertical field of view, all angles in radians. `seconds` turns the solids and
-         * moves them along their orbits. `shadowRays` over the sun disc, 8 or 64 for soft shadows, 0 for none, anything else for hard ones. `background`, a texture of the target's size
+         * moves them along their orbits, and `solids` false leaves them out. `shadowRays` over the sun disc, 8 or 64 for soft shadows, 0 for none, anything else for hard ones. `background`, a texture of the target's size
          * holding the sky in cd/m² through the same camera, replaces the sky map behind the solids. `cubified` for a sky map written cubified, `skyScale` for one written scaled, which its light and coefficients are divided by. The ground is
          * the backdrop's own, with the solids' shadows taken out of it. `sunLight` and `skyLight`, both on
          * by default, switch the direct sunlight and the sky's light from the coefficients.
@@ -198,6 +202,7 @@ export function createScene(device: GPUDevice) {
                 data.set(rotation(normalized(axis), start + speed * seconds), 24 + i * 12);
             });
             data.set(centers(seconds), 84);
+            if (rest.solids === false) for (let i = 0; i < 6; i++) data[87 + i * 4] = 1;
             flags[108] = rest.shadowRays ?? 0;
             flags[109] = rest.background ? 1 : 0;
             flags[111] = (rest.sunLight === false ? 0 : 1) | (rest.skyLight === false ? 0 : 2);

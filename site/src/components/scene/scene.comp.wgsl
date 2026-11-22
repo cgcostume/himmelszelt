@@ -30,7 +30,7 @@ struct Params {
     occlusionRays: u32,
     // Each polyhedron's orientation, object to world.
     rotations: array<mat3x3f, 5>,
-    // Where each solid is, the polyhedra on their orbits and the sphere in their middle; w unused.
+    // Where each solid is, the polyhedra on their orbits and the sphere in their middle; w nonzero to leave it out.
     centers: array<vec4f, 6>,
     // Shadow rays per point over the sun disc, 8 or 64, soft; 0 for none; otherwise one to its center, hard.
     shadowRays: u32,
@@ -143,6 +143,9 @@ struct Hit {
 // The nearest hit on one solid before `tMax`.
 fn intersectSolid(index: u32, origin: vec3f, direction: vec3f, tMax: f32) -> Hit {
     var hit = Hit(FAR, vec3f(0.0), 0.0);
+    if (params.centers[index].w != 0.0) {
+        return hit;
+    }
     let solid = solids[index];
     let offset = origin - params.centers[index].xyz;
 

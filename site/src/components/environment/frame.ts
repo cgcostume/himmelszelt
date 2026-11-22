@@ -1,4 +1,4 @@
-import { paintRange } from "../range";
+import { paintRange, snapMark } from "../range";
 import { changed, hdri, onHdri, onLoading, pending, remeter, setResolution, view } from "./hdri";
 
 const DEG = Math.PI / 180;
@@ -93,18 +93,10 @@ for (const frame of frames) {
         button.addEventListener("click", () => setResolution(button.dataset.resolution as typeof hdri.resolution));
     }
     const ev = frame.querySelector<HTMLInputElement>('[data-env="ev"]');
-    // Only under a pointer: a key's or the wheel's small steps would never get away from it again.
-    let dragging = false;
-    ev?.addEventListener("pointerdown", () => {
-        dragging = true;
-    });
-    window.addEventListener("pointerup", () => {
-        dragging = false;
-    });
     ev?.addEventListener("input", () => {
         const value = Number(ev.value);
         // A tenth at a time, but for the reading itself, which the thumb then sits on exactly.
-        hdri.ev100 = dragging && Math.abs(value - hdri.metered) < SNAP ? hdri.metered : Math.round(value * 10) / 10;
+        hdri.ev100 = snapMark(ev, [hdri.metered], SNAP) ?? Math.round(value * 10) / 10;
         ev.value = String(hdri.ev100);
         hdri.following = hdri.ev100 === hdri.metered;
         changed();

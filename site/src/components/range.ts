@@ -59,6 +59,34 @@ document.addEventListener(
     { passive: false },
 );
 
+// Which slider a pointer is dragging, for the marks that snap it (see snapMark).
+let dragged: HTMLInputElement | null = null;
+document.addEventListener(
+    "pointerdown",
+    (event) => {
+        dragged = sliderFor(event.target);
+    },
+    true,
+);
+window.addEventListener("pointerup", () => {
+    dragged = null;
+});
+
+/**
+ * The mark among `marks` a slider's value is within `reach` of, the nearest, for the slider to land on: the light
+ * meter's reading on an exposure, the powers of two on a size. Only while a pointer drags it, so that dragging further
+ * lets go, and a key's or the wheel's small steps are never caught.
+ */
+export function snapMark(input: HTMLInputElement, marks: readonly number[], reach: number): number | null {
+    if (dragged !== input) return null;
+    const value = Number(input.value);
+    let nearest: number | null = null;
+    for (const mark of marks)
+        if (Math.abs(mark - value) < reach && (nearest === null || Math.abs(mark - value) < Math.abs(nearest - value)))
+            nearest = mark;
+    return nearest;
+}
+
 // A slider in view for HINT_AFTER_MS without ever being touched pulses its thumb once, so a reader who has not noticed
 // that the figure can be dragged gets a hint. Counted per slider, while at least half of it is on screen.
 export const HINT_AFTER_MS = 12_000;

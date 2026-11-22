@@ -2,10 +2,12 @@ import Zdog from "zdog";
 import { find } from "../dom";
 import { onDemand } from "../frame";
 import { themeColor, themeColors } from "../sternzeit/figure";
+import { createGroundedView } from "./grounded-view";
 
 // The surface rbGroundedDirection lays an image on, drawn to scale in meters around the point it was taken from: the
 // plane out to the reach, the dome from the horizon up, and between them the inverse of the distance faded from the
 // one to the other. Two rays from a camera, in the vertical plane through it and the capture point, to where they land.
+// Beside it, the chosen HDRI laid on that surface as the grounded figure renders it, seen from that camera.
 
 const { Illustration, Anchor, Shape, Ellipse } = Zdog;
 const DEG = Math.PI / 180;
@@ -13,6 +15,8 @@ const FAR = 1e9;
 const MERIDIANS = 16;
 const DRAG_RADIANS_PER_PX = 0.008;
 const TILT = { min: -50 * DEG, max: 0 };
+// The HDRI view's vertical field of view.
+const FOV = 60 * DEG;
 
 const INK = themeColor("--text");
 const MUTED = themeColor("--muted");
@@ -31,6 +35,8 @@ const field = <T extends HTMLElement = HTMLElement>(name: string) => find<T>(`[d
 const slider = (name: string) => Number(field<HTMLInputElement>(name).value);
 
 const rotation = { x: -20 * DEG, y: -28 * DEG, z: 0 };
+// Where the camera looks, in degrees from north through east; it stands across the capture point from there.
+let heading = 90;
 let zoom = 1;
 // What the scene spans, in meters: the capture point's height, the dome's radius above it, and how far out it reaches.
 let fit = { height: 1, dome: 1, extent: 1 };
@@ -82,10 +88,10 @@ function label(name: string, cls = "", dx = 0, dy = 0) {
 label("capture", "frame-axis", -16, -24);
 label("camera", "frame-axis", 0, 14);
 label("reach", "frame-angle", 0, 12);
-label("blend", "", 0, 12);
 label("dome", "frame-angle", 0, -10);
 label("horizon", "", 0, -10);
 label("lifted", "frame-angle", 0, 12);
+label("blend", "", 0, 12);
 
 const reading = (length: number) => (length >= FAR ? "∞" : length.toFixed(length < 10 ? 1 : 0));
 const meters = (length: number) => (length >= FAR ? "∞" : `${reading(length)} m`);
@@ -97,19 +103,24 @@ function parameters() {
     const height = slider("height");
     const radius = Math.max(far("radius", 5), 2.5 * height);
     const reach = Math.min(far("reach", 3), Math.sqrt(radius ** 2 / 4 - height ** 2));
-    // Where the blend begins, as the sine of how far below the horizon the reach's edge lies, as in ground.wgsl.
-    const edge = Math.max(height / Math.hypot(height, reach), (2 * height) / radius);
-    return { height, radius, reach, edge, lift: slider("lift") };
+    const rounding = slider("rounding");
+    // As in ground.wgsl, as the sines of how far below the horizon they lie: where the dome's foot begins and the plane.
+    const dome = radius >= FAR ? 0 : height / radius;
+    const reached = Math.max(height / Math.hypot(height, reach), 2 * dome);
+    const foot = dome * (1 - Math.max(rounding, 0));
+    const edge = rounding < 0 ? dome + (reached - dome) * (1 + rounding) : reached;
+    const flat = edge > 0 ? (height * Math.sqrt(1 - edge * edge)) / edge : FAR;
+    return { height, radius, reach, dome, foot, edge, flat, rounding, lift: slider("lift") };
 }
 type Parameters = ReturnType<typeof parameters>;
 
 /** How far from the capture point the surface lies along a direction `down` (the sine of its depression) below it. */
-function distance({ height, radius, edge }: Parameters, down: number) {
-    const dome = radius >= FAR ? 0 : height / radius;
-    if (down <= dome) return radius;
-    // As `rbGroundedGap` in ground.wgsl: the plane from the edge down, the dome down to the plane's level, a cubic between.
-    const t = Math.min((down - dome) / (edge - dome), 1);
-    const w = down >= edge ? down : dome + (edge - dome) * t * t * (2 - t);
+function distance({ height, radius, dome, foot, edge }: Parameters, down: number) {
+    if (down >= edge) return height / down;
+    if (down <= foot) return radius;
+    // As `rbGroundedGap` in ground.wgsl: the plane from the edge down, the dome down to its foot, a cubic between.
+    const t = Math.min((down - foot) / (edge - foot), 1);
+    const w = dome + t * t * ((edge - dome) * (3 - 2 * t) + (edge - foot) * (t - 1));
     return w > 0 ? height / w : FAR;
 }
 
@@ -146,6 +157,11 @@ function profile(p: Parameters, extent: number): Profile {
     return points;
 }
 
+/** Where the camera stands, behind the capture point and above the ground, in meters. */
+function cameraAt({ height, radius, reach }: Parameters): [number, number] {
+    return [-Math.min(0.5 * reach, 0.3 * radius, 5), Math.min(1.5, 0.75 * height + 0.3)];
+}
+
 /** How tall the scene shows at a tilt, from the dome's top to the ground's near edge. */
 const span = (tilt: number) => fit.height * Math.cos(tilt) + fit.dome + fit.extent * Math.sin(tilt);
 
@@ -174,7 +190,7 @@ function rebuild() {
         illustration.setSize(size.width, size.height);
     }
 
-    const plane = Math.min(reach, extent);
+    const plane = Math.min(p.flat, extent);
     new Ellipse({
         addTo: groundAnchor,
         diameter: 2 * plane,
@@ -187,17 +203,9 @@ function rebuild() {
 
     // The surface of revolution: faint meridians, the section through the camera bold.
     const section = profile(p, extent);
-    for (let k = 0; k < MERIDIANS; k++) {
-        const azimuth = (k / MERIDIANS) * 360;
-        const bold = azimuth === 90 || azimuth === 270;
-        line(
-            section.map((point) => around(point, azimuth)),
-            bold ? INK : MUTED,
-            1,
-            null,
-            bold ? 1 : 0.45,
-        );
-    }
+    const meridian = (azimuth: number) => section.map((point) => around(point, azimuth));
+    for (let k = 0; k < MERIDIANS; k++) line(meridian((k / MERIDIANS) * 360), MUTED, 1, null, 0.45);
+    for (const azimuth of [heading, heading + 180]) line(meridian(azimuth), INK);
     const ring = (rho: number, z: number, color: string, dash: string | null, opacity = 1) =>
         styled(
             new Ellipse({
@@ -235,11 +243,14 @@ function rebuild() {
     line([enu(0, 0, 0), capture], MUTED, 1, DASHED);
     labels.capture.point = capture;
     labels.capture.element.textContent = `capture point, ${meters(height)} up`;
-    line([enu(0, 0, 0), around([plane, 0], 180)], MUTED, 1, DOTTED);
-    labels.reach.point = around([plane, 0], 180);
+    const reachAt = Math.min(reach, extent);
+    line([enu(0, 0, 0), around([reachAt, 0], 180)], MUTED, 1, DOTTED);
+    labels.reach.point = around([reachAt, 0], 180);
     labels.reach.element.textContent = `reach ${meters(reach)}`;
     const blendMiddle = section.find(([rho]) => rho >= (plane + extent) / 2);
-    labels.blend.point = blendMiddle ? around(blendMiddle, 270) : { x: 0, y: 0, z: Number.NaN };
+    // No blend at a hard corner.
+    const blends = blendMiddle && p.edge > p.foot + 1e-9;
+    labels.blend.point = blends ? around(blendMiddle, 270) : { x: 0, y: 0, z: Number.NaN };
     labels.blend.element.textContent = "blend";
     if (domed) {
         const toDome = around([radius * Math.cos(45 * DEG), height + radius * Math.sin(45 * DEG)], 180);
@@ -248,21 +259,21 @@ function rebuild() {
     }
     labels.dome.element.textContent = `dome ${meters(radius)}`;
 
-    // The camera west of the capture point, and two rays east: one to the plane, one to the dome or, without one, to
-    // the sky at infinity, where its lookup runs parallel to it.
-    const cameraAt: [number, number] = [-Math.min(0.5 * reach, 0.3 * radius, 5), Math.min(1.5, 0.75 * height + 0.3)];
-    const camera = enu(cameraAt[0], 0, cameraAt[1]);
+    // The camera across the capture point from where it looks, and two rays that way: one to the plane, one to the
+    // dome or, without one, to the sky at infinity, where its lookup runs parallel to it.
+    const at = cameraAt(p);
+    const camera = around(at, heading);
     dot(camera, INK);
     labels.camera.point = camera;
     labels.camera.element.textContent = "camera";
-    const groundHit = enu(0.6 * plane, 0, 0);
+    const groundHit = around([0.6 * reachAt, 0], heading);
     const skyAngle = 25 * DEG;
     const skyHit = domed
-        ? enu(radius * Math.cos(skyAngle), 0, height + radius * Math.sin(skyAngle))
-        : enu(cameraAt[0] + 0.9 * extent * Math.cos(skyAngle), 0, cameraAt[1] + 0.9 * extent * Math.sin(skyAngle));
+        ? around([radius * Math.cos(skyAngle), height + radius * Math.sin(skyAngle)], heading)
+        : around([at[0] + 0.9 * extent * Math.cos(skyAngle), at[1] + 0.9 * extent * Math.sin(skyAngle)], heading);
     const skyLookup = domed
         ? skyHit
-        : enu(0.9 * extent * Math.cos(skyAngle), 0, height + 0.9 * extent * Math.sin(skyAngle));
+        : around([0.9 * extent * Math.cos(skyAngle), height + 0.9 * extent * Math.sin(skyAngle)], heading);
     if (!domed) labels.dome.point = skyLookup;
     for (const [hit, lookup] of [
         [groundHit, groundHit],
@@ -274,20 +285,52 @@ function rebuild() {
     }
 }
 
+/**
+ * Places the labels in the order they were made, each at the first of a few offsets around its point where it overlaps
+ * none placed before it and stays on the stage; a label that finds none is left out, but for the first two.
+ */
 function placeLabels() {
     const center = { x: size.width / 2, y: size.height / 2 };
     const translate = layers[0]?.translate ?? { x: 0, y: 0, z: 0 };
-    for (const { element, point, dx, dy } of Object.values(labels)) {
-        if (Number.isNaN(point.z)) {
-            element.hidden = true;
-            continue;
-        }
-        element.hidden = false;
+    const stageBox = stage.getBoundingClientRect();
+    const placed: DOMRect[] = [];
+    const overlaps = (a: DOMRect, b: DOMRect) =>
+        a.left < b.right + 2 && b.left < a.right + 2 && a.top < b.bottom + 1 && b.top < a.bottom + 1;
+    Object.values(labels).forEach(({ element, point, dx, dy }, index) => {
+        element.hidden = Number.isNaN(point.z);
+        if (element.hidden) return;
         const v = new Zdog.Vector(point).rotate(rotation);
-        element.style.left = `${center.x + (v.x + translate.x) * zoom + dx}px`;
-        element.style.top = `${center.y + (v.y + translate.y) * zoom + dy}px`;
-        element.style.transform = `translate(${dx > 0 ? 0 : dx < 0 ? -100 : -50}%, -50%)`;
-    }
+        const x = center.x + (v.x + translate.x) * zoom;
+        const y = center.y + (v.y + translate.y) * zoom;
+        const away = dy < 0 ? -1 : 1;
+        const offsets = [
+            [dx, dy],
+            [dx, -dy || -14],
+            [dx, dy + 16 * away],
+            [dx, -dy - 16 * away],
+            [12, 0],
+            [-12, 0],
+        ];
+        for (const [ox = 0, oy = 0] of offsets) {
+            element.style.left = `${x + ox}px`;
+            element.style.top = `${y + oy}px`;
+            element.style.transform = `translate(${ox > 0 ? 0 : ox < 0 ? -100 : -50}%, -50%)`;
+            const box = element.getBoundingClientRect();
+            const inside = box.left >= stageBox.left && box.right <= stageBox.right && box.bottom <= stageBox.bottom;
+            if (inside && !placed.some((other) => overlaps(box, other))) {
+                placed.push(box);
+                return;
+            }
+        }
+        if (index < 2) {
+            element.style.left = `${x + dx}px`;
+            element.style.top = `${y + dy}px`;
+            element.style.transform = `translate(${dx > 0 ? 0 : dx < 0 ? -100 : -50}%, -50%)`;
+            placed.push(element.getBoundingClientRect());
+        } else {
+            element.hidden = true;
+        }
+    });
 }
 
 function frame() {
@@ -309,17 +352,44 @@ function frame() {
     field("heightReading").textContent = p.height.toFixed(1);
     field("liftReading").textContent = `${p.lift.toFixed(1)}°`;
     field("reachReading").textContent = reading(p.reach);
+    field("roundingReading").textContent = `${p.rounding > 0 ? "+" : ""}${p.rounding.toFixed(2).replace("-", "−")}`;
     field("radiusReading").textContent = reading(p.radius);
 }
 
+// The HDRI from the diagram's camera, without the solids, looking level the way it does: the scene's camera orbits a
+// point a meter ahead of it.
+const hdriCanvas = find<HTMLCanvasElement>('[data-field="canvas"]', root);
+const requestHdri = createGroundedView(hdriCanvas, () => {
+    const p = parameters();
+    const [rho, up] = cameraAt(p);
+    const [east, north] = [Math.sin(heading * DEG), Math.cos(heading * DEG)];
+    const center: [number, number, number] = [(rho + 1) * east, (rho + 1) * north, up];
+    return {
+        camera: { yaw: (heading + 180) * DEG, pitch: 0, distance: 1, fov: FOV, center },
+        height: p.height,
+        lift: p.lift,
+        reach: p.reach,
+        radius: p.radius,
+        flat: true,
+        even: true,
+        solids: false,
+        rounding: p.rounding,
+    };
+});
+
 const requestFrame = onDemand(frame, stage);
-const requestUpdate = onDemand(() => {
+const requestDiagram = onDemand(() => {
     rebuild();
     frame();
 }, stage);
+const requestUpdate = () => {
+    requestDiagram();
+    requestHdri?.();
+};
 
-for (const name of ["height", "lift", "reach", "radius"]) field(name).addEventListener("input", requestUpdate);
-new ResizeObserver(requestUpdate).observe(stage);
+for (const name of ["height", "lift", "reach", "radius", "rounding"])
+    field(name).addEventListener("input", requestUpdate);
+new ResizeObserver(requestDiagram).observe(stage);
 
 let dragFrom: { x: number; y: number } | null = null;
 stage.addEventListener("pointerdown", (event) => {
@@ -329,15 +399,29 @@ stage.addEventListener("pointerdown", (event) => {
 });
 stage.addEventListener("pointermove", (event) => {
     if (!dragFrom) return;
-    rotation.y -= (event.clientX - dragFrom.x) * DRAG_RADIANS_PER_PX;
-    rotation.x = Math.min(
-        TILT.max,
-        Math.max(TILT.min, rotation.x - (event.clientY - dragFrom.y) * DRAG_RADIANS_PER_PX),
-    );
+    const dx = event.clientX - dragFrom.x;
+    const tilt = rotation.x - (event.clientY - dragFrom.y) * DRAG_RADIANS_PER_PX;
+    rotation.x = Math.min(TILT.max, Math.max(TILT.min, tilt));
     dragFrom = { x: event.clientX, y: event.clientY };
-    requestFrame();
+    if (dx === 0) {
+        requestFrame();
+        return;
+    }
+    heading -= (dx * DRAG_RADIANS_PER_PX) / DEG;
+    requestUpdate();
 });
 stage.addEventListener("pointerup", () => {
     dragFrom = null;
 });
-requestUpdate();
+// Turning the HDRI's view turns the diagram's camera with it, the same way for the same drag: the view as if grabbed.
+hdriCanvas.addEventListener("pointerdown", (event) => {
+    hdriCanvas.setPointerCapture(event.pointerId);
+    const start = { x: event.clientX, heading };
+    const move = (e: PointerEvent) => {
+        heading = start.heading - ((e.clientX - start.x) * FOV) / hdriCanvas.clientHeight / DEG;
+        requestUpdate();
+    };
+    hdriCanvas.addEventListener("pointermove", move);
+    hdriCanvas.addEventListener("pointerup", () => hdriCanvas.removeEventListener("pointermove", move), { once: true });
+});
+requestDiagram();

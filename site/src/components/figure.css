@@ -157,6 +157,9 @@
     --plate: var(--overlay-tint);
     color: var(--accent);
 }
+.view-icon[aria-pressed="true"]:hover {
+    --plate: color-mix(in oklab, var(--accent) 34%, var(--surface));
+}
 /* Text buttons, with or without an icon before or after the word, at the small text's size: a view's switch, a step,
    a month. Within a group the group is their ground. */
 .view-toggle {
@@ -178,8 +181,13 @@
     background: var(--line);
     color: var(--text);
 }
+/* Pressed stays pressed under the pointer, only a deeper tint: the hover never hides the state it is about to change. */
 .view-toggle[aria-pressed="true"] {
-    background: color-mix(in oklab, var(--accent) 22%, var(--surface));
+    background: var(--overlay-tint);
+    color: var(--accent);
+}
+.view-toggle[aria-pressed="true"]:hover:enabled {
+    background: color-mix(in oklab, var(--accent) 34%, var(--surface));
     color: var(--accent);
 }
 /* The size said again, over a figure's own rule for the drawings it holds. */

@@ -17,8 +17,10 @@ interface Props {
     author?: boolean;
     /** What the figure says over itself instead of the map's or the view's hint, for one with a camera of its own. */
     ownView?: string;
+    /** Whether the exposure slider goes under it: not where the figure's own controls follow the page's exposure. */
+    exposure?: boolean;
 }
-const { fullscreen = false, author = true, ownView } = Astro.props;
+const { fullscreen = false, author = true, ownView, exposure = true } = Astro.props;
 // As a view into the sky has them (see SkyFrame.astro): a figure's own options, folded away behind a button.
 const optionsHtml = Astro.slots.has("options") ? (await Astro.slots.render("options")).trim() : "";
 const options = optionsHtml !== "";
@@ -55,7 +57,7 @@ const RESOLUTIONS = [
     </div>
     {options && <div class="sky-options" data-env="optionsPanel"><Fragment set:html={optionsHtml} /></div>}
     </div>
-    <div class="fig-controls env-exposure">
+    {exposure && <div class="fig-controls env-exposure">
         <Slider
             name="EV"
             title="The exposure, in EV: drag, or turn the mouse wheel"
@@ -64,7 +66,7 @@ const RESOLUTIONS = [
             metered={{ "data-env": "meteredMark", title: "What the light meter read for this image. The slider snaps to it, and the padlock closes while the exposure follows the reading; drag away to let go" }}
             output={{ "data-env": "reading" }}
         />
-    </div>
+    </div>}
 </div>
 
 <script>

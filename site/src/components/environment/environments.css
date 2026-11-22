@@ -144,8 +144,12 @@
 }
 .env-frame .fig-hint {
     pointer-events: auto;
-    /* The page's ink on its frosted glass, full screen as well, whose dark would otherwise take it light on light. */
-    color: var(--overlay-ink);
+    /* Straight on the image, as the marks drawn onto a render are: light, lifted off clouds by a dark halo, on either
+       page and full screen. */
+    color: var(--render-ink);
+    text-shadow:
+        0 0 3px var(--render-shade),
+        0 0 6px var(--render-shade);
 }
 .env-loading {
     display: none;

@@ -1,0 +1,41 @@
+/* The storage figure (Storage.astro): the stacked memory needs the room, the three values beside it are short. */
+.storage-figure .budget-grid {
+    grid-template-columns: max-content 3fr 0.6fr 0.8fr;
+}
+/* A family of several variants: its name a small heading across the grid, over a row per variant. */
+.storage-figure .storage-family {
+    grid-column: 1 / -1;
+    padding: 0.5rem 0 0;
+    border-top: var(--border);
+    color: var(--muted);
+    font-size: var(--text-meta);
+}
+/* Its variants under it, indented. */
+.storage-figure .storage-variant {
+    padding-left: 0.75rem;
+}
+.storage-figure .storage-first {
+    border-top: 0;
+}
+/* On a phone, the family's name and its memory each across, the two values side by side under them. */
+@media (max-width: 48rem) {
+    .storage-figure .budget-grid {
+        grid-template-columns: 1fr 1fr;
+        column-gap: 0.75rem;
+    }
+    .storage-figure .budget-size,
+    .storage-figure .budget-size + .budget-cell {
+        grid-column: 1 / -1;
+    }
+}
+/* The powers of two the sharpness has no room to name: a tick, as the figure-slider-tick draws one. */
+.storage-figure .figure-slider-mark:empty {
+    width: 1px;
+    height: 0.5em;
+    margin-top: 0.15em;
+    background: currentColor;
+}
+/* Every head on one line. */
+.storage-figure .budget-head {
+    white-space: nowrap;
+}

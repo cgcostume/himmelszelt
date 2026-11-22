@@ -1,0 +1,90 @@
+---
+import "../costs.css";
+import Slider from "../Slider.astro";
+import "./storage.css";
+
+const SCENARIOS = [
+    ["background", "1× background", "One background as sharp as a 4K HDRI, in half floats"],
+    [
+        "lighting",
+        "lighting / reflection",
+        "The cube map a renderer lights and reflects with, 256 a face, in half floats",
+    ],
+    ["probes", "1K probes of 32²", "An atlas of 1,024 octahedral light probes of 32 by 32 texels, in rg11b10ufloat"],
+];
+const FORMATS = [
+    ["rgba32float", "rgba32float", "16 bytes a texel, full floats"],
+    ["rgba16float", "rgba16float", "8 bytes a texel, half floats"],
+    ["rg11b10ufloat", "rg11b10ufloat", "4 bytes a texel, no alpha and no sign"],
+    [
+        "rgb9e5ufloat",
+        "rgb9e5ufloat",
+        "4 bytes a texel, an exponent shared by the three channels as in a Radiance HDR file",
+    ],
+    ["bc6h-rgb-ufloat", "BC6H", "1 byte a texel, 16 bytes a block of 4 by 4, encoded ahead of time"],
+];
+const GROUPS = [
+    { name: "scenario", heading: "scenario", options: SCENARIOS, checked: "background" },
+    { name: "format", heading: "format", options: FORMATS, checked: "rgba16float" },
+];
+// The powers of two from 32 to 16K, every other one named; the slider snaps to them.
+const LABELS: Record<number, string> = { 6: "64", 8: "256", 10: "1K", 12: "4K", 14: "16K" };
+const POWERS = Array.from({ length: 10 }, (_, i) => i + 5).map((power) => ({
+    at: ((power - 5) / 9) * 100,
+    label: LABELS[power] ?? "",
+}));
+---
+
+<figure class="fig budget-figure costs-figure storage-figure" id="storage" data-actions="copy" data-actions-in=".storage-formats">
+    {
+        GROUPS.map(({ name, heading, options, checked }) => (
+            <div class:list={["fig-controls", `storage-${name}s`]}>
+                <span class="steps" role="radiogroup" aria-label={heading}>
+                    <span class="steps-heading" aria-hidden="true">
+                        {heading}
+                    </span>
+                    {options.map(([value, text, title]) => (
+                        <label title={title}>
+                            <input type="radio" name={`storage-${name}`} value={value} checked={value === checked} />
+                            <span>{text}</span>
+                        </label>
+                    ))}
+                </span>
+            </div>
+        ))
+    }
+    <Slider
+        name="sharpness"
+        title="As sharp as an equirectangular this wide, in texels, snapping to the powers of two"
+        input={{ min: 5, max: 14, step: "any", "data-wheel-step": 0.25, value: 12, "data-field": "width", "aria-label": "Sharpness, as the width of an equirectangular" }}
+        marks={POWERS}
+        output={{ "data-field": "widthValue" }}
+    />
+    <Slider
+        name="maps"
+        title="How many maps of the kind. More than one make an atlas, as light probes are packed: every tile with a gutter of one texel each side, a copy of its edge for the bilinear filter, as DDGI packs its probes, and mip levels only down to 4 texels across, each with its own gutter, before the tiles blur into each other. Cube maps go into a cube map array, which needs no gutter."
+        input={{ min: 0, max: 12, step: 1, value: 0, "data-field": "count", "aria-label": "Number of maps" }}
+        marks={[
+            { at: 0, label: "1" },
+            { at: 100 / 3, label: "16" },
+            { at: 200 / 3, label: "256" },
+            { at: 100, label: "4096" },
+        ]}
+        output={{ "data-field": "countValue" }}
+    />
+    <div class="budget-legend note" aria-hidden="true">
+        <span><i class="budget-swatch budget-part-0"></i>first level</span>
+        <span><i class="budget-swatch budget-part-1"></i>mip levels</span>
+        <span><i class="budget-swatch budget-reference"></i>the reference</span>
+    </div>
+    <div class="budget-grid" data-field="grid" role="img" aria-label="Bar chart of the memory a sky takes in five families of projections and their variants at the same sharpness, the first level and its mip levels, against the equirectangular, with how evenly each spreads its texels" style="--costs-columns: 3"></div>
+    <figcaption class="figure-caption">
+        What a sky takes to hold in each projection, sized so that no texel covers more of the sky than the
+        equirectangular's at its horizon: each variant's first level and mip levels, against the equirectangular; the
+        spread, its largest texel's solid angle over its smallest's; and the share an even spread would not need.
+    </figcaption>
+</figure>
+
+<script>
+    import "./storage";
+</script>

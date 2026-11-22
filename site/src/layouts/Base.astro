@@ -26,6 +26,8 @@ const colors = Array.from({ length: CYANOMETER_STEPS }, (_, step) => stepColor(s
         <meta name="color-scheme" content="dark light" />
         <title>{title}</title>
         <meta name="description" content={description} />
+        {/* No icon of its own yet: an empty one, so that browsers do not ask the server for /favicon.ico in vain. */}
+        <link rel="icon" href="data:," />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link

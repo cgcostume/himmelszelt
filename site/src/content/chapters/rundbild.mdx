@@ -6,12 +6,17 @@ order: 2
 draft: true
 references:
     - brown2017
+    - cohen1985
     - engelhardt2008
+    - majercik2019
+    - microsoft2018bc6h
     - mueller2012thesis
     - nowell2005
+    - pharr2016
     - polyhaven
     - ramamoorthi2001
     - snyder1987
+    - w3c2026wgsl
 ---
 
 import Cite from "../../components/Cite.astro";
@@ -28,6 +33,7 @@ import Harmonics from "../../components/rundbild/Harmonics.astro";
 import Lighting from "../../components/rundbild/Lighting.astro";
 import Projections from "../../components/rundbild/Projections.astro";
 import Costs from "../../components/rundbild/Costs.astro";
+import Storage from "../../components/rundbild/Storage.astro";
 
 This chapter is being written. Its figures still show only the computed sky of dunstkreis.
 
@@ -56,7 +62,7 @@ a plain `GPUTexture`, and exposure and tone curves are [helldunkel](../helldunke
 ## Lighting a scene
 
 A cube map's faces are six perspective views, and a perspective crowds the most directions into its middle: a texel at a
-face's corner covers only a fifth of the solid angle of one at its center. So the sky is resolved five times as finely
+face's corner covers only a fifth of the <Term of="Solid angle">solid angle</Term> of one at its center. So the sky is resolved five times as finely
 towards the corners as in the middle of a face, and where two faces meet, the texel grid turns abruptly, which can show
 in gradients as smooth as the sky's. Cubified, as osgHimmel's `CubeMappedHimmel` did it <Cite id="mueller2012thesis" />,
 the texels are placed by Nowell's mapping of a cube onto a sphere <Cite id="nowell2005" /> instead. The largest then
@@ -107,7 +113,9 @@ A sphere has one radius for all of it, though. Small enough to end the ground be
 well, and the mountain slides past the solids as the camera moves: on a dome of 30 m, a step of 6 m to the side shifts
 it by 11°, some twenty times the Moon's width. rundbild keeps the two apart (<Fig id="grounded" />). The ground lies
 flat as far as its reach, the horizon and the sky lie on a dome with a radius of its own, and in between the image
-recedes from the one to the other, by how far below its horizon it lies, without a seam. The dome can be without end,
+recedes from the one to the other, by how far below its horizon it lies, without a seam. `rbGroundedDirectionRounded`
+shapes that foot, from a hard corner where the plane meets the dome to a wall that curves into the ground from as high
+up as the horizon (<Fig id="ground-geometry" />). The dome can be without end,
 where a sky belongs: the ground then falls away past its reach like a hilltop, and the mountain stays at infinity.
 Within the reach, `rbGroundedDirection` still costs the one intersection, and past it up to fifteen steps along the ray,
 which close in on the surface.
@@ -176,12 +184,115 @@ the two. An equirectangular of W texels across spends 2π/W radians on a texel a
 face 2/N at the middle of a face: N has to reach W/π, about a third of the width, not the quarter the faces' count
 suggests. A turn into a cube map and back then keeps the sky, up to the filter's softness. The octahedral map needs care
 of its own: its lower half folds outward, so a filtered lookup across its edge reads a neighbor that is not one on the
-sphere. `createCubeFromPanoramaPass` and `createPanoramaPass` go each way.
+sphere. `createCubeFromPanoramaPass` and `createPanoramaPass` go each way. Read with `decodeRgbe`, an HDRI goes into a
+cube map as sharp as itself and out again as an octahedral map, on your `device`:
+
+```ts
+import {
+    createCubeFromPanoramaPass,
+    createPanoramaPass,
+    decodeRgbe,
+} from "@himmelszelt/rundbild";
+
+const file = await (await fetch("sky.hdr")).arrayBuffer();
+const { width, height, pixels } = decodeRgbe(file);
+// The passes read half floats.
+const panorama = device.createTexture({
+    size: [width, height],
+    format: "rgba16float",
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+});
+device.queue.writeTexture(
+    { texture: panorama },
+    new Float16Array(pixels),
+    { bytesPerRow: width * 8 },
+    [width, height],
+);
+
+// As sharp at the horizon: a face a third of the width, 1304 for 4K.
+const face = Math.ceil(width / Math.PI);
+const cube = device.createTexture({
+    size: [face, face, 6],
+    mipLevelCount: Math.floor(Math.log2(face)) + 1,
+    format: "rgba16float",
+    usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+    textureBindingViewDimension: "cube",
+});
+// Octahedral, as sharp: 0.73 of the width, 2973 for 4K.
+const side = Math.ceil((width * Math.sqrt(3 * Math.sqrt(3))) / Math.PI);
+const octahedral = device.createTexture({
+    size: [side, side],
+    format: "rgba16float",
+    usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC,
+});
+
+const toCube = await createCubeFromPanoramaPass(device);
+const toOctahedral = await createPanoramaPass(device, {
+    projection: "octahedral", // or "equirectangular", "fisheye", "sphere"
+    format: "rgba16float",
+    samples: 4,
+});
+const encoder = device.createCommandEncoder();
+toCube.encode(encoder, panorama, cube);
+toOctahedral.encode(encoder, cube, octahedral);
+device.queue.submit([encoder.finish()]);
+```
+
+Sized that way, by the largest texel each may have, the projections hold the same sky in very different amounts of
+memory (<Fig id="storage" />). The cube map, which the hardware filters best, holds a fifth more texels than the
+equirectangular it came from: a 4K HDRI's 64 MiB in half floats become 78 MiB in faces of 1,304, as its fine corners
+waste more than the equirectangular's poles do. Cubified, the same sky fits in faces of 991 and 45 MiB, three tenths
+less, its texels within a third of each other. The octahedral map costs a twentieth more than the equirectangular: it
+spreads its texels about as unevenly as a cube map, but in one square without a seam. The sphere map, a fifth less,
+gives every texel the same share of the sky, yet leaves a fifth of its square to no direction and squeezes the nadir
+into its rim, where a texel is a sliver: even in area is not even in shape.
+
+A sky above a ground drawn by other means needs only its upper half. The equirectangular then ends at the horizon, four
+times as wide as high, and the cube map becomes a hemicube, its top face and the upper halves of its four sides, as
+Michael Cohen and Donald Greenberg laid out what a surface sees for radiosity <Cite id="cohen1985" />. Either holds half
+of what its whole sphere takes, and the fisheye was a hemisphere's from the start.
+
+How a texel is stored counts as much. Half floats take 8 bytes, rg11b10ufloat and rgb9e5ufloat 4, and
+<Term of="Block compression">BC6H</Term>, encoded ahead of time, a single byte <Cite id="microsoft2018bc6h" />.
+rundbild's passes write half or full floats; the others are for keeping a map once it is made. Light probes, packed
+by the thousand into one atlas, take a gutter of a texel around each, a copy of its edge for the filter
+<Cite id="majercik2019" />, and mip levels only as far down as the gutters hold.
+
+<Storage />
 
 Mip levels pay the same way. Each texel of a level is the mean of four above it, which treats them alike: nearly right on
 a cubified cube map, a little off towards a plain one's corners, and far off on an equirectangular, whose top rows are
 one direction many times over. So the mip levels live on the cube map. A cubified map keeps its evenness only for whoever
 knows: another tool reads it as a plain one, bent, so a file for others goes through `createPanoramaPass` first.
+
+Whoever samples an equirectangular directly, in a shader of their own, meets its two flaws. At a pole, one direction
+stretches over a whole row: at 4K, a texel of the top row holds some 1,300 times less of the sky than one at the
+horizon, and a filter there blends neighbors that lie a hair apart. Summing the image, for the sky's mean light or to
+pick its bright texels more often by <Term of="Importance sampling">importance sampling</Term>, has to weigh every row
+by the sine of its zenith angle, the solid angle its texels hold, and a direction picked by its texel has its density
+divided by that sine, which grows without end towards the poles <Cite id="pharr2016" />.
+
+The seam is the subtler flaw. A fragment shader's `textureSample` takes its mip level from how far the coordinates move
+between neighboring pixels <Cite id="w3c2026wgsl" />, and across the seam u jumps from 1 to 0: the whole image within
+one pixel, so it reads the coarsest level, the sky's mean color, in a line one pixel wide down the sky. The cure takes
+the step by hand, where a jump of a whole turn is no step at all, through a sampler that repeats along u:
+
+```wgsl
+// d is the unit direction a pixel looks at; wgsl.panorama goes in front.
+fn equirectangular(sky: texture_2d<f32>, s: sampler, d: vec3f) -> vec4f {
+    let uv = rbEquirectangularUv(d, 0.0);
+    // Across the seam u jumps by one, a whole turn, which is no turn at all.
+    var dx = dpdx(uv);
+    var dy = dpdy(uv);
+    dx.x -= round(dx.x);
+    dy.x -= round(dy.x);
+    return textureSampleGrad(sky, s, uv, dx, dy);
+}
+```
+
+A cube map has neither flaw, the other reason the mip levels live there. rundbild itself reads an equirectangular only
+in compute passes, at a level it names, wraps the azimuth the same way in `rbStretchedLods`, and takes the nine
+coefficients from directions spread evenly over the sphere, which need no weights.
 
 Two environments fade by their light, not by their pictures, so a mix of a noon and a night stays physically a mix of
 the two. `createEnvironmentBlendPass` writes it into a cube map, and the nine coefficients of the result are those of the
