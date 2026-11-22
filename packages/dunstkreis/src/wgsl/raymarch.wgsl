@@ -15,9 +15,103 @@ struct DkSkyRay {
     endUp: vec3f,
 }
 
+// A solar eclipse along a march: the Moon stands before the Sun for some of the air and not for the rest, its shadow. No
+// binding: whoever marches sets `dkEclipse` first, and left alone it is no eclipse at all.
+struct DkEclipse {
+    // Where the Moon's center stands off the line from the march's start towards the Sun, in km, across that line.
+    offset: vec3f,
+    // How far along that line the Moon is, in km.
+    along: f32,
+    // Unit vector towards the Sun, the true direction, in the march's frame.
+    sunDirection: vec3f,
+    // The Moon's radius in km; 0 for no eclipse.
+    moonRadius: f32,
+    // The Sun's angular radius, in radians.
+    sunRadius: f32,
+    // 1 where the march's frame holds both sides of the Sun's meridian as one, as the sky-view table does: the shadow is
+    // then the mean of itself and its mirror image, and the sky stays alike on both sides.
+    mirrored: f32,
+}
+
+var<private> dkEclipse: DkEclipse;
+
+// The share of a disc of angular radius `sun` that one of radius `moon` leaves uncovered, their centers `apart`: 1 with
+// nothing in front and 0 in a total eclipse, what two discs overlap by, the Sun's taken as evenly bright.
+fn dkDiscUncovered(sun: f32, moon: f32, apart: f32) -> f32 {
+    if (apart >= sun + moon) {
+        return 1.0;
+    }
+    if (apart <= abs(moon - sun)) {
+        return 1.0 - min(moon * moon / (sun * sun), 1.0);
+    }
+    let towardsSun = clamp((apart * apart + sun * sun - moon * moon) / (2.0 * apart * sun), -1.0, 1.0);
+    let towardsMoon = clamp((apart * apart + moon * moon - sun * sun) / (2.0 * apart * moon), -1.0, 1.0);
+    let kite = max((sun + moon - apart) * (apart + sun - moon) * (apart - sun + moon) * (apart + sun + moon), 0.0);
+    let lens = sun * sun * acos(towardsSun) + moon * moon * acos(towardsMoon) - 0.5 * sqrt(kite);
+    return clamp(1.0 - lens / (DK_PI * sun * sun), 0.0, 1.0);
+}
+
+// How far light scattered more than once reaches sideways, in km, and its shares by where it comes from: three quarters
+// from the air close by, the rest from rings 60, 150 and 300 km out. The air is a thin slab, so little crosses far.
+const DK_ECLIPSE_RINGS = vec3f(60.0, 150.0, 300.0);
+const DK_ECLIPSE_WEIGHTS = vec4f(0.77, 0.174, 0.046, 0.01);
+
+// The shares of the Sun's light a point `x` km from the march's start gets with the Moon `offset` km off its line to the
+// Sun: x of the sunlight itself, the Sun's disc as that point sees it uncovered, and y of the light scattered more than
+// once, which reaches it from the air around. In the Moon's shadow that is all there is: the shadow is some 200 km
+// wide, the air's light crosses it from the sunlit air outside, and the sky at totality is the deep blue of dusk.
+fn dkEclipseSharesOff(offset: vec3f, x: vec3f) -> vec2f {
+    let sun = dkEclipse.sunDirection;
+    let forward = dot(x, sun);
+    let along = dkEclipse.along - forward;
+    if (along <= 0.0) {
+        return vec2f(1.0);
+    }
+    let across = offset - (x - sun * forward);
+    let moon = dkEclipse.moonRadius / along;
+    let direct = dkDiscUncovered(dkEclipse.sunRadius, moon, length(across) / along);
+    // Out in the half shadow the light around is as the light here.
+    if (direct >= 0.15) {
+        return vec2f(direct);
+    }
+    let first = normalize(cross(sun, select(vec3f(0.0, 0.0, 1.0), vec3f(1.0, 0.0, 0.0), abs(sun.z) > 0.9)));
+    let second = cross(sun, first);
+    var around = DK_ECLIPSE_WEIGHTS.x * direct;
+    for (var ring = 0u; ring < 3u; ring = ring + 1u) {
+        var sum = 0.0;
+        for (var side = 0u; side < 4u; side = side + 1u) {
+            let turn = (f32(side) + 0.33 * f32(ring)) * 1.5707963267948966;
+            let out = across + DK_ECLIPSE_RINGS[ring] * (cos(turn) * first + sin(turn) * second);
+            sum += dkDiscUncovered(dkEclipse.sunRadius, moon, length(out) / along);
+        }
+        around += DK_ECLIPSE_WEIGHTS[ring + 1u] * 0.25 * sum;
+    }
+    return vec2f(direct, mix(around, direct, smoothstep(0.05, 0.15, direct)));
+}
+
+fn dkEclipseShares(x: vec3f) -> vec2f {
+    if (dkEclipse.moonRadius <= 0.0) {
+        return vec2f(1.0);
+    }
+    let shares = dkEclipseSharesOff(dkEclipse.offset, x);
+    if (dkEclipse.mirrored < 0.5) {
+        return shares;
+    }
+    return 0.5 * (shares + dkEclipseSharesOff(dkEclipse.offset * vec3f(1.0, -1.0, 1.0), x));
+}
+
+// The eclipse as a march sees it that starts `x` km from where `dkEclipse` was set for.
+fn dkEclipseFrom(x: vec3f) -> DkEclipse {
+    var moved = dkEclipse;
+    let forward = dot(x, moved.sunDirection);
+    moved.offset = moved.offset - (x - moved.sunDirection * forward);
+    moved.along = moved.along - forward;
+    return moved;
+}
+
 // One step of a march along `path` from altitude h, local up `up`, ds km long: adds the light scattered into the ray over
-// it to `ray`, single scattering with its phase functions plus the precomputed multiple-scattering term, and dims
-// what lies beyond by the step's transmittance. Returns the path after the step.
+// it to `ray`, single scattering with its phase functions plus the precomputed multiple-scattering term, each by its
+// share in a solar eclipse, and dims what lies beyond by the step's transmittance. Returns the path after the step.
 fn dkRaymarchStep(
     a: DkAtmosphere,
     transmittanceLut: texture_2d<f32>,
@@ -49,12 +143,13 @@ fn dkRaymarchStep(
     // share of the aerosols' lobe is left out here and added per pixel by the sky pass, where a table cannot hold it.
     let phases = a.betaR * densityR * dkPhaseRayleigh(nu)
         + a.betaMSca * densityM * dkPhaseMie(a, nu) * (1.0 - DK_AUREOLE_SHARE);
+    let eclipse = dkEclipseShares(dkPathToWorld(step.middle.position, up, horizontal));
     var inScatter = vec4f(0.0);
     if (DK_SINGLE_SCATTERING) {
-        inScatter += sunTransmittance * phases;
+        inScatter += sunTransmittance * phases * eclipse.x;
     }
     if (DK_MULTIPLE_SCATTERING) {
-        inScatter += dkSampleMultiScattering(a, multiScatteringLut, lutSampler, altitude, muS) * scattering;
+        inScatter += dkSampleMultiScattering(a, multiScatteringLut, lutSampler, altitude, muS) * scattering * eclipse.y;
     }
     inScatter *= a.solarIlluminance;
     (*ray).luminance += (*ray).transmittance * (inScatter - inScatter * stepTransmittance) / extinction;
@@ -154,7 +249,8 @@ fn dkRaymarchAerosol(
         let stepTransmittance = exp(-extinction * ds);
         let toSun = dkSampleTransmittanceToTop(a, transmittanceLut, lutSampler, step.altitude, muS);
         let scattering = a.betaMSca * dkDensityMie(a, step.altitude);
-        column += transmittance * toSun * scattering * (1.0 - stepTransmittance) / extinction;
+        let eclipse = dkEclipseShares(dkPathToWorld(step.middle.position, up, horizontal)).x;
+        column += transmittance * toSun * scattering * (eclipse * (1.0 - stepTransmittance)) / extinction;
         transmittance *= stepTransmittance;
         path = step.next;
     }
@@ -188,8 +284,10 @@ fn dkRaymarchSky(
         let muS = dot(result.endUp, sunDirection);
         if (muS > 0.0) {
             let toSun = dkSampleTransmittanceToTop(a, transmittanceLut, lutSampler, 0.0, muS);
+            // Where the ray meets the ground, from its start: the Moon's shadow lies on the ground too.
+            let eclipse = dkEclipseShares(a.Rg * result.endUp - (a.Rg + h) * up).x;
             result.luminance = result.luminance
-                + result.transmittance * a.solarIlluminance * toSun * muS * a.groundAlbedo / DK_PI;
+                + result.transmittance * a.solarIlluminance * toSun * (eclipse * muS) * a.groundAlbedo / DK_PI;
         }
     }
     return result;
@@ -233,10 +331,15 @@ fn dkRaymarchFromSpace(
     if (entry.w < 0.0) {
         return result;
     }
-    return dkRaymarchSky(
+    // The march starts where the ray enters the air, and so does its eclipse.
+    let here = dkEclipse;
+    dkEclipse = dkEclipseFrom(direction * entry.w);
+    result = dkRaymarchSky(
         a, transmittanceLut, multiScatteringLut, lutSampler, entry.xyz, a.Rt - a.Rg, direction, sunDirection, samples,
         true,
     );
+    dkEclipse = here;
+    return result;
 }
 
 // The aerial perspective of a point `distance` km from an observer at any altitude, ENU with z up, along `direction`:
@@ -264,8 +367,12 @@ fn dkRaymarchAerialPerspective(
     if (entry.w < 0.0 || entry.w >= distance) {
         return DkSkyRay(vec4f(0.0), vec4f(1.0), direction, false, vec3f(0.0, 0.0, 1.0));
     }
-    return dkRaymarchSegment(
+    let here = dkEclipse;
+    dkEclipse = dkEclipseFrom(direction * entry.w);
+    let segment = dkRaymarchSegment(
         a, transmittanceLut, multiScatteringLut, lutSampler, entry.xyz, top, direction, sunDirection,
         distance - entry.w, samples,
     );
+    dkEclipse = here;
+    return segment;
 }

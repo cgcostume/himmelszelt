@@ -1,5 +1,6 @@
 import { blueNoiseTexture, type ToneCurve } from "@himmelszelt/helldunkel";
 import { createHighSheet, type HighSheetPass } from "./highsheet.js";
+import { createLayerMarch, LAYERED_SIZE, type LayerMarch } from "./layerpass.js";
 import { DEFAULT_HIGH_SHEET, DEFAULT_LAYERED_PARAMS, DEFAULT_LAYERED_SKY } from "./layers.js";
 import {
     AERIAL_OFFSET,
@@ -65,6 +66,10 @@ export interface CloudPassOptions {
     /** Whether the pass has the layered model's sheet of high cloud, set with `high` in `update`, false by default: its
      *  map is baked at `mapSize` texels across, 2048 where not given, and held with its levels twice over. */
     high?: boolean | { mapSize?: number };
+    /** Whether the pass has the layered model's deep layer, set with `deep` in `update`, false by default: a front or
+     *  towers too wide and too tall for the cloudscape's voxels, marched apart from a map `mapSize` texels across, 512
+     *  where not given, at `scale` of the target's size, a half, and composed with the cloudscape by their distances. */
+    deep?: boolean | { mapSize?: number; scale?: number; maxSteps?: number };
     /** Whether the cloudscape changes by keyframes, false by default: its volumes are then built ahead, over as many
      *  frames as the caller likes, and the march reads a blend of the last two, see `Keyframes`. Three more sets of
      *  the volumes in memory. */
@@ -153,6 +158,8 @@ export interface CloudPass {
     readonly detailTexture: GPUTexture;
     /** The sheet of high cloud's pass, with `high`, for its map; null without. */
     readonly high: HighSheetPass | null;
+    /** The deep layer's march, with `deep`, for its map; null without. */
+    readonly deep: LayerMarch | null;
     /** The cloudscape's keyframes, with `keyframes`; null without. */
     readonly keyframes: Keyframes | null;
     /** Bytes of the textures the pass holds: maps, volumes, the flood's and the detail noise. */
@@ -251,14 +258,38 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         format: "rgba32float",
         usage: GPUTextureUsage.TEXTURE_BINDING,
     });
+    // Bound where there is no deep layer, for its light and its distance.
+    const noDepth = device.createTexture({
+        label: "gewoelk:noDepth",
+        size: [1, 1],
+        format: "rgba16float",
+        usage: GPUTextureUsage.TEXTURE_BINDING,
+    });
+    // Zeros: no layer of it is on.
+    const noLayered = device.createBuffer({
+        label: "gewoelk:noLayered",
+        size: Math.ceil(LAYERED_SIZE / 16) * 16,
+        usage: GPUBufferUsage.UNIFORM,
+    });
+    const deepOptions = options.deep === true ? {} : options.deep || {};
+    const deepScale = deepOptions.scale ?? 0.5;
+    // The deep layer shares the cloudscape's detail noise.
+    const deepLayer = options.deep
+        ? await createLayerMarch(device, {
+              detail,
+              ...(deepOptions.mapSize && { mapSize: deepOptions.mapSize }),
+              ...(deepOptions.maxSteps && { maxSteps: deepOptions.maxSteps }),
+          })
+        : null;
 
     const uniform = (label: string, size: number) =>
         device.createBuffer({ label, size, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const params = uniform("gewoelk:params", PARAMS_SIZE);
     const highSheet = options.high ? await createHighSheet(device, options.high === true ? {} : options.high) : null;
-    // The high sheet's altitude in km, and whether it is there.
+    // The high sheet's altitude in km, whether it is there, and whether the deep layer is.
     const highPlaced = uniform("gewoelk:highPlaced", 16);
     let highThere = false;
+    let deepThere = false;
     const cloudscape = uniform("gewoelk:cloudscape", CLOUDSCAPE_SIZE);
     const sunlight = uniform("gewoelk:sunlight", SUNLIGHT_SIZE);
     const coverage = device.createBuffer({
@@ -326,6 +357,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                 wgsl.camera,
                 wgsl.aerial,
                 wgsl.sheet,
+                wgsl.layerread,
                 wgsl.cloudOutput("rgba16float"),
                 wgsl.clouds,
             ]),
@@ -572,6 +604,9 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         { binding: 6, resource: { buffer: sunlight } },
         { binding: 7, resource: ambient.createView() },
         { binding: 12, resource: { buffer: deck } },
+        { binding: 14, resource: { buffer: deepLayer?.uniforms ?? noLayered } },
+        { binding: 15, resource: (deepLayer?.maps ?? noDepth).createView({ dimension: "2d-array" }) },
+        { binding: 16, resource: volumeSampler },
     ];
     const clampSampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
     // Bound where no aerial perspective volume is: the shaders read it only with a reach above 0.
@@ -587,7 +622,9 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
     let inputGroups: [GPUBindGroup, GPUBindGroup] | null = null;
     const groupsFor = (behind: GPUTexture, air: AerialPerspective | undefined) => {
         const high = highSheet?.texture ?? noBackground;
-        const inputs = [behind, air?.luminance ?? noAir, air?.transmittance ?? noAir, cloudsView, high];
+        const far = deepLayer?.texture ?? noDepth;
+        const farDepth = deepLayer?.depth ?? noDepth;
+        const inputs = [behind, air?.luminance ?? noAir, air?.transmittance ?? noAir, cloudsView, high, far, farDepth];
         if (inputGroups && inputs.every((x, i) => x === lastInputs[i])) return inputGroups;
         lastInputs = inputs;
         const luminance = (air?.luminance ?? noAir).createView();
@@ -617,6 +654,9 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                 { binding: 12, resource: blueNoise.createView() },
                 { binding: 13, resource: high.createView() },
                 { binding: 14, resource: { buffer: highPlaced } },
+                { binding: 15, resource: far.createView() },
+                { binding: 16, resource: farDepth.createView() },
+                { binding: 17, resource: cloudsDepthView as GPUTextureView },
             ]),
         ];
         return inputGroups;
@@ -643,6 +683,8 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
     let ambientKey = "";
     let clouds: GPUTexture | null = null;
     let cloudsView: GPUTextureView | null = null;
+    let cloudsDepth: GPUTexture | null = null;
+    let cloudsDepthView: GPUTextureView | null = null;
     const outputs = new WeakMap<GPUTexture, GPUBindGroup>();
 
     const sweep = (pass: GPUComputePassEncoder, pipeline: GPUComputePipeline, group: GPUBindGroup) => {
@@ -864,8 +906,9 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         detailTexture: detail,
         keyframes,
         high: highSheet,
+        deep: deepLayer,
         get memoryBytes() {
-            return memoryBytes + (highSheet?.memoryBytes ?? 0);
+            return memoryBytes + (highSheet?.memoryBytes ?? 0) + (deepLayer?.memoryBytes ?? 0);
         },
 
         update(next, frameEncoder, { timestampWrites, firstKeyframe = true } = {}) {
@@ -920,6 +963,35 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                         clearingKm: c.clearingKm ?? 0,
                         clearingFromKm: c.clearingFromKm ?? (c.clearingKm ?? 0) / 2,
                         timeS,
+                    },
+                    encoder,
+                    { observerKm: current.observerKm ?? [0, 0] },
+                );
+                if (!frameEncoder) device.queue.submit([encoder.finish()]);
+            }
+
+            // The deep layer's map, baked where its shape changed: it drifts with the cloudscape's wind.
+            const deep = current.deep ?? { ...DEFAULT_LAYERED_SKY.deep, coverage: 0 };
+            deepThere = deepLayer !== null && deep.coverage > 0.005;
+            device.queue.writeBuffer(highPlaced, 8, new Float32Array([deepThere ? 1 : 0]));
+            if (deepLayer) {
+                const encoder = frameEncoder ?? device.createCommandEncoder({ label: "gewoelk:deepMap" });
+                const none = { coverage: 0 };
+                deepLayer.update(
+                    {
+                        ...DEFAULT_LAYERED_PARAMS,
+                        sky: {
+                            ...DEFAULT_LAYERED_SKY,
+                            low: { ...DEFAULT_LAYERED_SKY.low, ...none },
+                            deep,
+                            middle: { ...DEFAULT_LAYERED_SKY.middle, ...none },
+                        },
+                        wind: c.wind,
+                        evolution: 0,
+                        seed: current.deepSeed ?? DEFAULT_LAYERED_PARAMS.seed,
+                        clearingKm: c.clearingKm ?? 0,
+                        clearingFromKm: c.clearingFromKm ?? (c.clearingKm ?? 0) / 2,
+                        timeS: timeS - (current.deepSinceS ?? 0),
                     },
                     encoder,
                     { observerKm: current.observerKm ?? [0, 0] },
@@ -1009,10 +1081,29 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                     usage,
                 });
                 cloudsView = clouds.createView();
+                cloudsDepth?.destroy();
+                cloudsDepth = device.createTexture({
+                    label: "gewoelk:cloudsDepth",
+                    size: [width, height],
+                    format: "rgba16float",
+                    usage,
+                });
+                cloudsDepthView = cloudsDepth.createView();
             }
             if (highSheet && highThere)
                 highSheet.encode(encoder, { params, sunlight, width: target.width, height: target.height });
-            const cloudsOutput = bindGroup(cloudsPipeline, [{ binding: 0, resource: cloudsView as GPUTextureView }], 1);
+            if (deepLayer && deepThere) {
+                const [w, h] = [target.width * deepScale, target.height * deepScale];
+                deepLayer.encode(encoder, { params, sunlight, width: w, height: h });
+            }
+            const cloudsOutput = bindGroup(
+                cloudsPipeline,
+                [
+                    { binding: 0, resource: cloudsView as GPUTextureView },
+                    { binding: 1, resource: cloudsDepthView as GPUTextureView },
+                ],
+                1,
+            );
             const [cloudsGroup, composeGroup] = groupsFor(behind ?? noBackground, air);
             // Whether the air comes from a volume, into the cloudscape's block of the frame's uniforms.
             device.queue.writeBuffer(params, AERIAL_OFFSET, new Float32Array([air ? 1 : 0]));
@@ -1040,6 +1131,10 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
             for (const texture of [map, ...flood, shape, modeling, light, ambient, detail, noBackground, noAir])
                 texture.destroy();
             clouds?.destroy();
+            cloudsDepth?.destroy();
+            noDepth.destroy();
+            noLayered.destroy();
+            deepLayer?.destroy();
             for (const buffer of [params, cloudscape, sunlight, coverage, ...models, ...jumpBuffers, deck])
                 buffer.destroy();
             for (const f of frames)

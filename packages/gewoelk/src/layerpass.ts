@@ -1,9 +1,11 @@
+import { blueNoiseTexture } from "@himmelszelt/helldunkel";
 import type { CloudLayer, LayeredParams } from "./layers.js";
 import { drift, evolutionAt } from "./params.js";
 import { rainbowTable, rainExtinction } from "./rainbow.js";
 import godrays from "./wgsl/godrays.comp.wgsl";
 import * as wgsl from "./wgsl/index.js";
 import layermap from "./wgsl/layermap.comp.wgsl";
+import layerpyramid from "./wgsl/layerpyramid.comp.wgsl";
 import layers from "./wgsl/layers.comp.wgsl";
 
 /**
@@ -27,6 +29,11 @@ export interface LayerMarchSettings {
     multiScatter: number;
     /** What the sky's and the ground's light on the clouds is multiplied by. */
     ambient: number;
+    /**
+     * Whether a ray's jitter is helldunkel's blue noise, the same every frame, not interleaved gradient noise: grain
+     * without a lattice at the clouds' edges, where a few steps decide what a ray sees.
+     */
+    blueNoise: boolean;
 }
 
 /** The march's settings as the research figure's sliders had them. */
@@ -38,6 +45,7 @@ export const DEFAULT_LAYER_MARCH: LayerMarchSettings = {
     noiseKm: 1.6,
     multiScatter: 0.6,
     ambient: 1,
+    blueNoise: false,
 };
 
 /** What a layer march is created with: its settings, and what cannot change afterwards. */
@@ -53,6 +61,16 @@ export interface LayerMarchOptions extends Partial<LayerMarchSettings> {
      * with every march, a quarter of `mapSize` by `mapSize` texels. Off by default: the air's shade is one number a ray.
      */
     godRays?: boolean;
+    /**
+     * An adaptive stride: a max pyramid of every map, a third of a map's texels in all and filled with it, tells a ray
+     * whether the air ahead is clear, and where it is the ray strides as far as 32 km at once. The same picture but for
+     * its grain, and as measured no faster: air outside the layers' slabs is cheap already, and within them a block that
+     * is clear of cloud, bulge and shear included, is rare where clouds stand as close as they are wide. Off by default:
+     * a ray strides 2.5 steps blindly through clear air and steps back at a cloud.
+     */
+    adaptiveStride?: boolean;
+    /** The blue noise the rays are jittered by where `blueNoise` is set, helldunkel's `blueNoiseTexture(device)` by default. */
+    blueNoiseTexture?: GPUTexture;
 }
 
 /** What an update may change besides the sky. */
@@ -80,9 +98,20 @@ export interface LayerEncodeOptions {
 export interface LayerMarch {
     /** The layers as last marched, premultiplied luminance in cd/m² and what they let through, rgba16float. */
     readonly texture: GPUTexture;
+    /**
+     * x the distances in km of what each pixel of `texture` shows, summed by their shares of the pixel, y those shares:
+     * their quotient is the mean distance; rgba16float.
+     */
+    readonly depth: GPUTexture;
+    /** `GwLayered` as the march reads it, `wgsl.layerread`'s: for a pass that reads the layers' maps itself. */
+    readonly uniforms: GPUBuffer;
     /** The layers' maps, an array of the low, the deep and the middle layer's: for inspection. */
     readonly maps: GPUTexture;
-    /** Bytes of the textures the march holds: the maps, its output, and the detail noise where it is its own. */
+    /** The maps' max pyramids with an adaptive stride, a layer of the array each and its levels: for inspection. */
+    readonly pyramids: GPUTexture | null;
+    /** The detail noise the layers' surfaces are heaped by, rgba8unorm, a volume that tiles: its own or the shared one. */
+    readonly detail: GPUTexture;
+    /** Bytes of the textures the march holds: the maps, their pyramids, its output and depth, and the detail noise where it is its own. */
     readonly memoryBytes: number;
     /** Writes the uniforms for `params` and bakes the maps whose shape changed; returns whether any was baked. */
     update(params: LayeredParams, encoder: GPUCommandEncoder, options?: LayerUpdateOptions): boolean;
@@ -94,9 +123,9 @@ export interface LayerMarch {
 const LAYERS = 3;
 const DETAIL_SIZE = 128;
 // Byte sizes of `GwLayerModel` in layermap.comp.wgsl, and of `GwLayered` and a `GwCloudLayer` in layers.comp.wgsl.
-const MODEL_SIZE = 48;
-const LAYERED_SIZE = 256;
-const LAYER_OFFSET = 64;
+const MODEL_SIZE = 56;
+export const LAYERED_SIZE = 272;
+const LAYER_OFFSET = 80;
 const LAYER_SIZE = 64;
 // How fast each layer drifts, as a share of the wind: the deep clouds slower, the middle ones faster.
 const WIND_SHARE = [1, 0.6, 1.8] as const;
@@ -124,7 +153,8 @@ function halfFloats(values: Float32Array): Uint16Array<ArrayBuffer> {
 
 /** Creates the layered model's march on `device`; it owns its maps and its output, not the frame's uniforms. */
 export async function createLayerMarch(device: GPUDevice, options: LayerMarchOptions = {}): Promise<LayerMarch> {
-    const { mapSize = 512, maxSteps = 128, godRays = false, detail: sharedDetail, ...given } = options;
+    const { mapSize = 512, maxSteps = 128, godRays = false, adaptiveStride = false, ...rest } = options;
+    const { detail: sharedDetail, blueNoiseTexture: blueNoise = blueNoiseTexture(device), ...given } = rest;
     let settings: LayerMarchSettings = { ...DEFAULT_LAYER_MARCH, ...given };
     let observer: readonly [number, number] = [0, 0];
 
@@ -133,6 +163,16 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
     const maps = device.createTexture({
         label: "gewoelk:layerMaps",
         size: [mapSize, mapSize, LAYERS],
+        format: "rgba16float",
+        usage,
+    });
+    // The pyramids' first level is half a map across, their last one texel: without them a texel of nothing.
+    const pyramidSize = adaptiveStride ? Math.max(1, mapSize >> 1) : 1;
+    const pyramidLevels = Math.floor(Math.log2(pyramidSize)) + 1;
+    const pyramids = device.createTexture({
+        label: "gewoelk:layerPyramids",
+        size: [pyramidSize, pyramidSize, LAYERS],
+        mipLevelCount: pyramidLevels,
         format: "rgba16float",
         usage,
     });
@@ -168,14 +208,22 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
                 ...(constants ? { constants } : {}),
             },
         });
-    const march = [wgsl.params, wgsl.camera, wgsl.rainbow, wgsl.cloudOutput("rgba16float"), layers, godrays];
-    const [mapPipeline, marchPipeline, detailPipeline, shadePipeline, meansPipeline] = await Promise.all([
-        pipeline("layerMap", [wgsl.noise, layermap], "gwLayerMap"),
-        pipeline("layers", march, "gwLayers", { GW_LAYER_MAX_STEPS: maxSteps, GW_GOD_RAYS: godRays ? 1 : 0 }),
-        ownDetail ? pipeline("layerDetail", [wgsl.noise, wgsl.detail], "gwDetail") : null,
-        godRays ? pipeline("godRaysShade", march, "gwGodRaysShade") : null,
-        godRays ? pipeline("godRaysMeans", march, "gwGodRaysMeans") : null,
-    ]);
+    const read = [wgsl.params, wgsl.camera, wgsl.rainbow, wgsl.layerread];
+    const march = [...read, wgsl.cloudOutput("rgba16float"), layers, godrays];
+    const constants = {
+        GW_LAYER_MAX_STEPS: maxSteps,
+        GW_GOD_RAYS: godRays ? 1 : 0,
+        GW_LAYER_ADAPTIVE: adaptiveStride ? 1 : 0,
+    };
+    const [mapPipeline, marchPipeline, detailPipeline, shadePipeline, meansPipeline, pyramidPipeline] =
+        await Promise.all([
+            pipeline("layerMap", [wgsl.noise, layermap], "gwLayerMap"),
+            pipeline("layers", march, "gwLayers", constants),
+            ownDetail ? pipeline("layerDetail", [wgsl.noise, wgsl.detail], "gwDetail") : null,
+            godRays ? pipeline("godRaysShade", march, "gwGodRaysShade") : null,
+            godRays ? pipeline("godRaysMeans", march, "gwGodRaysMeans") : null,
+            adaptiveStride ? pipeline("layerPyramid", [layerpyramid], "gwLayerPyramid") : null,
+        ]);
     const bindGroup = (pipeline: GPUComputePipeline, entries: GPUBindGroupEntry[], group = 0) =>
         device.createBindGroup({ layout: pipeline.getBindGroupLayout(group), entries });
     const mapArray = maps.createView({ dimension: "2d-array" });
@@ -184,6 +232,17 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
             { binding: 0, resource: { buffer: model } },
             { binding: 1, resource: mapArray },
         ]),
+    );
+    // A map's pyramid, level by level: each from the level below, the first from the map.
+    const pyramidGroups = models.map((_, layer) =>
+        Array.from({ length: pyramidPipeline ? pyramidLevels : 0 }, (_, level) => {
+            const one = { dimension: "2d", baseArrayLayer: layer, arrayLayerCount: 1, mipLevelCount: 1 } as const;
+            const below = level === 0 ? maps.createView(one) : pyramids.createView({ ...one, baseMipLevel: level - 1 });
+            return bindGroup(pyramidPipeline as GPUComputePipeline, [
+                { binding: 0, resource: below },
+                { binding: 1, resource: pyramids.createView({ ...one, baseMipLevel: level }) },
+            ]);
+        }),
     );
 
     // The detail noise, once.
@@ -204,7 +263,14 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
             format: "rgba16float",
             usage,
         });
-        return { texture, group: bindGroup(marchPipeline, [{ binding: 0, resource: texture.createView() }], 1) };
+        const depth = device.createTexture({
+            label: "gewoelk:layerDepth",
+            size: [width, height],
+            format: "rgba16float",
+            usage,
+        });
+        const entries = [texture, depth].map((target, binding) => ({ binding, resource: target.createView() }));
+        return { texture, depth, group: bindGroup(marchPipeline, entries, 1) };
     };
     let out = output(1, 1);
     // The rain's phase function, computed when it first rains: until then a texel of nothing.
@@ -251,11 +317,20 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
         get texture() {
             return out.texture;
         },
+        get depth() {
+            return out.depth;
+        },
         maps,
+        uniforms: layered,
+        pyramids: adaptiveStride ? pyramids : null,
+        detail: detailNoise,
         get memoryBytes() {
             const noise = ownDetail ? DETAIL_SIZE ** 3 * 4 : 0;
             const tables = 2 * columns * rows * 8;
-            return mapSize * mapSize * LAYERS * 8 + out.texture.width * out.texture.height * 8 + noise + tables;
+            // A pyramid's levels sum to four thirds of its first, a little less.
+            const maxima = Math.ceil((pyramidSize * pyramidSize * LAYERS * 8 * 4) / 3);
+            const marched = out.texture.width * out.texture.height * (8 + 8);
+            return mapSize * mapSize * LAYERS * 8 + maxima + marched + noise + tables;
         },
 
         update(params, encoder, { settings: changed, observerKm, timestampWrites } = {}) {
@@ -279,6 +354,8 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
             const lean = RAIN_LAG * speed;
             f.set([params.clearingFromKm, rain, along[0] * params.shear, along[1] * params.shear, ...observer], 8);
             f.set([along[0] * lean, along[1] * lean], 14);
+            u[16] = settings.blueNoise ? 1 : 0;
+            f.set(params.clearingCenterKm ?? [0, 0], 18);
 
             const changedMaps: number[] = [];
             const all: readonly CloudLayer[] = [sky.low, sky.deep, sky.middle];
@@ -311,12 +388,13 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
                           ((along[0] * heading[1] - along[1] * heading[0]) * cells) / tileKm,
                       ]
                     : along;
-                const reach = (kind === 0 ? 0 : anvil) / Math.max(Math.hypot(x, y), 1e-6);
+                const anvils = kind === 0 ? 0 : anvil;
+                const reach = anvils / Math.max(Math.hypot(x, y), 1e-6);
                 const model = new ArrayBuffer(MODEL_SIZE);
                 new Uint32Array(model).set([kind, i, (params.seed + i * 17) >>> 0, cells], 0);
                 const extent = [front ? frontDepthKm : tileKm, tileKm];
                 const shape = [layer.coverage, layer.sharpness, layer.lumps, evolution];
-                new Float32Array(model).set([...shape, x * reach, y * reach, ...extent], 4);
+                new Float32Array(model).set([...shape, x * reach, y * reach, ...extent, anvils], 4);
                 // A map is its model: baked again when a bit of it differs from what the map was last baked from.
                 const key = new Uint32Array(model).join();
                 if (key === baked[i]) return;
@@ -336,6 +414,15 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
                 pass.setBindGroup(0, mapGroups[i] as GPUBindGroup);
                 pass.dispatchWorkgroups(dispatch(mapSize, 8), dispatch(mapSize, 8));
             }
+            if (pyramidPipeline) {
+                pass.setPipeline(pyramidPipeline);
+                for (const i of changedMaps) {
+                    (pyramidGroups[i] as GPUBindGroup[]).forEach((group, level) => {
+                        pass.setBindGroup(0, group);
+                        pass.dispatchWorkgroups(dispatch(pyramidSize >> level, 8), dispatch(pyramidSize >> level, 8));
+                    });
+                }
+            }
             pass.end();
             return true;
         },
@@ -344,6 +431,7 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
             const [w, h] = [Math.max(1, Math.round(width)), Math.max(1, Math.round(height))];
             if (out.texture.width !== w || out.texture.height !== h) {
                 out.texture.destroy();
+                out.depth.destroy();
                 out = output(w, h);
             }
             if (inputs?.params !== params || inputs.sunlight !== sunlight) {
@@ -356,6 +444,8 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
                     { binding: 5, resource: detailNoise.createView() },
                     { binding: 6, resource: rainbow.createView() },
                     { binding: 7, resource: table.createView() },
+                    { binding: 8, resource: blueNoise.createView() },
+                    { binding: 9, resource: pyramids.createView({ dimension: "2d-array" }) },
                 ]);
                 const lines = rays
                     ? bindGroup(rays.shade, [
@@ -391,7 +481,8 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
         },
 
         destroy() {
-            for (const texture of [maps, out.texture, ownDetail, rainbow, shade, table]) texture?.destroy();
+            for (const texture of [maps, pyramids, out.texture, out.depth, ownDetail, rainbow, shade, table])
+                texture?.destroy();
             for (const buffer of [layered, ...models]) buffer.destroy();
         },
     };

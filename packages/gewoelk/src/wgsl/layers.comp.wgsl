@@ -4,59 +4,10 @@
 // march that samples towards the sun. Written as the voxel march writes its cloudscape: light in cd/m², premultiplied,
 // with what the layers let through of what lies behind, their shadow on the ground in it where a ray ends there.
 // Under the deep layer's tall columns rain falls, and where the sun reaches it, it sends back the bows of `rainbow.wgsl`.
-// Requires `params.wgsl`, dunstkreis' `camera.wgsl`, `rainbow.wgsl`, `godrays.comp.wgsl` and the output binding.
-
-// A layer: a slab `depth` km deep from `base` km up, its clouds `size` km across on a map of one `tile` km. A front is
-// placed, not tiled: `frontAt` km from the observer to its leading edge along `heading`, `frontDepth` km from there
-// to its back.
-struct GwCloudLayer {
-    enabled: u32,
-    // 0 heaps or a deck, 2 towers, 3 a front.
-    kind: u32,
-    base: f32,
-    depth: f32,
-    tile: f32,
-    size: f32,
-    // Extinction per km at full density.
-    extinction: f32,
-    // How far the detail noise's billows heap the surface out, and how far the flanks bulge, each 0 to 1.
-    detail: f32,
-    bulge: f32,
-    frontAt: f32,
-    frontDepth: f32,
-    pad: f32,
-    // Where the layer's clouds have drifted to with their wind, in km, and a front's heading, east and north.
-    drift: vec2f,
-    heading: vec2f,
-}
-
-// The march's settings and what the layers share. Lengths in km.
-struct GwLayered {
-    // One tile of the detail noise, and how far the march goes through the layers.
-    noiseScale: f32,
-    reach: f32,
-    // The first step's length, and how steps grow with the distance, per km.
-    stepMin: f32,
-    stepGrowth: f32,
-    // Each further order of scattering's share of the one before, and what the sky's and the ground's light on the
-    // clouds is multiplied by.
-    multiScatter: f32,
-    ambient: f32,
-    // The distance at which a cloud has faded to 1/e into the horizon's light: the air in between.
-    fade: f32,
-    // The distance at which the last cloud is gone, 0 for clouds all the way, and from where they thin out.
-    clearing: f32,
-    clearingFrom: f32,
-    // The rain's extinction per km where it falls hardest, under the deep layer: 0 for none.
-    rain: f32,
-    // How far the clouds lean with the wind per km they rise, east and north.
-    shear: vec2f,
-    // Where the observer stands over the ground the layers were laid out on, east and north.
-    observer: vec2f,
-    // How far the rain lags behind its cloud by the time it has fallen 1 km, east and north: it falls into slower air.
-    rainLean: vec2f,
-    layer: array<GwCloudLayer, 3>,
-}
+// Requires `params.wgsl`, dunstkreis' `camera.wgsl`, `rainbow.wgsl`, `layerread.wgsl`, `godrays.comp.wgsl` and the output
+// binding.
+// With GW_LAYER_ADAPTIVE it strides by the maps' max pyramids, which `layerpyramid.comp.wgsl` fills. It also writes how
+// far away what each pixel shows is, for whoever composes the layers with something else by depth.
 
 @group(0) @binding(0) var<uniform> gwParams: GwParams;
 @group(0) @binding(1) var<uniform> gwSunlight: GwSunlight;
@@ -67,21 +18,25 @@ struct GwLayered {
 @group(0) @binding(5) var gwLayerDetail: texture_3d<f32>;
 // The rain's phase function over the scattering angle, `rainbowTable`'s row.
 @group(0) @binding(6) var gwLayerRainbow: texture_2d<f32>;
+// helldunkel's blue noise, tiled over the rays: the march's jitter where `gwLayered.blueNoise` asks for it.
+@group(0) @binding(8) var gwLayerBlueNoise: texture_2d<f32>;
+// The maps' max pyramids, read with GW_LAYER_ADAPTIVE: a layer of the array and its levels for each layer's map.
+@group(0) @binding(9) var gwLayerPyramids: texture_2d_array<f32>;
+// Beside the output, how far away what each pixel shows is, its clouds and its rain: x the steps' distances in km, summed
+// by their shares of the pixel, y those shares. Their quotient is the mean distance, and both are 0 where nothing is.
+@group(1) @binding(1) var gwLayerDepth: texture_storage_2d<rgba16float, write>;
 
 // Steps a ray takes at most.
 override GW_LAYER_MAX_STEPS: u32 = 128u;
+// Whether the march asks the pyramids how far the air ahead is clear and strides that far at once. Without, and where
+// cloud may be near, it strides blindly through clear air, 2.5 steps at a time, and steps back at the first cloud.
+override GW_LAYER_ADAPTIVE: bool = false;
 
 const GW_LAYER_COUNT: u32 = 3u;
-// The deep layer, whose front the low layer answers to, and how far the low clouds' base sinks in its rain, in km.
-const GW_LAYER_DEEP: u32 = 1u;
+// How far the low clouds' base sinks in a front's rain, in km.
 const GW_LAYER_SCUD_DROP: f32 = 0.45;
 // How much of the low clouds' coverage a front's full shade takes.
 const GW_LAYER_SHADE_THINS: f32 = 0.8;
-// Where an anvil's top lies, as a share of its layer's depth, and how thick it is at its tower.
-const GW_LAYER_ANVIL_TOP: f32 = 0.9;
-const GW_LAYER_ANVIL_THICK: f32 = 0.22;
-// An anvil's ice against a tower's water, in extinction.
-const GW_LAYER_ANVIL_DENSITY: f32 = 0.2;
 // The shadow of towers on the ground: the samples along the sun's way up through their layer.
 const GW_LAYER_SHADOW_STEPS: u32 = 16u;
 // How far a billow heaps the surface out, as a share of the detail noise's tile, of which a billow spans a quarter,
@@ -114,6 +69,14 @@ const GW_LAYER_RAIN_WET_STEPS: u32 = 3u;
 const GW_LAYER_RAIN_WET_REACH: f32 = 12.0;
 // Below this transmittance a ray is done.
 const GW_LAYER_MIN_TRANSMITTANCE: f32 = 0.01;
+// A blind stride through clear air, in steps. The adaptive march's longest stride, in km, the shortest it asks the
+// pyramids for, in steps, and what a stride it has stopped asking for grows by with every step, until it asks again.
+const GW_LAYER_BLIND: f32 = 2.5;
+const GW_LAYER_STRIDE: f32 = 32.0;
+const GW_LAYER_ASKED: f32 = 8.0;
+const GW_LAYER_ASK_AGAIN: f32 = 1.1;
+// How far a flank's bulge moves a read of the map at most, as a share of `bulge` times the clouds' size.
+const GW_LAYER_BULGE: f32 = 0.3;
 const GW_LAYER_LUMA: vec3f = vec3f(0.2126, 0.7152, 0.0722);
 
 // The ray through a point of the target, in pixels from its top left corner, on dunstkreis' camera.
@@ -123,16 +86,15 @@ fn gwLayerRay(position: vec2f, size: vec2u) -> vec3f {
     return dkProjectRay(gwParams.inverseViewProjection, ndc, clamp(gwParams.projectionDistance, 0.0, 1.0));
 }
 
-// Interleaved gradient noise (Jimenez 2014), a different frame of it each frame.
+// The march's jitter for a ray: interleaved gradient noise (Jimenez 2014), a different frame of it each frame, or the
+// blue noise, each texel's rank at the middle of its step and the same every frame, as nothing sums the frames up.
 fn gwLayerJitter(pixel: vec2u, frame: u32) -> f32 {
+    if (gwLayered.blueNoise != 0u) {
+        let rank = textureLoad(gwLayerBlueNoise, vec2i(pixel % textureDimensions(gwLayerBlueNoise)), 0).r * 255.0;
+        return (rank + 0.5) / 256.0;
+    }
     let p = vec2f(pixel) + 5.588238 * f32(frame % 64u);
     return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y));
-}
-
-// Where a point stands over the ground, east and north in km along the planet's surface from below the observer.
-fn gwLayerGround(p: vec3f) -> vec2f {
-    let across = length(p.xy);
-    return p.xy / max(across, 1e-6) * (gwParams.planetRadius * atan2(across, p.z));
 }
 
 // The sun's illuminance from `row` of the sunlight table at `elevation`.
@@ -176,44 +138,12 @@ fn gwLayerSunlight(altitude: f32, elevation: f32) -> vec3f {
     return mix(low, gwLayerSunAt(over, elevation), (altitude - underAt) / max(overAt - underAt, 1e-3));
 }
 
-// A layer's map over the ground point `g`, km east and north: r the column's value, g the anvils' skirt, b a front's
-// shade, a the tops' slope per km. A front is placed, not tiled: nothing ahead of its edge or behind its back.
-fn gwLayerColumn(i: u32, g: vec2f) -> vec4f {
-    let l = gwLayered.layer[i];
-    var uv = fract((g - l.drift) / l.tile);
-    if (l.kind == 3u) {
-        let x = (dot(g, l.heading) - l.frontAt) / l.frontDepth;
-        if (x <= 0.0 || x >= 1.0) {
-            return vec4f(0.0);
-        }
-        uv = vec2f(x, fract(dot(g, vec2f(l.heading.y, -l.heading.x)) / l.tile));
-    }
-    return textureSampleLevel(gwLayerMaps, gwLayerSampler, uv, i32(i), 0.0);
-}
-
-// Where a column of value `m` has its bottom and its top, as shares of a layer `depth` km deep: the bottoms nearly
-// flat and at one height whatever the depth, as rising air condenses at one level, the tops as tall as the value.
-fn gwLayerSpan(depth: f32, m: f32) -> vec2f {
-    let dip = min(0.15 / depth, 0.3);
-    return vec2f(dip * (1.0 - m), dip + m * (1.0 - dip));
-}
-
 // An anvil's density at the height `h`, a share of its layer's depth, over the skirt `s`: a wedge that thins towards
 // its rim, densest under its flat top and fading out below, where its ice falls from it.
 fn gwLayerAnvil(s: f32, h: f32) -> f32 {
     let thick = GW_LAYER_ANVIL_THICK * s;
     let t = (h - (GW_LAYER_ANVIL_TOP - thick)) / max(thick, 1e-4);
     return clamp(t / 0.4, 0.0, 1.0) * clamp((1.0 - t) / 0.15, 0.0, 1.0) * smoothstep(0.0, 0.25, s);
-}
-
-// How much of the clouds' coverage the clearing takes over a point `near` km east and north of the observer: none
-// close by, all of it from the clearing's distance on, where one is set.
-fn gwLayerCleared(near: vec2f) -> f32 {
-    let clearing = gwLayered.clearing;
-    if (clearing <= 0.0) {
-        return 0.0;
-    }
-    return smoothstep(min(gwLayered.clearingFrom, 0.99 * clearing), clearing, length(near));
 }
 
 // Whether the low layer lies under a front, which changes it.
@@ -235,9 +165,11 @@ fn gwLayerDensity(p: vec3f, detailed: bool, only: u32) -> vec2f {
         let deep = gwLayered.layer[GW_LAYER_DEEP];
         let front = gwLayerColumn(GW_LAYER_DEEP, g);
         shade = front.b;
-        // What hangs under the front's base has all of the front over it.
+        // What hangs under the front's cloud has all of it overhead: up to that cloud's own bottom, which lies over the
+        // layer's base where the front is thin, and no more of it once inside, where the front counts what is over.
         let span = gwLayerSpan(deep.depth, front.r);
-        above = 0.6 * deep.extinction * (span.y - span.x) * deep.depth * step(altitude, deep.base);
+        let inside = altitude - deep.base - span.x * deep.depth;
+        above = 0.6 * deep.extinction * (span.y - span.x) * deep.depth * clamp(1.0 - inside / clamp(0.1 * deep.depth, 0.15, 0.6), 0.0, 1.0);
     }
     // Towards the clearing every layer's coverage falls, to nothing at its edge.
     let cleared = gwLayerCleared(near);
@@ -272,7 +204,7 @@ fn gwLayerDensity(p: vec3f, detailed: bool, only: u32) -> vec2f {
         var at = g - gwLayered.shear * (altitude - base);
         if (detailed && l.bulge > 0.0) {
             let bulge = textureSampleLevel(gwLayerDetail, gwLayerSampler, fract(local / max(1.2 * l.size, 2.0 * gwLayered.noiseScale)), 0.0).rb;
-            at = at + (bulge - 0.5) * 0.3 * l.bulge * l.size * clamp(2.0 * h, 0.0, 1.0);
+            at = at + (bulge - 0.5) * GW_LAYER_BULGE * l.bulge * l.size * clamp(2.0 * h, 0.0, 1.0);
         }
         let m = gwLayerColumn(i, at);
         let value = clamp((m.r - thinned) / max(1.0 - thinned, 1e-3), 0.0, 1.0);
@@ -304,23 +236,6 @@ fn gwLayerDensity(p: vec3f, detailed: bool, only: u32) -> vec2f {
         sum = sum + l.extinction * vec2f(density, over);
     }
     return sum + vec2f(0.0, above);
-}
-
-// The optical depth of the layer `i` straight up over `p`, by its column alone: its map read where the way `towards`
-// the sun crosses the layer's base, `slant` km for each km up.
-fn gwLayerOver(i: u32, p: vec3f, towards: vec3f, slant: f32) -> f32 {
-    let l = gwLayered.layer[i];
-    let altitude = length(p) - gwParams.planetRadius;
-    if (l.enabled == 0u || altitude >= l.base + l.depth) {
-        return 0.0;
-    }
-    let near = gwLayerGround(p + towards * max(l.base - altitude, 0.0) * slant);
-    let m = gwLayerColumn(i, near + gwLayered.observer);
-    let thinned = gwLayerCleared(near);
-    let value = clamp((m.r - thinned) / max(1.0 - thinned, 1e-3), 0.0, 1.0);
-    let span = gwLayerSpan(l.depth, value);
-    let column = min(l.base + span.y * l.depth - altitude, (span.y - span.x) * l.depth) * step(1e-3, value);
-    return l.extinction * (max(column, 0.0) + GW_LAYER_ANVIL_DENSITY * GW_LAYER_ANVIL_THICK * m.g * l.depth * (1.0 - thinned));
 }
 
 // How much of the sun's light the layers take on its way to `p`, by their columns. A sun at the horizon or under it
@@ -387,6 +302,77 @@ fn gwLayerWet(p: vec3f, sun: vec3f) -> f32 {
     return wet * way / f32(GW_LAYER_RAIN_WET_STEPS);
 }
 
+// Whether the layers have no cloud along the ray `v` from `p` as far as `reach` km: by their slabs, and by their maps'
+// pyramids, asked for a block wide enough for all that moves a read of the map off the ray's own way, the shear, the
+// flanks' bulge and the map's filter. Over a block's tallest column and its steepest top no billow heaps higher, and an
+// anvil hangs no lower than its widest skirt. It may say no where the air is clear, never yes where it is not.
+fn gwLayerClear(p: vec3f, v: vec3f, reach: f32) -> bool {
+    let radius = gwParams.planetRadius;
+    let ends = vec2f(length(p), length(p + v * reach)) - radius;
+    // The ray's heights along the stretch: between its ends', less the little it sags below them.
+    let low = min(ends.x, ends.y) - reach * reach / (8.0 * radius);
+    let high = max(ends.x, ends.y);
+    let near = gwLayerGround(p);
+    let out = length(near - gwLayered.clearingCenter);
+    // The least and the most the clearing takes along the stretch: beyond it nothing is left.
+    var thinned = vec2f(0.0);
+    let clearing = gwLayered.clearing;
+    if (clearing > 0.0) {
+        if (out - reach >= clearing) {
+            return true;
+        }
+        thinned = smoothstep(vec2f(min(gwLayered.clearingFrom, 0.99 * clearing)), vec2f(clearing), out + vec2f(-reach, reach));
+    }
+    let underFront = gwLayerUnderFront();
+    let levels = textureNumLevels(gwLayerPyramids);
+    let blocks = f32(textureDimensions(gwLayerPyramids).x);
+    for (var i = 0u; i < GW_LAYER_COUNT; i = i + 1u) {
+        let l = gwLayered.layer[i];
+        if (l.enabled == 0u) {
+            continue;
+        }
+        // Under a front the low clouds thin, sink and fray by its shade, which the pyramid does not hold.
+        let scud = select(0.0, GW_LAYER_SCUD_DROP, i == 0u && underFront);
+        if (high <= l.base - scud || low >= l.base + l.depth) {
+            continue;
+        }
+        let at = near + gwLayered.observer - gwLayered.shear * (ends.x - l.base);
+        let aside = (reach + scud) * (1.0 + length(gwLayered.shear)) + 0.5 * sqrt(2.0) * GW_LAYER_BULGE * l.bulge * l.size;
+        var uv = (at - l.drift) / l.tile;
+        var extent = l.tile;
+        if (l.kind == 3u) {
+            let x = dot(at, l.heading) - l.frontAt;
+            if (x <= -aside || x >= l.frontDepth + aside) {
+                continue;
+            }
+            uv = vec2f(clamp(x / l.frontDepth, 0.0, 1.0), dot(at, vec2f(l.heading.y, -l.heading.x)) / l.tile);
+            extent = min(l.tile, l.frontDepth);
+        }
+        // A block of level n knows of all cloud up to 2^n - 1 blocks of the first level from any point in it. The last
+        // level knows the whole map.
+        let level = min(u32(ceil(log2(1.0 + aside * blocks / extent))), levels - 1u);
+        let across = textureDimensions(gwLayerPyramids, level);
+        let m = textureLoad(gwLayerPyramids, min(vec2u(fract(uv) * vec2f(across)), across - 1u), i, level);
+        let h = (vec2f(low, high) - l.base) / l.depth;
+        if (m.r > thinned.x) {
+            if (scud > 0.0) {
+                return false;
+            }
+            let value = (m.r - thinned.x) / max(1.0 - thinned.x, 1e-3);
+            let dip = min(0.15 / l.depth, 0.3);
+            let slope = l.depth * m.a / max(1.0 - thinned.y, 1e-3);
+            let heap = min(l.detail * GW_LAYER_HEAP * gwLayered.noiseScale / l.depth, 0.5 * value);
+            if (h.x < dip + value * (1.0 - dip) + heap * sqrt(1.0 + slope * slope)) {
+                return false;
+            }
+        }
+        if (l.kind >= 2u && m.g > 0.0 && h.x < GW_LAYER_ANVIL_TOP && h.y > GW_LAYER_ANVIL_TOP - GW_LAYER_ANVIL_THICK * m.g) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // The lowest base and the highest top of the layers that are on.
 fn gwLayerBounds() -> vec2f {
     var bounds = vec2f(1e9, -1e9);
@@ -415,6 +401,9 @@ fn gwLayers(@builtin(global_invocation_id) id: vec3u) {
     let bounds = gwLayerBounds();
     var luminance = vec3f(0.0);
     var through = 1.0;
+    // The pixel's depth: the steps' distances, each weighed by its share of the pixel, for the clouds and the rain.
+    var cloudDepth = vec2f(0.0);
+    var rainDepth = vec2f(0.0);
     if (bounds.x < bounds.y) {
         // The stretch of the ray between the lowest base and the highest top, short of the ground.
         let shell = gwShell(o, v, radius + bounds.x, radius + bounds.y, radius);
@@ -455,28 +444,45 @@ fn gwLayers(@builtin(global_invocation_id) id: vec3u) {
         let murk = GW_LAYER_AIR_UNDER * mix(horizon, vec3f(dot(horizon, GW_LAYER_LUMA)), 0.7);
         let haze = mix(horizon, murk, shaded);
         // Jittered by a whole stride, so the bands a fixed start would draw turn into grain.
-        var t = t0 + jitter * gwParams.jitter * gwLayered.stepMin * (1.0 + max(t0, 0.0) * gwLayered.stepGrowth) * 2.5;
+        var t = t0 + jitter * gwParams.jitter * gwLayered.stepMin * (1.0 + max(t0, 0.0) * gwLayered.stepGrowth) * GW_LAYER_BLIND;
         // Striding through clear air; at the first cloud a stride back, and on in steps until the air has been clear
-        // for a few of them.
+        // for a few of them. The adaptive march first asks the pyramids whether the air is clear for a long stride: for
+        // twice as long a one where it was, for half as long where it was not, and not at all for a while once that
+        // is hardly longer than a blind stride. A long stride counts for the blind ones it stands for, so a ray goes
+        // as far on its steps as without.
         var striding = true;
         var clear = 0u;
+        var stride = GW_LAYER_STRIDE;
         for (var i = 0u; i < GW_LAYER_MAX_STEPS; i = i + 1u) {
             if (t >= t1 || through < GW_LAYER_MIN_TRANSMITTANCE) {
                 break;
             }
             let step = gwLayered.stepMin * (1.0 + t * gwLayered.stepGrowth);
             let p = o + v * t;
+            if (GW_LAYER_ADAPTIVE && striding) {
+                if (stride < GW_LAYER_ASKED * step) {
+                    stride = stride * GW_LAYER_ASK_AGAIN;
+                } else if (gwLayerClear(p, v, stride)) {
+                    // Short of the stride's end by a jittered blind stride, so the next sample falls anywhere in one.
+                    t = t + stride - within * GW_LAYER_BLIND * step;
+                    i = i + u32(stride / (GW_LAYER_BLIND * step)) - 1u;
+                    stride = min(2.0 * stride, GW_LAYER_STRIDE);
+                    continue;
+                } else {
+                    stride = 0.5 * stride;
+                }
+            }
             let here = gwLayerDensity(p, true, GW_LAYER_COUNT);
             if (here.x <= 0.0) {
                 clear = clear + 1u;
                 striding = striding || clear > 6u;
-                t = t + select(step, step * 2.5, striding);
+                t = t + select(step, step * GW_LAYER_BLIND, striding);
                 continue;
             }
             if (striding) {
                 striding = false;
                 clear = 0u;
-                t = max(t - step * 2.5, t0) + step;
+                t = max(t - step * GW_LAYER_BLIND, t0) + step;
                 continue;
             }
             clear = 0u;
@@ -515,6 +521,7 @@ fn gwLayers(@builtin(global_invocation_id) id: vec3u) {
                 veil = mix(horizon, murk, GW_LAYER_AIR_SHADED * gwGodRaysBefore(o, v, way, t, bounds));
             }
             luminance = luminance + through * (1.0 - passed) * (source * near + veil * (1.0 - near));
+            cloudDepth = cloudDepth + through * (1.0 - passed) * vec2f(t, 1.0);
             through = through * passed;
             t = t + step;
         }
@@ -553,12 +560,15 @@ fn gwLayers(@builtin(global_invocation_id) id: vec3u) {
                     let passed = exp(-gwLayered.rain * falling.x * step);
                     let near = exp(-t / fade);
                     rained = rained + dry * (1.0 - passed) * (source * near + haze * (1.0 - near));
+                    rainDepth = rainDepth + dry * (1.0 - passed) * vec2f(t, 1.0);
                     dry = dry * passed;
                 }
                 if (gwParams.observerAltitude < deep.base) {
                     luminance = rained + dry * luminance;
+                    cloudDepth = rainDepth + dry * cloudDepth;
                 } else {
                     luminance = luminance + through * rained;
+                    cloudDepth = cloudDepth + through * rainDepth;
                 }
                 through = through * dry;
             }
@@ -599,4 +609,5 @@ fn gwLayers(@builtin(global_invocation_id) id: vec3u) {
         through = through * (1.0 - veiled);
     }
     gwOutputStore(id.xy, vec4f(luminance, through));
+    textureStore(gwLayerDepth, vec2i(id.xy), vec4f(cloudDepth, 0.0, 0.0));
 }

@@ -65,3 +65,44 @@ test("a weather by its name renders: clouds over the background, nothing where t
     clouds.destroy();
     target.destroy();
 });
+
+test("the box filter brings the marched layers to the target's size with less grain and as much cloud", async () => {
+    const device = await gpuDevice();
+    test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
+    if (!device) return;
+    const { readTexture } = await import("@himmelszelt/dunstkreis");
+    const { createLayeredCloudPass } = await import("../dist/index.js");
+
+    device.pushErrorScope("validation");
+    const size = 96;
+    const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC;
+    const target = device.createTexture({ size: [size, size], format: "rgba16float", usage });
+    // Marched at half the target's size, where a pixel sits between the layers' texels.
+    const clouds = await createLayeredCloudPass(device, {
+        format: "rgba16float",
+        quality: { scale: 0.5, mapSize: 128, highMapSize: 256 },
+        toneMap: false,
+        background: false,
+    });
+    const through = async (boxFilter: boolean) => {
+        const encoder = device.createCommandEncoder();
+        clouds.update({ weather: "towering", boxFilter }, encoder);
+        clouds.encode(encoder, target);
+        device.queue.submit([encoder.finish()]);
+        const { data } = await readTexture(device, target);
+        expect(data.every((value, i) => Number.isFinite(value) && value >= 0 && (i % 4 < 3 || value <= 1 + 1e-3))).toBe(
+            true,
+        );
+        return Array.from({ length: size * size }, (_, i) => data[i * 4 + 3] ?? 1);
+    };
+    const mean = (values: number[]) => values.reduce((sum, x) => sum + x, 0) / values.length;
+    // How rough a picture is: the mean step from a pixel to the next in its row.
+    const rough = (values: number[]) => mean(values.map((x, i) => (i % size ? Math.abs(x - (values[i - 1] ?? x)) : 0)));
+    const taps = await through(false);
+    const box = await through(true);
+    expect(await device.popErrorScope()).toBeNull();
+    expect(Math.abs(mean(box) - mean(taps))).toBeLessThan(0.01);
+    expect(rough(box)).toBeLessThan(rough(taps));
+    clouds.destroy();
+    target.destroy();
+});

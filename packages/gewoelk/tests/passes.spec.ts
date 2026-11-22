@@ -32,7 +32,7 @@ const PASSES: Record<string, readonly string[]> = {
     detail: ["noise", "detail"],
     light: ["params", "light"],
     morph: ["morph"],
-    clouds: ["noise", "params", "camera", "aerial", "sheet", "clouds"],
+    clouds: ["noise", "params", "camera", "aerial", "sheet", "layerread", "clouds"],
     compose: ["noise", "params", "camera", "aerial", "sheet", "corona", "whitebalance", "tonemap", "compose"],
     sunlight: ["atmosphere", "common", "lut", "sampling", "sunlight"],
 };

@@ -1,0 +1,375 @@
+/* The chapter's rail (see Rail.astro): beside the text from 80rem on, sticky, in the mono of the page's labels. Below
+   that it is not shown, and the contents, the moment and place and the display settings stay in the text and the
+   figures, as before; a line along the top of the window says how far the reader is. */
+.rail {
+    display: none;
+}
+.read-line {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 20;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(var(--progress, 0));
+    transform-origin: left;
+    pointer-events: none;
+}
+@media (min-width: 80rem) {
+    :root:has(.rail) {
+        --rail-width: 20rem;
+        --rail-space: var(--rail-width);
+    }
+    .page:has(> .rail) {
+        display: grid;
+        grid-template-columns: var(--rail-width) minmax(0, 1fr);
+    }
+    /* A grid item with auto margins shrinks to its content: as wide as before instead, the padding included. */
+    .page:has(> .rail) > main {
+        grid-column: 2;
+        width: 100%;
+        max-width: calc(var(--measure) + 3rem);
+        box-sizing: border-box;
+    }
+    /* The header across the whole window, the brand over the rail; the footer under the content's column. */
+    :root:has(.rail) .site-header {
+        max-width: none;
+        padding-left: 1.25rem;
+    }
+    :root:has(.rail) .site-footer {
+        margin-left: calc(var(--rail-space) + max(0px, (100% - var(--rail-space) - var(--wide)) / 2));
+    }
+    .read-line {
+        display: none;
+    }
+    .rail {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        box-sizing: border-box;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+        padding: 2.5rem 0.75rem 2rem 1.25rem;
+        font-size: var(--text-small);
+        line-height: 1.5;
+    }
+    /* Their duplicates in the text and the figures give way to the rail's. */
+    :root:has(.rail) main :is(.toc, .moment:not([data-environments])),
+    :root:has(.rail [data-environments]) main :is([data-environments], .env-frame .env-resolutions) {
+        display: none;
+    }
+    :root:has(.rail:not([data-local~="display"]))
+        main
+        :is(.sky-group:has([data-hdr], input[name$="-tone"]), [data-hdr]) {
+        display: none;
+    }
+}
+.rail-label {
+    margin: 0 0 0.6rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.rail-tree ol {
+    margin: 0 0 1.25rem;
+    padding: 0;
+    list-style: none;
+    font-family: var(--font-mono);
+}
+.rail-tree li {
+    display: flex;
+    gap: 0.6em;
+    padding: 0.12rem 0;
+}
+/* A corner before each section, as in a listing of a directory tree. */
+.rail-tree li::before {
+    content: "\2514";
+    color: var(--line);
+}
+.rail-tree a {
+    color: var(--muted);
+    text-decoration: none;
+}
+/* Every section on one line, cut short with an ellipsis, its full name on hover; its figures' numbers never cut. */
+.rail-tree a[data-section] {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.rail-figures {
+    display: flex;
+    flex: 1 0 auto;
+    align-items: baseline;
+    gap: 0.4em;
+    font-variant-numeric: tabular-nums;
+}
+/* A dotted leader from the section's name to its figures, as in a book's contents, at the height of a minus sign. */
+.rail-figures::before {
+    content: "";
+    flex: 1;
+    min-width: 1em;
+    margin: 0 0.2em 0 0.4em;
+    border-bottom: 1px dotted var(--line);
+    transform: translateY(-0.36em);
+}
+.rail-figures a {
+    color: var(--rail-quiet);
+}
+.rail-tree li:has(a[aria-current]) .rail-figures a {
+    color: var(--muted);
+}
+.rail-tree a:hover {
+    color: var(--text);
+}
+.rail-tree a[aria-current] {
+    color: var(--text);
+}
+.rail-tree li:has(a[aria-current])::before {
+    color: var(--accent);
+}
+/* How far through the chapter, as a bar of dithered pixels: a sparse pattern for what is still to read, a dense one for
+   what is read, and the share in digits beside it. */
+.rail-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    /* The same gap above as below, with the contents folded too; open, the list's margin above collapses into it. */
+    margin: 0.5rem 0;
+    font-family: var(--font-mono);
+    color: var(--muted);
+}
+.rail-bar {
+    position: relative;
+    flex: 1;
+    height: 0.9rem;
+    background: repeating-conic-gradient(var(--line) 0 25%, transparent 0 50%) 0 0 / 2px 2px;
+}
+.rail-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0;
+    background:
+        repeating-conic-gradient(var(--text) 0 25%, transparent 0 50%) 0 0 / 2px 2px,
+        color-mix(in oklab, var(--text) 30%, transparent);
+}
+.rail-percent {
+    min-width: 4ch;
+    text-align: right;
+}
+/* The reading time informs only, as the groups' summaries do. */
+.rail-read {
+    margin: 0;
+    color: var(--rail-quiet);
+}
+.rail {
+    /* What only informs, the summaries and notes, in the gray of the figures' numbers in the contents. */
+    --rail-quiet: color-mix(in oklab, var(--muted), transparent 45%);
+    /* The width inside the rail's padding, which the gallery's rows are sized by. */
+    --rail-indent: calc(1.2 * var(--text-small));
+    --rail-inner: calc(var(--rail-width, 20rem) - 2rem - var(--rail-indent));
+}
+.rail details > summary {
+    cursor: pointer;
+    list-style: none;
+}
+.rail details > summary::-webkit-details-marker {
+    display: none;
+}
+/* Every group folds behind its name, a plus or a minus before it, as the folds in the text. */
+.rail-group > summary::before {
+    content: "+";
+    display: inline-block;
+    width: 1.2em;
+    color: var(--muted);
+}
+.rail-group[open] > summary::before {
+    content: "\2212";
+}
+.rail-group > summary .rail-label {
+    display: inline;
+}
+.rail-group[open] > summary {
+    margin-bottom: 0.6rem;
+}
+/* What is chosen, under the group's name, so it reads while the group is folded. */
+.rail-group > summary > .note {
+    display: block;
+    padding-left: 1.2em;
+}
+.rail-group,
+.rail-set {
+    transition: opacity 0.15s;
+}
+/* A group no figure here reads, or one the chapter keeps in its figures: there, in its place, but stepped back. */
+[data-group][data-muted] {
+    opacity: 0.4;
+}
+.rail-why {
+    margin: 0.4rem 0 0;
+    color: var(--muted);
+}
+.rail-why:empty {
+    display: none;
+}
+.rail-row {
+    display: grid;
+    grid-template-columns: 2.5rem 1fr;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+}
+.rail-name {
+    color: var(--muted);
+}
+.rail-hdr {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.rail .steps {
+    flex-wrap: nowrap;
+}
+/* The HDRI gallery: three a row, two rows in view, the rest scrolled to a row at a time. */
+.rail-gallery {
+    grid-template-columns: repeat(3, 1fr);
+    max-height: calc(2 * ((var(--rail-inner) - 8px) / 3 + 6px) + 4px);
+    margin: 0;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    scrollbar-width: thin;
+}
+.rail-gallery > * {
+    scroll-snap-align: start;
+}
+.rail-credit {
+    margin: 0.4rem 0 0;
+    color: var(--muted);
+}
+/* The moment and place, the same set of controls as under the figures in its compact form (Controls.astro): no rule
+   down the left, the summary as the group's name, each field on one line with its short name, its steps under it. */
+.rail .moment {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+.rail .moment:not([open]) {
+    opacity: 1;
+}
+.rail .moment summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+}
+.rail .moment-title {
+    font-family: var(--font-mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.rail .moment summary > .note {
+    flex-basis: 100%;
+    padding-left: 1.2em;
+}
+.rail .moment[open] .input-grid {
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 0.3rem 0.5rem;
+    margin: 0.6rem 0 0 var(--rail-indent);
+}
+.rail .input-grid > label,
+.rail .input-grid > .note {
+    justify-self: start;
+}
+/* The steps need no name: they sit right under the field they step. */
+.rail .input-grid > .note:has(+ .input-grid-subrow [data-field$="Step"]) {
+    visibility: hidden;
+}
+.rail .stepper {
+    grid-column: 2;
+    flex-wrap: nowrap;
+}
+.rail .input-grid-subrow {
+    grid-column: 2;
+    gap: 0.5rem;
+}
+.rail .moment input {
+    font-size: var(--text-small);
+}
+.rail .moment input[data-field="jd"] {
+    width: 14ch;
+}
+.rail .moment input.latlong {
+    width: 15ch;
+}
+.rail .stepper > button[data-field] {
+    margin-left: 0.3rem;
+}
+.rail .stepper button[data-field="animate"] {
+    display: grid;
+    place-items: center;
+    padding: 0 0.45rem;
+}
+.rail .stepper svg {
+    --icon-size: 12;
+}
+/* The steps step back: plain text without boxes, faint until the pointer or the keyboard comes to them, the chosen one
+   in the accent, tucked under the field they step. */
+.rail .input-grid-subrow:has([data-field$="Step"]) {
+    margin-top: -0.2rem;
+    opacity: 0.55;
+    transition: opacity 0.15s;
+}
+.rail .input-grid-subrow:has([data-field$="Step"]):is(:hover, :focus-within) {
+    opacity: 1;
+}
+.rail .input-grid-subrow:has([data-field$="Step"]) .steps label span {
+    padding: 0 0.3rem;
+    border-color: transparent;
+    background: none;
+}
+.rail .input-grid-subrow:has([data-field$="Step"]) .steps label:first-child span {
+    padding-left: 0;
+}
+/* The copy buttons in the summaries, vertically on the middle of the group's name, shown on hover as under the figures. */
+.rail summary {
+    position: relative;
+    padding-right: 2rem;
+}
+.rail summary .icon-button {
+    top: calc(0.75 * var(--text-small));
+    right: 0;
+    transform: translateY(-50%);
+}
+.rail-group:hover .icon-button,
+.rail .icon-button[data-copied] {
+    opacity: 1;
+}
+.rail .icon-button[data-copied] {
+    color: var(--accent);
+}
+/* Whatever a group holds starts where the text of its name does, after the plus or minus. */
+.rail-group > :not(summary) {
+    margin-left: var(--rail-indent);
+}
+.rail summary:focus:not(:focus-visible) {
+    outline: none;
+}
+/* Narrower steppers' buttons in the rail, so the fields hold all their digits beside now and play. */
+.rail .stepper > button[data-step],
+.rail .stepper > button[data-field="geolocate"] {
+    width: 1.5rem;
+}
+.rail .stepper button[data-field="live"] {
+    padding: 0.15rem 0.4rem;
+}
+.rail summary > .note,
+.rail .rail-hdr .note,
+.rail-why {
+    color: var(--rail-quiet);
+}

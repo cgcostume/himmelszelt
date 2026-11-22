@@ -15,21 +15,6 @@ export interface AutoExposureKey {
     tint?: Tint | { rising: Tint; setting: Tint };
 }
 
-/**
- * Night darker, the blue hour lifted a little so its blue shows, the minutes around sunrise and sunset darker, the
- * sunset a little brighter than the sunrise, the golden hour a touch brighter, and noon as metered.
- */
-export const DEFAULT_AUTO_EXPOSURE_KEYS: readonly AutoExposureKey[] = [
-    { sunAltitude: -18, compensation: -2 },
-    { sunAltitude: -8, compensation: -1.5 },
-    { sunAltitude: -5, compensation: -0.8 },
-    { sunAltitude: -2, compensation: -0.9 },
-    { sunAltitude: -1, compensation: -0.7 },
-    { sunAltitude: 0, compensation: { rising: 0, setting: 0.2 } },
-    { sunAltitude: 6, compensation: { rising: 0.2, setting: 0.3 } },
-    { sunAltitude: 60, compensation: 0 },
-];
-
 /** Monotone cubic through [x, y] points (Fritsch & Carlson 1980): smooth, never overshooting one, flat at both ends. */
 function monotoneCubic(points: readonly (readonly [number, number])[], x: number): number {
     const n = points.length;

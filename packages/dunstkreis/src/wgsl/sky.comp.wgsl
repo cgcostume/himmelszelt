@@ -1,6 +1,6 @@
 // The sky pass: a compute pass that turns the precomputed tables into pixels, one invocation per pixel of the target,
 // with no rasterization. Requires `atmosphere.wgsl`, `common.wgsl`, `lut.wgsl`, `sampling.wgsl`, `raymarch.wgsl`,
-// `camera.wgsl`, `cube.wgsl`, `sun.wgsl`, `glare.wgsl`, `lens.wgsl`, `whitebalance.wgsl`, `tonemap.wgsl`, `vision.wgsl`, `grid.wgsl`, `frame.wgsl`, `quality.wgsl` and
+// `camera.wgsl`, `cube.wgsl`, `sun.wgsl`, `glare.wgsl`, `whitebalance.wgsl`, `tonemap.wgsl`, `vision.wgsl`, `grid.wgsl`, `frame.wgsl`, `quality.wgsl` and
 // `features.wgsl`, plus the output
 // at group 1, `dkOutputSize` and `dkOutputStore`, declared by whoever builds the pipeline since its format has to be
 // spelled out: `skyOutput(format)` for an image, `skyCubeOutput(format)` for a cube map's six faces.
@@ -127,10 +127,14 @@ fn dkSkyFromSpace(a: DkAtmosphere, view: vec3f, altitude: f32) -> DkSkySample {
     );
     var luminance = dkToRgb(a, ray.luminance);
     if (DK_MOONLIGHT && dkParams.moonlight > 0.0) {
+        // The Moon's own light is in no eclipse of the Sun.
+        let eclipse = dkEclipse;
+        dkEclipse.moonRadius = 0.0;
         let moon = dkRaymarchFromSpace(
             a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, altitude, view, dkParams.moonDirection,
             DK_SAMPLES_SKY_VIEW,
         );
+        dkEclipse = eclipse;
         luminance = luminance + dkToRgb(a, moon.luminance) * dkParams.moonlight;
     }
     return DkSkySample(luminance, ray.hitsGround, ray.direction, ray.transmittance);
@@ -157,14 +161,79 @@ fn dkSkySunTransmittance(sky: DkSkySample) -> vec4f {
     return dkSampleTransmittanceToTop(dkAtmosphere, dkTransmittanceLut, dkLutSampler, h, sky.direction.z);
 }
 
-// The sun disc's luminance along a sampled ray, attenuated by the air between it and the observer, from sun.wgsl.
-fn dkSkySunLuminance(sky: DkSkySample) -> vec3f {
+// How far the Moon's limb stands out or in by its mountains and valleys, as a share of its radius, by the angle around
+// its disc: four waves standing in for its true profile, some 2.5 km at their most. Not the Moon's own limb.
+fn dkMoonLimb(angle: f32) -> f32 {
+    return 6e-4 * (sin(13.0 * angle + 1.3) + 0.7 * sin(29.0 * angle + 4.1) + 0.5 * sin(61.0 * angle + 2.2)
+        + 0.35 * sin(127.0 * angle + 5.7));
+}
+
+// Lines across a pixel on which the Moon's limb is laid over the Sun's.
+const DK_ECLIPSE_LINES: u32 = 12u;
+
+// How much of the Sun's part of a pixel `footprint` radians across, looking along the bent `direction`, the Moon leaves
+// uncovered in a solar eclipse: counted on lines from the Moon's center out through the pixel, each from where it
+// enters the Sun's disc or the pixel to where it leaves either, with the Moon's limb between. Near totality the sliver
+// between the two limbs is far thinner than a pixel, and a ray through the pixel's middle would light all of it or
+// none. With the uniforms' `eclipseBeads` the limb is the uneven one of dkMoonLimb, and the Sun shines through its
+// valleys, Baily's beads: in the seconds before and after a total eclipse, as a string of points.
+fn dkSkySunBehindMoon(direction: vec3f, footprint: f32) -> f32 {
+    let moon = dkParams.moonDirection;
+    let east = normalize(cross(select(vec3f(0.0, 0.0, 1.0), vec3f(1.0, 0.0, 0.0), abs(moon.z) > 0.9), moon));
+    let north = cross(moon, east);
+    // The pixel and the Sun's center from the Moon's, in radians east and north.
+    let pixel = vec2f(dot(direction - moon, east), dot(direction - moon, north));
+    let sun = vec2f(dot(dkParams.sunDirection - moon, east), dot(dkParams.sunDirection - moon, north));
+    let along = vec2f(-pixel.y, pixel.x) / max(length(pixel), 1e-12);
+    // The Moon's radius from its distance: a cosine near 1 holds it too coarsely for a sliver of an arcsecond.
+    let radius = dkParams.eclipseMoonRadius / length(vec4f(dkParams.eclipseOffset, dkParams.eclipseAlong));
+    // As far out and in as the pixel's corners reach.
+    let half = 0.7071 * footprint;
+    var lit = 0.0;
+    var clear = 0.0;
+    for (var i = 0u; i < DK_ECLIPSE_LINES; i = i + 1u) {
+        let at = pixel + along * (((f32(i) + 0.5) / f32(DK_ECLIPSE_LINES) - 0.5) * footprint);
+        let distance = length(at);
+        let out = at / max(distance, 1e-12);
+        let b = dot(out, sun);
+        let reach = b * b - dot(sun, sun) + dkParams.sunAngularRadius * dkParams.sunAngularRadius;
+        if (reach <= 0.0) {
+            continue;
+        }
+        let root = sqrt(reach);
+        let low = max(b - root, distance - half);
+        let high = min(b + root, distance + half);
+        if (high <= low) {
+            continue;
+        }
+        var limb = radius;
+        if (dkParams.eclipseBeads > 0.0) {
+            limb = radius * (1.0 + dkMoonLimb(atan2(out.y, out.x)));
+        }
+        lit += high - low;
+        clear += max(high - max(low, limb), 0.0);
+    }
+    if (lit <= 0.0) {
+        return 0.0;
+    }
+    return clear / lit;
+}
+
+// The sun disc's luminance along a sampled ray, attenuated by the air between it and the observer, from sun.wgsl. With
+// a `footprint`, the pixel's width in radians, the Moon in front takes its share of the pixel, dkSkySunBehindMoon.
+fn dkSkySunLuminance(sky: DkSkySample, footprint: f32) -> vec3f {
     // Behind the Moon, a solar eclipse: both true directions, as the ray leaves the air.
-    if (dot(sky.direction, dkParams.moonDirection) > dkParams.moonDiscCos) {
+    var uncovered = 1.0;
+    if (dkParams.eclipseMoonRadius > 0.0 && footprint > 0.0) {
+        uncovered = dkSkySunBehindMoon(sky.direction, footprint);
+    } else if (dot(sky.direction, dkParams.moonDirection) > dkParams.moonDiscCos) {
+        uncovered = 0.0;
+    }
+    if (uncovered <= 0.0) {
         return vec3f(0.0);
     }
     let illuminance = dkToRgb(dkAtmosphere, dkSkySunTransmittance(sky) * dkAtmosphere.solarIlluminance);
-    var luminance = dkSunDiscLuminance(illuminance, dkParams.sunAngularRadius);
+    var luminance = dkSunDiscLuminance(illuminance, dkParams.sunAngularRadius) * uncovered;
     if (DK_LIMB_DARKENING) {
         luminance = luminance * dkSunLimbDarkening(sky.direction, dkParams.sunDirection, dkParams.sunAngularRadius);
     }
@@ -206,7 +275,10 @@ fn dkSkyAureole(view: vec3f) -> vec3f {
     }
     var glow = dkAureoleOf(view, dkParams.sunDirection, dkParams.apparentSunDirection);
     if (DK_MOONLIGHT && dkParams.moonlight > 0.0) {
+        let eclipse = dkEclipse;
+        dkEclipse.moonRadius = 0.0;
         glow = glow + dkAureoleOf(view, dkParams.moonDirection, dkParams.apparentMoonDirection) * dkParams.moonlight;
+        dkEclipse = eclipse;
     }
     return glow;
 }
@@ -226,64 +298,29 @@ fn dkAureoleOf(view: vec3f, light: vec3f, apparent: vec3f) -> vec3f {
     return dkToRgb(a, column * a.solarIlluminance) * (DK_AUREOLE_SHARE * phase * fade);
 }
 
-// The share of the Sun's disc the Moon leaves uncovered, 1 with no Moon in front and 0 in a total eclipse: what two
-// discs overlap by, the Sun's taken as evenly bright. The veil and the starburst are of the disc's light, and dim by it.
-fn dkSunUncovered() -> f32 {
-    if (dkParams.moonDiscCos > 1.0) {
-        return 1.0;
-    }
-    let sun = dkParams.sunAngularRadius;
-    let moon = acos(dkParams.moonDiscCos);
-    let apart = 2.0 * asin(min(length(dkParams.sunDirection - dkParams.moonDirection) * 0.5, 1.0));
-    if (apart >= sun + moon) {
-        return 1.0;
-    }
-    if (apart <= abs(moon - sun)) {
-        return 1.0 - min(moon * moon / (sun * sun), 1.0);
-    }
-    let towardsSun = clamp((apart * apart + sun * sun - moon * moon) / (2.0 * apart * sun), -1.0, 1.0);
-    let towardsMoon = clamp((apart * apart + moon * moon - sun * sun) / (2.0 * apart * moon), -1.0, 1.0);
-    let kite = max((sun + moon - apart) * (apart + sun - moon) * (apart - sun + moon) * (apart + sun + moon), 0.0);
-    let lens = sun * sun * acos(towardsSun) + moon * moon * acos(towardsMoon) - 0.5 * sqrt(kite);
-    return clamp(1.0 - lens / (3.141592653589793 * sun * sun), 0.0, 1.0);
-}
-
 // The veil along a view ray, from glare.wgsl, by the illuminance the light meter wrote of the Sun and, with
 // DK_MOONLIGHT, of the Moon, so it dims and reddens with each through the air and goes out behind the planet, and the
-// Sun's behind the Moon, dkSunUncovered: for an eye of thirty years, blue-green, times DK_VEIL. An effect of the eye or the lens, so centered on where each shows, in
-// the view's directions, and only of what is looked at: times the uniforms' `sunInFrame` and `moonInFrame`.
+// Sun's behind the Moon: for an eye of thirty years, blue-green, times DK_VEIL. An effect of the eye or the lens, so
+// centered on where each shows, in the view's directions, and only of what is looked at: times the uniforms'
+// `sunInFrame` and `moonInFrame`.
 fn dkSkyVeil(view: vec3f) -> vec3f {
     if (DK_VEIL <= 0.0) {
         return vec3f(0.0);
     }
-    let sun = dkMetering.sunIlluminance * (dkParams.sunInFrame * dkSunUncovered());
-    var veil = hdVeil(view, dkParams.apparentSunDirection, sun, 30.0, 1.0);
+    // In a solar eclipse the light is the crescent's, off the Sun's center away from the Moon by the share covered: on
+    // the limb as it closes, where the last of the Sun shows.
+    var center = dkParams.apparentSunDirection;
+    let away = dkParams.sunDirection - dkParams.moonDirection;
+    if (dkParams.eclipseMoonRadius > 0.0 && dot(away, away) > 1e-16) {
+        let covered = 1.0 - dkEclipseShares(vec3f(0.0)).x;
+        center = normalize(center + normalize(away) * (dkParams.sunAngularRadius * covered));
+    }
+    var veil = hdVeil(view, center, dkMetering.sunIlluminance * dkParams.sunInFrame, 30.0, 1.0);
     if (DK_MOONLIGHT) {
         veil = veil
             + hdVeil(view, dkParams.apparentMoonDirection, dkMetering.moonIlluminance, 30.0, 1.0) * dkParams.moonInFrame;
     }
     return veil * DK_VEIL;
-}
-
-// A starburst around the Sun along a view ray, from lens.wgsl, in cd/m²: lit by the Sun's illuminance at the observer
-// and centered on where it shows, as the veil is, times the uniforms' `sunInFrame` and dkSunUncovered. Laid out in the image plane, by the
-// matrix's own rectilinear projection, at the true angle from the Sun: its lines straight, and fixed to the camera.
-fn dkSkyStarburst(view: vec3f) -> vec3f {
-    if (DK_STARBURST == 0u || dkParams.sunInFrame <= 0.0) {
-        return vec3f(0.0);
-    }
-    let sun = dkParams.apparentSunDirection;
-    let chord = length(view - sun);
-    // The camera's axes run along the matrix's first two columns.
-    let right = normalize(dkParams.inverseViewProjection[0].xyz);
-    let up = normalize(dkParams.inverseViewProjection[1].xyz);
-    let forward = cross(up, right);
-    let at = vec2f(dot(view, right), dot(view, up)) / max(dot(view, forward), 0.05);
-    let center = vec2f(dot(sun, right), dot(sun, up)) / max(dot(sun, forward), 0.05);
-    let across = at - center;
-    let offset = across * (chord / max(length(across), 1e-9));
-    let illuminance = dkMetering.sunIlluminance * (dkParams.sunInFrame * dkSunUncovered());
-    return illuminance * hdStarburst(offset, dkParams.sunAngularRadius, DK_STARBURST);
 }
 
 // The Sun's corona and chromosphere along a sampled ray, from sun.wgsl, in cd/m²: shares of the disc's luminance, so
@@ -294,13 +331,26 @@ fn dkSkySunCorona(sky: DkSkySample, ground: f32, footprint: f32) -> vec3f {
     }
     let radius = dkParams.sunAngularRadius;
     let near = length(sky.direction - dkParams.sunDirection) < DK_SUN_CORONA_REACH * radius;
-    if (!near || dot(sky.direction, dkParams.moonDirection) > dkParams.moonDiscCos) {
+    if (!near) {
+        return vec3f(0.0);
+    }
+    // Behind the Moon: in an eclipse by the share of the pixel its limb leaves, so the Moon's outline against the
+    // corona is as smooth as the pixels allow; its radius from its distance, as in dkSkySunBehindMoon.
+    var uncovered = 1.0;
+    if (dkParams.eclipseMoonRadius > 0.0) {
+        let moon = dkParams.eclipseMoonRadius / length(vec4f(dkParams.eclipseOffset, dkParams.eclipseAlong));
+        let fromMoon = length(sky.direction - dkParams.moonDirection);
+        uncovered = clamp((fromMoon - moon) / max(footprint, 1e-9) + 0.5, 0.0, 1.0);
+    } else if (dot(sky.direction, dkParams.moonDirection) > dkParams.moonDiscCos) {
+        uncovered = 0.0;
+    }
+    if (uncovered <= 0.0) {
         return vec3f(0.0);
     }
     let illuminance = dkToRgb(dkAtmosphere, dkSkySunTransmittance(sky) * dkAtmosphere.solarIlluminance);
     let share = vec3f(dkSunCorona(sky.direction, dkParams.sunDirection, radius))
         + dkSunChromosphere(sky.direction, dkParams.sunDirection, radius, footprint);
-    return share * dkSunDiscLuminance(illuminance, radius) * (1.0 - ground);
+    return share * dkSunDiscLuminance(illuminance, radius) * ((1.0 - ground) * uncovered);
 }
 
 // Rays through a pixel the disc's edge or the horizon crosses, with DK_SUPERSAMPLE.
@@ -357,7 +407,7 @@ fn dkSupersampledPixel(pixel: vec2u, size: vec2u) -> DkPixel {
         result.ground = result.ground + select(0.0, 1.0, ray.hitsGround);
         if (DK_SUN_DISC && !ray.hitsGround && dkSkySunCoverage(ray, 0.0) > 0.0) {
             result.disc = result.disc + 1.0;
-            result.sun = result.sun + dkSkySunLuminance(ray);
+            result.sun = result.sun + dkSkySunLuminance(ray, 0.0);
         }
     }
     if (result.disc > 0.0) {
@@ -451,7 +501,7 @@ fn dkCubeTexel(face: u32, texel: vec2u, size: u32) -> vec3f {
         );
         luminance = luminance + dkSkyRayLuminance(view, sky, cell) + dkSkyAureole(view);
         if (DK_SUN_DISC && dkSkySunCoverage(sky, 0.0) > 0.0) {
-            luminance = luminance + dkSkySunLuminance(sky);
+            luminance = luminance + dkSkySunLuminance(sky, 0.0);
         }
     }
     luminance = luminance / f32(DK_SAMPLES_CUBE) * select(1.0, dkParams.skyViewScale, DK_CUBE_SCALED);
@@ -465,6 +515,11 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
     if (id.x >= size.x || id.y >= size.y) {
         return;
     }
+    // A solar eclipse, for every march from here on.
+    dkEclipse = DkEclipse(
+        dkParams.eclipseOffset, dkParams.eclipseAlong, dkParams.sunDirection, dkParams.eclipseMoonRadius,
+        dkParams.sunAngularRadius, 0.0,
+    );
     if (DK_CUBE) {
         dkOutputStore(id.xy, id.z, vec4f(dkCubeTexel(id.z, id.xy, size.x), 1.0));
         return;
@@ -503,8 +558,8 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
         }
     }
 
-    // The aureole, the veil, the starburst and the Sun's corona, all smooth enough for the center ray.
-    luminance = luminance + dkSkyAureole(view) + dkSkyVeil(view) + dkSkyStarburst(view) + dkSkySunCorona(sky, ground, footprint);
+    // The aureole, the veil and the Sun's corona, all smooth enough for the center ray.
+    luminance = luminance + dkSkyAureole(view) + dkSkyVeil(view) + dkSkySunCorona(sky, ground, footprint);
     if (DK_DARK_ADAPTED) {
         luminance = hdDarkAdaptedEye(luminance);
     }
@@ -521,7 +576,7 @@ fn dkSky(@builtin(global_invocation_id) id: vec3u) {
     } else if (disc < 0.0) {
         disc = dkSkySunCoverageOfPixel(sky, id.xy, size, footprint) * (1.0 - ground);
         if (disc > 0.0) {
-            sunLuminance = dkSkySunLuminance(sky);
+            sunLuminance = dkSkySunLuminance(sky, footprint);
         }
     }
     let sun = hdWhiteBalance(sunLuminance, dkParams.whiteBalance) * exposure;

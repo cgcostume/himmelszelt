@@ -82,7 +82,7 @@ test("the tables, the sky-view table, the meter and a few pixels of sky hold the
     near(sky(10, 127), [37152, 24656, 11952, 3026], 0.01);
     near(sky(100, 200), [617.5, 575, 650.5, 663.5], 0.01);
     near(sky(64, 128), [1073, 1025, 1104, 939.5], 0.01);
-    expect(await pass.meteredEV100()).toBeCloseTo(12.7466, 1);
+    expect(await pass.meteredEV100()).toBeCloseTo(12.8977, 1);
     near(await pass.sunIlluminance(), [40391, 17550, 2147.6], 0.01);
     // The sky alone on the ground, bluer than the low Sun.
     near(await pass.skyIrradiance(), [1822.1, 2469.9, 3434.4], 0.01);
@@ -103,7 +103,7 @@ test("the tables, the sky-view table, the meter and a few pixels of sky hold the
 
     // From space the meter raymarches: the lit planet, and the sun's light with nothing in the way.
     pass.update({ ...params, observerHeightM: 300_000 });
-    expect(await pass.meteredEV100()).toBeCloseTo(12.2751, 1);
+    expect(await pass.meteredEV100()).toBeCloseTo(12.4406, 1);
     near(await pass.sunIlluminance(), [139650, 125070, 122740], 0.01);
 
     target.destroy();

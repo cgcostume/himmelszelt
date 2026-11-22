@@ -17,6 +17,8 @@ import highmap from "./highmap.comp.wgsl";
 import highsheet from "./highsheet.comp.wgsl";
 import layered from "./layered.comp.wgsl";
 import layermap from "./layermap.comp.wgsl";
+import layerpyramid from "./layerpyramid.comp.wgsl";
+import layerread from "./layerread.wgsl";
 import layers from "./layers.comp.wgsl";
 import light from "./light.comp.wgsl";
 import morph from "./morph.comp.wgsl";
@@ -30,7 +32,8 @@ import voxel from "./voxel.comp.wgsl";
 export { aerial, camera } from "@himmelszelt/dunstkreis/wgsl";
 export { tonemap, whitebalance } from "@himmelszelt/helldunkel/wgsl";
 export { cloudOutput } from "./output.js";
-// The layered model's passes: a layer's map, the layers' march, the high sheet's map and its read, and their composition.
+// The layered model's passes: a layer's map and its max pyramid, the layers' march, the high sheet's map and its read,
+// and their composition.
 export {
     cloudmap,
     clouds,
@@ -42,6 +45,8 @@ export {
     highsheet,
     layered,
     layermap,
+    layerpyramid,
+    layerread,
     layers,
     light,
     morph,

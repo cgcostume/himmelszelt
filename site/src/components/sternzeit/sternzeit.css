@@ -302,7 +302,7 @@ g.eclipse-corona {
     .moon-pair {
         position: relative;
         container-type: inline-size;
-        --wide-width: min(var(--wide), 100vw - 3rem);
+        --wide-width: min(var(--wide), var(--page-width) - 3rem);
         --panel-width: calc(0.38 * min(80vh, var(--wide-width) * 9 / 16));
         --margin-room: calc((var(--wide-width) - 100cqw) / 2 - 1.5rem);
     }

@@ -39,7 +39,7 @@ export {
 
 // Exposure in EV100, for the sky in cd/m².
 export type { AutoExposureKey, Tint } from "./exposure.js";
-export { autoExposureCompensation, autoExposureTint, DEFAULT_AUTO_EXPOSURE_KEYS } from "./exposure.js";
+export { autoExposureCompensation, autoExposureTint } from "./exposure.js";
 export { ev100FromLuminance, exposureFromEV100 } from "@himmelszelt/helldunkel";
 // The white balance, before the exposure: a reference white shown as D65.
 export type { WhiteBalance } from "@himmelszelt/helldunkel";
@@ -50,12 +50,11 @@ export { ATMOSPHERE_UNIFORM_SIZE, atmosphereUniformData } from "./uniforms.js";
 
 // Pipeline-overridable sample counts, for specializing a shader at pipeline creation.
 export type { ToneCurve } from "@himmelszelt/helldunkel";
-export type { Aureole, QualityConstants, Starburst } from "./quality.js";
+export type { Aureole, QualityConstants } from "./quality.js";
 export {
     aureoleConstants,
     DEFAULT_AUREOLE,
     DEFAULT_QUALITY,
-    DEFAULT_STARBURST,
     LENS_VEIL,
     pipelineConstants,
 } from "./quality.js";
@@ -95,6 +94,8 @@ export {
     lightThroughAir,
     refractionAngle,
 } from "./refraction.js";
+// The share of the Sun's disc the Moon leaves uncovered in a solar eclipse.
+export { discUncovered } from "./eclipse.js";
 
 // What the air does to light from beyond it, a star's, the Moon's, a satellite's: one table per observer height of the
 // bend, the transmittance, the airmass and the turbulence over the apparent altitude, looked up here and by `wgsl.air`.

@@ -29,10 +29,6 @@ override DK_SUN_DISC: bool = true;
 // too, times the uniforms' `sunInFrame`.
 override DK_VEIL: f32 = 0.005;
 
-// A starburst around the sun, the spikes an aperture's blades diffract (lens.wgsl): how many blades, an even count
-// drawing as many spikes and an odd one twice as many; 0 for none.
-override DK_STARBURST: u32 = 0u;
-
 // The Sun's corona and chromosphere around its disc (sun.wgsl), behind the air, the ground and the Moon as the disc is.
 // With DK_SUN_DISC, in the image only. Far below the veil: seen without it.
 override DK_SOLAR_CORONA: bool = true;

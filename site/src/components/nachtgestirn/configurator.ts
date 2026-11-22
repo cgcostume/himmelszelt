@@ -118,6 +118,15 @@ function costs(disc: number, config: Config) {
     };
 }
 
+/** `open`, the items and `close` on one line within 80 columns, the chapters' code width, else an item a line. */
+function wrap(indent: string, open: string, items: readonly string[], close: string, pad = "", columns = 80) {
+    const one = `${indent}${open}${pad}${items.join(", ")}${pad}${close}`;
+    if (one.length <= columns) return one;
+    return [`${indent}${open}`, ...items.map((item) => `${indent}    ${item.trimStart()},`), `${indent}${close}`].join(
+        "\n",
+    );
+}
+
 /** The code that makes the pass as configured, against the package's own defaults for a disc that size. */
 function snippet(disc: number, config: Config) {
     const options: string[] = ["maps"];
@@ -132,25 +141,42 @@ function snippet(disc: number, config: Config) {
         ...(config.on.roughness ? [`MOON_ROUGHNESS${suffix}`] : []),
     );
     const seen = config.whole ? "" : "seen-";
-    const files =
+    const files = (indent: string) =>
         config.maps === "8k"
-            ? `{ color: "moon-color-${seen}8k.webp", heights: "moon-height-${seen}8k.webp", width: 8192 }`
+            ? wrap(
+                  indent,
+                  "{",
+                  [`color: "moon-color-${seen}8k.webp"`, `heights: "moon-height-${seen}8k.webp"`, "width: 8192"],
+                  "}",
+                  " ",
+                  // Room for the comma after it.
+                  79,
+              ).trimStart()
             : `MOON_MAPS${suffix}["${config.maps}"]`;
     const rough = ROUGHNESS[config.maps];
     const sizes = [...new Set([config.maps, ...(config.on.roughness ? [rough] : [])])];
     const made = config.whole ? sizes : sizes.filter((size) => !SHIPPED.includes(size));
     const build = `npx @himmelszelt/nachtgestirn data maps${config.on.roughness ? " roughness" : ""}${config.whole ? " --whole" : ""} --size ${made.join(",")}`;
     const set = config.whole ? "The whole maps" : "The seen maps";
+    const compress = config.on.compress ? ["{ compress: true }"] : [];
+    const load = wrap("", "const maps = await loadMoonMaps(", ["device", files(""), ...compress], ");");
     const lines = [
-        `import { ${names.join(", ")} } from "@himmelszelt/nachtgestirn";`,
+        wrap("", "import {", names, '} from "@himmelszelt/nachtgestirn";', " "),
         "",
-        `// A disc ${disc} px across. ${config.maps === "8k" ? "The 8K maps, yours to host." : made.length ? `${set}: ${build}.` : `${set}, shipped.`}`,
-        `const maps = await loadMoonMaps(device, ${files}${config.on.compress ? ", { compress: true }" : ""});`,
-        `const pass = await createMoonPass(device, { ${options.join(", ")} });`,
+        `// A disc ${disc} px across. ${config.maps === "8k" ? "The 8K maps, yours to host." : made.length ? `${set}:\n// ${build}` : `${set}, shipped.`}`,
+        load.includes("\n")
+            ? wrap("", "const maps = await loadMoonMaps(", ["device", files("    "), ...compress], ");")
+            : load,
+        wrap("", "const pass = await createMoonPass(device, {", options, "});", " "),
     ];
     if (config.on.roughness) {
         lines.push(
-            `const roughness = await loadMoonRoughness(device, MOON_ROUGHNESS${suffix}["${rough}"]);`,
+            wrap(
+                "",
+                "const roughness = await loadMoonRoughness(",
+                ["device", `MOON_ROUGHNESS${suffix}["${rough}"]`],
+                ");",
+            ),
             "pass.setRoughness(roughness);",
             "pass.update({ roughness: true });",
         );
@@ -210,7 +236,10 @@ export function configuratorFigure(root: HTMLElement) {
         const near = REFERENCE.reduce((a, b) =>
             Math.abs(Math.log(b[0] / disc)) < Math.abs(Math.log(a[0] / disc)) ? b : a,
         );
-        const msAxis = 1.6 * Math.max(0.6, near[2], near[1], measured?.ms ?? 0);
+        // The time's axis a little past its longest bar, ending on one of at most six steps of its grid.
+        const msLongest = 1.6 * Math.max(0.6, near[2], near[1], measured?.ms ?? 0);
+        const msStep = [0.1, 0.25, 0.5, 1, 2.5, 5, 10, 25].find((step) => msLongest / step <= 6) ?? 50;
+        const msAxis = Math.ceil(msLongest / msStep - 1e-9) * msStep;
         const bar = (value: number, axis: number, cls: string, title: string) =>
             `<i class="budget-bar ${cls}" style="width: ${((100 * value) / axis).toFixed(3)}%" title="${title}"></i>`;
         const line = (bars: string, value: string, label = "") =>
@@ -226,13 +255,17 @@ export function configuratorFigure(root: HTMLElement) {
             .filter(([, v]) => v > 0)
             .map(([name, v, i]) => bar(v, 600, `budget-part-${i}`, `${name}: ${fmt(v)} MiB`))
             .join("");
+        // Each row's last grid line, at its end, named with its value.
+        const end = (value: number) => `<span class="config-cost-end">${value}</span>`;
         costsEl.innerHTML = [
             `<span class="config-cost-name note">download, MiB</span>`,
             `<span class="budget-cell" style="--grid: ${100 / 6}%">${line(bar(download, 60, "budget-part-0", `${fmt(download)} MiB`), fmt(download))}</span>`,
+            end(60),
             `<span class="config-cost-name note">GPU memory, MiB</span>`,
             `<span class="budget-cell" style="--grid: ${100 / 6}%">${line(parts, fmt(total))}</span>`,
+            end(600),
             `<span class="config-cost-name note">time a frame, ms</span>`,
-            `<span class="budget-cell" style="--grid: ${(25 / msAxis).toFixed(3)}%">${[
+            `<span class="budget-cell" style="--grid: ${((100 * msStep) / msAxis).toFixed(3)}%">${[
                 line(bar(near[1], msAxis, "", "the defaults"), fmt(near[1]), `${near[0].toLocaleString("en-US")} px`),
                 line(
                     bar(near[2], msAxis, "budget-reference", "everything on"),
@@ -242,6 +275,7 @@ export function configuratorFigure(root: HTMLElement) {
                 // This GPU's line held empty until measured, so the measure changes no layout.
                 line(bar(measured?.ms ?? 0, msAxis, "budget-part-0", "this GPU"), measured ? fmt(measured.ms) : "–"),
             ].join("")}</span>`,
+            end(Number(msAxis.toFixed(2))),
         ].join("");
     }
 

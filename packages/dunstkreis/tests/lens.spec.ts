@@ -82,10 +82,10 @@ test("the veil is CIE's at its strength, of the Sun's light at the observer, at 
     expect(eye.green(96, 0) / lit.green(96, 0)).toBeCloseTo(200, 0);
 
     // Only of what is looked at: the Sun on the frame's upper edge, all of it; 40 % of the frame's half height beyond
-    // it, 5.6° up in a view of 8°, none, and none of the starburst either.
+    // it, 5.6° up in a view of 8°, none.
     const edge = await frame(device, 400_000, { ...NOTHING, veil: LENS_VEIL }, 4, 0);
     expect(edge.green(0, 96) / (edge.sun[1] * LENS_VEIL * veil(angleOf(0.5, 32.5) / DEG))).toBeCloseTo(1, 1);
-    const beyond = await frame(device, 400_000, { ...NOTHING, veil: LENS_VEIL, starburst: true }, 5.7, 0);
+    const beyond = await frame(device, 400_000, { ...NOTHING, veil: LENS_VEIL }, 5.7, 0);
     expect(beyond.green(0, 96)).toBeLessThan(1e-3);
     expect(beyond.green(20, 120)).toBeLessThan(1e-3);
 
@@ -118,36 +118,6 @@ test("the veil dims by the share of the Sun's disc the Moon covers, to none in a
         1 - ((2 * Math.PI) / 3 - Math.sqrt(3) / 2) / Math.PI,
         2,
     );
-});
-
-test("a starburst draws as many spikes as an even count of blades, twice as many as an odd one, where a lens draws them", async () => {
-    const device = await gpuDevice();
-    test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
-    if (!device) return;
-    /** Spikes around the Sun: the peaks of the light on a ring 2.5° from it, well above what lies between them. */
-    const spikes = async (starburst: NonNullable<SkyPassOptions["starburst"]>) => {
-        const image = await frame(device, 400_000, { ...NOTHING, starburst });
-        const ring = [...Array(720).keys()].map((i) => {
-            const turn = (i / 720) * 2 * Math.PI;
-            return image.green(Math.round(80 * Math.cos(turn)), Math.round(80 * Math.sin(turn)));
-        });
-        const floor = Math.max(...ring) / 10;
-        return ring.filter((value, i) => value > floor && (ring[(i + 719) % 720] ?? 0) <= floor).length;
-    };
-    expect(await spikes(false)).toBe(0);
-    expect(await spikes(true)).toBe(6);
-    expect(await spikes({ blades: 8 })).toBe(8);
-    expect(await spikes({ blades: 5 })).toBe(10);
-    // On the first spike, 10° up from the image's horizontal, the light falls with the square of the angle.
-    const six = await frame(device, 400_000, { ...NOTHING, starburst: true });
-    const on = (pixels: number) =>
-        six.green(Math.round(pixels * Math.cos(10 * DEG)), Math.round(pixels * Math.sin(10 * DEG)));
-    expect(on(50) / on(100)).toBeGreaterThan(3.5);
-    expect(on(50) / on(100)).toBeLessThan(4.5);
-    const luts = await precomputeAtmosphere(device);
-    const two = createSkyPass(device, { luts, format: "rgba32float", toneMap: false, starburst: { blades: 2 } });
-    await expect(two).rejects.toThrow(/blades/);
-    luts.destroy();
 });
 
 test("the corona shines off the limb at Baumbach's share of the disc, and the disc darkens to its limb at the same light", async () => {

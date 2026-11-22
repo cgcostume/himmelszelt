@@ -38,6 +38,8 @@ export interface HighSheetPass {
     readonly texture: GPUTexture;
     /** The baked map with its levels, rgba16float, in the wind's frame: puffs, veil, broad field and billows' noise. */
     readonly map: GPUTexture;
+    /** `GwHighSheet` as the sheet is read by, `wgsl.highsheet`'s: for a pass that reads the map itself. */
+    readonly uniforms: GPUBuffer;
     /** Bytes of the textures the pass holds: the map with its levels, the one it is combed through, and the output. */
     readonly memoryBytes: number;
     /** Writes the uniforms and records the map's bake into `encoder` where its shape changed; returns whether so. */
@@ -49,7 +51,7 @@ export interface HighSheetPass {
 
 /** Byte sizes of `GwHighModel` in highmap.comp.wgsl and `GwHighSheet` in highsheet.comp.wgsl. */
 const MODEL_SIZE = 80;
-const SHEET_SIZE = 80;
+const SHEET_SIZE = 112;
 const TEXEL_BYTES = 8;
 const dispatch = (n: number) => Math.ceil(n / 8);
 
@@ -75,7 +77,12 @@ function sheetData(s: HighSheet, p: LayeredParams, observerKm: readonly [number,
     f.set([observerKm[0] - drifted[0], observerKm[1] - drifted[1]], 6);
     f.set([s.patchKm, s.bandStretch, (s.bandAngle * Math.PI) / 180, s.edge, s.softness, s.billows, s.billowKm], 8);
     const crept = ((billowSpeed * p.timeS) / 1000) % DRIFT_PERIOD_KM;
-    f.set([crept, s.relief, s.forwardG, p.clearingKm, p.clearingFromKm], 15);
+    f.set(
+        [crept, s.relief, s.forwardG, p.clearingKm, p.clearingFromKm, s.flakes, s.flakeKm, s.striation, s.stretch],
+        15,
+    );
+    f[24] = s.reachKm;
+    f.set(p.clearingCenterKm ?? [0, 0], 26);
     return f;
 }
 
@@ -169,6 +176,7 @@ export async function createHighSheet(device: GPUDevice, options: HighSheetOptio
             return output;
         },
         map,
+        uniforms: sheet,
         get memoryBytes() {
             let texels = mapSize * mapSize + output.width * output.height;
             for (let i = 0; i < levels; i++) texels += (mapSize >> i) ** 2;

@@ -63,11 +63,6 @@ fn show(luminance: vec3f, exposure: f32) -> vec3f {
   veil in a sky, where bloom knows only the image. At a two-hundredth of its strength it is a camera lens's.
 - `meanVeilingGlare(radius, sourceRadius, age, pigment)`: that veil on average over a field around the source, for
   metering a frame with the Sun or the Moon in it; finite where the equation at the source is not.
-- `hdStarburst(offset, radius, blades)` in `wgsl.lens`: the spikes an aperture's straight blades diffract a bright
-  point source into, falling with the square of the angle along each and longer in red than in blue, laid out in the
-  image plane, in cd/m² per lux at the lens, to add before the exposure; `starburstSpikes(blades)` counts them, as many
-  as blades for an even count, twice as many for an odd one. Like the veil a point spread of the whole source: whoever
-  has something in front of it, or the source out of the frame, dims the illuminance.
 - `darkAdaptedEye(rgb)` and `hdDarkAdaptedEye` in `wgsl.vision`: linear sRGB in cd/m² as the eye sees it at night, Jensen et
   al.'s blue shift (Night Rendering, 2000) on Larson et al.'s scotopic luminance. Below 0.01 cd/m² the rods see alone,
   above 4 the cones, `coneShare` between; the rods' light takes the chromaticity (0.25, 0.25), so colors fade and the

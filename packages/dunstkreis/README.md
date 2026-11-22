@@ -96,7 +96,7 @@ joined by a monotone cubic (Fritsch & Carlson) that is smooth and never overshoo
 value, or a pair `{ rising, setting }` for mornings and evenings apart, told by whether the Sun is east or west of the
 meridian and blended across it so noon does not jump. The model's air is the same morning and evening, so the pair is a
 matter of taste, e.g. for hazier evenings. The metering stays the base, so the ramp still follows a changed atmosphere.
-`DEFAULT_AUTO_EXPOSURE_KEYS`:
+There are no keys by default, so the reading stands as metered. A ramp such as the website's skies use, a photographer's:
 
 | Sun altitude | Morning | Evening | |
 |---|---|---|---|
@@ -114,8 +114,7 @@ warmer golden hour or a purple dusk. Each is scaled to keep the luminance, so th
 brightness, and they are joined channel by channel on a log scale by the same curve; a key without one is neutral.
 The tint is multiplied into the white balance after it, so it goes wherever the white balance does, metered or not, and
 costs the shaders nothing. `autoExposureTint(keys, sunDirection, horizonDip)` gives it for a scene of your own, as
-`autoExposureCompensation` gives the compensation. The default keys have none, and without one no bit of the frame
-changes.
+`autoExposureCompensation` gives the compensation. Without a tint no bit of the frame changes.
 
 Night is yet to come. A camera exposes a landscape by full moon at about EV100 −3 and the Milky Way at about −6 to
 −7, some 7 to 11 stops below the floor of 4. The floor stays until the night sky has light of its own: the Moon's
@@ -148,9 +147,22 @@ The Sun is drawn per pixel over the sky, never stored in a table, and in parts a
   in solar radii, out to 40 of them, and under it the chromosphere, a thin pink shell. Five millionths of the
   disc at the limb, some 9,000 cd/m²: lost in the sky by day and, above the air, in a lens's veil, some forty times
   brighter there, as in any camera. It shows from above the air with `veil: 0`, close in or at a long exposure. Behind
-  the air, the ground and the Moon as the disc is. The veil and the starburst dim by the share of the disc the Moon
-  covers, so a total eclipse shows the corona from above the air; under it not yet, since the sky and the aureole do
-  not dim with the covered Sun. In the image only, not in a cube map.
+  the air, the ground and the Moon as the disc is, and in a total eclipse it shows, from above the air and under it:
+  the veil, the sky and the aureole all dim with the covered Sun. In the image only, not in a cube map.
+- A solar eclipse, with `moonDirection` and `moonAngularDiameter`, wherever the Moon stands within 1.6° of the Sun. The
+  Sun's light at the observer, `sunIlluminance()`, falls by the share of the disc the Moon covers, `discUncovered` on
+  the CPU, and the sky's by what each point of the air sees of the Sun, the Moon's distance taken from its diameter:
+  the sky-view table, the aureole, the aerial perspective and the lit ground are all marched through the Moon's
+  shadow. Under it the Sun's own light is gone, and what lights the sky is light scattered more than once, in from the
+  sunlit air around: three quarters of it from close by, the rest from 60, 150 and 300 km out, a rough kernel. With the
+  Sun 60° up the zenith comes out at about a two-thousandth of the day's, some 1 cd/m², under a glow all round the
+  horizon. The disc is drawn behind the Moon's limb by the share of each pixel it leaves, so a sliver thinner than a
+  pixel keeps its light. Within 20 arcseconds of a total or annular eclipse's inner contacts, most of a minute
+  either side, the limb is an uneven one, four waves of 2.5 km at most standing in for the Moon's true profile, and the
+  Sun shows through its valleys as Baily's beads; at no other time is anything computed for them. The veil then sits
+  on the last of the Sun rather than on its center. Not modeled: off the shadow's center line the two sides of the
+  Sun's meridian differ, and the table holds their mean; the Sun's limb darkening in the covered share; the Moon's own
+  limb profile.
 - The aureole, `aureole`, the air's glow of about a degree around it: aerosols scatter sunlight far more sharply forward
   than the tables' one Cornette-Shanks lobe says, so a share of their scattering, `DEFAULT_AUREOLE`'s 5 % at g 0.98,
   goes into a narrow Henyey-Greenstein lobe the tables leave out and the sky pass adds per pixel where the lobe is above
@@ -166,15 +178,12 @@ The Sun is drawn per pixel over the sky, never stored in a table, and in parts a
   `moonlight` around the Moon as well, from its illuminance at the observer: a faint glow around a full Moon high at
   night, next to none around a crescent or a low Moon, lost in the sky by day. From `@himmelszelt/helldunkel`'s
   `glare.wgsl`, bundled.
-- The starburst, `starburst`, a camera's: the spikes the blades of its aperture diffract the Sun into, fixed to the
-  camera, `true` for six blades or `{ blades }` from 3 to 16, an even count drawing as many spikes and an odd one twice
-  as many. Off by default. It leaves the frame with the Sun as the veil does. From helldunkel's `lens.wgsl`, bundled.
 
 Bloom is the lens's and needs the image, helldunkel's `createBloomPass` over the exposed frame; god rays need something
 that casts a shadow, which the sky alone has not. They add up without counting each other twice: the aureole is
-light in the air, the corona the Sun's own, the veil, the starburst and bloom what the eye or the lens spreads of all
-that reaches it. The veil and the starburst know of nothing in front of the Sun but the planet: a renderer with clouds
-or terrain turns them off and adds `hdVeil` and `hdStarburst` with the light that gets through. `wgsl.sun` holds
+light in the air, the corona the Sun's own, the veil and bloom what the eye or the lens spreads of all that reaches
+it. The veil knows of nothing in front of the Sun but the planet and the Moon: a renderer with clouds or terrain turns
+it off and adds `hdVeil` with the light that gets through. `wgsl.sun` holds
 the disc, `dkSunLimbDarkening`, `dkSunCorona` and `dkSunChromosphere` binding-free, `wgsl.raymarch` the aureole's
 march, `dkRaymarchAerosol`, and `wgsl.common` its lobe, for a renderer's own sky.
 

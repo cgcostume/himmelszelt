@@ -1,12 +1,6 @@
 import type { AtmosphereLUTs, AtmosphereModel, SkyPass } from "@himmelszelt/dunstkreis";
-import {
-    apparentDirection,
-    clampObserverHeight,
-    createSkyPass,
-    DEFAULT_AUTO_EXPOSURE_KEYS,
-    refractionAngle,
-} from "@himmelszelt/dunstkreis";
-import type { CloudParams, CloudPass, LayerMotion, Weather, WeatherName } from "@himmelszelt/gewoelk";
+import { apparentDirection, clampObserverHeight, createSkyPass, refractionAngle } from "@himmelszelt/dunstkreis";
+import type { CloudParams, CloudPass, DeepLayer, LayerMotion, Weather, WeatherName } from "@himmelszelt/gewoelk";
 import {
     CLOUD_TYPES,
     continuedMotion,
@@ -37,6 +31,7 @@ import {
 } from "../dunstkreis/atmosphere";
 import { flightIn } from "../dunstkreis/flight";
 import { groundGrid } from "../dunstkreis/groundgrid";
+import { PHOTO_RAMP } from "../dunstkreis/ramps";
 import { type Basis, cameraBasis, lookAround, project } from "../dunstkreis/skycamera";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
@@ -243,6 +238,7 @@ export function cloudsFigure(root: HTMLElement) {
             atmosphere,
             keyframes,
             high: true,
+            deep: true,
             ...lab?.created,
         };
         createCloudPass(gpu.device, options).then((pass) => {
@@ -292,9 +288,16 @@ export function cloudsFigure(root: HTMLElement) {
     // A change of weather: the sliders blended from where they stand to the preset's over a few seconds, the frames
     // drawn only while it lasts.
     let weatherFrame = 0;
+    // A weather's front: the layered model's deep layer, too wide and too tall for the voxels, marched beside them.
+    let front: DeepLayer | null = null;
+    // When the front was chosen, on the clouds' clock: it stands as its weather places it then, and comes on from there.
+    let frontSince: number | null = null;
     function changeWeather(name: WeatherName) {
         // The high cloud is the layered model's: its kind at once, as a map cannot blend, its numbers with the others.
         const weather: Weather = WEATHER[name];
+        const { deep } = layeredSky(weather.layers ?? {});
+        front = deep.kind === "front" && deep.coverage > 0 ? deep : null;
+        frontSince = null;
         const kind = weather.layers?.high;
         const kinds = root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-high"]`);
         for (const input of kinds) if (typeof kind === "string") input.checked = input.value === kind;
@@ -365,6 +368,7 @@ export function cloudsFigure(root: HTMLElement) {
 
     function cloudParams(): Partial<CloudParams> {
         const timeS = seconds() + (lab?.clock.seconds ?? 0);
+        frontSince ??= timeS;
         const windOf = (speed: number, azimuth: number): [number, number] => [
             speed * Math.sin(azimuth * DEG),
             speed * Math.cos(azimuth * DEG),
@@ -417,6 +421,8 @@ export function cloudsFigure(root: HTMLElement) {
                 : null,
             highWind: windOf(slider("sheet.windSpeed"), slider("sheet.windFrom") + 180),
             observerKm: [flown.east, flown.north] as const,
+            deep: front,
+            deepSinceS: frontSince,
         };
     }
 
@@ -474,7 +480,7 @@ export function cloudsFigure(root: HTMLElement) {
             projectionDistance: basis.d,
             pixelRatio: dpr,
             ev100: UNIT_EV100,
-            autoExposureKeys: DEFAULT_AUTO_EXPOSURE_KEYS,
+            autoExposureKeys: PHOTO_RAMP,
         });
         const [x, y, z] = apparentDirection(sunDirection, table.luts.model, observerHeightM);
         const sunNote = maybe("sun");
@@ -563,6 +569,18 @@ export function cloudsFigure(root: HTMLElement) {
                 mode: SHOW.red,
                 ...took("sheets"),
             },
+            ...(clouds.pass.deep && front
+                ? [
+                      {
+                          label: "front map",
+                          title: "The front's map, the layered model's, from its leading edge at the left to its back: red is a column's value.",
+                          texture: clouds.pass.deep.maps,
+                          kind: "array" as const,
+                          at: 1,
+                          mode: SHOW.red,
+                      },
+                  ]
+                : []),
             {
                 label: "shape + distance",
                 title: "An upright cut through the voxel volume, east to west: the modeling data. Inside a cloud, warm to white, how deep a point lies under the surface: the shape the detail noise erodes. Outside, in blues, the distance to the nearest cloud: how far a ray may step without missing one.",

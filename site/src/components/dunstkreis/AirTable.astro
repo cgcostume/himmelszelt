@@ -1,25 +1,42 @@
 ---
-import Term from "../Term.astro";
+import Slider from "../Slider.astro";
 import "./dunstkreis.css";
 import "./flicker.css";
 import "./airtable.css";
 
-/** The air table of one observer height, texel by texel, and what it does to the Moon low over the horizon: lifted,
- *  squeezed, reddened and its colors spread. From `airTable` on the CPU, no GPU. */
-const at = (value: number, min: number, max: number) => `left: ${(((value - min) / (max - min)) * 100).toFixed(2)}%`;
+/** The air table of one observer height, row by row as thin strips of its texels, one of them plotted, and what it does
+ *  to the Moon low over the horizon: lifted, squeezed, reddened and its colors spread. From `airTable` on the CPU. */
 const TEMPERATURE = { min: -30, max: 40 };
+const at = (value: number) => ((value - TEMPERATURE.min) / (TEMPERATURE.max - TEMPERATURE.min)) * 100;
+const RGBA = ["rgb", "a"];
+const ROWS = [
+    { row: 0, name: "transmittance (rgb), bend (a)", strips: RGBA },
+    { row: 1, name: "airmass, seeing, distance (rgb), wind (a)", strips: RGBA },
+    { row: 2, name: "scintillation, distance, wind (rgb), dilution (a)", strips: RGBA },
+    { row: 3, name: "lift (r), over the true altitude", strips: ["r"] },
+];
 ---
 
 <figure class="fig scene-frame air-table" id="air-table" data-air-table>
-    <div class="air-table-export" data-export="air-table" data-export-timeless data-actions-in=".air-table-views">
+    <div class="air-table-export" data-export="air-table" data-export-timeless data-actions-in=".air-table-actions">
         <figure class="fig-tile air-table-texels">
-            <svg data-field="texels" role="img" aria-label="The air table's 256 by 5 texels, each channel a stripe of its own, over the apparent altitude"></svg>
+            <svg data-field="plot" role="img" aria-label="The chosen strip of the air table plotted over its entries, on fixed axes"></svg>
+            <div class="air-table-strips" role="group" aria-label="The air table's rows, each channel normalized to its plot's fixed range">
+                {ROWS.map(({ row, name, strips }) => (
+                    <>
+                        <span class="air-table-head">row {row}: {name}</span>
+                        {strips.map((letters) => (
+                            <button type="button" class="air-table-strip" data-strip={`${row}${letters}`} aria-pressed={row === 0 && letters === "a" ? "true" : "false"} aria-label={`row ${row}, ${letters}`}>
+                                <span>{letters}</span>
+                                <canvas width="256" height="1"></canvas>
+                            </button>
+                        ))}
+                    </>
+                ))}
+            </div>
             <figcaption>
                 <span><span class="subfigure-title">the table</span>, 256 × 5 texels of four floats</span>
-                <span class="air-table-views" role="group" aria-label="How the table is shown">
-                    <button type="button" class="view-toggle" data-view="texels" aria-pressed="true" title="The texels as a texture viewer shows them, each channel normalized to its own range">texels</button>
-                    <button type="button" class="view-toggle" data-view="values" aria-pressed="false" title="The bend as the table holds it, in arcminutes, and how far the air shows red and blue from green, in arcseconds">values</button>
-                </span>
+                <span class="air-table-actions"></span>
             </figcaption>
         </figure>
         <div class="fig-row">
@@ -37,45 +54,32 @@ const TEMPERATURE = { min: -30, max: 40 };
             </figure>
         </div>
     </div>
-    <label class="figure-slider" title="The true altitude of the Moon's center, where it would be without the air, the horizon end stretched">
-        <span class="note">Altitude</span>
-        <span class="figure-slider-rail">
-            <input type="range" data-field="altitude" min="0" max="1" step="0.001" value="0.27" aria-label="The Moon's true altitude, on a stretched scale" />
-            <span class="figure-slider-scale" aria-hidden="true">
-                <span class="figure-slider-mark" style="left: 0%">set</span>
-                <span class="figure-slider-mark" style="left: 100%">high</span>
-            </span>
-        </span>
-        <output data-field="altitudeValue"></output>
-    </label>
-    <label class="figure-slider" title="How high the observer stands, from the ground to the space station's orbit">
-        <span class="note">Observer</span>
-        <span class="figure-slider-rail">
-            <input type="range" data-field="height" min="0" max="5.61" step="0.01" value="0" aria-label="The observer's height, on a scale of powers of ten" />
-            <span class="figure-slider-scale" aria-hidden="true">
-                <span class="figure-slider-mark" style="left: 0%">1 m</span>
-                <span class="figure-slider-mark" style="left: 53.5%">1 km</span>
-                <span class="figure-slider-mark" style="left: 100%">orbit</span>
-            </span>
-        </span>
-        <output data-field="heightValue"></output>
-    </label>
-    <label class="figure-slider" title="The air's temperature at sea level, at a pressure of 1013 hPa: colder air is denser and bends light more">
-        <span class="note">Air</span>
-        <span class="figure-slider-rail">
-            <input type="range" data-field="temperature" min={TEMPERATURE.min} max={TEMPERATURE.max} step="1" value="15" aria-label="The air's temperature at sea level, in degrees Celsius" />
-            <span class="figure-slider-scale" aria-hidden="true">
-                <span class="figure-slider-mark" style={at(-20, TEMPERATURE.min, TEMPERATURE.max)}>winter</span>
-                <span class="figure-slider-mark" style={at(15, TEMPERATURE.min, TEMPERATURE.max)}>standard</span>
-            </span>
-        </span>
-        <output data-field="temperatureValue"></output>
-    </label>
+    <Slider
+        name="Altitude"
+        title="The true altitude of the Moon's center, where it would be without the air, the horizon end stretched"
+        input={{ "data-field": "altitude", min: 0, max: 1, step: 0.001, value: 0.27, "aria-label": "The Moon's true altitude, on a stretched scale" }}
+        marks={[{ at: 0, label: "set" }, { at: 100, label: "high" }]}
+        output={{ "data-field": "altitudeValue" }}
+    />
+    <Slider
+        name="Observer"
+        title="How high the observer stands, from the ground to the space station's orbit"
+        input={{ "data-field": "height", min: 0, max: 5.61, step: 0.01, value: 0, "aria-label": "The observer's height, on a scale of powers of ten" }}
+        marks={[{ at: 0, label: "1 m" }, { at: 53.5, label: "1 km" }, { at: 100, label: "orbit" }]}
+        output={{ "data-field": "heightValue" }}
+    />
+    <Slider
+        name="Air"
+        title="The air's temperature at sea level, at a pressure of 1013 hPa: colder air is denser and bends light more"
+        input={{ "data-field": "temperature", min: TEMPERATURE.min, max: TEMPERATURE.max, step: 1, value: 15, "aria-label": "The air's temperature at sea level, in degrees Celsius" }}
+        marks={[{ at: at(-20), label: "winter" }, { at: at(15), label: "standard" }]}
+        output={{ "data-field": "temperatureValue" }}
+    />
     <p class="view-status" data-field="note" aria-live="polite"></p>
     <figcaption class="figure-caption">
-        The air table of one observer height. (a) Its texels, each channel normalized, logarithmic for
-        the <Term of="Airmass">airmass</Term> and the turbulence, or its values; the accent marks the Moon. (b) The
-        Moon, its true place dashed. (c) Its lower limb, or the upper one if hidden, magnified: the air parts its colors.
+        The air table of one observer height. (a) Its rows as strips, each channel normalized to the fixed range of its
+        plot, logarithmic for the turbulence, the chosen strip plotted; the accent marks the Moon. (b) The Moon, its true
+        place dashed. (c) Its lower limb, or the upper one if hidden, magnified: the air parts its colors.
     </figcaption>
 </figure>
 

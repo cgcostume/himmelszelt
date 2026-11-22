@@ -20,9 +20,14 @@
 // helldunkel's blue noise, read with GW_DITHER.
 @group(0) @binding(12) var gwBlueNoise: texture_2d<f32>;
 // The layered model's sheet of high cloud as its own pass read it, the target's size: its light in cd/m² and what it
-// lets through. Then x its altitude in km, and y whether it is there.
+// lets through. Then x its altitude in km, y whether it is there, and z whether the deep layer is.
 @group(0) @binding(13) var gwHighLight: texture_2d<f32>;
 @group(0) @binding(14) var<uniform> gwHighPlaced: vec4f;
+// The layered model's deep layer as its own march wrote it, at its own size: its light and what it lets through, how
+// far away what it shows is, in km, and the same for the cloudscape, at the cloudscape's size.
+@group(0) @binding(15) var gwDeepLight: texture_2d<f32>;
+@group(0) @binding(16) var gwDeepDepth: texture_2d<f32>;
+@group(0) @binding(17) var gwCloudsDepth: texture_2d<f32>;
 
 // Tone map for a display by Neutral (1), AgX (2), ACES (3) or none (4); 0 writes the exposed luminance, linear.
 override GW_TONE_MAP: u32 = 1u;
@@ -30,6 +35,15 @@ override GW_HEADROOM: f32 = 1.0;
 override GW_DITHER: bool = true;
 // Whether a background is bound; without one the clouds alone are written, premultiplied, with their transmittance.
 override GW_BACKGROUND: bool = true;
+
+// How far apart two layers have to be, as a share of the nearer one's distance, for one to lie wholly in front.
+const GW_ORDER_APART: f32 = 0.5;
+
+// The mean distance in km of what a layer shows, from its distances summed by their shares of a pixel and those shares:
+// far beyond everything where it shows nothing.
+fn gwMeanDistance(met: vec4f) -> f32 {
+    return select(1e9, met.x / max(met.y, 1e-6), met.y > 1e-3);
+}
 
 fn gwToneMap(exposed: vec3f) -> vec3f {
     if (GW_TONE_MAP == 2u) {
@@ -77,10 +91,30 @@ fn gwCompose(@builtin(global_invocation_id) id: vec3u) {
         sheets = gwOver(sheets, GwLayer(high.rgb, high.a));
         above = gwParams.observerAltitude > gwHighPlaced.x;
     }
+    // The deep layer and the cloudscape, the nearer in front: each has one distance a pixel, so where they reach through
+    // one another the order is that of their middles, turned over softly.
+    var lower = GwLayer(low.rgb, low.a);
+    if (gwHighPlaced.z > 0.5) {
+        // Four taps two thirds of a texel out, as the layered model composes its march: its jitter's grain goes.
+        let apart = 2.0 / 3.0 / vec2f(textureDimensions(gwDeepLight));
+        var deep = vec4f(0.0);
+        var met = vec4f(0.0);
+        for (var k = 0; k < 4; k = k + 1) {
+            let tap = uv + (vec2f(f32(k & 1), f32(k >> 1)) * 2.0 - 1.0) * apart;
+            deep = deep + 0.25 * textureSampleLevel(gwDeepLight, gwCloudsSampler, tap, 0.0);
+            met = met + 0.25 * textureSampleLevel(gwDeepDepth, gwCloudsSampler, tap, 0.0);
+        }
+        let near = gwMeanDistance(textureSampleLevel(gwCloudsDepth, gwCloudsSampler, uv, 0.0));
+        let far = gwMeanDistance(met);
+        let inFront = smoothstep(-GW_ORDER_APART, GW_ORDER_APART, (far - near) / max(min(far, near), 1e-3));
+        let before = gwOver(lower, GwLayer(deep.rgb, deep.a));
+        let after = gwOver(GwLayer(deep.rgb, deep.a), lower);
+        lower = GwLayer(mix(after.luminance, before.luminance, inFront), before.transmittance);
+    }
     // The sheets lie above the cloudscape, unless the observer is above them too.
-    var clouds = gwOver(GwLayer(low.rgb, low.a), sheets);
+    var clouds = gwOver(lower, sheets);
     if (above) {
-        clouds = gwOver(sheets, GwLayer(low.rgb, low.a));
+        clouds = gwOver(sheets, lower);
     }
     var color = clouds.luminance;
     var alpha = clouds.transmittance;

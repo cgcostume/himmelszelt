@@ -390,9 +390,8 @@ export interface MoonFrame {
     headroom?: number;
     /** dunstkreis' grid over the sky: altitude lines every 10°, the compass directions and the Sun's symbol. */
     grid?: boolean;
-    /** A lens's veil around the Sun and the Moon, dunstkreis' default, on by default, and its starburst, off by default. */
+    /** A lens's veil around the Sun and the Moon, dunstkreis' default, on by default. */
     veil?: boolean;
-    starburst?: boolean;
     /** A grid on the ground under the air: how far the view has flown, in km east and north. */
     ground?: { east: number; north: number } | null;
     /** How the maps are filtered, "anisotropic" by default, as the package does. */
@@ -429,8 +428,8 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     // between, and with the Moon down, its light gone, the exposure would flash open for a frame.
     let lastSky = Number.NEGATIVE_INFINITY;
 
-    function buildSky(luts: AtmosphereLUTs, grid: boolean, veil: boolean, starburst: boolean) {
-        const wanted = `${grid} ${veil} ${starburst}`;
+    function buildSky(luts: AtmosphereLUTs, grid: boolean, veil: boolean) {
+        const wanted = `${grid} ${veil}`;
         if (skyBuilding === luts && skyBuildingGrid === wanted) return;
         skyBuilding = luts;
         skyBuildingGrid = wanted;
@@ -444,7 +443,6 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             groundLight: quality.groundLight,
             dither: false,
             ...(veil ? {} : { veil: 0 }),
-            starburst,
         }).then((pass) => {
             if (skyBuilding !== luts || skyBuildingGrid !== wanted) return pass.destroy();
             sky?.pass.destroy();
@@ -596,9 +594,8 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
         const { moon: m, luts, width, height } = frame;
         const grid = frame.grid ?? false;
         const veil = frame.veil ?? true;
-        const starburst = frame.starburst ?? false;
-        if (!sky || sky.luts !== luts || sky.lens !== `${grid} ${veil} ${starburst}`) {
-            buildSky(luts, grid, veil, starburst);
+        if (!sky || sky.luts !== luts || sky.lens !== `${grid} ${veil}`) {
+            buildSky(luts, grid, veil);
             if (!sky || sky.luts !== luts) return null;
         }
         // The maps asked for, or the smallest that shows the disc sharply, but never smaller than the ones bound.
@@ -771,8 +768,8 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     }
 
     return {
-        /** What the drawings depend on besides the frame: the maps bound, and the roughness maps loaded. */
-        bound: () => `${mapsBound} ${roughnessLoaded.size}`,
+        /** What the drawings depend on besides the frame: the maps bound, seen or whole, and the roughness maps loaded. */
+        bound: () => `${mapsBound} ${mapsSet} ${roughnessLoaded.size}`,
         /** Draws `frame` into `target`; null while a pass is still being made, which calls `requestRender` when done. */
         draw(target: GPUTexture, frame: MoonFrame) {
             if (!frame.compare) return render(target, frame, false);

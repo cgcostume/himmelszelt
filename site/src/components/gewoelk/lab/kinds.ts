@@ -44,10 +44,13 @@ const HIGH: Record<keyof HighSheet, string> = {
     altitudeKm: "c.altitude",
     opticalDepth: "c.opticalDepth",
     tileKm: "c.tile",
+    reachKm: "c.reach",
     patchKm: "c.patchKm",
     bandStretch: "c.bandStretch",
     bandAngle: "c.bandAngle",
     edge: "c.edge",
+    flakes: "c.flakes",
+    flakeKm: "c.flakeKm",
     puffs: "c.cells",
     puffKm: "c.cellKm",
     elongation: "c.elongation",
@@ -101,19 +104,20 @@ export function kindsOf(design: Design): string[] {
     return Object.keys(kinds).filter((name) => placeOf(design) !== "deep" || front(name) === (design === "front"));
 }
 
+/** A kind of cloud for `place`, its `numbers` over the place's defaults, as a preset of the sliders. */
+export function presetOf(place: Place, numbers: Record<string, unknown>): Record<string, number> {
+    const whole: Record<string, unknown> = { ...DEFAULT_LAYERED_SKY[place], ...numbers };
+    const preset: Record<string, number> = {};
+    for (const [key, param] of Object.entries(sliders(place)))
+        if (typeof whole[key] === "number") preset[param] = whole[key];
+    if (place === "deep") preset["@kind1"] = Number(KIND_VALUE[whole.kind === "front" ? "front" : "towers"]);
+    return preset;
+}
+
 /** The library's kinds of cloud for `place` as presets of the sliders: each over the place's defaults, as there. */
 export function kindPresets(place: Place): Presets {
-    const params = Object.entries(sliders(place));
     const kinds: Record<string, Record<string, unknown>> = CLOUD_TYPES[place];
-    return Object.fromEntries(
-        Object.entries(kinds).map(([name, kind]) => {
-            const whole: Record<string, unknown> = { ...DEFAULT_LAYERED_SKY[place], ...kind };
-            const preset: Record<string, number> = {};
-            for (const [key, param] of params) if (typeof whole[key] === "number") preset[param] = whole[key];
-            if (place === "deep") preset["@kind1"] = Number(KIND_VALUE[whole.kind === "front" ? "front" : "towers"]);
-            return [name, preset];
-        }),
-    );
+    return Object.fromEntries(Object.entries(kinds).map(([name, kind]) => [name, presetOf(place, kind)]));
 }
 
 /** What the sliders hold for `place`, as an entry of the library's `CLOUD_TYPES`: every number, rounded to its slider. */

@@ -1,0 +1,45 @@
+---
+import "../environment/environments.css";
+import Icon from "../Icon.astro";
+
+/**
+ * The HDRI in the rail (see Rail.astro), the same choice as the boxes under the figures: the most downloaded skies as
+ * a gallery of three a row, two rows in view and the rest scrolled to, each with its resolutions over it on hover, and
+ * a button that copies its link; without categories, search or a file of one's own, which the boxes keep.
+ */
+---
+
+<details class="rail-group environments" data-group="hdri" data-environments open>
+    <summary>
+        <span class="rail-label">HDRI</span>
+        <span class="note" data-field="summary">Loading…</span>
+        <button type="button" data-field="link" class="icon-button" title="Copy the link to this HDRI on Poly Haven" aria-label="Copy the link to this HDRI on Poly Haven">
+            <Icon name="copy" />
+        </button>
+    </summary>
+    <div class="environments-gallery rail-gallery" data-field="gallery" role="group" aria-label="HDRIs"></div>
+    <p class="rail-why" data-field="status"></p>
+    <p class="rail-credit">
+        From <a href="https://polyhaven.com/hdris">Poly Haven</a>, <a href="https://polyhaven.com/license">CC0</a>, thank you.
+    </p>
+</details>
+
+<script>
+    import "../environment/environments";
+    import { hdri } from "../environment/hdri";
+
+    const box = document.querySelector<HTMLElement>('.rail [data-group="hdri"]');
+    if (box) {
+        // Poly Haven's page of the chosen HDRI; a file of the reader's own has none, and has no authors either.
+        const link = box.querySelector<HTMLButtonElement>('[data-field="link"]');
+        link?.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const text = hdri.authors.length ? `https://polyhaven.com/a/${hdri.id}` : hdri.name;
+            try {
+                await navigator.clipboard.writeText(text);
+                link.toggleAttribute("data-copied", true);
+                setTimeout(() => link.removeAttribute("data-copied"), 1500);
+            } catch {}
+        });
+    }
+</script>

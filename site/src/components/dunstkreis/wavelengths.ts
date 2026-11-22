@@ -19,6 +19,7 @@ import { onDemand } from "../frame";
 import { drawSvg, LABEL_GAP as GAP, STRIP_MARGIN as MARGIN, svgText } from "../sternzeit/figure";
 import { onChange, state } from "../sternzeit/state";
 import { configureCanvas, display, gpu, gpuDevice, onDisplay, quality, SDR } from "./atmosphere";
+import { PHOTO_RAMP } from "./ramps";
 
 // Pick your wavelengths: the samples a sky is computed at, dragged along the spectrum, and what they make of eight
 // skies' colors, by the conversion and the error research/wavelengths.ts chose dunstkreis' four with.
@@ -428,6 +429,7 @@ function createLive() {
                     sunAngularDiameter,
                     observerHeightM: clampObserverHeight(state.heightM),
                     ev100: ev,
+                    autoExposureKeys: PHOTO_RAMP,
                     inverseViewProjection: new Float32Array([
                         ...right.map((c) => c * half),
                         0,

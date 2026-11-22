@@ -1,6 +1,6 @@
 import { NO_WHITE_BALANCE, type WhiteBalance } from "@himmelszelt/helldunkel";
 import { type Corona, DEFAULT_CORONA } from "./corona.js";
-import type { HighSheet } from "./layers.js";
+import type { DeepLayer, HighSheet } from "./layers.js";
 
 /**
  * What the clouds are made of and lit by, as plain numbers: a cloudscape of low clouds in a voxel volume, up to two
@@ -228,6 +228,13 @@ export interface CloudParams {
     observerKm?: readonly [number, number];
     highEvolution?: number;
     highSeed?: number;
+    /** The layered model's deep layer with the cloudscape, for a pass made with `deep`: a front or towers, none by
+     *  default, and `null` takes it away. It drifts with the cloudscape's wind and clears with it; `deepSeed` is
+     *  another layer of the same kind. A front stands where its numbers place it at `deepSinceS`, a time as `timeS`,
+     *  0 by default, and has come on with the wind since. */
+    deep?: DeepLayer | null;
+    deepSeed?: number;
+    deepSinceS?: number;
 }
 
 export const DEFAULT_CLOUDSCAPE: CloudscapeParams = {

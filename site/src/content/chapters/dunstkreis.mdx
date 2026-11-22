@@ -102,7 +102,11 @@ import { fromDate, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
 // Once per atmosphere: the transmittance and multiple scattering tables.
 const luts = await precomputeAtmosphere(device);
 // Into a canvas configured with rgba8unorm and STORAGE_BINDING usage.
-const sky = await createSkyPass(device, { luts, format: "rgba8unorm", autoExposure: true });
+const sky = await createSkyPass(device, {
+    luts,
+    format: "rgba8unorm",
+    autoExposure: true,
+});
 
 // Whenever the moment, the place or the camera changes.
 const time = fromDate(new Date());
@@ -112,7 +116,8 @@ sky.update({
     sunDirection: sun.direction(time, observer),
     sunAngularDiameter: sun.apparentAngularDiameter(julianEphemerisDay(time)),
     observerHeightM: observer.heightM,
-    inverseViewProjection, // your camera's without translation, column-major; reversed-z works too
+    // Your camera's, without translation, column-major; reversed-z works too.
+    inverseViewProjection,
 });
 const encoder = device.createCommandEncoder();
 sky.encode(encoder, context.getCurrentTexture());
@@ -341,7 +346,7 @@ channel, and the setting Sun's disc split into a white upper and a yellow lower 
 
 From there on the sky is light like any other, and what becomes of it is [helldunkel](../helldunkel/)'s, whose code
 dunstkreis bundles, so the sky pass needs no other package. `autoExposure` meters the sky-view table on the GPU, and
-`autoExposureKeys` shapes that reading over the day, darker at night, the blue hour lifted, as
+`autoExposureKeys` shapes that reading over the day, none by default, darker at night or the blue hour lifted, as
 [helldunkel explains](../helldunkel/#a-sky-that-moves); `toneMap` picks its curve, `whiteBalance` its
 white, `veil` adds a lens's or the eye's glare and `darkAdapted` its blue shift at night. A renderer with its own HDR pipeline turns
 the tone map off and gets the exposed luminance itself, linear and unclamped, for a float target. How one patch of this
@@ -355,6 +360,13 @@ balance, so it costs the shaders nothing and reaches the sun disc and the aerial
 (<Fig id="grading" />).
 
 <Grading />
+
+The stars come and go with the exposure. sternenheer's, exposed as the sky is, thin out as a key darkens the dusk: with
+the Sun 12° down the meter alone shows the bright stars of early night, and the photographer's ramp, some 1.8 stops
+darker, only a few. Further down the meter would follow the fading twilight to exposures no camera would choose, as the
+model's air has no light of its own at night, and the range's floor takes over: `autoExposureRange` sets how dark the
+night is, and the keys shape the twilight above it. The keys as you set them are under the figure as code, ready to
+paste.
 
 ## Aerial perspective
 
@@ -621,6 +633,13 @@ the limb, some 9,000 cd/m², fading over many solar radii <Cite id="baumbach1937
 chromosphere under it. By day the sky drowns the corona; from above the air it shows close in or at a long exposure.
 Both are on by default, `limbDarkening` and `solarCorona`.
 
+From the ground the corona shows in a total eclipse alone, and for that the sky has to go dark. Given the Moon's
+direction and the width it shows, `moonDirection` and `moonAngularDiameter`, the sky pass hides the disc behind it and
+gives every point of the air the share of the Sun it still sees: under the Moon's shadow, a hundred kilometers or two
+across, none. What lights the sky there has been scattered more than once, in from the sunlit air around, and it
+leaves the zenith at about a two-thousandth of the day's, some 1 cd/m², over a glow all round the horizon, where the
+view passes out of the shadow. [nachtgestirn's Moon](../nachtgestirn/#moon) stands in front of it.
+
 The glow around it is the aureole, and it is the air's. Aerosols scatter sunlight almost straight on, far more sharply
 than the one lobe of the tables can say: a Cornette-Shanks lobe with g 0.8 spreads that light over tens of degrees,
 where droplets and dust of a few micrometers bend it by diffraction into a peak of a few degrees, some ten times
@@ -639,8 +658,7 @@ the Sun's light at the observer. `veil` sets its strength: a lens's by default, 
 which outshines the sky out to some ten degrees around the Sun <Cite id="cie2002" />. However weak, the glow is never
 the size of the Sun. The disc is some forty thousand times brighter than what a sunny day's exposure shows as white, so
 even a lens's veil burns out twice the disc's width, and a good quarter more with every stop the exposure opens.
-`starburst`, off by default, adds the spikes a camera's aperture blades diffract the Sun into, fixed to the camera.
-Switch it on under the sky and raise the observer to orbit (<Fig id="sky" />).
+Switch it off under the sky and raise the observer to orbit (<Fig id="sky" />).
 
 Side by side, the disc stands more than five decades above the sky beside it at noon, and every glow in between falls
 off with the angle at its own pace (<Fig id="glows" />). That is why none of them has a size: an exposure draws a line
@@ -654,7 +672,7 @@ a degree out.
 
 The rest is [helldunkel](../helldunkel/)'s too: [bloom](../helldunkel/#bloom) needs the whole exposed image, and runs
 over it. All of these add up without counting each other twice: the aureole is light in the air, the corona the Sun's
-own, the veil, the starburst and the bloom what the lens or the eye spreads of all that reaches it. God rays, the shafts of light and shadow through haze, need what the sky does not
+own, the veil and the bloom what the lens or the eye spreads of all that reaches it. God rays, the shafts of light and shadow through haze, need what the sky does not
 have: something that casts a shadow. The scene below marches its haze against its solids' shadows, and
 [gewoelk](../gewoelk/) will have its clouds'. Lock the view on the Sun, set an evening, and switch them apart.
 

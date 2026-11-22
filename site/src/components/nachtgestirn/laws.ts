@@ -1,5 +1,5 @@
 import { ev100ForLuminance, moonEV100, type Vec3 } from "@himmelszelt/nachtgestirn";
-import { find } from "../dom";
+import { find, fixed } from "../dom";
 import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { onChange, state } from "../sternzeit/state";
@@ -171,7 +171,7 @@ export function lawsFigure(root: HTMLElement) {
         const by = roloHolds(m.phaseAngle) ? "" : ", Allen";
         for (const element of offs) {
             const off = Math.log2(Math.max(discLight(element.dataset.off as Law, m.phaseAngle * DEG), 1e-9) / moon);
-            element.textContent = `${off >= 0 ? "+" : ""}${off.toFixed(1)} stops${by}`;
+            element.textContent = `${off >= 0 ? "+" : ""}${fixed(off, 1)} stops${by}`;
         }
     }
 

@@ -5,17 +5,18 @@ import "./clouds.css";
 import Choice from "../dunstkreis/Choice.astro";
 import Hdr from "../dunstkreis/Hdr.astro";
 import OptionGroup from "../dunstkreis/OptionGroup.astro";
-import SkyFrame from "../dunstkreis/SkyFrame.astro";
-import StarGroups from "../sternenheer/StarGroups.astro";
+import Icon from "../Icon.astro";
 import { type Design, KIND_VALUE, kindsOf, placeOf } from "./lab/kinds";
 import LabSliders from "./lab/LabSliders.astro";
 import type { LabSlider } from "./lab/sliders";
 import * as all from "./lab/sliders";
 
 /**
- * A designer for one place of gewoelk's layered sky: the whole-sky figure with that place alone, its sliders, the
- * library's kinds of cloud for it as presets, the map it is rendered from, and its numbers to copy as a kind of the
- * library's `CLOUD_TYPES`. The deep layer has two, one for its towers and one for a front.
+ * A designer for one place of gewoelk's layered sky: a patch of the cloud alone under a real sky, seen from a camera
+ * that orbits it, a drawing of the model that kind of cloud is rendered by, small in the patch's corner until a click
+ * changes the two over, and beside them what it is rendered by, its numbers as sliders; under them a gallery of the textures it is rendered from, each with its format, size and memory on the GPU. The library's kinds of cloud for it are presets, and the reader
+ * saves their own beside them; the numbers copy as a kind of the library's `CLOUD_TYPES`. The time of day and the
+ * clock are the figure's own. The deep layer has two designers, one for its towers and one for a front.
  */
 interface Props {
     place: Design;
@@ -25,36 +26,41 @@ interface Props {
 const { place } = Astro.props;
 const marched = place !== "high";
 
-// What a designer is, in words, and the kind it starts with.
-const DESIGNS: Record<Design, { label: string; caption: string; checked: string }> = {
+// What a designer is, in words: its view, its model's drawing, its caption, and the kind it starts with.
+const DESIGNS: Record<Design, { label: string; model: string; caption: string; checked: string }> = {
     low: {
-        label: "The low layer of cloud alone, under a real sky",
+        label: "A patch of the low layer of cloud, 16 km across, seen from above",
+        model: "The low layer's model: a map on the ground, a column of cloud over each of its cells between the layer's base and its top, and a ray stepping through the slab",
         caption:
-            "The low layer alone, from a few heaps to a closed deck. At the left its map, one tile from above, north up: the brighter, the taller the cloud.",
+            "The low layer in three parts. (a) Its model: the map gives each column of cloud its height in the layer's slab, and a ray (accent) steps through, asking the way to the Sun (dashed) at every step. (b) A patch of the layer, 16 km across, on the chosen date and at the chosen place. (c) Its numbers. Below, what it is rendered from: the map's heights, the brighter the taller, the steepness of the tops, and the noise that heaps the surface. The model is to scale.",
         checked: "fair",
     },
     towers: {
-        label: "The deep layer's towers alone, under a real sky",
+        label: "A patch of the deep layer's towers, 80 km across, seen from above",
+        model: "The towers' model: a tower in some of the map's cells, turrets on top, the tallest under an anvil drawn downwind, rain under each",
         caption:
-            "The deep layer as towers, the tallest under anvils. At the left its map, one tile from above, north up: the brighter, the taller the tower.",
+            "The deep layer as towers. (a) Its model: a tower in a share of the map's cells, turrets on top, the tallest under an anvil drawn downwind, rain (dashed) under each. (b) A patch 80 km across. (c) Its numbers. Below, what it is rendered from: the towers' heights, the anvils' skirts, the steepness of the tops, and the noise. The model is to scale.",
         checked: "towers",
     },
     front: {
-        label: "The deep layer as a front, under a real sky",
+        label: "A patch of the deep layer as a front, 230 km across, seen from above",
+        model: "The front's model: one band placed by a distance and a bearing from the observer, a wall of towers behind its leading edge and a shield to the rear",
         caption:
-            "The deep layer as a front, one band placed in the world, seen from ahead of it. At the left its map, from the leading edge at its left to its back.",
+            "The deep layer as a front. (a) Its model: one band, placed from the observer by a distance and a bearing (accent), a wall of towers behind its leading edge and a shield to the rear. (b) A patch 230 km across, its middle 60 km ahead of the observer. (c) Its numbers. Below, the map from the leading edge at its left to its back: heights, anvils, the front's shade and the tops' steepness. Heights in the model are drawn four times.",
         checked: "frontAhead",
     },
     middle: {
-        label: "The middle layer of cloud alone, under a real sky",
+        label: "A patch of the middle layer of cloud, 16 km across, seen from above",
+        model: "The middle layer's model: a map on the ground, a column of cloud over each of its cells between the layer's base and its top, and a ray stepping through the slab",
         caption:
-            "The middle layer alone, from a few flakes to a deck. At the left its map, one tile from above, north up.",
+            "The middle layer. (a) Its model, the low layer's, higher and thinner: columns in a slab, by a map. (b) A patch 16 km across. (c) Its numbers. Below, its map and the noise. The model is to scale.",
         checked: "altocumulus",
     },
     high: {
-        label: "The sheet of high cloud alone, under a real sky",
+        label: "A patch of the sheet of high cloud, 12 km across, seen from above",
+        model: "The sheet's model: one shell at its altitude, the map's tile laid along the wind and repeated, a patch of the broad field, and a ray that reads the map once where it crosses",
         caption:
-            "The sheet of high cloud alone. At the left its map in the wind's frame, channel by channel: the puffs, the veil, the broad field that thins the sheet to patches, and the billows' noise.",
+            "The sheet of high cloud. (a) Its model: one shell, the map's tile repeated along the wind, a patch of the broad field (filled), and a ray (accent) that reads the map once where it crosses. (b) A patch 12 km across. (c) Its numbers. Below, the map channel by channel: puffs, veil, the broad field for the patches and flakes, and the fine noise of billows and fibers. The model is to scale.",
         checked: "mackerel",
     },
 };
@@ -107,13 +113,15 @@ const PRESET = {
 
 const only = (sliders: LabSlider[], ...params: string[]) => sliders.filter(([param]) => params.includes(param));
 const without = (sliders: LabSlider[], ...params: string[]) => sliders.filter(([param]) => !params.includes(param));
+// The deep layer's maps do not read the sharpness: its slider is held with the hidden ones.
+const DEEP = without(all.FORMATION_DEEP, "l1.sharp");
 // The designed place's sliders, group by group.
 const GROUPS: Record<Design, [name: string, sliders: LabSlider[]][]> = {
     low: [["low", all.FORMATION_LOW]],
-    towers: [["towers", [...all.FORMATION_DEEP, ...all.FORMATION_ANVIL, ...all.FORMATION_RAIN]]],
+    towers: [["towers", [...DEEP, ...all.FORMATION_ANVIL, ...all.FORMATION_RAIN]]],
     front: [
         ["front", all.FORMATION_FRONT],
-        ["clouds", [...all.FORMATION_DEEP, ...all.FORMATION_RAIN]],
+        ["clouds", [...DEEP, ...all.FORMATION_RAIN]],
     ],
     middle: [["middle", all.FORMATION_MIDDLE]],
     high: [
@@ -130,12 +138,10 @@ const starting = (sliders: LabSlider[], param: string, value: number) =>
 const time = marched ? all.FORMATION_TIME : without(all.FORMATION_TIME, "shear");
 // The towers start on a seed that stands a tower with its anvil in view.
 const TIME = place === "towers" ? starting(time, "seed", 13) : time;
-const CLEARING = all.CLEARING;
 
-// Every other slider of the research figures, once: held hidden at its start, as the whole-sky figure holds them.
-const SHOWN = new Set(
-    [...GROUPS[place].flatMap(([, sliders]) => sliders), ...TIME, ...CLEARING].map(([param]) => param),
-);
+// Every other slider of the research figures, once: held hidden at its start, as the whole-sky figure holds them. The
+// clearing's are among them: a designer's patch is its clearing.
+const SHOWN = new Set([...GROUPS[place].flatMap(([, sliders]) => sliders), ...TIME].map(([param]) => param));
 const HELD = [
     ...new Map(
         Object.values(all)
@@ -170,7 +176,7 @@ const SCALE = choice(
         ["0.5", "half"],
         ["0.25", "quarter"],
     ],
-    "0.5",
+    "1",
 );
 const STEPS = choice(
     "steps",
@@ -194,44 +200,74 @@ const SIZE = choice(
     ],
     "2048",
 );
-const SPEED = choice(
-    "speed",
-    "Speed",
-    "How fast the figure's clock runs while its animation does",
-    [
-        ["1", "1x"],
-        ["60", "60x"],
-        ["600", "600x"],
-    ],
-    "60",
-);
+// How fast the figure's clock runs while it plays.
+const SPEEDS = [
+    { speed: 1, icon: "speedClock", title: "As fast as a clock" },
+    { speed: 60, icon: "speedMinute", title: "A minute a second" },
+    { speed: 3600, icon: "speedHour", title: "An hour a second" },
+] as const;
 ---
 
-<figure class="fig scene-frame wide" id={id} data-cloud-designer data-design={place}>
-    <SkyFrame fly ownHeight grid={false} locked={false} hint="Drag to look around, scroll to zoom. The sky is dunstkreis', at the page's moment and place.">
-        <canvas data-field="canvas" aria-label={DESIGNS[place].label}></canvas>
-        <div class="cloud-textures" data-field="textures"></div>
-        <div class="sky-compass" data-field="compassLabels"></div>
-        <Fragment slot="bar">
-            <StarGroups catalog={null} />
-        </Fragment>
-        <Fragment slot="options">
+<figure class="fig scene-frame wide cloud-designer" id={id} data-cloud-designer data-design={place}>
+    <div class="designer-parts">
+        <div class="designer-view">
+            <div class="designer-stage" data-field="stage" data-main="view">
+                <div class="sky-view as-seen">
+                    <canvas data-field="canvas" aria-label={DESIGNS[place].label}></canvas>
+                </div>
+                <div class="designer-model frame-scene" data-field="model">
+                    <svg class="dome-layer zdog" data-layer="clouds" aria-hidden="true"></svg>
+                    <svg class="dome-layer zdog" data-layer="lines" aria-label={DESIGNS[place].model}></svg>
+                    <div class="frame-labels" aria-hidden="true"></div>
+                </div>
+                <button type="button" class="designer-swap" data-field="swap"></button>
+                <div class="fig-bar">
+                    <span class="fig-bar-start">
+                        <span class="fig-hint footnote" data-for="view">Drag to turn, with shift for height, scroll to zoom.</span>
+                        <span class="fig-hint footnote" data-for="model">Drag to rotate. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.</span>
+                    </span>
+                    <span class="fig-bar-end">
+                        <span class="view-buttons">
+                            <button type="button" class="view-icon" data-field="animate" aria-pressed="false" title="Play: the figure's own clock runs, the clouds drift and change, and the time of day goes with it" aria-label="Play"><Icon name="play" /></button>
+                            <button type="button" class="view-icon" data-field="timeLock" aria-pressed="false" title="Hold the time of day while the figure plays: the clouds drift and change, the Sun stays where it is" aria-label="Hold the time of day"><Icon name="timeLock" /></button>
+                            {SPEEDS.map(({ speed, icon, title }) => <button type="button" class="view-icon" data-speed={speed} aria-pressed={speed === 60 ? "true" : "false"} title={title} aria-label={title}><Icon name={icon} /></button>)}
+                        </span>
+                    </span>
+                </div>
+            </div>
+            <label class="figure-slider" title="The time of day in this figure alone, on the page's date and at its place: it starts at the page's moment and leaves it as it is">
+                <span class="note">Time of day</span>
+                <span class="figure-slider-rail">
+                    <input type="range" data-field="daytime" min="0" max="1439" step="1" value="720" aria-label="Minutes of the day, in this figure alone" />
+                    <span class="figure-slider-scale" aria-hidden="true">{["0", "6", "12", "18", "24"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 25}%`}>{mark}</span>)}</span>
+                </span>
+                <output data-field="daytimeValue"></output>
+            </label>
+            <label class="figure-slider" title="The height the camera looks at, in km: it starts at the middle of the cloud. Dragging the view with shift held sets it too">
+                <span class="note">Height</span>
+                <span class="figure-slider-rail">
+                    <input type="range" data-field="lookAt" min="0" max="16" step="0.1" value="2" aria-label="The height the camera looks at, in km" />
+                    <span class="figure-slider-scale" aria-hidden="true">{["0", "4", "8", "12", "16"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 25}%`}>{mark}</span>)}</span>
+                </span>
+                <output data-field="lookAtValue"></output>
+            </label>
+        </div>
+        <div class="designer-assets sky-options">
             <OptionGroup name="kind">
                 <Choice figure={id} {...PRESET} />
             </OptionGroup>
+            <OptionGroup name="yours">
+                <span class="own-kinds" data-field="own"></span>
+                <button type="button" class="view-toggle" data-copy-kind title="Copies the numbers as they stand, as a kind of cloud for the library's CLOUD_TYPES">copy</button>
+            </OptionGroup>
             {GROUPS[place].map(([name, sliders]) => <OptionGroup name={name}><LabSliders sliders={sliders} /></OptionGroup>)}
-            <OptionGroup name="time">
-                <button type="button" class="view-toggle" data-field="animate" aria-pressed="false" title="Runs the figure's clock: the clouds drift with the wind and their map changes, baked again every frame">animate</button>
-                <Choice figure={id} {...SPEED} />
+            <OptionGroup name="wind and change">
                 <LabSliders sliders={TIME} />
             </OptionGroup>
             <OptionGroup name="render">
                 <Choice figure={id} {...SCALE} />
                 {marched ? <Choice figure={id} {...STEPS} /> : <Choice figure={id} {...SIZE} />}
-                <button type="button" class="view-toggle" data-field="textures.on" aria-pressed="true" title="What the clouds are rendered from, at the left of the view: hover a map for what it holds">textures</button>
-                <button type="button" class="view-toggle" data-field="ground.grid" aria-pressed="true" title="A grid on the ground, for orientation, speed and height: thin lines every 10 km, 1 km, 100 m and on down to 1 mm, each level showing once its cells are a few pixels across">grid</button>
-                <LabSliders sliders={CLEARING} />
-                <button type="button" class="view-toggle" data-copy-kind title="Copies the numbers as they stand, as a kind of cloud for the library's CLOUD_TYPES">copy</button>
+                <button type="button" class="view-toggle" data-field="ground.grid" aria-pressed="true" title="A grid on the ground under the patch: thin lines every 10 km, 1 km, 100 m and on down, each level showing once its cells are a few pixels across">grid</button>
             </OptionGroup>
             <OptionGroup name="HDR (× SDR white)">
                 <Hdr figure={id} />
@@ -240,8 +276,9 @@ const SPEED = choice(
                 {placeOf(place) === "deep" && <Choice figure={id} {...KIND} />}
                 <LabSliders sliders={HELD} />
             </div>
-        </Fragment>
-    </SkyFrame>
+        </div>
+    </div>
+    <div class="designer-gallery" data-field="textures" role="group" aria-label="The textures this cloud is rendered from"></div>
     <p class="view-status"><span class="sky-timing" data-field="timing"></span></p>
     <figcaption class="figure-caption">{caption}</figcaption>
 </figure>

@@ -11,6 +11,9 @@
     --text-small: 0.8125rem;
     --text-meta: var(--text-small);
     --wide: 1140px;
+    /* The width the page's content has: the viewport's, less the rail beside it where there is one (see rail.css). */
+    --rail-space: 0px;
+    --page-width: calc(100vw - var(--rail-space));
     /* Corners: a canvas or panel, a group of controls, one control; and the smallest, for marks at the size of text. */
     --radius-canvas: 16px;
     --radius-group: 10px;
@@ -966,7 +969,7 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 }
 /* Breaks out of the reading column to the full site width, for scenes, controls and tables that need the room. */
 .wide {
-    --wide-width: min(var(--wide), 100vw - 3rem);
+    --wide-width: min(var(--wide), var(--page-width) - 3rem);
     width: var(--wide-width);
     margin-left: calc(50% - var(--wide-width) / 2);
 }

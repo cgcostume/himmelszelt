@@ -3,8 +3,8 @@ import Choice from "./Choice.astro";
 import "./dunstkreis.css";
 import "./grading.css";
 
-/** Grading the day: the evening sky at eight altitudes of the Sun, as metered and as the ramp's keys grade it. */
-const ALTITUDES = [-12, -6, -3, 0, 3, 10, 30, 60];
+/** Grading the day: the evening sky at nine altitudes of the Sun, as metered and as the ramp's keys grade it. */
+const ALTITUDES = [-30, -12, -6, -3, 0, 3, 10, 30, 60];
 ---
 
 <figure class="fig wide tiles-figure grading" id="grading" data-export-timeless>
@@ -16,16 +16,16 @@ const ALTITUDES = [-12, -6, -3, 0, 3, 10, 30, 60];
             title="Keys to start from; dragging one makes them your own"
             options={[
                 ["physical", "physical", "No ramp: every sky exposed as the meter reads it"],
-                ["default", "default", "DEFAULT_AUTO_EXPOSURE_KEYS: night darker, the blue hour lifted, the sunset a touch brighter"],
-                ["purple", "purple dusk", "The default's exposure, the blue hour and the sunset turned towards magenta"],
+                ["photo", "photo", "A photographer's: night darker, the blue hour lifted, the sunset a touch brighter; the ramp this site's skies use"],
+                ["purple", "purple dusk", "The photo ramp's exposure, the blue hour and the sunset turned towards magenta"],
                 ["golden", "golden", "The minutes around sunset brighter and warmer, noon as metered"],
             ]}
-            checked="default"
+            checked="photo"
         />
     </div>
     <div class="grading-stage" data-actions="png copy" data-actions-in=".grading-bar">
-        <div class="tiles-panel split as-seen grading-tiles" style="--count: 8; --rows: 2">
-            <canvas width="800" height="200" aria-label="The evening sky looking west at eight altitudes of the Sun, as metered above and graded below"></canvas>
+        <div class="tiles-panel split as-seen grading-tiles" style={`--count: ${ALTITUDES.length}; --rows: 2`}>
+            <canvas width="900" height="200" aria-label="The evening sky looking west at nine altitudes of the Sun, with its stars, as metered above and graded below"></canvas>
             <span class="overlay-label grading-row">physical</span>
             <span class="overlay-label grading-row grading-row-styled">graded</span>
         </div>
@@ -36,10 +36,15 @@ const ALTITUDES = [-12, -6, -3, 0, 3, 10, 30, 60];
             <svg role="img" aria-label="The ramp's keys over the Sun's altitude, in stops, warmth and magenta, draggable"></svg>
         </div>
     </div>
+    <details class="fold lut-fold">
+        <summary><span class="moment-title">The keys as code</span> <span class="note" data-field="summary"></span></summary>
+        <div class="lut-call" data-field="code"></div>
+    </details>
     <figcaption class="figure-caption">
-        The evening sky looking west at eight altitudes of the Sun, metered: as the meter reads it, above, and graded by
-        the ramp's keys, below. Under them the keys, draggable, in stops of exposure and in warmth and magenta, joined by
-        the curve dunstkreis applies, each tile over its altitude.
+        The evening sky looking west at nine altitudes of the Sun, with sternenheer's stars, metered: as the meter reads
+        it, above, and graded by the ramp's keys, below. In deep night the range's floor, EV100 −10, holds both. Under
+        them the keys in stops and in warmth and magenta, joined by the curve dunstkreis applies, each tile over its
+        altitude.
     </figcaption>
 </figure>
 

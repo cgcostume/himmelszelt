@@ -74,6 +74,10 @@ fn dkPrecomputeAerialPerspective(@builtin(global_invocation_id) id: vec3u) {
     let top = a.Rt - a.Rg;
     let direction = dkFroxelRay((vec2f(id.xy) + 0.5) / vec2f(size.xy));
     let sunDirection = dkParams.sunDirection;
+    dkEclipse = DkEclipse(
+        dkParams.eclipseOffset, dkParams.eclipseAlong, dkParams.sunDirection, dkParams.eclipseMoonRadius,
+        dkParams.sunAngularRadius, 0.0,
+    );
 
     var ray = DkSkyRay(vec4f(0.0), vec4f(1.0), direction, false, vec3f(0.0, 0.0, 1.0));
     // The Moon's light along the same path, with the same transmittance: only the light's direction differs.
@@ -94,6 +98,7 @@ fn dkPrecomputeAerialPerspective(@builtin(global_invocation_id) id: vec3u) {
         up = entry.xyz;
         h = top;
         offset = entry.w;
+        dkEclipse = dkEclipseFrom(direction * entry.w);
     }
 
     let horizontal = dkPathHorizontal(up, direction);
@@ -113,10 +118,14 @@ fn dkPrecomputeAerialPerspective(@builtin(global_invocation_id) id: vec3u) {
             let ds = max(min(slice - traveled, left), 0.0) / f32(DK_AERIAL_PERSPECTIVE_STEPS - i);
             traveled += ds;
             if (moonlit) {
+                // The Moon's own light is in no eclipse of the Sun.
+                let eclipse = dkEclipse.moonRadius;
+                dkEclipse.moonRadius = 0.0;
                 _ = dkRaymarchStep(
                     dkAtmosphere, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, up, horizontal, h,
                     dkParams.moonDirection, path, ds, &moon,
                 );
+                dkEclipse.moonRadius = eclipse;
             }
             path = dkRaymarchStep(
                 dkAtmosphere, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, up, horizontal, h, sunDirection,

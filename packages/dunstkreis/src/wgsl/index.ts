@@ -47,9 +47,9 @@ import sun from "./sun.wgsl";
 import transmittance from "./transmittance.comp.wgsl";
 
 // One source with the packages that own them, bundled here so the sky pass needs no other package: how a cube map lays
-// out directions, for whoever samples the sky's, the white balance, the tone curves, the veil around the sun, a lens's
-// starburst, and the eye's night vision.
-export { glare, lens, tonemap, vision, whitebalance } from "@himmelszelt/helldunkel/wgsl";
+// out directions, for whoever samples the sky's, the white balance, the tone curves, the veil around the sun and the
+// eye's night vision.
+export { glare, tonemap, vision, whitebalance } from "@himmelszelt/helldunkel/wgsl";
 export { cube } from "@himmelszelt/rundbild/wgsl";
 
 export { skyCubeOutput, skyOutput } from "./output.js";

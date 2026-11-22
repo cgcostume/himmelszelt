@@ -108,16 +108,17 @@ const time = fromDate(new Date());
 const jde = julianEphemerisDay(time);
 const observer = { latitude, longitude };
 const direction = moon.direction(time, observer);
+const orientation = moonOrientation({
+    direction,
+    libration: moon.topocentricLibrations(time, observer),
+    positionAngleOfAxis: moon.topocentricPositionAngleOfAxis(time, observer),
+    parallacticAngle: moon.parallacticAngle(time, observer),
+});
 pass.update({
     direction,
     angularDiameter: moon.topocentricAngularDiameter(time, observer),
     sunDirection: moon.sunDirection(time, observer),
-    orientation: moonOrientation({
-        direction,
-        libration: moon.topocentricLibrations(time, observer),
-        positionAngleOfAxis: moon.topocentricPositionAngleOfAxis(time, observer),
-        parallacticAngle: moon.parallacticAngle(time, observer),
-    }),
+    orientation,
     ev100: moonEV100(moon.phaseAngle(jde), moon.illuminatedFraction(jde)),
     inverseViewProjection, // your camera, as dunstkreis' sky pass takes it
     projectionDistance, // its bend towards a fisheye: 0 none, 1 stereographic

@@ -164,7 +164,6 @@ export function starsFigure(root: HTMLElement) {
             twinkle: pressed("twinkle"),
             time: (performance.now() - startedAt) / 1000,
             glare: pressed("glare"),
-            starburst: pressed("starburst"),
             veil: maybe("veil") ? pressed("veil") : true,
             halo: Number(maybe<HTMLInputElement>("halo")?.value ?? 1),
             starCompensation: offsetOf(root, "stars").stops,
@@ -252,7 +251,7 @@ export function starsFigure(root: HTMLElement) {
             for (const input of root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-${name}"]`))
                 input.addEventListener("change", requestRender);
         maybe("constellations")?.addEventListener("change", requestRender);
-        for (const name of ["auto", "lock", "air", "glare", "starburst", "veil", "eye", "moon", "twinkle", "lines"]) {
+        for (const name of ["auto", "lock", "air", "glare", "veil", "eye", "moon", "twinkle", "lines"]) {
             maybe(name)?.addEventListener("click", () => {
                 field(name).setAttribute("aria-pressed", String(!pressed(name)));
                 if (name === "twinkle") twinkle(pressed("twinkle"));

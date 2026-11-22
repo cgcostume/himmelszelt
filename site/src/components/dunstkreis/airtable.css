@@ -1,11 +1,20 @@
-/* The air table figure: the texels as wide as the figure, the Moon and its limb under it in flicker.css's panels. */
+/* The air table figure: the chosen strip's plot as wide as the figure, the strips under it, the Moon and its limb below
+   in flicker.css's panels. The strips' canvases and the plot share their left edge, the gutter for the plot's ticks. */
 .air-table-export {
     position: relative;
+    --air-table-gutter: 56px;
 }
 .air-table-texels {
     margin-bottom: 1rem;
 }
-/* Its caption, with the switch between texels and values at its end. */
+.air-table-texels > svg {
+    display: block;
+    width: 100%;
+    height: 260px;
+    overflow: visible;
+    touch-action: pan-y;
+}
+/* Its caption, with the figure's actions at its end. */
 .air-table-texels > figcaption {
     display: flex;
     flex-wrap: wrap;
@@ -13,30 +22,64 @@
     align-items: center;
     justify-content: space-between;
 }
-.air-table-views {
-    display: flex;
-    gap: 4px;
-}
-.air-table-texels > svg {
-    display: block;
-    width: 100%;
-    overflow: visible;
+/* The rows, each named over its strips, a strip a button: its channels in the gutter, its texels beside them. */
+.air-table-strips {
+    display: grid;
+    grid-template-columns: var(--air-table-gutter) minmax(0, 1fr);
+    gap: 3px 0;
+    margin-top: 0.5rem;
+    font-size: var(--text-meta);
     touch-action: pan-y;
 }
-.air-table-image {
+.air-table-head {
+    grid-column: 2;
+    margin-top: 0.3rem;
+    color: var(--muted);
+    line-height: 1.3;
+}
+.air-table-head:first-child {
+    margin-top: 0;
+}
+.air-table-strip {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    cursor: pointer;
+}
+.air-table-strip > span {
+    padding-right: 6px;
+    font-family: var(--font-mono);
+    line-height: 1;
+    text-align: right;
+}
+.air-table-strip > canvas {
+    display: block;
+    width: 100%;
+    height: 10px;
+    border-radius: 2px;
+    outline: 1px solid var(--line);
+    outline-offset: 1px;
     image-rendering: pixelated;
 }
-.air-table-r {
-    fill: oklch(0.62 0.19 25);
+.air-table-strip:hover > canvas {
+    outline-color: var(--muted);
 }
-.air-table-g {
-    fill: oklch(0.62 0.14 145);
+.air-table-strip[aria-pressed="true"] {
+    color: var(--accent);
 }
-.air-table-b {
-    fill: oklch(0.6 0.16 255);
+.air-table-strip[aria-pressed="true"] > canvas {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
-.air-table-row {
-    fill: var(--text);
+/* An alpha channel's line, in the text's ink: no hue of its own. */
+.plot-line.air-table-alpha {
+    stroke: var(--text);
 }
 .air-table-tick {
     stroke: var(--muted);
@@ -45,21 +88,6 @@
 .air-table-mark {
     stroke: var(--accent);
     stroke-width: 2;
-}
-.air-table-hover {
-    stroke: oklch(1 0 0 / 0.7);
-    stroke-width: 1;
-}
-/* Words inside the dark stripes, in the render's ink. */
-.air-table-inside {
-    fill: var(--render-ink);
-    font-size: 11px;
-    text-anchor: end;
-    dominant-baseline: middle;
-    opacity: 0.7;
-}
-.air-table-inside-start {
-    text-anchor: start;
 }
 /* The three images add up on black, as light does. */
 .air-table-light {

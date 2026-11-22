@@ -71,8 +71,8 @@ export interface SkyParams {
     autoExposureRange: readonly [number, number];
     /**
      * The metered exposure's ramp over the day: compensations at sun altitudes, for mornings and evenings apart if
-     * wanted, and tints, applied with the white balance whether metered or not. `DEFAULT_AUTO_EXPOSURE_KEYS` by
-     * default, untinted; empty for the meter's reading as it is.
+     * wanted, and tints, applied with the white balance whether metered or not. Empty by default: the meter's reading
+     * as it is.
      */
     autoExposureKeys: readonly AutoExposureKey[];
     /** Added to the metered exposure on top of the keys, in EV: +1 is twice as bright. */
@@ -90,8 +90,13 @@ export interface SkyParams {
      * of the Sun's light, from the Moon's direction. 0 by default, none.
      */
     moonIlluminance: number;
-    /** The Moon's apparent angular diameter, in degrees: its disc at `moonDirection` hides the sun disc behind it, a
-     *  solar eclipse; the sky's light stays as it is. 0 by default, no Moon in the way. */
+    /**
+     * The Moon's apparent angular diameter, in degrees, as the observer sees it, with `moonDirection`: a solar eclipse
+     * wherever the Moon stands before the Sun. Its disc hides the sun disc behind it, the Sun's light at the observer
+     * falls by the share of the disc it covers, and so does the sky's, by what each point of the air sees of the Sun:
+     * under the Moon's shadow the sky goes as dark as dusk, lit from the air outside, with a glow all round the horizon.
+     * The Moon's distance is taken from the diameter. 0 by default, no Moon in the way.
+     */
     moonAngularDiameter: number;
     /**
      * What the debug overlay is drawn in, for a sky pass made with `debugGrid`: 1 by default, white after the tone

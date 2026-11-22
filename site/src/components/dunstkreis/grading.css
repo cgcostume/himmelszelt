@@ -1,4 +1,5 @@
-/* Grading the day: the presets above, the tiles, their altitudes, and the keys' lanes aligned under the tiles. */
+/* Grading the day: the presets above, the tiles, their altitudes, the keys' lanes aligned under the tiles, and the keys
+   as code. */
 .grading-bar {
     display: flex;
     flex-wrap: wrap;
@@ -8,10 +9,11 @@
 .grading-stage {
     position: relative;
 }
+/* At the right, over noon's sky, so the night's stars stay clear. */
 .grading-row {
     position: absolute;
     top: 8px;
-    left: 8px;
+    right: 8px;
     z-index: 4;
 }
 .grading-row-styled {

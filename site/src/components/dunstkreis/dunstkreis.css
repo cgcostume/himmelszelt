@@ -402,7 +402,10 @@
    Mie's dashed, blue and red marked by bubbles, the second scale on the right fainter than the first. A little lower
    than the other strips, the plot ending just over its top row. */
 .scattering-panel > svg {
-    height: calc(0.88 * max(9rem, 0.38 * min(80vh, min(var(--wide), 100vw - 3rem) * var(--scene-ratio, 3 / 4))));
+    height: calc(
+        0.88 *
+        max(9rem, 0.38 * min(80vh, min(var(--wide), var(--page-width) - 3rem) * var(--scene-ratio, 3 / 4)))
+    );
     cursor: default;
 }
 .scattering-line,

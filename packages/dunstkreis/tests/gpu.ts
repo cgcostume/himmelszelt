@@ -20,7 +20,6 @@ export function wgslSource(name: string): string {
         {
             tonemap: "../../helldunkel/src/wgsl",
             glare: "../../helldunkel/src/wgsl",
-            lens: "../../helldunkel/src/wgsl",
             vision: "../../helldunkel/src/wgsl",
             whitebalance: "../../helldunkel/src/wgsl",
             cube: "../../rundbild/src/wgsl",

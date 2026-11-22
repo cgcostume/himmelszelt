@@ -43,13 +43,22 @@ struct DkSkyParams {
     sunDiscCeiling: f32,
     // The cosine of the Moon's angular radius, whose disc hides the sun disc behind it; above 1 for none.
     moonDiscCos: f32,
-    // How much of the veil and the starburst around the Sun shows, 0 to 1: all of it while the Sun is in the frame, none
-    // once it is well out of it, a lens being shaded by its barrel and an eye by its brow.
+    // How much of the veil around the Sun shows, 0 to 1: all of it while the Sun is in the frame, none once it is well
+    // out of it, a lens being shaded by its barrel and an eye by its brow.
     sunInFrame: f32,
     // The same for the veil around the Moon.
     moonInFrame: f32,
     // The white balance, helldunkel's `hdWhiteBalance`, applied wherever the exposure is: the identity for none.
     whiteBalance: mat3x3f,
+    // A solar eclipse, for `dkEclipse` in raymarch.wgsl: where the Moon's center stands off the line from the observer
+    // towards the Sun, in km, across that line, how far along it the Moon is, and the Moon's radius, all in km. The
+    // radius is 0 while the Moon is nowhere near the Sun.
+    eclipseOffset: vec3f,
+    eclipseAlong: f32,
+    eclipseMoonRadius: f32,
+    // Above 0 in the seconds around a total or annular eclipse's contacts, while Baily's beads show: the sun disc is
+    // then drawn behind the Moon's uneven limb, and at no other time.
+    eclipseBeads: f32,
 }
 
 // Directions the light meter reads per cap, above and below the horizon: 32 workgroups of 128 sample one each.

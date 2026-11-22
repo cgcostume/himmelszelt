@@ -52,6 +52,16 @@ fn dkPrecomputeSkyView(@builtin(global_invocation_id) id: vec3u) {
     let muS = clamp(select(dkParams.sunDirection.z, dkParams.moonDirection.z, DK_MOON_VIEW), -1.0, 1.0);
     let sunDirection = vec3f(sqrt(max(1.0 - muS * muS, 0.0)), 0.0, muS);
 
+    // A solar eclipse in the table's frame, turned about the zenith with the Sun: the Moon's own table has none.
+    if (!DK_MOON_VIEW && dkParams.eclipseMoonRadius > 0.0) {
+        let sun = dkParams.sunDirection.xy;
+        let east = normalize(select(vec2f(1.0, 0.0), sun, length(sun) > 1e-6));
+        let off = dkParams.eclipseOffset;
+        let turned = vec3f(dot(off.xy, east), dot(off.xy, vec2f(-east.y, east.x)), off.z);
+        dkEclipse = DkEclipse(
+            turned, dkParams.eclipseAlong, sunDirection, dkParams.eclipseMoonRadius, dkParams.sunAngularRadius, 1.0,
+        );
+    }
     let ray = dkRaymarchSky(
         a, dkTransmittanceLut, dkMultiScatteringLut, dkLutSampler, vec3f(0.0, 0.0, 1.0), h, direction, sunDirection,
         DK_SAMPLES_SKY_VIEW, true,

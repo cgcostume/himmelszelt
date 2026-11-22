@@ -22,6 +22,8 @@ struct GwLayerModel {
     anvil: vec2f,
     // What the map spans over the ground, in km: a tile, or a front from its edge to its back and a tile along it.
     extent: vec2f,
+    // The anvils' reach as it is set, in towers' spacings, whatever the wind: none at 0, and in full from 0.1 on.
+    anvils: f32,
 }
 
 @group(0) @binding(0) var<uniform> gwLayerModel: GwLayerModel;
@@ -59,7 +61,8 @@ fn gwLayerMapPillows(p: vec2f, period: vec2i, seed: u32) -> f32 {
 }
 
 // Towers, one per lattice cell where `share` of the cells have one: x the tallest tower's height at `p`, steep at its
-// flanks and rounded on top, y the skirt of a tall one's anvil, an ellipse carried and stretched by `reach` cells.
+// flanks and rounded on top, y the skirt of a tall one's anvil, an ellipse carried and stretched by `reach` cells, round
+// without a wind and none without a reach set.
 // With `column` 0 or more, only the cells of that column have towers: a row of them.
 fn gwLayerMapTowers(p: vec2f, period: vec2i, share: f32, reach: vec2f, column: i32, seed: u32) -> vec2f {
     let cell = vec2i(floor(p));
@@ -80,7 +83,7 @@ fn gwLayerMapTowers(p: vec2f, period: vec2i, share: f32, reach: vec2f, column: i
             let body = sqrt(max(1.0 - q * q * q * q, 0.0)) * (1.0 - 0.25 * q * q) * tall;
             let off = rel - reach * 0.5;
             let e = vec2f(dot(off, along) / (0.5 + 0.6 * far), dot(off, vec2f(-along.y, along.x)) / 0.5);
-            let skirt = max(1.0 - dot(e, e), 0.0) * smoothstep(0.8, 0.95, tall);
+            let skirt = max(1.0 - dot(e, e), 0.0) * smoothstep(0.8, 0.95, tall) * smoothstep(0.0, 0.1, gwLayerModel.anvils);
             best = max(best, vec2f(body, skirt));
         }
     }

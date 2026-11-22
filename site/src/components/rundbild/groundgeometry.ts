@@ -2,6 +2,8 @@ import Zdog from "zdog";
 import { find } from "../dom";
 import { onDemand } from "../frame";
 import { themeColor, themeColors } from "../sternzeit/figure";
+import { bendDistance, bendPoint, groundedBend, groundedMeets } from "./ground-math";
+import { setGroundSurface } from "./ground-state";
 import { createGroundedView } from "./grounded-view";
 
 // The surface rbGroundedDirection lays an image on, drawn to scale in meters around the point it was taken from: the
@@ -38,6 +40,12 @@ const rotation = { x: -20 * DEG, y: -28 * DEG, z: 0 };
 // Where the camera looks, in degrees from north through east; it stands across the capture point from there.
 let heading = 90;
 let zoom = 1;
+// The zoom that fits the scene, how many times the reader magnified it, and how far it is moved on the stage, in
+// pixels, to keep the point zoomed at under the pointer.
+let fitZoom = 1;
+let magnify = 1;
+const pan = { x: 0, y: 0 };
+const MAGNIFY = { min: 0.5, max: 60 };
 // What the scene spans, in meters: the capture point's height, the dome's radius above it, and how far out it reaches.
 let fit = { height: 1, dome: 1, extent: 1 };
 let size = { width: 0, height: 0 };
@@ -102,26 +110,32 @@ function parameters() {
     const far = (name: string, from: number) => (slider(name) >= 100 ? FAR : from * 100 ** (slider(name) / 99));
     const height = slider("height");
     const radius = Math.max(far("radius", 5), 2.5 * height);
-    const reach = Math.min(far("reach", 3), Math.sqrt(radius ** 2 / 4 - height ** 2));
-    const rounding = slider("rounding");
-    // As in ground.wgsl, as the sines of how far below the horizon they lie: where the dome's foot begins and the plane.
-    const dome = radius >= FAR ? 0 : height / radius;
-    const reached = Math.max(height / Math.hypot(height, reach), 2 * dome);
-    const foot = dome * (1 - Math.max(rounding, 0));
-    const edge = rounding < 0 ? dome + (reached - dome) * (1 + rounding) : reached;
-    const flat = edge > 0 ? (height * Math.sqrt(1 - edge * edge)) / edge : FAR;
-    return { height, radius, reach, dome, foot, edge, flat, rounding, lift: slider("lift") };
+    const soft = slider("soft");
+    const lift = slider("lift");
+    // As in ground.wgsl: how high up the dome the bend meets it, the bend itself, the reach at most its circle's; and as
+    // the sines of how far below the horizon they lie, the lookups to the plane's edge and to the bend's foot on the
+    // dome. Under a dome without end the ground falls away past the reach like a hilltop instead.
+    const domed = radius < FAR;
+    const meets = groundedMeets(height, radius, soft, lift * DEG);
+    const bend = groundedBend(height, far("reach", 3), radius, meets);
+    const reach = domed ? height * bend.along : far("reach", 3);
+    const edge = domed && bend.corner ? -Math.sin(meets) : height / Math.hypot(height, reach);
+    const foot = domed ? -Math.sin(Math.max(meets, -Math.asin(height / radius))) : 0;
+    return { height, radius, reach, soft, domed, bend, edge, foot, meets, lift };
 }
 type Parameters = ReturnType<typeof parameters>;
 
 /** How far from the capture point the surface lies along a direction `down` (the sine of its depression) below it. */
-function distance({ height, radius, dome, foot, edge }: Parameters, down: number) {
-    if (down >= edge) return height / down;
-    if (down <= foot) return radius;
-    // As `rbGroundedGap` in ground.wgsl: the plane from the edge down, the dome down to its foot, a cubic between.
-    const t = Math.min((down - foot) / (edge - foot), 1);
-    const w = dome + t * t * ((edge - dome) * (3 - 2 * t) + (edge - foot) * (t - 1));
-    return w > 0 ? height / w : FAR;
+function distance(p: Parameters, down: number) {
+    if (down >= p.edge) return down > 0 ? p.height / down : FAR;
+    if (!p.domed) {
+        // The hilltop: the cubic t^2 (2 - t) of the inverse distance, from the horizon to the plane's edge.
+        const t = Math.max(down, 0) / p.edge;
+        const inverse = p.edge * t * t * (2 - t);
+        return inverse > 0 ? p.height / inverse : FAR;
+    }
+    if (down <= p.foot) return p.radius;
+    return p.height * bendDistance(p.bend, down);
 }
 
 /** The point on the surface `angle` above the capture point's horizon, horizontally and up from under it. */
@@ -133,12 +147,25 @@ function onSurface(p: Parameters, angle: number): [number, number] {
 /** The surface's profile from the reach's edge up to the zenith, cut off at `extent` where it has no dome. */
 function profile(p: Parameters, extent: number): Profile {
     const points: Profile = [];
-    const steps = 48;
+    if (p.domed) {
+        // The bend from the plane's edge to where it meets the dome, then the dome to its top.
+        for (let k = 0; k <= 160; k++) {
+            const [x, z] = bendPoint(p.bend, k / 160);
+            points.push([x * p.height, z * p.height]);
+        }
+        const meets = Math.max(p.meets, -Math.asin(p.height / p.radius));
+        for (let k = 1; k <= 48; k++) {
+            const e = meets + ((Math.PI / 2 - meets) * k) / 48;
+            points.push([p.radius * Math.cos(e), p.height + p.radius * Math.sin(e)]);
+        }
+        return points;
+    }
+    const steps = 192;
     for (let k = 0; k <= steps; k++) {
         const down = p.edge * (1 - k / steps) ** 2;
         const r = Math.min(distance(p, down), 4 * extent);
         const point: [number, number] = [r * Math.sqrt(1 - down * down), p.height - r * down];
-        if (point[0] > extent && p.radius >= FAR) {
+        if (point[0] > extent) {
             const last = points.at(-1);
             if (last) {
                 const t = (extent - last[0]) / (point[0] - last[0]);
@@ -147,12 +174,6 @@ function profile(p: Parameters, extent: number): Profile {
             return points;
         }
         points.push(point);
-    }
-    if (p.radius < FAR) {
-        for (let k = 1; k <= 24; k++) {
-            const angle = (k / 24) * 90 * DEG;
-            points.push([p.radius * Math.cos(angle), p.height + p.radius * Math.sin(angle)]);
-        }
     }
     return points;
 }
@@ -184,13 +205,10 @@ function rebuild() {
     fit = { height, dome: domed ? radius : 0.5 * extent, extent };
     // Fitted for the steepest tilt, so the scale stays as the scene turns.
     const steepest = Math.max(...[0, 0.5, 1].map((t) => span(t * -TILT.min)));
-    zoom = Math.min(size.width / (2.3 * extent), size.height / (1.06 * steepest)) || 1;
-    for (const illustration of layers) {
-        illustration.zoom = zoom;
-        illustration.setSize(size.width, size.height);
-    }
+    fitZoom = Math.min(size.width / (2.3 * extent), size.height / (1.06 * steepest)) || 1;
+    for (const illustration of layers) illustration.setSize(size.width, size.height);
 
-    const plane = Math.min(p.flat, extent);
+    const plane = Math.min(reach, extent);
     new Ellipse({
         addTo: groundAnchor,
         diameter: 2 * plane,
@@ -248,10 +266,10 @@ function rebuild() {
     labels.reach.point = around([reachAt, 0], 180);
     labels.reach.element.textContent = `reach ${meters(reach)}`;
     const blendMiddle = section.find(([rho]) => rho >= (plane + extent) / 2);
-    // No blend at a hard corner.
-    const blends = blendMiddle && p.edge > p.foot + 1e-9;
+    // How high the bend climbs, none at a hard corner.
+    const blends = blendMiddle && p.domed && !p.bend.corner;
     labels.blend.point = blends ? around(blendMiddle, 270) : { x: 0, y: 0, z: Number.NaN };
-    labels.blend.element.textContent = "blend";
+    labels.blend.element.textContent = `bend, ${meters(p.bend.end[1] * height)} up`;
     if (domed) {
         const toDome = around([radius * Math.cos(45 * DEG), height + radius * Math.sin(45 * DEG)], 180);
         line([capture, toDome], MUTED, 1, DOTTED);
@@ -335,8 +353,14 @@ function placeLabels() {
 
 function frame() {
     const tilt = -rotation.x;
+    zoom = fitZoom * magnify;
     for (const illustration of layers) {
-        illustration.translate.y = (fit.height * Math.cos(tilt) + fit.dome - fit.extent * Math.sin(tilt)) / 2;
+        // Zdog bakes the zoom into the SVG's viewBox when the size is set.
+        illustration.zoom = zoom;
+        illustration.setSize(size.width, size.height);
+        illustration.translate.x = pan.x / zoom;
+        illustration.translate.y =
+            (fit.height * Math.cos(tilt) + fit.dome - fit.extent * Math.sin(tilt)) / 2 + pan.y / zoom;
         illustration.rotate.set(rotation);
         illustration.updateRenderGraph();
         themeColors(illustration.element);
@@ -351,8 +375,8 @@ function frame() {
     const p = parameters();
     field("heightReading").textContent = p.height.toFixed(1);
     field("liftReading").textContent = `${p.lift.toFixed(1)}°`;
+    field("softReading").textContent = p.soft.toFixed(2);
     field("reachReading").textContent = reading(p.reach);
-    field("roundingReading").textContent = `${p.rounding > 0 ? "+" : ""}${p.rounding.toFixed(2).replace("-", "−")}`;
     field("radiusReading").textContent = reading(p.radius);
 }
 
@@ -369,11 +393,11 @@ const requestHdri = createGroundedView(hdriCanvas, () => {
         height: p.height,
         lift: p.lift,
         reach: p.reach,
+        meets: p.meets,
         radius: p.radius,
         flat: true,
         even: true,
         solids: false,
-        rounding: p.rounding,
     };
 });
 
@@ -382,27 +406,60 @@ const requestDiagram = onDemand(() => {
     rebuild();
     frame();
 }, stage);
+// The grounded figure lays its solids on the same surface.
+const publish = () => {
+    const { height, lift, reach, radius, meets } = parameters();
+    setGroundSurface({ height, lift, reach, radius, meets });
+};
 const requestUpdate = () => {
     requestDiagram();
     requestHdri?.();
 };
 
-for (const name of ["height", "lift", "reach", "radius", "rounding"])
-    field(name).addEventListener("input", requestUpdate);
+for (const name of ["height", "lift", "reach", "soft", "radius"]) {
+    field(name).addEventListener("input", () => {
+        requestUpdate();
+        publish();
+    });
+}
+publish();
 new ResizeObserver(requestDiagram).observe(stage);
 
-let dragFrom: { x: number; y: number } | null = null;
+/** Magnifies the diagram `factor` times about the stage point at `clientX`, `clientY`, which stays where it is. */
+function zoomAt(factor: number, clientX: number, clientY: number) {
+    const next = Math.min(MAGNIFY.max, Math.max(MAGNIFY.min, magnify * factor));
+    const box = stage.getBoundingClientRect();
+    const at = { x: clientX - box.left - box.width / 2, y: clientY - box.top - box.height / 2 };
+    pan.x = at.x - ((at.x - pan.x) * next) / magnify;
+    pan.y = at.y - ((at.y - pan.y) * next) / magnify;
+    magnify = next;
+    requestFrame();
+}
+
+// One pointer turns the camera and tilts the scene, two pinch to zoom; the wheel zooms too.
+const pointers = new Map<number, { x: number; y: number }>();
+const spread = () => {
+    const [a, b] = [...pointers.values()];
+    return a && b ? { d: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } : null;
+};
 stage.addEventListener("pointerdown", (event) => {
     if (event.target instanceof Element && event.target.closest(".scene-bar, .fig-actions")) return;
-    dragFrom = { x: event.clientX, y: event.clientY };
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     stage.setPointerCapture(event.pointerId);
 });
 stage.addEventListener("pointermove", (event) => {
-    if (!dragFrom) return;
-    const dx = event.clientX - dragFrom.x;
-    const tilt = rotation.x - (event.clientY - dragFrom.y) * DRAG_RADIANS_PER_PX;
+    const last = pointers.get(event.pointerId);
+    if (!last) return;
+    const before = spread();
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size > 1) {
+        const after = spread();
+        if (before && after && before.d > 0) zoomAt(after.d / before.d, after.x, after.y);
+        return;
+    }
+    const dx = event.clientX - last.x;
+    const tilt = rotation.x - (event.clientY - last.y) * DRAG_RADIANS_PER_PX;
     rotation.x = Math.min(TILT.max, Math.max(TILT.min, tilt));
-    dragFrom = { x: event.clientX, y: event.clientY };
     if (dx === 0) {
         requestFrame();
         return;
@@ -410,9 +467,17 @@ stage.addEventListener("pointermove", (event) => {
     heading -= (dx * DRAG_RADIANS_PER_PX) / DEG;
     requestUpdate();
 });
-stage.addEventListener("pointerup", () => {
-    dragFrom = null;
-});
+for (const type of ["pointerup", "pointercancel"] as const) {
+    stage.addEventListener(type, (event) => pointers.delete(event.pointerId));
+}
+stage.addEventListener(
+    "wheel",
+    (event) => {
+        event.preventDefault();
+        zoomAt(Math.exp(-event.deltaY * 0.002), event.clientX, event.clientY);
+    },
+    { passive: false },
+);
 // Turning the HDRI's view turns the diagram's camera with it, the same way for the same drag: the view as if grabbed.
 hdriCanvas.addEventListener("pointerdown", (event) => {
     hdriCanvas.setPointerCapture(event.pointerId);

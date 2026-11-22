@@ -5,6 +5,7 @@ import {
     clampObserverHeight,
     createAirTexture,
     createSkyPass,
+    discUncovered,
     liftedDirection,
     refractionAngle,
     seeingUniformData,
@@ -92,6 +93,9 @@ export function skyAt(
     const [r, g, b] = through(moonAltitude) ?? [1, 1, 1];
     const moonThrough = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     const distanceKm = moon.distance(jde);
+    const sunAngularDiameter = sun.apparentAngularDiameter(jde);
+    const moonAngularDiameter = moon.topocentricAngularDiameter(time, observer);
+    const apart = (Math.acos(Math.max(Math.min(dot(sunDirection, moonDirection), 1), -1)) * 180) / Math.PI;
     return {
         jd,
         time,
@@ -104,12 +108,13 @@ export function skyAt(
         years: (jde - 2451545) / 365.25,
         siderealTime: apparentSiderealTime(time) + observer.longitude,
         sunDirection,
-        // The Sun's and the Moon's light at the eye, in lux.
-        sunAtEye: SUN_ILLUMINANCE * lit(sunDirection),
+        // The Sun's and the Moon's light at the eye, in lux: the Sun's by what the Moon leaves of its disc, in an eclipse.
+        sunAtEye:
+            SUN_ILLUMINANCE * lit(sunDirection) * discUncovered(sunAngularDiameter / 2, moonAngularDiameter / 2, apart),
         moonAtEye: moonIlluminance(phaseAngle, distanceKm) * lit(moonDirection),
-        sunAngularDiameter: sun.apparentAngularDiameter(jde),
+        sunAngularDiameter,
         moonDirection,
-        moonAngularDiameter: moon.topocentricAngularDiameter(time, observer),
+        moonAngularDiameter,
         moonSunDirection: moon.sunDirection(time, observer),
         moonOrientation: moonOrientation({
             direction: moonDirection,
@@ -193,8 +198,6 @@ export interface StarsFrame {
     /** The halos around bright stars, and their strength, the share of the light past the knee they show, 1 by default. */
     glare: boolean;
     halo?: number;
-    /** A starburst around the Sun, the spikes a camera's six aperture blades draw; off by default. */
-    starburst?: boolean;
     /** A lens's veil around the Sun and the Moon, dunstkreis' default; on by default. */
     veil?: boolean;
     /** Artistic offsets in stops on the stars' and the Milky Way's light, 0 by default, physical. */
@@ -319,9 +322,9 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
         requestRender();
     });
 
-    // The pass is made anew for the grid, the starburst and the veil, keyed as `lens`.
-    function buildSky(luts: AtmosphereLUTs, grid: boolean, starburst: boolean, veil: boolean) {
-        const lens = `${grid} ${starburst} ${veil}`;
+    // The pass is made anew for the grid and the veil, keyed as `lens`.
+    function buildSky(luts: AtmosphereLUTs, grid: boolean, veil: boolean) {
+        const lens = `${grid} ${veil}`;
         if (skyBuilding?.luts === luts && skyBuilding.lens === lens) return;
         const building = { luts, lens };
         skyBuilding = building;
@@ -334,7 +337,6 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             moonlight: true,
             groundLight: quality.groundLight,
             dither: false,
-            starburst,
             ...(veil ? {} : { veil: 0 }),
         }).then((pass) => {
             if (skyBuilding !== building) return pass.destroy();
@@ -429,10 +431,9 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
         draw(target: GPUTexture, frame: StarsFrame) {
             const { sky: s, luts, width, height } = frame;
             const grid = frame.grid ?? false;
-            const starburst = frame.starburst ?? false;
             const lensVeil = frame.veil ?? true;
-            if (!sky || sky.luts !== luts || sky.lens !== `${grid} ${starburst} ${lensVeil}`) {
-                buildSky(luts, grid, starburst, lensVeil);
+            if (!sky || sky.luts !== luts || sky.lens !== `${grid} ${lensVeil}`) {
+                buildSky(luts, grid, lensVeil);
                 if (!sky || sky.luts !== luts) return null;
             }
             loadMaps(frame.maps === "auto" ? mapForPixel(pixelAngle(frame.inverseViewProjection, height)) : frame.maps);

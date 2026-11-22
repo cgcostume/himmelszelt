@@ -8,8 +8,14 @@ const wgsl = (name: string) => readFileSync(new URL(`../src/wgsl/${name}.wgsl`, 
 test("the veil follows CIE's equation, within its angles, and grows with age", () => {
     // At 1° a young eye: the three terms and the constant, 15.1025 cd/m² per lux.
     expect(veilingGlare(1, 0, 1)).toBeCloseTo(15.1025, 10);
-    // Held at 0.1° inside, and at 100° outside, where the constant is nearly all that is left.
-    expect(veilingGlare(0.01)).toBe(veilingGlare(0.1));
+    // Rounded off inside 0.1°, as high and as steep there as the equation, to some 2.5 times it in the middle; held
+    // at 100° outside, where the constant is nearly all that is left.
+    expect(veilingGlare(0.0999999) / veilingGlare(0.1)).toBeCloseTo(1, 4);
+    const steep = (from: number, to: number) => (veilingGlare(to) - veilingGlare(from)) / (to - from);
+    expect(steep(0.0995, 0.1) / steep(0.1, 0.1005)).toBeCloseTo(1, 1);
+    expect(veilingGlare(0) / veilingGlare(0.1)).toBeGreaterThan(2.4);
+    expect(veilingGlare(0) / veilingGlare(0.1)).toBeLessThan(2.6);
+    expect(veilingGlare(0.05)).toBeLessThan(veilingGlare(0));
     expect(veilingGlare(180)).toBe(veilingGlare(100));
     expect(veilingGlare(100, 0, 1)).toBeCloseTo(0.00401, 6);
     // An eye of 62.5 years veils twice as much in the terms that age, and the cubic one not at all.

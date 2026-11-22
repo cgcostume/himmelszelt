@@ -28,7 +28,7 @@ const LIFT_BLEND = 8 * DEG;
 const BACKDROP = /* wgsl */ `
 ${wgsl.panorama}
 ${wgsl.ground}
-struct Params { right: vec3f, tx: f32, up: vec3f, ty: f32, forward: vec3f, height: f32, eye: vec3f, lift: f32, flat: u32, reach: f32, size: vec2f, band: f32, even: u32, radius: f32, rounding: f32 }
+struct Params { right: vec3f, tx: f32, up: vec3f, ty: f32, forward: vec3f, height: f32, eye: vec3f, lift: f32, flat: u32, reach: f32, size: vec2f, band: f32, even: u32, radius: f32, meets: f32 }
 @group(0) @binding(0) var<uniform> params: Params;
 @group(0) @binding(1) var image: texture_2d<f32>;
 @group(0) @binding(2) var imageSampler: sampler;
@@ -40,7 +40,7 @@ fn lookup(pixel: vec2f, size: vec2f) -> vec3f {
     let uv = pixel / size * 2.0 - 1.0;
     var direction = normalize(params.forward + params.right * (uv.x * params.tx) - params.up * (uv.y * params.ty));
     if (params.flat != 0u) {
-        direction = rbGroundedDirectionRounded(params.eye, direction, params.height, params.reach, params.radius, params.rounding);
+        direction = rbGroundedDirection(params.eye, direction, params.height, params.reach, params.radius, params.meets);
     }
     return rbLiftedHorizonDirection(direction, params.lift, ${LIFT_BLEND});
 }
@@ -129,7 +129,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 // A cube map only for the nine coefficients, which need no more.
 const CUBE_SIZE = 256;
 
-/** A grounded view's camera, capture height, horizon lift in degrees, reach, radius (1e9 for none), switches, rounding. */
+/** A grounded view's camera, capture height, horizon lift in degrees, reach and radius (1e9 for none), and switches. */
 export type GroundedView = {
     camera: Camera;
     height: number;
@@ -139,7 +139,8 @@ export type GroundedView = {
     flat: boolean;
     even: boolean;
     solids?: boolean;
-    rounding?: number;
+    /** How high up the dome the ground meets it, in radians seen from the capture point, as rbGroundedMeets gives. */
+    meets: number;
 };
 
 /**
@@ -288,7 +289,7 @@ export function createGroundedView(canvas: HTMLCanvasElement, view: () => Ground
             litBy = hdri.texture;
             build(encoder, hdri.texture);
         }
-        const { camera, height: captureHeight, lift, reach, radius, flat, even, solids, rounding = 0 } = view();
+        const { camera, height: captureHeight, lift, reach, radius, flat, even, solids, meets } = view();
         const { eye, forward, right, up } = cameraFrame(camera);
         const ty = Math.tan(camera.fov / 2);
         const data = new ArrayBuffer(96);
@@ -306,7 +307,7 @@ export function createGroundedView(canvas: HTMLCanvasElement, view: () => Ground
         new Float32Array(data)[17] = reach;
         new Float32Array(data).set([hdri.texture.width, hdri.texture.height, top / hdri.texture.height], 18);
         new Uint32Array(data)[21] = even ? 1 : 0;
-        new Float32Array(data).set([radius, rounding], 22);
+        new Float32Array(data).set([radius, meets], 22);
         device.queue.writeBuffer(params, 0, data);
         const pass = encoder.beginComputePass({ label: "sternwarte:groundedBackdrop" });
         pass.setPipeline(backdrop);

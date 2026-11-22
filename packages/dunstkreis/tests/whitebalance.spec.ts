@@ -4,7 +4,6 @@ import {
     type AutoExposureKey,
     autoExposureTint,
     createSkyPass,
-    DEFAULT_AUTO_EXPOSURE_KEYS,
     NO_WHITE_BALANCE,
     precomputeAtmosphere,
     readTexture,
@@ -89,7 +88,12 @@ test("the keys' tint scales the balanced light per channel, and untinted keys ch
     const device = await gpuDevice();
     test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
     const plain = new Uint32Array((await frame("neutral", undefined, [])).buffer);
-    const untinted = new Uint32Array((await frame("neutral", undefined, DEFAULT_AUTO_EXPOSURE_KEYS)).buffer);
+    const ramp: AutoExposureKey[] = [
+        { sunAltitude: -18, compensation: -2 },
+        { sunAltitude: 0, compensation: { rising: 0, setting: 0.2 } },
+        { sunAltitude: 60, compensation: 0 },
+    ];
+    const untinted = new Uint32Array((await frame("neutral", undefined, ramp)).buffer);
     expect(untinted).toEqual(plain);
     const m = whiteBalance([1.21, 1, 0.79]);
     const keys: AutoExposureKey[] = [{ sunAltitude: 0, compensation: 0, tint: [1.4, 0.8, 1.2] }];

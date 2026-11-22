@@ -1,6 +1,6 @@
 import { MOON_RADIUS_KM, typicalUmbra, umbraLightAt } from "@himmelszelt/nachtgestirn";
 import { eclipse, fromJulianDay, julianEphemerisDay, moon, sun } from "@himmelszelt/sternzeit";
-import { find } from "../dom";
+import { find, fixed } from "../dom";
 import { onTables, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
@@ -174,7 +174,7 @@ export function umbraLightFigure(root: HTMLElement) {
                 : depth > 0
                   ? `${Math.round(depth * 100)}% in the umbra`
                   : "outside the umbra";
-        note.textContent = `the Moon ${where}, its edge nearest the axis ${near.toFixed(1)} stops, its far edge ${far.toFixed(1)} stops`;
+        note.textContent = `the Moon ${where}, its edge nearest the axis ${fixed(near, 1)} stops, its far edge ${fixed(far, 1)} stops`;
     }
 
     slider.addEventListener("input", requestRender);

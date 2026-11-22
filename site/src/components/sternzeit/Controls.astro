@@ -8,25 +8,27 @@ interface Props {
     open?: boolean;
     /** Offers the observer's height, for where it matters; it stays part of the moment and place either way. */
     height?: boolean;
+    /** For the rail beside the text (see Rail.astro): short names and steps, so each field fits on one line with them. */
+    compact?: boolean;
 }
-const { open = false, height = true } = Astro.props;
+const { open = false, height = true, compact = false } = Astro.props;
 // Unique per instance, so every label still points at its own input when a page has several sets of controls.
 const uid = `moment-${Math.random().toString(36).slice(2, 8)}`;
 // The step sizes of each field, as a group of radio buttons: one tap on a touch screen, and the current one stays visible.
 // A unit follows its number after a narrow no-break space (U+202F), as everywhere on the site.
 const jdSteps = [
-    { label: "year", value: "365.25", calendar: "year" },
-    { label: "month", value: "30.436875", calendar: "month" },
-    { label: "week", value: "7", calendar: "week" },
-    { label: "day", value: "1", calendar: "day", checked: true },
-    { label: "hour", value: "0.0416666666667" },
-    { label: "min", value: "0.0006944444444" },
-    { label: "sec", value: "0.0000115740741" },
+    { label: "year", short: "y", value: "365.25", calendar: "year" },
+    { label: "month", short: "mo", value: "30.436875", calendar: "month" },
+    { label: "week", short: "wk", value: "7", calendar: "week" },
+    { label: "day", short: "d", value: "1", calendar: "day", checked: true },
+    { label: "hour", short: "h", value: "0.0416666666667" },
+    { label: "min", short: "min", value: "0.0006944444444" },
+    { label: "sec", short: "s", value: "0.0000115740741" },
 ];
 const angleSteps = [
-    { label: "deg", title: "One degree", value: "1", checked: true },
-    { label: "min", title: "One arcminute, a sixtieth of a degree", value: "0.0166666666667" },
-    { label: "sec", title: "One arcsecond, a sixtieth of an arcminute", value: "0.0002777777778" },
+    { label: "deg", short: "deg", title: "One degree", value: "1", checked: true },
+    { label: "min", short: "arcmin", title: "One arcminute, a sixtieth of a degree", value: "0.0166666666667" },
+    { label: "sec", short: "arcsec", title: "One arcsecond, a sixtieth of an arcminute", value: "0.0002777777778" },
 ];
 const heightSteps = [
     { label: "1\u202fm", value: "1" },
@@ -37,7 +39,7 @@ const heightSteps = [
 ];
 ---
 
-<details class="moment" open={open}>
+<details class="moment" open={open} data-compact={compact ? "" : undefined}>
     <summary>
         <span class="moment-title">Moment and place</span> <span class="note" data-field="summary"></span>
         {/* Inside the summary, so it is there while the set is folded away too; the click does not toggle it. */}
@@ -46,13 +48,15 @@ const heightSteps = [
         </button>
     </summary>
     <div class="input-grid">
-        <label for={`${uid}-jd`}>Julian Day</label>
+        <label for={`${uid}-jd`} title="Julian Day">{compact ? "JD" : "Julian Day"}</label>
         <span class="stepper">
             <button type="button" data-step="-1" aria-label="Julian Day, one step back">&#8722;</button>
             <input id={`${uid}-jd`} data-field="jd" type="number" />
             <button type="button" data-step="1" aria-label="Julian Day, one step forward">+</button>
             <button type="button" data-field="live" aria-pressed="false">now</button>
-            <button type="button" data-field="animate" aria-pressed="false" title="Step on by itself, thirty times a second">animate</button>
+            <button type="button" data-field="animate" aria-pressed="false" title="Step on by itself, thirty times a second" aria-label="animate">
+                {compact ? <Icon name="play" /> : "animate"}
+            </button>
         </span>
         <span class="note" aria-hidden="true">Step</span>
         <span class="input-grid-subrow">
@@ -67,7 +71,7 @@ const heightSteps = [
                                 data-calendar={step.calendar}
                                 checked={step.checked}
                             />
-                            <span>{step.label}</span>
+                            <span title={compact ? step.label : undefined}>{compact ? step.short : step.label}</span>
                         </label>
                     ))
                 }
@@ -92,7 +96,7 @@ const heightSteps = [
             </span>
         </span>
 
-        <label for={`${uid}-latitude`}>Latitude</label>
+        <label for={`${uid}-latitude`} title="Latitude">{compact ? "Lat" : "Latitude"}</label>
         <span class="stepper">
             <button type="button" data-step="-1" aria-label="Latitude, one step back">&#8722;</button>
             <input id={`${uid}-latitude`} data-field="latitude" class="latlong" type="number" />
@@ -102,7 +106,7 @@ const heightSteps = [
             </button>
         </span>
 
-        <label for={`${uid}-longitude`}>Longitude</label>
+        <label for={`${uid}-longitude`} title="Longitude">{compact ? "Lon" : "Longitude"}</label>
         <span class="stepper">
             <button type="button" data-step="-1" aria-label="Longitude, one step back">&#8722;</button>
             <input id={`${uid}-longitude`} data-field="longitude" class="latlong" type="number" />
@@ -116,7 +120,7 @@ const heightSteps = [
                     angleSteps.map((step) => (
                         <label title={step.title}>
                             <input type="radio" name={`${uid}-latlong-step`} value={step.value} checked={step.checked} />
-                            <span>{step.label}</span>
+                            <span>{compact ? step.short : step.label}</span>
                         </label>
                     ))
                 }

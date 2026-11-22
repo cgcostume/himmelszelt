@@ -141,13 +141,13 @@ reading jumps at once, and the band of what the output holds slides after it. Th
 import { createMeterPass } from "@himmelszelt/helldunkel";
 
 const meter = await createMeterPass(device, { source: "equirectangular" });
-// Each frame: the middle 80% of a spot to the north, following over the seconds since the last.
+// Each frame: the middle 80% of a spot to the north, adapted over `seconds`.
 meter.encode(encoder, panorama, {
     focus: { direction: [0, 1, 0], innerAngle: 0.1, outerAngle: 0.12 },
     percentiles: [0.1, 0.9],
     adapt: { seconds, toBrighter: 0.4, toDarker: 1.5 },
 });
-// Three f32 on the GPU, luminance, EV100 and adapted EV100: bind it in your own shader.
+// On the GPU: luminance, EV100 and adapted EV100, to bind in your shader.
 const { result } = meter;
 ```
 
@@ -173,9 +173,10 @@ where the sky pass stops by default: exposed like day, the night would look like
 landscape by full moon at about EV −3 and the Milky Way at about −6 to −7, and a sky the Moon lights, as in
 nachtgestirn's and sternenheer's figures, lowers that floor with `autoExposureRange`. On top, a ramp shapes the reading
 over the day: compensations at sun altitudes above the observer's horizon, joined by a smooth curve that never
-overshoots them <Cite id="fritsch1980" />. By default they keep the night and the minutes around sunrise and sunset
-darker than metered, lift the blue hour a little so its blue shows, make the sunset a little brighter than the
-sunrise, and leave noon as metered, and dunstkreis lets you [grade the day with them](../dunstkreis/#grading).
+overshoots them <Cite id="fritsch1980" />. There are none by default. The skies on this site take a photographer's,
+which keeps the night and the minutes around sunrise and sunset darker than metered, lifts the blue hour a little so its
+blue shows, makes the sunset a little brighter than the sunrise, and leaves noon as metered, and dunstkreis lets you
+[grade the day with them](../dunstkreis/#grading).
 
 ## White balance
 
@@ -274,7 +275,7 @@ amount leaves some of the steps.
 ```ts
 import { blueNoiseTexture, wgsl } from "@himmelszelt/helldunkel";
 
-// Bound where the shader declares it, the same texture for every pass on the device.
+// One texture per device, bound where the shader declares it.
 const noise = blueNoiseTexture(device);
 const code = `${wgsl.tonemap}
 @group(0) @binding(1) var noise: texture_2d<f32>;
@@ -313,14 +314,12 @@ age, to twice at 62. `hdVeil` lays that over a pixel from the source's direction
 cd/m², to add before the exposure; `veilingGlare` is the same curve on the CPU.
 
 A camera's lens veils far less, and in its own way, with a flare and a tail no one equation fits. Scaled down to a
-two-hundredth, the eye's curve stands in for it: a glow of about a degree around the Sun at a day's exposure. Its
-aperture's straight blades diffract the source into spikes, `hdStarburst` in `wgsl.lens`, as many as the blades for an
-even count and twice as many for an odd one, falling with the square of the angle and longer in red than in blue. Both
-know nothing of what stands in front of the source: whoever calls them dims its illuminance by it. How they meet the
+two-hundredth, the eye's curve stands in for it: a glow of about a degree around the Sun at a day's exposure. The veil
+knows nothing of what stands in front of the source: whoever calls it dims its illuminance by it. How it meets the
 Sun's disc and the air's own glow around it is [dunstkreis'](../dunstkreis/#the-sun-in-the-picture).
 
 ```wgsl
-// The Sun's veil over a pixel looking along `direction`, for an eye of thirty years, blue-green.
+// The Sun's veil along `direction`, for an eye of thirty years, blue-green.
 let veil = hdVeil(direction, sunDirection, sunIlluminance, 30.0, 1.0);
 ```
 

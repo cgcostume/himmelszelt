@@ -9,10 +9,12 @@ import { createStarsRenderer, type FrameLight, skyAt } from "../../sternenheer/r
 import { bindStarGroups, offsetOf } from "../../sternenheer/stargroups";
 import { state } from "../../sternzeit/state";
 import { SHOW, type Shown, texturePanel } from "../textures";
-import { CIRRUS_PRESETS } from "./cirrus";
-import { FORMATION_PRESETS } from "./formation";
+import { composer } from "./composer";
+import { createComposite } from "./composite";
+import { designerHeight, designerKinds, designerOrbit, designerSwap, designerTime, PATCH } from "./designer";
 import { type Design, KIND_VALUE, kindPresets, kindSource, type Place, placeOf, skyFrom } from "./kinds";
 import { createLab, type Lab, labPipeline } from "./lab";
+import { cloudModel } from "./model";
 import shader from "./weather.comp.wgsl";
 
 const DEG = Math.PI / 180;
@@ -47,46 +49,135 @@ function sunlightAt(altitudeKm: number, elevation: number, scale: number): Rgb {
     const up = smoothstep(-0.07, 0.02, sine + 0.012 * Math.sqrt(Math.max(altitudeKm, 0)));
     return [0.085, 0.15, 0.33].map((k) => SUNLIGHT * Math.exp(-k * mass) * up * scale) as Rgb;
 }
+// The meter exposes for the sky and does not see the clouds. Lit by a sun that has set for the ground, they are many
+// times as bright as the sky behind them: what a cloud sends back of the light on it, how many times as bright as the
+// sky the clouds may be before the frame is drawn darker for them, and the most stops it is.
+const CLOUD_ALBEDO = 0.6;
+const CLOUDS_OVER_SKY = 6;
+const CLOUD_STOPS = 6;
+type Lit = { coverage: number; illuminance: Rgb };
+/** The luminance of the brightest of `clouds`, each of `coverage` under `illuminance` lux, in cd/m². */
+const brightest = (clouds: readonly Lit[]) =>
+    Math.max(
+        0,
+        ...clouds.map(({ coverage, illuminance: [r, g, b] }) => {
+            const lux = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            return (Math.min(coverage, 1) * CLOUD_ALBEDO * lux) / Math.PI;
+        }),
+    );
+/** The stops a frame is drawn darker for `clouds` over a sky of `skyLuminance`. */
+const cloudStops = (clouds: readonly Lit[], skyLuminance: number) =>
+    Math.min(Math.max(Math.log2(brightest(clouds) / (CLOUDS_OVER_SKY * skyLuminance)), 0), CLOUD_STOPS);
+// A designer's frame is its cloud, seen from above with no sky for the meter: where the Sun's or the Moon's light on the
+// cloud outshines the sky, the frame is exposed for the cloud, which then shows this bright before the tone curve.
+const PATCH_WHITE = 0.9;
+// And its ground is a stage: drawn this much darker than the air shows it, so a thin sheet of cloud, which sends back
+// no more light than pale ground does, stands out against it.
+const PATCH_GROUND = 0.35;
+// Seen from above, the thin sheet of high cloud sends back a fraction of what a thick cloud does: its frame is exposed
+// this many stops brighter, and its ground drawn as much darker again.
+const PATCH_SHEET_STOPS = 1.5;
 const lit = (color: Rgb, luminance: number): Rgb => {
     const own = 0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2];
     return color.map((c) => (c * luminance) / own) as Rgb;
 };
 
-// How high a designer looks at the start, in degrees: at what it designs.
-const PITCH: Record<Design, number> = { low: 16, towers: 14, front: 14, middle: 30, high: 48 };
-// And which way, from north through east: a front's to where its front stands.
-const YAW: Record<Design, number> = { low: 230, towers: 230, front: 20, middle: 230, high: 230 };
-// The high sheet's map as its designer shows it, a channel each: the share of a tile across, 0 for all, and what it holds.
-const HIGH_CHANNELS: [label: string, mode: number, at: number, title: string][] = [
-    ["puffs", SHOW.red, 0.125, "Red, an eighth of a tile across: the puffs and their trails, as a height."],
-    ["veil", SHOW.green, 0.25, "Green, a quarter of a tile across: the veil with its striations, ribs and trails."],
-    ["broad field", SHOW.blue, 0, "Blue, the whole tile: a broad field, read again for the sheet's patches and bands."],
-    ["billows", SHOW.alpha, 0.25, "Alpha, a quarter of a tile across: the noise the billows eat into the puffs by."],
+// A designer's patch: where its clouds thin out, as a share of its radius, the field of view it is seen by, and how many
+// times its radius the air's fade and the march's reach are, so that neither hides a patch seen from far above.
+const PATCH_FROM = 0.85;
+const PATCH_FOV = 40;
+const PATCH_AIR = 400;
+const PATCH_REACH = 5;
+// What a designer's gallery shows of a texture: its name, how it is shown, the share of a tile across, 0 for all, and
+// what it holds as its tooltip.
+type Asset = [label: string, mode: number, at: number, title: string, scale?: number];
+const HIGH_ASSETS: Asset[] = [
+    ["puffs", SHOW.red, 0.125, "An eighth of a tile across: the puffs and their trails, as a height."],
+    ["veil", SHOW.green, 0.25, "A quarter of a tile across: the veil with its striations, ribs and trails."],
+    [
+        "broad field",
+        SHOW.blue,
+        0,
+        "The whole tile: a broad field, read again at other sizes for the sheet's patches, bands and flakes.",
+    ],
+    [
+        "fine noise",
+        SHOW.alpha,
+        0.25,
+        "A quarter of a tile across: the noise the billows eat into the puffs by, and the veil's fibers are drawn from, read per pixel at a far smaller size.",
+    ],
 ];
+const HEIGHTS: Asset = [
+    "heights",
+    SHOW.red,
+    0,
+    "One tile from above, north up: how much of the layer's depth each column of cloud fills.",
+];
+const STEEPNESS: Asset = [
+    "steepness",
+    SHOW.alpha,
+    0,
+    "How steep the columns' tops are, per km: by it the march turns a height over a top into a distance from it.",
+    0.25,
+];
+const ANVILS: Asset = ["anvils", SHOW.green, 0, "The skirts of the anvils around the tallest towers, frayed."];
+const SHIELD: Asset = ["shade", SHOW.blue, 0, "How far a front shades what lies under it."];
+const LAYER_ASSETS: Record<Exclude<Design, "high">, Asset[]> = {
+    low: [HEIGHTS, STEEPNESS],
+    towers: [HEIGHTS, ANVILS, STEEPNESS],
+    front: [HEIGHTS, ANVILS, SHIELD, STEEPNESS],
+    middle: [HEIGHTS, STEEPNESS],
+};
+// What a designer's textures make together, from above over its patch, where they are composed before the march.
+const COMPOSED: Partial<Record<Design, [label: string, title: string]>> = {
+    towers: [
+        "towers under their anvils",
+        "The patch from above, north up: the columns the march finds, each as tall as its height, under the anvils' thin ice.",
+    ],
+    front: [
+        "wall, shield and anvils",
+        "The patch from above, north up: the front's columns, each as tall as its height, under the anvils' thin ice.",
+    ],
+    high: [
+        "the sheet's density",
+        "The patch from above, north up: the density every pixel's read composes, the puffs kept where the broad field leaves patches and flakes, eaten by the billows, with the veil in its fibers.",
+    ],
+};
+const LAYER_INDEX = { low: 0, deep: 1, middle: 2 } as const;
+// A designer's thumbnails, in texels across.
+const ASSET_SIZE = 256;
 
 /**
  * The whole-sky research figure on `root`, a `figure[data-weather-lab]`: gewoelk's layered clouds, three marched
  * layers and a sheet of high cloud, over dunstkreis' sky with sternenheer's stars and nachtgestirn's Moon, exposed by
  * the stars figure's meter. The clouds' light is still a stand-in, the sun's by day and the Moon's share of it by
- * night, with the real sky's luminance for their ambient light. Also the designers' figure, a
- * `figure[data-cloud-designer]` whose `data-design` names what it designs: that place of the sky alone, the library's
- * kinds of cloud for it as presets, its map alone in the panel, and its numbers to copy as a kind.
+ * night, with the real sky's luminance for their ambient light. Its weather is composed, see `composer.ts`. Also the
+ * designers' figure, a `figure[data-cloud-designer]` whose `data-design` names what it designs: a patch of that place
+ * of the sky alone, seen from a camera that orbits it, at a time of day of its own, with the library's kinds of cloud
+ * and the reader's own as presets, its map and its model beside it, and its numbers to copy as a kind.
  */
 export async function weatherFigure(root: HTMLElement) {
     let draw: (lab: Lab) => void = () => {};
     const design = root.dataset.design as Design | undefined;
     const designed = design && placeOf(design);
+    const orbit = design && designerOrbit(design);
+    const time = design && designerTime(root, () => lab?.request());
+    const lookAt = orbit && designerHeight(root, orbit, () => lab?.request());
+    if (design) designerSwap(root);
     const lab = createLab(root, (current) => draw(current), {
-        presets: designed ? kindPresets(designed) : FORMATION_PRESETS,
-        morePresets: designed ? {} : { sky: CIRRUS_PRESETS },
-        camera: { yaw: (design ? YAW[design] : 230) * DEG, pitch: (design ? PITCH[design] : 16) * DEG, fov: 95 * DEG },
+        presets: designed ? kindPresets(designed) : {},
+        camera: { yaw: 230 * DEG, pitch: 16 * DEG, fov: (design ? PATCH_FOV : 95) * DEG },
+        ...(orbit && { orbit }),
+        ...(time && { speed: time.speed }),
     });
     if (!lab) return;
     const { device } = lab;
     const compose = await labPipeline(device, "weatherCompose", shader, "weatherCompose");
     if (!compose) return;
     const renderer = createStarsRenderer(device, () => lab.request());
-    const textures = texturePanel(root, device);
+    const textures = texturePanel(root, device, design ? ASSET_SIZE : undefined);
+    // Towers, a front and the sheet are made of several textures: a designer shows what they make together.
+    const composite = design && COMPOSED[design] ? await createComposite(device) : null;
     lab.timed = textures.refresh;
     const dimmed = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING;
@@ -105,7 +196,8 @@ export async function weatherFigure(root: HTMLElement) {
         ) as Partial<Record<K, GPUComputePassTimestampWrites>>;
     bindStarGroups(root, () => lab.request(), false);
 
-    // The pass of the chosen quality, made when it is first asked for: its maps' sizes and steps are fixed at creation.
+    // The pass of the chosen quality and options, made when it is first asked for: its maps' sizes, its steps, god rays and
+    // the adaptive stride are fixed at creation. Blue noise and the box filter are switched from frame to frame.
     const passes = new Map<string, LayeredCloudPass | Promise<LayeredCloudPass>>();
     const quality = (): LayeredQuality => ({
         scale: Number(lab.choice("scale")) || 0.5,
@@ -117,7 +209,8 @@ export async function weatherFigure(root: HTMLElement) {
     const clouds = () => {
         const chosen = quality();
         const godRays = lab.pressed("rays.on");
-        const key = JSON.stringify([chosen, godRays]);
+        const adaptiveStride = lab.pressed("stride.adaptive");
+        const key = JSON.stringify([chosen, godRays, adaptiveStride]);
         const made = passes.get(key);
         if (made && !(made instanceof Promise)) return made;
         if (!made) {
@@ -127,6 +220,7 @@ export async function weatherFigure(root: HTMLElement) {
                 background: false,
                 quality: chosen,
                 godRays,
+                adaptiveStride,
             });
             passes.set(key, making);
             making.then((pass) => {
@@ -140,11 +234,12 @@ export async function weatherFigure(root: HTMLElement) {
     /** The sky as the sliders have it: every place of it, or in a designer the one it designs. */
     const sky = (): LayeredSky => {
         const held = skyFrom(lab.value, lab.choice("kind1") === KIND_VALUE.front ? "front" : "towers");
-        const on = { low: "l0.enabled", deep: "l1.enabled", middle: "l2.enabled", high: "sheet.on" } as const;
-        for (const place of Object.keys(on) as Place[])
-            if (designed ? place !== designed : !lab.pressed(on[place])) held[place].coverage = 0;
+        for (const place of Object.keys(held) as Place[]) if (designed && place !== designed) held[place].coverage = 0;
         return held;
     };
+    const model = design ? cloudModel(root, design) : null;
+    if (design) designerKinds(root, design, lab, () => sky()[placeOf(design)]);
+    else composer(root, lab, (place) => sky()[place]);
     // A designer's numbers as they stand, as a kind of cloud to paste into the library's `CLOUD_TYPES`.
     const copy = root.querySelector<HTMLButtonElement>("button[data-copy-kind]");
     if (designed)
@@ -168,13 +263,29 @@ export async function weatherFigure(root: HTMLElement) {
         const table = tables();
         const pass = clouds();
         if (!table || !pass) return;
+        // A designer's patch: its clouds alone about the point the camera orbits, at the middle of their height.
+        const held = sky();
+        const patch = design && PATCH[design];
+        if (designed && orbit && patch) {
+            const bearing = held.deep.frontBearing * DEG;
+            orbit.center.east = patch.aheadKm * Math.sin(bearing);
+            orbit.center.north = patch.aheadKm * Math.cos(bearing);
+            const place = held[designed];
+            orbit.heightKm = "altitudeKm" in place ? place.altitudeKm : place.baseKm + place.depthKm / 2;
+            model?.update(place, lab.value("wind.from"), lab.value("wind.speed"));
+            lookAt?.sync();
+        }
         const { width, height, dpr, heightM, headroom, inverseViewProjection, projectionDistance } = lab.size();
         if (over?.width !== width || over.height !== height) {
             over?.destroy();
             over = device.createTexture({ size: [width, height], format: "rgba16float", usage });
         }
         const layer = over;
-        const seen = skyAt(state.jd, { ...state, heightM }, table.luts.model);
+        const seen = skyAt(time ? time.jd(lab.clock) : state.jd, { ...state, heightM }, table.luts.model);
+        // Where the patch lies from the camera, and how far it reaches.
+        const centerKm: [number, number] =
+            orbit && patch ? [orbit.center.east - lab.flown.east, orbit.center.north - lab.flown.north] : [0, 0];
+        const radiusKm = patch?.radiusKm ?? 0;
 
         // The clouds over the frame: lit by the Sun while it reaches the highest of them, by the Moon after.
         const overFrame = (encoder: GPUCommandEncoder, exposed: GPUTexture, target: GPUTexture, light: FrameLight) => {
@@ -190,30 +301,52 @@ export async function weatherFigure(root: HTMLElement) {
                 Math.sin(windTo) * lab.value("wind.speed"),
                 Math.cos(windTo) * lab.value("wind.speed"),
             ] as const;
-            darker = nightStops(light.skyLuminance);
-            device.queue.writeBuffer(dimmed, 0, new Float32Array([2 ** -darker, 0, 0, 0]));
+            // Each place's clouds by the sun's light on their tops: by night the meter has the Moon's sky right.
+            const elevation = Math.asin(Math.min(Math.max(sun[2] ?? 0, -1), 1));
+            const tops = [held.low, held.deep, held.middle].map((layer) => ({
+                coverage: layer.coverage,
+                illuminance: sunlightAt(layer.baseKm + layer.depthKm, elevation, scale),
+            }));
+            const highest = {
+                coverage: held.high.coverage,
+                illuminance: sunlightAt(held.high.altitudeKm, elevation, scale),
+            };
+            const sunlit = sunUp ? cloudStops([...tops, highest], luminance) : 0;
+            darker = Math.max(nightStops(light.skyLuminance), sunlit);
+            if (designed) {
+                const cloud = brightest([...tops, highest].map((lit) => ({ ...lit, coverage: 1 })));
+                const thin = designed === "high" ? PATCH_SHEET_STOPS : 0;
+                const stops = Math.log2(Math.max(cloud, 1e-9) / (1.2 * 2 ** light.ev100 * PATCH_WHITE)) - thin;
+                const outshines = Math.min(Math.max(Math.log2(Math.max(cloud, 1e-9) / luminance) / 2, 0), 1);
+                darker += (Math.min(Math.max(stops, -CLOUD_STOPS), CLOUD_STOPS) - darker) * outshines;
+            }
+            const stage = designed ? PATCH_GROUND * (designed === "high" ? 2 ** -PATCH_SHEET_STOPS : 1) : 1;
+            device.queue.writeBuffer(dimmed, 0, new Float32Array([2 ** -darker, stage]));
             pass.update(
                 {
-                    weather: sky(),
+                    weather: held,
                     wind,
                     highWind: wind,
                     shear: lab.value("shear"),
                     evolution: lab.value("change"),
                     evolutionOffset: lab.value("phase"),
                     seed: lab.value("seed"),
-                    clearingKm: lab.value("clearing"),
-                    clearingFromKm: lab.value("clearFrom"),
+                    clearingKm: patch ? radiusKm : lab.value("clearing"),
+                    clearingFromKm: patch ? PATCH_FROM * radiusKm : lab.value("clearFrom"),
+                    clearingCenterKm: centerKm,
                     timeS: lab.clock,
                     observerKm: [lab.flown.east, lab.flown.north],
                     march: {
                         stepKm: lab.value("stepKm"),
                         stepGrowth: lab.value("stepGrowth"),
-                        reachKm: lab.value("reachKm"),
-                        fadeKm: lab.value("fadeKm"),
+                        reachKm: patch ? PATCH_REACH * radiusKm : lab.value("reachKm"),
+                        fadeKm: patch ? PATCH_AIR * radiusKm : lab.value("fadeKm"),
                         noiseKm: lab.value("noiseKm"),
                         multiScatter: lab.value("multiple"),
                         ambient: lab.value("ambient"),
+                        blueNoise: lab.pressed("noise.blue"),
                     },
+                    boxFilter: lab.pressed("filter.box"),
                     sunDirection: [sun[0] ?? 0, sun[1] ?? 0, sun[2] ?? 1],
                     sunIlluminance: onGround,
                     sunlightAt: (altitudeKm, elevation) => sunlightAt(altitudeKm, elevation, scale),
@@ -294,17 +427,57 @@ export async function weatherFigure(root: HTMLElement) {
                     ms: () => lab.timer.ms.bake,
                 },
             ];
-            // A designer shows the map of its place alone, the sheet's channel by channel.
-            const baked = {
+            // A designer shows what its place is rendered from: its map channel by channel, and the noise read per sample.
+            const shown = (from: Omit<Shown, "label" | "title">, assets: Asset[]) =>
+                assets.map(([label, mode, at, title, scale = 1]) => ({ ...from, label, mode, at, title, scale }));
+            const sheet = {
                 texture: pass.high.map,
                 kind: "2d" as const,
+                group: "the sheet's map",
                 ms: () => lab.timer.ms.bake,
-                timed: "all four",
             };
-            const sheet = HIGH_CHANNELS.map(([label, mode, at, title]) => ({ ...baked, label, title, mode, at }));
-            const own = designed === "high" ? sheet : maps.filter((map) => map.label === `${designed} map`);
+            const layerMap = {
+                texture: pass.layers.maps,
+                kind: "array" as const,
+                group: "the layer's map",
+                ms: () => lab.timer.ms.maps,
+                timed: "all three layers",
+            };
+            const own: Shown[] =
+                !design || !designed
+                    ? []
+                    : design === "high" || designed === "high"
+                      ? shown(sheet, HIGH_ASSETS)
+                      : [
+                            ...shown(layerMap, LAYER_ASSETS[design]).map((asset) => ({
+                                ...asset,
+                                at: LAYER_INDEX[designed],
+                            })),
+                            {
+                                label: "a level slice",
+                                group: "detail noise",
+                                title: "A level slice of the volume of noise that heaps the clouds' surfaces out, read at every step of the march: made once, and tiled.",
+                                texture: pass.layers.detail,
+                                kind: "3d",
+                                mode: SHOW.blue,
+                                at: 0.5,
+                            },
+                        ];
+            if (composite && design && designed) {
+                composite.encode(
+                    encoder,
+                    pass,
+                    designed === "high" ? null : LAYER_INDEX[designed],
+                    centerKm,
+                    2 * radiusKm,
+                );
+                const [label, title] = COMPOSED[design] ?? ["", ""];
+                const drawn = designed === "high" ? "per pixel, not stored" : "per step, not stored";
+                const together = { label, title, drawn, group: "together", texture: composite.texture };
+                own.push({ ...together, kind: "2d", mode: SHOW.red });
+            }
             textures.show(designed ? own : maps);
-            textures.encode(encoder, lab.pressed("textures.on"));
+            textures.encode(encoder, Boolean(designed) || lab.pressed("textures.on"));
             lab.timer.resolve(encoder);
         };
         const drawn = renderer.draw(lab.target(), {

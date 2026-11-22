@@ -196,3 +196,53 @@
 .env-frame:fullscreen .tone-tiles {
     border-radius: 0;
 }
+/* A thumbnail's resolutions, small over the top of its image, on hover or focus, the one shown in the accent: one click
+   loads the image at that resolution. Where nothing hovers, the chosen image keeps them. */
+.environments-item {
+    position: relative;
+    min-width: 0;
+}
+.environments-res {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    right: 6px;
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+}
+.environments-item:is(:hover, :focus-within) .environments-res {
+    opacity: 1;
+    pointer-events: auto;
+}
+@media (hover: none) {
+    .environments-item:has(> [aria-pressed="true"]) .environments-res {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+.environments-res button {
+    flex: 1;
+    min-width: 0;
+    height: auto;
+    padding: 1px 0;
+    border: 0;
+    border-radius: var(--radius-small);
+    background: color-mix(in oklab, var(--overlay-solid), transparent 15%);
+    color: var(--overlay-quiet);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.4;
+    cursor: pointer;
+}
+.environments-res button:hover {
+    color: var(--overlay-ink);
+}
+.environments-res button[aria-pressed="true"] {
+    color: var(--overlay-accent);
+}
+.environments-item > .environments-thumb {
+    width: 100%;
+}

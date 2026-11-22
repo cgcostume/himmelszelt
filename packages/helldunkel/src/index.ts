@@ -52,9 +52,6 @@ export {
 // The veil of a bright point source, the eye's own glare.
 export { meanVeilingGlare, veilingGlare } from "./glare.js";
 
-// A lens's starburst around a bright point source.
-export { starburstSpikes } from "./lens.js";
-
 // The eye at night: the rods' blue shift, before the exposure.
 export { coneShare, darkAdaptedEye } from "./vision.js";
 

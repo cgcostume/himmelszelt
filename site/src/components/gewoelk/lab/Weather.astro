@@ -12,10 +12,11 @@ import type { LabSlider } from "./sliders";
 import * as all from "./sliders";
 
 /**
- * A research figure for the whole sky: the formation figure's three layers and the cirrus figure's sheet as they stand
- * there, over dunstkreis' sky with the stars and the Moon, at the page's moment and place. It shows weathers and what
- * they cost; the clouds' sliders are the other two figures', and here only held, hidden, at their starts. The stars are
- * the Yale catalog's and Hipparcos', their light and the Milky Way's off or brighter by stops, as in the stars figures.
+ * A research figure for the whole sky: gewoelk's three marched layers and its sheet of high cloud over dunstkreis' sky
+ * with the stars and the Moon, at the page's moment and place. It composes weathers, a kind of cloud for each place of
+ * the sky, the library's or one saved in a designer, and shows what they cost; the clouds' sliders are the designers',
+ * and here only held, hidden. The stars are the Yale catalog's and Hipparcos', their light and the Milky Way's off or
+ * brighter by stops, as in the stars figures.
  */
 interface Props {
     id?: string;
@@ -23,11 +24,11 @@ interface Props {
 }
 const {
     id = "weather-lab",
-    caption = "The research's clouds together under a real sky: three marched layers and a sheet of high cloud over dunstkreis' air, sternenheer's stars and nachtgestirn's Moon, exposed by the stars figure's meter. The clouds' own light is still a stand-in for the Sun's, and by night the Moon's share of it.",
+    caption = "A weather composed, a kind of cloud for each place of the sky: three marched layers and a sheet of high cloud over dunstkreis' air, sternenheer's stars and nachtgestirn's Moon, exposed by the stars figure's meter. The clouds' own light is still a stand-in for the Sun's, and by night the Moon's share of it.",
 } = Astro.props;
 
 // Every slider of the two figures, once: held hidden, so the weathers set them as they do there.
-const SHOWN = new Set(["clearFrom", "clearing", "rain"]);
+const SHOWN = new Set(["clearFrom", "clearing"]);
 const HELD = [
     ...new Map(
         Object.values(all)
@@ -60,33 +61,33 @@ const FRONTS = [
     "front",
     "A band placed in the world: a wall of towers behind its leading edge, a shield of cloud to the rear",
 ];
-const PRESET = {
-    name: "preset",
+// The library's weathers by name, `WEATHER`'s: what a button reads, and what the weather is.
+const WEATHERS = {
+    name: "weather",
     label: "Weather",
-    title: "Weathers to start from: a click eases the sliders over to one and sets the layers' kinds",
+    title: "The library's weathers: each names a kind of cloud for every place of the sky",
     options: [
-        ["fair", "fair"],
-        ["towering", "towering"],
-        ["showers", "showers"],
-        ["front", "front ahead"],
-        ["rain", "under the front"],
-        ["alto", "altocumulus"],
+        ["clear", "clear", "Blue sky, a few wisps"],
+        ["fair", "fair", "Fair-weather cumulus: small, flat, spread out"],
+        ["scattered", "scattered", "Scattered cumulus, some of it growing"],
+        ["towering", "towering", "Towering cumulus: tall, heaped, an afternoon in summer"],
+        ["overcast", "overcast", "A deck of stratocumulus under a veil of cirrostratus"],
+        ["mackerel", "mackerel", "A mackerel sky over a few low clouds"],
+        ["cirrus", "cirrus", "High cloud ahead of a front, over a few low clouds"],
+        ["altocumulus", "altocumulus", "A sky of altocumulus over a few low heaps"],
+        ["showers", "showers", "Showers under an open sky: rain under every tower"],
+        ["frontAhead", "front ahead", "A front coming on: its shield ahead, the low clouds thinning out under it"],
+        ["underFront", "under the front", "Under the front: a closed, dark sky, ragged cloud hanging low"],
     ],
     checked: "towering",
 };
-const SKY = {
-    name: "sky",
-    label: "High cloud",
-    title: "Skies to start from, after photographs: a click eases the sliders over to one",
-    options: [
-        ["mackerel", "mackerel"],
-        ["ripples", "ripple patch"],
-        ["ribbed", "ribbed band"],
-        ["mixed", "puffs and veil"],
-        ["veil", "veil"],
-    ],
-    checked: "mackerel",
-};
+// The places of the sky, each with a kind of cloud to choose: the library's, or one saved in a designer.
+const PLACES = [
+    ["low", "low", "The low layer: heaps or a deck"],
+    ["deep", "deep", "The deep layer: towers or a front"],
+    ["middle", "middle", "The middle layer"],
+    ["high", "high", "The sheet of high cloud"],
+];
 const SIZE = {
     name: "size",
     label: "Map size",
@@ -150,16 +151,16 @@ const SPEED = choice(
         </Fragment>
         <Fragment slot="options">
             <OptionGroup name="weather">
-                <Choice figure={id} {...PRESET} />
-                <Choice figure={id} {...SKY} />
+                <Choice figure={id} {...WEATHERS} />
             </OptionGroup>
-            <OptionGroup name="layers">
-                <button type="button" class="view-toggle" data-field="l0.enabled" aria-pressed="true" title="The low layer">low</button>
-                <button type="button" class="view-toggle" data-field="l1.enabled" aria-pressed="true" title="The deep layer: towers or a front">deep</button>
-                <button type="button" class="view-toggle" data-field="l2.enabled" aria-pressed="true" title="The middle layer">middle</button>
-                <button type="button" class="view-toggle" data-field="sheet.on" aria-pressed="true" title="The sheet of high cloud">high</button>
+            <OptionGroup name="a kind for each place">
+                {PLACES.map(([place, label, title]) => <label class="composer-place" title={title}>{label} <select data-place={place} aria-label={title}></select></label>)}
+            </OptionGroup>
+            <OptionGroup name="your weathers">
+                <span class="own-weathers" data-field="ownWeathers"></span>
+            </OptionGroup>
+            <OptionGroup name="clearing">
                 <LabSliders sliders={CLEARING} />
-                <LabSliders sliders={all.FORMATION_RAIN} />
             </OptionGroup>
             <OptionGroup name="time">
                 <button type="button" class="view-toggle" data-field="animate" aria-pressed="false" title="Runs the figure's clock: the layers drift, the billows creep and the maps change, baked again every frame">animate</button>
@@ -169,7 +170,10 @@ const SPEED = choice(
                 <Choice figure={id} {...SCALE} />
                 <Choice figure={id} {...STEPS} />
                 <Choice figure={id} {...SIZE} />
-                <button type="button" class="view-toggle" data-field="rays.on" aria-pressed="false" title="God rays: the shafts of sunlight and of the clouds' shade in the air, from a table of the layers' shade made with every march">god rays</button>
+                <button type="button" class="view-toggle" data-field="rays.on" aria-pressed="false" title="God rays: the shafts of sunlight and of the clouds' shade in the air, from a table of the layers' shade made with every march. Clearest towards a low Sun in hazy air">god rays</button>
+                <button type="button" class="view-toggle" data-field="noise.blue" aria-pressed="false" title="Jitters the rays by blue noise, the same every frame, not by interleaved gradient noise: grain without a lattice where a few steps decide what a ray sees">blue noise</button>
+                <button type="button" class="view-toggle" data-field="stride.adaptive" aria-pressed="false" title="An adaptive stride: a max pyramid of every layer's map tells a ray where the air ahead is clear, and there it strides as far as 32 km at once">adaptive stride</button>
+                <button type="button" class="view-toggle" data-field="filter.box" aria-pressed="false" title="Brings the marched layers to the frame's size by a box of three of their texels at every pixel: the grain of the rays' jitter evens out, where four plain taps leave a raster of dots at half and at quarter scale">box filter</button>
                 <button type="button" class="view-toggle" data-field="textures.on" aria-pressed="false" title="The textures the figure renders from, down the left of the view: hover one for what it is for">textures</button>
                 <button type="button" class="view-toggle" data-field="ground.grid" aria-pressed="true" title="A grid on the ground, for orientation, speed and height: thin lines every 10 km, 1 km, 100 m and on down to 1 mm, each level showing once its cells are a few pixels across">grid</button>
             </OptionGroup>

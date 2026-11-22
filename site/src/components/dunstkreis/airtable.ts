@@ -13,57 +13,171 @@ import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { drawSvg, svgText } from "../sternzeit/figure";
 
-// The air table texel by texel, and what it does to the Moon low down: lifted, squeezed, dimmed, its colors spread.
+// The air table row by row as strips of its texels, the chosen one plotted, and what the table does to the Moon low
+// down: lifted, squeezed, dimmed, its colors spread.
 
 const DEG = Math.PI / 180;
 const LAST = AIR_TABLE_WIDTH - 1;
 const MOON_RADIUS = 0.259;
 const MOON_ALBEDO = 0.9;
-const GUTTER = 132;
-const STRIPE = 14;
-const BAND_GAP = 8;
-const AXIS = 30;
 // The close-up's field, in degrees: 2.4 arcminutes high.
 const LIMB_FIELD = 0.04;
-
-type Scale = "unit" | "max" | "log";
-interface Stripe {
-    row: number;
-    channel: number;
-    name: string;
-    scale: Scale;
-}
-const STRIPES: Stripe[][] = [
-    [
-        { row: 0, channel: 0, name: "transmittance", scale: "unit" },
-        { row: 0, channel: 1, name: "", scale: "unit" },
-        { row: 0, channel: 2, name: "", scale: "unit" },
-        { row: 0, channel: 3, name: "bend", scale: "max" },
-    ],
-    [
-        { row: 1, channel: 0, name: "airmass", scale: "log" },
-        { row: 1, channel: 1, name: "seeing", scale: "log" },
-        { row: 1, channel: 2, name: "its distance", scale: "log" },
-        { row: 1, channel: 3, name: "its wind", scale: "max" },
-    ],
-    [
-        { row: 2, channel: 0, name: "scintillation", scale: "log" },
-        { row: 2, channel: 1, name: "its distance", scale: "log" },
-        { row: 2, channel: 2, name: "its wind", scale: "max" },
-        { row: 2, channel: 3, name: "dilution", scale: "unit" },
-    ],
-    [{ row: 3, channel: 0, name: "lift", scale: "max" }],
-    [{ row: 4, channel: 0, name: "range", scale: "unit" }],
-];
-const LETTERS = ["r", "g", "b", "a"];
 const OFFSETS = [0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 45];
-// The values view: the bend's plot and the colors' spread under it, each this high.
-const PLOT = 96;
+// The plot: as high whichever strip is chosen, its altitudes along the top, a panel per quantity under a title each.
+const PLOT_HEIGHT = 260;
+const AXIS = 26;
+const TITLE = 18;
+const PANEL_GAP = 10;
+
+/**
+ * A quantity of the table on a fixed axis, wide enough for every table the sliders make: the extremes over observer
+ * heights from 1 m to orbit and air from -30 °C to 40 °C, rounded out. Its strip shows it normalized to the same range.
+ */
+interface Quantity {
+    name: string;
+    min: number;
+    max: number;
+    log?: boolean;
+    ticks: number[];
+    label: (v: number) => string;
+}
+const SUPERSCRIPT = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+const power = (v: number) => {
+    const e = Math.round(Math.log10(v));
+    if (e === 0) return "1";
+    const digits = [...String(Math.abs(e))].map((d) => SUPERSCRIPT[Number(d)]).join("");
+    return `10${e < 0 ? "⁻" : ""}${digits}`;
+};
+const meters = (v: number) => (v < 1000 ? `${v} m` : `${v / 1000} km`);
+const plain = (v: number) => String(v);
+const signed = (unit: string) => (v: number) => (v === 0 ? "0" : `${v > 0 ? "+" : "−"}${Math.abs(v)}${unit}`);
+const arcminutes = (v: number) => `${v}′`;
+
+// Bend and lift peak at 90.5′, in -30 °C air for the ray grazing the limb from 89 km up; red and blue part by -8.2″
+// and +17.8″ at most.
+const BEND: Quantity = { name: "bend, arcminutes", min: 0, max: 100, ticks: [0, 50, 100], label: arcminutes };
+const LIFT: Quantity = { ...BEND, name: "lift, arcminutes" };
+const SPREAD: Quantity = {
+    name: "red and blue from green, arcseconds",
+    min: -10,
+    max: 20,
+    ticks: [-10, 0, 10, 20],
+    label: signed("″"),
+};
+const UNIT = { min: 0, max: 1, ticks: [0, 0.5, 1], label: plain };
+const TRANSMITTANCE: Quantity = { ...UNIT, name: "transmittance" };
+const DILUTION: Quantity = { ...UNIT, name: "dilution" };
+// The airmass reaches 80 along that ray, 39 on the ground's horizon.
+const AIRMASS: Quantity = { name: "airmass", min: 0, max: 80, ticks: [0, 40, 80], label: plain };
+// The turbulence spans decades: 1 straight up from sea level, the seeing's up to 600 along the limb from 13 km up, the
+// scintillation's up to 500,000 from orbit, lying 840 m to 2,400 km away. Below the axis, near nothing, it is clamped.
+const SEEING: Quantity = { name: "seeing", min: 1e-3, max: 1e3, log: true, ticks: [1e-3, 1, 1e3], label: power };
+const SCINTILLATION: Quantity = {
+    name: "scintillation",
+    min: 1e-3,
+    max: 1e6,
+    log: true,
+    ticks: [1e-3, 1, 1e3, 1e6],
+    label: power,
+};
+const DISTANCE = { min: 100, max: 1e7, log: true, ticks: [100, 1e4, 1e6], label: meters };
+const WIND = { min: 0, max: 1.5, ticks: [0, 0.5, 1, 1.5], label: plain };
+
+type Values = (t: AirTable, i: number) => number;
+const texel =
+    (row: number, channel: number, scale = 1): Values =>
+    (t, i) =>
+        (t.data[(row * AIR_TABLE_WIDTH + i) * 4 + channel] as number) * scale;
+const toArcminutes = 60 / DEG;
+
+/** How far the air shows red and blue apart from green at entry i, in arcseconds, up positive: the bend (row 0, a)
+ *  times the dilution (row 2, a) times each channel's share of the bend beyond green's. */
+const spread =
+    (channel: number): Values =>
+    (t, i) =>
+        ((AIR_CHANNEL_DISPERSION[channel] as number) - 1) * texel(0, 3, 3600 / DEG)(t, i) * texel(2, 3)(t, i);
+
+interface Panel {
+    quantity: Quantity;
+    lines: [Values, string][];
+}
+/** A strip: a row's rgb or its alpha, each channel's values on its quantity's axis, and the panels its plot shows. */
+interface Strip {
+    row: number;
+    alpha: boolean;
+    channels: [Quantity, Values][];
+    panels: Panel[];
+    /** Whether the row runs over the true altitude rather than the apparent one. */
+    real?: boolean;
+}
+const RED = "plot-line-red";
+const GREEN = "plot-line-green";
+const BLUE = "plot-line-blue";
+const ALPHA = "air-table-alpha";
+const one = (quantity: Quantity, values: Values, cls: string): Panel => ({ quantity, lines: [[values, cls]] });
+const STRIPS: Record<string, Strip> = {
+    "0rgb": {
+        row: 0,
+        alpha: false,
+        channels: [0, 1, 2].map((c) => [TRANSMITTANCE, texel(0, c)]),
+        panels: [{ quantity: TRANSMITTANCE, lines: [RED, GREEN, BLUE].map((cls, c) => [texel(0, c), cls]) }],
+    },
+    "0a": {
+        row: 0,
+        alpha: true,
+        channels: [[BEND, texel(0, 3, toArcminutes)]],
+        panels: [
+            one(BEND, texel(0, 3, toArcminutes), ALPHA),
+            {
+                quantity: SPREAD,
+                lines: [
+                    [() => 0, GREEN],
+                    [spread(0), RED],
+                    [spread(2), BLUE],
+                ],
+            },
+        ],
+    },
+    "1rgb": {
+        row: 1,
+        alpha: false,
+        channels: [
+            [AIRMASS, texel(1, 0)],
+            [SEEING, texel(1, 1)],
+            [{ ...DISTANCE, name: "the seeing's distance" }, texel(1, 2)],
+        ],
+        panels: [],
+    },
+    "1a": { row: 1, alpha: true, channels: [[{ ...WIND, name: "the seeing's wind" }, texel(1, 3)]], panels: [] },
+    "2rgb": {
+        row: 2,
+        alpha: false,
+        channels: [
+            [SCINTILLATION, texel(2, 0)],
+            [{ ...DISTANCE, name: "the scintillation's distance" }, texel(2, 1)],
+            [{ ...WIND, name: "the scintillation's wind" }, texel(2, 2)],
+        ],
+        panels: [],
+    },
+    "2a": { row: 2, alpha: true, channels: [[DILUTION, texel(2, 3)]], panels: [] },
+    "3r": { row: 3, alpha: false, channels: [[LIFT, texel(3, 0, toArcminutes)]], panels: [], real: true },
+};
+// Where a strip holds one quantity per channel, its plot is a panel per channel, each in the channel's hue.
+for (const strip of Object.values(STRIPS)) {
+    if (strip.panels.length > 0) continue;
+    const hues = strip.alpha ? [ALPHA] : [RED, GREEN, BLUE];
+    strip.panels = strip.channels.map(([quantity, values], c) => one(quantity, values, hues[c] ?? ALPHA));
+}
 
 const f = (n: number) => n.toFixed(2);
 const encode = (v: number) => {
     const c = Math.min(Math.max(v, 0), 1);
     return Math.round(255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055));
+};
+/** A value as a share of its quantity's axis, clamped to it: linear, or by its logarithm. */
+const share = ({ min, max, log }: Quantity, v: number) => {
+    const s = log ? Math.log(Math.max(v, 1e-30) / min) / Math.log(max / min) : (v - min) / (max - min);
+    return Math.min(Math.max(s, 0), 1);
 };
 const heightText = (m: number) => (m < 1000 ? `${m.toFixed(0)} m` : `${(m / 1000).toFixed(m < 10_000 ? 1 : 0)} km`);
 const angleText = (deg: number) => {
@@ -75,45 +189,16 @@ const percent = (x: number) => `${x < 0.1 ? (x * 100).toFixed(1) : Math.round(x 
 const shareOf = (altitude: number, from: number, to: number) =>
     Math.sqrt(Math.sqrt(Math.min(Math.max((altitude - from) / Math.max(to - from, 1e-12), 0), 1)));
 
-/** A round step, 1, 2 or 5 times a power of ten, that divides a span of `max` into some `count` parts. */
-const niceStep = (max: number, count: number) => {
-    const raw = max / count;
-    const power = 10 ** Math.floor(Math.log10(raw));
-    return power * ([1, 2, 5, 10].find((k) => k * power >= raw) ?? 10);
-};
-
-/** One band of the table, a row's four channels as stripes, as a PNG data URL scaled up without smoothing. */
-function bandImage(table: AirTable, stripes: Stripe[]): string {
-    const rows = stripes.length;
-    const small = Object.assign(document.createElement("canvas"), { width: AIR_TABLE_WIDTH, height: rows });
-    const image = new ImageData(AIR_TABLE_WIDTH, rows);
-    stripes.forEach(({ row, channel, scale }, s) => {
-        const at = (i: number) => table.data[(row * AIR_TABLE_WIDTH + i) * 4 + channel] as number;
-        let [low, high] = [Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
-        const value = (i: number) => (scale === "log" ? Math.log(Math.max(at(i), 1e-9)) : at(i));
-        for (let i = 0; i < AIR_TABLE_WIDTH; i++) [low, high] = [Math.min(low, value(i)), Math.max(high, value(i))];
-        if (scale === "max") low = Math.min(low, 0);
-        for (let i = 0; i < AIR_TABLE_WIDTH; i++) {
-            const used = row < 4 || i < (channel === 0 ? 2 : 1);
-            let v = scale === "unit" ? at(i) : (value(i) - low) / Math.max(high - low, 1e-12);
-            if (row === 4) v = used ? 0.5 : 0;
-            const k = (s * AIR_TABLE_WIDTH + i) * 4;
-            const c = encode(v);
-            // Each channel in its own color, alpha in gray, as a texture viewer shows them.
-            const gray = channel === 3 || row === 4;
-            image.data[k] = gray || channel === 0 ? c : 0;
-            image.data[k + 1] = gray || channel === 1 ? c : 0;
-            image.data[k + 2] = gray || channel === 2 ? c : 0;
-            image.data[k + 3] = 255;
-        }
-    });
-    small.getContext("2d")?.putImageData(image, 0, 0);
-    const big = Object.assign(document.createElement("canvas"), { width: AIR_TABLE_WIDTH * 4, height: rows * 8 });
-    const context = big.getContext("2d");
-    if (!context) return "";
-    context.imageSmoothingEnabled = false;
-    context.drawImage(small, 0, 0, big.width, big.height);
-    return big.toDataURL("image/png");
+/** Paints a strip's canvas, 256 by 1 texels, scaled up by CSS without smoothing: rgb in their colors, alpha in gray,
+ *  each value as a share of its quantity's axis, encoded as a texture viewer encodes linear values for the screen. */
+function paintStrip(canvas: HTMLCanvasElement, strip: Strip, table: AirTable) {
+    const image = new ImageData(AIR_TABLE_WIDTH, 1);
+    for (let i = 0; i < AIR_TABLE_WIDTH; i++) {
+        const shares = strip.channels.map(([quantity, values]) => encode(share(quantity, values(table, i))));
+        const rgb = strip.alpha ? [shares[0], shares[0], shares[0]] : [0, 1, 2].map((c) => shares[c] ?? 0);
+        image.data.set([...(rgb as number[]), 255], i * 4);
+    }
+    canvas.getContext("2d")?.putImageData(image, 0, 0);
 }
 
 /** The air table figure on `root`. Follows no moment and no place: the sliders set the Moon's altitude and the air. */
@@ -124,18 +209,18 @@ export function airTableFigure(root: HTMLElement) {
         height: field<HTMLInputElement>("height"),
         temperature: field<HTMLInputElement>("temperature"),
     };
-    const texels = field<SVGSVGElement>("texels");
+    const plotSvg = field<SVGSVGElement>("plot");
     const moonSvg = field<SVGSVGElement>("moon");
     const limbSvg = field<SVGSVGElement>("limb");
     const note = field("note");
     const limbName = field("limbName");
-    const views = [...root.querySelectorAll<HTMLButtonElement>("[data-view]")];
-    let view = "texels";
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>("[data-strip]")];
+    const canvases = buttons.map((button) => find<HTMLCanvasElement>("canvas", button));
+    let chosen = buttons.find((button) => button.getAttribute("aria-pressed") === "true")?.dataset.strip ?? "0a";
     const requestRender = onDemand(render, root);
 
     let table: AirTable | null = null;
     let key = "";
-    let bands: string[] = [];
     let hover: number | null = null;
 
     function settings() {
@@ -145,7 +230,11 @@ export function airTableFigure(root: HTMLElement) {
             const model = { ...DEFAULT_ATMOSPHERE_MODEL, refractivity: airRefractivity(temperature) };
             table = airTable(model, heightM);
             key = `${heightM}/${temperature}`;
-            bands = (STRIPES as Stripe[][]).map((stripes) => bandImage(table as AirTable, stripes));
+            buttons.forEach((button, k) => {
+                const strip = STRIPS[button.dataset.strip ?? ""];
+                const canvas = canvases[k];
+                if (strip && canvas) paintStrip(canvas, strip, table as AirTable);
+            });
         }
         const t = table as AirTable;
         // A span fixed above the true horizon, not ended at the table's top: that drops from 90° to the air's upper
@@ -193,8 +282,7 @@ export function airTableFigure(root: HTMLElement) {
         const close = limb === "lower" ? bottom[1] : limb === "upper" ? top[1] : t.horizon;
         const light = airAt(t, Math.max(center[1], t.horizon))?.transmittance ?? [0, 0, 0];
         const shape = outlines(t, altitude);
-        if (view === "values") drawValues(t, center[1]);
-        else drawTexels(t, altitude, center[1]);
+        drawPlot(t, altitude, center[1]);
         const span = Math.max(1.4, Math.abs(center[1] - altitude) + 0.8);
         drawMoon(t, span, altitude, center[1], close, shape, light);
         drawLimb(t, span / LIMB_FIELD, close, shape, light, limb === null);
@@ -223,11 +311,11 @@ export function airTableFigure(root: HTMLElement) {
     }
 
     function entryText(t: AirTable, i: number) {
-        const value = (row: number, channel: number) => t.data[(row * AIR_TABLE_WIDTH + i) * 4 + channel] as number;
+        const value = (row: number, channel: number) => texel(row, channel)(t, i);
         const apparent = t.horizon + (t.top - t.horizon) * (i / LAST) ** 4;
         const real = t.trueHorizon + (t.trueTop - t.trueHorizon) * (i / LAST) ** 4;
         const transmittance = [0, 1, 2].map((c) => value(0, c).toFixed(3)).join(", ");
-        const [red, , blue] = spreadOf(t, i).map((v) => `${v > 0 ? "+" : ""}${v.toFixed(1)}″`);
+        const [red, blue] = [spread(0)(t, i), spread(2)(t, i)].map((v) => `${v > 0 ? "+" : ""}${v.toFixed(1)}″`);
         return (
             `entry ${i}: seen at ${angleText(apparent)}, bent by ${angleText(value(0, 3) / DEG)}, red ${red} and blue ` +
             `${blue} from green; transmittance ${transmittance}, ${value(1, 0).toFixed(1)} airmasses, dilution ` +
@@ -235,151 +323,73 @@ export function airTableFigure(root: HTMLElement) {
         );
     }
 
-    /** The x of an altitude in a row running from `from` to `to`, in the image's span. */
-    const texelX = (left: number, width: number, altitude: number, from: number, to: number) =>
-        left + (shareOf(altitude, from, to) * LAST + 0.5) * (width / AIR_TABLE_WIDTH);
+    /** Where the strips' texels lie across the plot: the plot's x runs entry by entry under the same canvas. */
+    function span() {
+        const box = plotSvg.getBoundingClientRect();
+        const strip = canvases[0]?.getBoundingClientRect();
+        const left = strip && strip.width > 0 ? strip.left - box.left : 56;
+        return { left, inner: strip && strip.width > 0 ? strip.width : Math.max(box.width - left, 100) };
+    }
 
-    function axis(left: number, width: number, y: number, from: number, to: number, words: string, above: boolean) {
-        let svg = "";
-        svg += svgText(left, y, "horizon", "figure-label figure-anchor-start");
-        let lastX = left + 50;
+    /** The x of an altitude in a row running from `from` to `to`. */
+    const texelX = (left: number, inner: number, altitude: number, from: number, to: number) =>
+        left + (shareOf(altitude, from, to) * LAST + 0.5) * (inner / AIR_TABLE_WIDTH);
+
+    function axis(left: number, inner: number, y: number, from: number, to: number, real: boolean) {
+        const first = real ? "true horizon" : "horizon";
+        let svg = svgText(left, y, first, "figure-label figure-anchor-start");
+        let lastX = left + (real ? 84 : 50);
         for (const offset of OFFSETS) {
             if (from + offset >= to) break;
-            const x = texelX(left, width, from + offset, from, to);
-            if (x - lastX < 32 || left + width - x < 34) continue;
+            const x = texelX(left, inner, from + offset, from, to);
+            if (x - lastX < 32 || left + inner - x < 56) continue;
             lastX = x;
-            svg += `<line x1="${f(x)}" y1="${f(y + (above ? 8 : -8))}" x2="${f(x)}" y2="${f(y + (above ? 12 : -12))}" class="air-table-tick"/>`;
-            svg += svgText(x, y, `${offset}°`, "figure-label");
+            svg += `<line x1="${f(x)}" y1="${f(y + 8)}" x2="${f(x)}" y2="${f(y + 12)}" class="air-table-tick"/>`;
+            svg += svgText(x, y, `+${offset}°`, "figure-label");
         }
-        svg += svgText(left + width, y, to === 90 ? "zenith" : "top", "figure-label figure-anchor-end");
-        svg += svgText(left - 10, y, words, "figure-label figure-anchor-end");
+        svg += svgText(left + inner, y, to === 90 ? "zenith" : "top", "figure-label figure-anchor-end");
         return svg;
     }
 
-    function drawTexels(t: AirTable, trueAltitude: number, seenAltitude: number) {
-        const width = texels.clientWidth || 600;
-        const left = GUTTER;
-        const inner = width - left - 4;
-        let y = AXIS;
-        let svg = axis(left, inner, 12, t.horizon, t.top, "apparent", true);
-        const marks: string[] = [];
-        STRIPES.forEach((stripes, band) => {
-            const height = stripes.length * STRIPE;
-            const href = bands[band] ?? "";
-            svg += `<image href="${href}" x="${left}" y="${y}" width="${f(inner)}" height="${height}" preserveAspectRatio="none" class="air-table-image"/>`;
-            svg += svgText(4, y + STRIPE / 2, `${band}`, "figure-label figure-anchor-start air-table-row");
-            stripes.forEach(({ channel, name, row }, s) => {
-                const yy = y + s * STRIPE + STRIPE / 2;
-                if (name) svg += svgText(left - (row === 4 ? 40 : 20), yy, name, "figure-label figure-anchor-end");
-                const letters = row === 4 ? "rgba" : (LETTERS[channel] ?? "");
-                svg += svgText(left - 6, yy, letters, `figure-label figure-anchor-end air-table-${letters}`);
-            });
-            if (band === 3) svg += svgText(left + inner - 6, y + STRIPE / 2, "g, b, a unused", "air-table-inside");
-            if (band === 4) {
-                const words = "texel 0: horizons, tops; 1: height";
-                svg += svgText(left + 10, y + STRIPE / 2, words, "air-table-inside air-table-inside-start");
-            }
-            const x =
-                band === 3
-                    ? texelX(left, inner, trueAltitude, t.trueHorizon, t.trueTop)
-                    : texelX(left, inner, seenAltitude, t.horizon, t.top);
-            if (band < 4 && seenAltitude >= t.horizon) {
-                marks.push(
-                    `<line x1="${f(x)}" y1="${y - 2}" x2="${f(x)}" y2="${y + height + 2}" class="air-table-mark"/>`,
-                );
-            }
-            if (hover !== null && band < 4) {
-                const hx = left + (hover + 0.5) * (inner / AIR_TABLE_WIDTH);
-                marks.push(`<line x1="${f(hx)}" y1="${y}" x2="${f(hx)}" y2="${y + height}" class="air-table-hover"/>`);
-            }
-            y += height + (band === 3 ? AXIS : BAND_GAP);
-            if (band === 3) svg += axis(left, inner, y - AXIS / 2 - 1, t.trueHorizon, t.trueTop, "true", false);
-        });
-        const height = y - BAND_GAP + 2;
-        texels.setAttribute("viewBox", `0 0 ${width} ${height}`);
-        texels.style.height = `${height}px`;
-        drawSvg(texels, svg + marks.join(""), 1);
-        texels.dataset.left = String(left);
-        texels.dataset.inner = String(inner);
-    }
-
-    /** How far the air shows red, green and blue apart from green at entry i, in arcseconds, up positive: the bend
-     *  (row 0, a) times the dilution (row 2, a) times each channel's share of the bend beyond green's. */
-    function spreadOf(t: AirTable, i: number): [number, number, number] {
-        const bend = (t.data[i * 4 + 3] as number) / DEG;
-        const dilution = t.data[(2 * AIR_TABLE_WIDTH + i) * 4 + 3] as number;
-        return AIR_CHANNEL_DISPERSION.map((d) => (d - 1) * bend * dilution * 3600) as [number, number, number];
-    }
-
-    /** The table's values over its entries, spaced as the texels are: the bend in arcminutes, and under it how far
-     *  the air shows red and blue from green, in arcseconds. */
-    function drawValues(t: AirTable, seenAltitude: number) {
-        const width = texels.clientWidth || 600;
-        const left = GUTTER;
-        const inner = width - left - 4;
+    /** The chosen strip's values over its entries, a panel per quantity on its fixed axis, the Moon in the accent. */
+    function drawPlot(t: AirTable, trueAltitude: number, seenAltitude: number) {
+        const strip = STRIPS[chosen] ?? (STRIPS["0a"] as Strip);
+        const width = plotSvg.clientWidth || 600;
+        const { left, inner } = span();
         const xOf = (i: number) => left + (i + 0.5) * (inner / AIR_TABLE_WIDTH);
-        const entries = Array.from({ length: AIR_TABLE_WIDTH }, (_, i) => i);
-        const bends = entries.map((i) => ((t.data[i * 4 + 3] as number) / DEG) * 60);
-        const spreads = entries.map((i) => spreadOf(t, i));
-        let svg = axis(left, inner, 12, t.horizon, t.top, "apparent", true);
-        const marks: string[] = [];
-
-        /** One plot: grid lines at round values in the gutter's unit, a line per series, its name in the gutter. */
-        const plot = (
-            y: number,
-            low: number,
-            high: number,
-            unit: string,
-            series: [number[], string][],
-            name: string,
-        ) => {
-            const yOf = (v: number) => y + PLOT - ((v - low) / (high - low)) * PLOT;
-            const step = niceStep(high - low, 5);
-            for (let v = Math.ceil(low / step) * step; v <= high + 1e-9; v += step) {
-                const yy = yOf(v);
-                const zero = Math.abs(v) < step / 2;
-                svg += `<line x1="${left}" y1="${f(yy)}" x2="${f(left + inner)}" y2="${f(yy)}" class="figure-grid"/>`;
-                const text = zero ? "0" : `${v > 0 && low < 0 ? "+" : ""}${Number(v.toPrecision(3))}${unit}`;
-                svg += svgText(left - 6, yy, text.replace("-", "−"), "figure-grid-label");
+        const [from, to] = strip.real ? [t.trueHorizon, t.trueTop] : [t.horizon, t.top];
+        const moon = strip.real ? trueAltitude : seenAltitude;
+        const count = strip.panels.length;
+        const height = (PLOT_HEIGHT - AXIS - count * TITLE - (count - 1) * PANEL_GAP) / count;
+        let svg = axis(left, inner, 10, from, to, strip.real ?? false);
+        let marks = "";
+        strip.panels.forEach(({ quantity, lines }, p) => {
+            const top = AXIS + p * (TITLE + height + PANEL_GAP) + TITLE;
+            const yOf = (v: number) => top + height - share(quantity, v) * height;
+            svg += svgText(left, top - TITLE / 2 - 1, quantity.name, "figure-label figure-anchor-start");
+            for (const v of quantity.ticks) {
+                const y = yOf(v);
+                svg += `<line x1="${f(left)}" y1="${f(y)}" x2="${f(left + inner)}" y2="${f(y)}" class="figure-grid"/>`;
+                svg += svgText(left - 6, y, quantity.label(v), "figure-grid-label");
             }
-            for (const [values, cls] of series) {
-                const points = entries.map((i) => `${f(xOf(i))},${f(yOf(values[i] as number))}`).join(" ");
-                svg += `<polyline points="${points}" class="plot-line ${cls}"/>`;
-            }
-            svg += svgText(4, y + 6, name, "figure-label figure-anchor-start air-table-row");
-            if (seenAltitude >= t.horizon) {
-                const x = texelX(left, inner, seenAltitude, t.horizon, t.top);
-                marks.push(
-                    `<line x1="${f(x)}" y1="${y - 2}" x2="${f(x)}" y2="${y + PLOT + 2}" class="air-table-mark"/>`,
+            for (const [values, cls] of lines) {
+                const points = Array.from(
+                    { length: AIR_TABLE_WIDTH },
+                    (_, i) => `${f(xOf(i))},${f(yOf(values(t, i)))}`,
                 );
+                svg += `<polyline points="${points.join(" ")}" class="plot-line ${cls}"/>`;
+            }
+            if (moon >= from) {
+                const x = texelX(left, inner, moon, from, to);
+                marks += `<line x1="${f(x)}" y1="${f(top - 2)}" x2="${f(x)}" y2="${f(top + height + 2)}" class="air-table-mark"/>`;
             }
             if (hover !== null) {
-                const hx = xOf(hover);
-                marks.push(`<line x1="${f(hx)}" y1="${y}" x2="${f(hx)}" y2="${y + PLOT}" class="plot-mark"/>`);
+                const x = xOf(hover);
+                marks += `<line x1="${f(x)}" y1="${f(top)}" x2="${f(x)}" y2="${f(top + height)}" class="plot-mark"/>`;
             }
-        };
-
-        const bendMax = Math.max(...bends);
-        plot(AXIS, 0, bendMax * 1.05, "′", [[bends, ""]], "bend");
-        svg += svgText(4, AXIS + 24, "row 0, a", "figure-label figure-anchor-start");
-        const red = spreads.map((s) => s[0]);
-        const blue = spreads.map((s) => s[2]);
-        const y2 = AXIS + PLOT + 2 * BAND_GAP;
-        const reach = Math.max(...blue, -Math.min(...red), 1e-6) * 1.08;
-        const below = Math.min(Math.max(-Math.min(...red) / Math.max(...blue, 1e-9), 0.3), 1);
-        const lines: [number[], string][] = [
-            [entries.map(() => 0), "plot-line-green"],
-            [red, "plot-line-red"],
-            [blue, "plot-line-blue"],
-        ];
-        plot(y2, -reach * below, reach, "″", lines, "spread");
-        svg += svgText(4, y2 + 24, "from green", "figure-label figure-anchor-start");
-        const height = y2 + PLOT + 6;
-        texels.setAttribute("viewBox", `0 0 ${width} ${height}`);
-        texels.style.height = `${height}px`;
-        drawSvg(texels, svg + marks.join(""), 1);
-        texels.dataset.left = String(left);
-        texels.dataset.inner = String(inner);
+        });
+        plotSvg.setAttribute("viewBox", `0 0 ${width} ${PLOT_HEIGHT}`);
+        drawSvg(plotSvg, svg + marks, 1);
     }
 
     /** The Moon's three images, red, green and blue, added on black, each filled by the light that gets through. */
@@ -464,25 +474,31 @@ export function airTableFigure(root: HTMLElement) {
         drawSvg(limbSvg, svg, 1);
     }
 
-    texels.addEventListener("pointermove", (event) => {
-        const left = Number(texels.dataset.left);
-        const inner = Number(texels.dataset.inner);
-        const x = event.clientX - texels.getBoundingClientRect().left;
-        const i = Math.floor(((x - left) / inner) * AIR_TABLE_WIDTH);
-        const next = i >= 0 && i < AIR_TABLE_WIDTH ? i : null;
-        if (next !== hover) {
-            hover = next;
+    /** The entry under the pointer, by its x across the strips' canvases, which the plot shares. */
+    const pointed = (event: PointerEvent) => {
+        const strip = canvases[0]?.getBoundingClientRect();
+        if (!strip || strip.width === 0) return null;
+        const i = Math.floor(((event.clientX - strip.left) / strip.width) * AIR_TABLE_WIDTH);
+        return i >= 0 && i < AIR_TABLE_WIDTH ? i : null;
+    };
+    const strips = find(".air-table-strips", root);
+    for (const element of [plotSvg, strips] as HTMLElement[]) {
+        element.addEventListener("pointermove", (event) => {
+            const next = pointed(event);
+            if (next !== hover) {
+                hover = next;
+                requestRender();
+            }
+        });
+        element.addEventListener("pointerleave", () => {
+            hover = null;
             requestRender();
-        }
-    });
-    texels.addEventListener("pointerleave", () => {
-        hover = null;
-        requestRender();
-    });
-    for (const button of views) {
+        });
+    }
+    for (const button of buttons) {
         button.addEventListener("click", () => {
-            view = button.dataset.view ?? "texels";
-            for (const other of views) other.setAttribute("aria-pressed", String(other === button));
+            chosen = button.dataset.strip ?? chosen;
+            for (const other of buttons) other.setAttribute("aria-pressed", String(other === button));
             requestRender();
         });
     }

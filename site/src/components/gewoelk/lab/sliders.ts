@@ -26,8 +26,17 @@ export const CLEARING: LabSlider[] = [
 // The sliders of the cirrus figure, group by group.
 export const CIRRUS_SHEET: LabSlider[] = [
     ["c.altitude", "altitude", 4, 12, 0.1, 7, "The sheet's height, in km"],
-    ["c.opticalDepth", "depth", 0.1, 4, 0.1, 1.4, "The sheet's optical depth where the map reads 1"],
+    ["c.opticalDepth", "depth", 0.1, 4, 0.1, 0.6, "The sheet's optical depth where the map reads 1"],
     ["c.tile", "tile", 8, 80, 1, 32, "One tile of the map, in km: larger tiles, coarser texels"],
+    [
+        "c.reach",
+        "reach",
+        0,
+        400,
+        10,
+        140,
+        "The distance at which the sheet has thinned out to none, in km: 0 for a sheet to the horizon",
+    ],
     [
         "wind.from",
         "wind from",
@@ -40,11 +49,13 @@ export const CIRRUS_SHEET: LabSlider[] = [
     ["wind.speed", "wind", 0, 60, 1, 20, "The wind the sheet drifts with while the animation runs, in m/s"],
 ];
 export const CIRRUS_PATCHES: LabSlider[] = [
-    ["c.coverage", "coverage", 0, 1, 0.01, 0.8, "How much of the sky the sheet's patches and bands cover"],
+    ["c.coverage", "coverage", 0, 1, 0.01, 0.55, "How much of the sky the sheet's patches and bands cover"],
     ["c.patchKm", "patch size", 10, 300, 5, 60, "A patch's size across, in km"],
     ["c.bandStretch", "band stretch", 1, 10, 0.1, 2, "How many times as long as wide the patches are: bands"],
     ["c.bandAngle", "band angle", 0, 180, 5, 20, "The bands' angle to the wind, in degrees"],
     ["c.edge", "edge", 0, 1, 0.05, 0.6, "How far a patch thins out towards its edge, where the puffs shrink"],
+    ["c.flakes", "flakes", 0, 1, 0.05, 0.5, "How far the patches break up into flakes with clear sky between"],
+    ["c.flakeKm", "flake size", 1, 40, 0.5, 9, "A flake's size across, in km"],
 ];
 export const CIRRUS_CELLS: LabSlider[] = [
     ["c.cells", "puffs", 0, 1, 0.05, 1, "How much of the sheet is puffs, the cells of cirrocumulus and altocumulus"],

@@ -1,5 +1,6 @@
 import { blueNoiseTexture, exposureFromEV100, NO_WHITE_BALANCE, type ToneCurve } from "@himmelszelt/helldunkel";
-import { autoExposureCompensation, autoExposureTint, DEFAULT_AUTO_EXPOSURE_KEYS } from "./exposure.js";
+import { solarEclipse } from "./eclipse.js";
+import { autoExposureCompensation, autoExposureTint } from "./exposure.js";
 import { createLut, dispatch } from "./luts.js";
 import { spectrumToRgb } from "./model.js";
 import {
@@ -17,13 +18,11 @@ import {
 import {
     type Aureole,
     aureoleConstants,
-    DEFAULT_STARBURST,
     type Features,
     featureConstants,
     LENS_VEIL,
     pipelineConstants,
     refractionConstants,
-    type Starburst,
     scatteringConstants,
 } from "./quality.js";
 import { apparentDirection } from "./refraction.js";
@@ -83,12 +82,6 @@ export interface SkyPassOptions {
      * the Moon: a renderer with clouds or terrain in front turns it off and adds `hdVeil` with the light that gets through.
      */
     veil?: number;
-    /**
-     * A starburst around the sun, the spikes the blades of a camera's aperture diffract its light into, fixed to the
-     * camera: `true` for `DEFAULT_STARBURST`'s six blades, or the count of blades, an even one drawing as many spikes
-     * and an odd one twice as many. Off by default. It leaves the frame with the sun as the veil does.
-     */
-    starburst?: Starburst | boolean;
     /**
      * The Sun's corona and chromosphere around its disc, with `sunDisc`: Baumbach's corona, five millionths of the
      * disc's luminance at the limb, and the thin pink shell under it, behind the air, the ground and the Moon as the
@@ -150,9 +143,10 @@ export interface SkyPassOptions {
 
 /**
  * Byte size of DkSkyParams in frame.wgsl: a vec3 and a scalar, a mat4x4, four scalars, a vec2 and two scalars, a vec3
- * and a scalar twice, a vec3 and a scalar, three scalars padded to 16, and a mat3x3 of three columns padded to 16.
+ * and a scalar twice, a vec3 and a scalar, three scalars padded to 16, a mat3x3 of three columns padded to 16, and a
+ * vec3 and two scalars padded to 16.
  */
-const SKY_PARAMS_SIZE = 224;
+const SKY_PARAMS_SIZE = 256;
 /** `x` as a half float holds it, to the nearest: the aerial perspective volume keeps its reach in one. */
 const halfFloat = (x: number) => {
     const step = 2 ** (Math.floor(Math.log2(x)) - 10);
@@ -160,7 +154,7 @@ const halfFloat = (x: number) => {
 };
 
 /**
- * How much of the veil and the starburst of a source towards `direction` shows in the frame of an inverse
+ * How much of the veil of a source towards `direction` shows in the frame of an inverse
  * view-projection matrix `m` with the projection's `d`, as `dkProjectRay` draws it: all of it while the source is in
  * the image, fading to none 40 % of the image's half extent beyond its edge, and none behind the camera.
  */
@@ -200,7 +194,7 @@ const DEFAULTS: SkyParams = {
     inverseViewProjection: new Float32Array([1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0]),
     ev100: 14,
     autoExposureRange: [4, 20],
-    autoExposureKeys: DEFAULT_AUTO_EXPOSURE_KEYS,
+    autoExposureKeys: [],
     exposureCompensation: 0,
     pixelRatio: 1,
     sunAngularDiameter: 0.533,
@@ -279,11 +273,6 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         darkAdapted = false,
     } = options;
     if (!(veil >= 0)) throw new Error(`dunstkreis: a veil of ${veil}; its strength is 0 or more`);
-    const blades =
-        options.starburst === true ? DEFAULT_STARBURST.blades : options.starburst ? options.starburst.blades : 0;
-    if (blades !== 0 && !(Number.isInteger(blades) && blades >= 3 && blades <= 16)) {
-        throw new Error(`dunstkreis: a starburst of ${blades} blades; an aperture has from 3 to 16`);
-    }
     if (aureole && !(aureole.share >= 0 && aureole.share <= 1 && aureole.g > 0 && aureole.g < 1)) {
         throw new Error(
             "dunstkreis: an aureole takes a share from 0 to 1 of the aerosols' scattering and a g within (0, 1)",
@@ -324,7 +313,6 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             wgsl.cube,
             wgsl.sun,
             wgsl.glare,
-            wgsl.lens,
             wgsl.whitebalance,
             wgsl.tonemap,
             wgsl.vision,
@@ -457,7 +445,6 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                     debugGrid,
                     sunDisc,
                     veil,
-                    starburst: blades,
                     solarCorona,
                     limbDarkening,
                     discAlpha,
@@ -657,7 +644,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             sky[39] = params.gridInk;
             sky[40] = params.sunDiscCeiling ?? 0;
             sky[41] = params.moonAngularDiameter > 0 ? Math.cos((params.moonAngularDiameter * Math.PI) / 360) : 2;
-            // The veil and the starburst by how far the Sun is out of the frame, and the veil by the Moon likewise.
+            // The veil by how far the Sun is out of the frame, and by the Moon likewise.
             sky[42] = inFrame(params.inverseViewProjection, params.projectionDistance, apparent.direction);
             sky[43] =
                 moonShare > 0 && veil > 0
@@ -667,12 +654,20 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             const [r, g, b] = autoExposureTint(params.autoExposureKeys, [sx, sy, sz], dip);
             const [m0, m1, m2, m3, m4, m5, m6, m7, m8] = params.whiteBalance;
             sky.set([m0 * r, m1 * g, m2 * b, 0, m3 * r, m4 * g, m5 * b, 0, m6 * r, m7 * g, m8 * b], 44);
+            const eclipse = solarEclipse(
+                [sx, sy, sz],
+                [mx, my, mz],
+                params.moonAngularDiameter,
+                params.sunAngularDiameter,
+            );
+            sky.set(eclipse, 56);
             device.queue.writeBuffer(skyParams, 0, sky);
 
             // Rebuilding the sky-view table is the expensive part, and it is why the sky pass itself is one fetch
             // per pixel rather than a raymarch. It depends on nothing but the Sun and the observer. Above the
             // atmosphere nothing reads the table: the sky pass raymarches per pixel, and so does the meter.
-            const key = `${sx},${sy},${sz},${height}`;
+            // And on the Moon, while it stands before the Sun for some of the air.
+            const key = `${sx},${sy},${sz},${height}${(eclipse[4] ?? 0) > 0 ? `,${eclipse.join(",")}` : ""}`;
             const rebuildSkyView = key !== skyViewKey;
             const inSpace = height / 1000 > model.planet.thicknessKm;
             const moonTableKey = moonShare > 0 && !inSpace ? `${moonKey},${moonShare}` : "";

@@ -51,7 +51,10 @@ export interface LayeredCloudPassOptions {
     /** Tone map for a display, "neutral" by default, "agx", "aces", "clip"; `false` writes the exposed luminance, linear. */
     toneMap?: ToneCurve | false;
     headroom?: number;
-    /** Dither the tone mapped output by a step of helldunkel's blue noise, false by default, and the noise to take. */
+    /**
+     * Dither the tone mapped output by a step of helldunkel's blue noise, false by default, and the noise to take, for
+     * the dither and for the march's jitter where its `blueNoise` is set.
+     */
     dither?: boolean;
     blueNoise?: GPUTexture;
     /** Whether `encode` composes over a background in cd/m², true by default; without, the clouds alone, premultiplied. */
@@ -62,6 +65,8 @@ export interface LayeredCloudPassOptions {
     detail?: GPUTexture;
     /** God rays, the shafts of sunlight and of the clouds' shade in the air: see `LayerMarchOptions`. Off by default. */
     godRays?: boolean;
+    /** An adaptive stride, by a max pyramid of every map: see `LayerMarchOptions`. Off by default. */
+    adaptiveStride?: boolean;
 }
 
 /**
@@ -78,6 +83,12 @@ export interface LayeredCloudParams
     observerKm?: readonly [number, number];
     /** How the layers are marched and lit, where it is to change. */
     march?: Partial<LayerMarchSettings>;
+    /**
+     * Whether the marched layers are brought to the target's size by a box of three of their texels at every pixel, false
+     * by default: the march's grain then evens out at any `scale`, not at 1 alone, for a little more blur. Without, at a
+     * share of the frame the grain shows as a raster of dots along the clouds' edges and in far rain.
+     */
+    boxFilter?: boolean;
     /**
      * The sun's illuminance in lux at an altitude in km for the sun's elevation there in radians, for a sunlight table
      * of the caller's own air: clouds aloft stay lit after sunset on the ground. It stands in for `sunlight`; `null`
@@ -144,6 +155,8 @@ export async function createLayeredCloudPass(
             mapSize: quality.mapSize,
             maxSteps: quality.maxSteps,
             godRays: options.godRays ?? false,
+            adaptiveStride: options.adaptiveStride ?? false,
+            blueNoiseTexture: blueNoise,
             ...(options.detail && { detail: options.detail }),
         }),
         createHighSheet(device, { mapSize: quality.highMapSize }),
@@ -204,7 +217,16 @@ export async function createLayeredCloudPass(
         update(next, encoder, { timestampWrites } = {}) {
             current = { ...current, ...next };
             frame += 1;
-            const { weather = "fair", coverage, density, observerKm = [0, 0], march, sunlightAt, ...rest } = current;
+            const {
+                weather = "fair",
+                coverage,
+                density,
+                observerKm = [0, 0],
+                march,
+                sunlightAt,
+                boxFilter,
+                ...rest
+            } = current;
             const chosen: Sky = typeof weather === "string" ? (WEATHER[weather].layers ?? {}) : weather;
             sky = layeredSky(chosen, {
                 ...(coverage !== undefined && { coverage }),
@@ -245,12 +267,19 @@ export async function createLayeredCloudPass(
             device.queue.writeBuffer(
                 placed,
                 0,
-                new Float32Array([sky.high.altitudeKm, there.layers ? 1 : 0, there.high ? 1 : 0, 0]),
+                new Float32Array([sky.high.altitudeKm, there.layers ? 1 : 0, there.high ? 1 : 0, boxFilter ? 1 : 0]),
             );
-            const { wind, highWind, shear, evolution, evolutionOffset, seed, clearingKm, clearingFromKm } = {
-                ...DEFAULT_LAYERED_PARAMS,
-                ...rest,
-            };
+            const {
+                wind,
+                highWind,
+                shear,
+                evolution,
+                evolutionOffset,
+                seed,
+                clearingKm,
+                clearingFromKm,
+                clearingCenterKm,
+            } = { ...DEFAULT_LAYERED_PARAMS, ...rest };
             const layered: LayeredParams = {
                 sky,
                 wind,
@@ -261,6 +290,7 @@ export async function createLayeredCloudPass(
                 seed,
                 clearingKm,
                 clearingFromKm,
+                ...(clearingCenterKm && { clearingCenterKm }),
                 timeS: light.timeS,
             };
             const { maps, highMap } = timestampWrites ?? {};

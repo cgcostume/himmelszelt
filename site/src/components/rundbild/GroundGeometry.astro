@@ -4,7 +4,8 @@ import "../environment/environments.css";
 import "../helldunkel/helldunkel.css";
 import "../sternzeit/sternzeit.css";
 
-// The sliders of the grounded figure, with its ranges and defaults, but a dome of some 15 m rather than one without end.
+// The sliders of the grounded figure, with its ranges, but a dome of some 15 m rather than one without end, the reach at
+// its far end, the bend's circle, and how high up the dome the bend climbs.
 const SLIDERS = [
     {
         name: "height",
@@ -29,12 +30,22 @@ const SLIDERS = [
     {
         name: "reach",
         label: "reach",
-        title: "How far from under the capture point the ground lies flat, about half the dome's radius at most",
+        title: "How far from under the capture point the ground lies flat before it bends up into the dome: at the far end as far as the circle that touches plane and dome, shorter for a flatter bend; under a dome without end, past it the ground falls away like a hilltop",
         min: 0,
         max: 100,
         step: 1,
-        value: 15,
-        marks: ["3", "∞"],
+        value: 100,
+        marks: ["3", "circle"],
+    },
+    {
+        name: "soft",
+        label: "soft",
+        title: "How high up the dome's wall the ground bends into it: a hard corner where the plane meets the dome at the left, at the right up to where the image's horizon meets the dome, as high as the capture point for a level horizon",
+        min: 0,
+        max: 1,
+        step: 0.01,
+        value: 0.5,
+        marks: ["corner", "round"],
     },
     {
         name: "radius",
@@ -45,16 +56,6 @@ const SLIDERS = [
         step: 1,
         value: 24,
         marks: ["5", "∞"],
-    },
-    {
-        name: "rounding",
-        label: "foot",
-        title: "How the dome's foot goes over into the ground: a hard corner at the left end, a wall that curves into the ground from as high as the horizon at the right",
-        min: -1,
-        max: 1,
-        step: 0.05,
-        value: 0,
-        marks: ["corner", "round"],
     },
 ];
 ---
@@ -68,7 +69,7 @@ const SLIDERS = [
                 <div class="frame-labels" aria-hidden="true"></div>
                 <div class="scene-bar">
                     <p class="vis-credit footnote">
-                        Drag to rotate. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
+                        Drag to rotate, scroll to zoom. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
                     </p>
                 </div>
             </div>
@@ -94,8 +95,8 @@ const SLIDERS = [
         ))}
     </div>
     <figcaption class="figure-caption">
-        The surface an image is laid on: (a) flat out to the reach, a dome from the ground's level up, the one rounded into
-        the other between. Where a ray from the camera (accent) lands, the image is looked up from the capture point
+        The surface an image is laid on: (a) flat out to the reach, a dome for the sky, and between them a bend touching
+        both, up to where the image's horizon meets the dome at most. Where a ray from the camera (accent) lands, the image is looked up from the capture point
         (dashed); a lifted horizon shows as a dashed ring. (b) The chosen image on it, as that camera sees it.
     </figcaption>
 </figure>

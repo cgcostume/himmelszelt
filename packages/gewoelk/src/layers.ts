@@ -50,12 +50,17 @@ export interface HighSheet {
     opticalDepth: number;
     /** One tile of the map, which repeats beyond it: larger tiles, coarser texels. */
     tileKm: number;
+    /** The distance over the ground at which the sheet has thinned out to none, patch by patch: 0 for a sheet to the horizon. */
+    reachKm: number;
     /** A patch's size across, how many times as long as wide it is, a band, and the bands' angle to the wind. */
     patchKm: number;
     bandStretch: number;
     bandAngle: number;
     /** How far a patch thins out towards its edge, where the puffs shrink, 0 to 1. */
     edge: number;
+    /** How far the patches break up into flakes with clear sky between, 0 to 1, and a flake's size across. */
+    flakes: number;
+    flakeKm: number;
     /** How much of the sheet is puffs, the cells of cirrocumulus and altocumulus, and a puff's size across the wind. */
     puffs: number;
     puffKm: number;
@@ -75,7 +80,7 @@ export interface HighSheet {
     /** How far billows across a band break it into ribs, each with a sharp front and a tail, and the ribs' spacing. */
     ribs: number;
     ribKm: number;
-    /** How much of the sheet is a veil without puffs, how far it is drawn into fine lines along the wind, and how many times as long as wide those are. */
+    /** How much of the sheet is a veil without puffs, how far it is drawn into fine lines along the wind, in the map and again pixel by pixel, and how many times as long as wide those are. */
     veil: number;
     striation: number;
     stretch: number;
@@ -142,14 +147,17 @@ export const DEFAULT_MIDDLE_LAYER: CloudLayer = {
 };
 
 export const DEFAULT_HIGH_SHEET: HighSheet = {
-    coverage: 0.8,
+    coverage: 0.55,
     altitudeKm: 7,
-    opticalDepth: 1.4,
+    opticalDepth: 0.6,
     tileKm: 32,
+    reachKm: 140,
     patchKm: 60,
     bandStretch: 2,
     bandAngle: 20,
     edge: 0.6,
+    flakes: 0.5,
+    flakeKm: 9,
     puffs: 1,
     puffKm: 0.32,
     elongation: 1.1,
@@ -250,9 +258,9 @@ export const CLOUD_TYPES = {
     high: {
         /** A mackerel sky: cirrocumulus, puffs in rows. */
         mackerel: {
-            ...{ coverage: 0.8, patchKm: 60, bandStretch: 2, bandAngle: 20, edge: 0.6, puffs: 1, puffKm: 0.32 },
+            ...{ coverage: 0.65, patchKm: 60, bandStretch: 2, bandAngle: 20, edge: 0.6, puffs: 1, puffKm: 0.32 },
             ...{ rows: 0.7, elongation: 1.1, grain: 0.5, ripples: 0.7, rippleKm: 1.1, curve: 0.6, ribs: 0, veil: 0.08 },
-            ...{ striation: 0.3, stretch: 10, combing: 0, trails: 0.3, trailBend: 0.1, opticalDepth: 2.4 },
+            ...{ striation: 0.3, stretch: 10, combing: 0, trails: 0.3, trailBend: 0.1, opticalDepth: 1.2 },
         },
         /** A patch of fine ripples. */
         ripples: {
@@ -267,24 +275,34 @@ export const CLOUD_TYPES = {
                 ribs: 0,
                 veil: 0.15,
             },
-            ...{ striation: 0.4, stretch: 8, combing: 4, trails: 0.3, trailBend: 0.1, opticalDepth: 1.2 },
+            ...{ striation: 0.4, stretch: 8, combing: 4, trails: 0.3, trailBend: 0.1, opticalDepth: 1 },
         },
         /** A ribbed band: a veil broken into ribs across it. */
         ribbed: {
             ...{ coverage: 0.45, patchKm: 60, bandStretch: 6, bandAngle: 25, edge: 0.5, puffs: 0, puffKm: 0.4 },
             ...{ rows: 0.5, elongation: 1, grain: 0.4, ripples: 0, rippleKm: 1, curve: 0.5, ribs: 0.85, ribKm: 3.5 },
-            ...{ veil: 1, striation: 0.8, stretch: 14, combing: 16, trails: 0.6, trailBend: 0.1, opticalDepth: 1.4 },
+            ...{ veil: 1, striation: 0.8, stretch: 14, combing: 16, trails: 0.6, trailBend: 0.1, opticalDepth: 0.8 },
+            flakes: 0.2,
         },
         /** Puffs under a veil with trails. */
         puffsAndVeil: {
-            ...{ coverage: 0.7, patchKm: 50, bandStretch: 2, bandAngle: 70, edge: 0.7, puffs: 0.9, puffKm: 0.4 },
+            ...{ coverage: 0.6, patchKm: 50, bandStretch: 2, bandAngle: 70, edge: 0.7, puffs: 0.9, puffKm: 0.4 },
             ...{ rows: 0.35, elongation: 1, grain: 0.5, ripples: 0.3, rippleKm: 1.4, curve: 0.7, ribs: 0, veil: 0.5 },
-            ...{ striation: 0.5, stretch: 10, combing: 6, trails: 0.5, trailBend: 0.15, opticalDepth: 1.2 },
+            ...{ striation: 0.5, stretch: 10, combing: 6, trails: 0.5, trailBend: 0.15, opticalDepth: 0.9 },
         },
         /** A veil of cirrostratus, combed along the wind. */
         veil: {
-            ...{ coverage: 0.7, patchKm: 90, bandStretch: 3, bandAngle: 15, edge: 0.9, puffs: 0, ripples: 0, ribs: 0 },
-            ...{ veil: 0.8, striation: 0.25, stretch: 16, combing: 8, trails: 0.5, trailBend: 0.05, opticalDepth: 0.7 },
+            ...{ coverage: 0.55, patchKm: 90, bandStretch: 3, bandAngle: 15, edge: 0.9, puffs: 0, ripples: 0, ribs: 0 },
+            ...{
+                veil: 0.8,
+                striation: 0.25,
+                stretch: 16,
+                combing: 8,
+                trails: 0.5,
+                trailBend: 0.05,
+                opticalDepth: 0.4,
+            },
+            flakes: 0.3,
         },
     },
 } satisfies {
@@ -342,7 +360,7 @@ export function mixLayeredSky(a: LayeredSky, b: LayeredSky, t: number): LayeredS
         for (const [key, to] of Object.entries({ ...x, ...y })) {
             const from = (x as Record<string, unknown>)[key];
             out[key] =
-                typeof from === "number" && typeof to === "number" ? from + (to - from) * t : t < 0.5 ? from : to;
+                typeof from === "number" && typeof to === "number" ? from * (1 - t) + to * t : t < 0.5 ? from : to;
         }
         return out as T;
     };
@@ -373,6 +391,11 @@ export interface LayeredParams {
     /** The distance at which the last cloud is gone, so the horizon stays clear, 0 for clouds all the way, and from where they thin out. */
     clearingKm: number;
     clearingFromKm: number;
+    /**
+     * Where the clearing is centered, in km east and north of the observer, around the observer by default: set off,
+     * it leaves a patch of cloud that stays where it is while the observer moves about it.
+     */
+    clearingCenterKm?: readonly [number, number];
     /** The time the drift and the evolution are taken at, in seconds. */
     timeS: number;
 }

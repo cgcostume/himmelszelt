@@ -1,6 +1,4 @@
 ---
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { resolve } from "node:path";
 import Cite from "../Cite.astro";
 import CopyInfo from "../CopyInfo.astro";
 import Icon from "../Icon.astro";
@@ -8,34 +6,11 @@ import LunationSlider from "../sternzeit/LunationSlider.astro";
 import "./nachtgestirn.css";
 
 /** The three maps the Moon is drawn from, flat, as the package loads them by default: what Earth ever sees, past it the
- *  color's mean and no relief. With the files' sizes, whole to seen, from the tree or, for those only the asset mirror holds, its manifest. */
+ *  color's mean and no relief. */
 interface Props {
     id?: string;
 }
 const { id = "maps" } = Astro.props;
-
-const PACKAGE = resolve(process.cwd(), "../packages/nachtgestirn");
-const mirrored = new Map<string, number>(
-    JSON.parse(readFileSync(`${PACKAGE}/assets.json`, "utf8")).files.map((f: { name: string; size: number }) => [
-        f.name,
-        f.size,
-    ]),
-);
-const bytes = (name: string) =>
-    existsSync(`${PACKAGE}/maps/${name}`) ? statSync(`${PACKAGE}/maps/${name}`).size : mirrored.get(name);
-const N = "\u202f";
-const unit = (b: number) => (b < 1e6 ? "KB" : "MB");
-const amount = (b: number) => (b < 1e6 ? String(Math.round(b / 1e3)) : (b / 1e6).toFixed(b < 1e7 ? 1 : 0));
-const pair = (whole: number, seen: number) =>
-    unit(whole) === unit(seen)
-        ? `${amount(whole)} to ${amount(seen)}${N}${unit(seen)}`
-        : `${amount(whole)}${N}${unit(whole)} to ${amount(seen)}${N}${unit(seen)}`;
-const SIZES = ["512", "1k", "2k", "4k", "8k"];
-const sizes = (kind: string) =>
-    SIZES.flatMap((size) => {
-        const [whole, seen] = [bytes(`moon-${kind}-${size}.webp`), bytes(`moon-${kind}-seen-${size}.webp`)];
-        return whole && seen ? [pair(whole, seen)] : [];
-    }).join(", ");
 ---
 
 <figure class="fig tiles-figure" id={id} data-maps>
@@ -59,10 +34,6 @@ const sizes = (kind: string) =>
     </div>
     <LunationSlider />
     <p class="view-status" data-field="note" hidden></p>
-    <p class="view-status">
-        The files, whole to seen, at 512, 1K, 2K, 4K and 8K texels around: the color ({sizes("color")}), the heights
-        ({sizes("height")}) and the roughness ({sizes("roughness")}, no 8K).
-    </p>
     <figcaption class="figure-caption">
         nachtgestirn's maps laid out flat as the package loads them by default, 1024 texels around: NASA's color or
         heights from the CGI Moon Kit <Cite id="svs4720" />, or the roughness from the laser altimeter's tracks

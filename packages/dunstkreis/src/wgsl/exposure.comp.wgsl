@@ -87,6 +87,11 @@ fn dkMeterSample(@builtin(global_invocation_id) id: vec3u) {
     let a = dkAtmosphere;
     let h = max(dkParams.observerAltitude, 0.0);
     let size = vec2f(textureDimensions(dkSkyViewLut));
+    // A solar eclipse, for the rays marched from space.
+    dkEclipse = DkEclipse(
+        dkParams.eclipseOffset, dkParams.eclipseAlong, dkParams.sunDirection, dkParams.eclipseMoonRadius,
+        dkParams.sunAngularRadius, 0.0,
+    );
     // The visible horizon from h, from space as well: it splits the caps.
     let horizon = dkHorizonOf(a, h);
     let total = f32(DK_METER_SAMPLES);
@@ -128,7 +133,13 @@ fn dkMeterSky(@builtin(local_invocation_index) index: u32) {
     let sums = dkWorkgroupSum(vec4f(sum, 0.0, 0.0), index);
     if (index == 0u) {
         dkMeteringOut.log2Luminance = max(sums.x, sums.y) / f32(DK_METER_SAMPLES);
-        let sun = a.solarIlluminance * dkLightTransmittance(a, h, dkParams.sunDirection);
+        // The Sun's light at the observer, by the share of its disc the Moon leaves uncovered there.
+        dkEclipse = DkEclipse(
+            dkParams.eclipseOffset, dkParams.eclipseAlong, dkParams.sunDirection, dkParams.eclipseMoonRadius,
+            dkParams.sunAngularRadius, 0.0,
+        );
+        let uncovered = dkEclipseShares(vec3f(0.0)).x;
+        let sun = a.solarIlluminance * dkLightTransmittance(a, h, dkParams.sunDirection) * uncovered;
         dkMeteringOut.sunIlluminance = dkToRgb(a, sun);
         let moon = a.solarIlluminance * dkParams.moonlight * dkLightTransmittance(a, h, dkParams.moonDirection);
         dkMeteringOut.moonIlluminance = select(vec3f(0.0), dkToRgb(a, moon), dkParams.moonlight > 0.0);

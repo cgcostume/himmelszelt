@@ -50,7 +50,17 @@ function storedHeadroom() {
  * How the page's figures show the sky on a display, shared by all: the tone curve, "neutral", "agx", "aces" or "clip",
  * and the headroom chosen for an HDR display, how many times SDR white it may show.
  */
-export const display = { toneCurve: "neutral" as ToneCurve, headroom: storedHeadroom() };
+// The tone curve likewise, "neutral" until one is chosen.
+const TONE_KEY = "himmelszelt-tone-curve";
+const TONE_CURVES: ToneCurve[] = ["clip", "neutral", "agx", "aces"];
+function storedToneCurve(): ToneCurve {
+    try {
+        const stored = localStorage.getItem(TONE_KEY) as ToneCurve | null;
+        if (stored && TONE_CURVES.includes(stored)) return stored;
+    } catch {}
+    return "neutral";
+}
+export const display = { toneCurve: storedToneCurve(), headroom: storedHeadroom() };
 export const onDisplay = (listener: (current: typeof display) => void) =>
     events.addEventListener("display", () => listener(display));
 
@@ -148,6 +158,9 @@ export function bindToneCurveChoice(choices: Iterable<HTMLInputElement>) {
         input.checked = input.value === display.toneCurve;
         input.addEventListener("change", () => {
             display.toneCurve = input.value as ToneCurve;
+            try {
+                localStorage.setItem(TONE_KEY, input.value);
+            } catch {}
             events.dispatchEvent(new Event("display"));
         });
     }

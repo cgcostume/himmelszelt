@@ -2,12 +2,11 @@
 import OptionGroup from "./OptionGroup.astro";
 
 /**
- * A sky figure's lens: its veil around the Sun, and around the Moon where the figure draws it, and the starburst, as
- * dunstkreis' sky pass draws them (`veil`, `starburst`). The veil on and the starburst off, as the pass has them.
+ * A sky figure's lens: its veil around the Sun, and around the Moon where the figure draws it, as dunstkreis' sky pass
+ * draws it (`veil`). On, as the pass has it.
  */
 ---
 
 <OptionGroup name="lens">
     <button type="button" class="view-toggle" data-field="veil" aria-pressed="true" title="The veil a camera's lens lays around the Sun and the Moon, the light its glass scatters: a two-hundredth of the eye's own glare, from the light each throws at the observer. Without it a disc above the haze stands as a bare circle">veil</button>
-    <button type="button" class="view-toggle" data-field="starburst" aria-pressed="false" title="A starburst around the Sun, as a camera draws it: the six blades of its aperture diffract the Sun's light into six spikes, fixed to the camera">starburst</button>
 </OptionGroup>

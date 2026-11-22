@@ -100,6 +100,12 @@ export const ICONS = {
         '<path class="tl" d="M2.5 6V2.5H6"/><path class="tr" d="M10 2.5h3.5V6"/><path class="br" d="M13.5 10v3.5H10"/><path class="bl" d="M6 13.5H2.5V10"/>',
     /** Play, and pause, which fades in over it while its button is pressed. */
     play: '<path class="play" d="M5 3.2v9.6L12.8 8z"/><path class="pause" d="M5.5 3.5v9M10.5 3.5v9"/>',
+    /** How fast a figure's clock runs: at a clock's pace, a minute a second, an hour a second. One chevron more each. */
+    speedClock: '<path d="M6 3.5 10.5 8 6 12.5"/>',
+    speedMinute: '<path d="M3.5 3.5 8 8l-4.5 4.5M8.5 3.5 13 8l-4.5 4.5"/>',
+    speedHour: '<path d="M1.5 3.5 6 8l-4.5 4.5M6 3.5 10.5 8 6 12.5M10.5 3.5 15 8l-4.5 4.5"/>',
+    /** A padlock: the time of day held while the clouds go on. */
+    timeLock: '<rect x="3.5" y="7.5" width="9" height="6" rx="1.5"/><path d="M5.5 7.5v-2a2.5 2.5 0 0 1 5 0v2"/>',
     /** Two sheets, the front one nudged on hover; a check once copied. */
     copy: `<g class="body"><rect class="nudge" x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5v-1a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h1"/></g>${CHECK}`,
     /** The browser's location: a fix in cross hairs, which pulses on hover. */

@@ -9,10 +9,11 @@ import { paintRange } from "../range";
 import { drawSvg, LABEL_GAP, svgText } from "../sternzeit/figure";
 import { onChange, state } from "../sternzeit/state";
 import { gpu, gpuDevice, onTables, quality, tables } from "./atmosphere";
+import { PHOTO_RAMP } from "./ramps";
 
 // The glows around the Sun over the angle from its center. The sky and the aureole are read from two sky passes of the
 // figure's own, a strip of pixels through the Sun with and without the aureole; the disc, the Sun's corona, the veils,
-// a cloud's corona and a starburst's spike are computed from the Sun's light at the observer, as the passes compute them.
+// and a cloud's corona are computed from the Sun's light at the observer, as the passes compute them.
 
 const DEG = Math.PI / 180;
 // The strip: a row of pixels 30° to either side of the Sun, at its altitude.
@@ -143,6 +144,7 @@ async function read(made: NonNullable<typeof passes>, key: string) {
             inverseViewProjection: stripCamera(apparent),
             projectionDistance: 0,
             ev100: UNIT_EV100,
+            autoExposureKeys: PHOTO_RAMP,
         });
         pass.encode(encoder, (strips as [GPUTexture, GPUTexture])[i] as GPUTexture);
     });
@@ -169,7 +171,6 @@ async function read(made: NonNullable<typeof passes>, key: string) {
         lens: [],
         eye: [],
         cloud: [],
-        spike: [],
         total: [],
     };
     const thin = coronaShare(Math.exp(-0.5));
@@ -189,16 +190,12 @@ async function read(made: NonNullable<typeof passes>, key: string) {
                   fade *
                   (3 - 2 * fade);
         const veil = illuminance * veilingGlare(angle);
-        const sigma = 0.7 * r;
         lines.aureole?.push(Math.max((withAureole[i] ?? 0) - (sky[i] ?? 0), 0));
         lines.disc?.push(radii < 1 ? disc : 0);
         lines.solar?.push(solar);
         lines.lens?.push(veil * LENS_VEIL);
         lines.eye?.push(veil);
         lines.cloud?.push(illuminance * thin * diffractionLobe(angle, 550));
-        lines.spike?.push(
-            (illuminance * 1.1e-4) / (3 * Math.sqrt(2 * Math.PI) * sigma * Math.PI * ((angle * DEG) ** 2 + r * r)),
-        );
         lines.total?.push((withAureole[i] ?? 0) + (radii < 1 ? disc : 0) + solar + veil * LENS_VEIL);
     }
     profile = { lines, radius, illuminance, ev100 };
@@ -266,7 +263,7 @@ function draw() {
         svg += line(x(radius), top, x(radius), bottom, "figure-grid");
         svg += svgText(x(radius), bottom + 12, "limb", "figure-label");
         let curves = "";
-        for (const name of ["sky", "aureole", "solar", "spike", "cloud", "eye", "lens", "disc", "total"]) {
+        for (const name of ["sky", "aureole", "solar", "cloud", "eye", "lens", "disc", "total"]) {
             const values = lines[name] ?? [];
             // The disc ends at the limb: its line drops there.
             const points = values.map((value, i) => `${f(x(angleAt(i)))},${f(y(value))}`);

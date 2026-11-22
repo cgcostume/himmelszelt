@@ -12,6 +12,13 @@ export const SHOW = { rgb: 0, red: 1, green: 2, blue: 3, alpha: 4, modeling: 5, 
 export interface Shown {
     label: string;
     title: string;
+    /**
+     * For a gallery: the texture's name, under which its channels stand side by side as one asset, its format, size
+     * and memory said once over them and each tile left with its label and channel.
+     */
+    group?: string;
+    /** For what is no texture of the library's but drawn from them: said in place of its format, size and memory. */
+    drawn?: string;
     texture: GPUTexture;
     kind: "2d" | "array" | "3d";
     mode?: number;
@@ -119,8 +126,18 @@ function pipelinesOf(device: GPUDevice) {
     return made;
 }
 
-/** The panel in `root`'s `[data-field="textures"]`: `show` what to draw, `encode` into the figure's frame. */
-export function texturePanel(root: HTMLElement, device: GPUDevice) {
+const CHANNELS: Record<number, string> = {
+    [SHOW.red]: "R",
+    [SHOW.green]: "G",
+    [SHOW.blue]: "B",
+    [SHOW.alpha]: "A",
+};
+
+/**
+ * The panel in `root`'s `[data-field="textures"]`: `show` what to draw, `encode` into the figure's frame. Its
+ * thumbnails are `size` texels across, a multiple of 8.
+ */
+export function texturePanel(root: HTMLElement, device: GPUDevice, size = SIZE) {
     const holder = root.querySelector<HTMLElement>('[data-field="textures"]');
     const sampler = device.createSampler({
         addressModeU: "repeat",
@@ -154,27 +171,49 @@ export function texturePanel(root: HTMLElement, device: GPUDevice) {
         show(list: Shown[]) {
             if (!holder) return;
             const next = list
-                .map((s) => [s.label, idOf(s.texture), s.mode, s.scale, s.at, s.channel].join(":"))
+                .map((s) => [s.label, s.group, s.drawn, idOf(s.texture), s.mode, s.scale, s.at, s.channel].join(":"))
                 .join("|");
             if (next === key) return;
             key = next;
             holder.replaceChildren();
             times = [];
             const made = pipelinesOf(device);
+            const groups = new Map<string, HTMLElement>();
+            const span = (to: HTMLElement, textContent: string) =>
+                to.appendChild(Object.assign(document.createElement("span"), { textContent }));
+            // What a texture is and takes, with its time kept up to date where the figure times it.
+            const facts = (to: HTMLElement, s: Shown) => {
+                span(to, `${s.texture.format} ${sizeOf(s.texture, s.kind)}`);
+                const memory = memoryOf(s.texture, s.kind);
+                if (s.ms) times.push({ note: span(to, memory), memory, ms: s.ms, timed: s.timed ?? "" });
+                else span(to, memory);
+            };
             items = list.flatMap((s) => {
-                const figure = holder.appendChild(document.createElement("figure"));
+                let into = holder;
+                if (s.group !== undefined) {
+                    let group = groups.get(s.group);
+                    if (!group) {
+                        group = holder.appendChild(document.createElement("div"));
+                        group.className = "asset-group";
+                        const head = group.appendChild(document.createElement("p"));
+                        head.className = "asset-head";
+                        span(head, s.group);
+                        if (s.drawn) span(head, s.drawn);
+                        else facts(head, s);
+                        group.appendChild(document.createElement("div")).className = "asset-tiles";
+                        groups.set(s.group, group);
+                    }
+                    into = group.lastElementChild as HTMLElement;
+                }
+                const figure = into.appendChild(document.createElement("figure"));
                 figure.className = "cloud-texture";
                 figure.title = s.title;
                 const canvas = figure.appendChild(document.createElement("canvas"));
-                Object.assign(canvas, { width: SIZE, height: SIZE });
+                Object.assign(canvas, { width: size, height: size });
                 const caption = figure.appendChild(document.createElement("figcaption"));
-                const line = (textContent: string) =>
-                    caption.appendChild(Object.assign(document.createElement("span"), { textContent }));
-                line(s.label);
-                line(`${s.texture.format} ${sizeOf(s.texture, s.kind)}`);
-                const memory = memoryOf(s.texture, s.kind);
-                if (s.ms) times.push({ note: line(memory), memory, ms: s.ms, timed: s.timed ?? "" });
-                else line(memory);
+                span(caption, s.label);
+                if (s.group === undefined) facts(caption, s);
+                else if (CHANNELS[s.mode ?? SHOW.rgb] && !s.drawn) span(caption, CHANNELS[s.mode ?? SHOW.rgb] ?? "");
                 const context = canvas.getContext("webgpu");
                 const pipeline = made[s.kind];
                 if (!context || !pipeline) return [];
@@ -219,7 +258,7 @@ export function texturePanel(root: HTMLElement, device: GPUDevice) {
                 pass.setPipeline(pipeline);
                 pass.setBindGroup(0, group);
                 pass.setBindGroup(1, output);
-                pass.dispatchWorkgroups(SIZE / 8, SIZE / 8);
+                pass.dispatchWorkgroups(size / 8, size / 8);
             }
             pass.end();
         },

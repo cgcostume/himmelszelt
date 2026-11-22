@@ -65,3 +65,210 @@
     outline: 1px solid oklch(1 0 0 / 0.25);
     cursor: help;
 }
+
+/* A cloud designer (see Designer.astro): the patch and the model's drawing on one stage, one large and the other small
+   in its corner, and what the cloud is rendered from beside them, as tall as they are; one under the other where the
+   figure is narrow. */
+.designer-parts {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: 0.75rem;
+}
+.designer-stage {
+    position: relative;
+    aspect-ratio: 4 / 3;
+}
+.designer-stage > :is(.sky-view, .designer-model) {
+    position: absolute;
+    inset: 0;
+    width: auto;
+    max-height: none;
+    aspect-ratio: auto;
+    border-radius: var(--radius-canvas);
+}
+.designer-stage > .designer-model {
+    background: var(--bg);
+}
+/* The small one and the button over it, which takes its clicks. */
+.designer-stage[data-main="view"] > .designer-model,
+.designer-stage[data-main="model"] > .sky-view,
+.designer-swap {
+    inset: auto 8px 8px auto;
+    width: 32%;
+    height: 32%;
+    border-radius: 6px;
+}
+.designer-stage[data-main="view"] > .designer-model,
+.designer-stage[data-main="model"] > .sky-view {
+    z-index: 4;
+    outline: 1px solid var(--overlay-line, var(--line));
+    box-shadow: 0 2px 10px oklch(0 0 0 / 0.4);
+}
+.designer-stage[data-main="view"] .frame-labels,
+.designer-stage[data-main="view"] .fig-hint[data-for="model"],
+.designer-stage[data-main="model"] .fig-hint[data-for="view"] {
+    display: none;
+}
+.designer-stage[data-main="view"] .fig-hint {
+    color: oklch(1 0 0 / 0.65);
+}
+.designer-swap {
+    position: absolute;
+    z-index: 6;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+.designer-swap:hover {
+    outline: 2px solid var(--accent);
+}
+.designer-assets {
+    contain: size;
+}
+/* The columns of cloud under the lines, let through: Zdog draws a cylinder's side as a stroke as wide as the cylinder,
+   in scene units, where the other figures' strokes are in pixels. */
+.designer-model svg[data-layer="clouds"] {
+    opacity: 0.55;
+}
+.designer-model svg[data-layer="clouds"] path {
+    vector-effect: none;
+}
+/* The options' own look, without the glass they lie on over a view: in the page, scrolling where they are many. */
+.designer-assets.sky-options {
+    position: static;
+    max-width: none;
+    max-height: none;
+    padding: 0 0.5rem 0 0;
+    border-radius: 0;
+    background: none;
+    align-content: start;
+}
+/* What the cloud is rendered from, as a gallery under the three parts: a group for each texture, its format, size
+   and memory on the GPU said once over its channels' tiles, and what they make together, which is not stored. */
+.designer-gallery {
+    display: flex;
+    flex-flow: row wrap;
+    gap: 0.5rem 1.25rem;
+    margin: 0.75rem 0 0.25rem;
+    font-size: var(--text-meta);
+    line-height: 1.3;
+}
+.asset-head {
+    margin: 0 0 0.3rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+.asset-head span:first-child {
+    color: var(--text);
+}
+.asset-head span + span::before {
+    content: " · ";
+}
+.asset-tiles {
+    display: flex;
+    gap: 0.4rem;
+}
+.designer-gallery .cloud-texture {
+    width: 6rem;
+    color: var(--muted);
+    text-shadow: none;
+}
+.designer-gallery .cloud-texture figcaption {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.25rem;
+    width: auto;
+    margin-top: 0.15rem;
+    padding: 0;
+    background: none;
+}
+.designer-gallery .cloud-texture figcaption span {
+    white-space: normal;
+}
+.designer-gallery .cloud-texture figcaption span + span {
+    color: var(--muted);
+    opacity: 0.7;
+}
+.designer-gallery .cloud-texture canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    border-radius: 4px;
+    outline: 1px solid var(--line);
+}
+@media (max-width: 60rem) {
+    .designer-parts {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .designer-assets {
+        contain: none;
+    }
+}
+
+/* The reader's own kinds and weathers (see store.ts): each a button with one that deletes it, then a name to save under. */
+.own-kinds,
+.own-weathers {
+    display: grid;
+    gap: 4px;
+}
+.own-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 6px;
+}
+.own-list[hidden] {
+    display: none;
+}
+.own-item,
+.own-save {
+    display: inline-flex;
+    align-items: center;
+}
+.own-save {
+    gap: 4px;
+}
+.own-save input {
+    width: 9rem;
+    padding: 2px 6px;
+    border: var(--border);
+    border-radius: var(--radius-button);
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+}
+.sky-options :is(.own-save, [data-copy-kind], .own-delete).view-toggle::before,
+.sky-options .own-save .view-toggle::before {
+    content: none;
+}
+.sky-options :is(.own-save .view-toggle, [data-copy-kind].view-toggle) {
+    padding: 3px 9px;
+    background: var(--surface);
+}
+.sky-options .own-delete.view-toggle {
+    padding: 3px 6px;
+}
+.own-note {
+    color: var(--muted);
+}
+.own-note:empty {
+    display: none;
+}
+/* The composer's places (see composer.ts): a kind of cloud chosen for each. */
+.composer-place {
+    display: grid;
+    grid-template-columns: 3.5rem minmax(0, 1fr);
+    gap: 0.4rem;
+    align-items: center;
+    width: 100%;
+}
+.composer-place select {
+    min-width: 0;
+    padding: 2px 4px;
+    border: var(--border);
+    border-radius: var(--radius-button);
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+}

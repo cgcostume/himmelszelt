@@ -141,7 +141,6 @@ const REACH = 88;
  */
 export function lobesFigure(root: HTMLElement) {
     const panels = [...root.querySelectorAll<SVGSVGElement>("svg[data-law]")];
-    const note = root.querySelector<HTMLElement>("[data-field=lobes]");
     const slider = root.querySelector<HTMLInputElement>("[data-field=sunAngle]");
     const sliderValue = root.querySelector<HTMLElement>("[data-field=sunAngleValue]");
     let light = (Number(slider?.value ?? -40) || -40) * DEG;
@@ -194,11 +193,6 @@ export function lobesFigure(root: HTMLElement) {
             drawSvg(panel, svg, 1);
         }
         const degrees = Math.round(light / DEG);
-        if (note)
-            note.textContent =
-                degrees === 0
-                    ? "side views: the Sun straight over the patch"
-                    : `side views: the Sun ${Math.abs(degrees)}° ${degrees < 0 ? "left" : "right"} of the normal`;
         if (slider && Number(slider.value) !== degrees) {
             slider.value = String(degrees);
             paintRange(slider);

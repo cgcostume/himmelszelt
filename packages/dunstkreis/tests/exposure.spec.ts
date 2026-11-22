@@ -1,6 +1,18 @@
 import { expect, test } from "@playwright/test";
-import { autoExposureCompensation, autoExposureTint, DEFAULT_AUTO_EXPOSURE_KEYS } from "../src/exposure.js";
+import { type AutoExposureKey, autoExposureCompensation, autoExposureTint } from "../src/exposure.js";
 import { DEFAULT_ATMOSPHERE_MODEL, luminanceScale, spectrumToRgb } from "../src/model.js";
+
+// A photographer's ramp, untinted: night darker, the blue hour lifted, the sunset a little brighter than the sunrise.
+const RAMP: readonly AutoExposureKey[] = [
+    { sunAltitude: -18, compensation: -2 },
+    { sunAltitude: -8, compensation: -1.5 },
+    { sunAltitude: -5, compensation: -0.8 },
+    { sunAltitude: -2, compensation: -0.9 },
+    { sunAltitude: -1, compensation: -0.7 },
+    { sunAltitude: 0, compensation: { rising: 0, setting: 0.2 } },
+    { sunAltitude: 6, compensation: { rising: 0.2, setting: 0.3 } },
+    { sunAltitude: 60, compensation: 0 },
+];
 
 test("the luminance scale gives the sun its illuminance, once its four wavelengths are turned into RGB", () => {
     const model = DEFAULT_ATMOSPHERE_MODEL;
@@ -13,7 +25,7 @@ test("the keys ramp the compensation smoothly with the sun, mornings and evening
     const at = (altitude: number, east: number) => {
         const a = (altitude * Math.PI) / 180;
         const [e, n] = [Math.sin(east), -Math.cos(east)];
-        return autoExposureCompensation(DEFAULT_AUTO_EXPOSURE_KEYS, [e * Math.cos(a), n * Math.cos(a), Math.sin(a)]);
+        return autoExposureCompensation(RAMP, [e * Math.cos(a), n * Math.cos(a), Math.sin(a)]);
     };
     const [east, west] = [Math.PI / 2, -Math.PI / 2];
     expect(at(-40, east)).toBe(-2);
@@ -30,7 +42,7 @@ test("the keys ramp the compensation smoothly with the sun, mornings and evening
     expect(autoExposureCompensation([], [0, 0, 1])).toBe(0);
     // High up, the horizon sinks: a sun 5° below the horizontal is 5° above a horizon 10° down.
     const low = [0, Math.cos((5 * Math.PI) / 180), -Math.sin((5 * Math.PI) / 180)] as const;
-    expect(autoExposureCompensation(DEFAULT_AUTO_EXPOSURE_KEYS, low, 10)).toBeCloseTo(at(5, 0), 12);
+    expect(autoExposureCompensation(RAMP, low, 10)).toBeCloseTo(at(5, 0), 12);
     // No jumps: not over the altitudes, nor where morning turns into evening across the meridian.
     for (let altitude = -30; altitude < 70; altitude += 0.01) {
         expect(Math.abs(at(altitude + 0.01, east) - at(altitude, east))).toBeLessThan(0.01);
@@ -46,7 +58,7 @@ test("a tint keeps the luminance, follows the keys by the sun, and leaves untint
         return [east * Math.cos(a), 0, Math.sin(a)];
     };
     const luminance = ([r, g, b]: number[]) => 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0);
-    expect(autoExposureTint(DEFAULT_AUTO_EXPOSURE_KEYS, sunAt(3, -1))).toEqual([1, 1, 1]);
+    expect(autoExposureTint(RAMP, sunAt(3, -1))).toEqual([1, 1, 1]);
     expect(autoExposureTint([], sunAt(3, -1))).toEqual([1, 1, 1]);
     const warm = [2, 1, 0.5] as const;
     const keys = [

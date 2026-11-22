@@ -189,9 +189,13 @@ Weather observers sort clouds by where they stand: low heaps and decks, towers t
 layer, and the ice clouds on top. gewoelk's layered model has these four places. It marches the first three as one
 density, with nothing built but a map for each, and reads the fourth as a sheet. For each place the library names a
 handful of kinds, `CLOUD_TYPES`, each a few numbers over the place's defaults. The five figures of this section are
-where a kind is made: one place alone under the sky of the chosen moment and place, its numbers as sliders, the
-library's kinds to start from, and at the left the map the clouds are rendered from. The copy button puts the numbers
-as they stand on the clipboard, written as an entry for `CLOUD_TYPES`.
+where a kind is made. Each has three parts: a drawing of the model that kind of cloud is rendered by, a patch of the
+cloud alone, seen from above, and its numbers as sliders, and under them the textures it is rendered from, each with
+its format, its size and what it takes on the GPU. The patch stands under the
+sky of the chosen date and place, at a time of day of its own: play runs its clock, as fast as a clock, a minute a
+second or an hour a second, and the clouds drift and change with it. The library's kinds are there to start from, and
+up to eight of your own are kept in your browser under the names you give them. The copy button puts the numbers as
+they stand on the clipboard, written as an entry for `CLOUD_TYPES`.
 
 The low layer holds what a fair day brings, heaps with flat bases 1.2 km up, and with more of the sky covered the
 same map closes into a deck (<Fig id="design-low" />). Raise the coverage step by step, and the gaps between the heaps
@@ -211,7 +215,7 @@ stand farther apart, with rain under them and anvils a whole spacing long.
 
 A front does not repeat as the other maps do: it is one band, placed in the world by a distance and a bearing, a wall
 of towers behind its leading edge and a shield of cloud to the rear, 160 km deep (<Fig id="design-front" />). Pull the
-distance below 0, and the leading edge has passed overhead, with nothing ahead but the gray of its shield.
+distance below 0, and the leading edge has passed over the observer, who stands under its shield.
 
 <Designer place="front" />
 
@@ -339,8 +343,10 @@ broad field read a second time.
 
 {import.meta.env.DEV && <Cirrus />}
 
-All of it under one sky: the three layers and the sheet as the two figures above have them, over dunstkreis' air with
-the stars and the Moon, at the page's moment and place. Only what the rendering costs is left to set here.
+All of it under one sky: the three layers and the sheet over dunstkreis' air with the stars and the Moon, at the
+page's moment and place. A weather is composed here, a kind of cloud for each place of the sky: the library's
+weathers name one each, and a kind saved in a designer above can stand in any place it was made for. Up to eight
+weathers of your own are kept in your browser.
 
 {import.meta.env.DEV && <Weather />}
 

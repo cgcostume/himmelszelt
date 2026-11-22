@@ -4,7 +4,6 @@ import {
     clampObserverHeight,
     createSkyPass,
     DEFAULT_AUREOLE,
-    DEFAULT_AUTO_EXPOSURE_KEYS,
     LENS_VEIL,
     precomputeAtmosphere,
 } from "@himmelszelt/dunstkreis";
@@ -35,6 +34,7 @@ import {
 } from "./atmosphere";
 import { flightIn } from "./flight";
 import { groundGrid } from "./groundgrid";
+import { PHOTO_RAMP } from "./ramps";
 import { type Basis, cameraBasis, lookAround, project } from "./skycamera";
 
 // The parts of the sky a figure with `data-parts` switches: the air's three ingredients, which take tables of their own
@@ -260,8 +260,6 @@ export function skyFigure(root: HTMLElement) {
             headroom,
             // On in every figure; the one with the air's parts switches it.
             aureole: pressed("aureole") ? DEFAULT_AUREOLE : false,
-            // Off in the figures without the switch.
-            starburst: maybe("starburst")?.getAttribute("aria-pressed") === "true",
             veil: pressed("veil") ? LENS_VEIL : 0,
             ...(parts ? { scattering: scattering() } : {}),
         };
@@ -280,7 +278,7 @@ export function skyFigure(root: HTMLElement) {
             projectionDistance: basis.d,
             pixelRatio: dpr,
             ev100: evOfSlider(),
-            autoExposureKeys: pressed("ramp") ? DEFAULT_AUTO_EXPOSURE_KEYS : [],
+            autoExposureKeys: pressed("ramp") ? PHOTO_RAMP : [],
             whiteBalance: skyWhite(sunDirection),
         });
         const skyViewKey = `${state.jd},${state.latitude},${state.longitude},${air.height()}`;
@@ -363,7 +361,6 @@ export function skyFigure(root: HTMLElement) {
             "refraction",
             "dither",
             "aureole",
-            "starburst",
             "veil",
             ...INGREDIENTS,
             ...Object.keys(ORDERS),

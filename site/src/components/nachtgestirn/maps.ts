@@ -1,6 +1,6 @@
 import { MOON_MAPS, MOON_ROUGHNESS } from "@himmelszelt/nachtgestirn";
 import { fromJulianDay, julianEphemerisDay, moon } from "@himmelszelt/sternzeit";
-import { find } from "../dom";
+import { find, fixed } from "../dom";
 import { save } from "../dunstkreis/download";
 import { figureInfo } from "../figure-info";
 import { onDemand } from "../frame";
@@ -248,7 +248,7 @@ export function mapsFigure(root: HTMLElement) {
             data[i * 4 + 3] = 255;
         }
         context.putImageData(pixels, 0, 0);
-        texels = `${width} × ${height} texels each, the heights from ${low.toFixed(1)} km to ${high.toFixed(1)} km about the mean radius; `;
+        texels = `${width} × ${height} texels each, the heights from ${fixed(low, 1)} km to ${fixed(high, 1)} km about the mean radius; `;
         requestRender();
     };
     image.src = files.heights ? String(files.heights) : "";

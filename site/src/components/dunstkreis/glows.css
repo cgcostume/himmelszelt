@@ -42,10 +42,6 @@
     stroke: #12a594;
     stroke-dasharray: 5 3;
 }
-.glows-spike {
-    stroke: var(--muted);
-    stroke-dasharray: 1.5 3;
-}
 .glows-white {
     stroke: var(--accent);
     stroke-width: 1;

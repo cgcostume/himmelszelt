@@ -207,14 +207,13 @@ function render() {
     drawSky(elevation);
     sliderValue.textContent = `${elevation.toFixed(1)}°`;
     const [primary, secondary] = [bowTop(elevation, 1), bowTop(elevation, 2)];
-    readout.innerHTML =
-        `<span class="status-title">Sun ${elevation.toFixed(1)}° up:</span> ` +
-        (primary > 0
-            ? `the primary bow's top stands ${primary.toFixed(1)}° over the horizon, the secondary's ${secondary.toFixed(1)}°, and ` +
+    readout.textContent =
+        primary > 0
+            ? `The primary bow's top stands ${primary.toFixed(1)}° over the horizon, the secondary's ${secondary.toFixed(1)}°, and ` +
               `${Math.round(100 * shareOver(sunBehind(elevation), bowRadius(1)))}% of the primary's circle clears the ground.`
             : secondary > 0
-              ? `higher than the primary bow's ${bowRadius(1).toFixed(1)}°, so its circle lies in the ground; the secondary's top still stands ${secondary.toFixed(1)}° up.`
-              : `higher than both bows' radii, ${bowRadius(1).toFixed(1)}° and ${bowRadius(2).toFixed(1)}°: no bow can stand over level ground.`);
+              ? `The Sun stands higher than the primary bow's ${bowRadius(1).toFixed(1)}°, so its circle lies in the ground; the secondary's top still stands ${secondary.toFixed(1)}° up.`
+              : `The Sun stands higher than both bows' radii, ${bowRadius(1).toFixed(1)}° and ${bowRadius(2).toFixed(1)}°: no bow can stand over level ground.`;
 }
 
 const requestRender = onDemand(render, root);

@@ -736,8 +736,21 @@
 }
 .config-costs {
     display: grid;
-    grid-template-columns: max-content 1fr;
+    grid-template-columns: max-content 1fr max-content;
     gap: 0 1.5rem;
+}
+/* The bars' cells closed by their last grid line, its value beside it, as the axis under a cost chart names its ticks. */
+.config-costs > .budget-cell {
+    border-right: 1px solid var(--line);
+}
+.config-cost-end {
+    display: flex;
+    align-items: center;
+    margin-left: -1.2rem;
+    border-top: var(--border);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
 }
 .config-cost-name {
     display: flex;

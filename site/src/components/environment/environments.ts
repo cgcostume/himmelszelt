@@ -8,6 +8,7 @@ import {
     onHdri,
     onLoading,
     pending,
+    type Resolution,
     setPending,
     show,
 } from "./hdri";
@@ -16,6 +17,9 @@ const KEY = "himmelszelt-hdri";
 const boxes = [...document.querySelectorAll<HTMLElement>("[data-environments]")];
 const field = <T extends HTMLElement = HTMLElement>(box: HTMLElement, name: string) =>
     box.querySelector(`[data-field="${name}"]`) as T;
+// The rail's box (see RailHdri.astro) has no search, categories or file of its own.
+const optional = <T extends HTMLElement = HTMLElement>(box: HTMLElement, name: string) =>
+    box.querySelector<T>(`[data-field="${name}"]`);
 
 const megabytes = (bytes: number) => `${(bytes / 1048576).toFixed(1)}\u202fMB`;
 
@@ -28,12 +32,17 @@ function refresh() {
                 ? `Loading ${chosen ?? "the HDRI"}: ${megabytes(pending.loaded)} of ${megabytes(pending.total)}`
                 : `Loading ${chosen ?? "the HDRI"}…`;
         else if (hdri.name) field(box, "summary").textContent = `${hdri.name}, EV ${hdri.ev100.toFixed(1)}`;
-        for (const thumb of field(box, "gallery").children) {
+        for (const thumb of field(box, "gallery").querySelectorAll(".environments-thumb")) {
             thumb.setAttribute("aria-pressed", String((thumb as HTMLElement).dataset.id === hdri.id));
             const busy = (thumb as HTMLElement).dataset.id === pending.id;
             thumb.setAttribute("aria-busy", String(busy));
             thumb.toggleAttribute("data-progress", busy && pending.total > 0);
             (thumb as HTMLElement).style.setProperty("--progress", String(share));
+        }
+        for (const button of field(box, "gallery").querySelectorAll<HTMLElement>("[data-resolution]")) {
+            const item = button.closest<HTMLElement>(".environments-item");
+            const shown = item?.dataset.id === hdri.id && button.dataset.resolution === hdri.resolution;
+            button.setAttribute("aria-pressed", String(shown));
         }
     }
 }
@@ -50,14 +59,21 @@ async function openFile(file: File) {
     }
 }
 
-function choose(entry: Entry) {
+function choose(entry: Entry, resolution?: Resolution) {
+    if (resolution) {
+        if (entry.id === hdri.id && resolution === hdri.resolution) return;
+        hdri.resolution = resolution;
+    }
     load(entry).catch(() => status("That one could not be loaded."));
     try {
         localStorage.setItem(KEY, entry.id);
     } catch {}
 }
 const status = (text: string) => {
-    for (const box of boxes) field(box, "status").textContent = text;
+    for (const box of boxes) {
+        const note = optional(box, "status");
+        if (note) note.textContent = text;
+    }
 };
 
 function loadingBar() {
@@ -66,6 +82,7 @@ function loadingBar() {
     return bar;
 }
 
+const RESOLUTIONS: Resolution[] = ["1k", "2k", "4k", "8k"];
 let entries: Entry[] = [];
 let category = "skies";
 let search = "";
@@ -89,10 +106,26 @@ function fill() {
                 loadingBar(),
             );
             thumb.addEventListener("click", () => choose(entry));
-            return thumb;
+            // Its resolutions over its foot, on hover or focus: one click loads it at the one pressed.
+            const resolutions = Object.assign(document.createElement("span"), { className: "environments-res" });
+            for (const resolution of RESOLUTIONS) {
+                const button = Object.assign(document.createElement("button"), {
+                    type: "button",
+                    textContent: resolution.toUpperCase(),
+                    title: `${entry.name} at ${resolution.toUpperCase()}`,
+                });
+                button.dataset.resolution = resolution;
+                button.addEventListener("click", () => choose(entry, resolution));
+                resolutions.append(button);
+            }
+            const item = Object.assign(document.createElement("div"), { className: "environments-item" });
+            item.dataset.id = entry.id;
+            item.append(thumb, resolutions);
+            return item;
         });
         field(box, "gallery").replaceChildren(...thumbs);
-        field<HTMLInputElement>(box, "search").value = search;
+        const input = optional<HTMLInputElement>(box, "search");
+        if (input) input.value = search;
         for (const radio of box.querySelectorAll<HTMLInputElement>("[data-category]")) {
             radio.checked = radio.value === category;
         }
@@ -106,7 +139,7 @@ onLoading(refresh);
 // Until the first list and HDRI come.
 setPending("first");
 for (const box of boxes) {
-    field<HTMLInputElement>(box, "search").addEventListener("input", (event) => {
+    optional<HTMLInputElement>(box, "search")?.addEventListener("input", (event) => {
         search = (event.target as HTMLInputElement).value;
         fill();
     });
@@ -116,7 +149,7 @@ for (const box of boxes) {
             fill();
         });
     }
-    field<HTMLInputElement>(box, "file").addEventListener("change", (event) => {
+    optional<HTMLInputElement>(box, "file")?.addEventListener("change", (event) => {
         const file = (event.target as HTMLInputElement).files?.[0];
         if (file) openFile(file);
     });

@@ -111,11 +111,100 @@ function createTimer(device: GPUDevice, onRead: () => void, slots = 12) {
 
 export type Lab = NonNullable<ReturnType<typeof createLab>>;
 
+/**
+ * A camera that orbits a point over the ground: the point's height and where it lies, in km east and north of where the
+ * figure's ground starts, the compass bearing from it to the camera, the camera's elevation over it and its distance.
+ */
+export interface Orbit {
+    center: { east: number; north: number };
+    heightKm: number;
+    /** How far over that height the camera looks instead, in km: panned with shift held, or set by the figure. */
+    liftKm: number;
+    azimuth: number;
+    elevation: number;
+    distanceKm: number;
+    /** The nearest and the farthest the wheel zooms to. */
+    reachKm: readonly [number, number];
+}
+const ORBIT_ELEVATION = [3 * DEG, 89 * DEG] as const;
+const ORBIT_LEAST_HEIGHT_KM = 0.02;
+/** The heights an orbit's camera looks at, in km. */
+export const ORBIT_HEIGHT_KM = [0, 16] as const;
+const EARTH_KM = 6360;
+
+/** Where an orbit's camera stands: how far along the ground from its center, how high, and the pitch it looks at it by. */
+function orbitCamera({ heightKm: centerKm, liftKm, elevation, distanceKm }: Orbit) {
+    const heightKm = centerKm + liftKm;
+    const out = distanceKm * Math.cos(elevation);
+    const up = EARTH_KM + heightKm + distanceKm * Math.sin(elevation);
+    const heightAbove = Math.max(Math.hypot(out, up) - EARTH_KM, ORBIT_LEAST_HEIGHT_KM);
+    const arc = Math.atan2(out, up);
+    // The center as the camera has it, in its own horizon's frame: so far out, and so far below.
+    const [across, below] = [(EARTH_KM + heightKm) * Math.sin(arc), (EARTH_KM + heightKm) * Math.cos(arc)];
+    return {
+        groundKm: EARTH_KM * arc,
+        heightKm: heightAbove,
+        pitch: Math.atan2(below - EARTH_KM - heightAbove, across),
+    };
+}
+
+/** Drag on `canvas` to turn `orbit` about its center, with shift held to look higher or lower, turn the wheel or pinch to move in and out. */
+function orbitAround(canvas: HTMLCanvasElement, orbit: Orbit, onChange: () => void) {
+    const zoom = (factor: number) => {
+        orbit.distanceKm = Math.min(Math.max(orbit.distanceKm * factor, orbit.reachKm[0]), orbit.reachKm[1]);
+        onChange();
+    };
+    const pointers = new Map<number, { x: number; y: number }>();
+    const spread = () => {
+        const [a, b] = [...pointers.values()];
+        return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+    };
+    canvas.addEventListener("pointerdown", (event) => {
+        canvas.setPointerCapture(event.pointerId);
+        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    });
+    canvas.addEventListener("pointermove", (event) => {
+        const last = pointers.get(event.pointerId);
+        if (!last) return;
+        const before = spread();
+        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (pointers.size > 1) return before > 0 ? zoom(before / Math.max(spread(), 1)) : undefined;
+        if (event.shiftKey) {
+            // A pixel's worth of the view at the center, about: the picture follows the pointer.
+            const lifted = orbit.heightKm + orbit.liftKm + (event.clientY - last.y) * orbit.distanceKm * 0.0015;
+            orbit.liftKm = Math.min(Math.max(lifted, ORBIT_HEIGHT_KM[0]), ORBIT_HEIGHT_KM[1]) - orbit.heightKm;
+            return onChange();
+        }
+        orbit.azimuth += (event.clientX - last.x) * 0.006;
+        const elevation = orbit.elevation + (event.clientY - last.y) * 0.006;
+        orbit.elevation = Math.min(Math.max(elevation, ORBIT_ELEVATION[0]), ORBIT_ELEVATION[1]);
+        onChange();
+    });
+    for (const type of ["pointerup", "pointercancel"] as const)
+        canvas.addEventListener(type, (event) => pointers.delete(event.pointerId));
+    canvas.addEventListener(
+        "wheel",
+        (event) => {
+            event.preventDefault();
+            zoom(Math.exp(event.deltaY * 0.001));
+        },
+        { passive: false },
+    );
+}
+
 /** The research figure on `root`: `draw` renders one frame with what the returned lab holds. */
 export function createLab(
     root: HTMLElement,
     draw: (lab: Lab) => void,
-    options: { presets?: Presets; morePresets?: Record<string, Presets>; camera?: SkyCamera } = {},
+    options: {
+        presets?: Presets;
+        morePresets?: Record<string, Presets>;
+        camera?: SkyCamera;
+        /** A camera that orbits a point, where the figure is not one to look around and fly in. */
+        orbit?: Orbit;
+        /** How many times as fast as a clock the lab's runs, where the figure has no choice named "speed" for it. */
+        speed?: () => number;
+    } = {},
 ) {
     const field = <T extends HTMLElement = HTMLElement>(name: string) => find<T>(`[data-field="${name}"]`, root);
     const maybe = (name: string) => root.querySelector<HTMLElement>(`[data-field="${name}"]`);
@@ -144,7 +233,20 @@ export function createLab(
     let last = 0;
     let frame = 0;
     // Flight, and the height and the place over the ground the figure is seen from: its own, no other figure follows.
-    const { flown, height: seenFrom } = flightIn(root, canvas, camera, () => lab.request());
+    // An orbit has neither: the camera stands where the orbit puts it, before every frame.
+    const { orbit } = options;
+    const flying = orbit ? null : flightIn(root, canvas, camera, () => lab.request());
+    const flown = flying?.flown ?? { east: 0, north: 0 };
+    let orbitHeightM = 1;
+    const seenFrom = flying?.height ?? (() => orbitHeightM);
+    function placeOrbit() {
+        if (!orbit) return;
+        const { groundKm, heightKm, pitch } = orbitCamera(orbit);
+        flown.east = orbit.center.east + groundKm * Math.sin(orbit.azimuth);
+        flown.north = orbit.center.north + groundKm * Math.cos(orbit.azimuth);
+        orbitHeightM = heightKm * 1000;
+        Object.assign(camera, { yaw: orbit.azimuth + Math.PI, pitch });
+    }
     const view = device.createBuffer({ size: VIEW_SIZE, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     let viewed: Parameters<typeof viewData>[0] | null = null;
 
@@ -174,6 +276,7 @@ export function createLab(
         sun: (): readonly [number, number, number] => sun.direction(fromJulianDay(state.jd), state),
         /** Sizes the canvas to its box, writes the view's uniform and returns the size in pixels. */
         size() {
+            placeOrbit();
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
             const width = Math.max(1, Math.round(canvas.clientWidth * dpr));
             const height = Math.max(1, Math.round(canvas.clientHeight * dpr));
@@ -225,6 +328,26 @@ export function createLab(
         /** The line under the figure: the GPU's name and whatever `status` gives. */
         status: (() => "") as () => string,
         request: () => {},
+        /**
+         * Eases the sliders named in `values` over to them, as a preset does, or sets them at once, and checks the
+         * choices its "@choice" entries name: one easing at a time for each `group`.
+         */
+        apply(group: string, values: Record<string, number>, eased = true) {
+            for (const [key, value] of Object.entries(values)) {
+                if (!key.startsWith("@")) continue;
+                const name = `${root.id}-${key.slice(1)}`;
+                const input = root.querySelector<HTMLInputElement>(`input[name="${name}"][value="${value}"]`);
+                if (input) input.checked = true;
+            }
+            if (eased) return ease(group, values);
+            for (const [param, value] of Object.entries(values)) {
+                const input = byParam.get(param);
+                if (!input) continue;
+                input.value = String(value);
+                paintRange(input);
+            }
+            lab.request();
+        },
     };
 
     function showStatus() {
@@ -235,7 +358,8 @@ export function createLab(
     lab.request = onDemand(() => {
         const now = performance.now();
         const animating = lab.pressed("animate");
-        if (animating && last > 0) clock += (Math.min(now - last, 100) / 1000) * (Number(lab.choice("speed")) || 1);
+        const speed = options.speed?.() ?? (Number(lab.choice("speed")) || 1);
+        if (animating && last > 0) clock += (Math.min(now - last, 100) / 1000) * speed;
         last = animating ? now : 0;
         frame += 1;
         draw(lab);
@@ -264,7 +388,10 @@ export function createLab(
     const easing = new Map<string, number>();
     function applyPreset(group: string, name: string) {
         checkChoices(group, name);
-        const target = Object.entries(presets[group]?.[name] ?? {}).flatMap(([param, to]) => {
+        ease(group, presets[group]?.[name] ?? {});
+    }
+    function ease(group: string, values: Record<string, number>) {
+        const target = Object.entries(values).flatMap(([param, to]) => {
             const input = byParam.get(param);
             return input ? [{ input, from: Number(input.value), to }] : [];
         });
@@ -309,7 +436,8 @@ export function createLab(
     maybe("marks")?.addEventListener("click", lab.request);
     onChange(lab.request);
     new ResizeObserver(lab.request).observe(canvas);
-    lookAround(canvas, camera, { onChange: lab.request });
+    if (orbit) orbitAround(canvas, orbit, lab.request);
+    else lookAround(canvas, camera, { onChange: lab.request });
     // The checked preset's values over the sliders' own, so the two never disagree at the start.
     for (const group of Object.keys(presets)) {
         const first = lab.choice(group);

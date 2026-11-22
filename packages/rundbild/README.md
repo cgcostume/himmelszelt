@@ -52,14 +52,16 @@ unless the device has "float32-filterable".
 ## Status
 
 `wgsl.ground` puts an image's ground on a plane, so objects stand on it and a camera moves over it, and lifts its horizon.
-`rbGroundedDirection(eye, direction, captureHeight, reach, radius)` lays the image on one smooth surface about where it
-was taken: the plane as far as `reach`, about half the dome's radius at most, a sphere of `radius` from the plane's
-level up, as three.js' GroundedSkybox and Unreal's HDRI Backdrop have it, and in between the image receding from the one
-to the other, never beyond the sphere. Either can be without end, 1e9: a far dome keeps the sky at infinity over a ground that ends at its reach, and
-both together are the plane without bound.
-`rbGroundedDirectionRounded(eye, direction, captureHeight, reach, radius, rounding)` shapes the dome's foot, from -1 to 1:
-0 is `rbGroundedDirection`, -1 a hard corner where the plane meets the sphere, and up to 1 the sphere's wall rounding into
-the ground from `rounding` capture heights above the plane, at 1 from the horizon down, without a crease.
+`rbGroundedDirection(eye, direction, captureHeight, reach, radius, meets)` lays the image on one smooth surface about
+where it was taken: the plane as far as `reach`, a sphere of `radius` for the sky, as three.js' GroundedSkybox and
+Unreal's HDRI Backdrop have it, and in between, in every meridian, a bend that leaves the plane level at the reach and
+meets the sphere at its slope `meets` radians up, never under the plane and never beyond the sphere. At its longest
+reach, `rbGroundedReach(captureHeight, radius, meets)`, the bend is the circle that touches both; a shorter reach draws
+it out into a flatter conic, a rational quadratic Bezier curve. `rbGroundedMeets(captureHeight, radius, soft, horizon)`
+gives the height for a bend `soft` of the widest, from 0, a hard corner where the plane meets the sphere, to 1, where the
+image's horizon meets it, `horizon` radians up as `rbLiftedHorizonDirection` lifts it: as high as the capture point for
+a level horizon. Either can be without end, 1e9: under a dome without end the ground falls away past its reach like a
+hilltop and the sky stays at infinity, and both together are the plane without bound.
 `rbStretchedLods` gives the mip levels along u and v where the ground stretches an equirectangular image, for a lookup
 blurred evenly rather than in streaks, from levels halved more along u than along v.
 

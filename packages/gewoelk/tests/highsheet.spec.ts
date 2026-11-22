@@ -67,13 +67,31 @@ test("the high sheet bakes its map once and covers some of the sky overhead", as
     const ribbed = { ...DEFAULT_LAYERED_PARAMS.sky.high, ribs: 0.5, combing: 3 };
     const sky = { ...DEFAULT_LAYERED_PARAMS.sky, high: ribbed };
     expect(pass.update({ ...DEFAULT_LAYERED_PARAMS, sky }, encoder)).toBe(true);
-    pass.update(DEFAULT_LAYERED_PARAMS, encoder);
+    // A sheet without clear patches, so there is cloud overhead whatever the seed.
+    const closed = {
+        ...DEFAULT_LAYERED_PARAMS.sky,
+        high: { ...DEFAULT_LAYERED_PARAMS.sky.high, coverage: 1, flakes: 0 },
+    };
+    pass.update({ ...DEFAULT_LAYERED_PARAMS, sky: closed }, encoder);
     pass.encode(encoder, { params, sunlight, width, height });
     device.queue.submit([encoder.finish()]);
     expect([pass.texture.width, pass.texture.height]).toEqual([width, height]);
     expect(pass.memoryBytes).toBeGreaterThan(2 * 1024 * 1024 * 8);
 
     const { data } = await readTexture(device, pass.texture);
+    // A clearing centered far off leaves no sheet overhead; centered on the observer it keeps it.
+    const cleared = async (clearingCenterKm: readonly [number, number]) => {
+        const encoder = device.createCommandEncoder();
+        pass.update(
+            { ...DEFAULT_LAYERED_PARAMS, sky: closed, clearingKm: 12, clearingFromKm: 10, clearingCenterKm },
+            encoder,
+        );
+        pass.encode(encoder, { params, sunlight, width, height });
+        device.queue.submit([encoder.finish()]);
+        return Math.min(...(await readTexture(device, pass.texture)).data.filter((_, i) => i % 4 === 3));
+    };
+    expect(await cleared([0, 0])).toBeLessThan(0.9);
+    expect(await cleared([40, 0])).toBe(1);
     expect(await device.popErrorScope()).toBeNull();
     expect(data.every(Number.isFinite)).toBe(true);
     const through = data.filter((_, i) => i % 4 === 3);

@@ -9,7 +9,7 @@
 @group(0) @binding(4) var gwBackground: texture_2d<f32>;
 // helldunkel's blue noise, read with GW_DITHER.
 @group(0) @binding(5) var gwBlueNoise: texture_2d<f32>;
-// x the sheet's altitude in km, y and z whether the layers and the sheet are there.
+// x the sheet's altitude in km, y and z whether the layers and the sheet are there, w whether the box filter is on.
 @group(0) @binding(6) var<uniform> gwLayered: vec4f;
 
 // Tone map for a display by Neutral (1), AgX (2), ACES (3) or none (4); 0 writes the exposed luminance, linear.
@@ -40,16 +40,33 @@ fn gwLayeredCompose(@builtin(global_invocation_id) id: vec3u) {
     }
     let ndc = (vec2f(id.xy) + 0.5) / vec2f(size) * vec2f(2.0, -2.0) + vec2f(-1.0, 1.0);
     let v = dkProjectRay(gwParams.inverseViewProjection, ndc, clamp(gwParams.projectionDistance, 0.0, 1.0));
-    // The layers from four taps two thirds of a texel of theirs out: a box three texels wide, over which the march's
-    // jitter is even by design, so its grain goes.
+    // The layers from four taps two thirds of a texel of theirs out: a box three texels wide where a pixel sits on a
+    // texel, over which the march's jitter is even by design, so its grain goes. Between texels, as at any share of the
+    // frame but all of it, that is no box: it weighs the texels to either side most, and the grain shows as a raster.
+    // The box filter takes the box at each of the four texels around the pixel and blends the four, in four taps too.
     var layers = vec4f(0.0, 0.0, 0.0, 1.0);
     if (gwLayered.y > 0.5) {
         let uv = (vec2f(id.xy) + 0.5) / vec2f(size);
-        let apart = 2.0 / 3.0 / vec2f(textureDimensions(gwLayersLight));
+        let texels = vec2f(textureDimensions(gwLayersLight));
         layers = vec4f(0.0);
-        for (var k = 0; k < 4; k = k + 1) {
-            let corner = vec2f(f32(k & 1), f32(k >> 1)) * 2.0 - 1.0;
-            layers = layers + 0.25 * textureSampleLevel(gwLayersLight, gwLayersSampler, uv + corner * apart, 0.0);
+        if (gwLayered.w > 0.5) {
+            // Along an axis the texels from one before to two after weigh (1 - f) / 3, 1 / 3, 1 / 3 and f / 3: two taps,
+            // each between two of them.
+            let at = uv * texels - 0.5;
+            let f = fract(at);
+            let weight = array(2.0 - f, 1.0 + f);
+            let tap = array((floor(at) - 0.5 + 1.0 / (2.0 - f)) / texels, (floor(at) + 1.5 + f / (1.0 + f)) / texels);
+            for (var k = 0; k < 4; k = k + 1) {
+                let a = k & 1;
+                let b = k >> 1;
+                layers = layers + weight[a].x * weight[b].y / 9.0 * textureSampleLevel(gwLayersLight, gwLayersSampler, vec2f(tap[a].x, tap[b].y), 0.0);
+            }
+        } else {
+            let apart = 2.0 / 3.0 / texels;
+            for (var k = 0; k < 4; k = k + 1) {
+                let corner = vec2f(f32(k & 1), f32(k >> 1)) * 2.0 - 1.0;
+                layers = layers + 0.25 * textureSampleLevel(gwLayersLight, gwLayersSampler, uv + corner * apart, 0.0);
+            }
         }
     }
     var high = vec4f(0.0, 0.0, 0.0, 1.0);

@@ -185,6 +185,16 @@ const WEATHER = {
         ["scattered", "scattered"],
         ["towering", "towering"],
         ["overcast", "overcast"],
+        [
+            "frontAhead",
+            "front ahead",
+            "A front coming on: the voxels' low clouds under a front of the layered model, marched beside them",
+        ],
+        [
+            "underFront",
+            "under the front",
+            "The front overhead: a closed, dark sky, its rain where the tall columns stand",
+        ],
         ["mackerel", "mackerel"],
         ["cirrus", "cirrus"],
     ],
@@ -328,7 +338,7 @@ const LAB: LabSlider[] = [
                 <Choice figure={id} {...LAYERS} />
                 {lab && <Choice figure={id} {...GRID} />}
                 <Choice figure={id} {...AIR} />
-                <button type="button" class="view-toggle" data-field="textures.on" aria-pressed="true" title="The textures the figure renders from, down the left of the view: hover one for what it is for">textures</button>
+                <button type="button" class="view-toggle" data-field="textures.on" aria-pressed="false" title="The textures the figure renders from, down the left of the view: hover one for what it is for">textures</button>
                 <button type="button" class="view-toggle" data-field="ground.grid" aria-pressed="true" title="A grid on the ground, for orientation, speed and height: thin lines every 10 km, 1 km, 100 m and on down to 1 mm, each level showing once its cells are a few pixels across">grid</button>
             </OptionGroup>
             <OptionGroup name="HDR (× SDR white)">

@@ -45,6 +45,8 @@ struct GwHighModel {
 const GW_HIGH_TAU: f32 = 6.283185307179586;
 // Lattice cells of the billows' noise across the tile: its largest lumps are half a cell.
 const GW_HIGH_MAP_BILLOWS: i32 = 16;
+// How far from a crack between two puffs each has risen to its full height, in cells.
+const GW_HIGH_MAP_CRACK: f32 = 0.6;
 
 // Gradient noise that tiles over the map and loops with the evolution, every 8 of it.
 fn gwHighMapNoise(p: vec2f, period: vec2i, seed: u32) -> f32 {
@@ -73,6 +75,33 @@ fn gwHighMapBumps(p: vec2f, period: vec2i, jitter: f32, seed: u32) -> f32 {
     return pow(sum, 1.0 / 6.0);
 }
 
+// Cells packed side by side: one per lattice cell about a center off the middle by `jitter` of the cell, each as tall
+// as its own weight, which swells and fades with the evolution, and down to 0 along the cracks between neighbors. At
+// `p`, in cells.
+fn gwHighMapPacked(p: vec2f, period: vec2i, jitter: f32, seed: u32) -> f32 {
+    let cell = vec2i(floor(p));
+    let f = p - floor(p);
+    var near = vec2f(8.0);
+    var weight = 1.0;
+    for (var j = -1; j <= 1; j = j + 1) {
+        for (var i = -1; i <= 1; i = i + 1) {
+            let o = vec2i(i, j);
+            let h = gwLattice(vec3i(cell + o, 0), vec3i(period, 1), seed);
+            let r = vec3f(gwUnit(h), gwUnit(gwHash(vec3u(h, 1u, 2u))), gwUnit(gwHash(vec3u(h, 3u, 4u))));
+            let life = 0.5 + 0.5 * sin(GW_HIGH_TAU * (gwHighModel.evolution / 8.0 * (1.0 + floor(r.z * 3.0)) + r.x));
+            let d = length(f - (vec2f(o) + 0.5 + (r.xy - 0.5) * jitter));
+            if (d < near.x) {
+                near = vec2f(d, near.x);
+                weight = mix(0.7, 1.0, r.z) * (0.75 + 0.25 * life);
+            } else if (d < near.y) {
+                near.y = d;
+            }
+        }
+    }
+    let inside = 1.0 - clamp((near.y - near.x) / GW_HIGH_MAP_CRACK, 0.0, 1.0);
+    return (1.0 - inside * inside) * weight;
+}
+
 // Lumps: bumps of three sizes, each half the last, for a puff's cauliflower surface.
 fn gwHighMapLumps(p: vec2f, period: vec2i, seed: u32) -> f32 {
     return 0.55 * gwHighMapBumps(p * 2.0, period * 2, 1.0, seed) + 0.3 * gwHighMapBumps(p * 4.0, period * 4, 1.0, seed + 1u) + 0.15 * gwHighMapBumps(p * 8.0, period * 8, 1.0, seed + 2u);
@@ -97,7 +126,7 @@ fn gwHighMapBake(@builtin(global_invocation_id) id: vec3u) {
     let wobble = vec2f(gwHighMapNoise(uv * 17.0, vec2i(17), seed + 3u), gwHighMapNoise(uv * 17.0, vec2i(17), seed + 4u));
     let q = uv + (gwHighModel.curve * 1.6 * bend + (1.0 - gwHighModel.rows) * 0.35 * wobble) * gwHighModel.rippleSize / gwHighModel.tile;
 
-    // Puffs: bumps in a lattice bent out of shape at their own scale, their edges eaten into lumps, then a fine grain.
+    // Puffs: cells packed in a lattice bent out of shape at their own scale, their edges eaten into lumps, then a fine grain.
     let across = gwHighMapCells(gwHighModel.puffSize);
     let along = gwHighMapCells(gwHighModel.puffSize * gwHighModel.elongation);
     let lattice = vec2i(along, across);
@@ -105,18 +134,18 @@ fn gwHighMapBake(@builtin(global_invocation_id) id: vec3u) {
     let coarse = max(vec2i(vec2f(lattice) * 0.7 + 0.5), vec2i(1));
     let shove = vec2f(gwHighMapNoise(q * vec2f(coarse), coarse, seed + 5u), gwHighMapNoise(q * vec2f(coarse), coarse, seed + 6u));
     let shaped = at + (1.0 - 0.6 * gwHighModel.rows) * 0.55 * shove;
-    let mounds = gwHighMapBumps(shaped, lattice, 1.0 - 0.7 * gwHighModel.rows, seed + 10u);
+    let mounds = gwHighMapPacked(shaped, lattice, 1.0 - 0.4 * gwHighModel.rows, seed + 10u);
     let lumps = gwHighMapLumps(shaped, lattice, seed + 11u);
-    let eaten = (1.0 - lumps) * gwHighModel.grain;
+    let eaten = 0.5 * (1.0 - lumps) * gwHighModel.grain;
     var puffs = clamp((mounds - eaten) / max(1.0 - eaten, 0.05), 0.0, 1.0);
     let fine = gwFbm(vec3f(uv * f32(across * 6), evolution), vec3i(vec2i(across * 6), 8), 3u, seed + 14u);
     // Lower at the rim, where the fine grain frays it, and higher lump by lump towards the middle.
-    puffs = clamp(puffs * (1.0 - 0.6 * gwHighModel.grain * fine), 0.0, 1.0) * mix(1.0, 0.55 + 0.6 * lumps, gwHighModel.grain);
+    puffs = clamp(puffs * (1.0 - 0.4 * gwHighModel.grain * fine), 0.0, 1.0) * mix(1.0, 0.75 + 0.4 * lumps, gwHighModel.grain);
 
     // Ripples: lanes of sky across the wind, between crests the puffs stay on.
     let crests = f32(gwHighMapCells(gwHighModel.rippleSize));
     let wave = 0.5 + 0.5 * cos(GW_HIGH_TAU * q.x * crests);
-    puffs = puffs * mix(1.0, smoothstep(0.08, 0.5, wave), gwHighModel.ripples);
+    puffs = puffs * mix(1.0, smoothstep(0.0, 0.35, wave), gwHighModel.ripples);
 
     // The veil: a smooth field, drawn into striations along the wind.
     let strands = gwHighMapCells(0.5);

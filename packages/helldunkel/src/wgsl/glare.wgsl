@@ -6,11 +6,19 @@
 // no one equation fits; scaled down to a two-hundredth, this stands in for it. Binding-free. A point source only: a
 // bright place of some size is bloom's, in bloom.comp.wgsl.
 
-// The veil in cd/m² per lux at the eye, at `angle` degrees from the source.
+// The veil in cd/m² per lux at the eye, at `angle` degrees from the source. Inside 0.1°, where the equation ends, it is
+// rounded off: a cap that leaves the equation there as it runs, and tops out at some 2.5 times its value, so a source
+// with nothing over it, the last of the Sun in an eclipse, glows to a point and not as a flat disc with an edge.
 fn hdVeilingGlare(angle: f32, age: f32, pigment: f32) -> f32 {
     let theta = clamp(angle, 0.1, 100.0);
     let aging = 1.0 + pow(age / 62.5, 4.0);
-    return 10.0 / (theta * theta * theta) + (5.0 / (theta * theta) + 0.1 * pigment / theta) * aging + 0.0025 * pigment;
+    let cubed = theta * theta * theta;
+    let veil = 10.0 / cubed + (5.0 / (theta * theta) + 0.1 * pigment / theta) * aging + 0.0025 * pigment;
+    if (angle >= 0.1) {
+        return veil;
+    }
+    let fall = 30.0 / (cubed * theta) + (10.0 / cubed + 0.1 * pigment / (theta * theta)) * aging;
+    return veil + 0.05 * fall * (1.0 - angle * angle * 100.0);
 }
 
 // The veil of a source at `sourceDirection` whose illuminance at the eye is `illuminance`, lux per channel, over a

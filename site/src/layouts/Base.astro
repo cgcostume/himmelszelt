@@ -83,9 +83,13 @@ const colors = Array.from({ length: CYANOMETER_STEPS }, (_, step) => stepColor(s
                 }
             </nav>
         </header>
-        <main>
-            <slot />
-        </main>
+        {/* The chapter's rail beside the content on a wide screen, if the page has one (see Rail.astro). */}
+        <div class="page">
+            <slot name="rail" />
+            <main>
+                <slot />
+            </main>
+        </div>
         <footer class="site-footer">
             <span>
                 <a href={`${base}/#about`}>himmelszelt</a>, small TypeScript + WebGPU libraries for rendering the sky, is

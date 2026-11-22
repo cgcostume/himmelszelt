@@ -1,4 +1,4 @@
-import { find } from "../dom";
+import { find, fixed } from "../dom";
 import {
     bindHdr,
     bindRefractionToggle,
@@ -165,7 +165,6 @@ export function moonFigure(root: HTMLElement) {
             law: "hapke2012",
             darkAdapted: pressed("night"),
             veil: maybe("veil") ? pressed("veil") : true,
-            starburst: maybe("starburst") ? pressed("starburst") : false,
             white: (choice("white") || "auto") as White,
             shimmer: pressed("shimmer") ? { time: performance.now() / 1000, dispersion: 1 } : null,
             ...rays(),
@@ -189,7 +188,7 @@ export function moonFigure(root: HTMLElement) {
                         ? " · penumbral eclipse"
                         : "";
             note.textContent =
-                `Moon ${horizontal.altitude.toFixed(2)}° high, azimuth ${horizontal.azimuth.toFixed(1)}°, ` +
+                `Moon ${fixed(horizontal.altitude, 2)}° high, azimuth ${horizontal.azimuth.toFixed(1)}°, ` +
                 `${(angularDiameter * 60).toFixed(1)}′ wide · ${(lit * 100).toFixed(0)}% lit, ${waxing ? "waxing" : "waning"} · ` +
                 `libration ${Math.abs(libration.longitude).toFixed(1)}° ${ew}, ${Math.abs(libration.latitude).toFixed(1)}° ${ns} · ` +
                 `earthshine ${earthshine.toFixed(1)} lx · air lets ${(through * 100).toFixed(0)}% through${eclipseText}`;
@@ -228,7 +227,6 @@ export function moonFigure(root: HTMLElement) {
             "earthshine",
             "eclipse",
             "veil",
-            "starburst",
         ]) {
             maybe(name)?.addEventListener("click", () => {
                 const on = !pressed(name);

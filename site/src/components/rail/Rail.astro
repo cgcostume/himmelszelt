@@ -1,0 +1,101 @@
+---
+import Choice from "../dunstkreis/Choice.astro";
+import Hdr from "../dunstkreis/Hdr.astro";
+import Controls from "../sternzeit/Controls.astro";
+import RailHdri from "./RailHdri.astro";
+import "./rail.css";
+
+/**
+ * The chapter's rail, beside the text on a wide screen: its contents with how far the reader is, then the settings that
+ * several figures share, set once for all of them. Every group is always there, in the same place: one no figure on
+ * the page reads, or one the chapter is about and keeps in its figures, is muted rather than taken away. Each folds
+ * behind its name, and stays as the reader left it, across chapters and visits. Below the
+ * rail's width the figures carry these settings themselves, as before.
+ */
+interface Props {
+    chapter: string;
+    sections: { slug: string; text: string }[];
+    minutes: number;
+}
+const { chapter, sections, minutes } = Astro.props;
+const entries = [...sections, { slug: "references", text: "References" }];
+
+// What a chapter is about stays in its figures, where the text explains it, and the rail mutes it there.
+const LOCAL: Record<string, string[]> = { helldunkel: ["display"] };
+const local = LOCAL[chapter] ?? [];
+
+const TONE = {
+    name: "tone",
+    label: "Tone curve",
+    title: "Khronos PBR Neutral keeps colors as they are and compresses only the brightest, AgX fades bright colors towards white as film does, ACES is the saturated filmic curve used before, none cuts the light off where it saturates. Switches every figure",
+    options: [
+        ["clip", "none", "No curve: the exposed light cut off at 1, where it saturates, sRGB encoded"],
+        ["neutral", "neutral"],
+        ["agx", "AgX"],
+        ["aces", "ACES"],
+    ],
+    checked: "neutral",
+};
+---
+
+<aside class="rail" aria-label="Contents and settings" data-local={local.join(" ")}>
+    <nav class="rail-tree" aria-label="Contents">
+        <details class="rail-group" data-group="contents" open>
+            <summary><span class="rail-label">Contents</span></summary>
+            <ol>
+            {
+                entries.map((entry) => (
+                    <li>
+                        <a href={`#${entry.slug}`} data-section={entry.slug} title={entry.text}>
+                            {entry.text}
+                        </a>
+                    </li>
+                ))
+            }
+            </ol>
+        </details>
+        <p class="rail-progress" aria-hidden="true">
+            <span class="rail-bar"><span class="rail-fill"></span></span>
+            <span class="rail-percent">00%</span>
+        </p>
+        <p class="rail-read">{minutes} min read</p>
+    </nav>
+
+    <section class="rail-set" data-group="moment">
+        <Controls compact open />
+        <p class="rail-why"></p>
+    </section>
+
+    {chapter === "rundbild" && <RailHdri />}
+
+    <details class="rail-group" data-group="display" open>
+        <summary>
+            <span class="rail-label">Display</span>
+            <span class="note" data-field="summary"></span>
+        </summary>
+        <div class="rail-row">
+            <span class="rail-name">tone</span>
+            <Choice figure="rail" {...TONE} />
+        </div>
+        <div class="rail-row">
+            <span class="rail-name">HDR</span>
+            <span class="rail-hdr"><Hdr figure="rail" /></span>
+        </div>
+    </details>
+</aside>
+{/* Each group as the reader left it, folded or open, set before the first paint so that nothing moves (see rail.ts). */}
+<script is:inline>
+    try {
+        const folds = JSON.parse(localStorage.getItem("sternwarte:rail") ?? "{}");
+        for (const fold of document.querySelectorAll(".rail details")) {
+            const name = fold.closest("[data-group]")?.dataset.group;
+            if (name in folds) fold.open = folds[name];
+        }
+    } catch {}
+</script>
+{/* How far the reader is, on a screen too narrow for the rail: a line along the top of the window. */}
+<div class="read-line" aria-hidden="true"></div>
+
+<script>
+    import "./rail";
+</script>

@@ -638,7 +638,7 @@ figure[id] {
 .strip-panel > svg {
     display: block;
     width: 100%;
-    height: max(9rem, 0.38 * min(80vh, min(var(--wide), 100vw - 3rem) * var(--scene-ratio, 3 / 4)));
+    height: max(9rem, 0.38 * min(80vh, min(var(--wide), var(--page-width) - 3rem) * var(--scene-ratio, 3 / 4)));
     background: var(--bg);
     cursor: crosshair;
 }

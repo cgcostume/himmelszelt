@@ -190,9 +190,12 @@ function render() {
     spreadValue.textContent = spread() === 0 ? "none" : `${Math.round(100 * spread())}%`;
     const [primary, secondary] = [crest(of, 134, 146), crest(of, 122, 132)];
     const rate = rainRate(radius());
-    const rain = rate === null ? "" : `, as in rain of ${rate < 10 ? rate.toFixed(1) : rate.toFixed(0)}\u202fmm/h`;
+    const rain =
+        rate === null
+            ? ""
+            : `Drops this size fall in rain of ${rate < 10 ? rate.toFixed(1) : rate.toFixed(0)}\u202fmm/h. `;
     readout.innerHTML =
-        `<span class="status-title">Drops of ${radius()}\u202fmm</span>${rain}: the primary bow is brightest ` +
+        `${rain}The primary bow is brightest ` +
         `${(180 - primary.angle).toFixed(1)}° from the antisolar point, ${(primary.value / EVEN).toFixed(1)} times an even share ` +
         `and ${(primary.value / secondary.value).toFixed(1)} times the secondary. ` +
         `<span class="note">${of.width} texels in ${computed.ms.toFixed(0)}\u202fms.</span>`;

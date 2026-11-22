@@ -31,6 +31,14 @@ const {
     caption = "A sheet of high cloud from a baked map: puffs in rows, lanes of sky between ripples, a veil with striations, ribs across a band, and trails combed along the wind. The map view shows the tile itself.",
 } = Astro.props;
 
+// The research sheet knows no reach and no flakes, and starts as its first sky, not as the library's sheet.
+const SHEET = CIRRUS_SHEET.filter(([param]) => param !== "c.reach").map((s) =>
+    s[0] === "c.opticalDepth" ? s.with(5, 2.4) : s,
+) as typeof CIRRUS_SHEET;
+const PATCHES = CIRRUS_PATCHES.filter(([param]) => !param.startsWith("c.flake")).map((s) =>
+    s[0] === "c.coverage" ? s.with(5, 0.8) : s,
+) as typeof CIRRUS_PATCHES;
+
 const PRESET = {
     name: "preset",
     label: "Sky",
@@ -88,8 +96,8 @@ const SPEED = {
                 <Choice figure={id} {...PRESET} />
                 <button type="button" class="view-toggle" data-copy title="Copies every slider as a preset, to paste into the figure's list">copy</button>
             </OptionGroup>
-            <OptionGroup name="sheet"><LabSliders sliders={CIRRUS_SHEET} /><LabSliders sliders={CLEARING} /></OptionGroup>
-            <OptionGroup name="patches"><LabSliders sliders={CIRRUS_PATCHES} /></OptionGroup>
+            <OptionGroup name="sheet"><LabSliders sliders={SHEET} /><LabSliders sliders={CLEARING} /></OptionGroup>
+            <OptionGroup name="patches"><LabSliders sliders={PATCHES} /></OptionGroup>
             <OptionGroup name="puffs"><LabSliders sliders={CIRRUS_CELLS} /></OptionGroup>
             <OptionGroup name="waves"><LabSliders sliders={CIRRUS_RIPPLES} /></OptionGroup>
             <OptionGroup name="veil"><LabSliders sliders={CIRRUS_VEIL} /></OptionGroup>
