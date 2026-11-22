@@ -30,7 +30,9 @@ function groupOf(host: HTMLElement, figure: HTMLElement) {
     if (into) {
         const group = into.querySelector<HTMLElement>(":scope > .fig-actions");
         if (group) return group;
-        const made = Object.assign(document.createElement("span"), { className: "view-buttons fig-actions fig-row" });
+        const made = Object.assign(document.createElement("span"), {
+            className: "view-buttons fig-actions fig-actions-row",
+        });
         into.append(made);
         return made;
     }
@@ -44,10 +46,19 @@ function groupOf(host: HTMLElement, figure: HTMLElement) {
     return group;
 }
 
-/** Downloads, then Copy, then full screen, at the group's end, in that order. */
+/** Downloads, then Copy, then full screen, at the group's end, in that order. Two downloads side by side each say
+ *  their format in a word, the last of their title, as one icon twice would not tell them apart. */
 function order(group: HTMLElement) {
     for (const selector of [DOWNLOADS, "[data-field=copyInfo]", FULL_SCREEN])
         for (const element of group.querySelectorAll<HTMLElement>(`:scope > :is(${selector})`)) group.append(element);
+    const downloads = [...group.querySelectorAll<HTMLElement>(`:scope > :is(${DOWNLOADS})`)];
+    if (downloads.length < 2) return;
+    for (const download of downloads) {
+        const format = /\bas (\w+)$/.exec(download.title)?.[1];
+        if (!format || !download.classList.contains("view-icon")) continue;
+        download.classList.replace("view-icon", "view-toggle");
+        download.textContent = format.toLowerCase();
+    }
 }
 
 const text = (element: Element) => (element.textContent ?? "").replace(/\s+/g, " ").trim();

@@ -5,15 +5,8 @@
 /* In the projection's own shape, at most a third of the view high and seven tenths of it wide. */
 .projections-inset {
     --aspect: 1;
-    position: absolute;
-    right: 0.6rem;
-    bottom: calc(0.6rem + var(--sky-foot, 0px));
     width: min(70cqw, 36cqh * var(--aspect));
     aspect-ratio: var(--aspect);
-    overflow: hidden;
-    border-radius: var(--radius-button);
-    box-shadow: 0 0 0 1px oklch(1 0 0 / 0.25);
-    background: oklch(0 0 0);
 }
 .sky-view .projections-inset canvas {
     cursor: default;

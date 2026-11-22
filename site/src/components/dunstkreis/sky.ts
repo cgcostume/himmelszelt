@@ -14,6 +14,7 @@ import { onDemand, watchView } from "../frame";
 import { paintRange } from "../range";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
+import { gpuMissing } from "../webgpu";
 import { skyWhite } from "../white";
 import {
     bindHdr,
@@ -132,20 +133,12 @@ export function skyFigure(root: HTMLElement) {
     const air = flightIn(root, canvas, camera, () => requestRender());
     let groundPass: ReturnType<typeof groundGrid> | null = null;
 
-    function showError(html: string) {
-        const error = document.createElement("div");
-        error.className = "sky-error";
-        error.innerHTML = `<p>${html}</p>`;
-        canvas.replaceWith(error);
-    }
-
     function setup() {
-        if (shared.error) {
-            showError(shared.error);
+        const context = shared.error ? null : canvas.getContext("webgpu");
+        if (!context) {
+            gpuMissing(canvas, "sky-error");
             return null;
         }
-        const context = canvas.getContext("webgpu");
-        if (!context) return null;
         configureCanvas(context, SDR);
         return { device: gpuDevice(), context, format: SDR, adapterName: shared.adapterName };
     }

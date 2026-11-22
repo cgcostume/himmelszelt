@@ -679,8 +679,10 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             autoExposureKeys: [],
             // Metered for the figure's own exposure, down into the night, where the Moon sets it.
             autoExposureRange: [-6, 20],
-            // The sky by moonlight, dimmed in Earth's shadow as the disc is.
+            // The sky by moonlight, dimmed in Earth's shadow as the disc is, and the Moon's width, which hides the Sun's
+            // disc behind it in a solar eclipse.
             moonDirection: m.trueDirection,
+            moonAngularDiameter: frame.air ? m.angularDiameter : m.geocentricDiameter,
             moonIlluminance: moonIlluminance(m.phaseAngle, m.distanceKm) * Math.max(1 - umbral, 1e-4),
         });
         moonPass.setRoughness(frame.roughness && maps ? sharedRoughness(device, mapsBound, requestRender) : null);

@@ -3,30 +3,10 @@
     width: 100%;
     aspect-ratio: 2 / 1;
 }
-.hdri-controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 1rem;
-    margin: 0.5rem 0;
-}
-.hdri-controls label {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    cursor: pointer;
-}
 /* In the view's bottom right corner, drags passing through it to the view. Dark on either theme: red, green and blue add up to white only on the dark. */
 .range-plot {
-    position: absolute;
-    right: 8px;
-    bottom: 8px;
-    z-index: 1;
     width: min(46%, 36rem);
     height: min(24%, 10.5rem);
-    overflow: hidden;
-    border-radius: var(--radius-button);
-    box-shadow: 0 0 0 1px oklch(1 0 0 / 0.25);
     background: #1c1c1c;
     pointer-events: none;
 }

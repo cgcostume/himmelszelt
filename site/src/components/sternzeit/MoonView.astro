@@ -34,7 +34,7 @@ const locked = lockedOnly || (Astro.props.locked ?? textured !== "on");
 <figure class="fig moon-figure" id={id} data-moon-view data-textured={textured}>
     <div class={parallax ? "moon-pair" : "moon-single"}>
         <div class={`moon-view as-seen${textured === "on" ? " textured" : ""}`} data-export="moon">
-            <span class="moon-bar">
+            <span class="fig-bar">
                 <span class="view-buttons">
                     <button type="button" class="view-icon" data-field="lockMoon" hidden={lockedOnly} aria-pressed={locked ? "true" : "false"} title="Lock the view to the Moon itself: north up, seen from Earth's center, without the air" aria-label="Moon frame"><Icon name="moonLock" /></button>
                     <button type="button" class="view-icon" data-field="opticalLibration" aria-pressed="true" title="The tilt of the Moon's axis against its orbit and its uneven speed along it let us see a little around its edges" aria-label="Optical libration"><Icon name="libration" /></button>
@@ -119,9 +119,8 @@ const locked = lockedOnly || (Astro.props.locked ?? textured !== "on");
             face ??= import("../nachtgestirn/moonface").then(({ attachMoonFace }) => attachMoonFace(view, controller));
             const attached = await face;
             if (!attached) {
-                const { gpu } = await import("../dunstkreis/atmosphere");
                 button.setAttribute("aria-pressed", "false");
-                button.setAttribute("title", gpu.error ?? "WebGPU is not available here");
+                button.setAttribute("title", "Needs WebGPU, see the note at the top of the page");
                 button.setAttribute("disabled", "");
                 view.classList.remove("textured");
                 return;

@@ -1,4 +1,6 @@
 import { blueNoiseTexture, type ToneCurve } from "@himmelszelt/helldunkel";
+import { createHighSheet, type HighSheetPass } from "./highsheet.js";
+import { DEFAULT_HIGH_SHEET, DEFAULT_LAYERED_PARAMS, DEFAULT_LAYERED_SKY } from "./layers.js";
 import {
     AERIAL_OFFSET,
     CLOUDSCAPE_SIZE,
@@ -60,6 +62,9 @@ export interface CloudPassOptions {
     /** The air the sunlight comes through, for the sunlight table computed here on the GPU, in the frame's own encoder,
      *  as the sun moves: dunstkreis' `AtmosphereLUTs` as they are. A `sunlight` table given to `update` overrides it. */
     atmosphere?: SunlightAtmosphere;
+    /** Whether the pass has the layered model's sheet of high cloud, set with `high` in `update`, false by default: its
+     *  map is baked at `mapSize` texels across, 2048 where not given, and held with its levels twice over. */
+    high?: boolean | { mapSize?: number };
     /** Whether the cloudscape changes by keyframes, false by default: its volumes are then built ahead, over as many
      *  frames as the caller likes, and the march reads a blend of the last two, see `Keyframes`. Three more sets of
      *  the volumes in memory. */
@@ -146,6 +151,8 @@ export interface CloudPass {
     readonly ambientTexture: GPUTexture;
     /** The detail noise, 3D, four channels of billows and wisps. */
     readonly detailTexture: GPUTexture;
+    /** The sheet of high cloud's pass, with `high`, for its map; null without. */
+    readonly high: HighSheetPass | null;
     /** The cloudscape's keyframes, with `keyframes`; null without. */
     readonly keyframes: Keyframes | null;
     /** Bytes of the textures the pass holds: maps, volumes, the flood's and the detail noise. */
@@ -248,6 +255,10 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
     const uniform = (label: string, size: number) =>
         device.createBuffer({ label, size, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const params = uniform("gewoelk:params", PARAMS_SIZE);
+    const highSheet = options.high ? await createHighSheet(device, options.high === true ? {} : options.high) : null;
+    // The high sheet's altitude in km, and whether it is there.
+    const highPlaced = uniform("gewoelk:highPlaced", 16);
+    let highThere = false;
     const cloudscape = uniform("gewoelk:cloudscape", CLOUDSCAPE_SIZE);
     const sunlight = uniform("gewoelk:sunlight", SUNLIGHT_SIZE);
     const coverage = device.createBuffer({
@@ -329,6 +340,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                 wgsl.camera,
                 wgsl.aerial,
                 wgsl.sheet,
+                wgsl.corona,
                 wgsl.whitebalance,
                 wgsl.tonemap,
                 wgsl.cloudOutput(format),
@@ -574,7 +586,8 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
     let lastInputs: readonly (GPUTexture | GPUTextureView | null)[] = [];
     let inputGroups: [GPUBindGroup, GPUBindGroup] | null = null;
     const groupsFor = (behind: GPUTexture, air: AerialPerspective | undefined) => {
-        const inputs = [behind, air?.luminance ?? noAir, air?.transmittance ?? noAir, cloudsView];
+        const high = highSheet?.texture ?? noBackground;
+        const inputs = [behind, air?.luminance ?? noAir, air?.transmittance ?? noAir, cloudsView, high];
         if (inputGroups && inputs.every((x, i) => x === lastInputs[i])) return inputGroups;
         lastInputs = inputs;
         const luminance = (air?.luminance ?? noAir).createView();
@@ -602,6 +615,8 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                 { binding: 10, resource: light.createView() },
                 { binding: 11, resource: { buffer: deck } },
                 { binding: 12, resource: blueNoise.createView() },
+                { binding: 13, resource: high.createView() },
+                { binding: 14, resource: { buffer: highPlaced } },
             ]),
         ];
         return inputGroups;
@@ -848,7 +863,10 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         ambientTexture: ambient,
         detailTexture: detail,
         keyframes,
-        memoryBytes,
+        high: highSheet,
+        get memoryBytes() {
+            return memoryBytes + (highSheet?.memoryBytes ?? 0);
+        },
 
         update(next, frameEncoder, { timestampWrites, firstKeyframe = true } = {}) {
             current = { ...current, ...next };
@@ -883,6 +901,29 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                 pass.dispatchWorkgroups(dispatch(tableEntries, 64));
                 pass.end();
                 encoder.copyBufferToBuffer(sunTable.values, 0, sunlight, 64, tableEntries * 16);
+                if (!frameEncoder) device.queue.submit([encoder.finish()]);
+            }
+
+            // The high sheet's map, baked where its shape changed.
+            const high = current.high ?? { ...DEFAULT_HIGH_SHEET, coverage: 0 };
+            highThere = highSheet !== null && high.coverage > 0.005;
+            device.queue.writeBuffer(highPlaced, 0, new Float32Array([high.altitudeKm, highThere ? 1 : 0, 0, 0]));
+            if (highSheet) {
+                const encoder = frameEncoder ?? device.createCommandEncoder({ label: "gewoelk:highMap" });
+                highSheet.update(
+                    {
+                        ...DEFAULT_LAYERED_PARAMS,
+                        sky: { ...DEFAULT_LAYERED_SKY, high },
+                        highWind: current.highWind ?? DEFAULT_LAYERED_PARAMS.highWind,
+                        evolution: current.highEvolution ?? 0,
+                        seed: current.highSeed ?? DEFAULT_LAYERED_PARAMS.seed,
+                        clearingKm: c.clearingKm ?? 0,
+                        clearingFromKm: c.clearingFromKm ?? (c.clearingKm ?? 0) / 2,
+                        timeS,
+                    },
+                    encoder,
+                    { observerKm: current.observerKm ?? [0, 0] },
+                );
                 if (!frameEncoder) device.queue.submit([encoder.finish()]);
             }
 
@@ -969,6 +1010,8 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                 });
                 cloudsView = clouds.createView();
             }
+            if (highSheet && highThere)
+                highSheet.encode(encoder, { params, sunlight, width: target.width, height: target.height });
             const cloudsOutput = bindGroup(cloudsPipeline, [{ binding: 0, resource: cloudsView as GPUTextureView }], 1);
             const [cloudsGroup, composeGroup] = groupsFor(behind ?? noBackground, air);
             // Whether the air comes from a volume, into the cloudscape's block of the frame's uniforms.
@@ -1004,6 +1047,8 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
             for (const buffer of [snapshot?.params, snapshot?.cloudscape, snapshot?.model, morph?.t]) buffer?.destroy();
             sunTable?.query.destroy();
             sunTable?.values.destroy();
+            highSheet?.destroy();
+            highPlaced.destroy();
         },
     };
 }

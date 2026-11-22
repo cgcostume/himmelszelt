@@ -25,37 +25,41 @@ const APERTURE = { min: -2.7, max: -0.3 };
 ---
 
 <figure class="fig scene-frame flicker" id={id} data-flicker data-choices={JSON.stringify(choices)}>
-    <div class="eclipse-views" data-actions="png copy">
-        <figure class="eclipse-view">
+    <div class="fig-row" data-actions="png copy">
+        <figure class="fig-tile">
             <div class="flicker-panel as-seen">
                 <canvas data-field="star-canvas" aria-label="The star, enlarged, its light as the air leaves it right now"></canvas>
-                <span class="view-buttons">
-                    <button type="button" class="view-icon" data-field="play" aria-pressed="false" title="Let the star flicker on, or hold it" aria-label="Play"><Icon name="play" /></button>
-                </span>
+                <div class="fig-bar">
+                    <span class="view-buttons">
+                        <button type="button" class="view-icon" data-field="play" aria-pressed="false" title="Let the star flicker on, or hold it" aria-label="Play"><Icon name="play" /></button>
+                    </span>
+                </div>
             </div>
             <figcaption><span class="subfigure-title">the star</span>, enlarged</figcaption>
         </figure>
-        <figure class="eclipse-view">
+        <figure class="fig-tile">
             <div class="flicker-panel">
                 <svg data-field="light" role="img" aria-label="The star's light over the last two seconds, red, green and blue, and as a strip of color"></svg>
             </div>
             <figcaption><span class="subfigure-title">its light</span> over two seconds</figcaption>
         </figure>
     </div>
-    <div class="eclipse-views">
-        <figure class="eclipse-view">
+    <div class="fig-row">
+        <figure class="fig-tile">
             <div class="flicker-panel">
                 <svg data-field="altitudes" role="img" aria-label="How strongly a star twinkles over the altitude, for the lens and exposure chosen and unaveraged"></svg>
             </div>
             <figcaption><span class="subfigure-title">the twinkling</span> over the altitude</figcaption>
         </figure>
-        <figure class="eclipse-view">
+        <figure class="fig-tile">
             <div class="flicker-panel as-seen">
                 <canvas data-field="ground" aria-label="The pattern of light and shade the turbulence casts on the ground, and the lens on it"></canvas>
                 <svg class="flicker-overlay" data-field="ground-overlay" aria-hidden="true"></svg>
-                <span class="view-buttons">
-                    <button type="button" class="view-toggle" data-field="planet" aria-pressed="false" title="A planet's disc 30 arcseconds wide instead of a point: each of its points casts the pattern a little shifted">planet</button>
-                </span>
+                <div class="fig-bar">
+                    <span class="view-buttons">
+                        <button type="button" class="view-toggle" data-field="planet" aria-pressed="false" title="A planet's disc 30 arcseconds wide instead of a point: each of its points casts the pattern a little shifted">planet</button>
+                    </span>
+                </div>
             </div>
             <figcaption><span class="subfigure-title">the pattern</span> on the ground</figcaption>
         </figure>

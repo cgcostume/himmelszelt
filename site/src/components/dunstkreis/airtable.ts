@@ -1,5 +1,6 @@
 import type { AirTable } from "@himmelszelt/dunstkreis";
 import {
+    AIR_CHANNEL_DISPERSION,
     AIR_TABLE_WIDTH,
     airAt,
     airLift,
@@ -17,8 +18,6 @@ import { drawSvg, svgText } from "../sternzeit/figure";
 const DEG = Math.PI / 180;
 const LAST = AIR_TABLE_WIDTH - 1;
 const MOON_RADIUS = 0.259;
-// How much more or less than green the air bends red and blue: `DK_AIR_DISPERSION` in `wgsl.air`.
-const DISPERSION = [0.9964, 1, 1.0078] as const;
 const MOON_ALBEDO = 0.9;
 const GUTTER = 132;
 const STRIPE = 14;
@@ -58,6 +57,8 @@ const STRIPES: Stripe[][] = [
 ];
 const LETTERS = ["r", "g", "b", "a"];
 const OFFSETS = [0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 45];
+// The values view: the bend's plot and the colors' spread under it, each this high.
+const PLOT = 96;
 
 const f = (n: number) => n.toFixed(2);
 const encode = (v: number) => {
@@ -73,6 +74,13 @@ const percent = (x: number) => `${x < 0.1 ? (x * 100).toFixed(1) : Math.round(x 
 /** Where an altitude falls in a row spaced by the fourth power, as a share of its width. */
 const shareOf = (altitude: number, from: number, to: number) =>
     Math.sqrt(Math.sqrt(Math.min(Math.max((altitude - from) / Math.max(to - from, 1e-12), 0), 1)));
+
+/** A round step, 1, 2 or 5 times a power of ten, that divides a span of `max` into some `count` parts. */
+const niceStep = (max: number, count: number) => {
+    const raw = max / count;
+    const power = 10 ** Math.floor(Math.log10(raw));
+    return power * ([1, 2, 5, 10].find((k) => k * power >= raw) ?? 10);
+};
 
 /** One band of the table, a row's four channels as stripes, as a PNG data URL scaled up without smoothing. */
 function bandImage(table: AirTable, stripes: Stripe[]): string {
@@ -121,6 +129,8 @@ export function airTableFigure(root: HTMLElement) {
     const limbSvg = field<SVGSVGElement>("limb");
     const note = field("note");
     const limbName = field("limbName");
+    const views = [...root.querySelectorAll<HTMLButtonElement>("[data-view]")];
+    let view = "texels";
     const requestRender = onDemand(render, root);
 
     let table: AirTable | null = null;
@@ -151,7 +161,7 @@ export function airTableFigure(root: HTMLElement) {
         const green = trueAltitude + airLift(t, trueAltitude);
         const air = airAt(t, Math.max(green, t.horizon));
         const spread = air ? air.bend * air.dilution : 0;
-        return [0, 1, 2].map((c) => green + ((DISPERSION[c] as number) - 1) * spread) as [number, number, number];
+        return AIR_CHANNEL_DISPERSION.map((d) => green + (d - 1) * spread) as [number, number, number];
     }
 
     /** The Moon's outline, true and seen per channel, as points (x across, y up, in degrees), dense at both limbs. */
@@ -183,7 +193,8 @@ export function airTableFigure(root: HTMLElement) {
         const close = limb === "lower" ? bottom[1] : limb === "upper" ? top[1] : t.horizon;
         const light = airAt(t, Math.max(center[1], t.horizon))?.transmittance ?? [0, 0, 0];
         const shape = outlines(t, altitude);
-        drawTexels(t, altitude, center[1]);
+        if (view === "values") drawValues(t, center[1]);
+        else drawTexels(t, altitude, center[1]);
         const span = Math.max(1.4, Math.abs(center[1] - altitude) + 0.8);
         drawMoon(t, span, altitude, center[1], close, shape, light);
         drawLimb(t, span / LIMB_FIELD, close, shape, light, limb === null);
@@ -216,10 +227,11 @@ export function airTableFigure(root: HTMLElement) {
         const apparent = t.horizon + (t.top - t.horizon) * (i / LAST) ** 4;
         const real = t.trueHorizon + (t.trueTop - t.trueHorizon) * (i / LAST) ** 4;
         const transmittance = [0, 1, 2].map((c) => value(0, c).toFixed(3)).join(", ");
+        const [red, , blue] = spreadOf(t, i).map((v) => `${v > 0 ? "+" : ""}${v.toFixed(1)}″`);
         return (
-            `entry ${i}: seen at ${angleText(apparent)}, bent by ${angleText(value(0, 3) / DEG)}, transmittance ` +
-            `${transmittance}, ${value(1, 0).toFixed(1)} airmasses, dilution ${value(2, 3).toFixed(3)}; ` +
-            `a body truly at ${angleText(real)} lifted by ${angleText(value(3, 0) / DEG)}`
+            `entry ${i}: seen at ${angleText(apparent)}, bent by ${angleText(value(0, 3) / DEG)}, red ${red} and blue ` +
+            `${blue} from green; transmittance ${transmittance}, ${value(1, 0).toFixed(1)} airmasses, dilution ` +
+            `${value(2, 3).toFixed(3)}; a body truly at ${angleText(real)} lifted by ${angleText(value(3, 0) / DEG)}`
         );
     }
 
@@ -284,6 +296,85 @@ export function airTableFigure(root: HTMLElement) {
             if (band === 3) svg += axis(left, inner, y - AXIS / 2 - 1, t.trueHorizon, t.trueTop, "true", false);
         });
         const height = y - BAND_GAP + 2;
+        texels.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        texels.style.height = `${height}px`;
+        drawSvg(texels, svg + marks.join(""), 1);
+        texels.dataset.left = String(left);
+        texels.dataset.inner = String(inner);
+    }
+
+    /** How far the air shows red, green and blue apart from green at entry i, in arcseconds, up positive: the bend
+     *  (row 0, a) times the dilution (row 2, a) times each channel's share of the bend beyond green's. */
+    function spreadOf(t: AirTable, i: number): [number, number, number] {
+        const bend = (t.data[i * 4 + 3] as number) / DEG;
+        const dilution = t.data[(2 * AIR_TABLE_WIDTH + i) * 4 + 3] as number;
+        return AIR_CHANNEL_DISPERSION.map((d) => (d - 1) * bend * dilution * 3600) as [number, number, number];
+    }
+
+    /** The table's values over its entries, spaced as the texels are: the bend in arcminutes, and under it how far
+     *  the air shows red and blue from green, in arcseconds. */
+    function drawValues(t: AirTable, seenAltitude: number) {
+        const width = texels.clientWidth || 600;
+        const left = GUTTER;
+        const inner = width - left - 4;
+        const xOf = (i: number) => left + (i + 0.5) * (inner / AIR_TABLE_WIDTH);
+        const entries = Array.from({ length: AIR_TABLE_WIDTH }, (_, i) => i);
+        const bends = entries.map((i) => ((t.data[i * 4 + 3] as number) / DEG) * 60);
+        const spreads = entries.map((i) => spreadOf(t, i));
+        let svg = axis(left, inner, 12, t.horizon, t.top, "apparent", true);
+        const marks: string[] = [];
+
+        /** One plot: grid lines at round values in the gutter's unit, a line per series, its name in the gutter. */
+        const plot = (
+            y: number,
+            low: number,
+            high: number,
+            unit: string,
+            series: [number[], string][],
+            name: string,
+        ) => {
+            const yOf = (v: number) => y + PLOT - ((v - low) / (high - low)) * PLOT;
+            const step = niceStep(high - low, 5);
+            for (let v = Math.ceil(low / step) * step; v <= high + 1e-9; v += step) {
+                const yy = yOf(v);
+                const zero = Math.abs(v) < step / 2;
+                svg += `<line x1="${left}" y1="${f(yy)}" x2="${f(left + inner)}" y2="${f(yy)}" class="figure-grid"/>`;
+                const text = zero ? "0" : `${v > 0 && low < 0 ? "+" : ""}${Number(v.toPrecision(3))}${unit}`;
+                svg += svgText(left - 6, yy, text.replace("-", "−"), "figure-grid-label");
+            }
+            for (const [values, cls] of series) {
+                const points = entries.map((i) => `${f(xOf(i))},${f(yOf(values[i] as number))}`).join(" ");
+                svg += `<polyline points="${points}" class="plot-line ${cls}"/>`;
+            }
+            svg += svgText(4, y + 6, name, "figure-label figure-anchor-start air-table-row");
+            if (seenAltitude >= t.horizon) {
+                const x = texelX(left, inner, seenAltitude, t.horizon, t.top);
+                marks.push(
+                    `<line x1="${f(x)}" y1="${y - 2}" x2="${f(x)}" y2="${y + PLOT + 2}" class="air-table-mark"/>`,
+                );
+            }
+            if (hover !== null) {
+                const hx = xOf(hover);
+                marks.push(`<line x1="${f(hx)}" y1="${y}" x2="${f(hx)}" y2="${y + PLOT}" class="plot-mark"/>`);
+            }
+        };
+
+        const bendMax = Math.max(...bends);
+        plot(AXIS, 0, bendMax * 1.05, "′", [[bends, ""]], "bend");
+        svg += svgText(4, AXIS + 24, "row 0, a", "figure-label figure-anchor-start");
+        const red = spreads.map((s) => s[0]);
+        const blue = spreads.map((s) => s[2]);
+        const y2 = AXIS + PLOT + 2 * BAND_GAP;
+        const reach = Math.max(...blue, -Math.min(...red), 1e-6) * 1.08;
+        const below = Math.min(Math.max(-Math.min(...red) / Math.max(...blue, 1e-9), 0.3), 1);
+        const lines: [number[], string][] = [
+            [entries.map(() => 0), "plot-line-green"],
+            [red, "plot-line-red"],
+            [blue, "plot-line-blue"],
+        ];
+        plot(y2, -reach * below, reach, "″", lines, "spread");
+        svg += svgText(4, y2 + 24, "from green", "figure-label figure-anchor-start");
+        const height = y2 + PLOT + 6;
         texels.setAttribute("viewBox", `0 0 ${width} ${height}`);
         texels.style.height = `${height}px`;
         drawSvg(texels, svg + marks.join(""), 1);
@@ -388,6 +479,13 @@ export function airTableFigure(root: HTMLElement) {
         hover = null;
         requestRender();
     });
+    for (const button of views) {
+        button.addEventListener("click", () => {
+            view = button.dataset.view ?? "texels";
+            for (const other of views) other.setAttribute("aria-pressed", String(other === button));
+            requestRender();
+        });
+    }
     for (const slider of Object.values(sliders)) slider.addEventListener("input", requestRender);
     new ResizeObserver(() => requestRender()).observe(root);
     requestRender();

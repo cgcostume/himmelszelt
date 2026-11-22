@@ -38,8 +38,8 @@ export {
 } from "./spectral.js";
 
 // Exposure in EV100, for the sky in cd/m².
-export type { AutoExposureKey } from "./exposure.js";
-export { autoExposureCompensation, DEFAULT_AUTO_EXPOSURE_KEYS } from "./exposure.js";
+export type { AutoExposureKey, Tint } from "./exposure.js";
+export { autoExposureCompensation, autoExposureTint, DEFAULT_AUTO_EXPOSURE_KEYS } from "./exposure.js";
 export { ev100FromLuminance, exposureFromEV100 } from "@himmelszelt/helldunkel";
 // The white balance, before the exposure: a reference white shown as D65.
 export type { WhiteBalance } from "@himmelszelt/helldunkel";
@@ -130,7 +130,14 @@ export {
     zenithTilt,
 } from "./seeing.js";
 export type { ShimmerParams, ShimmerParts, ShimmerPass, ShimmerPassOptions } from "./shimmer.js";
-export { AIR_DISPERSION, createShimmerPass, shimmerExtent, shimmerReach, shimmerShows } from "./shimmer.js";
+export {
+    AIR_CHANNEL_DISPERSION,
+    AIR_DISPERSION,
+    createShimmerPass,
+    shimmerExtent,
+    shimmerReach,
+    shimmerShows,
+} from "./shimmer.js";
 
 // Reading a LUT back to the CPU, for inspecting or exporting one.
 export type { TexturePixels } from "./readback.js";

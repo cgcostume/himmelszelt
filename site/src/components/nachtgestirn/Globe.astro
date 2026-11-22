@@ -19,21 +19,23 @@ const { id = "globe" } = Astro.props;
         <div class="tiles-panel as-seen globe-panel" data-actions="copy">
             <canvas aria-label="The Moon at the chosen moment, lit by the Sun and by earthshine, to turn and zoom, rendered with WebGPU" title="Drag to turn the Moon, shift and drag to move the view, scroll to zoom; double click to see it from Earth again"></canvas>
             <svg class="globe-labels" data-field="annotationLayer" aria-hidden="true"></svg>
-            <span class="tiles-start">
-                <span class="view-buttons">
-                    <button type="button" class="view-icon" data-field="lock" aria-pressed="true" title="Seen from Earth: turns the Moon back to the face Earth sees; turning it lets go" aria-label="Moon lock"><Icon name="moonLock" /></button>
-                    <button type="button" class="view-icon" data-field="far" aria-pressed="false" title="The far side, which Earth never sees: the Moon turned half round, the Sun staying where it is; turning it lets go" aria-label="Far side"><Icon name="farSide" /></button>
+            <div class="fig-bar">
+                <span class="fig-bar-start">
+                    <span class="view-buttons">
+                        <button type="button" class="view-icon" data-field="lock" aria-pressed="true" title="Seen from Earth: turns the Moon back to the face Earth sees; turning it lets go" aria-label="Moon lock"><Icon name="moonLock" /></button>
+                        <button type="button" class="view-icon" data-field="far" aria-pressed="false" title="The far side, which Earth never sees: the Moon turned half round, the Sun staying where it is; turning it lets go" aria-label="Far side"><Icon name="farSide" /></button>
+                    </span>
+                    <span class="view-buttons">
+                        <button type="button" class="view-icon" data-field="annotations" aria-pressed="false" title="The annotations over the Moon: the terminator, the limb, the axis, the points under the Sun and under Earth, the edge of the near side, and the names of maria, craters and landing sites, more as you zoom in" aria-label="Annotations"><Icon name="labels" /></button>
+                    </span>
+                    <span class="fig-hint footnote">Drag to turn, shift-drag to move, scroll to zoom. Rendered with WebGPU</span>
                 </span>
-                <span class="view-buttons">
-                    <button type="button" class="view-icon" data-field="annotations" aria-pressed="false" title="The annotations over the Moon: the terminator, the limb, the axis, the points under the Sun and under Earth, the edge of the near side, and the names of maria, craters and landing sites, more as you zoom in" aria-label="Annotations"><Icon name="labels" /></button>
+                <span class="view-buttons fig-actions">
+                    <button type="button" class="view-icon" data-field="download" title="Download the Moon as shown, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+                    <CopyInfo />
+                    <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
                 </span>
-                <span class="tiles-hint footnote">Drag to turn, shift-drag to move, scroll to zoom. Rendered with WebGPU</span>
-            </span>
-            <span class="view-buttons fig-actions globe-end">
-                <button type="button" class="view-icon" data-field="download" title="Download the Moon as shown, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
-                <CopyInfo />
-                <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
-            </span>
+            </div>
         </div>
         <LunationSlider class="sky-time" />
     </div>

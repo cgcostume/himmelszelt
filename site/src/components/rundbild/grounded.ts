@@ -10,6 +10,7 @@ import { configureCanvas, displayOutput, gpu, gpuDevice, SDR } from "../dunstkre
 import { hdri, onHdri } from "../environment/hdri";
 import { onDemand } from "../frame";
 import { cameraFrame, createScene } from "../scene/scene";
+import { gpuMissing } from "../webgpu";
 
 const DEG = Math.PI / 180;
 const root = find("#grounded");
@@ -138,7 +139,7 @@ function setPitch(pitch: number) {
 }
 
 if (gpu.error) {
-    canvas.replaceWith(Object.assign(document.createElement("p"), { textContent: gpu.error }));
+    gpuMissing(canvas, "sky-error");
 } else {
     const device = gpuDevice();
     const context = canvas.getContext("webgpu");

@@ -15,6 +15,13 @@ references:
     - wrenninge2013
     - hillaire2016
     - mueller2012thesis
+    - cowley2005
+    - vandehulst1957
+    - descartes1637
+    - airy1838
+    - jackson1999
+    - daimon2007
+    - marshall1948
 ---
 
 import Cite from "../../components/Cite.astro";
@@ -23,9 +30,13 @@ import Planned from "../../components/Planned.astro";
 import Term from "../../components/Term.astro";
 import Fig from "../../components/Fig.astro";
 import Clouds from "../../components/gewoelk/Clouds.astro";
+import Designer from "../../components/gewoelk/Designer.astro";
 import Cirrus from "../../components/gewoelk/lab/Cirrus.astro";
 import Formation from "../../components/gewoelk/lab/Formation.astro";
 import Weather from "../../components/gewoelk/lab/Weather.astro";
+import BowPlace from "../../components/gewoelk/rainbow/BowPlace.astro";
+import Drop from "../../components/gewoelk/rainbow/Drop.astro";
+import Phase from "../../components/gewoelk/rainbow/Phase.astro";
 
 This chapter is being written. The sky below is live, and it grows with the chapter; the dashed boxes are the figures
 still to come.
@@ -142,6 +153,17 @@ gray underside. The Sun's light reaches the clouds at their own altitude, not th
 ground lies in shadow while a cloud base 2 km up is still lit, from below, by a reddened Sun, and the summed density
 towards it runs downward through the volume then. Step the moment past sunset and watch the undersides turn.
 
+Where a cloud thins out in front of the Sun or the Moon, it glows: a disc of light a few degrees wide, bluish white
+with a brownish red rim, the <Term of="Corona">corona</Term>. Its droplets bend light around themselves as small discs
+do, into a lobe as wide as the wavelength is to the droplet, so red spreads farther than blue
+<Cite id="cowley2005" />. Half of what a droplet takes out of a beam goes this way <Cite id="vandehulst1957" />, so
+nearly straight on that a cloud renderer, gewoelk too, counts it as light passed through. The composition spreads that
+half around its source again wherever the clouds let some light through: most where three fifths of it pass, none in
+clear air or behind thick cloud. `corona` sets the droplets' radius, 10 µm by default for a glow 2° in radius, some
+seven Moons across, and how far their sizes vary, since only droplets all of one size draw rings around it. The Moon's
+corona takes its direction and its light, `moonDirection` and `moonIlluminance`; the clouds themselves are lit by the
+Sun alone so far.
+
 <Planned title="Direct, multiple and ambient">
 One cloud lit by each term alone, and the summed density towards the Sun as a slice through the light grid, at three
 Sun altitudes.
@@ -160,6 +182,137 @@ Nubis³ shipped at 2.2 to 4 ms at 960 by 540 pixels on a PlayStation 5, from the
 <Cite id="schneider2023" />. gewoelk marches the whole sky at one scale of your choosing and composes it bilinearly;
 the two-pass split is on its list. Set the render scale and the steps in the figure and watch the time on the line
 under it.
+
+## A kind of cloud for each place
+
+Weather observers sort clouds by where they stand: low heaps and decks, towers that grow through every level, a middle
+layer, and the ice clouds on top. gewoelk's layered model has these four places. It marches the first three as one
+density, with nothing built but a map for each, and reads the fourth as a sheet. For each place the library names a
+handful of kinds, `CLOUD_TYPES`, each a few numbers over the place's defaults. The five figures of this section are
+where a kind is made: one place alone under the sky of the chosen moment and place, its numbers as sliders, the
+library's kinds to start from, and at the left the map the clouds are rendered from. The copy button puts the numbers
+as they stand on the clipboard, written as an entry for `CLOUD_TYPES`.
+
+The low layer holds what a fair day brings, heaps with flat bases 1.2 km up, and with more of the sky covered the
+same map closes into a deck (<Fig id="design-low" />). Raise the coverage step by step, and the gaps between the heaps
+close.
+
+<Designer place="low" />
+
+<Controls />
+
+The deep layer starts at the same base and reaches 9 km above it. A few of its cells grow tall, and the tallest
+spread out flat on top into <Term of="Anvil">anvils</Term>, drawn downwind (<Fig id="design-towers" />). As storms they
+stand farther apart, with rain under them and anvils a whole spacing long.
+
+<Designer place="towers" />
+
+<Controls />
+
+A front does not repeat as the other maps do: it is one band, placed in the world by a distance and a bearing, a wall
+of towers behind its leading edge and a shield of cloud to the rear, 160 km deep (<Fig id="design-front" />). Pull the
+distance below 0, and the leading edge has passed overhead, with nothing ahead but the gray of its shield.
+
+<Designer place="front" />
+
+<Controls />
+
+The middle layer stands 4.5 km up and is thin, 700 m: flakes and fields of small heaps, and with most of the sky
+covered a deck with a few holes left (<Fig id="design-middle" />).
+
+<Designer place="middle" />
+
+<Controls />
+
+The high cloud is the sheet: puffs in rows, ripples, ribs and a veil combed along the wind, baked into one map in the
+wind's frame and read once where a ray crosses it, 7 km up (<Fig id="design-high" />). Turn the wind, and the whole
+pattern turns with it.
+
+<Designer place="high" />
+
+<Controls />
+
+## Rainbows
+
+A rainbow is not a thing in the rain but an angle. Stand with the Sun at your back, and every drop that happens to be
+42° from the shadow of your head sends you color, whichever drop that is at the moment. The shadow marks the
+<Term of="Antisolar point">antisolar point</Term>, straight opposite the Sun, and the bow is a circle around it. The
+42° come from following rays of sunlight through a drop, as Descartes did in 1637 <Cite id="descartes1637" />: each is
+refracted on its way in, reflected off the back and refracted again on its way out, and how far that turns it depends
+on where it met the drop, its <Term of="Impact parameter">impact parameter</Term>. A ray through the middle comes
+straight back, turned by 180°. Rays farther out are turned less, but never less than 138°, and near that least
+deviation a whole bundle of neighbors leaves side by side (<Fig id="raindrop" />). There the light piles up, 180° less
+138° from the antisolar point: a <Term of="Caustic">caustic</Term>, like the bright lines on the bottom of a pool.
+Drag the ray from the middle of the drop to its rim, and the angle at the eye grows to 42°, then shrinks again.
+
+<Drop />
+
+Water bends blue light more than red: its <Term of="Refractive index">refractive index</Term> rises from 1.330 at
+700 nm to 1.343 at 400 nm, which `waterIndex` has from Daimon and Masumura's measurements <Cite id="daimon2007" />.
+So every wavelength has a least deviation of its own, and `bowRadius` puts red at 42.5° and violet at 40.6°, a band
+three and a half Suns wide. Light reflected twice inside the drop makes the secondary bow at 51°, a seventh as bright
+and with its colors the other way round. Between the two bows no light of either kind arrives:
+<Term of="Alexander's band">Alexander's band</Term>, named after Alexander of Aphrodisias, who taught in Athens around
+the year 200 <Cite id="jackson1999" />. This is where a painted bow goes wrong. A rainbow is the bright rim of a disc
+of light, not a colored line on the sky: the rain just inside the primary bow sends back over twenty times the light
+of the band outside it.
+
+Rays are not the whole story. By them the bow's rim would be infinitely bright, and they know nothing of the pale
+fringes sometimes seen just inside it, the <Term of="Supernumerary bows">supernumerary bows</Term>. Those are waves at
+work: two rays that entered the drop on either side of the least deviated one leave it the same way after paths of
+different lengths, and strengthen or cancel each other, as Thomas Young saw in 1803. George Airy worked the whole bow
+out as a wave, published in 1838 <Cite id="airy1838" /> <Cite id="jackson1999" />. `rainbowTable` follows Airy for both
+bows and plain rays for what a drop reflects off its outside and lets through, summed over the visible wavelengths,
+over drops of many sizes and over the Sun's disc, half a degree that blurs every fringe. What comes out is rain's phase
+function as a row of colors over the <Term of="Scattering angle">scattering angle</Term>
+(<Fig id="rain-phase" />). Most of the light, 94%, goes on forward past the drop, and next to that the bow is a small
+thing: at its crest a drop sends 1.6 times what it would if it scattered evenly to all sides.
+
+A fringe is as wide as its drop is small, so the drops decide what a bow looks like. A shower holds drops of many
+sizes at once <Cite id="marshall1948" />, their fringes fall on top of each other, and what is left is the smooth bow
+everyone knows. Set the drops to 0.15 mm and their spread to one size, and supernumerary bows appear inside the
+primary. Go down to 0.02 mm, droplets as in fog, and every color spreads so wide that they merge into a pale, nearly
+white <Term of="Fogbow">fogbow</Term>, 2° farther in.
+
+<Phase />
+
+Where a bow stands is geometry alone. The antisolar point lies as far under the horizon as the Sun stands over it, so
+the primary bow's top is 42° less the Sun's elevation up, which is `bowTop`: half a circle at sunset, a low arc in the
+afternoon, and nothing once the Sun is higher than 42° (<Fig id="bow-place" />). That is why rainbows belong to
+mornings and evenings. The rest of the circle lies under the horizon, and only an observer with rain beneath, on a
+mountain or in a plane, has drops there to see it in.
+
+<BowPlace />
+
+<Controls />
+
+For a renderer all of this is one lookup per view ray. `antisolarAngle` is the ray's angle from the antisolar point,
+the table at 180° less it gives red, green and blue per steradian, and times the Sun's illuminance and the rain's
+optical depth along the ray, as long as that is thin, it is light in cd/m² to add over the sky behind.
+`rainDropRadius` and `rainExtinction` turn a rain rate into the drops' size and that depth, by Marshall and Palmer's
+sizes. The table takes some 50 ms to compute and changes only with the rain; a shader reads it as one row of texels
+through `gwRainbowPhase` in `wgsl.rainbow`. The view ray, the Sun's direction and illuminance and the kilometers of
+sunlit rain along the ray are yours:
+
+```ts
+import {
+    antisolarAngle,
+    rainbowPhase,
+    rainbowTable,
+    rainDropRadius,
+    rainExtinction,
+} from "@himmelszelt/gewoelk";
+
+const rate = 5; // mm/h, a shower: drops of 0.52 mm
+const table = rainbowTable({ dropRadiusMm: rainDropRadius(rate) });
+
+const angle = 180 - antisolarAngle(viewDirection, sunDirection);
+const depth = rainExtinction(rate) * sunlitKm; // 0.25 through 500 m
+const [red, green, blue] = rainbowPhase(table, angle).map(
+    (phase) => phase * sunIlluminance * depth,
+);
+// On the bow's crest under 100,000 lux: 3,800 cd/m² in green.
+```
 
 ## Research figures
 
@@ -201,4 +354,12 @@ into a game. Nubis began in 2015 with Horizon Zero Dawn, the first real-time clo
 Greenstein were astronomers, and their phase function of 1941 described the dust of the Milky Way
 <Cite id="henyey1941" /> before it described every cloud in every game. August Beer measured how red light faded in
 colored liquids in 1852 <Cite id="beer1852" />, and Ken Perlin improved his own noise in 2002 <Cite id="perlin2002" />,
-twenty years after the original won him an Academy Award.
+seventeen years after he introduced it; the original had won him an Academy Award in 1997.
+
+The rainbow's numbers are older. René Descartes traced rays through a drop in 1637 and found the angle they crowd at
+<Cite id="descartes1637" />, and two centuries on George Airy treated the same drop as a wave, in a paper on the light
+near a caustic whose function still carries his name <Cite id="airy1838" />. The water in `waterIndex` was measured by
+Masahiko Daimon and Akira Masumura in 2007, from the near infrared into the ultraviolet <Cite id="daimon2007" />, and
+the sizes of raindrops are J. S. Marshall and W. McK. Palmer's of 1948, from a paper two pages long
+<Cite id="marshall1948" />. John David Jackson, the author of Classical Electrodynamics, told the bow's whole story
+from Alexander to Airy in ten <Cite id="jackson1999" />.

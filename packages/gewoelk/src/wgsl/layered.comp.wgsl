@@ -1,6 +1,6 @@
 // The layered model's composition: the marched layers, at their share of the frame, and the sheet of high cloud over the
-// background, then white balance, exposure and the tone curve. Requires `params`, `whitebalance`, `tonemap` and
-// `cloudOutput`.
+// background, the corona over both, then white balance, exposure and the tone curve. Requires `params`, `camera`,
+// `corona`, `whitebalance`, `tonemap` and `cloudOutput`.
 
 @group(0) @binding(0) var<uniform> gwParams: GwParams;
 @group(0) @binding(1) var gwLayersLight: texture_2d<f32>;
@@ -38,6 +38,8 @@ fn gwLayeredCompose(@builtin(global_invocation_id) id: vec3u) {
     if (id.x >= size.x || id.y >= size.y) {
         return;
     }
+    let ndc = (vec2f(id.xy) + 0.5) / vec2f(size) * vec2f(2.0, -2.0) + vec2f(-1.0, 1.0);
+    let v = dkProjectRay(gwParams.inverseViewProjection, ndc, clamp(gwParams.projectionDistance, 0.0, 1.0));
     // The layers from four taps two thirds of a texel of theirs out: a box three texels wide, over which the march's
     // jitter is even by design, so its grain goes.
     var layers = vec4f(0.0, 0.0, 0.0, 1.0);
@@ -63,9 +65,16 @@ fn gwLayeredCompose(@builtin(global_invocation_id) id: vec3u) {
     }
     var color = back.rgb * front.a + front.rgb;
     var alpha = back.a * front.a;
+    let through = alpha;
     if (GW_BACKGROUND) {
         color = color + textureLoad(gwBackground, vec2i(id.xy), 0).rgb * alpha;
         alpha = 1.0;
+    }
+    // The corona of the Sun and of the Moon, where the clouds let some of their light through.
+    if (gwParams.coronaRadius > 0.0 && through < 1.0) {
+        let sun = gwCorona(v, normalize(gwParams.sunDirection), gwParams.sunIlluminance, through, gwParams.coronaRadius, gwParams.coronaSpread);
+        let moon = gwCorona(v, normalize(gwParams.moonDirection), gwParams.moonIlluminance, through, gwParams.coronaRadius, gwParams.coronaSpread);
+        color = color + sun + moon;
     }
     color = hdWhiteBalance(color, gwParams.whiteBalance) * gwParams.exposure;
     if (GW_TONE_MAP != 0u) {

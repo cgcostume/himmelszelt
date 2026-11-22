@@ -13,9 +13,11 @@ const { id = "color" } = Astro.props;
 <figure class="fig tiles-figure" id={id} data-color>
     <div class="tiles-panel as-seen split" style="--count: 3" data-actions="png copy">
         <canvas aria-label="The Moon from its color map as gray, as published and tinted to the Moon's color, rendered with WebGPU"></canvas>
-        <span class="tiles-start">
-            <span class="tiles-hint footnote">Rendered with WebGPU</span>
-        </span>
+        <div class="fig-bar">
+            <span class="fig-bar-start">
+                <span class="fig-hint footnote">Rendered with WebGPU</span>
+            </span>
+        </div>
     </div>
     <ul class="tiles-labels" style="grid-template-columns: 1fr 1fr 1fr">
         <li><span class="tiles-name">gray</span> <span class="tiles-value">the map's luminance</span></li>

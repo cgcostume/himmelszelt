@@ -13,6 +13,7 @@ import { configureCanvas, gpuDevice, SDR, gpu as shared } from "../dunstkreis/at
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { drawSvg, splitLine } from "../sternzeit/figure";
+import { GPU_MISSING } from "../webgpu";
 import { deepStarsOnce, mapForPixel, milkyWayOnce, pixelAngle } from "./renderer";
 import { bindStarGroups, offsetOf, picked } from "./stargroups";
 import STARMAP from "./starmap.json";
@@ -71,7 +72,7 @@ export function starredFigure(root: HTMLElement) {
     if (shared.error) {
         for (const { stage } of panels) {
             const note = Object.assign(document.createElement("p"), { className: "tiles-empty" });
-            note.innerHTML = shared.error;
+            note.innerHTML = GPU_MISSING;
             stage.replaceChildren(note);
         }
         return;

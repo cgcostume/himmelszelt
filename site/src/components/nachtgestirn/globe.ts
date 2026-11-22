@@ -193,13 +193,16 @@ export function globeFigure(root: HTMLElement) {
     canvas.addEventListener("pointermove", (event) => {
         if (!dragging) return;
         // A radian per disc radius on screen: the ground under the cursor follows it, whatever the zoom and the screen.
-        const perPx = 1 / ((panel.clientWidth || 1) / across()[0]);
+        const [w, h] = [panel.clientWidth || 1, panel.clientHeight || 1];
+        const radiusPx = w / across()[0];
         if (event.shiftKey) {
-            view.x -= (event.clientX - dragging.x) * perPx;
-            view.y += (event.clientY - dragging.y) * perPx;
+            view.x -= (event.clientX - dragging.x) / radiusPx;
+            view.y += (event.clientY - dragging.y) / radiusPx;
             keepInView();
         } else {
             if (event.clientX !== dragging.x || event.clientY !== dragging.y) locked(null);
+            // A small disc would spin under the least move: never more than half a turn across the view's shorter side.
+            const perPx = 1 / Math.max(radiusPx, Math.min(w, h) / Math.PI);
             view.yaw += (event.clientX - dragging.x) * perPx;
             view.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, view.pitch + (event.clientY - dragging.y) * perPx));
         }

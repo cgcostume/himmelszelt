@@ -1,9 +1,10 @@
 // An image's ground as more than a picture at infinity. Binding-free, over ENU directions, to look up in any map.
 //
 // Grounded: the image laid on one smooth surface about where it was taken, `captureHeight` above the origin. Under the
-// camera that took it lies the plane, z = 0, as far as `reach`; at the horizon and above it, a sphere of `radius`. In
-// between, the image recedes from the one to the other, by how far below its horizon it lies. A camera that moves then
-// moves over the ground, and what stands on the plane stands on the image, while what lies far off stays far off.
+// camera that took it lies the plane, z = 0, as far as `reach`; from the plane's level up, a sphere of `radius`. In
+// between, the image recedes from the one to the other, by how far below its horizon it lies, never beyond the sphere:
+// the ground rounds into the dome's foot. A camera that moves then moves over the ground, and what stands on the plane
+// stands on the image, while what lies far off stays far off.
 // Lifted horizon: the image stretched about its azimuths so that its horizon shows `lift` radians higher, the poles
 // staying where they are, for a horizon that is not where the image has it.
 
@@ -11,18 +12,21 @@
 
 // How far outside the surface the point `u` capture heights^-1 along a ray lies, below zero inside it. The surface is
 // given by the inverse of its distance along every lookup, in capture heights: the plane's, the lookup's part downwards,
-// from `edge` down, the dome's from the horizon up, and between them the one faded into the other.
+// from `edge` down; the dome's down to where the plane would cross it, at `dome` downwards; and between them the cubic
+// that leaves each as it runs, so it stays within the dome and at the plane's level or under it.
 fn rbGroundedGap(u: f32, offset: vec3f, direction: vec3f, edge: f32, dome: f32) -> f32 {
     let p = direction + u * offset;
     let n = length(p);
     let down = -p.z / n;
-    return mix(dome, down, smoothstep(0.0, edge, down)) * n - u;
+    let t = clamp((down - dome) / (edge - dome), 0.0, 1.0);
+    let between = dome + (edge - dome) * t * t * (2.0 - t);
+    return select(between, down, down >= edge) * n - u;
 }
 
 // Where to look up in the image what a ray from `eye`, above the plane and inside the dome, sees along the unit
 // `direction`: towards the point it meets on the surface, from where the image was taken. The ground is flat up to
-// `reach` from the origin, about half the dome's radius at most, which leaves the image room to rise into the dome
-// without a crease, and the sky `radius` away; 1e9 for either is as good as without end.
+// `reach` from the origin, about half the dome's radius at most, which leaves the image room to round into the dome's
+// foot without a crease, and the sky `radius` away; 1e9 for either is as good as without end.
 // With both, it is the plane without bound, which smears whatever rises from it. With a small `reach` under a far dome,
 // the ground falls away past its reach like a hilltop, and the horizon stays at infinity.
 fn rbGroundedDirection(eye: vec3f, direction: vec3f, captureHeight: f32, reach: f32, radius: f32) -> vec3f {
@@ -37,7 +41,8 @@ fn rbGroundedDirection(eye: vec3f, direction: vec3f, captureHeight: f32, reach: 
     let root = sqrt(b * b + within);
     let sphere = select((root + b) / within, 1.0 / (root - b), b < 0.0);
     let onDome = normalize(direction + sphere * offset);
-    if (onDome.z >= 0.0) {
+    // From the plane's level up the surface is the dome, and a ray from above the plane meets nothing before it.
+    if (-onDome.z <= dome) {
         return onDome;
     }
     let edge = max(captureHeight / length(vec2f(captureHeight, reach)), 2.0 * dome);

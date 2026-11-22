@@ -17,6 +17,7 @@ import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { drawSvg, splitLine } from "../sternzeit/figure";
 import { linkedSearch } from "../sternzeit/state";
+import { gpuMissing } from "../webgpu";
 import { ev100Of, PHOTOS, type StarPhoto } from "./photo-options";
 import { createStarsRenderer, inverseViewProjection, type SkyAt, skyAt, type ToneCurveName } from "./renderer";
 import { bindStarGroups, picked } from "./stargroups";
@@ -121,10 +122,8 @@ export function photosFigure(root: HTMLElement) {
     }
     const gpu = setup();
     if (!gpu) {
-        // Without WebGPU the photographs still show, whole, with a note over them in the canvas' place.
-        const error = Object.assign(document.createElement("p"), { className: "tiles-empty" });
-        error.innerHTML = shared.error ?? "WebGPU is not available here.";
-        canvas.replaceWith(error);
+        // Without WebGPU the photographs still show, whole, with a note over their foot in the canvas' place.
+        Object.assign(gpuMissing(canvas).style, { minHeight: "", background: "none" });
     }
     const renderer = gpu ? createStarsRenderer(gpu.device, requestRender) : null;
 

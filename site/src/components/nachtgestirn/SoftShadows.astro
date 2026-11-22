@@ -21,16 +21,18 @@ const { id = "soft-shadows" } = Astro.props;
         <canvas aria-label="The Moon, and a close-up of its terminator lit by a point Sun on the undisplaced relief, rendered with WebGPU"></canvas>
         <canvas class="detail-full" data-field="full" aria-label="The close-up as the pass draws it, the Sun's half degree on the displaced relief, rendered with WebGPU"></canvas>
         <svg class="tiles-overlay" data-field="marker" aria-hidden="true"></svg>
-        <span class="tiles-start">
-            <Resolutions options={WHOLE_RESOLUTIONS} chosen="8k" />
-            <span class="view-buttons"><button type="button" class="view-toggle" data-field="albedo" aria-pressed="false" title="NASA's color map of the Moon; off, a uniform surface of the Moon's albedo, so the relief and its shadows show alone">albedo</button><button type="button" class="view-toggle" data-field="roughness" aria-pressed="false" title="The slopes below the maps' texels, where a pixel is finer, as in the close-ups: octaves of noise as steep as LOLA's statistics of the ground say it is at each scale">rough</button></span>
-        </span>
-        <span class="tiles-ends">
-            <span class="view-buttons fig-actions">
-                <button type="button" class="view-icon" data-field="download" title="Download the disc and both close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
-                <CopyInfo />
+        <div class="fig-bar">
+            <span class="fig-bar-start">
+                <Resolutions options={WHOLE_RESOLUTIONS} chosen="8k" />
+                <span class="view-buttons"><button type="button" class="view-toggle" data-field="albedo" aria-pressed="false" title="NASA's color map of the Moon; off, a uniform surface of the Moon's albedo, so the relief and its shadows show alone">albedo</button><button type="button" class="view-toggle" data-field="roughness" aria-pressed="false" title="The slopes below the maps' texels, where a pixel is finer, as in the close-ups: octaves of noise as steep as LOLA's statistics of the ground say it is at each scale">rough</button></span>
             </span>
-        </span>
+            <span class="fig-bar-end">
+                <span class="view-buttons fig-actions">
+                    <button type="button" class="view-icon" data-field="download" title="Download the disc and both close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+                    <CopyInfo />
+                </span>
+            </span>
+        </div>
     </div>
     <label class="figure-slider split-slider" title="Where the line between the cheap close-up and the full one runs">
         <span class="note">point Sun, on the sphere</span>

@@ -1,0 +1,52 @@
+---
+import Choice from "../../dunstkreis/Choice.astro";
+import Slider from "../../Slider.astro";
+import Term from "../../Term.astro";
+import "./rainbow.css";
+
+/** A ray of sunlight through a raindrop: refracted in, reflected inside once or twice, refracted out, among a fan of its neighbors. */
+const N = "\u202f";
+---
+
+<figure class="fig" id="raindrop">
+    <p class="fig-controls">
+        <Choice
+            figure="raindrop"
+            name="order"
+            label="Reflections inside the drop"
+            heading="reflections inside"
+            title="How often the light is reflected inside the drop before it leaves"
+            options={[
+                ["1", "one", "The primary bow"],
+                ["2", "two", "The secondary bow"],
+            ]}
+            checked="1"
+        />
+    </p>
+    <div class="raindrop-panel" data-export="raindrop" data-export-timeless data-actions-in=".fig-controls">
+        <svg role="img" aria-label="Parallel rays of sunlight entering a round drop of water, reflected inside and leaving it, crowding at one angle"></svg>
+    </div>
+    <Slider
+        name="Ray"
+        title="Where the chosen ray meets the drop, from its middle to its rim: drag, or turn the mouse wheel"
+        input={{ "data-field": "impact", min: 0, max: 1, step: 0.005, value: 0.86, "aria-label": "The ray's impact parameter" }}
+        marks={[
+            { at: 0, label: "middle" },
+            { at: 86, label: "bow", attributes: { "data-field": "bowMark" } },
+        ]}
+        output={{ "data-field": "impactValue" }}
+        outputCh="4ch"
+    />
+    <p class="view-status"><span data-field="readout"></span></p>
+    <figcaption class="figure-caption">
+        Sunlight through a raindrop, in a plane through its middle: evenly spaced parallel rays, and one of them in five
+        wavelengths from 660 to 450{N}nm, each in its own color. Dashed, the ray turned least, where the rays crowd into a{" "}
+        <Term of="Caustic">caustic</Term>; dotted, the way from the eye to the{" "}
+        <Term of="Antisolar point">antisolar point</Term>, with the angle the eye sees the drop at. Water's index from
+        gewoelk's <code>waterIndex</code>, the bows' angles from its <code>bowRadius</code>. Not to scale.
+    </figcaption>
+</figure>
+
+<script>
+    import "./drop";
+</script>

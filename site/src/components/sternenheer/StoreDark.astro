@@ -35,10 +35,10 @@ const PATCHES = [
 const DEGREES_PER_TEXEL = 360 / 4096;
 ---
 
-<figure class="fig eclipse-figure storedark-figure" id={id} data-storedark data-base={BASE} data-patches={JSON.stringify(data.patches)} data-stops={data.stops}>
-    <div class="eclipse-views storedark-views" data-actions="png copy" data-export-timeless>
+<figure class="fig storedark-figure" id={id} data-storedark data-base={BASE} data-patches={JSON.stringify(data.patches)} data-stops={data.stops}>
+    <div class="fig-row" style="--count: 3; --gap: 1rem" data-actions="png copy" data-export-timeless>
         {PANELS.map((panel) => (
-            <figure class="eclipse-view" data-panel={panel.kind}>
+            <figure class="fig-tile" data-panel={panel.kind}>
                 <div class="storedark-panel as-seen">
                     <canvas aria-label={`The patch stored as ${panel.title}, rendered with WebGPU`}></canvas>
                 </div>

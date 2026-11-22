@@ -45,50 +45,6 @@ onChange(() => {
     }
 });
 
-// Play's two halves of the triangle and pause's two bars, four corners each in the same order, so one folds into the
-// other corner by corner, as YouTube's button does.
-const PLAY = [
-    [4, 2.5, 9, 5.556, 9, 10.444, 4, 13.5],
-    [8.5, 5.25, 13, 8, 13, 8, 8.5, 10.75],
-];
-const PAUSE = [
-    [4, 3, 7, 3, 7, 13, 4, 13],
-    [9, 3, 12, 3, 12, 13, 9, 13],
-];
-const MORPH_MS = 200;
-
-/** Folds `button`'s icon towards pause while `playing`, towards play otherwise, from wherever it is. */
-export function morph(button: Element) {
-    const paths = [...button.querySelectorAll("path")];
-    let t = 0;
-    let target = 0;
-    let frame = 0;
-    let last = 0;
-    const draw = () => {
-        const ease = t * t * (3 - 2 * t);
-        paths.forEach((path, i) => {
-            const points = (PLAY[i] ?? []).map((p, k) => p + ((PAUSE[i]?.[k] ?? p) - p) * ease);
-            const corners = [0, 2, 4, 6].map((k) => `${points[k]?.toFixed(3)} ${points[k + 1]?.toFixed(3)}`);
-            path.setAttribute("d", `M${corners.join("L")}Z`);
-            // Paused, the bars snap to whole pixels, so both come out equally wide.
-            path.setAttribute("shape-rendering", t === 1 ? "crispEdges" : "auto");
-        });
-    };
-    const step = (now: number) => {
-        const dt = (now - last) / MORPH_MS;
-        last = now;
-        t = target > t ? Math.min(target, t + dt) : Math.max(target, t - dt);
-        draw();
-        frame = t === target ? 0 : requestAnimationFrame(step);
-    };
-    return (playing: boolean) => {
-        target = playing ? 1 : 0;
-        if (frame || t === target) return;
-        last = performance.now();
-        frame = requestAnimationFrame(step);
-    };
-}
-
 /**
  * Wires every frame on the page once (see SkyFrame.astro): the height, play, the options' fold and full screen. The Sun
  * lock, the grid and the download are the figure's own.
@@ -109,7 +65,6 @@ export function skyFrames() {
         let pageHeight = state.heightM;
         const playButton = field("play");
         playButton.addEventListener("click", () => play(!state.animate));
-        const fold = morph(playButton);
         const sync = () => {
             // The page's height has changed: the frame's own gives way to it.
             if (state.heightM !== pageHeight) delete frame.dataset.heightM;
@@ -123,7 +78,6 @@ export function skyFrames() {
             time?.style.setProperty("--at", String((Number(offset.value) - Number(offset.min)) / span));
             playButton.setAttribute("aria-pressed", String(state.animate));
             playButton.setAttribute("aria-label", state.animate ? "Pause" : "Play");
-            fold(state.animate);
         };
         onChange(sync);
         frame.addEventListener("skyheight", sync);

@@ -44,10 +44,6 @@
     transform: translateY(-50%);
     white-space: nowrap;
 }
-.colorindex-figure .figure-slider > output {
-    min-width: 5ch;
-    text-align: right;
-}
 /* The Sun in the numbers' row: a tick at its index, its name after it, clear of 0.5 before it; where the rail is
    short, the halves give way and the name centers on its index. */
 .colorindex-scale {

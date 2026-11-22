@@ -8,6 +8,8 @@ const DEG = Math.PI / 180;
 
 /** How much more the air bends blue than red, as a share of the bend: `DK_AIR_DISPERSION` in `wgsl.air`. */
 export const AIR_DISPERSION = 0.0114;
+/** How much the air bends red, green and blue, as shares of the bend in green: `DK_AIR_DISPERSION` in `wgsl.air`. */
+export const AIR_CHANNEL_DISPERSION = [0.9964, 1, 1.0078] as const;
 
 /** The two parts of the shimmer's motion and its colors, each 1 as the air does, 0 for none. */
 export interface ShimmerParts {

@@ -10,7 +10,9 @@ import { atmosphere, common, lut, sampling } from "@himmelszelt/dunstkreis/wgsl"
 import cloudmap from "./cloudmap.comp.wgsl";
 import clouds from "./clouds.comp.wgsl";
 import compose from "./compose.comp.wgsl";
+import corona from "./corona.wgsl";
 import detail from "./detail.comp.wgsl";
+import godrays from "./godrays.comp.wgsl";
 import highmap from "./highmap.comp.wgsl";
 import highsheet from "./highsheet.comp.wgsl";
 import layered from "./layered.comp.wgsl";
@@ -20,6 +22,7 @@ import light from "./light.comp.wgsl";
 import morph from "./morph.comp.wgsl";
 import noise from "./noise.wgsl";
 import params from "./params.wgsl";
+import rainbow from "./rainbow.wgsl";
 import sheet from "./sheet.wgsl";
 import sunlight from "./sunlight.comp.wgsl";
 import voxel from "./voxel.comp.wgsl";
@@ -32,7 +35,9 @@ export {
     cloudmap,
     clouds,
     compose,
+    corona,
     detail,
+    godrays,
     highmap,
     highsheet,
     layered,
@@ -42,6 +47,7 @@ export {
     morph,
     noise,
     params,
+    rainbow,
     sheet,
     sunlight,
     voxel,

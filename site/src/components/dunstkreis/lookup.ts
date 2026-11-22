@@ -414,7 +414,7 @@ function rayAt(name: TableName, event: MouseEvent, texture: GPUTexture, g: Geome
 }
 
 if (gpu.error) {
-    find(".lookup-panel", root).hidden = true;
+    find(".lookup-panel", root).style.display = "none";
 } else {
     const show = (name: TableName, texture: GPUTexture) => {
         textures[name] = texture;

@@ -36,7 +36,6 @@ import Planned from "../../components/Planned.astro";
 import Term from "../../components/Term.astro";
 import Sky from "../../components/dunstkreis/Sky.astro";
 import Environments from "../../components/environment/Environments.astro";
-import ExposureDay from "../../components/dunstkreis/ExposureDay.astro";
 import Stages from "../../components/dunstkreis/Stages.astro";
 import Banding from "../../components/helldunkel/Banding.astro";
 import Bloom from "../../components/helldunkel/Bloom.astro";
@@ -176,11 +175,7 @@ nachtgestirn's and sternenheer's figures, lowers that floor with `autoExposureRa
 over the day: compensations at sun altitudes above the observer's horizon, joined by a smooth curve that never
 overshoots them <Cite id="fritsch1980" />. By default they keep the night and the minutes around sunrise and sunset
 darker than metered, lift the blue hour a little so its blue shows, make the sunset a little brighter than the
-sunrise, and leave noon as metered (<Fig id="exposure-day" />).
-
-<ExposureDay />
-
-<Controls />
+sunrise, and leave noon as metered, and dunstkreis lets you [grade the day with them](../dunstkreis/#grading).
 
 ## White balance
 

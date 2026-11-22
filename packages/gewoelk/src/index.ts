@@ -78,5 +78,25 @@ export type {
 } from "./clouds.js";
 export { createCloudPass } from "./clouds.js";
 
+// Rainbows: what raindrops send of the sun's light into every scattering angle, as a table, and where the bows stand.
+export type { Rainbow, RainbowTable } from "./rainbow.js";
+export {
+    antisolarAngle,
+    bowDirection,
+    bowRadius,
+    bowTop,
+    DEFAULT_RAINBOW,
+    RAINBOW_FROM,
+    RAINBOW_TO,
+    rainbowPhase,
+    rainbowTable,
+    rainDropRadius,
+    rainExtinction,
+    waterIndex,
+} from "./rainbow.js";
+// The corona thin cloud lays around the Sun and the Moon.
+export type { Corona } from "./corona.js";
+export { CORONA_WAVELENGTHS, coronaShare, DEFAULT_CORONA, diffractionLobe } from "./corona.js";
+
 // The raw WGSL, for inlining into a consumer's own pipelines instead of using the pass above.
 export * as wgsl from "./wgsl/index.js";

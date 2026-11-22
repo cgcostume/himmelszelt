@@ -30,7 +30,7 @@ const uid = `environment-${Math.random().toString(36).slice(2, 8)}`;
     <summary>
         <span class="moment-title">Environment</span> <span class="note" data-field="summary">Loading…</span>
     </summary>
-    <p class="environments-controls">
+    <p class="fig-controls">
         <span class="steps" role="radiogroup" aria-label="Poly Haven category">
             {CATEGORIES.map((category) => (
                 <label>
@@ -42,7 +42,7 @@ const uid = `environment-${Math.random().toString(36).slice(2, 8)}`;
         <input type="search" data-field="search" placeholder="Search by name or tag" aria-label="Search Poly Haven's HDRIs by name or tag" />
     </p>
     <div class="environments-gallery" data-field="gallery" role="group" aria-label="HDRIs"></div>
-    <p class="environments-controls">
+    <p class="fig-controls">
         <label class="environments-button">your own .hdr <input type="file" accept=".hdr" data-field="file" hidden /></label>
         <span class="footnote">or drop one on this box or on a figure showing the image.</span>
         <span class="note" data-field="status"></span>

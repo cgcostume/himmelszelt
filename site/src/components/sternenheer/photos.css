@@ -39,12 +39,6 @@
     stroke: rgb(0 0 0 / 0.6);
     stroke-width: 3px;
 }
-/* The exposure under the stage, as the stars figure has it in its options. */
-[data-star-photos] .figure-slider > output {
-    min-width: 13rem;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-}
 /* Six photographs, not the Moon's seven: tabs of a fixed size at the bar's left end, not a sixth of the figure each. */
 [data-star-photos] .photo-tabs {
     grid-template-columns: repeat(var(--count), minmax(0, 6rem));

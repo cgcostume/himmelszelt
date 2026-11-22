@@ -280,11 +280,12 @@ export async function cirrusFigure(root: HTMLElement) {
         lab.size();
         const encoder = device.createCommandEncoder({ label: "sternwarte:cirrusLab" });
         passes.bake(encoder);
-        passes.sky(encoder, lab.context.getCurrentTexture());
+        passes.sky(encoder, lab.target());
         textures.show(passes.shown());
         textures.encode(encoder, lab.pressed("textures.on"));
         lab.timer.resolve(encoder);
         device.queue.submit([encoder.finish()]);
+        lab.present();
         lab.timer.read();
     };
     lab.request();

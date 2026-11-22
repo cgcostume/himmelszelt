@@ -1,7 +1,7 @@
+import { AIR_DISPERSION } from "@himmelszelt/dunstkreis";
 import { liftedDirection, shimmerScales, type Vec3 } from "@himmelszelt/nachtgestirn";
 import { find } from "../dom";
 import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
-import { morph } from "../dunstkreis/skyframe";
 import { figureInfo } from "../figure-info";
 import { onDemand } from "../frame";
 import { drawSvg, moonSymbol, svgText, THUMB_RADIUS } from "../sternzeit/figure";
@@ -112,13 +112,10 @@ export function shimmerFigure(root: HTMLElement) {
     // The air's own clock, held while paused.
     let clock = 0;
     let last = performance.now();
-    const fold = morph(play);
-    fold(true);
     play.addEventListener("click", () => {
         const playing = !pressed(play);
         play.setAttribute("aria-pressed", String(playing));
         play.setAttribute("aria-label", playing ? "Pause" : "Play");
-        fold(playing);
         last = performance.now();
         requestRender();
     });
@@ -239,7 +236,7 @@ export function shimmerFigure(root: HTMLElement) {
         renderCut(altitude, airColumn, m.heightM, m.lit, dot(sun, right), -dot(sun, up), m.earthshine);
         const { tilt, cell: finest } = shimmerScales(shimmer, airColumn);
         const [rms, cell] = [tilt * ARCSEC, finest * ARCSEC];
-        const fringe = bend * 0.0114 * ARCSEC;
+        const fringe = bend * AIR_DISPERSION * ARCSEC;
         note.textContent =
             `the Moon ${Math.abs(elevation).toFixed(1)}° ${elevation < 0 ? "below the level" : "up"}` +
             `${altitude > 90 ? ", past the zenith" : ""}: ` +

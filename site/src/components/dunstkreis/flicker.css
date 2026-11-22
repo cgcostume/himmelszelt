@@ -15,12 +15,6 @@
     border-radius: var(--radius-canvas);
     background: oklch(0 0 0);
 }
-.flicker-panel > .view-buttons {
-    position: absolute;
-    top: 6px;
-    left: 6px;
-    z-index: 5;
-}
 .flicker-overlay {
     position: absolute;
     inset: 0;

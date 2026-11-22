@@ -110,9 +110,10 @@ fn dkSunCorona(direction: vec3f, sunDirection: vec3f, angularRadius: f32) -> f32
     return share * (1.0 - smoothstep(0.75 * DK_SUN_CORONA_REACH, DK_SUN_CORONA_REACH, r));
 }
 
-// The chromosphere as a share of the disc's mean luminance over a pixel `footprint` radians across: a shell 2,500 km
-// deep, 0.36 % of the radius, in the pink of hydrogen's lines, taken at 3e-4 of the disc, a rough figure. Thinner
-// than a pixel unless zoomed far in, so by how much of the pixel it covers, as the disc's edge is.
+// The chromosphere as a share of the disc's mean luminance over a pixel `footprint` radians across: a shell taken as
+// 2,500 km deep, 0.36 % of the radius, in the pink of hydrogen's lines, at 3e-4 of the disc. Both are rough figures
+// without a source: texts give its depth as 2,000 to 5,000 km, and none its brightness. Thinner than a pixel unless
+// zoomed far in, so by how much of the pixel it covers, as the disc's edge is.
 fn dkSunChromosphere(direction: vec3f, sunDirection: vec3f, angularRadius: f32, footprint: f32) -> vec3f {
     let distance = length(direction - sunDirection);
     let outer = clamp((1.0036 * angularRadius - distance) / footprint + 0.5, 0.0, 1.0);

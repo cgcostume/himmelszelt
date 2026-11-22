@@ -30,9 +30,9 @@ function surfaceDistance(lookup: Vec3, reach: number, radius: number) {
     const dome = HEIGHT / radius;
     const edge = Math.max(HEIGHT / Math.hypot(HEIGHT, reach), 2 * dome);
     const down = -lookup[2];
-    const t = Math.min(Math.max(down / edge, 0), 1);
-    const faded = t * t * (3 - 2 * t);
-    return HEIGHT / (dome + (down - dome) * faded);
+    if (down >= edge) return HEIGHT / down;
+    const t = Math.min(Math.max((down - dome) / (edge - dome), 0), 1);
+    return HEIGHT / (dome + (edge - dome) * t * t * (2 - t));
 }
 
 /**
@@ -83,6 +83,24 @@ test("within its reach the ground is the plane, and above the horizon the dome",
     [3 + along * x, 0, 3 - HEIGHT + along * z].forEach((m, k) => {
         expect(lookups[1]?.[k]).toBeCloseTo(m / 30, 5);
     });
+});
+
+test("the surface stays within the dome, and past the dome's foot at the plane's level or under it", () => {
+    for (const [reach, radius] of [
+        [8, 30],
+        [3, 200],
+        [6, 15],
+    ]) {
+        for (let depression = 0; depression <= 90; depression += 0.25) {
+            const lookup: Vec3 = [Math.cos(depression * DEG), 0, -Math.sin(depression * DEG)];
+            const distance = surfaceDistance(lookup, reach as number, radius as number);
+            expect(distance).toBeLessThanOrEqual((radius as number) * (1 + 1e-12));
+            // Down to the dome's foot it is the dome, above the plane; from there on at the plane's level or under it.
+            const foot = -lookup[2] >= HEIGHT / (radius as number);
+            if (foot) expect(HEIGHT + distance * lookup[2]).toBeLessThanOrEqual(1e-9);
+            else expect(distance).toBeCloseTo(radius as number, 9);
+        }
+    }
 });
 
 test("past its reach a ray meets the one surface, whatever the reach and the dome", async () => {

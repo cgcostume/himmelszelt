@@ -19,12 +19,12 @@ const time = (date: string) => date.slice(11, 16);
     <div class="tiles-panel as-seen split" data-field="strip" style="--count: 16" data-actions="copy">
         <canvas aria-label="nachtgestirn's Moon at sixteen moments from the umbra's first contact to its last, rendered with WebGPU"></canvas>
         <svg class="tiles-overlay" data-field="stripMarks" aria-hidden="true"></svg>
-        <span class="tiles-ends">
+        <div class="fig-bar">
             <span class="view-buttons fig-actions">
                 <button type="button" class="view-icon" data-field="download" title="Download the whole eclipse as PNG, the photographs' moments marked" aria-label="Download as PNG"><Icon name="download" /></button>
                 <CopyInfo />
             </span>
-        </span>
+        </div>
     </div>
     <div class="tiles-panel as-seen split eclipse-photos" style="cursor: ew-resize; touch-action: pan-y">
         <canvas aria-label="nachtgestirn's Moon for each photograph's moment, place and exposure, rendered with WebGPU"></canvas>

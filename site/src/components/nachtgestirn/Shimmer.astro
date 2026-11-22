@@ -17,21 +17,23 @@ const { id = "shimmer" } = Astro.props;
     <div class="shimmer-row">
         <div class="tiles-panel as-seen" data-actions="copy">
             <canvas aria-label="The Moon's lower limb through the air, shimmering, rendered with WebGPU"></canvas>
-            <span class="tiles-start">
-                <Resolutions options={WHOLE_RESOLUTIONS} chosen="4k" />
-                <span class="view-buttons">
-                    <button type="button" class="view-toggle" data-part="motion" aria-pressed="true" title="The larger cells of the turbulence, which move patches of the image about as a whole">motion</button>
-                    <button type="button" class="view-toggle" data-part="boiling" aria-pressed="true" title="The smaller cells, which make the image boil within those patches">boiling</button>
-                    <button type="button" class="view-toggle" data-part="colors" aria-pressed="true" title="The air's dispersion: it bends blue more than red, so the blue image stands higher, more the lower the Moon">colors</button>
+            <div class="fig-bar">
+                <span class="fig-bar-start">
+                    <Resolutions options={WHOLE_RESOLUTIONS} chosen="4k" />
+                    <span class="view-buttons">
+                        <button type="button" class="view-toggle" data-part="motion" aria-pressed="true" title="The larger cells of the turbulence, which move patches of the image about as a whole">motion</button>
+                        <button type="button" class="view-toggle" data-part="boiling" aria-pressed="true" title="The smaller cells, which make the image boil within those patches">boiling</button>
+                        <button type="button" class="view-toggle" data-part="colors" aria-pressed="true" title="The air's dispersion: it bends blue more than red, so the blue image stands higher, more the lower the Moon">colors</button>
+                    </span>
+                    <span class="fig-hint footnote">Rendered with WebGPU</span>
                 </span>
-                <span class="tiles-hint footnote">Rendered with WebGPU</span>
-            </span>
-            <span class="view-buttons fig-actions tiles-end">
-                <Rays />
-                <button type="button" class="view-icon" data-field="play" aria-pressed="true" title="Let the air drift on, or hold it" aria-label="Pause"><Icon name="play" /></button>
-                <button type="button" class="view-icon" data-field="download" title="Download the close-up and the air from the side as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
-                <CopyInfo />
-            </span>
+                <span class="view-buttons fig-actions">
+                    <Rays />
+                    <button type="button" class="view-icon" data-field="play" aria-pressed="true" title="Let the air drift on, or hold it" aria-label="Pause"><Icon name="play" /></button>
+                    <button type="button" class="view-icon" data-field="download" title="Download the close-up and the air from the side as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+                    <CopyInfo />
+                </span>
+            </div>
         </div>
         <div class="shimmer-cut" title="Drag the observer up and down, the Moon from one horizon over the zenith to the other; double click for where they started">
             <svg data-field="cut" role="img" aria-label="The air between the observer and the Moon from the side: the path the light takes through it, and how much of it"></svg>

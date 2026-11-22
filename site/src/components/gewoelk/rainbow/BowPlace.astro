@@ -1,0 +1,36 @@
+---
+import Term from "../../Term.astro";
+import Try from "../../Try.astro";
+import "./rainbow.css";
+
+/** Where a bow can stand: the cones of the two bows around the antisolar point, for the Sun of the page's moment and place. */
+---
+
+<figure class="fig" id="bow-place">
+    <div class="fig-row" style="--gap: 1rem" data-export="bow-place">
+        <figure class="fig-tile">
+            <div class="bowplace-panel"><svg data-panel="side" role="img" aria-label="An observer from the side, the Sun behind, and the lines of sight to the two bows in the rain ahead"></svg></div>
+            <figcaption><span class="subfigure-title">from the side</span>, the Sun behind you</figcaption>
+        </figure>
+        <figure class="fig-tile">
+            <div class="bowplace-panel"><svg data-panel="sky" role="img" aria-label="The sky opposite the Sun: the two bows as circles around the antisolar point, cut off by the horizon"></svg></div>
+            <figcaption><span class="subfigure-title">as seen</span>, looking away from the Sun</figcaption>
+        </figure>
+    </div>
+    <p class="view-status"><span data-field="readout"></span></p>
+    <figcaption class="figure-caption">
+        Where the two bows stand for the Sun of the chosen moment and place, seen from level ground. (a) The lines of
+        sight 42° and 51° from the line to the <Term of="Antisolar point">antisolar point</Term>, dashed where the ground
+        is in the way. (b) The bows as circles around that point, in five wavelengths by gewoelk's{" "}
+        <code>bowDirection</code>, each top as high as <code>bowTop</code> gives it; a stereographic projection, in which
+        circles stay circles. Symbols, not to scale.
+        <Try label="Midsummer noon in Potsdam" set="date=2026-06-21T11:08Z&lat=52.395&lon=13.085&h=1" fig="bow-place">
+            the Sun stands 61° up, both circles lie in the ground, and from 9:46 to 16:33 local time it is too high for a
+            primary bow.
+        </Try>
+    </figcaption>
+</figure>
+
+<script>
+    import "./bowplace";
+</script>

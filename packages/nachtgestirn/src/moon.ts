@@ -66,7 +66,7 @@ export interface MoonPassOptions {
     darkAdapted?: boolean;
     /** How the maps are filtered, to compare: "nearest" and "bilinear" read the full size alone, "trilinear" between
      *  its levels; "anisotropic", the default, up to sixteen taps along the footprint, and by a cubic B-spline where the
-     *  maps are magnified. */
+     *  footprint's shorter axis magnifies the maps. */
     filter?: MapFilter;
     /** The reflectance law, as WGSL that defines `fn ngReflectance(mu0: f32, mu: f32, cosG: f32) -> f32`: luminance over
      *  the illuminance arriving along the light, for normal albedo 1, from the cosines of the angles of incidence,

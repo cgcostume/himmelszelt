@@ -30,18 +30,25 @@ export const FORMATION_PRESETS: Presets = {
     },
     towering: {
         ...{ "l0.coverage": 0.42, "l0.depth": 1.4, "l0.feature": 3, "l0.extinction": 40, "l0.lumps": 0.5 },
-        ...{ "@kind1": 2, "l1.coverage": 0.3, "l1.depth": 9, "l1.feature": 14, "l1.extinction": 25 },
-        ...{ "l2.coverage": 0.15, "l2.feature": 1.6, "l2.lumps": 0.6 },
+        ...{ "@kind1": 2, "l1.coverage": 0.3, "l1.depth": 9, "l1.feature": 14, "l1.extinction": 25, rain: 4 },
+        ...{ anvil: 0.6, "l2.coverage": 0.15, "l2.feature": 1.6, "l2.lumps": 0.6 },
+    },
+    showers: {
+        ...{ "l0.coverage": 0.12, "l0.depth": 0.8, "l0.feature": 2, "l0.extinction": 40, "l0.lumps": 0.5 },
+        ...{ "@kind1": 2, "l1.coverage": 0.45, "l1.depth": 6, "l1.feature": 7, "l1.extinction": 25, anvil: 0.15 },
+        ...{ rain: 6, "l2.coverage": 0 },
     },
     front: {
         ...{ "l0.coverage": 0.25, "l0.depth": 1, "l0.feature": 2.5, "l0.extinction": 40, "l0.lumps": 0.5 },
         ...{ "@kind1": 3, "l1.coverage": 0.8, "l1.depth": 9, "l1.feature": 10, "l1.extinction": 30 },
         ...{ "front.distance": 12, "front.depth": 160, "l2.coverage": 0.4, "l2.feature": 2.4, "l2.lumps": 0.6 },
+        rain: 4,
     },
     rain: {
         ...{ "l0.coverage": 0.9, "l0.depth": 1.2, "l0.feature": 3, "l0.extinction": 50, "l0.lumps": 0.4 },
         ...{ "@kind1": 3, "l1.coverage": 1, "l1.depth": 8, "l1.feature": 10, "l1.extinction": 30 },
         ...{ "front.distance": -50, "front.depth": 220, "l2.coverage": 0.8, "l2.feature": 3, "l2.lumps": 0.6 },
+        rain: 4,
     },
     alto: {
         ...{ "l0.coverage": 0.12, "l0.depth": 0.8, "l0.feature": 2, "l0.extinction": 40, "l0.lumps": 0.5 },
@@ -344,10 +351,11 @@ export async function formationFigure(root: HTMLElement) {
         const { width, height } = lab.size();
         const encoder = device.createCommandEncoder({ label: "sternwarte:formationLab" });
         passes.march(encoder, width, height);
-        passes.compose(encoder, lab.context.getCurrentTexture(), width, height);
+        passes.compose(encoder, lab.target(), width, height);
         textures.encode(encoder, lab.pressed("textures.on"));
         lab.timer.resolve(encoder);
         device.queue.submit([encoder.finish()]);
+        lab.present();
         lab.timer.read();
     };
     lab.request();

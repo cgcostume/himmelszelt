@@ -5,6 +5,18 @@
 .air-table-texels {
     margin-bottom: 1rem;
 }
+/* Its caption, with the switch between texels and values at its end. */
+.air-table-texels > figcaption {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: space-between;
+}
+.air-table-views {
+    display: flex;
+    gap: 4px;
+}
 .air-table-texels > svg {
     display: block;
     width: 100%;

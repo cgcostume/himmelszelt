@@ -61,6 +61,8 @@ fn show(luminance: vec3f, exposure: f32) -> vec3f {
 - `veilingGlare(angle, age, pigment)` and `hdVeil` in `wgsl.glare`: the eye's veil around a bright point source, CIE's
   general disability glare equation (CIE 146:2002), in cd/m² per lux at the eye, to add before the exposure. The Sun's
   veil in a sky, where bloom knows only the image. At a two-hundredth of its strength it is a camera lens's.
+- `meanVeilingGlare(radius, sourceRadius, age, pigment)`: that veil on average over a field around the source, for
+  metering a frame with the Sun or the Moon in it; finite where the equation at the source is not.
 - `hdStarburst(offset, radius, blades)` in `wgsl.lens`: the spikes an aperture's straight blades diffract a bright
   point source into, falling with the square of the angle along each and longer in red than in blue, laid out in the
   image plane, in cd/m² per lux at the lens, to add before the exposure; `starburstSpikes(blades)` counts them, as many

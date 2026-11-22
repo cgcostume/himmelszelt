@@ -1,6 +1,7 @@
 ---
 import Icon from "../Icon.astro";
 import Resolutions from "../Resolutions.astro";
+import Slider from "../Slider.astro";
 import "../dunstkreis/dunstkreis.css";
 import "./environments.css";
 
@@ -33,7 +34,8 @@ const RESOLUTIONS = [
     <div class="env-stage" data-actions="png copy" data-export-timeless>
     <slot />
     {author && <span class="env-author" data-env="author"></span>}
-    <div class="env-bar">
+    <div class="fig-bar">
+        <span class="fig-bar-start">
         {!ownView && (<Fragment>
         <span class="view-buttons">
             <button type="button" class="view-icon" data-env="map" aria-pressed="true" title="The whole map, as it is stored" aria-label="Map"><Icon name="envMap" /></button>
@@ -44,23 +46,24 @@ const RESOLUTIONS = [
         </span>
         </Fragment>)}
         <Resolutions options={RESOLUTIONS} chosen="1k" />
-        <span class="sky-hint footnote" data-env="hint"></span>
-        <span class="view-buttons env-end fig-actions">
+        <span class="fig-hint footnote" data-env="hint"></span>
+        </span>
+        <span class="view-buttons fig-actions">
             {options && <button type="button" class="view-icon" data-env="options" aria-pressed="true" title="Show or hide this figure's options" aria-label="Options"><Icon name="options" /></button>}
             {fullscreen && <button type="button" class="view-icon" data-env="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>}
         </span>
     </div>
     {options && <div class="sky-options" data-env="optionsPanel"><Fragment set:html={optionsHtml} /></div>}
     </div>
-    <div class="env-exposure">
-        <label class="figure-slider" title="The exposure, in EV: drag, or turn the mouse wheel">
-            <span class="note">EV</span>
-            <span class="figure-slider-rail">
-                <input type="range" data-env="ev" min="-8" max="8" step="any" data-wheel-step="0.1" value="0" aria-label="Exposure in EV" />
-                <span class="figure-slider-scale" aria-hidden="true">{["−8", "0", "+8"].map((mark, i) => <span class="figure-slider-mark" style={`left: ${i * 50}%`} data-env={["low", "zero", "high"][i]}>{mark}</span>)}<span class="figure-slider-mark env-metered" data-env="meteredMark" title="What the light meter read for this image. The slider snaps to it, and the padlock closes while the exposure follows the reading; drag away to let go" aria-pressed="true" hidden><Icon name="padlock" />metered</span></span>
-            </span>
-            <output data-env="reading"></output>
-        </label>
+    <div class="fig-controls env-exposure">
+        <Slider
+            name="EV"
+            title="The exposure, in EV: drag, or turn the mouse wheel"
+            input={{ "data-env": "ev", min: -8, max: 8, step: "any", "data-wheel-step": 0.1, value: 0, "aria-label": "Exposure in EV" }}
+            marks={["−8", "0", "+8"].map((label, i) => ({ at: i * 50, label, attributes: { "data-env": ["low", "zero", "high"][i] } }))}
+            metered={{ "data-env": "meteredMark", title: "What the light meter read for this image. The slider snaps to it, and the padlock closes while the exposure follows the reading; drag away to let go" }}
+            output={{ "data-env": "reading" }}
+        />
     </div>
 </div>
 

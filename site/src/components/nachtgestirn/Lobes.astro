@@ -15,7 +15,7 @@ const LAWS = [
 ---
 
 <figure class="fig lobes-figure wide" id={id} data-lobes>
-    <div class="lobes-row" data-export="reflectance" data-export-timeless>
+    <div class="fig-row" style="--count: 4; --count-narrow: 2; --gap: 0.75rem" data-export="reflectance" data-export-timeless>
         {LAWS.map(([law, name, what]) => (
             <div class="lobes-panel">
                 <svg data-law={law} role="img" aria-label={`The light a patch of surface sends to each side under ${name}'s law`}></svg>

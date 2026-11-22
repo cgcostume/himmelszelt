@@ -67,10 +67,12 @@ other package at runtime: the astronomy comes in as directions and angles, from
 - **Cheap**: one ray per pixel by default (`samples`), four along the terminator and a displaced limb
   (`terminatorSamples`), where a crater rim turns from lit to dark within a pixel; the maps are filtered over the
   whole pixel's footprint whatever the count, so the rays sharpen the shading and never alias the maps, and read by a cubic
-  B-spline when magnified, so the terminator and the relief along it stay smooth. Minified, they are filtered
-  anisotropically, `textureSampleGrad` over each ray's footprint with up to 16 taps along its long axis: towards the
-  poles an equirectangular map crowds its texels east to west, and at the limb the slant stretches the footprint, so
-  one isotropic mip level would blur the poles, which always lie near the limb.
+  B-spline where magnified, under a texel to a pixel, so the terminator and the relief along it stay smooth. Minified,
+  they are filtered anisotropically, `textureSampleGrad` over each ray's footprint with up to 16 taps along its long
+  axis: towards the poles an equirectangular map crowds its texels east to west, and at the limb the slant stretches
+  the footprint, so one isotropic mip level would blur the poles, which always lie near the limb. Where a footprint
+  is magnified across and minified along, at the limb of a disc larger than the maps, each of the B-spline's taps is
+  filtered along it, so the limb shows no texel steps.
 - **The exposure**: `moonEV100` meters the lit part a stop over mid gray, the photographer's "looney 11", EV100 13.6 at
   full Moon; `moonIlluminance` gives the Moon's light above the air, some 0.3 lux at full Moon, for lighting a sky by
   it, as dunstkreis' `moonlight` does.

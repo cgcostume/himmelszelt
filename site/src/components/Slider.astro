@@ -1,0 +1,43 @@
+---
+/** A slider under a figure (`.figure-slider` in figure.css): its name, the rail with marks under the thumb's travel, and
+ *  its value beside it in `outputCh`, a width that holds the longest value. `metered` adds the light meter's mark, a
+ *  padlock the exposure snaps to (see environment/frame.ts). Attributes in `input`, `output` and `metered` go on those
+ *  elements as they are, so a script finds them by its own `data-*` names. */
+import Icon from "./Icon.astro";
+
+type Attributes = Record<string, string | number | boolean | undefined>;
+interface Mark {
+    /** Where along the rail, 0 to 100. */
+    at: number;
+    label?: string;
+    /** Hangs after the label, so the mark centers on its number. */
+    unit?: string;
+    attributes?: Attributes;
+}
+interface Props {
+    name: string;
+    title: string;
+    input: Attributes;
+    marks?: readonly Mark[];
+    output?: Attributes;
+    outputCh?: string;
+    metered?: Attributes;
+    /** On the label: what a figure's CSS or script picks the slider by. */
+    attributes?: Attributes;
+}
+const { name, title, input, marks = [], output, outputCh, metered, attributes = {} } = Astro.props;
+---
+
+<label class="figure-slider" title={title} style={outputCh ? `--output-ch: ${outputCh}` : undefined} {...attributes}>
+    <span class="note" set:html={name} />
+    <span class="figure-slider-rail">
+        <input type="range" {...input} />
+        {(marks.length > 0 || metered) && (
+            <span class="figure-slider-scale" aria-hidden="true">
+                {marks.map(({ at, label, unit, attributes: own }) => <span class="figure-slider-mark" style={`left: ${at}%`} {...own}>{label}{unit && <span class="figure-slider-unit">{unit}</span>}</span>)}
+                {metered && <span class="figure-slider-mark slider-metered" title="What the light meter read. The slider snaps to it, and the padlock closes while the exposure follows the reading; drag away to let go" aria-pressed="true" hidden {...metered}><Icon name="padlock" />metered</span>}
+            </span>
+        )}
+    </span>
+    {output && <output {...output} />}
+</label>

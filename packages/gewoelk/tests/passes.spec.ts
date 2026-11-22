@@ -33,7 +33,7 @@ const PASSES: Record<string, readonly string[]> = {
     light: ["params", "light"],
     morph: ["morph"],
     clouds: ["noise", "params", "camera", "aerial", "sheet", "clouds"],
-    compose: ["noise", "params", "camera", "aerial", "sheet", "whitebalance", "tonemap", "compose"],
+    compose: ["noise", "params", "camera", "aerial", "sheet", "corona", "whitebalance", "tonemap", "compose"],
     sunlight: ["atmosphere", "common", "lut", "sampling", "sunlight"],
 };
 const OUTPUTS: Record<string, string> = { clouds: cloudOutput("rgba16float"), compose: cloudOutput("rgba8unorm") };

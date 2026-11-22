@@ -109,6 +109,14 @@ matter of taste, e.g. for hazier evenings. The metering stays the base, so the r
 | 6° | +0.2 | +0.3 | golden hour |
 | 60° | 0 | 0 | noon, as metered |
 
+A key may also carry a `tint`, gains over linear sRGB, or a `{ rising, setting }` pair of them: a grade, such as a
+warmer golden hour or a purple dusk. Each is scaled to keep the luminance, so the compensation alone sets the
+brightness, and they are joined channel by channel on a log scale by the same curve; a key without one is neutral.
+The tint is multiplied into the white balance after it, so it goes wherever the white balance does, metered or not, and
+costs the shaders nothing. `autoExposureTint(keys, sunDirection, horizonDip)` gives it for a scene of your own, as
+`autoExposureCompensation` gives the compensation. The default keys have none, and without one no bit of the frame
+changes.
+
 Night is yet to come. A camera exposes a landscape by full moon at about EV100 −3 and the Milky Way at about −6 to
 −7, some 7 to 11 stops below the floor of 4. The floor stays until the night sky has light of its own: the Moon's
 scattered light, airglow, zodiacal light and the stars. Exposed that far now, the sky would show only the Sun's last
@@ -137,11 +145,12 @@ The Sun is drawn per pixel over the sky, never stored in a table, and in parts a
   is short enough for the disc not to burn out, some EV100 32.
 - The corona and the chromosphere, `solarCorona`, the Sun's own light beyond its limb, on by default with the disc:
   Baumbach's fit to the corona (1937), 0.0532 / r^2.5 + 1.425 / r^7 + 2.565 / r^17 millionths of the disc's center, r
-  in solar radii, out to 40 of them, and under it the chromosphere, a pink shell of 2,500 km. Five millionths of the
+  in solar radii, out to 40 of them, and under it the chromosphere, a thin pink shell. Five millionths of the
   disc at the limb, some 9,000 cd/m²: lost in the sky by day and, above the air, in a lens's veil, some forty times
   brighter there, as in any camera. It shows from above the air with `veil: 0`, close in or at a long exposure. Behind
-  the air, the ground and the Moon as the disc is, but a total eclipse does not show it yet: the sky, the aureole and
-  the veil do not dim with the covered Sun. In the image only, not in a cube map.
+  the air, the ground and the Moon as the disc is. The veil and the starburst dim by the share of the disc the Moon
+  covers, so a total eclipse shows the corona from above the air; under it not yet, since the sky and the aureole do
+  not dim with the covered Sun. In the image only, not in a cube map.
 - The aureole, `aureole`, the air's glow of about a degree around it: aerosols scatter sunlight far more sharply forward
   than the tables' one Cornette-Shanks lobe says, so a share of their scattering, `DEFAULT_AUREOLE`'s 5 % at g 0.98,
   goes into a narrow Henyey-Greenstein lobe the tables leave out and the sky pass adds per pixel where the lobe is above

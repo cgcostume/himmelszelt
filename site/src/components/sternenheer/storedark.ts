@@ -5,6 +5,7 @@ import { find } from "../dom";
 import { display, gpu, gpuDevice, onDisplay } from "../dunstkreis/atmosphere";
 import { onDemand, watchView } from "../frame";
 import { drawSvg, svgText } from "../sternzeit/figure";
+import { GPU_MISSING } from "../webgpu";
 
 type Kind = "srgb" | "log" | "float";
 type Patch = { low: number; median: number; high: number };
@@ -98,8 +99,9 @@ async function fetchPlanes(url: string) {
 export function storeDarkFigure(root: HTMLElement) {
     const status = find("[data-field=status]", root);
     if (gpu.error) {
-        status.innerHTML = gpu.error;
+        status.innerHTML = GPU_MISSING;
         status.hidden = false;
+        for (const canvas of root.querySelectorAll<HTMLCanvasElement>("canvas")) canvas.style.display = "none";
         return;
     }
     const device = gpuDevice();

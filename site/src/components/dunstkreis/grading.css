@@ -1,0 +1,62 @@
+/* Grading the day: the presets above, the tiles, their altitudes, and the keys' lanes aligned under the tiles. */
+.grading-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.grading-stage {
+    position: relative;
+}
+.grading-row {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 4;
+}
+.grading-row-styled {
+    top: calc(50% + 8px);
+}
+@media (max-width: 40rem) {
+    .grading-tiles > .grading-row {
+        font-size: var(--text-small);
+        padding: 1px 6px;
+    }
+}
+.grading-lanes {
+    margin-top: 0.5rem;
+}
+.grading-lanes > svg {
+    display: block;
+    width: 100%;
+    overflow: visible;
+    touch-action: pan-y;
+}
+.grading-lane {
+    fill: var(--surface);
+}
+.grading-zero {
+    stroke: var(--line);
+    stroke-dasharray: var(--line-dashes);
+    stroke-width: 1;
+}
+.grading-curve {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.8;
+    stroke-linejoin: round;
+}
+.grading-handle {
+    cursor: grab;
+}
+.grading-name,
+.grading-end {
+    font-size: var(--text-small);
+    paint-order: stroke;
+    stroke: var(--surface);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
+.grading-end {
+    fill: var(--muted);
+}

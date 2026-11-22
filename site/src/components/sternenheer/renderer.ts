@@ -16,9 +16,9 @@ import {
     ev100FromLuminance,
     localAdaptation,
     lowLightCompensation,
+    meanVeilingGlare,
     meteredLuminance,
     NO_WHITE_BALANCE,
-    veilingGlare,
 } from "@himmelszelt/helldunkel";
 import type { MoonMaps, MoonPass } from "@himmelszelt/nachtgestirn";
 import {
@@ -476,8 +476,8 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
                 frame.moon && frame.air && s.moonDirection[2] > 0 ? 0.05 * s.moonIlluminance * s.moonDirection[2] : 0;
             // Until the frame is metered, on the whole sky's light and on what the Moon lends it.
             const guess = Math.max(frame.air ? 2 ** (skyEV100 - 3) : 0, moonlit);
-            // A bright body in the frame veils the eye, by CIE's glare equation at its angle from where the eye looks: the
-            // Sun exposes as day wherever it stands, also over a black sky, and the Moon dims the stars around it.
+            // A bright body in the frame veils the eye, by CIE's glare equation on average over the frame, as the eye
+            // looks about it rather than into the body: the Sun exposes as day, also over a black sky, the Moon a little.
             const m = frame.inverseViewProjection;
             const along = (x: number, y: number) => {
                 const w = m[3] * x + m[7] * y + m[11] + m[15];
@@ -487,11 +487,13 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             };
             const forward = along(0, 0);
             const reach = Math.acos(Math.min(dot(forward, along(1, 1)), 1));
-            const veil = (direction: ArrayLike<number>, lux: number) => {
+            const veil = (direction: ArrayLike<number>, lux: number, diameter: number) => {
                 const angle = Math.acos(Math.max(Math.min(dot(forward, direction), 1), -1));
-                return angle < reach ? lux * veilingGlare((angle * 180) / Math.PI) : 0;
+                return angle < reach ? lux * meanVeilingGlare((reach * 180) / Math.PI, diameter / 2) : 0;
             };
-            const veiled = veil(s.sunDirection, s.sunAtEye) + (frame.moon ? veil(s.moonDirection, s.moonAtEye) : 0);
+            const veiled =
+                veil(s.sunDirection, s.sunAtEye, s.sunAngularDiameter) +
+                (frame.moon ? veil(s.moonDirection, s.moonAtEye, s.moonAngularDiameter) : 0);
             const metered = Math.max(frameLuminance ?? guess, milkyWay) + veiled;
             const automatic = ev100FromLuminance(metered) - lowLightCompensation(metered);
             const goal = Math.min(Math.max(automatic, DARKEST_EV100), 20);

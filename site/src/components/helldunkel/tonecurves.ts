@@ -3,6 +3,7 @@ import { find } from "../dom";
 import { gpu } from "../dunstkreis/atmosphere";
 import { context, draw, onHdri } from "../environment/hdri";
 import { onDemand } from "../frame";
+import { gpuMissing } from "../webgpu";
 
 const root = find("#tones");
 
@@ -17,4 +18,9 @@ if (!gpu.error) {
     }, root);
     onHdri(request);
     new ResizeObserver(request).observe(root);
+} else {
+    // One note for the four tiles, in the first one's place.
+    const [first, ...rest] = root.querySelectorAll<HTMLCanvasElement>("canvas[data-curve]");
+    if (first) gpuMissing(first);
+    for (const canvas of rest) canvas.style.display = "none";
 }

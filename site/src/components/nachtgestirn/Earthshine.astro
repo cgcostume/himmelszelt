@@ -15,15 +15,17 @@ const { id = "earthshine-crescent" } = Astro.props;
 <figure class="fig tiles-figure" id={id} data-earthshine>
     <div class="tiles-panel as-seen split" style="--count: 2" data-actions="copy">
         <canvas aria-label="The Moon without earthshine and with it, rendered with WebGPU"></canvas>
-        <span class="tiles-start">
-            <span class="tiles-hint footnote">Rendered with WebGPU</span>
-        </span>
-        <span class="tiles-ends">
-            <span class="view-buttons fig-actions">
-                <button type="button" class="view-icon" data-field="download" title="Download both discs as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
-                <CopyInfo />
+        <div class="fig-bar">
+            <span class="fig-bar-start">
+                <span class="fig-hint footnote">Rendered with WebGPU</span>
             </span>
-        </span>
+            <span class="fig-bar-end">
+                <span class="view-buttons fig-actions">
+                    <button type="button" class="view-icon" data-field="download" title="Download both discs as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+                    <CopyInfo />
+                </span>
+            </span>
+        </div>
     </div>
     <ul class="tiles-labels" style="grid-template-columns: 1fr 1fr">
         <li><span class="tiles-name">without earthshine</span> <span class="tiles-value">the night side a hole</span></li>

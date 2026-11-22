@@ -1,6 +1,5 @@
 ---
 import CopyInfo from "../CopyInfo.astro";
-import Icon from "../Icon.astro";
 import Term from "../Term.astro";
 import Rays from "./Rays.astro";
 import "./nachtgestirn.css";
@@ -18,19 +17,21 @@ const { id = "surface" } = Astro.props;
 <figure class="fig tiles-figure wide" id={id} data-surface>
     <div class="tiles-panel as-seen split" style="--count: 5" data-actions="copy">
         <canvas aria-label="The Moon, and a close-up of its terminator drawn from the color map alone, with the relief, with the relief's shadows, and with the relief displaced, rendered with WebGPU"></canvas>
-        <span class="tiles-start">
-            <Resolutions options={WHOLE_RESOLUTIONS} chosen="4k" />
-            <span class="view-buttons"><button type="button" class="view-toggle" data-field="albedo" aria-pressed="true" title="NASA's color map of the Moon; off, a uniform surface of the Moon's albedo, so the relief and its shadows show alone">albedo</button></span>
-            <span class="tiles-hint footnote">Rendered with WebGPU</span>
-        </span>
         <svg class="tiles-overlay" data-field="marker" aria-hidden="true"></svg>
-        <span class="tiles-ends">
-            <span class="view-buttons"><Rays /></span>
-            <span class="view-buttons fig-actions">
-                <button type="button" class="view-icon" data-field="download" title="Download the disc and its close-ups as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
-                <CopyInfo />
+        <div class="fig-bar">
+            <span class="fig-bar-start">
+                <Resolutions options={WHOLE_RESOLUTIONS} chosen="4k" />
+                <span class="view-buttons"><button type="button" class="view-toggle" data-field="albedo" aria-pressed="true" title="NASA's color map of the Moon; off, a uniform surface of the Moon's albedo, so the relief and its shadows show alone">albedo</button></span>
+                <span class="fig-hint footnote">Rendered with WebGPU</span>
             </span>
-        </span>
+            <span class="fig-bar-end">
+                <span class="view-buttons"><Rays /></span>
+                <span class="view-buttons fig-actions">
+                    <button type="button" class="view-toggle" data-field="download" title="Download the disc and its close-ups as PNG" aria-label="Download as PNG">png</button>
+                    <CopyInfo />
+                </span>
+            </span>
+        </div>
     </div>
     <ul class="tiles-labels" style="grid-template-columns: repeat(5, 1fr)">
         <li><span class="tiles-name">the disc</span> <span class="tiles-value">metered</span></li>
@@ -40,15 +41,17 @@ const { id = "surface" } = Astro.props;
         <li><span class="tiles-name">displaced</span> <span class="tiles-value">rays marched through the heights</span></li>
     </ul>
     <div class="tiles-panel tycho-panel" data-export="tycho-slice" data-actions-in=".fig-actions">
-        <span class="view-buttons">
-            <button type="button" class="view-toggle" data-field="sliceShadows" aria-pressed="true" title="The shadows: each point's march towards the Sun and the share of the Sun's disc it sees; off, every point sees all of it">shadows</button>
-            <button type="button" class="view-toggle" data-field="sliceNormals" aria-pressed="true" title="The normals: each point lit by the cosine of its normal to the Sun; off, by the share of the Sun it sees alone">normals</button>
-        </span>
+        <div class="fig-bar">
+            <span class="view-buttons">
+                <button type="button" class="view-toggle" data-field="sliceShadows" aria-pressed="true" title="The shadows: each point's march towards the Sun and the share of the Sun's disc it sees; off, every point sees all of it">shadows</button>
+                <button type="button" class="view-toggle" data-field="sliceNormals" aria-pressed="true" title="The normals: each point lit by the cosine of its normal to the Sun; off, by the share of the Sun it sees alone">normals</button>
+            </span>
+        </div>
         <svg class="tycho-slice" data-field="slice" role="img" aria-label="A slice through the crater Tycho from west to east, from LOLA's heights: the surface lit as much as it sees of the Sun, its normals, and one point's march towards the Sun" data-hint="Drag along the slice for another point's march; double click for the tip of the shadow"></svg>
         <span class="tycho-names">
-            <span class="tiles-hint footnote" data-export-text>west</span>
-            <span class="tiles-hint footnote" data-field="sliceName" data-export-text></span>
-            <span class="tiles-hint footnote" data-export-text>east</span>
+            <span class="fig-hint footnote" data-export-text>west</span>
+            <span class="fig-hint footnote" data-field="sliceName" data-export-text></span>
+            <span class="fig-hint footnote" data-export-text>east</span>
         </span>
     </div>
     <p class="view-status tycho-note" data-field="sliceNote"></p>

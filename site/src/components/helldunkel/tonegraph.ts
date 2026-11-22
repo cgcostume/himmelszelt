@@ -2,6 +2,7 @@ import { wgsl } from "@himmelszelt/helldunkel";
 import { find } from "../dom";
 import { gpu, gpuDevice } from "../dunstkreis/atmosphere";
 import { drawSvg, LABEL_GAP, svgText } from "../sternzeit/figure";
+import { gpuMissing } from "../webgpu";
 
 const root = find("#curves");
 const POINTS = 512;
@@ -148,4 +149,8 @@ if (!gpu.error) {
     new ResizeObserver(plot).observe(plotEl);
     for (const radio of root.querySelectorAll('input[name="curves-color"]')) radio.addEventListener("change", refresh);
     for (const radio of root.querySelectorAll('input[name="curves-curve"]')) radio.addEventListener("change", plot);
+} else {
+    // The curves are what the shaders compute: without a GPU, neither plot nor strips.
+    gpuMissing(plotEl);
+    for (const canvas of root.querySelectorAll<HTMLCanvasElement>("canvas[data-strip]")) canvas.style.display = "none";
 }

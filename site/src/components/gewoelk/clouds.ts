@@ -8,10 +8,12 @@ import {
 } from "@himmelszelt/dunstkreis";
 import type { CloudParams, CloudPass, LayerMotion, Weather, WeatherName } from "@himmelszelt/gewoelk";
 import {
+    CLOUD_TYPES,
     continuedMotion,
     createCloudPass,
     DEFAULT_CLOUDSCAPE,
-    DEFAULT_SHEET,
+    DEFAULT_HIGH_SHEET,
+    layeredSky,
     SUNLIGHT_ENTRIES,
     WEATHER,
 } from "@himmelszelt/gewoelk";
@@ -40,6 +42,7 @@ import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
+import { gpuMissing } from "../webgpu";
 import { skyWhite } from "../white";
 import { changeLab } from "./change";
 import { SHOW, texturePanel } from "./textures";
@@ -135,19 +138,12 @@ export function cloudsFigure(root: HTMLElement) {
     const marks = () => Number(field("marks").dataset.level);
     field("marks").addEventListener("click", () => requestRender());
 
-    function showError(html: string) {
-        const error = document.createElement("div");
-        error.className = "sky-error";
-        error.innerHTML = `<p>${html}</p>`;
-        canvas.replaceWith(error);
-    }
     function setup() {
-        if (shared.error) {
-            showError(shared.error);
+        const context = shared.error ? null : canvas.getContext("webgpu");
+        if (!context) {
+            gpuMissing(canvas, "sky-error");
             return null;
         }
-        const context = canvas.getContext("webgpu");
-        if (!context) return null;
         configureCanvas(context, SDR);
         return { device: gpuDevice(), context, format: SDR, adapterName: shared.adapterName };
     }
@@ -205,8 +201,6 @@ export function cloudsFigure(root: HTMLElement) {
             autoExposure: false,
             groundLight: quality.groundLight,
             dither: false,
-            // No veil of a Sun the clouds may hide.
-            veil: 0,
             // The air in front of the clouds, out to the farthest cloud in sight.
             aerialPerspective: { maxDistanceKm: reach },
         }).then((pass) => {
@@ -239,7 +233,18 @@ export function cloudsFigure(root: HTMLElement) {
         // On an HDR display into the page's headroom, dithered only in 8 bits.
         const { format, headroom } = output;
         const dither = format === SDR;
-        const options = { format, headroom, dither, scale, maxSteps, grid, atmosphere, keyframes, ...lab?.created };
+        const options = {
+            format,
+            headroom,
+            dither,
+            scale,
+            maxSteps,
+            grid,
+            atmosphere,
+            keyframes,
+            high: true,
+            ...lab?.created,
+        };
         createCloudPass(gpu.device, options).then((pass) => {
             if (cloudsBuilding !== key) return pass.destroy();
             clouds?.pass.destroy();
@@ -288,11 +293,15 @@ export function cloudsFigure(root: HTMLElement) {
     // drawn only while it lasts.
     let weatherFrame = 0;
     function changeWeather(name: WeatherName) {
-        const { noise, ...sheet } = (WEATHER[name] as Weather).sheet;
+        // The high cloud is the layered model's: its kind at once, as a map cannot blend, its numbers with the others.
+        const weather: Weather = WEATHER[name];
+        const kind = weather.layers?.high;
+        const kinds = root.querySelectorAll<HTMLInputElement>(`input[name="${root.id}-high"]`);
+        for (const input of kinds) if (typeof kind === "string") input.checked = input.value === kind;
+        const { coverage, opticalDepth, altitudeKm } = layeredSky(weather.layers ?? {}).high;
         const target = Object.entries({
-            ...prefixed("cloudscape", WEATHER[name].cloudscape),
-            ...prefixed("sheet", sheet),
-            ...prefixed("sheet.noise", noise ?? {}),
+            ...prefixed("cloudscape", weather.cloudscape),
+            ...prefixed("sheet", { coverage, opticalDepth, altitudeKm }),
         }).flatMap(([param, to]) => {
             const input = sliders.find((s) => s.dataset.param === param);
             return input && to !== undefined ? [{ input, from: Number(input.value), to }] : [];
@@ -320,9 +329,7 @@ export function cloudsFigure(root: HTMLElement) {
                 const own = input.dataset.param?.startsWith(`${prefix}.`) && !key.includes(".") && !UNSHAPED.has(key);
                 return own ? [`${key}: ${Number(input.value)}`] : [];
             });
-        const inner = values(layer);
-        if (layer === "sheet") inner.push(`noise: { ${values("sheet.noise").join(", ")} }`);
-        return `${layer}: { ${inner.join(", ")} },`;
+        return `${layer}: { ${values(layer).join(", ")} },`;
     }
 
     const textures = gpu ? texturePanel(root, gpu.device) : null;
@@ -397,27 +404,19 @@ export function cloudsFigure(root: HTMLElement) {
                 detailShiftKm: lab?.clock.detailShiftKm ?? 0,
                 multiScatter: pressed("light.multi") ? DEFAULT_CLOUDSCAPE.multiScatter : 0,
             },
-            sheets: [
-                {
-                    ...DEFAULT_SHEET,
-                    enabled: pressed("sheet.enabled"),
-                    coverage: slider("sheet.coverage"),
-                    altitudeKm: slider("sheet.altitudeKm"),
-                    opticalDepth: slider("sheet.opticalDepth"),
-                    ...moving(
-                        1,
-                        windOf(slider("sheet.windSpeed"), slider("sheet.windFrom") + 180),
-                        DEFAULT_SHEET.evolution,
-                        timeS,
-                    ),
-                    ripples: slider("sheet.ripples"),
-                    noise: Object.fromEntries(
-                        sliders
-                            .filter((input) => input.dataset.param?.startsWith("sheet.noise."))
-                            .map((input) => [input.dataset.param?.slice(12) ?? "", Number(input.value)]),
-                    ),
-                },
-            ],
+            // The high cloud is the layered model's sheet, of the chosen kind; the voxel model's own sheets are off.
+            sheets: [],
+            high: pressed("sheet.enabled")
+                ? {
+                      ...DEFAULT_HIGH_SHEET,
+                      ...CLOUD_TYPES.high[choice("high") as keyof typeof CLOUD_TYPES.high],
+                      coverage: slider("sheet.coverage"),
+                      altitudeKm: slider("sheet.altitudeKm"),
+                      opticalDepth: slider("sheet.opticalDepth"),
+                  }
+                : null,
+            highWind: windOf(slider("sheet.windSpeed"), slider("sheet.windFrom") + 180),
+            observerKm: [flown.east, flown.north] as const,
         };
     }
 
@@ -557,11 +556,10 @@ export function cloudsFigure(root: HTMLElement) {
                 ...took("map"),
             },
             {
-                label: "cirrus map",
-                title: "The high sheet's map: how much cirrus lies where, before its fibers are drawn in per pixel.",
-                texture: mapTexture,
-                kind: "array",
-                at: 1,
+                label: "high map",
+                title: "The high sheet's baked map, in the wind's frame: its puffs and their trails as a height.",
+                texture: clouds.pass.high?.map ?? mapTexture,
+                kind: clouds.pass.high ? "2d" : "array",
                 mode: SHOW.red,
                 ...took("sheets"),
             },

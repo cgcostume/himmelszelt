@@ -1,9 +1,8 @@
-// What the budget figure measures: one row per configuration of the stars pass, the same list for the figure, for the
-// reader's own run and for `scripts/stars-budget.mjs`, which writes the reference into budget-reference.json.
+// The configurations of the stars pass the chapter's costs (bench.ts, cost-rows.ts) measure, one row each.
 
 /** One configuration: what the pass gets, what it draws, and the target it draws into. */
 export interface BudgetRow {
-    /** The key of its measures in budget-reference.json, and of its bars in the figure. */
+    /** The key of its measures. */
     id: string;
     /** What the row adds to the one before, and a note under it. */
     label: string;

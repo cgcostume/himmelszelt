@@ -104,6 +104,20 @@ export const WEATHER = {
         sheet: { coverage: 0.6, opticalDepth: 1, ripples: 0.6 },
         layers: { low: "few", middle: "altocumulus", high: "ripples" },
     },
+    /** Showers under an open sky: rain under every tower, and its bows where a low sun behind the observer reaches it. */
+    showers: {
+        cloudscape: {
+            coverage: 0.35,
+            sharpness: 0.3,
+            towers: 0.7,
+            towerScale: 2,
+            billows: 0.2,
+            baseKm: 1,
+            heightKm: 2.2,
+        },
+        sheet: { coverage: 0, opticalDepth: 0.6, ripples: 0 },
+        layers: { low: "few", deep: "showers" },
+    },
     /** A front coming on: its shield ahead, the low clouds thinning out under it. */
     frontAhead: {
         cloudscape: {

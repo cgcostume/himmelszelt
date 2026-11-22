@@ -3,6 +3,7 @@ import { find } from "../dom";
 import { gpu, gpuDevice } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
+import { gpuMissing } from "../webgpu";
 
 const root = find("#banding");
 const SOURCE = /* wgsl */ `
@@ -109,4 +110,6 @@ if (!gpu.error) {
         });
     }
     new ResizeObserver(request).observe(root);
+} else {
+    gpuMissing(find<HTMLCanvasElement>("[data-field=canvas]", root));
 }

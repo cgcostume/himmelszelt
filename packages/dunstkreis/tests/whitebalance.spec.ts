@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 // From the built package: the passes import their `.wgsl` files, which only the bundler inlines; `pnpm test` builds first.
 import {
+    type AutoExposureKey,
+    autoExposureTint,
     createSkyPass,
+    DEFAULT_AUTO_EXPOSURE_KEYS,
     NO_WHITE_BALANCE,
     precomputeAtmosphere,
     readTexture,
@@ -17,7 +20,7 @@ const DEG = Math.PI / 180;
 const SUN: [number, number, number] = [0, Math.cos(5 * DEG), Math.sin(5 * DEG)];
 
 /** The frame of a sky pass with `toneMap` and `whiteBalance`, or none given, read back as it was written. */
-async function frame(toneMap: ToneCurve | false, balance?: WhiteBalance) {
+async function frame(toneMap: ToneCurve | false, balance?: WhiteBalance, keys?: readonly AutoExposureKey[]) {
     const device = await gpuDevice();
     if (!device) return new Float32Array();
     const luts = await precomputeAtmosphere(device);
@@ -27,7 +30,13 @@ async function frame(toneMap: ToneCurve | false, balance?: WhiteBalance) {
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC,
     });
     const sky = await createSkyPass(device, { luts, format: "rgba32float", toneMap });
-    sky.update({ sunDirection: SUN, observerHeightM: 100, ev100: 12, ...(balance ? { whiteBalance: balance } : {}) });
+    sky.update({
+        sunDirection: SUN,
+        observerHeightM: 100,
+        ev100: 12,
+        ...(balance ? { whiteBalance: balance } : {}),
+        ...(keys ? { autoExposureKeys: keys } : {}),
+    });
     const encoder = device.createCommandEncoder();
     sky.encode(encoder, target);
     device.queue.submit([encoder.finish()]);
@@ -74,4 +83,27 @@ test("a white balance turns the exposed light by its matrix, sky, ground and sun
     const mid = (SIZE * (SIZE / 4) + SIZE / 2) * 4;
     const ratio = (d: Float32Array) => (d[mid + 2] ?? 0) / (d[mid] ?? 1);
     expect(ratio(balanced)).toBeGreaterThan(ratio(plain));
+});
+
+test("the keys' tint scales the balanced light per channel, and untinted keys change no bit", async () => {
+    const device = await gpuDevice();
+    test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
+    const plain = new Uint32Array((await frame("neutral", undefined, [])).buffer);
+    const untinted = new Uint32Array((await frame("neutral", undefined, DEFAULT_AUTO_EXPOSURE_KEYS)).buffer);
+    expect(untinted).toEqual(plain);
+    const m = whiteBalance([1.21, 1, 0.79]);
+    const keys: AutoExposureKey[] = [{ sunAltitude: 0, compensation: 0, tint: [1.4, 0.8, 1.2] }];
+    const balanced = await frame(false, m);
+    const tinted = await frame(false, m, keys);
+    // One key: the same tint at any altitude, whatever the horizon's dip.
+    const tint = autoExposureTint(keys, SUN);
+    let checked = 0;
+    for (let i = 0; i < SIZE * SIZE; ++i) {
+        for (let c = 0; c < 3; ++c) {
+            const e = (balanced[i * 4 + c] ?? 0) * (tint[c] ?? 1);
+            expect(Math.abs((tinted[i * 4 + c] ?? 0) - e)).toBeLessThanOrEqual(Math.abs(e) * 1e-4 + 1e-7);
+        }
+        checked += (balanced[i * 4] ?? 0) > 0 ? 1 : 0;
+    }
+    expect(checked).toBeGreaterThan(SIZE * SIZE * 0.9);
 });

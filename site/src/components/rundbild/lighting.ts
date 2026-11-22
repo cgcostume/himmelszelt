@@ -27,6 +27,7 @@ import { onDemand } from "../frame";
 import { createDisplay } from "../scene/display";
 import { cameraFrame, createScene } from "../scene/scene";
 import { COMPASS } from "../sternzeit/figure";
+import { gpuMissing } from "../webgpu";
 import { skyWhite } from "../white";
 
 const DEG = Math.PI / 180;
@@ -313,9 +314,7 @@ function render() {
 const requestRender = onDemand(render, canvas);
 
 if (gpu.error) {
-    canvas.replaceWith(
-        Object.assign(document.createElement("div"), { className: "sky-error", innerHTML: `<p>${gpu.error}</p>` }),
-    );
+    gpuMissing(canvas, "sky-error");
 } else {
     context = canvas.getContext("webgpu");
     if (context) configureCanvas(context, SDR);

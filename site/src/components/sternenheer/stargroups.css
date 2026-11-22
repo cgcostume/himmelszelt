@@ -19,14 +19,11 @@
 /* Over the stars figure the groups share the bar's row; below the width the row holds, they take a row of their own
    under it, at the right, and the options panel moves down past them. */
 @media (max-width: 48rem) {
-    figure[data-stars] .sky-bar {
+    figure[data-stars] .fig-bar {
         flex-wrap: wrap;
     }
-    figure[data-stars] .sky-bar-end {
+    figure[data-stars] .fig-bar-end {
         display: contents;
-    }
-    figure[data-stars] .sky-bar-start {
-        flex: 1 1 0;
     }
     figure[data-stars] .star-groups {
         order: 1;
@@ -36,13 +33,4 @@
         top: 92px;
         max-height: calc(100% - 100px - var(--sky-foot, 0px));
     }
-}
-
-/* Over the starred figure, at the top left beside the inset. */
-.tiles-panel > .star-groups {
-    position: absolute;
-    top: 6px;
-    left: 6px;
-    z-index: 5;
-    justify-content: flex-start;
 }

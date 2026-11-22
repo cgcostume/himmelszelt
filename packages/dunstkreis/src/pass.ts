@@ -71,7 +71,8 @@ export interface SkyParams {
     autoExposureRange: readonly [number, number];
     /**
      * The metered exposure's ramp over the day: compensations at sun altitudes, for mornings and evenings apart if
-     * wanted. `DEFAULT_AUTO_EXPOSURE_KEYS` by default; empty for the meter's reading as it is.
+     * wanted, and tints, applied with the white balance whether metered or not. `DEFAULT_AUTO_EXPOSURE_KEYS` by
+     * default, untinted; empty for the meter's reading as it is.
      */
     autoExposureKeys: readonly AutoExposureKey[];
     /** Added to the metered exposure on top of the keys, in EV: +1 is twice as bright. */

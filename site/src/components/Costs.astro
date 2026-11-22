@@ -17,6 +17,8 @@ export interface CostsLine {
     label: string;
     note?: string;
     values: (number | string | undefined)[];
+    /** A case to compare against, beyond what the defaults draw: hatched, the defaults solid. */
+    reference?: boolean;
 }
 interface Props {
     id?: string;
@@ -33,6 +35,12 @@ const grid = (c: number) => `--grid: ${(100 * (axes[c]?.step ?? 1)) / (axes[c]?.
 ---
 
 <figure class="fig budget-figure costs-figure" id={id} data-actions="copy">
+    {rows.some((row) => row.reference) && (
+        <div class="budget-legend note" aria-hidden="true">
+            <span><i class="budget-swatch"></i>the defaults</span>
+            <span><i class="budget-swatch budget-reference"></i>for comparison</span>
+        </div>
+    )}
     <div class="budget-grid" role="img" aria-label={label} style={`--costs-columns: ${columns.length}`}>
         <span></span>
         {columns.map((column, c) => <span class:list={["budget-head note", c === columns.length - 1 && "costs-head-last"]}>{column.head}</span>)}
@@ -48,7 +56,7 @@ const grid = (c: number) => `--grid: ${(100 * (axes[c]?.step ?? 1)) / (axes[c]?.
                         <span class="budget-cell" style={grid(c)} data-label={column.head}>
                             {typeof v === "number" ? (
                                 <span class="budget-line" title={`${row.label}: ${v} (${column.head})`}>
-                                    <i class:list={["budget-bar", column.part !== undefined && `budget-part-${column.part}`]} style={`width: ${pct(v, c)}`}></i>
+                                    <i class:list={["budget-bar", column.part !== undefined && `budget-part-${column.part}`, row.reference && "budget-reference"]} style={`width: ${pct(v, c)}`}></i>
                                     <span class="budget-value">{formatValue(v)}</span>
                                 </span>
                             ) : (

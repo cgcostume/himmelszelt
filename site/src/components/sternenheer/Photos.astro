@@ -27,25 +27,27 @@ const first = PHOTOS[0];
                     <svg class="photo-marks" data-field="marks" aria-hidden="true"></svg>
                 </div>
             </div>
-            <span class="tiles-start">
-                <StarGroups offsets={[]} />
-                <span class="view-buttons">
-                    <button type="button" class="view-toggle" data-field="milkyway" aria-pressed="true" title="The Milky Way, from NASA's Deep Star Maps, at the light the calibration gives it">Milky Way</button>
-                    <button type="button" class="view-toggle" data-field="air" aria-pressed="true" title="The air: dunstkreis' sky behind the stars, lit by the Moon where it is up, and every star lifted, dimmed and reddened; off, the stars from space, over black">air</button>
-                    <button type="button" class="view-toggle" data-field="glare" aria-pressed="true" title="The halo around a star too bright for its pixel: the light beyond display white spread around it, falling with the cube of the distance">glare</button>
-                </span>
-                <span class="view-buttons">
-                    <button type="button" class="view-toggle" data-field="names" aria-pressed="false" title="The brightest stars in the frame, ringed and named, where the fit puts them">names</button>
-                </span>
-            </span>
             <span class="photo-note" data-field="note"></span>
-            <span class="tiles-ends">
-                <span class="view-buttons fig-actions">
-                    <button type="button" class="view-icon" data-field="download" title="Download the comparison as shown, at the photograph's pixels, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
-                    <CopyInfo />
-                    <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
+            <div class="fig-bar">
+                <span class="fig-bar-start">
+                    <StarGroups offsets={[]} />
+                    <span class="view-buttons">
+                        <button type="button" class="view-icon" data-field="milkyway" aria-pressed="true" title="The Milky Way, from NASA's Deep Star Maps, at the light the calibration gives it" aria-label="Milky Way"><Icon name="milkyWay" /></button>
+                        <button type="button" class="view-toggle" data-field="air" aria-pressed="true" title="The air: dunstkreis' sky behind the stars, lit by the Moon where it is up, and every star lifted, dimmed and reddened; off, the stars from space, over black">air</button>
+                        <button type="button" class="view-toggle" data-field="glare" aria-pressed="true" title="The halo around a star too bright for its pixel: the light beyond display white spread around it, falling with the cube of the distance">glare</button>
+                    </span>
+                    <span class="view-buttons">
+                        <button type="button" class="view-icon" data-field="names" aria-pressed="false" title="The annotations over the photograph: the brightest stars in the frame, ringed and named, where the fit puts them" aria-label="Annotations"><Icon name="labels" /></button>
+                    </span>
                 </span>
-            </span>
+                <span class="fig-bar-end">
+                    <span class="view-buttons fig-actions">
+                        <button type="button" class="view-icon" data-field="download" title="Download the comparison as shown, at the photograph's pixels, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+                        <CopyInfo />
+                        <button type="button" class="view-icon" data-field="fullscreen" aria-pressed="false" title="Full screen" aria-label="Full screen"><Icon name="fullscreen" /></button>
+                    </span>
+                </span>
+            </div>
         </div>
         <label class="figure-slider split-slider" title="Where the line between the photograph and sternenheer's sky runs">
             <span class="note">sternenheer</span>
@@ -54,14 +56,14 @@ const first = PHOTOS[0];
             </span>
             <span class="note">photograph</span>
         </label>
-        <label class="figure-slider" title="The exposure sternenheer's sky is drawn at: from the photograph's aperture, time and sensitivity, less what its stars show its processing added. Brighter to the right">
+        <label class="figure-slider" style="--output-ch: 13rem" title="The exposure sternenheer's sky is drawn at: from the photograph's aperture, time and sensitivity, less what its stars show its processing added. Brighter to the right">
             <span class="note">EV<sub>100</sub></span>
             <span class="figure-slider-rail">
                 <input type="range" data-field="exposure" min="-4" max="4" step="0.1" value="0" aria-label="The exposure of sternenheer's sky, in stops brighter than the photograph's stars match at" />
             </span>
             <output data-field="ev"></output>
         </label>
-        <label class="figure-slider" title="How much of the light past a star's knee its halo shows: none at the left, all of it at the right, where the halo adds no light and takes none">
+        <label class="figure-slider" style="--output-ch: 13rem" title="How much of the light past a star's knee its halo shows: none at the left, all of it at the right, where the halo adds no light and takes none">
             <span class="note">halo</span>
             <span class="figure-slider-rail">
                 <input type="range" data-field="halo" min="0" max="1" step="0.05" value="1" aria-label="The share of the light past the knee the halos show" />

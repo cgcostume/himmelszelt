@@ -16,7 +16,7 @@ const COLORS = [
 ---
 
 <figure class="fig scene-frame" id="curves">
-    <p class="hdri-controls">
+    <p class="fig-controls">
         <span class="steps" role="radiogroup" aria-label="The light's color">
             <span class="steps-heading" aria-hidden="true">light</span>
             {COLORS.map(([value, name]) => (
@@ -36,7 +36,7 @@ const COLORS = [
             ))}
         </span>
     </p>
-    <div class="curves-plot" data-export="tone-curves" data-export-timeless data-actions-in=".hdri-controls"><svg data-field="plot" aria-label="What the chosen tone curve makes of each channel of the chosen light"></svg></div>
+    <div class="curves-plot" data-export="tone-curves" data-export-timeless data-actions-in=".fig-controls"><svg data-field="plot" aria-label="What the chosen tone curve makes of each channel of the chosen light"></svg></div>
     <div class="curves-strips">
         {CURVES.map(([value, name]) => (
             <Fragment>

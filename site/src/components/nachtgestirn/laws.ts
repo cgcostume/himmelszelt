@@ -1,8 +1,9 @@
 import { ev100ForLuminance, moonEV100, type Vec3 } from "@himmelszelt/nachtgestirn";
 import { find } from "../dom";
-import { display, onDisplay, onTables, gpu as shared, tables } from "../dunstkreis/atmosphere";
+import { display, onDisplay, onTables, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { onChange, state } from "../sternzeit/state";
+import { gpuMissing } from "../webgpu";
 import { discLight, LAWS, type Law } from "./lobes";
 import { measured, roloHolds } from "./measured";
 import { moonAt, type ToneCurveName } from "./renderer";
@@ -99,13 +100,8 @@ export function orbited(m: ReturnType<typeof moonAt>, yaw: number, pitch: number
     };
 }
 
-/** Replaces a figure's canvas by a note that WebGPU is missing. */
-export function noGpu(canvas: HTMLCanvasElement) {
-    const error = document.createElement("p");
-    error.className = "tiles-empty";
-    error.textContent = shared.error ?? "WebGPU is not available here.";
-    canvas.replaceWith(error);
-}
+/** Hides a figure's canvas behind the site's note that WebGPU is missing. */
+export const noGpu = (canvas: HTMLCanvasElement) => gpuMissing(canvas);
 
 /**
  * The reflectance laws figure on `root`: the Moon under Lambert's law, Oren-Nayar's and Hapke's side by side. Dragging

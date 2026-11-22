@@ -173,6 +173,17 @@ export const FORMATION_FRONT: LabSlider[] = [
     ["front.bearing", "bearing", 0, 360, 5, 20, "Where the front stands, in degrees from north through east"],
     ["front.depth", "front depth", 40, 400, 10, 160, "From the front's leading edge to its back, in km"],
 ];
+export const FORMATION_RAIN: LabSlider[] = [
+    [
+        "rain",
+        "rain",
+        0,
+        30,
+        0.5,
+        0,
+        "How hard it rains under the deep clouds' tall columns, in mm an hour: where the Sun reaches the rain, its bows",
+    ],
+];
 export const FORMATION_TIME: LabSlider[] = [
     [
         "wind.speed",

@@ -69,13 +69,6 @@
     text-align: center;
 }
 /* The tables figure: a bar of switches, then each table with its controls over it. */
-.lut-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1rem;
-    align-items: center;
-    margin-bottom: 1rem;
-}
 .lut {
     margin-bottom: 2rem;
 }
@@ -452,7 +445,6 @@
 .sky-stage {
     position: relative;
 }
-.sky-bar,
 .sky-options,
 .sky-height,
 .sky-stage:fullscreen > .sky-time {
@@ -464,40 +456,6 @@
     --accent: var(--overlay-accent);
     --border: 1px solid var(--line);
     color: var(--text);
-}
-.sky-bar {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    left: 8px;
-    z-index: 5;
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    justify-content: space-between;
-    pointer-events: none;
-}
-.sky-bar-end {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-}
-.sky-bar-start {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    min-width: 0;
-}
-/* Muted and on no plate, as sternzeit's scenes credit theirs. */
-.sky-hint {
-    min-width: 0;
-    margin: 0;
-    padding: 0.45rem 0.25rem;
-    overflow: hidden;
-    color: var(--muted);
-    opacity: 0.7;
-    white-space: nowrap;
-    text-overflow: ellipsis;
 }
 /* The marks' compass gains its circle of altitude once the grid is on. */
 .sky-marks .grid-part {
@@ -605,13 +563,13 @@
    on; a choice of several is a row of tabs, the chosen one underlined in the accent. */
 .sky-options {
     position: absolute;
-    top: 54px;
-    right: 8px;
+    top: 52px;
+    right: 6px;
     z-index: 5;
     display: grid;
     gap: 0.6rem;
     max-width: min(19rem, calc(100% - 6rem));
-    max-height: calc(100% - 62px - var(--sky-foot, 0px));
+    max-height: calc(100% - 60px - var(--sky-foot, 0px));
     overflow: auto;
     padding: 0.6rem 0.75rem 0.75rem;
     border-radius: var(--radius-group);

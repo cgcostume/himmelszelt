@@ -75,17 +75,17 @@ const named: Record<number, string> = { 0: "1 m", 3: "1 km", 5: "100 km" }
 <div class="sky-stage" data-sky-frame data-own-height={ownHeight ? "" : undefined}>
     <div class={`sky-view as-seen ${viewClass}`} data-panel={panel} data-actions={png ? "copy" : "png copy"}>
         <slot />
-        <div class="sky-bar">
-            <span class="sky-bar-start">
+        <div class="fig-bar">
+            <span class="fig-bar-start">
                 <span class="view-buttons">
                     <button type="button" class="view-icon" data-field="lock" aria-pressed={locked ? "true" : "false"} title={lockTitle} aria-label={lockIcon === "moonLock" ? "Moon lock" : "Sun lock"}><Icon name={lockIcon} /></button>
                     {sunLock && <button type="button" class="view-icon" data-field="sunLock" aria-pressed="false" title="Keep the view on the Sun's apparent direction; dragging lets go" aria-label="Sun lock"><Icon name="sunLock" /></button>}
                     {refraction && <button type="button" class="view-icon" data-field="refraction" aria-pressed="true" title="Refraction: the light traced through the air, bending, the Sun lifted and squeezed low over the horizon. Switches it for the whole page, recomputing every table and cube map" aria-label="Refraction"><Icon name="refraction" /></button>}
                     <button type="button" class="view-icon sky-marks" data-field="marks" data-levels={grid ? 3 : 2} data-level={marks} data-titles={JSON.stringify(marksTitles)} aria-pressed={marks > 0 ? "true" : "false"} title={marksTitles[marks]} aria-label="Compass and grid"><Icon name="marks" /></button>
                 </span>
-                <span class="sky-hint footnote">{hint}</span>
+                <span class="fig-hint footnote">{hint}</span>
             </span>
-            <span class="sky-bar-end">
+            <span class="fig-bar-end">
             <slot name="bar" />
             {fly && <span class="view-buttons"><button type="button" class="view-icon" data-field="fly" aria-pressed="false" title="Fly, or F over the view: the mouse is captured and turns the view, W A S D move, E up and Q down, at a speed of the height over the ground per second, Shift faster, over a grid on the ground. F lands" aria-label="Fly"><Icon name="fly" /></button></span>}
             <span class="view-buttons fig-actions">

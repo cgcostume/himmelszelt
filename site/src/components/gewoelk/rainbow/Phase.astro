@@ -1,0 +1,57 @@
+---
+import Slider from "../../Slider.astro";
+import Term from "../../Term.astro";
+import "./rainbow.css";
+import { RADII } from "./radii";
+
+/** What rain sends where: gewoelk's rainbow table over the scattering angle, for drops of a chosen size and spread. */
+const at = (radius: number) => (100 * RADII.indexOf(radius)) / (RADII.length - 1);
+---
+
+<figure class="fig" id="rain-phase">
+    <div class="rainphase-panels" data-export="rain-phase" data-export-timeless>
+        <figure class="fig-tile">
+            <div class="rainphase-panel"><svg data-panel="all" role="img" aria-label="The light a raindrop sends to each angle, from straight on to straight back, on a logarithmic scale"></svg></div>
+            <figcaption><span class="subfigure-title">every angle</span>, from straight on, left, to straight back</figcaption>
+        </figure>
+        <figure class="fig-tile">
+            <div class="rainphase-panel"><svg data-panel="bows" role="img" aria-label="The same between 125 and 145 degrees: the secondary bow, the dark band and the primary bow"></svg></div>
+            <figcaption><span class="subfigure-title">the bows</span>, the shaded part of (a)</figcaption>
+        </figure>
+    </div>
+    <Slider
+        name="Drops"
+        title="The drops' mean radius, from a fog's droplets to a downpour's drops: drag, or turn the mouse wheel"
+        input={{ "data-field": "radius", min: 0, max: RADII.length - 1, step: 1, value: RADII.indexOf(0.5), "aria-label": "The drops' mean radius" }}
+        marks={[
+            { at: at(0.02), label: "0.02" },
+            { at: at(0.1), label: "0.1" },
+            { at: at(0.5), label: "0.5" },
+            { at: at(2), label: "2", unit: "\u202fmm" },
+        ]}
+        output={{ "data-field": "radiusValue" }}
+        outputCh="7ch"
+    />
+    <Slider
+        name="Spread"
+        title="How far the drops' radii vary, their standard deviation as a share of the mean: 0 for drops all of one size"
+        input={{ "data-field": "spread", min: 0, max: 0.6, step: 0.05, value: 0.5, "aria-label": "The spread of the drops' radii" }}
+        marks={[
+            { at: 0, label: "one size" },
+            { at: (100 * 0.5) / 0.6, label: "rain" },
+        ]}
+        output={{ "data-field": "spreadValue" }}
+        outputCh="7ch"
+    />
+    <p class="view-status"><span data-field="readout"></span></p>
+    <figcaption class="figure-caption">
+        What rain sends where, by gewoelk's <code>rainbowTable</code>: the share of the light a drop scatters, per
+        steradian over the <Term of="Scattering angle">scattering angle</Term>, as luminance on a logarithmic scale, and
+        the table's colors in the strip under it, at one exposure for every drop. Dashed across, light scattered evenly
+        to all sides; dashed down, the bows where <code>bowRadius</code> has them.
+    </figcaption>
+</figure>
+
+<script>
+    import "./phase";
+</script>

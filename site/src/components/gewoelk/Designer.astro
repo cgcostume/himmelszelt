@@ -1,0 +1,253 @@
+---
+import "../sternzeit/sternzeit.css";
+import "../dunstkreis/dunstkreis.css";
+import "./clouds.css";
+import Choice from "../dunstkreis/Choice.astro";
+import Hdr from "../dunstkreis/Hdr.astro";
+import OptionGroup from "../dunstkreis/OptionGroup.astro";
+import SkyFrame from "../dunstkreis/SkyFrame.astro";
+import StarGroups from "../sternenheer/StarGroups.astro";
+import { type Design, KIND_VALUE, kindsOf, placeOf } from "./lab/kinds";
+import LabSliders from "./lab/LabSliders.astro";
+import type { LabSlider } from "./lab/sliders";
+import * as all from "./lab/sliders";
+
+/**
+ * A designer for one place of gewoelk's layered sky: the whole-sky figure with that place alone, its sliders, the
+ * library's kinds of cloud for it as presets, the map it is rendered from, and its numbers to copy as a kind of the
+ * library's `CLOUD_TYPES`. The deep layer has two, one for its towers and one for a front.
+ */
+interface Props {
+    place: Design;
+    id?: string;
+    caption?: string;
+}
+const { place } = Astro.props;
+const marched = place !== "high";
+
+// What a designer is, in words, and the kind it starts with.
+const DESIGNS: Record<Design, { label: string; caption: string; checked: string }> = {
+    low: {
+        label: "The low layer of cloud alone, under a real sky",
+        caption:
+            "The low layer alone, from a few heaps to a closed deck. At the left its map, one tile from above, north up: the brighter, the taller the cloud.",
+        checked: "fair",
+    },
+    towers: {
+        label: "The deep layer's towers alone, under a real sky",
+        caption:
+            "The deep layer as towers, the tallest under anvils. At the left its map, one tile from above, north up: the brighter, the taller the tower.",
+        checked: "towers",
+    },
+    front: {
+        label: "The deep layer as a front, under a real sky",
+        caption:
+            "The deep layer as a front, one band placed in the world, seen from ahead of it. At the left its map, from the leading edge at its left to its back.",
+        checked: "frontAhead",
+    },
+    middle: {
+        label: "The middle layer of cloud alone, under a real sky",
+        caption:
+            "The middle layer alone, from a few flakes to a deck. At the left its map, one tile from above, north up.",
+        checked: "altocumulus",
+    },
+    high: {
+        label: "The sheet of high cloud alone, under a real sky",
+        caption:
+            "The sheet of high cloud alone. At the left its map in the wind's frame, channel by channel: the puffs, the veil, the broad field that thins the sheet to patches, and the billows' noise.",
+        checked: "mackerel",
+    },
+};
+const { id = `design-${place}`, caption = DESIGNS[place].caption } = Astro.props;
+
+// The library's kinds by name: what a button reads, and what the kind is, after `CLOUD_TYPES`.
+const KINDS: Record<Design, Record<string, [label: string, title: string]>> = {
+    low: {
+        few: ["few", "A few small heaps, far apart"],
+        fair: ["fair", "Fair-weather cumulus: small and flat"],
+        scattered: ["scattered", "Heaps ahead of a front, thinning out under its shield"],
+        heaps: ["heaps", "Swelling cumulus, as between towers on a summer afternoon"],
+        deck: ["deck", "A closed deck of stratocumulus, pillows on top"],
+    },
+    towers: {
+        towers: ["towers", "Towering cumulus and cumulonimbus, the tallest with anvils"],
+        showers: [
+            "showers",
+            "Showers: towers close together with little anvil, rain under each, and gaps the Sun shines through",
+        ],
+        congestus: ["congestus", "Towering cumulus that has not reached its ceiling: no anvils yet"],
+        storms: ["storms", "Thunderstorms, far apart, under wide anvils"],
+    },
+    front: {
+        frontAhead: ["ahead", "A front coming on, its leading edge 12 km ahead"],
+        frontOverhead: ["overhead", "The same front overhead: its shield from horizon to horizon"],
+    },
+    middle: {
+        few: ["few", "A few flakes of altocumulus"],
+        patches: ["patches", "Patches of altocumulus"],
+        fields: ["fields", "Altocumulus ahead of a front, in larger fields"],
+        altocumulus: ["altocumulus", "A sky of altocumulus, small cells apart"],
+        deck: ["deck", "A closed deck of altostratus"],
+    },
+    high: {
+        mackerel: ["mackerel", "A mackerel sky: cirrocumulus, puffs in rows"],
+        ripples: ["ripples", "A patch of fine ripples"],
+        ribbed: ["ribbed band", "A ribbed band: a veil broken into ribs across it"],
+        puffsAndVeil: ["puffs and veil", "Puffs under a veil with trails"],
+        veil: ["veil", "A veil of cirrostratus, combed along the wind"],
+    },
+};
+const PRESET = {
+    name: "preset",
+    label: "Kind",
+    title: "The library's kinds of cloud for this place of the sky: a click eases the sliders over to one",
+    options: kindsOf(place).map((name) => [name, ...(KINDS[place][name] ?? [name])]),
+    checked: DESIGNS[place].checked,
+};
+
+const only = (sliders: LabSlider[], ...params: string[]) => sliders.filter(([param]) => params.includes(param));
+const without = (sliders: LabSlider[], ...params: string[]) => sliders.filter(([param]) => !params.includes(param));
+// The designed place's sliders, group by group.
+const GROUPS: Record<Design, [name: string, sliders: LabSlider[]][]> = {
+    low: [["low", all.FORMATION_LOW]],
+    towers: [["towers", [...all.FORMATION_DEEP, ...all.FORMATION_ANVIL, ...all.FORMATION_RAIN]]],
+    front: [
+        ["front", all.FORMATION_FRONT],
+        ["clouds", [...all.FORMATION_DEEP, ...all.FORMATION_RAIN]],
+    ],
+    middle: [["middle", all.FORMATION_MIDDLE]],
+    high: [
+        ["sheet", without(all.CIRRUS_SHEET, "wind.from", "wind.speed")],
+        ["patches", all.CIRRUS_PATCHES],
+        ["puffs", without(all.CIRRUS_CELLS, "billowSpeed")],
+        ["waves", all.CIRRUS_RIPPLES],
+        ["veil", all.CIRRUS_VEIL],
+        ["light", only(all.CIRRUS_LIGHT, "c.relief", "c.forwardG")],
+    ],
+};
+const starting = (sliders: LabSlider[], param: string, value: number) =>
+    sliders.map((s): LabSlider => (s[0] === param ? [s[0], s[1], s[2], s[3], s[4], value, s[6]] : s));
+const time = marched ? all.FORMATION_TIME : without(all.FORMATION_TIME, "shear");
+// The towers start on a seed that stands a tower with its anvil in view.
+const TIME = place === "towers" ? starting(time, "seed", 13) : time;
+const CLEARING = all.CLEARING;
+
+// Every other slider of the research figures, once: held hidden at its start, as the whole-sky figure holds them.
+const SHOWN = new Set(
+    [...GROUPS[place].flatMap(([, sliders]) => sliders), ...TIME, ...CLEARING].map(([param]) => param),
+);
+const HELD = [
+    ...new Map(
+        Object.values(all)
+            .flatMap((sliders) => sliders as LabSlider[])
+            .map((slider) => [slider[0], slider]),
+    ).values(),
+].filter(([param]) => !SHOWN.has(param) && param !== "view.ev");
+
+const choice = (name: string, label: string, title: string, options: string[][], checked: string) => ({
+    name,
+    label,
+    title,
+    options,
+    checked,
+});
+const KIND = choice(
+    "kind1",
+    "Kind",
+    "What the deep layer's map is made of",
+    [
+        [KIND_VALUE.towers, "towers"],
+        [KIND_VALUE.front, "front"],
+    ],
+    KIND_VALUE[place === "front" ? "front" : "towers"],
+);
+const SCALE = choice(
+    "scale",
+    "Render scale",
+    "The share of the frame's pixels the clouds are marched at",
+    [
+        ["1", "full"],
+        ["0.5", "half"],
+        ["0.25", "quarter"],
+    ],
+    "0.5",
+);
+const STEPS = choice(
+    "steps",
+    "Steps",
+    "Steps a ray takes at most",
+    [
+        ["64", "64"],
+        ["128", "128"],
+        ["256", "256"],
+    ],
+    "128",
+);
+const SIZE = choice(
+    "size",
+    "Map size",
+    "Texels across the baked map",
+    [
+        ["1024", "1024"],
+        ["2048", "2048"],
+        ["4096", "4096"],
+    ],
+    "2048",
+);
+const SPEED = choice(
+    "speed",
+    "Speed",
+    "How fast the figure's clock runs while its animation does",
+    [
+        ["1", "1x"],
+        ["60", "60x"],
+        ["600", "600x"],
+    ],
+    "60",
+);
+---
+
+<figure class="fig scene-frame wide" id={id} data-cloud-designer data-design={place}>
+    <SkyFrame fly ownHeight grid={false} locked={false} hint="Drag to look around, scroll to zoom. The sky is dunstkreis', at the page's moment and place.">
+        <canvas data-field="canvas" aria-label={DESIGNS[place].label}></canvas>
+        <div class="cloud-textures" data-field="textures"></div>
+        <div class="sky-compass" data-field="compassLabels"></div>
+        <Fragment slot="bar">
+            <StarGroups catalog={null} />
+        </Fragment>
+        <Fragment slot="options">
+            <OptionGroup name="kind">
+                <Choice figure={id} {...PRESET} />
+            </OptionGroup>
+            {GROUPS[place].map(([name, sliders]) => <OptionGroup name={name}><LabSliders sliders={sliders} /></OptionGroup>)}
+            <OptionGroup name="time">
+                <button type="button" class="view-toggle" data-field="animate" aria-pressed="false" title="Runs the figure's clock: the clouds drift with the wind and their map changes, baked again every frame">animate</button>
+                <Choice figure={id} {...SPEED} />
+                <LabSliders sliders={TIME} />
+            </OptionGroup>
+            <OptionGroup name="render">
+                <Choice figure={id} {...SCALE} />
+                {marched ? <Choice figure={id} {...STEPS} /> : <Choice figure={id} {...SIZE} />}
+                <button type="button" class="view-toggle" data-field="textures.on" aria-pressed="true" title="What the clouds are rendered from, at the left of the view: hover a map for what it holds">textures</button>
+                <button type="button" class="view-toggle" data-field="ground.grid" aria-pressed="true" title="A grid on the ground, for orientation, speed and height: thin lines every 10 km, 1 km, 100 m and on down to 1 mm, each level showing once its cells are a few pixels across">grid</button>
+                <LabSliders sliders={CLEARING} />
+                <button type="button" class="view-toggle" data-copy-kind title="Copies the numbers as they stand, as a kind of cloud for the library's CLOUD_TYPES">copy</button>
+            </OptionGroup>
+            <OptionGroup name="HDR (× SDR white)">
+                <Hdr figure={id} />
+            </OptionGroup>
+            <div hidden>
+                {placeOf(place) === "deep" && <Choice figure={id} {...KIND} />}
+                <LabSliders sliders={HELD} />
+            </div>
+        </Fragment>
+    </SkyFrame>
+    <p class="view-status"><span class="sky-timing" data-field="timing"></span></p>
+    <figcaption class="figure-caption">{caption}</figcaption>
+</figure>
+
+<script>
+    import { weatherFigure } from "./lab/weather";
+
+    for (const root of document.querySelectorAll<HTMLElement>("figure[data-cloud-designer]")) weatherFigure(root);
+</script>

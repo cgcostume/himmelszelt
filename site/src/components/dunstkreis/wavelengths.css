@@ -1,11 +1,5 @@
 /* Pick your wavelengths: the presets over the strip, the spectrum with the markers, the eight skies under it as pairs of
    swatches, their numbers, and the two live skies, side by side. */
-.wavelengths-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1rem;
-    margin-bottom: 0.5rem;
-}
 .wavelengths-strip > svg {
     height: 13rem;
     cursor: default;
@@ -84,7 +78,7 @@
     .wide > .wavelengths-skies,
     .wide > .wavelengths-numbers,
     .wide > .wavelengths-live,
-    .wide > .wavelengths-bar {
+    .wide > .fig-controls {
         margin-inline: 1.5rem;
     }
 }

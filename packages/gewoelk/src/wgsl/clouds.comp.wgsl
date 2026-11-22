@@ -172,11 +172,18 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
         let m = gwModelingAt(q);
         let sdf = gwSignedDistance(m, q);
         let adaptive = max(volume.stepMin, volume.stepGrowth * sqrt(max(t, 0.0)));
-        let step = max(sdf, adaptive);
+        var step = max(sdf, adaptive);
         within = within && sdf < 0.0;
         if (sdf < 0.0) {
             let thinning = gwThinning(x, left);
             let sample = gwDensity(m, x, thinning);
+            // Thinned away, by the clearing or the variation: the distance field still holds the cloud, but nothing of
+            // it is left here. Not within a cloud then, and on by a voxel or more, or a ray would creep through what
+            // is not there until its steps run out, short of the clouds behind.
+            if (thinning.x <= 0.0) {
+                within = false;
+                step = max(step, max(cell, 4.0 * adaptive));
+            }
             if (sample.full > 1e-4) {
                 // The light grid's slices interpolated at the sun's elevation over this point.
                 let up = p / length(p);

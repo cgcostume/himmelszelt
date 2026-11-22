@@ -1,5 +1,7 @@
 import type { CloudLayer, LayeredParams } from "./layers.js";
 import { drift, evolutionAt } from "./params.js";
+import { rainbowTable, rainExtinction } from "./rainbow.js";
+import godrays from "./wgsl/godrays.comp.wgsl";
 import * as wgsl from "./wgsl/index.js";
 import layermap from "./wgsl/layermap.comp.wgsl";
 import layers from "./wgsl/layers.comp.wgsl";
@@ -46,6 +48,11 @@ export interface LayerMarchOptions extends Partial<LayerMarchSettings> {
     detail?: GPUTexture;
     /** Steps a ray takes at most, 128 by default. */
     maxSteps?: number;
+    /**
+     * God rays: the shafts of sunlight and of the clouds' shade in the air, from a table of the layers' shade made anew
+     * with every march, a quarter of `mapSize` by `mapSize` texels. Off by default: the air's shade is one number a ray.
+     */
+    godRays?: boolean;
 }
 
 /** What an update may change besides the sky. */
@@ -93,14 +100,31 @@ const LAYER_OFFSET = 64;
 const LAYER_SIZE = 64;
 // How fast each layer drifts, as a share of the wind: the deep clouds slower, the middle ones faster.
 const WIND_SHARE = [1, 0.6, 1.8] as const;
+// How far rain lags behind its cloud per km it falls, in km for each m/s of wind: the air below is slower by some 0.3
+// of the wind, and a drop of half a millimeter falls at 6.5 m/s.
+const RAIN_LAG = 0.3 / 6.5;
 // The map's columns from a front's leading edge to its back, of which its towers stand in one.
 const FRONT_COLUMNS = 12;
 const DEG = Math.PI / 180;
 const dispatch = (n: number, group: number) => Math.ceil(n / group);
 
+/** `values` as half floats, to the nearest, for a texture of 16 bit floats. */
+function halfFloats(values: Float32Array): Uint16Array<ArrayBuffer> {
+    const bits = new Uint32Array(values.buffer, values.byteOffset, values.length);
+    return Uint16Array.from(bits, (x) => {
+        const sign = (x >>> 16) & 0x8000;
+        const exponent = ((x >>> 23) & 0xff) - 112;
+        const mantissa = x & 0x7fffff;
+        if (exponent <= 0)
+            return exponent < -10 ? sign : sign | ((((mantissa | 0x800000) >>> (1 - exponent)) + 0x1000) >>> 13);
+        if (exponent >= 31) return sign | 0x7bff;
+        return (sign | (exponent << 10) | (mantissa >>> 13)) + ((mantissa >>> 12) & 1);
+    });
+}
+
 /** Creates the layered model's march on `device`; it owns its maps and its output, not the frame's uniforms. */
 export async function createLayerMarch(device: GPUDevice, options: LayerMarchOptions = {}): Promise<LayerMarch> {
-    const { mapSize = 512, maxSteps = 128, detail: sharedDetail, ...given } = options;
+    const { mapSize = 512, maxSteps = 128, godRays = false, detail: sharedDetail, ...given } = options;
     let settings: LayerMarchSettings = { ...DEFAULT_LAYER_MARCH, ...given };
     let observer: readonly [number, number] = [0, 0];
 
@@ -144,12 +168,13 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
                 ...(constants ? { constants } : {}),
             },
         });
-    const [mapPipeline, marchPipeline, detailPipeline] = await Promise.all([
+    const march = [wgsl.params, wgsl.camera, wgsl.rainbow, wgsl.cloudOutput("rgba16float"), layers, godrays];
+    const [mapPipeline, marchPipeline, detailPipeline, shadePipeline, meansPipeline] = await Promise.all([
         pipeline("layerMap", [wgsl.noise, layermap], "gwLayerMap"),
-        pipeline("layers", [wgsl.params, wgsl.camera, wgsl.cloudOutput("rgba16float"), layers], "gwLayers", {
-            GW_LAYER_MAX_STEPS: maxSteps,
-        }),
+        pipeline("layers", march, "gwLayers", { GW_LAYER_MAX_STEPS: maxSteps, GW_GOD_RAYS: godRays ? 1 : 0 }),
         ownDetail ? pipeline("layerDetail", [wgsl.noise, wgsl.detail], "gwDetail") : null,
+        godRays ? pipeline("godRaysShade", march, "gwGodRaysShade") : null,
+        godRays ? pipeline("godRaysMeans", march, "gwGodRaysMeans") : null,
     ]);
     const bindGroup = (pipeline: GPUComputePipeline, entries: GPUBindGroupEntry[], group = 0) =>
         device.createBindGroup({ layout: pipeline.getBindGroupLayout(group), entries });
@@ -182,8 +207,44 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
         return { texture, group: bindGroup(marchPipeline, [{ binding: 0, resource: texture.createView() }], 1) };
     };
     let out = output(1, 1);
-    // The group that takes the frame's uniforms, remade only when they are other buffers.
-    let inputs: { params: GPUBuffer; sunlight: GPUBuffer; group: GPUBindGroup } | null = null;
+    // The rain's phase function, computed when it first rains: until then a texel of nothing.
+    let rainbow = device.createTexture({
+        label: "gewoelk:rainbow",
+        size: [1, 1],
+        format: "rgba16float",
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    let raining = false;
+    const letItRain = () => {
+        const table = rainbowTable();
+        rainbow.destroy();
+        rainbow = device.createTexture({
+            label: "gewoelk:rainbow",
+            size: [table.width, 1],
+            format: "rgba16float",
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
+        device.queue.writeTexture({ texture: rainbow }, halfFloats(table.data), {}, [table.width, 1]);
+        raining = true;
+        inputs = null;
+    };
+    // The god rays' table, a row for each direction and a column for each distance, and the shade it is summed from:
+    // without god rays a texel of nothing each.
+    const [columns, rows] = godRays ? [Math.max(2, mapSize / 4), mapSize] : [1, 1];
+    const [shade, table] = ["godRaysShade", "godRays"].map((label) =>
+        device.createTexture({ label: `gewoelk:${label}`, size: [columns, rows], format: "rgba16float", usage }),
+    ) as [GPUTexture, GPUTexture];
+    const rays = shadePipeline &&
+        meansPipeline && {
+            shade: shadePipeline,
+            means: meansPipeline,
+            shadeOut: bindGroup(shadePipeline, [{ binding: 0, resource: shade.createView() }], 1),
+            summed: bindGroup(meansPipeline, [{ binding: 7, resource: shade.createView() }]),
+            meansOut: bindGroup(meansPipeline, [{ binding: 0, resource: table.createView() }], 1),
+        };
+    // The groups that take the frame's uniforms, remade only when they are other buffers.
+    let inputs: { params: GPUBuffer; sunlight: GPUBuffer; group: GPUBindGroup; shade: GPUBindGroup | null } | null =
+        null;
     const baked = Array.from({ length: LAYERS }, () => "");
 
     return {
@@ -193,7 +254,8 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
         maps,
         get memoryBytes() {
             const noise = ownDetail ? DETAIL_SIZE ** 3 * 4 : 0;
-            return mapSize * mapSize * LAYERS * 8 + out.texture.width * out.texture.height * 8 + noise;
+            const tables = 2 * columns * rows * 8;
+            return mapSize * mapSize * LAYERS * 8 + out.texture.width * out.texture.height * 8 + noise + tables;
         },
 
         update(params, encoder, { settings: changed, observerKm, timestampWrites } = {}) {
@@ -212,7 +274,11 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
             const u = new Uint32Array(buffer);
             f.set([settings.noiseKm, settings.reachKm, settings.stepKm, settings.stepGrowth], 0);
             f.set([settings.multiScatter, settings.ambient, settings.fadeKm, params.clearingKm], 4);
-            f.set([params.clearingFromKm, 0, along[0] * params.shear, along[1] * params.shear, ...observer], 8);
+            const rain = sky.deep.coverage > 0.005 ? rainExtinction(Math.max(sky.deep.rain, 0)) : 0;
+            if (rain > 0 && !raining) letItRain();
+            const lean = RAIN_LAG * speed;
+            f.set([params.clearingFromKm, rain, along[0] * params.shear, along[1] * params.shear, ...observer], 8);
+            f.set([along[0] * lean, along[1] * lean], 14);
 
             const changedMaps: number[] = [];
             const all: readonly CloudLayer[] = [sky.low, sky.deep, sky.middle];
@@ -288,13 +354,35 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
                     { binding: 3, resource: mapArray },
                     { binding: 4, resource: sampler },
                     { binding: 5, resource: detailNoise.createView() },
+                    { binding: 6, resource: rainbow.createView() },
+                    { binding: 7, resource: table.createView() },
                 ]);
-                inputs = { params, sunlight, group };
+                const lines = rays
+                    ? bindGroup(rays.shade, [
+                          { binding: 0, resource: { buffer: params } },
+                          { binding: 2, resource: { buffer: layered } },
+                          { binding: 3, resource: mapArray },
+                          { binding: 4, resource: sampler },
+                          { binding: 5, resource: detailNoise.createView() },
+                      ])
+                    : null;
+                inputs = { params, sunlight, group, shade: lines };
             }
             const pass = encoder.beginComputePass({
                 label: "gewoelk:layers",
                 ...(timestampWrites ? { timestampWrites } : {}),
             });
+            // The god rays' table first, for this frame's sun, clouds and observer: its shade, then that summed.
+            if (rays && inputs.shade) {
+                pass.setPipeline(rays.shade);
+                pass.setBindGroup(0, inputs.shade);
+                pass.setBindGroup(1, rays.shadeOut);
+                pass.dispatchWorkgroups(dispatch(columns, 8), dispatch(rows, 8));
+                pass.setPipeline(rays.means);
+                pass.setBindGroup(0, rays.summed);
+                pass.setBindGroup(1, rays.meansOut);
+                pass.dispatchWorkgroups(1, dispatch(rows, 64));
+            }
             pass.setPipeline(marchPipeline);
             pass.setBindGroup(0, inputs.group);
             pass.setBindGroup(1, out.group);
@@ -303,7 +391,7 @@ export async function createLayerMarch(device: GPUDevice, options: LayerMarchOpt
         },
 
         destroy() {
-            for (const texture of [maps, out.texture, ownDetail]) texture?.destroy();
+            for (const texture of [maps, out.texture, ownDetail, rainbow, shade, table]) texture?.destroy();
             for (const buffer of [layered, ...models]) buffer.destroy();
         },
     };

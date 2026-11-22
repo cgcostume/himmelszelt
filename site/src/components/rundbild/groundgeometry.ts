@@ -87,10 +87,6 @@ label("dome", "frame-angle", 0, -10);
 label("horizon", "", 0, -10);
 label("lifted", "frame-angle", 0, 12);
 
-const smoothstep = (a: number, b: number, x: number) => {
-    const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-    return t * t * (3 - 2 * t);
-};
 const reading = (length: number) => (length >= FAR ? "∞" : length.toFixed(length < 10 ? 1 : 0));
 const meters = (length: number) => (length >= FAR ? "∞" : `${reading(length)} m`);
 const degrees = (value: number) => `${value > 0 ? "+" : ""}${value.toFixed(1).replace("-", "−")}°`;
@@ -110,8 +106,10 @@ type Parameters = ReturnType<typeof parameters>;
 /** How far from the capture point the surface lies along a direction `down` (the sine of its depression) below it. */
 function distance({ height, radius, edge }: Parameters, down: number) {
     const dome = radius >= FAR ? 0 : height / radius;
-    if (down <= 0) return radius;
-    const w = dome + (down - dome) * smoothstep(0, edge, down);
+    if (down <= dome) return radius;
+    // As `rbGroundedGap` in ground.wgsl: the plane from the edge down, the dome down to the plane's level, a cubic between.
+    const t = Math.min((down - dome) / (edge - dome), 1);
+    const w = down >= edge ? down : dome + (edge - dome) * t * t * (2 - t);
     return w > 0 ? height / w : FAR;
 }
 

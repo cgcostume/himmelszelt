@@ -10,6 +10,7 @@ import { fromJulianDay, julianDayFromDate, julianEphemerisDay, sun } from "@himm
 import { find } from "../dom";
 import { onDemand } from "../frame";
 import { COMPASS } from "../sternzeit/figure";
+import { gpuMissing } from "../webgpu";
 import { configureCanvas, gpu, gpuDevice, onTables, quality, SDR, tables } from "./atmosphere";
 
 // The Sun rising over the planet's rim from the space station, rendered next to a photograph of it: a fixed moment and
@@ -425,9 +426,6 @@ if (gpu.device) {
     onTables(draw);
     new ResizeObserver(draw).observe(canvas);
     draw();
-} else if (gpu.error) {
-    const error = document.createElement("div");
-    error.className = "sky-error";
-    error.innerHTML = `<p>${gpu.error}</p>`;
-    canvas.replaceWith(error);
+} else {
+    gpuMissing(canvas, "sky-error");
 }

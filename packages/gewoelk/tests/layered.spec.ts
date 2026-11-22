@@ -13,6 +13,8 @@ test("the layered composition compiles from its declared fragments", async () =>
     const code = [
         cloudOutput("rgba8unorm"),
         fragment("../src/wgsl/params.wgsl"),
+        fragment("../../dunstkreis/src/wgsl/camera.wgsl"),
+        fragment("../src/wgsl/corona.wgsl"),
         fragment(`${helldunkel}/whitebalance.wgsl`),
         fragment(`${helldunkel}/tonemap.wgsl`),
         fragment("../src/wgsl/layered.comp.wgsl"),

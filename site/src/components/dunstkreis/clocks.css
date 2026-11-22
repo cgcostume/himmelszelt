@@ -1,11 +1,4 @@
 /* Four pieces, four clocks: the scenarios over the diagram, the sums under it. */
-.clocks-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1rem;
-    align-items: center;
-    margin-bottom: 0.75rem;
-}
 .clocks-panel > svg {
     height: auto;
     cursor: default;
@@ -18,7 +11,7 @@
 }
 @media (min-width: 48rem) {
     .wide > .clocks-measured,
-    .wide > .clocks-bar {
+    .wide > .fig-controls {
         margin-inline: 1.5rem;
     }
 }

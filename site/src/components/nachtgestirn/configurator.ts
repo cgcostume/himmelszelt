@@ -233,12 +233,12 @@ export function configuratorFigure(root: HTMLElement) {
             `<span class="budget-cell" style="--grid: ${100 / 6}%">${line(parts, fmt(total))}</span>`,
             `<span class="config-cost-name note">time a frame, ms</span>`,
             `<span class="budget-cell" style="--grid: ${(25 / msAxis).toFixed(3)}%">${[
+                line(bar(near[1], msAxis, "", "the defaults"), fmt(near[1]), `${near[0].toLocaleString("en-US")} px`),
                 line(
-                    bar(near[1], msAxis, "budget-defaults", "the defaults"),
-                    fmt(near[1]),
+                    bar(near[2], msAxis, "budget-reference", "everything on"),
+                    fmt(near[2]),
                     `${near[0].toLocaleString("en-US")} px`,
                 ),
-                line(bar(near[2], msAxis, "", "everything on"), fmt(near[2]), `${near[0].toLocaleString("en-US")} px`),
                 // This GPU's line held empty until measured, so the measure changes no layout.
                 line(bar(measured?.ms ?? 0, msAxis, "budget-part-0", "this GPU"), measured ? fmt(measured.ms) : "–"),
             ].join("")}</span>`,

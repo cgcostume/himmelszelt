@@ -4,16 +4,6 @@
     overflow: hidden;
     border-radius: var(--radius-canvas);
 }
-.maps-panel > .view-buttons {
-    position: absolute;
-    top: 6px;
-    left: 6px;
-    z-index: 5;
-}
-.maps-panel > .view-buttons.maps-end {
-    left: auto;
-    right: 6px;
-}
 .maps-panel > img,
 .maps-panel > canvas:not(.maps-seen) {
     display: block;
@@ -322,11 +312,6 @@
     top: 30px;
     right: 16px;
 }
-/* The rising Moon's two sliders, their values right aligned in one width, so both rails stay put and line up. */
-[data-rising] .figure-slider > output {
-    min-width: 7ch;
-    text-align: right;
-}
 
 /* Each disc named at its foot, over the canvas, with how far its light is off the measured Moon's; two by two on a phone. */
 .disc-labels {
@@ -347,20 +332,6 @@
     }
 }
 
-/* The laws' patches from the side, four in a row, two on a phone; the light dragged in any. */
-.lobes-row {
-    position: relative;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.75rem;
-    margin-top: 0.5rem;
-}
-@media (max-width: 40rem) {
-    .lobes-row {
-        grid-template-columns: repeat(2, 1fr);
-        row-gap: 1rem;
-    }
-}
 /* Each law named under its side view, muted like a readout, the name over what it stands for. */
 .lobes-label {
     margin: 0.35rem 0 0;
@@ -484,7 +455,7 @@
     pointer-events: none;
 }
 /* As far up from the foot as in from the side: a square in each corner, the names' boxes tight round their text. */
-.tycho-names > .tiles-hint {
+.tycho-names > .fig-hint {
     height: auto;
     padding: 0;
     line-height: 1;
@@ -706,22 +677,6 @@
     width: 100%;
     height: 100%;
 }
-/* The hint at the top left, as over the other figures' canvases, clear of the download and copy buttons. */
-.config-preview > .tiles-start {
-    position: absolute;
-    top: 6px;
-    right: 92px;
-    left: 6px;
-    z-index: 5;
-    display: flex;
-    pointer-events: none;
-}
-.config-ends {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    z-index: 5;
-}
 .config-settings {
     display: flex;
     flex-direction: column;
@@ -795,11 +750,7 @@
 }
 .config-code pre {
     margin: 0;
-    padding: 0.75rem 1rem;
-    overflow-x: auto;
-    border-radius: var(--radius-canvas);
     background: var(--surface);
-    font-size: var(--text-small);
 }
 .config-code > .copy-info {
     position: absolute;

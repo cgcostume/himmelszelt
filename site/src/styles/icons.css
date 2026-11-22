@@ -1,13 +1,15 @@
-/* The site's icons (see icons.ts): a stroke of 1.4 on the 16 unit grid, 16 pixels, in the text's color. Their parts move
-   when what holds them is hovered, switched on (aria-pressed), opened (aria-expanded) or done (data-copied); each turns
-   or slides about its own middle. */
+/* The site's icons (see icons.ts): on the 16 unit grid, in the text's color, with a stroke of 0.85 pixels on screen at
+   every size. A context sets --icon-size alone, the icon's width in pixels as a plain number, 16 unless it does; the
+   stroke's width in units follows from it. Their parts move when what holds them is hovered, switched on
+   (aria-pressed), opened (aria-expanded) or done (data-copied); each turns or slides about its own middle. */
 .icon {
-    width: 16px;
-    height: 16px;
+    --icon-size: 16;
+    width: calc(var(--icon-size) * 1px);
+    height: calc(var(--icon-size) * 1px);
     overflow: visible;
     fill: none;
     stroke: currentColor;
-    stroke-width: 1.05;
+    stroke-width: calc(0.85px * 16 / var(--icon-size));
     stroke-linecap: round;
     stroke-linejoin: round;
 }
@@ -15,13 +17,20 @@
     transform-box: fill-box;
     transform-origin: center;
 }
-.icon :is(.solid, .morph) {
+.icon .solid {
     fill: currentColor;
     stroke: none;
 }
-/* The stops a layer is brightened by, small in the corner (see icons.ts). */
-.icon .stops {
-    font: 600 6px / 1 var(--font-mono);
+/* Play gives way to pause while its button is pressed. */
+.icon :is(.play, .pause) {
+    transition: opacity 0.2s;
+}
+.icon .pause,
+[aria-pressed="true"] > .icon .play {
+    opacity: 0;
+}
+[aria-pressed="true"] > .icon .pause {
+    opacity: 1;
 }
 .icon :is(.spin, .spin22) {
     transition: transform 0.6s cubic-bezier(0.3, 1.4, 0.5, 1);
@@ -121,12 +130,6 @@
 [aria-pressed="true"] > .icon :is(.tl, .tr, .bl, .br) {
     transform: rotate(180deg);
 }
-.icon .lift {
-    transition: transform 0.3s cubic-bezier(0.3, 1.6, 0.5, 1);
-}
-:hover > .icon .lift {
-    transform: translateY(-1px);
-}
 .icon .nudge {
     transition: transform 0.3s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
@@ -175,10 +178,10 @@
     transition: transform 0.3s;
 }
 [aria-expanded="true"] > .icon .fold-a {
-    transform: translateY(2px) rotate(45deg);
+    transform: translateY(2.5px) rotate(45deg);
 }
 [aria-expanded="true"] > .icon .fold-b {
-    transform: translateY(-2px) rotate(-45deg) scaleX(1.6);
+    transform: translateY(-2.5px) rotate(-45deg) scaleX(1.6);
 }
 @media (prefers-reduced-motion: reduce) {
     /* No motion at all, whatever started it. */

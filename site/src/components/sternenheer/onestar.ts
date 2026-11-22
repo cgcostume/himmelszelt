@@ -14,6 +14,7 @@ import { gpu, onTables, tables } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { linkedSearch, onChange, state } from "../sternzeit/state";
+import { GPU_MISSING } from "../webgpu";
 import { renderStarPatch, type StarPatch } from "./starpatch";
 import { starPicker } from "./starpicker";
 
@@ -303,7 +304,7 @@ export function oneStarFigure(root: HTMLElement) {
             canvas.hidden = true;
             profile.style.display = "none";
             noPixels.hidden = false;
-            noPixels.innerHTML = !atEye ? "None at this moment and place." : (gpu.error ?? "This needs WebGPU.");
+            noPixels.innerHTML = !atEye ? "None at this moment and place." : GPU_MISSING;
             set("pixels", "");
             return;
         }

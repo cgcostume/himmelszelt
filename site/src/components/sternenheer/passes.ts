@@ -47,6 +47,7 @@ import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { drawSvg } from "../sternzeit/figure";
 import { onChange, state } from "../sternzeit/state";
+import { GPU_MISSING } from "../webgpu";
 import { type GraphState, graphSvg, type Thumb } from "./passes-graph";
 import { deepStarsOnce, inverseViewProjection, skyAt } from "./renderer";
 import { bindStarGroups, picked } from "./stargroups";
@@ -99,7 +100,8 @@ export function passesFigure(root: HTMLElement) {
     const pressed = (name: string) => field(name).getAttribute("aria-pressed") === "true";
     const device = gpu.device;
     if (!device) {
-        status.innerHTML = gpu.error ?? "This needs WebGPU.";
+        status.innerHTML = GPU_MISSING;
+        for (const canvas of root.querySelectorAll<HTMLCanvasElement>("canvas")) canvas.style.display = "none";
         return;
     }
     const texture = (label: string, format: GPUTextureFormat, usage: number) =>

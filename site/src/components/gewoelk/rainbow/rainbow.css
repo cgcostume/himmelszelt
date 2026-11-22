@@ -1,0 +1,124 @@
+/* The rainbow figures: a ray through a drop, the rain's phase function, and where a bow stands in the sky. Diagrams, ink
+   on paper: every line in the page's tokens but the wavelengths, which keep their hues on both pages. */
+.raindrop-panel > svg,
+.rainphase-panel > svg,
+.bowplace-panel > svg {
+    display: block;
+    width: 100%;
+}
+/* Labels over lines keep a rim of the page around them. */
+:is(.raindrop-panel, .rainphase-panel, .bowplace-panel) text {
+    paint-order: stroke;
+    stroke: var(--bg);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
+.raindrop-panel > svg {
+    height: clamp(20rem, 58vw, 26rem);
+}
+.raindrop-water {
+    fill: color-mix(in oklab, var(--accent) 14%, var(--bg));
+    stroke: var(--muted);
+    stroke-width: 1;
+}
+.raindrop-fan {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 0.8;
+    stroke-linejoin: round;
+    opacity: 0.3;
+}
+.raindrop-sunlight {
+    stroke: var(--text);
+    stroke-width: 1.8;
+}
+.raindrop-tip {
+    fill: var(--text);
+}
+.raindrop-ray,
+.bowplace-bow {
+    fill: none;
+    stroke-width: 1.6;
+    stroke-linejoin: round;
+}
+/* The secondary bow fainter, as it is. */
+.bowplace-order-2 {
+    opacity: 0.6;
+    stroke-width: 1.2;
+}
+/* Where the wavelengths run together they add up to the white they came from, on paper to ink. */
+.raindrop-ray {
+    mix-blend-mode: screen;
+}
+:root[data-theme="light"] .raindrop-ray {
+    mix-blend-mode: multiply;
+}
+/* On paper the bright hues, yellow and green before all, are darkened to read. */
+:root[data-theme="light"] :is(.raindrop-ray, .bowplace-bow) {
+    filter: brightness(0.82) saturate(1.5);
+}
+.raindrop-least {
+    stroke: var(--accent);
+    stroke-width: 1;
+    stroke-dasharray: var(--line-dashes);
+}
+.raindrop-least-label {
+    fill: var(--accent);
+}
+.raindrop-antisolar,
+.bowplace-axis {
+    stroke: var(--muted);
+    stroke-width: 1.2;
+    stroke-dasharray: var(--line-dots);
+    stroke-linecap: round;
+}
+.raindrop-angle,
+.bowplace-angle {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 1;
+}
+.raindrop-eye,
+.bowplace-eye {
+    fill: var(--text);
+    stroke: var(--bg);
+    stroke-width: 1.5;
+}
+/* The phase function's two panels, one over the other, each a plot in screen pixels over its strip of colors. */
+.rainphase-panels > .fig-tile + .fig-tile {
+    margin-top: 1rem;
+}
+.rainphase-panel > svg[data-panel="all"] {
+    height: 13rem;
+}
+.rainphase-panel > svg[data-panel="bows"] {
+    height: 17rem;
+}
+.rainphase-tick {
+    font-family: var(--font-mono);
+}
+/* Where a bow stands: two panels of one shape, the ground under both. */
+.bowplace-panel > svg {
+    aspect-ratio: 4 / 3;
+    border-radius: var(--radius-button);
+}
+.bowplace-sunlight {
+    stroke: var(--text);
+    stroke-width: 1.2;
+}
+.bowplace-hidden {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1;
+    stroke-dasharray: var(--line-dashes);
+}
+.bowplace-point {
+    stroke: var(--text);
+    stroke-width: 1.2;
+}
+.bowplace-drop {
+    stroke: var(--muted);
+    stroke-width: 1;
+    stroke-linecap: round;
+    opacity: 0.5;
+}

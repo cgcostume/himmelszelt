@@ -37,6 +37,7 @@ export function softShadowsFigure(root: HTMLElement) {
     const tiles = createTiles(canvas, requestRender);
     if (!tiles) noGpu(canvas);
     const fullTiles = createTiles(fullCanvas, requestRender);
+    if (!fullTiles) fullCanvas.style.display = "none";
     // The 8K maps where the GPU takes textures that wide, else the 4K.
     const finest = (gpu.device?.limits.maxTextureDimension2D ?? 0) >= 8192 ? "8k" : "4k";
     const resolution = mapResolutions(root, finest, requestRender);

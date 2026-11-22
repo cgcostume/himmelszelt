@@ -552,14 +552,6 @@ h2 {
 .nav-toggle:hover {
     color: var(--accent);
 }
-.nav-toggle svg {
-    width: 16px;
-    height: 16px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.05;
-    stroke-linecap: round;
-}
 @media (max-width: 50rem) {
     .nav-toggle {
         display: grid;
@@ -760,7 +752,8 @@ pre {
 pre {
     font-size: var(--text-small);
     margin: 1rem 0 1.75rem;
-    padding: 0.6rem 0.8rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-canvas);
     overflow-x: auto;
 }
 pre code {
@@ -1180,6 +1173,26 @@ figure[id],
     color: var(--muted);
     font-size: var(--text-meta);
 }
+/* Where WebGPU is missing, once per page under its byline: why, and the fix for this browser (see webgpu.ts). */
+.gpu-notice {
+    margin: 1.5rem 0;
+    padding: 0.75rem 1rem;
+    border: var(--border);
+    border-radius: var(--radius-group);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: var(--text-meta);
+    scroll-margin-top: 1rem;
+}
+.gpu-notice p {
+    margin: 0;
+}
+.gpu-notice p + p {
+    margin-top: 0.4rem;
+}
+.gpu-notice strong {
+    color: var(--text);
+}
 /* Numbered citations share the glossary terms' tooltip. */
 .cite {
     position: relative;
@@ -1227,10 +1240,11 @@ figure[id],
 .code-block > pre {
     margin: 0;
 }
+/* 8px in from the block's 16px corner, as a figure's buttons sit, so the two corners share a center. */
 .code-copy {
     position: absolute;
-    top: 6px;
-    right: 6px;
+    top: 8px;
+    right: 8px;
     display: grid;
     place-items: center;
     width: 1.65rem;
@@ -1255,13 +1269,7 @@ figure[id],
     }
 }
 .code-copy svg {
-    width: 14px;
-    height: 14px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.05;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    --icon-size: 14;
 }
 
 /* Saussure's cyanometer, opened from its term in the footer: the ring of 53 steps, the chosen one ringed. Hovering a

@@ -1,4 +1,6 @@
 import { NO_WHITE_BALANCE, type WhiteBalance } from "@himmelszelt/helldunkel";
+import { type Corona, DEFAULT_CORONA } from "./corona.js";
+import type { HighSheet } from "./layers.js";
 
 /**
  * What the clouds are made of and lit by, as plain numbers: a cloudscape of low clouds in a voxel volume, up to two
@@ -184,6 +186,14 @@ export interface CloudParams {
     /** The rows `sunlight` was made for, so a table that comes late, after the sun moved on, keeps its values at their
      *  elevations rather than stretched over the current rows. The current ones where left out. */
     sunlightRows?: readonly SunlightRow[] | null;
+    /** Unit vector towards the Moon, as `@himmelszelt/sternzeit`'s `moon.direction`, and its illuminance at the observer,
+     *  per channel in lux, as `SkyPass.moonIlluminance()` of `@himmelszelt/dunstkreis` gives it: what its `corona` is lit
+     *  by. The clouds themselves are lit by the sun alone. None by default. */
+    moonDirection?: readonly [number, number, number];
+    moonIlluminance?: Rgb;
+    /** The corona thin cloud lays around the Sun and the Moon, its droplets diffracting their light into a glow with a
+     *  red rim, where the cloud lets some of it through: `DEFAULT_CORONA` by default, `false` for none. */
+    corona?: Corona | false;
     /** The sky's luminance along the horizon, in cd/m²: what far clouds fade into. */
     horizonLuminance: readonly [number, number, number];
     /** The sky's irradiance on a surface facing up and the lit ground's on one facing down, in lux. */
@@ -208,6 +218,16 @@ export interface CloudParams {
     cloudscape: CloudscapeParams;
     /** Up to two. */
     sheets: readonly SheetParams[];
+    /** The layered model's sheet of high cloud over the cloudscape, for a pass made with `high`: none by default, and
+     *  `null` takes it away. With it, its wind, east and north in m/s, how fast its map changes, in changes per hour,
+     *  and its seed; it clears towards the horizon as the cloudscape does. */
+    high?: HighSheet | null;
+    highWind?: readonly [number, number];
+    /** Where the observer stands over the ground the high sheet was laid out on, in km east and north, [0, 0] by
+     *  default: an observer who moves passes under it. */
+    observerKm?: readonly [number, number];
+    highEvolution?: number;
+    highSeed?: number;
 }
 
 export const DEFAULT_CLOUDSCAPE: CloudscapeParams = {
@@ -280,7 +300,7 @@ export const DEFAULT_CLOUD_PARAMS: CloudParams = {
 export const EVOLUTION_PERIOD = 8;
 
 /** Byte sizes of the uniform structs in params.wgsl. */
-export const PARAMS_SIZE = 576;
+export const PARAMS_SIZE = 608;
 export const SUNLIGHT_SIZE = 64 + 128 * 16;
 export const CLOUDSCAPE_SIZE = 112;
 export const SHEET_SIZE = 128;
@@ -290,6 +310,7 @@ const CLOUDSCAPE_OFFSET = 160;
 export const AERIAL_OFFSET = CLOUDSCAPE_OFFSET + 88;
 const SHEETS_OFFSET = 272;
 const WHITE_BALANCE_OFFSET = 528;
+const MOON_OFFSET = 576;
 export const MAX_SHEETS = 2;
 
 const wrap = (value: number, period: number) => ((value % period) + period) % period;
@@ -375,7 +396,8 @@ export interface SunlightRow {
 export const steppedHeightM = (heightM: number) => 2 ** (Math.ceil(Math.log2(Math.max(heightM, 1)) * 2) / 2);
 
 /**
- * Where the clouds want the sun's illuminance: four rows, the cloudscape's base and top and each sheet's altitude,
+ * Where the clouds want the sun's illuminance: four rows, the cloudscape's base and top and each sheet's altitude, the
+ * layered model's high sheet's in the first sheet's place where there is one,
  * over the elevations the sun has above the horizon of anything at that altitude in sight. It stands higher over a
  * cloud towards it, by the angle the planet curves through in between.
  */
@@ -390,7 +412,7 @@ export function sunlightRows(p: CloudParams): SunlightRow[] {
     };
     const sized = sizedCloudscape(p.cloudscape);
     const top = sized.baseKm + slabHeightKm(sized);
-    const sheet = (i: number) => p.sheets[i]?.altitudeKm ?? top;
+    const sheet = (i: number) => (i === 0 ? p.high?.altitudeKm : undefined) ?? p.sheets[i]?.altitudeKm ?? top;
     return [row(sized.baseKm, top), row(top), row(sheet(0)), row(sheet(1))];
 }
 
@@ -479,6 +501,8 @@ export function paramsData(p: CloudParams, frame: number): ArrayBuffer {
     f.set([p.horizonFadeKm, p.jitter], 32);
     u.set([frame >>> 0, Math.min(p.sheets.length, MAX_SHEETS)], 34);
     f.set(p.horizonLuminance, 36);
+    const corona = p.corona ?? DEFAULT_CORONA;
+    f[39] = corona ? corona.dropletRadiusUm : 0;
     const { fromRad, toRad } = sunlightRows(p)[0] as SunlightRow;
     const cloudscape = cloudscapeData(p.cloudscape, p.timeS, [fromRad, toRad]);
     new Uint8Array(buffer, CLOUDSCAPE_OFFSET).set(new Uint8Array(cloudscape));
@@ -488,5 +512,7 @@ export function paramsData(p: CloudParams, frame: number): ArrayBuffer {
     });
     const [m0, m1, m2, m3, m4, m5, m6, m7, m8] = p.whiteBalance ?? NO_WHITE_BALANCE;
     f.set([m0, m1, m2, 0, m3, m4, m5, 0, m6, m7, m8], WHITE_BALANCE_OFFSET / 4);
+    f.set([...(p.moonDirection ?? [0, 0, 1]), corona ? corona.spread : 0], MOON_OFFSET / 4);
+    f.set(p.moonIlluminance ?? [0, 0, 0], MOON_OFFSET / 4 + 4);
     return buffer;
 }

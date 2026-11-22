@@ -244,7 +244,7 @@ export function flightIn(root: HTMLElement, canvas: HTMLCanvasElement, camera: S
             look();
         },
         look,
-        hint: root.querySelector(".sky-hint"),
+        hint: root.querySelector(".fig-hint"),
     });
     return { flown, height: seenFrom.get, flying };
 }

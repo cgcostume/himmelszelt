@@ -2,13 +2,14 @@ import { find } from "../dom";
 import { bindHdr, display, gpu } from "../dunstkreis/atmosphere";
 import { context, draw, hdri, onHdri } from "../environment/hdri";
 import { onDemand } from "../frame";
+import { gpuMissing } from "../webgpu";
 
 const root = find("#hdri");
 const field = <T extends HTMLElement = HTMLElement>(name: string) => find<T>(`[data-field="${name}"]`, root);
 const canvas = field<HTMLCanvasElement>("canvas");
 
 if (gpu.error) {
-    field("info").textContent = gpu.error;
+    gpuMissing(canvas);
 } else {
     bindHdr(find('[data-hdr="note"]', root), find('[data-hdr="choice"]', root));
     const target = context(canvas);

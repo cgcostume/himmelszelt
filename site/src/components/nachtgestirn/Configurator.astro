@@ -32,8 +32,8 @@ const TECHNIQUES = [
     <div class="config-main">
         <div class="config-preview as-seen" data-actions="copy">
             <canvas aria-label="nachtgestirn's Moon as configured, one pixel of the canvas to a pixel of the screen, rendered with WebGPU"></canvas>
-            <span class="tiles-start"><span class="view-buttons"><button type="button" class="view-icon" data-field="lock" aria-pressed="true" title="Seen from Earth: turns the Moon back to the face Earth sees; turning it lets go" aria-label="Moon lock"><Icon name="moonLock" /></button></span><span class="tiles-hint footnote">Rendered with WebGPU</span></span>
-            <span class="view-buttons fig-actions config-ends"><button type="button" class="view-icon" data-field="download" title="Download the Moon as configured as PNG" aria-label="Download as PNG"><Icon name="download" /></button><CopyInfo /></span>
+            <div class="fig-bar"><span class="fig-bar-start"><span class="view-buttons"><button type="button" class="view-icon" data-field="lock" aria-pressed="true" title="Seen from Earth: turns the Moon back to the face Earth sees; turning it lets go" aria-label="Moon lock"><Icon name="moonLock" /></button></span><span class="fig-hint footnote">Rendered with WebGPU</span></span>
+            <span class="view-buttons fig-actions"><button type="button" class="view-icon" data-field="download" title="Download the Moon as configured as PNG" aria-label="Download as PNG"><Icon name="download" /></button><CopyInfo /></span></div>
             <output class="config-disc-note footnote" data-field="discValue" title="How many pixels across the disc: turn the mouse wheel over the Moon"></output>
         </div>
         <div class="config-settings">
@@ -63,8 +63,8 @@ const TECHNIQUES = [
     </div>
     <LunationSlider own />
     <div class="budget-legend note" aria-hidden="true">
-        <span><i class="budget-swatch budget-defaults"></i>the defaults</span>
-        <span><i class="budget-swatch"></i>everything on</span>
+        <span><i class="budget-swatch"></i>the defaults</span>
+        <span><i class="budget-swatch budget-reference"></i>everything on</span>
         <span><i class="budget-swatch budget-part-0"></i>color map</span>
         <span><i class="budget-swatch budget-part-1"></i>relief</span>
         <span><i class="budget-swatch budget-part-2"></i>shadow map</span>
@@ -77,7 +77,7 @@ const TECHNIQUES = [
     </div>
     <figcaption class="figure-caption">
         nachtgestirn's pass set up for a disc of a given size, the disc one pixel to a pixel, and what it costs: the time
-        a frame takes as measured in <Fig id="budget" />, hatched the defaults, solid everything on, and in blue this GPU's.
+        a frame takes as measured in <Fig id="budget" />, solid the defaults, hatched everything on, and in blue this GPU's.
     </figcaption>
 </figure>
 

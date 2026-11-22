@@ -11,19 +11,25 @@ const TEMPERATURE = { min: -30, max: 40 };
 ---
 
 <figure class="fig scene-frame air-table" id="air-table" data-air-table>
-    <div class="air-table-export" data-export="air-table" data-export-timeless>
-        <figure class="eclipse-view air-table-texels">
+    <div class="air-table-export" data-export="air-table" data-export-timeless data-actions-in=".air-table-views">
+        <figure class="fig-tile air-table-texels">
             <svg data-field="texels" role="img" aria-label="The air table's 256 by 5 texels, each channel a stripe of its own, over the apparent altitude"></svg>
-            <figcaption><span class="subfigure-title">the table</span>, 256 × 5 texels of four floats</figcaption>
+            <figcaption>
+                <span><span class="subfigure-title">the table</span>, 256 × 5 texels of four floats</span>
+                <span class="air-table-views" role="group" aria-label="How the table is shown">
+                    <button type="button" class="view-toggle" data-view="texels" aria-pressed="true" title="The texels as a texture viewer shows them, each channel normalized to its own range">texels</button>
+                    <button type="button" class="view-toggle" data-view="values" aria-pressed="false" title="The bend as the table holds it, in arcminutes, and how far the air shows red and blue from green, in arcseconds">values</button>
+                </span>
+            </figcaption>
         </figure>
-        <div class="eclipse-views">
-            <figure class="eclipse-view">
+        <div class="fig-row">
+            <figure class="fig-tile">
                 <div class="flicker-panel as-seen">
                     <svg data-field="moon" role="img" aria-label="The Moon low over the horizon, lifted and squeezed by the air, its true place dashed"></svg>
                 </div>
                 <figcaption><span class="subfigure-title">the Moon</span>, to scale</figcaption>
             </figure>
-            <figure class="eclipse-view">
+            <figure class="fig-tile">
                 <div class="flicker-panel as-seen">
                     <svg data-field="limb" role="img" aria-label="The Moon's limb, magnified, its red, green and blue images apart"></svg>
                 </div>
@@ -67,9 +73,9 @@ const TEMPERATURE = { min: -30, max: 40 };
     </label>
     <p class="view-status" data-field="note" aria-live="polite"></p>
     <figcaption class="figure-caption">
-        The air table of one observer height. (a) Its texels, each channel a stripe normalized to its own range,
-        logarithmic for the <Term of="Airmass">airmass</Term> and the turbulence; the accent marks the Moon. (b) The Moon,
-        its true place dashed. (c) Its lower limb, or the upper one while the ground hides it, magnified where (b) marks it: the air parts its colors.
+        The air table of one observer height. (a) Its texels, each channel normalized, logarithmic for
+        the <Term of="Airmass">airmass</Term> and the turbulence, or its values; the accent marks the Moon. (b) The
+        Moon, its true place dashed. (c) Its lower limb, or the upper one if hidden, magnified: the air parts its colors.
     </figcaption>
 </figure>
 

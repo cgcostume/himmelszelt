@@ -53,9 +53,9 @@ unless the device has "float32-filterable".
 
 `wgsl.ground` puts an image's ground on a plane, so objects stand on it and a camera moves over it, and lifts its horizon.
 `rbGroundedDirection(eye, direction, captureHeight, reach, radius)` lays the image on one smooth surface about where it
-was taken: the plane as far as `reach`, about half the dome's radius at most, a sphere of `radius` from the horizon up,
-as three.js' GroundedSkybox and Unreal's HDRI Backdrop have it, and in between the image receding from the one to the
-other. Either can be without end, 1e9: a far dome keeps the sky at infinity over a ground that ends at its reach, and
+was taken: the plane as far as `reach`, about half the dome's radius at most, a sphere of `radius` from the plane's
+level up, as three.js' GroundedSkybox and Unreal's HDRI Backdrop have it, and in between the image receding from the one
+to the other, never beyond the sphere. Either can be without end, 1e9: a far dome keeps the sky at infinity over a ground that ends at its reach, and
 both together are the plane without bound.
 `rbStretchedLods` gives the mip levels along u and v where the ground stretches an equirectangular image, for a lookup
 blurred evenly rather than in streaks, from levels halved more along u than along v.

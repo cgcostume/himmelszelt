@@ -64,12 +64,7 @@
     place-items: center;
 }
 .stepper svg {
-    width: 14px;
-    height: 14px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 0.95;
-    stroke-linejoin: round;
+    --icon-size: 14;
 }
 .input-grid-extra,
 .input-grid-subrow {
@@ -150,13 +145,7 @@
     color: var(--accent);
 }
 .icon-button svg {
-    width: 14px;
-    height: 14px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.05;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    --icon-size: 14;
 }
 /* No box around the controls any more, so their copy button sits in the corner of the summary line itself. It is
    inside the summary element, not a child of the set, hence the descendant selector. */

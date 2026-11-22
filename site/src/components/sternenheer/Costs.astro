@@ -19,10 +19,17 @@ const LABELS: Record<CostKey, [string, string]> = {
     large: ["everything on, 1920 × 1080", "twinkling, constellations, the 4K map"],
     deep: ["with the deep stars, 1920 × 1080", "2.4 million more"],
 };
+// Hatched, to compare against: everything on and the deep stars; the rest is what the defaults draw.
+const COMPARED = new Set<CostKey>(["large", "deep"]);
 const rows = COST_ROWS.map((key) => {
     const row = measure.rows[key];
     const [label, note] = LABELS[key];
-    return { label, note, values: [row?.ms?.median, (row?.memory ?? 0) / MiB, (row?.download ?? 0) / MiB] };
+    return {
+        label,
+        note,
+        values: [row?.ms?.median, (row?.memory ?? 0) / MiB, (row?.download ?? 0) / MiB],
+        reference: COMPARED.has(key),
+    };
 });
 ---
 

@@ -226,15 +226,38 @@ fn dkAureoleOf(view: vec3f, light: vec3f, apparent: vec3f) -> vec3f {
     return dkToRgb(a, column * a.solarIlluminance) * (DK_AUREOLE_SHARE * phase * fade);
 }
 
+// The share of the Sun's disc the Moon leaves uncovered, 1 with no Moon in front and 0 in a total eclipse: what two
+// discs overlap by, the Sun's taken as evenly bright. The veil and the starburst are of the disc's light, and dim by it.
+fn dkSunUncovered() -> f32 {
+    if (dkParams.moonDiscCos > 1.0) {
+        return 1.0;
+    }
+    let sun = dkParams.sunAngularRadius;
+    let moon = acos(dkParams.moonDiscCos);
+    let apart = 2.0 * asin(min(length(dkParams.sunDirection - dkParams.moonDirection) * 0.5, 1.0));
+    if (apart >= sun + moon) {
+        return 1.0;
+    }
+    if (apart <= abs(moon - sun)) {
+        return 1.0 - min(moon * moon / (sun * sun), 1.0);
+    }
+    let towardsSun = clamp((apart * apart + sun * sun - moon * moon) / (2.0 * apart * sun), -1.0, 1.0);
+    let towardsMoon = clamp((apart * apart + moon * moon - sun * sun) / (2.0 * apart * moon), -1.0, 1.0);
+    let kite = max((sun + moon - apart) * (apart + sun - moon) * (apart - sun + moon) * (apart + sun + moon), 0.0);
+    let lens = sun * sun * acos(towardsSun) + moon * moon * acos(towardsMoon) - 0.5 * sqrt(kite);
+    return clamp(1.0 - lens / (3.141592653589793 * sun * sun), 0.0, 1.0);
+}
+
 // The veil along a view ray, from glare.wgsl, by the illuminance the light meter wrote of the Sun and, with
-// DK_MOONLIGHT, of the Moon, so it dims and reddens with each through the air and goes out behind the planet: for an
-// eye of thirty years, blue-green, times DK_VEIL. An effect of the eye or the lens, so centered on where each shows, in
+// DK_MOONLIGHT, of the Moon, so it dims and reddens with each through the air and goes out behind the planet, and the
+// Sun's behind the Moon, dkSunUncovered: for an eye of thirty years, blue-green, times DK_VEIL. An effect of the eye or the lens, so centered on where each shows, in
 // the view's directions, and only of what is looked at: times the uniforms' `sunInFrame` and `moonInFrame`.
 fn dkSkyVeil(view: vec3f) -> vec3f {
     if (DK_VEIL <= 0.0) {
         return vec3f(0.0);
     }
-    var veil = hdVeil(view, dkParams.apparentSunDirection, dkMetering.sunIlluminance, 30.0, 1.0) * dkParams.sunInFrame;
+    let sun = dkMetering.sunIlluminance * (dkParams.sunInFrame * dkSunUncovered());
+    var veil = hdVeil(view, dkParams.apparentSunDirection, sun, 30.0, 1.0);
     if (DK_MOONLIGHT) {
         veil = veil
             + hdVeil(view, dkParams.apparentMoonDirection, dkMetering.moonIlluminance, 30.0, 1.0) * dkParams.moonInFrame;
@@ -243,7 +266,7 @@ fn dkSkyVeil(view: vec3f) -> vec3f {
 }
 
 // A starburst around the Sun along a view ray, from lens.wgsl, in cd/m²: lit by the Sun's illuminance at the observer
-// and centered on where it shows, as the veil is, times the uniforms' `sunInFrame`. Laid out in the image plane, by the
+// and centered on where it shows, as the veil is, times the uniforms' `sunInFrame` and dkSunUncovered. Laid out in the image plane, by the
 // matrix's own rectilinear projection, at the true angle from the Sun: its lines straight, and fixed to the camera.
 fn dkSkyStarburst(view: vec3f) -> vec3f {
     if (DK_STARBURST == 0u || dkParams.sunInFrame <= 0.0) {
@@ -259,7 +282,8 @@ fn dkSkyStarburst(view: vec3f) -> vec3f {
     let center = vec2f(dot(sun, right), dot(sun, up)) / max(dot(sun, forward), 0.05);
     let across = at - center;
     let offset = across * (chord / max(length(across), 1e-9));
-    return dkMetering.sunIlluminance * hdStarburst(offset, dkParams.sunAngularRadius, DK_STARBURST) * dkParams.sunInFrame;
+    let illuminance = dkMetering.sunIlluminance * (dkParams.sunInFrame * dkSunUncovered());
+    return illuminance * hdStarburst(offset, dkParams.sunAngularRadius, DK_STARBURST);
 }
 
 // The Sun's corona and chromosphere along a sampled ray, from sun.wgsl, in cd/m²: shares of the disc's luminance, so

@@ -50,7 +50,7 @@ export {
 } from "./meter.js";
 
 // The veil of a bright point source, the eye's own glare.
-export { veilingGlare } from "./glare.js";
+export { meanVeilingGlare, veilingGlare } from "./glare.js";
 
 // A lens's starburst around a bright point source.
 export { starburstSpikes } from "./lens.js";

@@ -12,6 +12,7 @@ import { find } from "../dom";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { state } from "../sternzeit/state";
+import { GPU_MISSING } from "../webgpu";
 import {
     bindRefractionToggle,
     currentSky,
@@ -415,7 +416,7 @@ function showControls() {
 }
 
 if (gpu.error) {
-    find(".lut-bar", root).insertAdjacentHTML("afterend", `<p class="note">${gpu.error}</p>`);
+    find(".lut-bar", root).insertAdjacentHTML("afterend", `<p class="note">${GPU_MISSING}</p>`);
 } else {
     showControls();
     const showTables = () => {

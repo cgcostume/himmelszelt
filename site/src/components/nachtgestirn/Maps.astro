@@ -44,16 +44,18 @@ const sizes = (kind: string) =>
         <canvas data-field="heights" aria-label="The Moon's heights from the Lunar Orbiter Laser Altimeter, as gray, low to high, the far side past what Earth ever sees at the mean radius" hidden></canvas>
         <canvas data-field="roughness" aria-label="How steep the Moon's ground is over 57 m, from the Lunar Orbiter Laser Altimeter's tracks, as gray, smooth to rough, the far side past what Earth ever sees smooth" hidden></canvas>
         <canvas class="maps-seen" data-field="seen" aria-hidden="true"></canvas>
-        <span class="view-buttons">
-            <button type="button" class="view-toggle" data-map="color" aria-pressed="true" title="The color map, the surface's albedo">albedo</button>
-            <button type="button" class="view-toggle" data-map="heights" aria-pressed="false" title="The heights, as gray from the lowest ground to the highest">heights</button>
-            <button type="button" class="view-toggle" data-map="roughness" aria-pressed="false" title="The roughness, the median slope over 57 m as gray, from flat to 15° and steeper, which the pass adds below the texels where a pixel is finer">roughness</button>
-        </span>
-        <span class="view-buttons fig-actions maps-end">
-            <button type="button" class="view-icon" data-field="annotations" aria-pressed="false" title="The annotations over the map, over the hatching of the moment: the edge of what Earth ever sees, the diurnal libration included, and past it the 2° margin and the 4° feather into the mean color, no height and no slope" aria-label="Annotations"><Icon name="labels" /></button>
-            <button type="button" class="view-icon" data-field="download" title="Download the map shown, with what Earth sees or the annotations, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
-            <CopyInfo />
-        </span>
+        <div class="fig-bar">
+            <span class="view-buttons">
+                <button type="button" class="view-toggle" data-map="color" aria-pressed="true" title="The color map, the surface's albedo">albedo</button>
+                <button type="button" class="view-toggle" data-map="heights" aria-pressed="false" title="The heights, as gray from the lowest ground to the highest">heights</button>
+                <button type="button" class="view-toggle" data-map="roughness" aria-pressed="false" title="The roughness, the median slope over 57 m as gray, from flat to 15° and steeper, which the pass adds below the texels where a pixel is finer">roughness</button>
+            </span>
+            <span class="view-buttons fig-actions">
+                <button type="button" class="view-icon" data-field="annotations" aria-pressed="false" title="The annotations over the map, over the hatching of the moment: the edge of what Earth ever sees, the diurnal libration included, and past it the 2° margin and the 4° feather into the mean color, no height and no slope" aria-label="Annotations"><Icon name="labels" /></button>
+                <button type="button" class="view-icon" data-field="download" title="Download the map shown, with what Earth sees or the annotations, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
+                <CopyInfo />
+            </span>
+        </div>
     </div>
     <LunationSlider />
     <p class="view-status" data-field="note" hidden></p>

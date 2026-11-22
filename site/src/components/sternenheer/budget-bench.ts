@@ -18,8 +18,8 @@ import { cameraBasis } from "../dunstkreis/skycamera";
 import type { BudgetMeasure, BudgetRow, FileName, RowMeasure } from "./budget-rows";
 import { inverseViewProjection } from "./renderer";
 
-// The benchmark behind the budget figure, for the reader's own run and for `scripts/stars-budget.mjs`: every row's
-// pass drawn into an offscreen target, timed pass by pass on the GPU's clock.
+// The benchmark behind the chapter's costs (bench.ts): every row's pass drawn into an offscreen target, timed pass by
+// pass on the GPU's clock.
 
 // The sky every row draws: the chapter's own experiment, a new moon in August over Berlin, the Milky Way from Cygnus
 // overhead to Sagittarius on the horizon, through the view the chapter's sky opens with, at a moonless night's

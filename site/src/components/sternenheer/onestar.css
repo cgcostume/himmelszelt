@@ -1,6 +1,6 @@
 /* One star from its row to its pixels: the star picked, then the stages as a strip, six across where the page is wide,
    three or two where it is not, each a picture, its numbers and its function. */
-.onestar-figure.wide > :is(.onestar-controls, .onestar-pick) {
+.onestar-figure.wide > :is(.fig-controls, .onestar-pick) {
     max-width: calc(var(--measure) - 3rem);
     margin-inline: auto;
 }
@@ -200,19 +200,4 @@
 .onestar-stage[data-stage="pixels"] .onestar-none {
     padding: 2rem 0.5rem;
     color: oklch(0.7 0.02 265);
-}
-.onestar-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1rem;
-    align-items: center;
-    margin-top: 0.75rem;
-}
-.onestar-controls > .figure-slider {
-    flex: 1 1 16rem;
-    margin: 0;
-}
-.onestar-controls output {
-    min-width: 4ch;
-    text-align: right;
 }

@@ -24,14 +24,16 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
                 <svg class="photo-marks" aria-hidden="true"></svg>
             </div>
         </div>
-        <StarGroups offsets={["stars"]} steps={["off", "0"]} />
-        <span class="tiles-ends">
-            <span class="view-buttons pick-group starred-maps" role="radiogroup" aria-label="NASA's map right of the line" data-group="backdrop">
-                <button type="button" class="view-toggle" data-pick="starred" aria-pressed="true" tabindex="0" title="NASA's map with its stars baked in, the Hipparcos and Tycho stars over half the background">starred</button>
-                <button type="button" class="view-toggle" data-pick="starless" aria-pressed="false" tabindex="-1" title="NASA's starless layer as published, before sternenheer's script takes out the points left in it">starless</button>
+        <div class="fig-bar">
+            <span class="fig-bar-start"><StarGroups offsets={["stars"]} steps={["off", "0"]} /></span>
+            <span class="fig-bar-end">
+                <span class="view-buttons pick-group starred-maps" role="radiogroup" aria-label="NASA's map right of the line" data-group="backdrop">
+                    <button type="button" class="view-toggle" data-pick="starred" aria-pressed="true" tabindex="0" title="NASA's map with its stars baked in, the Hipparcos and Tycho stars over half the background">starred</button>
+                    <button type="button" class="view-toggle" data-pick="starless" aria-pressed="false" tabindex="-1" title="NASA's starless layer as published, before sternenheer's script takes out the points left in it">starless</button>
+                </span>
+                <span class="view-buttons fig-actions"></span>
             </span>
-            <span class="view-buttons fig-actions"></span>
-        </span>
+        </div>
     </div>
     <label class="figure-slider split-slider" title="Where the line between sternenheer's map and NASA's runs">
         <span class="note">sternenheer</span>

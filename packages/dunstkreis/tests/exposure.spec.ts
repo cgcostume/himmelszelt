@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { autoExposureCompensation, DEFAULT_AUTO_EXPOSURE_KEYS } from "../src/exposure.js";
+import { autoExposureCompensation, autoExposureTint, DEFAULT_AUTO_EXPOSURE_KEYS } from "../src/exposure.js";
 import { DEFAULT_ATMOSPHERE_MODEL, luminanceScale, spectrumToRgb } from "../src/model.js";
 
 test("the luminance scale gives the sun its illuminance, once its four wavelengths are turned into RGB", () => {
@@ -38,4 +38,37 @@ test("the keys ramp the compensation smoothly with the sun, mornings and evening
     for (let azimuth = -Math.PI; azimuth < Math.PI; azimuth += 0.001) {
         expect(Math.abs(at(3, azimuth + 0.001) - at(3, azimuth))).toBeLessThan(0.001);
     }
+});
+
+test("a tint keeps the luminance, follows the keys by the sun, and leaves untinted keys neutral", () => {
+    const sunAt = (altitude: number, east: number): [number, number, number] => {
+        const a = (altitude * Math.PI) / 180;
+        return [east * Math.cos(a), 0, Math.sin(a)];
+    };
+    const luminance = ([r, g, b]: number[]) => 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0);
+    expect(autoExposureTint(DEFAULT_AUTO_EXPOSURE_KEYS, sunAt(3, -1))).toEqual([1, 1, 1]);
+    expect(autoExposureTint([], sunAt(3, -1))).toEqual([1, 1, 1]);
+    const warm = [2, 1, 0.5] as const;
+    const keys = [
+        { sunAltitude: -6, compensation: -1, tint: { rising: [1, 1, 1] as const, setting: [1, 0.6, 1.4] as const } },
+        { sunAltitude: 3, compensation: 0, tint: warm },
+        { sunAltitude: 30, compensation: 0 },
+    ];
+    // At a key, its tint at unit luminance; between keys, between their tints, still at unit luminance.
+    const atKey = autoExposureTint(keys, sunAt(3, -1));
+    const scale = luminance([...warm]);
+    for (const [i, g] of atKey.entries()) expect(g).toBeCloseTo((warm[i] as number) / scale, 12);
+    for (let altitude = -10; altitude <= 40; altitude += 0.5)
+        expect(luminance(autoExposureTint(keys, sunAt(altitude, -1)))).toBeCloseTo(1, 12);
+    const between = autoExposureTint(keys, sunAt(15, -1));
+    expect(between[0]).toBeGreaterThan(1);
+    expect(between[0]).toBeLessThan(atKey[0]);
+    for (const g of autoExposureTint(keys, sunAt(60, -1))) expect(g).toBeCloseTo(1, 12);
+    // Mornings and evenings apart: purple at dusk, neutral at dawn.
+    const dusk = autoExposureTint(keys, sunAt(-6, -1));
+    const dawn = autoExposureTint(keys, sunAt(-6, 1));
+    expect(dusk[1]).toBeLessThan(dusk[2]);
+    for (const g of dawn) expect(g).toBeCloseTo(1, 12);
+    // The tint takes nothing from the compensation.
+    expect(autoExposureCompensation(keys, sunAt(-6, -1))).toBeCloseTo(-1, 12);
 });

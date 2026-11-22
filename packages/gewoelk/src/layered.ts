@@ -60,6 +60,8 @@ export interface LayeredCloudPassOptions {
     march?: Partial<LayerMarchSettings>;
     /** A detail noise to share, as a cloud pass' `detailTexture`; without, the pass makes its own. */
     detail?: GPUTexture;
+    /** God rays, the shafts of sunlight and of the clouds' shade in the air: see `LayerMarchOptions`. Off by default. */
+    godRays?: boolean;
 }
 
 /**
@@ -141,6 +143,7 @@ export async function createLayeredCloudPass(
             ...options.march,
             mapSize: quality.mapSize,
             maxSteps: quality.maxSteps,
+            godRays: options.godRays ?? false,
             ...(options.detail && { detail: options.detail }),
         }),
         createHighSheet(device, { mapSize: quality.highMapSize }),
@@ -150,7 +153,15 @@ export async function createLayeredCloudPass(
             compute: {
                 module: device.createShaderModule({
                     label: "gewoelk:layered",
-                    code: [wgsl.params, wgsl.whitebalance, wgsl.tonemap, wgsl.cloudOutput(format), compose].join("\n"),
+                    code: [
+                        wgsl.params,
+                        wgsl.camera,
+                        wgsl.corona,
+                        wgsl.whitebalance,
+                        wgsl.tonemap,
+                        wgsl.cloudOutput(format),
+                        compose,
+                    ].join("\n"),
                 }),
                 entryPoint: "gwLayeredCompose",
                 constants: {

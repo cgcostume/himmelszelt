@@ -1,0 +1,69 @@
+---
+import Try from "../Try.astro";
+import "../sternzeit/sternzeit.css";
+import "./dunstkreis.css";
+import "./glows.css";
+
+/**
+ * The glows around the Sun, told apart: how bright each is by its angle from the Sun's center, for the chosen moment,
+ * place and height, against the luminance an exposure shows as white. The sky and the aureole are read from dunstkreis'
+ * sky pass, the others computed from the Sun's light at the observer.
+ */
+const LINES = [
+    [
+        "total",
+        "the picture",
+        "The Sun as the sky pass draws it by default: the sky, the aureole, the disc, the Sun's corona and a lens's veil together",
+    ],
+    ["disc", "disc", "The Sun's own disc, half a degree across: its mean luminance"],
+    ["solar", "Sun's corona", "The Sun's own corona beyond its limb, after Baumbach"],
+    ["sky", "sky", "The sky beside the Sun, without its aureole"],
+    ["aureole", "aureole", "The air's glow: what the aerosols' narrow forward lobe adds to the sky"],
+    ["lens", "lens's veil", "What a camera's lens scatters of the Sun's light: a two-hundredth of the eye's veil"],
+    ["eye", "eye's veil", "What the eye scatters across its retina: CIE's glare equation, for an eye of thirty years"],
+    [
+        "cloud",
+        "cloud's corona",
+        "The corona of a thin cloud in front of the Sun, droplets of 10 µm, where it lets three fifths of the light through, in green",
+    ],
+    ["spike", "starburst", "Along one spike of a starburst, six blades"],
+];
+---
+
+<figure class="fig strip-figure glows" id="glows" data-glows>
+    <div class="strip-panel glows-panel" data-export="glows">
+        <svg data-field="plot" role="img" aria-label="The luminance of each glow around the Sun over the angle from its center, on logarithmic scales, and the luminance the exposure shows as white"></svg>
+        <button type="button" class="view-toggle glows-metered" data-field="metered" aria-pressed="true" title="Expose as the sky pass meters the sky at the chosen moment; moving the slider lets go">metered</button>
+    </div>
+    <p class="glows-legend" aria-hidden="true">
+        {LINES.map(([name, label, title]) => (
+            <span class={`glows-key glows-key-${name}`} title={title}><svg viewBox="0 0 22 6"><line x1="0" y1="3" x2="22" y2="3" class={`glows-line glows-${name}`} /></svg>{label}</span>
+        ))}
+    </p>
+    <label class="figure-slider" title="The exposure: what it shows as white moves up with every stop it closes">
+        <span class="note">EV<sub>100</sub></span>
+        <span class="figure-slider-rail">
+            <input type="range" data-field="exposure" min="0" max="33" step="0.1" value="15" aria-label="The exposure in EV100" />
+            <span class="figure-slider-scale" aria-hidden="true">
+                <span class="figure-slider-mark" style="left: 0%">twilight</span>
+                <span class="figure-slider-mark" style={`left: ${((15 / 33) * 100).toFixed(1)}%`}>sunny day</span>
+                <span class="figure-slider-mark" style={`left: ${((32 / 33) * 100).toFixed(1)}%`}>the disc</span>
+            </span>
+        </span>
+        <output data-field="exposureValue"></output>
+    </label>
+    <p class="view-status" data-field="note" aria-live="polite"></p>
+    <figcaption class="figure-caption">
+        The glows around the Sun at the chosen moment, place and height: how bright each is, in cd/m², over the angle
+        from the Sun's center, both on logarithmic scales, a factor of a hundred between the lines across. The heavy line
+        is the picture by default, the sum of the solid ones; dashed, what an eye, a thin cloud or an aperture's blades
+        would add. Above the accent line the exposure shows white.
+        <Try label="From orbit" set="h=400000" fig="glows">
+            the sky and the aureole are gone, and the lens's veil alone stands between the disc and black.
+        </Try>
+    </figcaption>
+</figure>
+
+<script>
+    import "./glows";
+</script>

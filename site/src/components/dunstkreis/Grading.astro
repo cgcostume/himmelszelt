@@ -1,0 +1,48 @@
+---
+import Choice from "./Choice.astro";
+import "./dunstkreis.css";
+import "./grading.css";
+
+/** Grading the day: the evening sky at eight altitudes of the Sun, as metered and as the ramp's keys grade it. */
+const ALTITUDES = [-12, -6, -3, 0, 3, 10, 30, 60];
+---
+
+<figure class="fig wide tiles-figure grading" id="grading" data-export-timeless>
+    <div class="grading-bar">
+        <Choice
+            figure="grading"
+            name="preset"
+            label="Preset"
+            title="Keys to start from; dragging one makes them your own"
+            options={[
+                ["physical", "physical", "No ramp: every sky exposed as the meter reads it"],
+                ["default", "default", "DEFAULT_AUTO_EXPOSURE_KEYS: night darker, the blue hour lifted, the sunset a touch brighter"],
+                ["purple", "purple dusk", "The default's exposure, the blue hour and the sunset turned towards magenta"],
+                ["golden", "golden", "The minutes around sunset brighter and warmer, noon as metered"],
+            ]}
+            checked="default"
+        />
+    </div>
+    <div class="grading-stage" data-actions="png copy" data-actions-in=".grading-bar">
+        <div class="tiles-panel split as-seen grading-tiles" style="--count: 8; --rows: 2">
+            <canvas width="800" height="200" aria-label="The evening sky looking west at eight altitudes of the Sun, as metered above and graded below"></canvas>
+            <span class="overlay-label grading-row">physical</span>
+            <span class="overlay-label grading-row grading-row-styled">graded</span>
+        </div>
+        <ol class="tiles-labels" style={`grid-template-columns: repeat(${ALTITUDES.length}, 1fr)`}>
+            {ALTITUDES.map((a) => <li data-export-text>{`${a < 0 ? "−" : ""}${Math.abs(a)}°`}</li>)}
+        </ol>
+        <div class="strip-panel grading-lanes">
+            <svg role="img" aria-label="The ramp's keys over the Sun's altitude, in stops, warmth and magenta, draggable"></svg>
+        </div>
+    </div>
+    <figcaption class="figure-caption">
+        The evening sky looking west at eight altitudes of the Sun, metered: as the meter reads it, above, and graded by
+        the ramp's keys, below. Under them the keys, draggable, in stops of exposure and in warmth and magenta, joined by
+        the curve dunstkreis applies, each tile over its altitude.
+    </figcaption>
+</figure>
+
+<script>
+    import "./grading";
+</script>

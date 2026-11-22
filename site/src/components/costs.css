@@ -1,7 +1,8 @@
 /* What it costs, as every chapter shows it: bars per size across panels, each with its own axis (see the Budget
    figures of nachtgestirn and sternenheer, and nachtgestirn's configurator). */
-/* The cost figure: per disc size a row of bars across three panels, each with its own axis; the defaults hatched,
-   everything on solid, the memory stacked by what holds it. Labeled cards on a phone. */
+/* The cost figure: per disc size a row of bars across three panels, each with its own axis; the defaults solid, what
+   the reader gets, everything on hatched, the reference, as the site hatches what matters less; the memory stacked by
+   what holds it. Labeled cards on a phone. */
 .budget-figure {
     --budget-0: oklch(0.66 0.12 245);
     --budget-1: oklch(0.67 0.14 70);
@@ -90,18 +91,18 @@
 .budget-part-3 {
     background: var(--budget-3);
 }
-/* The defaults hatched in their own color: stripes over the panel's background, so the color stays the part's. */
-.budget-defaults {
+/* The reference hatched in its own color: stripes over the panel's background, so the color stays the part's. */
+.budget-reference {
     background: repeating-linear-gradient(135deg, var(--budget-fill, var(--budget-ink)) 0 2px, transparent 2px 4.5px);
     box-shadow: inset 0 0 0 1px var(--budget-fill, var(--budget-ink));
 }
-.budget-defaults.budget-part-0 {
+.budget-reference.budget-part-0 {
     --budget-fill: var(--budget-0);
 }
-.budget-defaults.budget-part-1 {
+.budget-reference.budget-part-1 {
     --budget-fill: var(--budget-1);
 }
-.budget-defaults.budget-part-2 {
+.budget-reference.budget-part-2 {
     --budget-fill: var(--budget-2);
 }
 .budget-value {

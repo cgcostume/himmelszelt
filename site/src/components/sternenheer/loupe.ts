@@ -4,6 +4,7 @@ import { gpu } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { drawSvg, svgText } from "../sternzeit/figure";
+import { GPU_MISSING } from "../webgpu";
 import { renderStarPatch, type StarPatch } from "./starpatch";
 import { starPicker } from "./starpicker";
 
@@ -109,7 +110,8 @@ export function loupeFigure(root: HTMLElement) {
         }
         const device = gpu.device;
         if (!device) {
-            status.innerHTML = gpu.error ?? "";
+            status.innerHTML = GPU_MISSING;
+            canvas.style.display = "none";
             return;
         }
         drawing = true;

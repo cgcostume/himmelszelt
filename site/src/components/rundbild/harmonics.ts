@@ -9,6 +9,7 @@ import {
 } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { offsetSliders } from "../sternzeit/offset";
+import { GPU_MISSING } from "../webgpu";
 
 type Vec3 = [number, number, number];
 
@@ -572,7 +573,10 @@ for (const button of root.querySelectorAll<HTMLElement>(".harmonics-variants [da
 }
 
 if (gpu.error) {
-    find(".harmonics-build", root).insertAdjacentHTML("afterbegin", `<p class="note">${gpu.error}</p>`);
+    // The sky's irradiance is built on the GPU: without one, a note in place of its spheres.
+    const build = find(".harmonics-build", root);
+    for (const step of build.querySelectorAll<HTMLElement>(".harmonics-step")) step.style.display = "none";
+    build.insertAdjacentHTML("afterbegin", `<p class="note">${GPU_MISSING}</p>`);
 } else {
     onEnvironment(readSky);
     needEnvironment(root);

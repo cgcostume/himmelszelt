@@ -435,15 +435,6 @@ g.eclipse-corona {
     stroke-width: 1;
     stroke-dasharray: 3 3;
 }
-/* The Moon's switches in the top left corner, opposite the download. */
-.moon-bar {
-    position: absolute;
-    top: 6px;
-    left: 6px;
-    z-index: 5;
-    display: flex;
-    gap: 6px;
-}
 .moon-reference {
     fill: none;
     stroke: var(--muted);
@@ -556,13 +547,7 @@ g.eclipse-corona {
     opacity: 0.55;
 }
 .calendar-lock svg {
-    width: 14px;
-    height: 14px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.05;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    --icon-size: 14;
 }
 /* The shown month, highlighted like a pressed toggle, with nothing to pick. */
 .calendar-title[aria-pressed="true"] {

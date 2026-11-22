@@ -136,8 +136,8 @@ const loading = (maps: Maps, variant: Variant) => {
                 <button type="button" class="view-toggle" data-variant={variant} aria-pressed={variant === "seen" ? "true" : "false"} title={variant === "seen" ? "The seen maps, the package's default: the far side Earth never sees its own mean, at no height" : "The whole maps, the far side too, for a globe or a camera that orbits the Moon"}>{variant}</button>
             ))}
         </span>
-        <span><i class="budget-swatch budget-defaults"></i>the defaults</span>
-        <span><i class="budget-swatch"></i>everything on</span>
+        <span><i class="budget-swatch"></i>the defaults</span>
+        <span><i class="budget-swatch budget-reference"></i>everything on</span>
         {PARTS.map((part, i) => <span><i class={`budget-swatch budget-part-${i}`}></i>{part}</span>)}
         <span><i class="budget-swatch budget-part-0 budget-saved"></i>BC1 saves</span>
     </div>
@@ -157,7 +157,7 @@ const loading = (maps: Maps, variant: Variant) => {
                 <span class="budget-cell" style={grid("ms")} data-label="time a frame, ms">
                     {row.ms.map((v, c) => (
                         <span class="budget-line" title={`${CONFIGS[c]}: ${v} ms`}>
-                            <i class:list={["budget-bar", c === 0 && "budget-defaults"]} style={`width: ${pct(v, "ms")}`}></i>
+                            <i class:list={["budget-bar", c === 1 && "budget-reference"]} style={`width: ${pct(v, "ms")}`}></i>
                             <span class="budget-value">{ms(v)}</span>
                         </span>
                     ))}
@@ -166,7 +166,7 @@ const loading = (maps: Maps, variant: Variant) => {
                     {row.mb.map((m, c) => (
                         <span class="budget-line" title={c === 0 ? `the defaults: color map ${m[0]} MiB, as BC1 ${m[1]}, relief ${m[2]}, shadow map ${m[3]}` : `everything on: color map ${m[0]} MiB, relief ${m[2]}, shadow map ${m[3]}`}>
                             {parts(m, c === 0).map((v, i) => v > 0 && (
-                                <i class:list={["budget-bar", `budget-part-${PART_OF[i]}`, i === 1 && "budget-saved", c === 0 && i !== 1 && "budget-defaults"]} style={`width: ${pct(v, "mb")}`}></i>
+                                <i class:list={["budget-bar", `budget-part-${PART_OF[i]}`, i === 1 && "budget-saved", c === 1 && i !== 1 && "budget-reference"]} style={`width: ${pct(v, "mb")}`}></i>
                             ))}
                             <span class="budget-value">{mb(total(m))}</span>
                         </span>
@@ -178,7 +178,7 @@ const loading = (maps: Maps, variant: Variant) => {
                         return (
                             <span class="budget-line" title={d.seen.title} data-seen={d.seen.title} data-whole={d.whole.title}>
                                 {[0, 1].map((i) => (
-                                    <i class:list={["budget-bar", `budget-part-${i}`, c === 0 && "budget-defaults"]} style={`width: ${d.seen.bars[i]}`} data-seen={d.seen.bars[i]} data-whole={d.whole.bars[i]}></i>
+                                    <i class:list={["budget-bar", `budget-part-${i}`, c === 1 && "budget-reference"]} style={`width: ${d.seen.bars[i]}`} data-seen={d.seen.bars[i]} data-whole={d.whole.bars[i]}></i>
                                 ))}
                                 <span class="budget-value" data-seen={d.seen.value} data-whole={d.whole.value}>{d.seen.value}</span>
                             </span>
@@ -190,7 +190,7 @@ const loading = (maps: Maps, variant: Variant) => {
                         const l = { seen: loading(maps, "seen"), whole: loading(maps, "whole") };
                         return (
                             <span class="budget-line" title={l.seen.title} data-seen={l.seen.title} data-whole={l.whole.title}>
-                                <i class:list={["budget-bar", c === 0 && "budget-defaults"]} style={`width: ${l.seen.bar}`} data-seen={l.seen.bar} data-whole={l.whole.bar}></i>
+                                <i class:list={["budget-bar", c === 1 && "budget-reference"]} style={`width: ${l.seen.bar}`} data-seen={l.seen.bar} data-whole={l.whole.bar}></i>
                                 <span class="budget-value" data-seen={l.seen.value} data-whole={l.whole.value}>{l.seen.value}</span>
                             </span>
                         );
@@ -198,7 +198,7 @@ const loading = (maps: Maps, variant: Variant) => {
                 </span>
                 <span class="budget-cell" style={grid("off")} data-label="pixels a third of a stop off, %">
                     <span class="budget-line" title={`the defaults: ${row.off}% of the disc's pixels`}>
-                        <i class="budget-bar budget-defaults" style={`width: ${pct(row.off, "off")}`}></i>
+                        <i class="budget-bar" style={`width: ${pct(row.off, "off")}`}></i>
                         <span class="budget-value">{row.off.toFixed(1)}</span>
                     </span>
                 </span>

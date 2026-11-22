@@ -26,15 +26,11 @@ const { label, set, fig } = Astro.props;
         margin-top: 0.4em;
         color: var(--text);
     }
+    /* 1.1 em of the caption's 13 pixels. */
     .figure-try > :global(.icon) {
-        width: 1.1em;
-        height: 1.1em;
+        --icon-size: 14.3;
         margin-right: 0.3em;
         vertical-align: -0.2em;
-        fill: none;
         stroke: var(--golden-hour);
-        stroke-width: 0.95;
-        stroke-linecap: round;
-        stroke-linejoin: round;
     }
 </style>

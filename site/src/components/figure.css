@@ -38,7 +38,7 @@
     z-index: 5;
 }
 /* In a row of controls above a plot, at its end, as high in the row's flow as the segmented controls beside it. */
-.fig-row {
+.fig-actions-row {
     margin-block: -5px;
     margin-left: auto;
 }
@@ -109,6 +109,18 @@
     color: var(--overlay-ink);
     font-size: 0.9375rem;
 }
+/* A plot or a picture inset into a stage's bottom right corner, framed by a hairline, dark on either theme; over a sky
+   view, clear of the time slider that full screen puts at its foot. Without specificity, so the inset's own rules win. */
+:where(.fig-inset) {
+    position: absolute;
+    right: 8px;
+    bottom: calc(8px + var(--sky-foot, 0px));
+    z-index: 1;
+    overflow: hidden;
+    border-radius: var(--radius-button);
+    box-shadow: 0 0 0 1px oklch(1 0 0 / 0.25);
+    background: #000;
+}
 /* Once a view is copied, a word under its button says so, for a moment. */
 .copy-info[data-copied]::after {
     content: "copied";
@@ -145,11 +157,6 @@
     --plate: var(--overlay-tint);
     color: var(--accent);
 }
-.view-icon .icon {
-    width: 16px;
-    height: 16px;
-    stroke-width: 0.85;
-}
 /* Text buttons, with or without an icon before or after the word, at the small text's size: a view's switch, a step,
    a month. Within a group the group is their ground. */
 .view-toggle {
@@ -175,10 +182,14 @@
     background: color-mix(in oklab, var(--accent) 22%, var(--surface));
     color: var(--accent);
 }
+/* The size said again, over a figure's own rule for the drawings it holds. */
+.view-icon .icon,
 .view-toggle .icon {
-    width: 14px;
-    height: 14px;
-    stroke-width: 1;
+    width: calc(var(--icon-size) * 1px);
+    height: calc(var(--icon-size) * 1px);
+}
+.view-toggle .icon {
+    --icon-size: 14;
 }
 .view-buttons > .view-toggle:not(:hover, [aria-pressed="true"]) {
     background: none;
@@ -202,8 +213,7 @@
     }
     .icon-when-narrow > .icon {
         display: block;
-        width: 16px;
-        height: 16px;
+        --icon-size: 16;
     }
     /* The supersampling switch says "4×" alone (see Rays.astro). */
     .rays-long {
@@ -343,6 +353,35 @@
     position: absolute;
     left: 100%;
 }
+/* What the light meter read, on an exposure's slider (see Slider.astro): a tick under the rail, its name beside it, on
+   the reading's left when it is under zero. */
+.slider-metered {
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+    transform: translateX(-0.5px);
+    padding-left: 7px;
+    border-left: 1px solid currentColor;
+    color: var(--text);
+}
+.slider-metered[data-left] {
+    transform: translateX(calc(0.5px - 100%));
+    padding: 0 7px 0 0;
+    border-left: 0;
+    border-right: 1px solid currentColor;
+}
+/* Its size and no fill said again, over the phases' rule above. */
+.slider-metered > svg {
+    --icon-size: 13;
+    width: 13px;
+    height: 13px;
+    margin: 0;
+    fill: none;
+}
+/* Locked on the reading, in the accent: the exposure follows it. */
+.slider-metered[aria-pressed="true"] {
+    color: var(--accent);
+}
 /* A mark without a name, its name on hover: the tropics and the polar circles under the latitude. */
 .figure-slider-tick {
     width: 1px;
@@ -355,34 +394,46 @@
 .figure-slider + .figure-slider > .note {
     min-width: 4em;
 }
-.figure-slider:has(+ .figure-slider) > output,
-.figure-slider + .figure-slider > output {
-    min-width: 7ch;
-    text-align: right;
+.figure-slider:has(+ .figure-slider),
+.figure-slider + .figure-slider {
+    --output-stacked: 7ch;
 }
+/* Its value right aligned in a width that holds the longest one, `--output-ch` on the slider (see Slider.astro), so
+   the rail stays put as the value changes. */
 .figure-slider output {
-    min-width: 5ch;
+    min-width: var(--output-ch, var(--output-stacked, 5ch));
     font-family: var(--font-mono);
-}
-/* The latitude, as wide as "90.0° S", so the rail stays put. */
-.figure-slider[data-latitude] output {
-    min-width: 7ch;
     text-align: right;
 }
-/* The days since the new moon, as wide as two digits ever need, so the rail stays put as they drop to one. */
-.figure-slider[data-lunation] output {
-    min-width: 6ch;
-    text-align: right;
+/* The days since the new moon, two digits; an offset from the moment, "+24:00". */
+.figure-slider:is([data-lunation], [data-offset]) {
+    --output-ch: 6ch;
 }
-/* An offset from the moment, as wide as "+24:00", so the rail stays put as the hours gain a digit. */
-.figure-slider[data-offset] output {
-    min-width: 6ch;
-    text-align: right;
+/* The latitude, "90.0° S"; an offset in days over a lunation, "+12.5 d". */
+.figure-slider:is([data-latitude], [data-offset="hours"], [data-zoom]) {
+    --output-ch: 7ch;
 }
-/* In days over a lunation, "+12.5 d": a character more, so a one-digit day does not shift the slider. */
-.figure-slider[data-offset="hours"] output,
-.figure-slider[data-zoom] output {
-    min-width: 7ch;
+/* A row of controls under a stage or over a plot: switches, a search field, sliders sharing the row, wrapping where it
+   is narrow. Its children's rules without specificity, so a figure's own rules for them win. */
+.fig-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    align-items: center;
+    margin: 0.5rem 0;
+}
+.fig-controls > :where(label:not(.figure-slider)) {
+    display: inline-flex;
+    gap: 0.4rem;
+    align-items: center;
+    cursor: pointer;
+}
+.fig-controls > :where(.figure-slider) {
+    flex: 1 1 16rem;
+    min-width: 0;
+}
+.fig-controls > .figure-slider {
+    margin: 0;
 }
 /* At the top of the scene it belongs to, not the bottom, where it would read as a caption of whatever panel floats
    over the scene's lower half. */
@@ -534,18 +585,19 @@
     stroke-dasharray: 1 3;
     vector-effect: non-scaling-stroke;
 }
-/* The eclipse views: two square panels side by side within the reading column, stacked below 40rem (see there). */
-.eclipse-views {
+/* Panels side by side, `--count` of them (two by default) and `--gap` apart, each a `.fig-tile` with its sub-caption
+   under it; stacked, or `--count-narrow` across, where the column is narrow. */
+.fig-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
+    grid-template-columns: repeat(var(--count, 2), minmax(0, 1fr));
+    gap: var(--gap, 1.5rem);
     margin-bottom: 0.75rem;
 }
-.eclipse-view {
+.fig-tile {
     position: relative;
     margin: 0;
 }
-.eclipse-view figcaption {
+.fig-tile figcaption {
     margin: 0.5rem 0 0;
     font-size: var(--text-meta);
 }
@@ -567,10 +619,9 @@ figure[id] {
 .eclipse-panel {
     position: relative;
 }
-/* Too narrow for two panels side by side: the eclipses stack, and are then as wide as every other figure. */
 @media (max-width: 40rem) {
-    .eclipse-views {
-        grid-template-columns: 1fr;
+    .fig-row {
+        grid-template-columns: repeat(var(--count-narrow, 1), minmax(0, 1fr));
     }
 }
 /* The flat strips (ΔT over the millennia, the year's daylight, the scattering): SVGs in screen pixels, no frame. */
@@ -738,17 +789,24 @@ figure[id] {
     stroke-width: 3;
     stroke-linecap: butt;
 }
-/* The switches over a panel, at its top left, as over the other figures' scenes. */
-.tiles-panel > .view-buttons:not(.eclipse-jump) {
-    position: absolute;
-    top: 6px;
-    left: 6px;
-    z-index: 5;
-}
 .tiles-empty {
     padding: 2rem 1rem;
     color: var(--muted);
     text-align: center;
+}
+/* A figure that needs WebGPU where there is none: a short note in its canvas' place (see webgpu.ts). */
+.gpu-missing,
+.gpu-missing.sky-error {
+    position: static;
+    display: grid;
+    place-items: center;
+    border-radius: var(--radius-canvas);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: var(--text-small);
+}
+.gpu-missing p {
+    margin: 0;
 }
 /* Tiles split by lines of the page's background between them, both ways, `--count` tiles wide and `--rows` high; the
    last lines fall outside. The page's background is taken on the figure, outside the dark panel, which has its own. */
@@ -767,8 +825,17 @@ figure[id] {
         calc(100% / var(--rows, 1));
     pointer-events: none;
 }
-/* The maps' resolutions and the switches for the relief at the top left, each a group of its own, the resolutions first. */
-.tiles-panel > .tiles-start {
+/* A bar across the top of a stage: groups of switches and a hint at its start, the figure's actions at its end. It lets
+   a drag through to the stage between its groups. Its controls sit on frosted glass in the page's own theme, also over
+   a stage that stays dark, so they take the page's colors back from the overlay tokens. */
+.fig-bar {
+    --bg: var(--overlay-solid);
+    --surface: var(--overlay-surface);
+    --line: var(--overlay-line);
+    --text: var(--overlay-ink);
+    --muted: var(--overlay-quiet);
+    --accent: var(--overlay-accent);
+    --border: 1px solid var(--line);
     position: absolute;
     top: 6px;
     right: 6px;
@@ -777,72 +844,77 @@ figure[id] {
     display: flex;
     gap: 6px;
     align-items: flex-start;
+    color: var(--text);
     pointer-events: none;
 }
-/* Where the switches do not fit in one row, they take a second, and the hint makes way. */
-@media (max-width: 40rem) {
-    .tiles-panel > .tiles-start {
-        flex-wrap: wrap;
-    }
-    .tiles-panel > .tiles-start > .tiles-hint {
-        display: none;
-    }
+.fig-bar-start,
+.fig-bar-end {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
 }
-/* Clear of the buttons at the top right: the antialiasing switch, the download besides, the full screen too. */
-.tiles-panel:has(> .tiles-ends) > .tiles-start {
-    right: 112px;
+.fig-bar-start {
+    flex: 1 1 0;
+    min-width: 0;
 }
-.tiles-panel:has(> .tiles-end, > .fig-actions) > .tiles-start {
-    right: 88px;
+.fig-bar-end,
+.fig-bar > .fig-actions {
+    flex: none;
+    margin-left: auto;
 }
-.tiles-panel:has(> .globe-end) > .tiles-start {
-    right: 156px;
-}
-.tiles-panel:has(> .tiles-end > .view-icon) > .tiles-start {
-    right: 122px;
-}
-.tiles-panel:has(> .tiles-ends > :nth-child(2)) > .tiles-start {
-    right: 122px;
-}
-.tiles-panel:has(> .tiles-ends > :nth-child(2)):has(> .tiles-ends [data-field="metered"]) > .tiles-start {
-    right: 154px;
-}
-/* After the switches, how to turn the panel and what renders it, as sternzeit's scenes say it: muted, on no plate, cut
-   short where the panel is narrow. */
-.tiles-hint {
+/* After the switches, how to use the stage and what renders it: muted, on no plate, cut short where the bar is narrow. */
+.fig-hint {
     min-width: 0;
     height: 36px;
-    line-height: 36px;
     padding: 0 0.25rem;
     overflow: hidden;
     color: var(--muted);
-    opacity: 0.7;
+    line-height: 36px;
     white-space: nowrap;
     text-overflow: ellipsis;
+    opacity: 0.7;
 }
 /* Alone, without switches before it, as far from the top as from the side: the box trimmed to the capitals and the
    baseline, so the gap above the letters is the one beside them. */
-.tiles-start > .tiles-hint:only-child {
+.fig-bar-start > .fig-hint:only-child {
     height: auto;
     padding: 4px;
     line-height: 1;
     text-box: trim-both cap alphabetic;
 }
-/* Groups of buttons at the top right side by side: the antialiasing and the meter, the download apart. */
-.tiles-panel > .tiles-ends {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    z-index: 5;
-    display: flex;
-    gap: 6px;
-}
-/* The globe's full screen button, top right, and the globe full screen: the canvas the screen's size. */
-.tiles-panel > .view-buttons.globe-end,
-.tiles-panel > .view-buttons.tiles-end,
-.tiles-panel > .view-buttons.fig-actions {
-    left: auto;
-    right: 6px;
+/* Where the switches do not fit in one row, they take a second, and the hint makes way. */
+@media (max-width: 40rem) {
+    .fig-bar-start {
+        flex-wrap: wrap;
+    }
+    .fig-bar-start > .fig-hint {
+        display: none;
+    }
+    /* Over a row of tiles the bar, or the actions alone, go above the panel, where they would otherwise cover the top
+       row's tiles: the panel moves down by a bar's height, within the figure, its clip opened upwards, its corners rounded
+       on its canvas. */
+    .fig:has(> .tiles-panel.split > :is(.fig-bar, .fig-actions)) {
+        display: flow-root;
+    }
+    .tiles-panel.split:has(> .fig-bar, > .fig-actions) {
+        margin-top: 42px;
+        overflow: visible;
+        clip-path: inset(-120px 0 0 round 0 0 var(--radius-canvas) var(--radius-canvas));
+    }
+    .tiles-panel.split > :is(.fig-bar, .fig-actions) {
+        top: auto;
+        bottom: calc(100% + 6px);
+    }
+    .tiles-panel.split > .fig-bar {
+        right: 0;
+        left: 0;
+    }
+    .tiles-panel.split > .fig-actions {
+        right: 0;
+    }
+    .tiles-panel.split > canvas {
+        border-radius: var(--radius-canvas) var(--radius-canvas) 0 0;
+    }
 }
 .timeline-pointer {
     fill: var(--accent);
@@ -851,6 +923,8 @@ figure[id] {
    and a screen reader. */
 .split-slider {
     position: absolute;
+    top: 0;
+    left: 0;
     width: 1px;
     height: 1px;
     overflow: hidden;

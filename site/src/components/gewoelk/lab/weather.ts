@@ -8,9 +8,10 @@ import { HDR, onTables, tables } from "../../dunstkreis/atmosphere";
 import { createStarsRenderer, type FrameLight, skyAt } from "../../sternenheer/renderer";
 import { bindStarGroups, offsetOf } from "../../sternenheer/stargroups";
 import { state } from "../../sternzeit/state";
-import { SHOW, texturePanel } from "../textures";
+import { SHOW, type Shown, texturePanel } from "../textures";
 import { CIRRUS_PRESETS } from "./cirrus";
 import { FORMATION_PRESETS } from "./formation";
+import { type Design, KIND_VALUE, kindPresets, kindSource, type Place, placeOf, skyFrom } from "./kinds";
 import { createLab, type Lab, labPipeline } from "./lab";
 import shader from "./weather.comp.wgsl";
 
@@ -32,7 +33,8 @@ function nightStops(skyLuminance: number) {
 // The clouds' light, still a stand-in for dunstkreis' air: the sun's above the air, in lux, reddened by the air mass
 // in its way, a clear sky's colors overhead and at the horizon, and the ground's share of what falls on it.
 const SUNLIGHT = 128000;
-const ZENITH: Rgb = [0.06, 0.17, 0.48];
+// The whole sky's light on a cloud: between the zenith's blue and the horizon's pale, and half of it gray.
+const OVERHEAD: Rgb = [0.39, 0.45, 0.6];
 const PALE: Rgb = [0.42, 0.58, 0.85];
 const GROUND_ALBEDO = 0.25;
 const smoothstep = (a: number, b: number, x: number) => {
@@ -50,18 +52,34 @@ const lit = (color: Rgb, luminance: number): Rgb => {
     return color.map((c) => (c * luminance) / own) as Rgb;
 };
 
+// How high a designer looks at the start, in degrees: at what it designs.
+const PITCH: Record<Design, number> = { low: 16, towers: 14, front: 14, middle: 30, high: 48 };
+// And which way, from north through east: a front's to where its front stands.
+const YAW: Record<Design, number> = { low: 230, towers: 230, front: 20, middle: 230, high: 230 };
+// The high sheet's map as its designer shows it, a channel each: the share of a tile across, 0 for all, and what it holds.
+const HIGH_CHANNELS: [label: string, mode: number, at: number, title: string][] = [
+    ["puffs", SHOW.red, 0.125, "Red, an eighth of a tile across: the puffs and their trails, as a height."],
+    ["veil", SHOW.green, 0.25, "Green, a quarter of a tile across: the veil with its striations, ribs and trails."],
+    ["broad field", SHOW.blue, 0, "Blue, the whole tile: a broad field, read again for the sheet's patches and bands."],
+    ["billows", SHOW.alpha, 0.25, "Alpha, a quarter of a tile across: the noise the billows eat into the puffs by."],
+];
+
 /**
  * The whole-sky research figure on `root`, a `figure[data-weather-lab]`: gewoelk's layered clouds, three marched
  * layers and a sheet of high cloud, over dunstkreis' sky with sternenheer's stars and nachtgestirn's Moon, exposed by
  * the stars figure's meter. The clouds' light is still a stand-in, the sun's by day and the Moon's share of it by
- * night, with the real sky's luminance for their ambient light.
+ * night, with the real sky's luminance for their ambient light. Also the designers' figure, a
+ * `figure[data-cloud-designer]` whose `data-design` names what it designs: that place of the sky alone, the library's
+ * kinds of cloud for it as presets, its map alone in the panel, and its numbers to copy as a kind.
  */
 export async function weatherFigure(root: HTMLElement) {
     let draw: (lab: Lab) => void = () => {};
+    const design = root.dataset.design as Design | undefined;
+    const designed = design && placeOf(design);
     const lab = createLab(root, (current) => draw(current), {
-        presets: FORMATION_PRESETS,
-        morePresets: { sky: CIRRUS_PRESETS },
-        camera: { yaw: 230 * DEG, pitch: 16 * DEG, fov: 95 * DEG },
+        presets: designed ? kindPresets(designed) : FORMATION_PRESETS,
+        morePresets: designed ? {} : { sky: CIRRUS_PRESETS },
+        camera: { yaw: (design ? YAW[design] : 230) * DEG, pitch: (design ? PITCH[design] : 16) * DEG, fov: 95 * DEG },
     });
     if (!lab) return;
     const { device } = lab;
@@ -92,12 +110,14 @@ export async function weatherFigure(root: HTMLElement) {
     const quality = (): LayeredQuality => ({
         scale: Number(lab.choice("scale")) || 0.5,
         maxSteps: Number(lab.choice("steps")) || 128,
-        mapSize: 512,
-        highMapSize: Number(lab.choice("size")) || 2048,
+        // A designer keeps the maps it does not show small.
+        mapSize: designed === "high" ? 64 : 512,
+        highMapSize: designed && designed !== "high" ? 256 : Number(lab.choice("size")) || 2048,
     });
     const clouds = () => {
         const chosen = quality();
-        const key = JSON.stringify(chosen);
+        const godRays = lab.pressed("rays.on");
+        const key = JSON.stringify([chosen, godRays]);
         const made = passes.get(key);
         if (made && !(made instanceof Promise)) return made;
         if (!made) {
@@ -106,6 +126,7 @@ export async function weatherFigure(root: HTMLElement) {
                 toneMap: false,
                 background: false,
                 quality: chosen,
+                godRays,
             });
             passes.set(key, making);
             making.then((pass) => {
@@ -116,68 +137,22 @@ export async function weatherFigure(root: HTMLElement) {
         return null;
     };
 
-    /** The sky as the held sliders have it. */
+    /** The sky as the sliders have it: every place of it, or in a designer the one it designs. */
     const sky = (): LayeredSky => {
-        const layer = (i: number) => {
-            const value = (name: string) => lab.value(`l${i}.${name}`);
-            return {
-                coverage: lab.pressed(`l${i}.enabled`) ? value("coverage") : 0,
-                baseKm: value("base"),
-                depthKm: value("depth"),
-                sizeKm: value("feature"),
-                tileKm: value("tile"),
-                extinction: value("extinction"),
-                detail: value("detail"),
-                sharpness: value("sharp"),
-                lumps: value("lumps"),
-                bulge: value("warp"),
-            };
-        };
-        const c = (name: string) => lab.value(`c.${name}`);
-        return {
-            low: layer(0),
-            deep: {
-                ...layer(1),
-                kind: lab.choice("kind1") === "3" ? "front" : "towers",
-                anvil: lab.value("anvil"),
-                frontKm: lab.value("front.distance"),
-                frontDepthKm: lab.value("front.depth"),
-                frontBearing: lab.value("front.bearing"),
-            },
-            middle: layer(2),
-            high: {
-                coverage: lab.pressed("sheet.on") ? c("coverage") : 0,
-                altitudeKm: c("altitude"),
-                opticalDepth: c("opticalDepth"),
-                tileKm: c("tile"),
-                patchKm: c("patchKm"),
-                bandStretch: c("bandStretch"),
-                bandAngle: c("bandAngle"),
-                edge: c("edge"),
-                puffs: c("cells"),
-                puffKm: c("cellKm"),
-                elongation: c("elongation"),
-                rows: c("rows"),
-                grain: c("grain"),
-                softness: c("soft"),
-                billows: c("billows"),
-                billowKm: c("billowKm"),
-                ripples: c("ripples"),
-                rippleKm: c("rippleKm"),
-                curve: c("curve"),
-                ribs: c("ribs"),
-                ribKm: c("ribKm"),
-                veil: c("veil"),
-                striation: c("striation"),
-                stretch: c("stretch"),
-                combing: lab.value("comb"),
-                trails: c("streaks"),
-                trailBend: c("bend"),
-                relief: c("relief"),
-                forwardG: c("forwardG"),
-            },
-        };
+        const held = skyFrom(lab.value, lab.choice("kind1") === KIND_VALUE.front ? "front" : "towers");
+        const on = { low: "l0.enabled", deep: "l1.enabled", middle: "l2.enabled", high: "sheet.on" } as const;
+        for (const place of Object.keys(on) as Place[])
+            if (designed ? place !== designed : !lab.pressed(on[place])) held[place].coverage = 0;
+        return held;
     };
+    // A designer's numbers as they stand, as a kind of cloud to paste into the library's `CLOUD_TYPES`.
+    const copy = root.querySelector<HTMLButtonElement>("button[data-copy-kind]");
+    if (designed)
+        copy?.addEventListener("click", async () => {
+            await navigator.clipboard.writeText(kindSource(sky(), designed));
+            copy.textContent = "copied";
+            setTimeout(() => (copy.textContent = "copy"), 1200);
+        });
 
     lab.status = () => {
         const ms = (name: string) => (lab.timer.ms[name] === undefined ? "?" : lab.timer.ms[name]?.toFixed(2));
@@ -209,7 +184,7 @@ export async function weatherFigure(root: HTMLElement) {
             const sun = sunUp || !moonUp ? seen.sunDirection : seen.moonDirection;
             const luminance = Math.max(light.skyLuminance, 1e-6);
             const onGround = sunlightAt(0, Math.asin(Math.min(Math.max(sun[2], -1), 1)), scale);
-            const fromSky = lit(ZENITH, luminance * Math.PI);
+            const fromSky = lit(OVERHEAD, luminance * Math.PI);
             const windTo = (lab.value("wind.from") + 180) * DEG;
             const wind = [
                 Math.sin(windTo) * lab.value("wind.speed"),
@@ -282,7 +257,7 @@ export async function weatherFigure(root: HTMLElement) {
             composing.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
             composing.end();
             const channels = "Red is the column's value.";
-            textures.show([
+            const maps: Shown[] = [
                 {
                     label: "low map",
                     title: `The low layer's map, one tile from above, north up. ${channels}`,
@@ -318,11 +293,21 @@ export async function weatherFigure(root: HTMLElement) {
                     mode: SHOW.red,
                     ms: () => lab.timer.ms.bake,
                 },
-            ]);
+            ];
+            // A designer shows the map of its place alone, the sheet's channel by channel.
+            const baked = {
+                texture: pass.high.map,
+                kind: "2d" as const,
+                ms: () => lab.timer.ms.bake,
+                timed: "all four",
+            };
+            const sheet = HIGH_CHANNELS.map(([label, mode, at, title]) => ({ ...baked, label, title, mode, at }));
+            const own = designed === "high" ? sheet : maps.filter((map) => map.label === `${designed} map`);
+            textures.show(designed ? own : maps);
             textures.encode(encoder, lab.pressed("textures.on"));
             lab.timer.resolve(encoder);
         };
-        const drawn = renderer.draw(lab.context.getCurrentTexture(), {
+        const drawn = renderer.draw(lab.target(), {
             sky: seen,
             luts: table.luts,
             format: HDR,
@@ -352,6 +337,7 @@ export async function weatherFigure(root: HTMLElement) {
             over: overFrame,
         });
         if (!drawn) return;
+        lab.present();
         exposure = `, exposed at EV100 ${(drawn.ev100 + darker).toFixed(1)}`;
         lab.timer.read();
         // The exposure follows its meter slowly: frames asked for while it moves, none once it has arrived.

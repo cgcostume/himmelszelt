@@ -3,6 +3,7 @@ import { find } from "../dom";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { offsetSliders } from "../sternzeit/offset";
+import { gpuMissing } from "../webgpu";
 import { currentSky, gpu, gpuDevice, onSkyView, onTables, type Sky, tables } from "./atmosphere";
 import { plot, type Readout, type Stage } from "./stagesplots";
 
@@ -474,6 +475,8 @@ if (gpu.device) {
     new ResizeObserver(draw).observe(canvas);
     new ResizeObserver(replot).observe(plotSvg);
     draw();
+} else {
+    gpuMissing(canvas);
 }
 
 function normalize([x, y, z]: number[]): number[] {

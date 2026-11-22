@@ -3,7 +3,8 @@
 // built first, the way Horizon Zero Dawn and Red Dead Redemption 2 do it. Every change is free, at the price of a
 // march that samples towards the sun. Written as the voxel march writes its cloudscape: light in cd/m², premultiplied,
 // with what the layers let through of what lies behind, their shadow on the ground in it where a ray ends there.
-// Requires `params.wgsl`, dunstkreis' `camera.wgsl` and the output binding.
+// Under the deep layer's tall columns rain falls, and where the sun reaches it, it sends back the bows of `rainbow.wgsl`.
+// Requires `params.wgsl`, dunstkreis' `camera.wgsl`, `rainbow.wgsl`, `godrays.comp.wgsl` and the output binding.
 
 // A layer: a slab `depth` km deep from `base` km up, its clouds `size` km across on a map of one `tile` km. A front is
 // placed, not tiled: `frontAt` km from the observer to its leading edge along `heading`, `frontDepth` km from there
@@ -46,12 +47,14 @@ struct GwLayered {
     // The distance at which the last cloud is gone, 0 for clouds all the way, and from where they thin out.
     clearing: f32,
     clearingFrom: f32,
-    pad0: f32,
+    // The rain's extinction per km where it falls hardest, under the deep layer: 0 for none.
+    rain: f32,
     // How far the clouds lean with the wind per km they rise, east and north.
     shear: vec2f,
     // Where the observer stands over the ground the layers were laid out on, east and north.
     observer: vec2f,
-    pad1: vec2f,
+    // How far the rain lags behind its cloud by the time it has fallen 1 km, east and north: it falls into slower air.
+    rainLean: vec2f,
     layer: array<GwCloudLayer, 3>,
 }
 
@@ -62,6 +65,8 @@ struct GwLayered {
 // Repeats in every axis: the maps' and the detail noise's.
 @group(0) @binding(4) var gwLayerSampler: sampler;
 @group(0) @binding(5) var gwLayerDetail: texture_3d<f32>;
+// The rain's phase function over the scattering angle, `rainbowTable`'s row.
+@group(0) @binding(6) var gwLayerRainbow: texture_2d<f32>;
 
 // Steps a ray takes at most.
 override GW_LAYER_MAX_STEPS: u32 = 128u;
@@ -95,6 +100,18 @@ const GW_LAYER_AIR_UNDER: f32 = 0.3;
 const GW_LAYER_FORWARD_G: f32 = 0.8;
 const GW_LAYER_BACKWARD_G: f32 = -0.15;
 const GW_LAYER_FORWARD: f32 = 0.85;
+// Rain: the deep layer's column values between which it sets in and falls in full, the points along a ray under the
+// deep layer's base it is asked at, as far as GW_LAYER_RAIN_REACH km, and the samples up the deep layer towards the sun.
+const GW_LAYER_RAIN_FROM: vec2f = vec2f(0.35, 0.65);
+const GW_LAYER_RAIN_STEPS: u32 = 24u;
+const GW_LAYER_RAIN_REACH: f32 = 90.0;
+const GW_LAYER_RAIN_SUN_STEPS: u32 = 6u;
+// A curtain of rain hangs in streaks: how wide the field that thins them is, in km, and what it leaves between them.
+const GW_LAYER_RAIN_STREAKS: f32 = 2.4;
+const GW_LAYER_RAIN_BETWEEN: f32 = 0.3;
+// The points the rain in the sun's way is asked at, and how far that way is followed, in km.
+const GW_LAYER_RAIN_WET_STEPS: u32 = 3u;
+const GW_LAYER_RAIN_WET_REACH: f32 = 12.0;
 // Below this transmittance a ray is done.
 const GW_LAYER_MIN_TRANSMITTANCE: f32 = 0.01;
 const GW_LAYER_LUMA: vec3f = vec3f(0.2126, 0.7152, 0.0722);
@@ -319,6 +336,57 @@ fn gwLayerShade(p: vec3f, sun: vec3f) -> f32 {
     return 1.0 - gwDiffused(tau, GW_LAYER_FORWARD);
 }
 
+// The cloud in the sun's way to a point `p` under the layers, as an optical depth: the deep layer's sampled up its
+// depth, as tall as its towers stand, the others' by their columns.
+fn gwLayerSunDepth(p: vec3f, sun: vec3f) -> f32 {
+    let up = normalize(p);
+    let slant = 1.0 / max(dot(sun, up), 0.05);
+    let altitude = length(p) - gwParams.planetRadius;
+    var tau = (gwLayerOver(0u, p, sun, slant) + gwLayerOver(2u, p, sun, slant)) * slant;
+    let deep = gwLayered.layer[GW_LAYER_DEEP];
+    let rise = deep.depth / f32(GW_LAYER_RAIN_SUN_STEPS);
+    for (var k = 0u; k < GW_LAYER_RAIN_SUN_STEPS; k = k + 1u) {
+        let over = deep.base + (f32(k) + 0.5) * rise - altitude;
+        tau = tau + gwLayerDensity(p + sun * over * slant, false, GW_LAYER_DEEP).x * rise * slant;
+    }
+    return tau;
+}
+
+// How much of the full rain falls through `p`, 0 to 1, and the optical depth of the deep layer straight over where it
+// fell from: rain in curtains under the deep layer's dense columns, the towers of a shower or a front's wall, none past
+// the clearing. A curtain hangs in streaks and trails behind its cloud, more the farther it has fallen. Asked for a
+// stretch `across` km long, the streaks narrower than that are taken at their mean.
+fn gwLayerRain(p: vec3f, across: f32) -> vec2f {
+    let deep = gwLayered.layer[GW_LAYER_DEEP];
+    let fallen = max(deep.base - (length(p) - gwParams.planetRadius), 0.0);
+    let near = gwLayerGround(p) + gwLayered.rainLean * fallen * (0.4 + 0.6 * fallen / deep.base);
+    let g = near + gwLayered.observer;
+    let m = gwLayerColumn(GW_LAYER_DEEP, g);
+    let thinned = gwLayerCleared(near);
+    let value = clamp((m.r - thinned) / max(1.0 - thinned, 1e-3), 0.0, 1.0);
+    let rain = smoothstep(GW_LAYER_RAIN_FROM.x, GW_LAYER_RAIN_FROM.y, value);
+    if (rain <= 0.0) {
+        return vec2f(0.0);
+    }
+    let field = textureSampleLevel(gwLayerDetail, gwLayerSampler, vec3f(fract((g - deep.drift) / GW_LAYER_RAIN_STREAKS), 0.5), 0.0).b;
+    let streaks = mix(GW_LAYER_RAIN_BETWEEN, 1.0, mix(smoothstep(0.3, 0.7, field), 0.5, clamp(2.0 * across / GW_LAYER_RAIN_STREAKS, 0.0, 1.0)));
+    let span = gwLayerSpan(deep.depth, value);
+    return vec2f(rain * streaks, deep.extinction * (span.y - span.x) * deep.depth);
+}
+
+// The rain in the sun's way to `p`, a point in the rain under the deep layer's base, as a share of the full rain times
+// the km of that way: what dims the sun for the rain behind a curtain's lit face.
+fn gwLayerWet(p: vec3f, sun: vec3f) -> f32 {
+    let up = normalize(p);
+    let under = max(gwLayered.layer[GW_LAYER_DEEP].base - (length(p) - gwParams.planetRadius), 0.0);
+    let way = min(under / max(dot(sun, up), 0.05), GW_LAYER_RAIN_WET_REACH);
+    var wet = 0.0;
+    for (var k = 0u; k < GW_LAYER_RAIN_WET_STEPS; k = k + 1u) {
+        wet = wet + gwLayerRain(p + sun * way * (f32(k) + 0.5) / f32(GW_LAYER_RAIN_WET_STEPS), way).x;
+    }
+    return wet * way / f32(GW_LAYER_RAIN_WET_STEPS);
+}
+
 // The lowest base and the highest top of the layers that are on.
 fn gwLayerBounds() -> vec2f {
     var bounds = vec2f(1e9, -1e9);
@@ -366,7 +434,17 @@ fn gwLayers(@builtin(global_invocation_id) id: vec3u) {
         let farthest = min(select(outer.far, earth.near, grounded), 4.0 * fade);
         let lit = 1.0 - exp(-max(farthest, 0.0) / fade);
         var shade = vec2f(0.0);
-        for (var k = 0u; k < GW_LAYER_AIR_STEPS; k = k + 1u) {
+        // With god rays their table answers instead, for each stretch of the ray and for the air in front of a cloud,
+        // and the shade takes the air's share of the light behind, not its light as a share of the horizon's.
+        let way = gwGodRaysWay(v);
+        var airShare = lit;
+        if (GW_GOD_RAYS) {
+            let shares = gwGodRaysShares(cosTheta, fade);
+            let air = gwGodRaysAir(o, v, way, lit, fade, bounds, shares);
+            shade = vec2f(air.x, 1.0);
+            airShare = gwGodRaysShare(o, v, air.y, lit, farthest, fade, grounded, shares);
+        }
+        for (var k = 0u; k < select(GW_LAYER_AIR_STEPS, 0u, GW_GOD_RAYS); k = k + 1u) {
             let part = (f32(k) + within) / f32(GW_LAYER_AIR_STEPS);
             let p = o + v * (-fade * log(1.0 - part * lit));
             let thin = exp(-max(length(p) - radius, 0.0) / 8.0);
@@ -432,12 +510,59 @@ fn gwLayers(@builtin(global_invocation_id) id: vec3u) {
             let source = light * orders + ambient;
             let passed = exp(-here.x * step);
             let near = exp(-t / fade);
-            luminance = luminance + through * (1.0 - passed) * (source * near + haze * (1.0 - near));
+            var veil = haze;
+            if (GW_GOD_RAYS) {
+                veil = mix(horizon, murk, GW_LAYER_AIR_SHADED * gwGodRaysBefore(o, v, way, t, bounds));
+            }
+            luminance = luminance + through * (1.0 - passed) * (source * near + veil * (1.0 - near));
             through = through * passed;
             t = t + step;
         }
         // A march ends on a hundredth let through, and a sun behind would still shine through that: it counts as none.
         through = max(through - GW_LAYER_MIN_TRANSMITTANCE, 0.0) / (1.0 - GW_LAYER_MIN_TRANSMITTANCE);
+        // Rain under the deep layer, along the ray's stretch between the ground and that layer's base: more points near
+        // than far. Where the sun reaches it, it sends the sun's light back by the rain's phase function, the bows in
+        // it, less the deeper in the rain; all of it is lit by the sky through the cloud overhead and by the ground.
+        // Seen from under the base it lies in front of the clouds, from above behind them.
+        let deep = gwLayered.layer[GW_LAYER_DEEP];
+        if (gwLayered.rain > 0.0 && deep.enabled != 0u && deep.kind >= 2u) {
+            let lid = gwSphere(o, v, radius + deep.base);
+            let start = max(lid.near, 0.0);
+            let end = min(select(lid.far, min(lid.far, earth.near), grounded), start + GW_LAYER_RAIN_REACH);
+            if (lid.hits && end > start) {
+                let bows = gwRainbowPhase(cosTheta, gwLayerRainbow, gwLayerSampler);
+                var rained = vec3f(0.0);
+                var dry = 1.0;
+                var before = start;
+                for (var k = 0u; k < GW_LAYER_RAIN_STEPS; k = k + 1u) {
+                    let part = (f32(k) + 1.0) / f32(GW_LAYER_RAIN_STEPS);
+                    let after = start + (end - start) * part * part;
+                    let t = mix(before, after, within);
+                    let step = after - before;
+                    before = after;
+                    let p = o + v * t;
+                    let falling = gwLayerRain(p, step);
+                    if (falling.x <= 0.0) {
+                        continue;
+                    }
+                    let up = p / length(p);
+                    let light = gwLayerSunlight(length(p) - radius, asin(clamp(dot(sun, up), -1.0, 1.0)));
+                    let direct = exp(-gwLayerSunDepth(p, sun) - gwLayered.rain * gwLayerWet(p, sun));
+                    let fromSky = gwParams.skyIrradiance * gwDiffused(falling.y, GW_LAYER_FORWARD);
+                    let source = light * direct * bows + gwLayered.ambient * (fromSky + gwParams.groundIrradiance) / (4.0 * GW_PI);
+                    let passed = exp(-gwLayered.rain * falling.x * step);
+                    let near = exp(-t / fade);
+                    rained = rained + dry * (1.0 - passed) * (source * near + haze * (1.0 - near));
+                    dry = dry * passed;
+                }
+                if (gwParams.observerAltitude < deep.base) {
+                    luminance = rained + dry * luminance;
+                } else {
+                    luminance = luminance + through * rained;
+                }
+                through = through * dry;
+            }
+        }
         // The layers' shadow on the ground, where the ray ends there: what they let through of the sun's light on its
         // way down to that point, taken from what the ground sends back. The sky's light on it stays, and the air in
         // front hides the far ground's shadows as it hides the ground.
@@ -469,7 +594,7 @@ fn gwLayers(@builtin(global_invocation_id) id: vec3u) {
         }
         // What lies behind the layers is seen through the air under them: where that is shaded, less of the sky's or
         // the ground's own color arrives, and the shaded air's gray instead.
-        let veiled = shaded * lit;
+        let veiled = shaded * airShare;
         luminance = luminance + through * veiled * murk;
         through = through * (1.0 - veiled);
     }

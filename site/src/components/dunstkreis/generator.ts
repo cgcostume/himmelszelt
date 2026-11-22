@@ -4,6 +4,7 @@ import { showCode } from "../code";
 import { find } from "../dom";
 import { onDemand } from "../frame";
 import { state } from "../sternzeit/state";
+import { GPU_MISSING } from "../webgpu";
 import {
     bindCubifyToggle,
     bindModelChoice,
@@ -467,7 +468,7 @@ function draw() {
 }
 
 if (gpu.error) {
-    field("recipe").insertAdjacentHTML("afterend", `<p class="note">${gpu.error}</p>`);
+    field("recipe").insertAdjacentHTML("afterend", `<p class="note">${GPU_MISSING}</p>`);
 } else {
     const request = onDemand(draw, root);
     onEnvironment(request);

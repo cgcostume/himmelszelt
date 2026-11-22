@@ -14,7 +14,6 @@ import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { starPicker } from "../sternenheer/starpicker";
 import { drawSvg, svgText } from "../sternzeit/figure";
-import { morph } from "./skyframe";
 
 // One star's flicker through the air: its light as `dkScintillation` draws it, the twinkling's strength over the
 // altitude from `scintillationIndex`, and the pattern of light and shade the turbulence casts on the ground. CPU only.
@@ -162,7 +161,6 @@ export function flickerFigure(root: HTMLElement) {
     let clock = WINDOW_S;
     let last = performance.now();
     let playing = false;
-    const fold = morph(play);
 
     function settings() {
         const heightM = 10 ** Number(sliders.height.value);
@@ -476,7 +474,6 @@ export function flickerFigure(root: HTMLElement) {
         playing = !playing;
         play.setAttribute("aria-pressed", String(playing));
         play.setAttribute("aria-label", playing ? "Pause" : "Play");
-        fold(playing);
         last = performance.now();
         requestRender();
     });

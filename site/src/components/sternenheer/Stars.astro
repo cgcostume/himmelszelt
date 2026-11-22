@@ -61,7 +61,7 @@ const TONE = {
         <Fragment slot="options">
             <OptionGroup name="exposure">
                 <label class="sky-ev">EV<sub>100</sub> <input data-field="exposure" type="range" min="-20" max="14" step="0.1" value="9" title="Brighter to the right: a lower EV lets in more light" /> <output data-field="ev" /></label>
-                <button type="button" class="view-toggle" data-field="auto" aria-pressed="true" title="Expose for the sky where it is brighter than the stars, by day and by moonlight, else for the Milky Way">auto</button>
+                <button type="button" class="view-toggle" data-field="auto" aria-pressed="true" title="Expose for the sky where it is brighter than the stars, by day and by moonlight, else for the Milky Way">metered</button>
             </OptionGroup>
             <OptionGroup name="sky">
                 <button type="button" class="view-toggle" data-field="moon" aria-pressed="true" title="nachtgestirn's Moon, lighting the sky and hiding the stars behind its disc, lit or not">Moon</button>
@@ -81,7 +81,7 @@ const TONE = {
             </OptionGroup>
             <OptionGroup name="eye">
                 <button type="button" class="view-toggle" data-field="glare" aria-pressed="true" title="The halo around a bright star: the light its core cannot show, spread around it, falling with the cube of the distance, wider the brighter the star">glare</button>
-                <button type="button" class="view-toggle" data-field="eye" aria-pressed="true" title="As the dark-adapted eye sees the night rather than a camera: below some 4 cd/m² the rods take over from the cones, colors fade and what is left shifts towards blue">eye at night</button>
+                <button type="button" class="view-toggle" data-field="eye" aria-pressed="true" title="As the dark-adapted eye sees the night rather than a camera: below some 4 cd/m² the rods take over from the cones, colors fade and what is left shifts towards blue">night vision</button>
             </OptionGroup>
             <Lens />
             <OptionGroup name="HDR (× SDR white)">

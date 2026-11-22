@@ -19,6 +19,8 @@ const LABELS: Record<CostKey, [string, string]> = {
     blend: ["a fade of two environments", `into 6 × ${CUBE_SIZE}², mips`],
     panorama: ["a panorama laid out", `equirectangular, ${4 * CUBE_SIZE} × ${2 * CUBE_SIZE}`],
 };
+// Hatched, to compare against: the 4K HDRI into a cube map as sharp; the rest is what the defaults draw.
+const COMPARED = new Set<CostKey>(["hdri4k"]);
 const rows = COST_ROWS.map((key) => {
     const row = measure.rows[key];
     const [label, note] = LABELS[key];
@@ -26,6 +28,7 @@ const rows = COST_ROWS.map((key) => {
         label,
         note,
         values: [row?.ms?.median, (row?.memory ?? 0) / MiB, row?.download ? row.download / MiB : "none"],
+        reference: COMPARED.has(key),
     };
 });
 ---

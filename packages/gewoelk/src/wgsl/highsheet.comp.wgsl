@@ -52,6 +52,11 @@ const GW_HIGH_SOFT_LEVELS: f32 = 3.5;
 const GW_HIGH_GROUND_AIR: f32 = 90.0;
 const GW_HIGH_AIR: f32 = 220.0;
 const GW_HIGH_SUN_ANGLE: f32 = 0.0093;
+// Towards a patch's edge: the least of a puff's height its rim fades over, how far the veil's faintest lines are cut
+// before it thins, and how wide the toe is a cut leaves the sky with, each as a share.
+const GW_HIGH_RIM: f32 = 0.6;
+const GW_HIGH_VEIL_CUT: f32 = 0.35;
+const GW_HIGH_TOE: f32 = 0.5;
 // A puff's thickness over its width.
 const GW_HIGH_LUMP: f32 = 0.35;
 // How much of the ground's light a cloud's full shadow takes, the rest being the sky's.
@@ -82,6 +87,13 @@ fn gwHighSunAt(elevation: f32) -> vec3f {
     return mix(gwSunlight.illuminance[at].rgb, gwSunlight.illuminance[at + 1u].rgb, f - f32(i));
 }
 
+// What is left of a height `x` cut at 0, up to 1: leaving 0 without a kink, over a toe `toe` wide, where a plain cut
+// would draw an outline.
+fn gwHighCut(x: f32, toe: f32) -> f32 {
+    let t = clamp(x, 0.0, 1.0);
+    return t * t * (1.0 + toe) / (t + max(toe, 1e-4));
+}
+
 // The sheet's density over a point of the ground, `over` km east and north of the observer, for a footprint of `lod`
 // levels of the map: the tile read in the wind's frame, thinned to the patches of the broad field.
 fn gwHighDensity(over: vec2f, lod: f32) -> f32 {
@@ -100,8 +112,15 @@ fn gwHighDensity(over: vec2f, lod: f32) -> f32 {
     let stays = smoothstep(1.0 - gwHigh.coverage - soft, 1.0 - gwHigh.coverage + soft, broad) * smoothstep(0.0, 0.05, gwHigh.coverage);
     // Softness: the puffs read from a coarser level of the map, a blur that spreads each one past its rim.
     let blurred = textureSampleLevel(gwHighMap, gwHighMapSampler, w / gwHigh.tile, lod + gwHigh.softness * GW_HIGH_SOFT_LEVELS).r * (1.0 + 0.8 * gwHigh.softness);
-    // Towards a patch's edge the threshold rises: small puffs go first, large ones shrink, and the veil thins.
-    let left = clamp((vec2f(blurred, detail.g) - (1.0 - stays)) / max(stays, 0.05), vec2f(0.0), vec2f(1.0)) * sqrt(stays);
+    // Towards a patch's edge the puffs' threshold rises: small ones go first, large ones shrink and thin, over no less
+    // of their height than a rim takes. The veil thins out as a whole, and only its faintest lines are cut.
+    let gone = 1.0 - stays;
+    let toe = GW_HIGH_TOE * gone;
+    let cut = GW_HIGH_VEIL_CUT * gone;
+    let left = vec2f(
+        gwHighCut((blurred - gone) / max(stays, GW_HIGH_RIM), toe) * sqrt(stays),
+        gwHighCut((detail.g - cut) / (1.0 - cut), toe) * stays,
+    );
     // Billows: the noise read twice, at two sizes and creeping two ways, so its lumps change as they go. It eats into
     // the puffs from their rims, as the detail noise erodes a volume's profile, and gives the blur its lumps back.
     let size = GW_HIGH_BILLOW_CELLS * gwHigh.billowSize;

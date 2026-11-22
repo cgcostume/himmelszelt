@@ -8,6 +8,7 @@ import {
     gpuDevice,
     HDR,
     onDisplay,
+    SDR,
     gpu as shared,
 } from "../../dunstkreis/atmosphere";
 import { flightIn } from "../../dunstkreis/flight";
@@ -17,6 +18,7 @@ import { onDemand } from "../../frame";
 import { paintRange } from "../../range";
 import { COMPASS } from "../../sternzeit/figure";
 import { onChange, state } from "../../sternzeit/state";
+import { gpuMissing } from "../../webgpu";
 import view from "./view.wgsl";
 
 /**
@@ -118,18 +120,16 @@ export function createLab(
     const field = <T extends HTMLElement = HTMLElement>(name: string) => find<T>(`[data-field="${name}"]`, root);
     const maybe = (name: string) => root.querySelector<HTMLElement>(`[data-field="${name}"]`);
     const canvas = field<HTMLCanvasElement>("canvas");
-    if (shared.error || !shared.device) {
-        const error = Object.assign(document.createElement("div"), { className: "sky-error" });
-        error.innerHTML = `<p>${shared.error ?? "No GPU device."}</p>`;
-        canvas.replaceWith(error);
+    const context = shared.error || !shared.device ? null : canvas.getContext("webgpu");
+    if (!context) {
+        gpuMissing(canvas, "sky-error");
         return null;
     }
-    const context = canvas.getContext("webgpu");
-    if (!context) return null;
     // Half floats whatever the display: one canvas format for the passes that write it, and values over 1 only where
-    // the page's display choice gives them headroom.
-    configureCanvas(context, HDR);
+    // the page's display choice gives them headroom. A browser without half float canvases (Firefox) gets them
+    // offscreen, copied to an rgba8unorm canvas.
     const device = gpuDevice();
+    const offscreen = halfFloatsOffscreen(device, context);
 
     const sliders = [...root.querySelectorAll<HTMLInputElement>("input[data-param]")];
     const byParam = new Map(sliders.map((input) => [input.dataset.param ?? "", input]));
@@ -154,6 +154,10 @@ export function createLab(
         device,
         context,
         camera,
+        /** The half float texture to write a frame into: the canvas', or one shown on it by `present()`. */
+        target: () => offscreen?.target() ?? context.getCurrentTexture(),
+        /** Shows the frame written into `target()` on the canvas, where that was not the canvas' own. */
+        present: () => offscreen?.present(),
         /** The view's uniform, written by `size()`. */
         view,
         /** How far the figure has flown from where it started, in km east and north. */
@@ -340,5 +344,72 @@ export function floatStruct(name: string, fields: readonly string[]) {
         wgsl: `struct ${name} {\n${padded.map((field) => `    ${field}: f32,`).join("\n")}\n}`,
         size: padded.length * 4,
         pack: (values: Record<string, number>) => new Float32Array(padded.map((field) => values[field] ?? 0)),
+    };
+}
+
+const COPY = /* wgsl */ `
+@group(0) @binding(0) var source: texture_2d<f32>;
+@group(0) @binding(1) var output: texture_storage_2d<rgba8unorm, write>;
+@compute @workgroup_size(8, 8) fn main(@builtin(global_invocation_id) id: vec3u) {
+    if (any(id.xy >= textureDimensions(output))) {
+        return;
+    }
+    textureStore(output, id.xy, vec4f(clamp(textureLoad(source, id.xy, 0).rgb, vec3f(0.0), vec3f(1.0)), 1.0));
+}`;
+
+/**
+ * Configures `context` for half floats, or where the browser has no such canvas, for rgba8unorm with an rgba16float
+ * texture of its size to write into and copy over: null when the canvas takes half floats itself.
+ */
+function halfFloatsOffscreen(device: GPUDevice, context: GPUCanvasContext) {
+    try {
+        configureCanvas(context, HDR);
+        return null;
+    } catch {
+        configureCanvas(context, SDR);
+    }
+    const pipeline = device.createComputePipeline({
+        label: "sternwarte:labCopy",
+        layout: "auto",
+        compute: { module: device.createShaderModule({ code: COPY }), entryPoint: "main" },
+    });
+    let texture: GPUTexture | null = null;
+    return {
+        target() {
+            const { width, height } = context.canvas;
+            if (!texture || texture.width !== width || texture.height !== height) {
+                texture?.destroy();
+                texture = device.createTexture({
+                    label: "sternwarte:labOffscreen",
+                    size: [width, height],
+                    format: HDR,
+                    usage:
+                        GPUTextureUsage.STORAGE_BINDING |
+                        GPUTextureUsage.TEXTURE_BINDING |
+                        GPUTextureUsage.RENDER_ATTACHMENT,
+                });
+            }
+            return texture;
+        },
+        present() {
+            if (!texture) return;
+            const canvas = context.getCurrentTexture();
+            const encoder = device.createCommandEncoder({ label: "sternwarte:labCopy" });
+            const pass = encoder.beginComputePass();
+            pass.setPipeline(pipeline);
+            pass.setBindGroup(
+                0,
+                device.createBindGroup({
+                    layout: pipeline.getBindGroupLayout(0),
+                    entries: [
+                        { binding: 0, resource: texture.createView() },
+                        { binding: 1, resource: canvas.createView() },
+                    ],
+                }),
+            );
+            pass.dispatchWorkgroups(Math.ceil(canvas.width / 8), Math.ceil(canvas.height / 8));
+            pass.end();
+            device.queue.submit([encoder.finish()]);
+        },
     };
 }

@@ -16,6 +16,7 @@ import { formatBytes, saveHdr, savePng } from "../dunstkreis/download";
 import { createPreview, type PreviewOptions, renderPixels, SCALE } from "../dunstkreis/preview";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
+import { GPU_MISSING } from "../webgpu";
 
 type PanelName = "sky" | "irradiance";
 const PANELS: PanelName[] = ["sky", "irradiance"];
@@ -176,7 +177,8 @@ function showValues(sh: ArrayLike<number>, [r = 0, g = 0, b = 0]: ArrayLike<numb
 }
 
 if (gpu.error) {
-    find(".lut-bar", root).insertAdjacentHTML("afterend", `<p class="note">${gpu.error}</p>`);
+    find(".lut-bar", root).insertAdjacentHTML("afterend", `<p class="note">${GPU_MISSING}</p>`);
+    for (const panel of root.querySelectorAll<HTMLElement>("section.lut")) panel.style.display = "none";
 } else {
     // Drawn while on screen, from the environment built last.
     const requestDraw = onDemand(() => {

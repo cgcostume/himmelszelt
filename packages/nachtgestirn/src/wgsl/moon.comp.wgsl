@@ -57,10 +57,19 @@ fn ngHas(flag: u32) -> bool {
 
 // The maps ------------------------------------------------------------------------------------------------------------
 
-// A map magnified, by a cubic B-spline in four bilinear taps after Sigg and Hadwiger, so the texels' edges do not show
-// as steps along the terminator.
-fn ngSampleBicubic(map: texture_2d<f32>, uv: vec2f) -> vec3f {
-    let size = vec2f(textureDimensions(map));
+// The displaced heights by the B-spline only below this level, truly magnified: at level 0, a 1303 px disc on 4K maps,
+// rounding alone chose it.
+const NG_SPLINE_BELOW: f32 = -0.25;
+
+// Where the cubic B-spline after Sigg and Hadwiger reads a map in four bilinear taps, and how it weighs them.
+struct NgSplineTaps {
+    t0: vec2f,
+    t1: vec2f,
+    g0: vec2f,
+    g1: vec2f,
+}
+
+fn ngSplineTaps(size: vec2f, uv: vec2f) -> NgSplineTaps {
     let texel = uv * size - 0.5;
     let f = fract(texel);
     let f2 = f * f;
@@ -72,31 +81,54 @@ fn ngSampleBicubic(map: texture_2d<f32>, uv: vec2f) -> vec3f {
     let g0 = w0 + w1;
     let g1 = w2 + w3;
     let base = floor(texel) + 0.5;
-    let t0 = (base - 1.0 + w1 / g0) / size;
-    let t1 = (base + 1.0 + w3 / g1) / size;
-    let a = textureSampleLevel(map, ngMapSampler, vec2f(t0.x, t0.y), 0.0).rgb;
-    let b = textureSampleLevel(map, ngMapSampler, vec2f(t1.x, t0.y), 0.0).rgb;
-    let c = textureSampleLevel(map, ngMapSampler, vec2f(t0.x, t1.y), 0.0).rgb;
-    let d = textureSampleLevel(map, ngMapSampler, vec2f(t1.x, t1.y), 0.0).rgb;
-    return g0.y * (g0.x * a + g1.x * b) + g1.y * (g0.x * c + g1.x * d);
+    return NgSplineTaps((base - 1.0 + w1 / g0) / size, (base + 1.0 + w3 / g1) / size, g0, g1);
 }
 
-// A map over a ray's footprint, `dx` and `dy` its axes in uv: by the B-spline where it is magnified, else filtered
-// anisotropically by the hardware, up to sixteen taps along the long axis. Towards the poles the parallels crowd the
-// texels together east to west, and at the limb the slant stretches the footprint: an isotropic mip level would take
-// the longer of both and blur what the other axis still resolves.
+// A map magnified, by the B-spline, so the texels' edges do not show as steps along the terminator.
+fn ngSampleBicubic(map: texture_2d<f32>, uv: vec2f) -> vec3f {
+    let s = ngSplineTaps(vec2f(textureDimensions(map)), uv);
+    let a = textureSampleLevel(map, ngMapSampler, vec2f(s.t0.x, s.t0.y), 0.0).rgb;
+    let b = textureSampleLevel(map, ngMapSampler, vec2f(s.t1.x, s.t0.y), 0.0).rgb;
+    let c = textureSampleLevel(map, ngMapSampler, vec2f(s.t0.x, s.t1.y), 0.0).rgb;
+    let d = textureSampleLevel(map, ngMapSampler, vec2f(s.t1.x, s.t1.y), 0.0).rgb;
+    return s.g0.y * (s.g0.x * a + s.g1.x * b) + s.g1.y * (s.g0.x * c + s.g1.x * d);
+}
+
+// The B-spline with each tap filtered over the footprint: magnified across it, minified along it.
+fn ngSampleBicubicOver(map: texture_2d<f32>, uv: vec2f, dx: vec2f, dy: vec2f) -> vec3f {
+    let s = ngSplineTaps(vec2f(textureDimensions(map)), uv);
+    let a = textureSampleGrad(map, ngMapSampler, vec2f(s.t0.x, s.t0.y), dx, dy).rgb;
+    let b = textureSampleGrad(map, ngMapSampler, vec2f(s.t1.x, s.t0.y), dx, dy).rgb;
+    let c = textureSampleGrad(map, ngMapSampler, vec2f(s.t0.x, s.t1.y), dx, dy).rgb;
+    let d = textureSampleGrad(map, ngMapSampler, vec2f(s.t1.x, s.t1.y), dx, dy).rgb;
+    return s.g0.y * (s.g0.x * a + s.g1.x * b) + s.g1.y * (s.g0.x * c + s.g1.x * d);
+}
+
+// A map over a ray's footprint, `dx` and `dy` its axes in uv: by the B-spline where its shorter axis magnifies the map,
+// else filtered anisotropically by the hardware, up to sixteen taps along the long axis. Towards the poles the
+// parallels crowd the texels together east to west, and at the limb the slant stretches the footprint: an isotropic mip
+// level would take the longer of both and blur what the other axis still resolves. There the footprint can be half a
+// texel across and dozens along, and read bilinearly its creases show as steps along the limb: the B-spline's taps are
+// filtered along it instead. The B-spline alone up to three quarters of a texel, where the hardware's creases would show
+// as a grid across the terminator, blended into the sampler up to a whole texel, where they no longer do.
 fn ngSampleIn(map: texture_2d<f32>, uv: vec2f, dx: vec2f, dy: vec2f) -> vec3f {
     let size = vec2f(textureDimensions(map));
-    let texels = max(length(dx * size), length(dy * size));
-    if (!NG_MAP_BSPLINE || texels >= 1.25) {
+    let across = length(dx * size);
+    let along = length(dy * size);
+    let texels = min(across, along);
+    if (!NG_MAP_BSPLINE || texels >= 1.0) {
         return textureSampleGrad(map, ngMapSampler, uv, dx, dy).rgb;
     }
-    let spline = ngSampleBicubic(map, uv);
+    var spline: vec3f;
+    if (max(across, along) < 1.0) {
+        spline = ngSampleBicubic(map, uv);
+    } else {
+        spline = ngSampleBicubicOver(map, uv, dx, dy);
+    }
     if (texels <= 0.75) {
         return spline;
     }
-    // Blended over a band around a texel to a footprint, so no seam shows where the one hands over to the other.
-    return mix(spline, textureSampleGrad(map, ngMapSampler, uv, dx, dy).rgb, (texels - 0.75) / 0.5);
+    return mix(spline, textureSampleGrad(map, ngMapSampler, uv, dx, dy).rgb, (texels - 0.75) / 0.25);
 }
 
 // Where a point of the whole maps lies in the detail strip, in the strip's own uv, or -1 outside it or without one: a
@@ -219,13 +251,13 @@ fn ngNormalAt(point: vec3f, footprint: NgFootprint) -> vec3f {
 
 // The relief's height at a level: by the B-spline below `splineBelow`, smooth across the texels' creases, bilinearly
 // above it. The shadows are marched through a smooth terrain wherever the finest level is read, so their edges do not
-// follow the creases: below half a level. The displaced relief only where it is magnified: below level 0.
+// follow the creases: below half a level. The displaced relief only where it is magnified: below a quarter level.
 const NG_SPLINE_SHADOWS: f32 = 0.5;
 // Where a shadow is cast from between a coarse texel's mean height and its highest: the march follows a line, the texel
 // is a square, and its highest point mostly lies off the line. Halfway matches the share of shadow photographs show
 // along the terminator.
 override NG_PEAK_SHARE: f32 = 0.5;
-const NG_SPLINE_DISPLACED: f32 = 0.0;
+const NG_SPLINE_DISPLACED: f32 = NG_SPLINE_BELOW;
 
 fn ngHeightIn(map: texture_2d<f32>, uv: vec2f, level: f32, splineBelow: f32, highest: bool) -> f32 {
     if (level < splineBelow) {

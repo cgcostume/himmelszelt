@@ -43,8 +43,10 @@ import Lighting from "../../components/rundbild/Lighting.astro";
 import Wavelengths from "../../components/dunstkreis/Wavelengths.astro";
 import AirTable from "../../components/dunstkreis/AirTable.astro";
 import Flicker from "../../components/dunstkreis/Flicker.astro";
+import Glows from "../../components/dunstkreis/Glows.astro";
 import Shimmer from "../../components/nachtgestirn/Shimmer.astro";
 import Costs from "../../components/dunstkreis/Costs.astro";
+import Grading from "../../components/dunstkreis/Grading.astro";
 
 This chapter is being written. The sky below is live, and it grows with the chapter; the dashed boxes are the figures
 still to come.
@@ -166,8 +168,8 @@ bounced two, three, many times, and it is what lights the shadow side of the sky
 it. Bruneton computed each <Term of="Scattering order">order</Term> in turn and stopped after four.
 Hillaire assumed that light scattered more than once has lost any preferred direction, which makes every further order
 a fixed fraction of the one before and the whole infinite sum one table lookup <Cite id="hillaire2020" />, held in the
-<Term of="Multi-scattering LUT">multiple scattering table</Term>. For Earth's air the two agree to a few percent, and at
-twilight that table carries most of the sky (<Fig id="sky-parts" />).
+<Term of="Multi-scattering LUT">multiple scattering table</Term>. At twilight that table carries most of the sky
+(<Fig id="sky-parts" />).
 
 <Sky
     id="sky-parts"
@@ -340,10 +342,19 @@ channel, and the setting Sun's disc split into a white upper and a yellow lower 
 From there on the sky is light like any other, and what becomes of it is [helldunkel](../helldunkel/)'s, whose code
 dunstkreis bundles, so the sky pass needs no other package. `autoExposure` meters the sky-view table on the GPU, and
 `autoExposureKeys` shapes that reading over the day, darker at night, the blue hour lifted, as
-[helldunkel follows through a day](../helldunkel/#a-sky-that-moves); `toneMap` picks its curve, `whiteBalance` its
+[helldunkel explains](../helldunkel/#a-sky-that-moves); `toneMap` picks its curve, `whiteBalance` its
 white, `veil` adds a lens's or the eye's glare and `darkAdapted` its blue shift at night. A renderer with its own HDR pipeline turns
 the tone map off and gets the exposed luminance itself, linear and unclamped, for a float target. How one patch of this
 sky becomes a pixel, step by step, is [helldunkel's last section](../helldunkel/#one-sky-end-to-end).
+
+The ramp is also where a sky gets its look. Left to itself, the meter brings every sky to about the same brightness, so
+the end of nautical twilight, with the Sun 12° down, comes out as bright as day, only bluer. The keys say how
+much darker each altitude should be, and a key's `tint` grades its color, a warmer golden hour or a purple dusk, scaled
+to keep the luminance so the compensation alone sets the brightness. dunstkreis multiplies the tint into the white
+balance, so it costs the shaders nothing and reaches the sun disc and the aerial perspective as well
+(<Fig id="grading" />).
+
+<Grading />
 
 ## Aerial perspective
 
@@ -631,6 +642,16 @@ even a lens's veil burns out twice the disc's width, and a good quarter more wit
 `starburst`, off by default, adds the spikes a camera's aperture blades diffract the Sun into, fixed to the camera.
 Switch it on under the sky and raise the observer to orbit (<Fig id="sky" />).
 
+Side by side, the disc stands more than five decades above the sky beside it at noon, and every glow in between falls
+off with the angle at its own pace (<Fig id="glows" />). That is why none of them has a size: an exposure draws a line
+across them, and whatever lies above it is white. Slide the exposure, and the white patch around the Sun grows and
+shrinks with it; a thin cloud in front adds its [corona](../gewoelk/#light-in-a-cloud), brighter than all the others
+a degree out.
+
+<Glows />
+
+<Controls />
+
 The rest is [helldunkel](../helldunkel/)'s too: [bloom](../helldunkel/#bloom) needs the whole exposed image, and runs
 over it. All of these add up without counting each other twice: the aureole is light in the air, the corona the Sun's
 own, the veil, the starburst and the bloom what the lens or the eye spreads of all that reaches it. God rays, the shafts of light and shadow through haze, need what the sky does not
@@ -669,9 +690,9 @@ scattered towards an observer at any height, in any direction, for any Sun, in o
 by 32 by 8 texels, computed once; aerial perspective between any two points comes from it for free, and the sky needs no
 table of its own per Sun. Hillaire's holds two small tables of the air and rebuilds a table of the whole sky whenever the
 Sun moves, in a quarter of a millisecond; it is what dunstkreis uses, fits in half a megabyte, and its multiple
-scattering is an infinite sum under one assumption where Bruneton's is four orders exactly. For Earth's air the skies
-differ by a few percent, mostly in twilight. Bruneton's table may come to dunstkreis as another way to fill the sky view,
-and the two would then be switchable like sternzeit's precise and approximate variants.
+scattering is an infinite sum under one assumption where Bruneton's is four orders exactly. Bruneton's table may come
+to dunstkreis as another way to fill the sky view, and the two would then be switchable like sternzeit's precise and
+approximate variants.
 
 <Planned title="Bruneton and Hillaire" plan="only once Bruneton's table is built; a paragraph until then.">
     Both skies at the chosen moment side by side, and their difference magnified.
@@ -705,8 +726,8 @@ Eric Bruneton and Fabrice Neyret, at INRIA in Grenoble, wrote the 2008 paper who
 starts from <Cite id="bruneton2008" />, and Bruneton's later implementation, which computes fifteen wavelengths exactly,
 is where the solar spectrum and the ozone cross-sections come from <Cite id="bruneton2017" />. Sébastien Hillaire, then
 at Epic Games, replaced the four-dimensional table with the three small ones of this chapter, for a sky cheap enough to
-rebuild every frame <Cite id="hillaire2020" />. Tomoyuki Nishita and his colleagues drew the first computed Earth seen
-through its atmosphere in 1993 <Cite id="nishita1993" />, and the thickness of the shell is still theirs.
+rebuild every frame <Cite id="hillaire2020" />. Tomoyuki Nishita and his colleagues computed Earth as seen from space,
+through its atmosphere, in 1993 <Cite id="nishita1993" />, and the thickness of the shell is still theirs.
 
 Bengt Edlén, a physicist at Lund, measured the refractive index of air that bends every ray here
 <Cite id="edlen1966" />, and George G. Bennett's fit for navigators <Cite id="bennett1982" /> is what the traced

@@ -179,6 +179,10 @@ can, or goes.
 - Figures render on demand, never in a continuous loop (the one exception: the corona in the eclipse figure turns
   while it shows and is in view), and are built so the later Tafeln can lift them out (colors
   from CSS tokens, UI switchable off, no reach into the chapter's DOM).
+- A figure's bar shows a switch as its icon where the set has one (`icons.ts`), a panel of options as its word, and one
+  concept has one icon and one word in every chapter: "metered", "refracted", "night vision", "Annotations" for the tag.
+  A switch only one figure has stays a word in its bar, as does a number ("4×MSAA"). Two downloads in one group say
+  their formats ("png", "svg").
 - Figures follow the theme, light or dark, which the cyanometer's step picks. A diagram is ink on paper and turns with
   the page; whatever shows the sky as it is seen (the Moon's phases, eclipses, the WebGPU skies) sits in `.as-seen`
   and stays dark. Zdog takes its colors as `themeColor("--text")` and resolves them with `themeColors` after each

@@ -5,64 +5,20 @@ import {
     OSGHIMMEL_ATMOSPHERE_MODEL,
     precomputeAtmosphere,
     RGB_ATMOSPHERE_MODEL,
-    skyRequirements,
 } from "@himmelszelt/dunstkreis";
 import type { IrradiancePass } from "@himmelszelt/rundbild";
 import { createIrradiancePass } from "@himmelszelt/rundbild";
 import type { Direction } from "@himmelszelt/sternzeit";
 import { watchView } from "../frame";
 import type { ToneCurve } from "../scene/scene";
+import { gpu, gpuDevice, gpuFailed } from "../webgpu";
 
 /**
  * The GPU and the tables the whole page shares: the sky renders with them, the tables figure configures and shows
  * them. Whoever swaps its pass to new tables destroys the old ones.
  */
 
-async function acquire(): Promise<{ device?: GPUDevice; adapterName?: string; error?: string }> {
-    if (!navigator.gpu) {
-        return {
-            error:
-                'This figure needs WebGPU, which this browser does not expose. See <a href="https://caniuse.com/webgpu" ' +
-                'target="_blank" rel="noopener">caniuse.com/webgpu</a>.',
-        };
-    }
-    const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
-    if (!adapter) {
-        // Mostly Linux, where Chrome still ships WebGPU behind a flag: the API is there, but no adapter behind it.
-        return {
-            error:
-                "WebGPU is there, but without a GPU adapter. On Linux, Chrome needs " +
-                "<code>chrome://flags/#enable-unsafe-webgpu</code> enabled and a restart.",
-        };
-    }
-    // With subgroups where the GPU has them, for the sums over a workgroup.
-    const requirements = skyRequirements({ format: "rgba8unorm" }, adapter);
-    // Timestamps around a pass, for the figures that show what a pass costs, where the GPU gives them.
-    if (adapter.features.has("timestamp-query")) requirements.requiredFeatures.push("timestamp-query");
-    // As large a texture as the GPU takes, up to 16384, for the largest maps and environments.
-    requirements.requiredLimits.maxTextureDimension2D = Math.max(
-        requirements.requiredLimits.maxTextureDimension2D ?? 8192,
-        Math.min(adapter.limits.maxTextureDimension2D, 16384),
-    );
-    // And as large a buffer, up to a gigabyte, to stage such a texture in on its way to the GPU.
-    requirements.requiredLimits.maxBufferSize = Math.max(
-        requirements.requiredLimits.maxBufferSize ?? 268_435_456,
-        Math.min(adapter.limits.maxBufferSize, 1 << 30),
-    );
-    const device = await adapter.requestDevice(requirements);
-    // Which GPU, for the timings: a fallback adapter renders on the CPU, a hundred times slower.
-    const { vendor, architecture, description, isFallbackAdapter } = adapter.info ?? {};
-    const name = description || [vendor, architecture].filter(Boolean).join(" ") || "unknown GPU";
-    return { device, adapterName: isFallbackAdapter ? `${name}, a CPU fallback` : name };
-}
-
-export const gpu = await acquire();
-
-/** The page's GPU device, for code that runs only once `gpu.error` has been ruled out. */
-export function gpuDevice(): GPUDevice {
-    if (!gpu.device) throw new Error(gpu.error);
-    return gpu.device;
-}
+export { gpu, gpuDevice } from "../webgpu";
 
 /**
  * What the tables are computed with: the model, four wavelengths or three as RGB or osgHimmel's, refraction on or off, sizes and sample counts, and whether the sky lights the
@@ -121,9 +77,14 @@ function canvasExtended() {
     if (extended === null && gpu.device) {
         const context = document.createElement("canvas").getContext("webgpu");
         if (context) {
-            configureCanvas(context, HDR);
-            extended = context.getConfiguration?.()?.toneMapping?.mode === "extended";
-            context.unconfigure();
+            // Firefox throws on an rgba16float canvas, which it does not take yet.
+            try {
+                configureCanvas(context, HDR);
+                extended = context.getConfiguration?.()?.toneMapping?.mode === "extended";
+                context.unconfigure();
+            } catch {
+                extended = false;
+            }
         }
     }
     return extended === true;
@@ -447,4 +408,11 @@ export async function recompute() {
     running = null;
 }
 
-if (gpu.device) await recompute();
+if (gpu.device) {
+    try {
+        await recompute();
+    } catch (error) {
+        running = null;
+        gpuFailed(error);
+    }
+}

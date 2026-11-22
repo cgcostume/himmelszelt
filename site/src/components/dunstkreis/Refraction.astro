@@ -6,8 +6,8 @@ const PHOTO = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/images/sunrise-201
 ---
 
 <figure class="fig scene-frame refraction" id="refraction">
-    <div class="refraction-views" data-actions="png copy" data-export-timeless>
-        <figure class="refraction-view">
+    <div class="fig-row" style="--gap: 1rem" data-actions="png copy" data-export-timeless>
+        <figure class="fig-tile">
             <div class="sky-view refraction-render as-seen">
                 <canvas data-field="canvas" aria-label="The Sun rising over the planet's rim, seen from 408 km up, rendered"></canvas>
                 <svg class="refraction-overlay" data-field="overlay" aria-hidden="true"></svg>
@@ -15,7 +15,7 @@ const PHOTO = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/images/sunrise-201
             </div>
             <figcaption><span class="subfigure-title">rendered</span> by dunstkreis</figcaption>
         </figure>
-        <figure class="refraction-view">
+        <figure class="fig-tile">
             <div class="refraction-photo as-seen">
                 <a href="https://commons.wikimedia.org/wiki/File:ISS-44_Sunrise_seen_from_the_ISS.jpg" target="_blank" rel="noopener" title="The original, 4928 by 3280 pixels"><img src={PHOTO} width="1536" height="1022" loading="lazy" alt="A flattened, glaring Sun on the planet's rim, under bands of red, orange, pale blue and violet air" /></a>
             </div>

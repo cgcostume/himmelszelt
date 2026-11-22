@@ -16,7 +16,7 @@
 .colorhist-bar > .view-buttons:not(.fig-actions) {
     margin-left: auto;
 }
-.colorhist-bar > .fig-row {
+.colorhist-bar > .fig-actions-row {
     margin: 0;
 }
 .colorhist-panel > svg {

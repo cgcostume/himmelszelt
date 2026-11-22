@@ -37,6 +37,8 @@ export interface DeepLayer extends CloudLayer {
     frontDepthKm: number;
     /** Where the front stands, from north through east. */
     frontBearing: number;
+    /** How hard it rains under the tall columns, the towers of a shower or a front's wall, in mm an hour: 0 for none. */
+    rain: number;
 }
 
 /** The sheet of high cloud: patches and bands of puffs, ripples, ribs and veil, baked into one map and read once. */
@@ -123,6 +125,7 @@ export const DEFAULT_DEEP_LAYER: DeepLayer = {
     frontKm: 12,
     frontDepthKm: 160,
     frontBearing: 20,
+    rain: 0,
 };
 
 export const DEFAULT_MIDDLE_LAYER: CloudLayer = {
@@ -193,7 +196,22 @@ export const CLOUD_TYPES = {
     },
     deep: {
         /** Towering cumulus and cumulonimbus, the tallest with anvils. */
-        towers: { kind: "towers", coverage: 0.3, depthKm: 9, sizeKm: 14, extinction: 25 },
+        towers: { kind: "towers", coverage: 0.3, depthKm: 9, sizeKm: 14, extinction: 25, rain: 4 },
+        /** Showers: towers close together with little anvil, rain under each, and gaps the sun shines through. */
+        showers: { kind: "towers", coverage: 0.45, depthKm: 6, sizeKm: 7, extinction: 25, anvil: 0.15, rain: 6 },
+        /** Towering cumulus that has not reached its ceiling: no anvils yet. */
+        congestus: { kind: "towers", coverage: 0.35, depthKm: 6, sizeKm: 4, extinction: 30, anvil: 0 },
+        /** Thunderstorms, far apart, under wide anvils. */
+        storms: {
+            kind: "towers",
+            coverage: 0.25,
+            depthKm: 11,
+            sizeKm: 18,
+            tileKm: 180,
+            extinction: 25,
+            anvil: 1,
+            rain: 20,
+        },
         /** A front coming on, its leading edge 12 km ahead. */
         frontAhead: {
             kind: "front",
@@ -203,6 +221,7 @@ export const CLOUD_TYPES = {
             extinction: 30,
             frontKm: 12,
             frontDepthKm: 160,
+            rain: 4,
         },
         /** The same front overhead: its shield from horizon to horizon. */
         frontOverhead: {
@@ -213,6 +232,7 @@ export const CLOUD_TYPES = {
             extinction: 30,
             frontKm: -50,
             frontDepthKm: 220,
+            rain: 4,
         },
     },
     middle: {

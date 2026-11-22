@@ -30,6 +30,7 @@ async function frame(
     options: Partial<SkyPassOptions> = {},
     altitude = 0,
     look = altitude,
+    moon: { moonDirection?: [number, number, number]; moonAngularDiameter?: number } = {},
 ) {
     const luts = await precomputeAtmosphere(device);
     const pass = await createSkyPass(device, { luts, format: "rgba32float", toneMap: false, ...options });
@@ -39,6 +40,7 @@ async function frame(
         sunAngularDiameter: 0.533,
         ev100: -Math.log2(1.2),
         observerHeightM: heightM,
+        ...moon,
     });
     const target = device.createTexture({
         size: [SIZE, SIZE],
@@ -92,6 +94,30 @@ test("the veil is CIE's at its strength, of the Sun's light at the observer, at 
     const veiled = await frame(device, 100, { ...NOTHING, veil: LENS_VEIL }, 60);
     const added = veiled.green(40, 0) - ground.green(40, 0);
     expect(added / (veiled.sun[1] * LENS_VEIL * veil(angleOf(40.5, 0.5) / DEG))).toBeCloseTo(1, 1);
+});
+
+test("the veil dims by the share of the Sun's disc the Moon covers, to none in a total eclipse", async () => {
+    const device = await gpuDevice();
+    test.skip(device === null, "GPU tests disabled; run pnpm test:gpu");
+    if (!device) return;
+    const options = { ...NOTHING, veil: LENS_VEIL };
+    const { sunDirection } = towards(0);
+    const open = await frame(device, 400_000, options);
+    // A Moon a little wider than the Sun, right in front of it: nothing left 3° out.
+    const total = await frame(device, 400_000, options, 0, 0, {
+        moonDirection: sunDirection,
+        moonAngularDiameter: 0.54,
+    });
+    expect(total.green(96, 0)).toBeLessThan(1e-3);
+    // A Moon as wide as the Sun with its center on the Sun's upper limb: two circles a radius apart overlap by 39.1 %.
+    const partial = await frame(device, 400_000, options, 0, 0, {
+        moonDirection: [0, Math.cos(RADIUS), Math.sin(RADIUS)],
+        moonAngularDiameter: 0.533,
+    });
+    expect(partial.green(96, 0) / open.green(96, 0)).toBeCloseTo(
+        1 - ((2 * Math.PI) / 3 - Math.sqrt(3) / 2) / Math.PI,
+        2,
+    );
 });
 
 test("a starburst draws as many spikes as an even count of blades, twice as many as an odd one, where a lens draws them", async () => {

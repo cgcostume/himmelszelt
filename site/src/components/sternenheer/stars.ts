@@ -19,6 +19,7 @@ import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
+import { gpuMissing } from "../webgpu";
 import { skyWhite } from "../white";
 import {
     createStarsRenderer,
@@ -56,19 +57,12 @@ export function starsFigure(root: HTMLElement) {
     const marks = () => Number(field("marks").dataset.level);
     field("marks").addEventListener("click", () => requestRender());
 
-    function showError(html: string) {
-        const error = document.createElement("div");
-        error.className = "sky-error";
-        error.innerHTML = `<p>${html}</p>`;
-        canvas.replaceWith(error);
-    }
     function setup() {
-        if (shared.error) {
-            showError(shared.error);
+        const context = shared.error ? null : canvas.getContext("webgpu");
+        if (!context) {
+            gpuMissing(canvas, "sky-error");
             return null;
         }
-        const context = canvas.getContext("webgpu");
-        if (!context) return null;
         configureCanvas(context, SDR);
         return { device: gpuDevice(), context, adapterName: shared.adapterName, format: SDR as GPUTextureFormat };
     }

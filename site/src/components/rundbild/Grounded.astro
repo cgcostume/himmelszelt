@@ -51,7 +51,7 @@ const SLIDERS = [
     <EnvironmentFrame fullscreen ownView="Drag to turn around, scroll to move closer. Raytraced with WebGPU.">
         <div class="hdri-view as-seen"><canvas data-field="canvas" aria-label="The five Platonic solids and a sphere, standing on the chosen HDRI's ground"></canvas></div>
     </EnvironmentFrame>
-    <div class="env-exposure grounded-controls">
+    <div class="fig-controls env-exposure grounded-controls">
         <button type="button" class="environments-button" data-field="flat" aria-pressed="true" title="Lay the image's ground on a plane, as far as its reach; off, all of it lies at infinity">flat ground</button>
         <button type="button" class="environments-button" data-field="even" aria-pressed="true" title="Read the image blurred evenly where the plane stretches it; off, as it is, in streaks">even blur</button>
         {SLIDERS.map(({ name, label, title, min, max, step, value, marks }) => (

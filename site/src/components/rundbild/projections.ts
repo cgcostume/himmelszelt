@@ -17,6 +17,7 @@ import {
 } from "../dunstkreis/atmosphere";
 import { cameraBasis, lookAround, project, type SkyCamera, type Vec3 } from "../dunstkreis/skycamera";
 import { onDemand } from "../frame";
+import { gpuMissing } from "../webgpu";
 import { skyWhite } from "../white";
 
 /**
@@ -1097,7 +1098,7 @@ function describe() {
 const requestDraw = onDemand(draw, root);
 
 if (gpu.error) {
-    find(".projections-view", root).insertAdjacentHTML("beforebegin", `<p class="note">${gpu.error}</p>`);
+    gpuMissing(find(".projections-view", root));
 } else {
     onSkyView(requestDraw);
     onDisplay(requestDraw);

@@ -115,11 +115,18 @@ struct GwParams {
     sheets: u32,
     // The sky's luminance along the horizon, in cd/m²: what far clouds fade into without a background, and the cap with.
     horizonLuminance: vec3f,
-    pad: f32,
+    // The corona thin cloud lays around the Sun and the Moon, corona.wgsl: its droplets' radius in micrometers, 0 for none.
+    coronaRadius: f32,
     cloudscape: GwCloudscape,
     sheet: array<GwSheet, 2>,
     // The white balance, helldunkel's `hdWhiteBalance`, applied with the exposure: the identity for none.
     whiteBalance: mat3x3f,
+    // Unit vector towards the Moon, for its corona, and how far the corona's droplets vary in size, as a share.
+    moonDirection: vec3f,
+    coronaSpread: f32,
+    // The Moon's illuminance at the observer, per channel in lux: zero for no Moon.
+    moonIlluminance: vec3f,
+    pad: f32,
 }
 
 // The sun's illuminance in lux by its elevation above the local horizon, which grows by a degree every 111 km towards

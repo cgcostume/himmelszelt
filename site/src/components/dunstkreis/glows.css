@@ -1,0 +1,83 @@
+/* The glows around the Sun: one color a cause, holding in both themes. */
+#glows .strip-panel > svg {
+    height: clamp(20rem, 56vw, 26rem);
+    cursor: default;
+}
+.glows-metered {
+    position: absolute;
+    top: 20px;
+    left: auto;
+    right: 8px;
+}
+.glows-line {
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+}
+.glows-total {
+    stroke: var(--text);
+    stroke-width: 2.5;
+}
+.glows-disc {
+    stroke: #e5a50a;
+}
+.glows-solar {
+    stroke: #c061cb;
+}
+.glows-sky {
+    stroke: #3e8ce0;
+}
+.glows-aureole {
+    stroke: #12a594;
+}
+.glows-lens {
+    stroke: #e5484d;
+}
+.glows-eye {
+    stroke: #e5484d;
+    stroke-dasharray: 5 3;
+}
+.glows-cloud {
+    stroke: #12a594;
+    stroke-dasharray: 5 3;
+}
+.glows-spike {
+    stroke: var(--muted);
+    stroke-dasharray: 1.5 3;
+}
+.glows-white {
+    stroke: var(--accent);
+    stroke-width: 1;
+}
+.glows-burnt {
+    fill: var(--accent);
+    opacity: 0.1;
+}
+.glows-reach {
+    stroke: var(--accent);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+}
+.glows-white-label {
+    fill: var(--accent);
+}
+.glows-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    margin: 0.5rem 0 0;
+    font-size: var(--text-meta);
+    color: var(--muted);
+}
+.glows-key {
+    display: inline-flex;
+    gap: 0.4rem;
+    align-items: center;
+    white-space: nowrap;
+}
+.glows-key > svg {
+    width: 22px;
+    height: 6px;
+    overflow: visible;
+}

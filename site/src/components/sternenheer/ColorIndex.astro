@@ -14,11 +14,11 @@ const at = (bv: number) => (((bv + 0.3) / 2.3) * 100).toFixed(2);
 const COLUMNS = ["T", "x", "y", "R", "G", "B"];
 ---
 
-<figure class="fig eclipse-figure colorindex-figure" id={id} data-colorindex>
+<figure class="fig colorindex-figure" id={id} data-colorindex>
     <div class="eclipse-panel colorindex-panel">
         <div class="colorindex-plot" data-export="color-index" data-export-timeless>
             <svg data-field="diagram" role="img" aria-label="The Planckian locus in the CIE 1931 chromaticity diagram, magnified, with temperatures, the CIE's white points, sRGB's triangle and a marker at the chosen color index"></svg>
-            <figure class="eclipse-view colorindex-inset">
+            <figure class="fig-tile colorindex-inset">
                 <svg class="colorindex-whole" data-field="whole" role="img" aria-label="The whole CIE 1931 chromaticity diagram, the spectrum around it, sRGB's triangle and the magnified part outlined"></svg>
                 <figcaption><span class="subfigure-title">CIE 1931</span>, the whole diagram</figcaption>
             </figure>
@@ -33,12 +33,12 @@ const COLUMNS = ["T", "x", "y", "R", "G", "B"];
             </tbody>
         </table>
     </div>
-    <div class="figure-slider" aria-hidden="true">
+    <div class="figure-slider" style="--output-ch: 5ch" aria-hidden="true">
         <span class="note colorindex-names"><span data-strip="ballesteros">Ballesteros</span><span data-strip="jensen">Jensen et al.</span></span>
         <span class="figure-slider-rail"><svg data-field="band" aria-label="The colors of stars over the color index B−V from −0.3 to 2, by Ballesteros' temperature and by Jensen et al.'s"></svg></span>
         <output class="colorindex-ghost">0.00</output>
     </div>
-    <label class="figure-slider" title="The color index B−V: drag, or click the strips or the locus">
+    <label class="figure-slider" style="--output-ch: 5ch" title="The color index B−V: drag, or click the strips or the locus">
         <span class="note">B−V</span>
         <span class="figure-slider-rail">
             <input type="range" data-field="bv" min="-0.3" max="2" step="0.01" value="0.65" aria-label="The color index B−V" />

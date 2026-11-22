@@ -1,5 +1,5 @@
 import { blueNoiseTexture, exposureFromEV100, NO_WHITE_BALANCE, type ToneCurve } from "@himmelszelt/helldunkel";
-import { autoExposureCompensation, DEFAULT_AUTO_EXPOSURE_KEYS } from "./exposure.js";
+import { autoExposureCompensation, autoExposureTint, DEFAULT_AUTO_EXPOSURE_KEYS } from "./exposure.js";
 import { createLut, dispatch } from "./luts.js";
 import { spectrumToRgb } from "./model.js";
 import {
@@ -79,8 +79,8 @@ export interface SkyPassOptions {
      * `moonlight` around the Moon from its own. Its strength: 1 for the eye's own, which washes out some 10° around the
      * Sun by day; `LENS_VEIL`, a two-hundredth, for a camera's lens, the default, without which the disc stands as a
      * bare white circle above the haze; 0 for none. Only of what is looked at: it fades as the sun leaves the frame and
-     * is gone 40 % of the image's half extent beyond its edge. It knows nothing of what hides the sun but the planet: a
-     * renderer with clouds or terrain in front turns it off and adds `hdVeil` with the light that gets through.
+     * is gone 40 % of the image's half extent beyond its edge. It knows nothing of what hides the sun but the planet and
+     * the Moon: a renderer with clouds or terrain in front turns it off and adds `hdVeil` with the light that gets through.
      */
     veil?: number;
     /**
@@ -663,8 +663,10 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
                 moonShare > 0 && veil > 0
                     ? inFrame(params.inverseViewProjection, params.projectionDistance, apparentMoon.direction)
                     : 0;
+            // The keys' tint after the white balance, its rows scaled: without one, the matrix as it is.
+            const [r, g, b] = autoExposureTint(params.autoExposureKeys, [sx, sy, sz], dip);
             const [m0, m1, m2, m3, m4, m5, m6, m7, m8] = params.whiteBalance;
-            sky.set([m0, m1, m2, 0, m3, m4, m5, 0, m6, m7, m8], 44);
+            sky.set([m0 * r, m1 * g, m2 * b, 0, m3 * r, m4 * g, m5 * b, 0, m6 * r, m7 * g, m8 * b], 44);
             device.queue.writeBuffer(skyParams, 0, sky);
 
             // Rebuilding the sky-view table is the expensive part, and it is why the sky pass itself is one fetch

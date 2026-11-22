@@ -13,7 +13,7 @@ const STRENGTHS = [
     <EnvironmentFrame fullscreen>
         <div class="hdri-view as-seen"><canvas data-field="canvas" aria-label="The chosen HDRI with bloom"></canvas></div>
     </EnvironmentFrame>
-    <p class="hdri-controls">
+    <p class="fig-controls">
         <span class="steps" role="radiogroup" aria-label="Bloom strength">
             <span class="steps-heading" aria-hidden="true">bloom</span>
             {STRENGTHS.map(([value, name]) => (
@@ -35,6 +35,7 @@ const STRENGTHS = [
     import { gpu } from "../dunstkreis/atmosphere";
     import { context, draw, onHdri } from "../environment/hdri";
     import { onDemand } from "../frame";
+    import { gpuMissing } from "../webgpu";
 
     const root = find("#glow");
     const canvas = find<HTMLCanvasElement>('[data-field="canvas"]', root);
@@ -47,5 +48,7 @@ const STRENGTHS = [
         onHdri(request);
         new ResizeObserver(request).observe(canvas);
         for (const radio of root.querySelectorAll('input[name="bloom-strength"]')) radio.addEventListener("change", request);
+    } else {
+        gpuMissing(canvas);
     }
 </script>

@@ -19,6 +19,7 @@ import {
     view,
 } from "../environment/hdri";
 import { onDemand } from "../frame";
+import { gpuMissing } from "../webgpu";
 
 const root = find("#range");
 const field = <T extends HTMLElement = HTMLElement>(name: string) => find<T>(`[data-field="${name}"]`, root);
@@ -340,7 +341,8 @@ function applyOutput() {
 }
 
 if (gpu.error) {
-    field("info").textContent = gpu.error;
+    gpuMissing(canvas);
+    plotCanvas.style.display = "none";
 } else {
     const target = context(canvas);
     const request = onDemand(() => {
