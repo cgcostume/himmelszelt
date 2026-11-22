@@ -36,18 +36,19 @@ const voxel = (
     layers: number,
     detailSize: number,
     mapSize: number,
+    nearDetailKm: number,
 ) => ({
-    ...{ scale, maxSteps, nearLightSamples, grid: { size, layers }, detailSize, mapSize },
+    ...{ scale, maxSteps, nearLightSamples, grid: { size, layers }, detailSize, mapSize, nearDetailKm },
 });
 const layered = (scale: number, maxSteps: number, mapSize: number, highMapSize: number): LayeredQuality => ({
     ...{ scale, maxSteps, mapSize, highMapSize },
 });
 // The voxel pass's options and the layered pass's quality, level by level.
 const SAMPLING = {
-    low: { voxel: voxel(1 / 3, 128, 1, 128, 32, 64, 256), layered: layered(1 / 3, 64, 256, 512) },
-    medium: { voxel: voxel(0.5, 256, 2, 256, 64, 128, 512), layered: layered(0.5, 128, 512, 1024) },
-    high: { voxel: voxel(1, 256, 2, 256, 64, 128, 512), layered: layered(1, 256, 1024, 2048) },
-    ultra: { voxel: voxel(1, 512, 3, 384, 96, 128, 1024), layered: layered(1, 384, 2048, 2048) },
+    low: { voxel: voxel(1 / 3, 128, 1, 128, 32, 64, 256, 0), layered: layered(1 / 3, 64, 256, 512) },
+    medium: { voxel: voxel(0.5, 256, 2, 256, 64, 128, 512, 0), layered: layered(0.5, 128, 512, 1024) },
+    high: { voxel: voxel(1, 256, 2, 256, 64, 128, 512, 2), layered: layered(1, 256, 1024, 2048) },
+    ultra: { voxel: voxel(1, 512, 3, 384, 96, 128, 1024, 4), layered: layered(1, 384, 2048, 2048) },
 } as const;
 
 // Whether the shape changes at all, whether the voxel pass builds keyframes and how many build steps it takes a frame,
@@ -64,7 +65,7 @@ export interface ResolvedQuality {
     /** Options for `createCloudPass`. */
     voxel: Pick<
         CloudPassOptions,
-        "scale" | "maxSteps" | "nearLightSamples" | "grid" | "detailSize" | "mapSize" | "keyframes"
+        "scale" | "maxSteps" | "nearLightSamples" | "nearDetailKm" | "grid" | "detailSize" | "mapSize" | "keyframes"
     >;
     /** The `quality` of `createLayeredCloudPass`, and its march's reach. */
     layered: LayeredQuality;

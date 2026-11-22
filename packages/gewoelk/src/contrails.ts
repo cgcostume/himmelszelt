@@ -11,8 +11,8 @@ export interface Contrail {
     /** Its width at either end, in km: a trail starts some 0.03 wide and spreads to a few km. */
     fromWidthKm: number;
     toWidthKm: number;
-    /** The optical depth straight through its middle at the young end, about 0.3: it thins as it spreads, and fades out
-     *  over its last third. */
+    /** The optical depth straight through its middle at the young end, about 0.3: it thins slowly as it spreads, and
+     *  fades out over its last third. */
     opticalDepth: number;
 }
 

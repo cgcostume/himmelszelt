@@ -74,7 +74,7 @@ exposes for clouds: metered as they come, bright clouds turn gray.
 
 <Controls open />
 
-## Two kinds of cloud
+## Two skies, three models
 
 Look up on a fair day and there are two skies of cloud: the <Term of="Cumulus">heaps</Term> a few kilometers up,
 flat below and billowing above, and far above them the veils and streaks of cirrus, ice crystals 6 to 12 km up that
@@ -186,13 +186,22 @@ The first step is jittered by a pattern that changes every frame, so the bands a
 Nubis³ shipped at 2.2 to 4 ms at 960 by 540 pixels on a PlayStation 5, from the ground and in flight, and halved it at
 60 Hz by marching the near clouds at a quarter of the pixels and the far ones at all of them
 <Cite id="schneider2023" />. gewoelk marches the whole sky at one scale of your choosing and composes it bilinearly;
-the two-pass split is on its list. Set the render scale and the steps in the figure and watch the time on the line
-under it.
+the two-pass split is on its list. Set the sampling in the figure and watch the time on the line under it.
+
+What a frame costs hangs on a few numbers, and `cloudQuality` gathers them into three dials of four levels each, low
+to ultra, for both models. Reach is how far the clouds are seen before they thin out to a clear horizon. Sampling is
+the share of the frame the clouds are marched at, a ray's steps, and the sizes of the volumes, maps and noise. Motion
+is how the shape changes: not at all, where the clouds still drift and billow for free, by keyframes built a few steps
+a frame, or every frame. One level sets all three, or each takes its own, and what comes back are the options the
+passes are made with.
 
 The voxel volume has a figure of its own, where its numbers are set on a patch of it alone
 (<Fig id="design-voxel" />): a drawing of the model, the patch seen from a camera that turns about it, the sliders,
 and under them the cloud map and the volumes built from it, each a slice at a time. Raise the towers, and columns of
-the grid grow through the slab while the map stays as it was.
+the grid grow through the slab while the map stays as it was. The library names its kinds of voxel cloud by their
+species, `CLOUDSCAPE_TYPES`: three sizes of cumulus, humilis, mediocris and congestus, a deck of
+<Term of="Stratocumulus">stratocumulus</Term>, and <Term of="Stratus">stratus</Term>. Each comes with the grid that
+holds it without waste, since a flat layer needs a fraction of the levels a tower does.
 
 <Designer place="voxel" />
 
@@ -213,39 +222,49 @@ up to eight of your own are kept in your browser under the names you give them. 
 they stand on the clipboard, written as an entry for `CLOUD_TYPES`.
 
 The low layer holds what a fair day brings, heaps with flat bases 1.2 km up, and with more of the sky covered the
-same map closes into a deck (<Fig id="design-low" />). Raise the coverage step by step, and the gaps between the heaps
-close.
+same map closes into a deck of <Term of="Stratocumulus">stratocumulus</Term> (<Fig id="design-low" />). Raise the
+coverage step by step, and the gaps between the heaps close.
 
 <Designer place="low" />
 
 <Controls />
 
 The deep layer starts at the same base and reaches 9 km above it. A few of its cells grow tall, and the tallest
-spread out flat on top into <Term of="Anvil">anvils</Term>, drawn downwind (<Fig id="design-towers" />). As storms they
-stand farther apart, with rain under them and anvils a whole spacing long.
+spread out flat on top into <Term of="Anvil">anvils</Term>, drawn downwind (<Fig id="design-towers" />). As storms,
+<Term of="Cumulonimbus">cumulonimbus</Term>, they stand farther apart, with rain under them and anvils a whole spacing long.
 
 <Designer place="towers" />
 
 <Controls />
 
 A front does not repeat as the other maps do: it is one band, placed in the world by a distance and a bearing, a wall
-of towers behind its leading edge and a shield of cloud to the rear, 160 km deep (<Fig id="design-front" />). Pull the
+of towers behind its leading edge and a shield of <Term of="Nimbostratus">nimbostratus</Term> to the rear, 160 km deep
+(<Fig id="design-front" />). Pull the
 distance below 0, and the leading edge has passed over the observer, who stands under its shield.
 
 <Designer place="front" />
 
 <Controls />
 
-The middle layer stands 4.5 km up and is thin, 700 m: flakes and fields of small heaps, and with most of the sky
-covered a deck with a few holes left (<Fig id="design-middle" />).
+The middle layer stands 4.5 km up and is thin, 700 m: flakes and fields of small heaps,
+<Term of="Altocumulus">altocumulus</Term>, and with most of the sky covered a deck with a few holes left, on its way to
+<Term of="Altostratus">altostratus</Term> (<Fig id="design-middle" />).
 
 <Designer place="middle" />
 
 <Controls />
 
-The high cloud is the sheet: puffs in rows, ripples, ribs and a veil combed along the wind, baked into one map in the
-wind's frame and read once where a ray crosses it, 7 km up (<Fig id="design-high" />). Turn the wind, and the whole
-pattern turns with it.
+The high cloud is the sheet: the puffs in rows and ripples of <Term of="Cirrocumulus">cirrocumulus</Term>, ribs, and
+the veil of <Term of="Cirrostratus">cirrostratus</Term> combed along the wind, baked into one map in the wind's frame
+and read once where a ray crosses it, 7 km up (<Fig id="design-high" />). Turn the wind, and the whole pattern turns
+with it.
+
+One cloud up there is not baked but drawn: the contrail. Raise its depth in the figure, and a trail crosses the patch,
+young and sharp at one end and as old at the other as a trail lasts, spread wide and broken into lumps by then. A
+trail is a streak over the ground with a width at either end, read with the sheet at no cost in memory, and
+`contrailBehind` lays one behind an aircraft from where it is, where it heads and how long a trail lasts in the air up
+there: seconds where the air is dry, an hour and more where it is moist enough for the ice to stay. Where the aircraft
+are is yours to say.
 
 <Designer place="high" />
 

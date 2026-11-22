@@ -60,6 +60,9 @@ export interface CloudPassOptions {
     /** Steps a ray takes at most through the cloudscape, 256 by default, and detailed light samples per step, 2. */
     maxSteps?: number;
     nearLightSamples?: number;
+    /** The distance within which the detail noise is read a second time, five times finer, in km, 0 by default for
+     *  never: for an observer who flies among the clouds, at one more read of the noise per sample there. */
+    nearDetailKm?: number;
     /** The air the sunlight comes through, for the sunlight table computed here on the GPU, in the frame's own encoder,
      *  as the sun moves: dunstkreis' `AtmosphereLUTs` as they are. A `sunlight` table given to `update` overrides it. */
     atmosphere?: SunlightAtmosphere;
@@ -196,6 +199,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
         scale = 1,
         maxSteps = 256,
         nearLightSamples = 2,
+        nearDetailKm = 0,
     } = options;
     const grid = { size: 256, layers: 32, ...options.grid };
     const dither = options.dither ?? false;
@@ -362,7 +366,12 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                 wgsl.clouds,
             ]),
             "gwClouds",
-            { GW_MAX_STEPS: maxSteps, GW_NEAR_LIGHT_SAMPLES: nearLightSamples, GW_BACKGROUND: background ? 1 : 0 },
+            {
+                GW_MAX_STEPS: maxSteps,
+                GW_NEAR_LIGHT_SAMPLES: nearLightSamples,
+                GW_NEAR_DETAIL: nearDetailKm,
+                GW_BACKGROUND: background ? 1 : 0,
+            },
         ),
         pipeline(
             "compose",

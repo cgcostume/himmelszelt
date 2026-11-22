@@ -10,6 +10,21 @@ export type LabSlider = [
 ];
 
 /** The clouds thinning out towards the horizon, for every figure of the research: from where, and to nothing where. */
+/** A contrail in the high sheet: how thick, how old at its far end, and how fast it widens. */
+export const CONTRAIL: LabSlider[] = [
+    ["contrail.depth", "depth", 0, 1, 0.01, 0.3, "A trail's optical depth straight through its young end: 0 for none"],
+    [
+        "contrail.minutes",
+        "lasting",
+        0.5,
+        60,
+        0.5,
+        12,
+        "How long a trail lasts, in minutes: half a minute in dry air, an hour where the air up there is moist enough for the ice to stay",
+    ],
+    ["contrail.spread", "spread", 0.2, 5, 0.1, 1.5, "How fast a trail widens, in m/s"],
+];
+
 export const CLEARING: LabSlider[] = [
     ["clearFrom", "clear from", 0, 200, 5, 30, "The distance from which the clouds thin out, in km"],
     [

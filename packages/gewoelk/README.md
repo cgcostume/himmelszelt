@@ -109,6 +109,36 @@ turns it off. The Sun's is lit by `sunIlluminance`, the Moon's by `moonDirection
 default; the clouds themselves are lit by the Sun alone. `diffractionLobe` and `coronaShare` are the same numbers in
 TypeScript, and `wgsl.corona` holds the binding-free functions, `gwCorona` and `gwCoronaLobe`.
 
+### Kinds, quality and contrails
+
+`CLOUDSCAPE_TYPES` names kinds of voxel cloud by their species, `humilis`, `mediocris`, `congestus`, `stratocumulus`
+and `stratus`: each a `shape`, the cloudscape's numbers it sets, and the `grid` that holds it without waste. The
+weathers take their cloudscapes from them.
+
+```js
+import { CLOUDSCAPE_TYPES, cloudQuality, contrailBehind, createCloudPass, DEFAULT_CLOUDSCAPE } from "@himmelszelt/gewoelk";
+
+const quality = cloudQuality({ reach: "high", sampling: "medium", motion: "low" });
+const clouds = await createCloudPass(device, { format: "rgba8unorm", high: true, ...quality.voxel });
+const cloudscape = { ...DEFAULT_CLOUDSCAPE, ...CLOUDSCAPE_TYPES.congestus.shape, ...quality.clearing };
+const contrails = [contrailBehind({ atKm: [4, -2], headingDeg: 70 }, { persistenceS: 600, wind: [18, 7] })];
+clouds.update({ ...frame, cloudscape, contrails });
+```
+
+`cloudQuality` turns three dials of four levels each, `"low"` to `"ultra"`, into what the passes are made and updated
+with: `reach`, how far the clouds are seen, `sampling`, the share of the frame, a ray's steps and the sizes of the
+volumes and maps, and `motion`, how the shape changes, from not at all to every frame. One level sets all three. It
+returns `voxel` for `createCloudPass`, `layered` and `march` for `createLayeredCloudPass`, the `clearing`, and for the
+change `evolves`, the keyframes' `stepsPerFrame` and the layered model's `evolutionEveryS`, the seconds between two
+bakes of its maps. `nearDetailKm` reads the detail noise a second time, five times finer, within that distance of
+the eye, for an observer who flies among the clouds.
+
+Contrails are streaks at the high sheet's altitude, `MAX_CONTRAILS` at most, drawn where the sheet is read, with a
+sheet or without, for a pass made with `high`. A `Contrail` is two ends over the ground, a width at each and an optical
+depth; `contrailBehind` lays one behind an `Aircraft` in a `ContrailAir`, as long as the aircraft flew while the trail
+lasted, less the wind's drift. Where the aircraft are, and how long a trail lasts in the air up there, is the caller's
+to say.
+
 ### Change over time
 
 Three things change a cloudscape, at three costs. The wind's drift is a uniform. So is `detailShiftKm`, how far the
@@ -144,7 +174,7 @@ dunstkreis' `camera.wgsl` and the tone curves and the white balance helldunkel's
 
 A first draft: the cloudscape, the sheets, wind and evolution, Nubis3's march and lighting. Not yet: the split into a
 low resolution near the camera and a high one far away, temporal accumulation against the jitter's grain, mip
-levels of the detail noise, clouds casting shadows on the ground, and contrails, flocks of birds, rainbows and halos.
+levels of the detail noise, clouds casting shadows on the ground, flocks of birds and halos.
 
 ## References
 

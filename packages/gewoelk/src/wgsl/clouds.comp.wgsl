@@ -74,6 +74,10 @@ override GW_BACKGROUND: bool = true;
 // two, whose remaining light comes from the summed grid.
 override GW_MAX_STEPS: u32 = 256u;
 override GW_NEAR_LIGHT_SAMPLES: u32 = 2u;
+// The distance within which the detail noise is read a second time, `GW_NEAR_DETAIL_FINER` times finer, in km, 0 for
+// never: detail for an observer among the clouds, where the noise's texels would show, at one more read a sample there.
+override GW_NEAR_DETAIL: f32 = 0.0;
+const GW_NEAR_DETAIL_FINER: f32 = 5.0;
 // Orders of scattering of the sun's light, the first the single scattering, each a `multiScatter` share of the one before.
 override GW_SCATTERING_OCTAVES: u32 = 8u;
 // Below this transmittance a ray is done.
@@ -148,8 +152,8 @@ fn gwThinning(x: GwPoint, left: f32) -> vec2f {
 }
 
 // Nubis3's up-rez: the detail noise read at the point, wispy and billowy composites blended by the type, the profile
-// thinned and eroded by the result, scaled and sharpened.
-fn gwDensity(m: vec4f, x: GwPoint, thinning: vec2f) -> GwSample {
+// thinned and eroded by the result, scaled and sharpened. `t` is the distance from the eye, for the finer noise near it.
+fn gwDensity(m: vec4f, x: GwPoint, thinning: vec2f, t: f32) -> GwSample {
     let volume = gwParams.cloudscape;
     let profile = m.r * thinning.x;
     if (profile <= 0.0) {
@@ -160,7 +164,14 @@ fn gwDensity(m: vec4f, x: GwPoint, thinning: vec2f) -> GwSample {
     let local = vec3f(x.ground - volume.drift, x.height - volume.detailShift);
     // Wrapped here, in full float precision, before the sampler's coarser coordinates see it; the sampler repeats in
     // all three axes, so the filter runs across a tile's edge.
-    let noise = textureSampleLevel(gwDetail, gwDetailSampler, fract(local / volume.noiseScale), 0.0);
+    var noise = textureSampleLevel(gwDetail, gwDetailSampler, fract(local / volume.noiseScale), 0.0);
+    if (t < GW_NEAR_DETAIL) {
+        // The same noise again, finer and offset, lifting and lowering the first about its mean: it fades in from the
+        // far end of its reach, so no ring shows where it begins.
+        let finer = textureSampleLevel(gwDetail, gwDetailSampler, fract(local * GW_NEAR_DETAIL_FINER / volume.noiseScale + 0.37), 0.0);
+        let far = clamp((t / max(GW_NEAR_DETAIL, 1e-6) - 0.4) / 0.6, 0.0, 1.0);
+        noise = noise * mix(0.6 + 0.8 * finer, vec4f(1.0), far * far * (3.0 - 2.0 * far));
+    }
     let wispy = mix(noise.r, noise.g, profile);
     let billowy = mix(noise.b * 0.3, noise.a * 0.3, pow(profile, 0.25));
     // Billowy rather than wispy for the most part: the map's type field only shifts the blend.
@@ -225,7 +236,7 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
         within = within && sdf < 0.0;
         if (sdf < 0.0) {
             let thinning = gwThinning(x, left);
-            var sample = gwDensity(m, x, thinning);
+            var sample = gwDensity(m, x, thinning, t);
             if (sample.full > 1e-4) {
                 sample.full = sample.full * gwDeepOutside(p);
             }
@@ -264,7 +275,7 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
                 for (var k = 0u; k < GW_NEAR_LIGHT_SAMPLES; k = k + 1u) {
                     let pk = p + sun * (f32(k) + 0.5) * cell / f32(GW_NEAR_LIGHT_SAMPLES);
                     let xk = gwPointAt(pk);
-                    near = near + gwDensity(gwModelingAt(gwVolumeCoordinate(xk)), xk, thinning).full * cell / f32(GW_NEAR_LIGHT_SAMPLES);
+                    near = near + gwDensity(gwModelingAt(gwVolumeCoordinate(xk)), xk, thinning, t).full * cell / f32(GW_NEAR_LIGHT_SAMPLES);
                 }
                 let tauSun = extinction * (near + toSun);
                 // The sun's light scattered once, and the orders after it as octaves (Wrenninge 2013, Hillaire 2016):

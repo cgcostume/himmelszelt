@@ -69,7 +69,7 @@ const DESIGNS: Record<Designed, { label: string; model: string; caption: string;
         label: "A patch of the sheet of high cloud, 12 km across, seen from above",
         model: "The sheet's model: one shell at its altitude, the map's tile laid along the wind and repeated, a patch of the broad field, and a ray that reads the map once where it crosses",
         caption:
-            "The sheet of high cloud: cirrocumulus in puffs and ripples, cirrostratus as a veil, and cirrus in the trails combed out of both. (a) Its model: one shell, the map's tile repeated along the wind, a patch of the broad field (filled), and a ray (accent) that reads the map once where it crosses. (b) A patch 12 km across. (c) Its numbers. Below, the map channel by channel: puffs, veil, the broad field for the patches and flakes, and the fine noise of billows and fibers. The model is to scale.",
+            "The sheet of high cloud: cirrocumulus in puffs and ripples, cirrostratus as a veil, and cirrus in the trails combed out of both; a contrail crosses it where its depth is above 0. (a) Its model: one shell, the map's tile repeated along the wind, a patch of the broad field (filled), and a ray (accent) that reads the map once where it crosses. (b) A patch 12 km across. (c) Its numbers. Below, the map channel by channel: puffs, veil, the broad field for the patches and flakes, and the fine noise of billows and fibers. The model is to scale.",
         checked: "mackerel",
     },
 };
@@ -151,6 +151,7 @@ const GROUPS: Record<Designed, [name: string, sliders: LabSlider[]][]> = {
         ["waves", all.CIRRUS_RIPPLES],
         ["veil", all.CIRRUS_VEIL],
         ["light", only(all.CIRRUS_LIGHT, "c.relief", "c.forwardG")],
+        ["contrail", all.CONTRAIL.map((s): LabSlider => (s[0] === "contrail.depth" ? [s[0], s[1], s[2], s[3], s[4], 0, s[6]] : s))],
     ],
 };
 const starting = (sliders: LabSlider[], param: string, value: number) =>

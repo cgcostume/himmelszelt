@@ -71,6 +71,9 @@ struct GwContrails {
 @group(0) @binding(5) var<uniform> gwContrails: GwContrails;
 // A trail's lumps, from crest to crest, in widths of its young end: the wingtip vortices' own instability, after Crow.
 const GW_CONTRAIL_LUMPS: f32 = 14.0;
+// How fast a trail thins as it widens, as a power of its width: 1 would keep the ice it was laid with, but a trail
+// that lasts takes up the moist air's vapor as it spreads, and stays visible kilometers wide.
+const GW_CONTRAIL_THINNING: f32 = 0.25;
 
 // The row of the sunlight table that holds the sun's light at the sheet's altitude: the first sheet's.
 override GW_HIGH_SUNLIGHT_ROW: u32 = 2u;
@@ -214,8 +217,8 @@ fn gwHighKept(over: vec2f) -> f32 {
 }
 
 // The optical depth of the contrails over the ground point `over`, for a footprint `wide` km across: each streak as
-// thick across as a bell curve, thinner as it spreads, since it holds what it was laid with, broken into lumps as it
-// ages and fading out over its last third. No map is read.
+// thick across as a bell curve, thinner as it spreads, broken into lumps as it ages and fading out over its last
+// third. No map is read.
 fn gwContrailDepth(over: vec2f, wide: f32) -> f32 {
     var tau = 0.0;
     for (var i = 0u; i < gwContrails.count; i = i + 1u) {
@@ -225,7 +228,8 @@ fn gwContrailDepth(over: vec2f, wide: f32) -> f32 {
         let s = clamp(dot(over - ends.xy, along) / span, 0.0, 1.0);
         let young = max(gwContrails.streak[i].fromWidth, 1e-3);
         // Never narrower than the footprint, and as much thinner: a far streak stays a line and does not flicker.
-        let width = max(max(mix(young, gwContrails.streak[i].toWidth, s), young), wide);
+        let spread = max(mix(young, gwContrails.streak[i].toWidth, s), young);
+        let width = max(spread, wide);
         let d = length(over - ends.xy - along * s) / width;
         if (d > 2.5) {
             continue;
@@ -233,7 +237,7 @@ fn gwContrailDepth(over: vec2f, wide: f32) -> f32 {
         let period = GW_CONTRAIL_LUMPS * young;
         let crest = 0.5 + 0.5 * cos(6.283185307179586 * s * sqrt(span) / period);
         let lumps = mix(1.0, 0.4 + 1.2 * crest * crest, s * (1.0 - clamp(2.0 * wide / period, 0.0, 1.0)));
-        tau = tau + gwContrails.streak[i].opticalDepth * young / width * exp(-2.0 * d * d) * lumps * (1.0 - smoothstep(0.67, 1.0, s));
+        tau = tau + gwContrails.streak[i].opticalDepth * pow(young / spread, GW_CONTRAIL_THINNING) * spread / width * exp(-2.0 * d * d) * lumps * (1.0 - smoothstep(0.67, 1.0, s));
     }
     return tau;
 }

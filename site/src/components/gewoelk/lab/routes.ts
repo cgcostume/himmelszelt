@@ -1,4 +1,4 @@
-import { type Contrail, contrailBehind } from "@himmelszelt/gewoelk";
+import { type Contrail, type ContrailAir, contrailBehind } from "@himmelszelt/gewoelk";
 
 /**
  * Air routes over the observer, invented: gewoelk draws trails and lays one behind an aircraft, and where the aircraft
@@ -27,8 +27,9 @@ const SPEED_MPS = 230;
 /** The share of the way at either end over which a trail comes and goes, far off. */
 const FADE = 0.15;
 
-/** The trails over the routes at `timeS`, each lasting `persistenceS` in a `wind` east and north, in m/s. */
-export function routeTrails(timeS: number, wind: readonly [number, number], persistenceS: number): Contrail[] {
+/** The trails over the routes at `timeS`, in the `air` up there. */
+export function routeTrails(timeS: number, air: ContrailAir): Contrail[] {
+    const { persistenceS } = air;
     const wayS = (2 * REACH_KM * 1000) / SPEED_MPS;
     return ROUTES.flatMap(({ passKm, headingDeg, aircraft, phase }) =>
         Array.from({ length: aircraft }, (_, i) => {
@@ -39,7 +40,7 @@ export function routeTrails(timeS: number, wind: readonly [number, number], pers
             // A trail is no longer than the aircraft has flown on this way, and faint where the way begins and ends.
             const trail = contrailBehind(
                 { atKm, headingDeg, speedMps: SPEED_MPS },
-                { persistenceS: Math.min(persistenceS, way * wayS), wind },
+                { ...air, persistenceS: Math.min(persistenceS, way * wayS) },
             );
             const shown = Math.min(way / FADE, (1 - way) / FADE, 1);
             return { ...trail, opticalDepth: trail.opticalDepth * shown };

@@ -24,7 +24,7 @@ interface Props {
 }
 const {
     id = "weather-lab",
-    caption = "A weather composed, a kind of cloud for each place of the sky: three marched layers and a sheet of high cloud over dunstkreis' air, sternenheer's stars and nachtgestirn's Moon, exposed by the stars figure's meter. The clouds' own light is still a stand-in for the Sun's, and by night the Moon's share of it.",
+    caption = "A weather composed, a kind of cloud for each place of the sky: three marched layers and a sheet of high cloud over dunstkreis' air, sternenheer's stars and nachtgestirn's Moon, exposed by the stars figure's meter. Reach, sampling and motion are gewoelk's three dials of quality, and the contrails fly five invented routes over the place. The clouds' own light is still a stand-in for the Sun's, and by night the Moon's share of it.",
 } = Astro.props;
 
 // Every slider of the two figures, once: held hidden, so the weathers set them as they do there.
@@ -36,17 +36,6 @@ const HELD = [
             .map((slider) => [slider[0], slider]),
     ).values(),
 ].filter(([param]) => !SHOWN.has(param) && param !== "view.ev");
-const CONTRAILS: LabSlider[] = [
-    [
-        "contrails.minutes",
-        "lasting",
-        0.5,
-        60,
-        0.5,
-        12,
-        "How long a trail lasts, in minutes: half a minute in dry air, an hour where the air up there is moist enough for the ice to stay",
-    ],
-];
 const CLEARING: LabSlider[] = [
     ["clearFrom", "clear from", 0, 200, 5, 60, "The distance from which the clouds thin out, in km"],
     [
@@ -179,7 +168,7 @@ const SPEED = choice(
             </OptionGroup>
             <OptionGroup name="contrails">
                 <button type="button" class="view-toggle" data-field="contrails.on" aria-pressed="false" title="Contrails behind aircraft on five invented routes over the place, at the high sheet's altitude: run the clock to see them fly">contrails</button>
-                <LabSliders sliders={CONTRAILS} />
+                <LabSliders sliders={all.CONTRAIL} />
             </OptionGroup>
             <OptionGroup name="time">
                 <button type="button" class="view-toggle" data-field="animate" aria-pressed="false" title="Runs the figure's clock: the layers drift, the billows creep and the maps change, baked again every frame">animate</button>

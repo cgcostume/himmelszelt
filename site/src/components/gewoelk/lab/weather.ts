@@ -199,6 +199,30 @@ export async function weatherFigure(root: HTMLElement) {
         ) as Partial<Record<K, GPUComputePassTimestampWrites>>;
     bindStarGroups(root, () => lab.request(), false);
 
+    // The contrails: in the whole sky those over the invented routes, and in the high sheet's designer one across the
+    // patch, as old at its far end as the trail lasts, so its whole life shows in the patch's width.
+    const YOUNG_KM = 0.03;
+    const trails = (wind: readonly [number, number], centerKm: readonly [number, number], radiusKm: number) => {
+        const air = {
+            persistenceS: 60 * lab.value("contrail.minutes"),
+            spreadMps: lab.value("contrail.spread"),
+            opticalDepth: lab.value("contrail.depth"),
+            wind,
+        };
+        if (!designed) return lab.pressed("contrails.on") ? routeTrails(lab.clock, air) : [];
+        if (designed !== "high" || !(air.opticalDepth > 0)) return [];
+        const [east, north] = [0.94 * 0.8 * radiusKm, 0.34 * 0.8 * radiusKm];
+        return [
+            {
+                fromKm: [centerKm[0] + east, centerKm[1] + north] as const,
+                toKm: [centerKm[0] - east, centerKm[1] - north] as const,
+                fromWidthKm: YOUNG_KM,
+                toWidthKm: YOUNG_KM + (air.spreadMps * air.persistenceS) / 1000,
+                opticalDepth: air.opticalDepth,
+            },
+        ];
+    };
+
     // The pass of the chosen quality and options, made when it is first asked for: its maps' sizes, its steps, god rays and
     // the adaptive stride are fixed at creation. Blue noise and the box filter are switched from frame to frame.
     const passes = new Map<string, LayeredCloudPass | Promise<LayeredCloudPass>>();
@@ -356,9 +380,7 @@ export async function weatherFigure(root: HTMLElement) {
                     clearingFromKm: patch ? PATCH_FROM * radiusKm : lab.value("clearFrom"),
                     clearingCenterKm: centerKm,
                     timeS: lab.clock,
-                    contrails: lab.pressed("contrails.on")
-                        ? routeTrails(lab.clock, wind, 60 * lab.value("contrails.minutes"))
-                        : [],
+                    contrails: trails(wind, centerKm, radiusKm),
                     observerKm: [lab.flown.east, lab.flown.north],
                     march: {
                         stepKm: lab.value("stepKm"),
