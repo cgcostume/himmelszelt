@@ -91,12 +91,12 @@ const QUALITY = {
             <span class="view-buttons">
                 <button type="button" class="view-icon" data-field="animate" aria-pressed="false" title="Play: the clouds drift and change, the aircraft fly, and the moment runs on with them" aria-label="Play"><Icon name="play" /></button>
                 <button type="button" class="view-icon" data-field="timeLock" aria-pressed="false" title="Hold the moment while the figure plays: the clouds drift and change, the Sun, the Moon and the stars stay where they are" aria-label="Hold the moment"><Icon name="timeLock" /></button>
-                {SPEEDS.map(({ speed, icon, title }) => <button type="button" class="view-icon" data-speed={speed} aria-pressed={speed === 60 ? "true" : "false"} title={title} aria-label={title}><Icon name={icon} /></button>)}
+                {SPEEDS.map(({ speed, icon, title }) => <button type="button" class="view-icon" data-speed={speed} aria-pressed={speed === 1 ? "true" : "false"} title={title} aria-label={title}><Icon name={icon} /></button>)}
             </span>
         </Fragment>
         <Fragment slot="options">
             <OptionGroup name="weather">
-                <Choice figure={id} {...WEATHER} />
+                <Choice figure={id} {...WEATHER} combo />
             </OptionGroup>
             <OptionGroup name="clouds">
                 <Choice figure={id} {...MODEL} />

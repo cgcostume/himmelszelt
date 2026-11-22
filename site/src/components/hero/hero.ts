@@ -14,6 +14,7 @@ import {
 import { find } from "../dom";
 import { HDR, onTables, tables } from "../dunstkreis/atmosphere";
 import { cameraBasis, project } from "../dunstkreis/skycamera";
+import { frameHeight } from "../dunstkreis/skyframe";
 import { createLab, type Lab, labPipeline } from "../gewoelk/lab/lab";
 import { routeTrails } from "../gewoelk/lab/routes";
 import voxelShader from "../gewoelk/lab/voxel.comp.wgsl";
@@ -63,6 +64,7 @@ const PLANE_LEAST_PX = 9;
 const PLANE_ALBEDO = 0.4;
 const PLANE_AIR_KM = 50;
 const PLANES = 16;
+const START_HEIGHT_M = 20;
 
 /** The aircraft's photograph on the GPU, with levels down to a texel, each the mean of four of the one before. */
 async function planeTexture(device: GPUDevice) {
@@ -97,11 +99,13 @@ type Clouds = { key: string; voxel: CloudPass | null; layered: LayeredCloudPass 
  */
 export async function heroFigure(root: HTMLElement) {
     let draw: (lab: Lab) => void = () => {};
+    // Seen from a rooftop at first, the figure's own height: the page's stays.
+    frameHeight(root).set(START_HEIGHT_M);
     const speeds = [...root.querySelectorAll<HTMLElement>("[data-speed]")];
     const lab = createLab(root, (current) => draw(current), {
         camera: { yaw: 205 * DEG, pitch: 20 * DEG, fov: 85 * DEG },
         speed: () =>
-            Number(speeds.find((button) => button.getAttribute("aria-pressed") === "true")?.dataset.speed) || 60,
+            Number(speeds.find((button) => button.getAttribute("aria-pressed") === "true")?.dataset.speed) || 1,
     });
     if (!lab) return;
     const { device, canvas, camera } = lab;
@@ -386,7 +390,16 @@ export async function heroFigure(root: HTMLElement) {
             );
             flying.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
             flying.end();
-            const view = { observerHeightM: heightM, inverseViewProjection, projectionDistance };
+            // By night the Moon is the clouds' light, and their corona would be the Moon's. Its disc is drawn as the eye
+            // sees it, adapted to it and many stops darker than the night is exposed: a corona exposed as the night
+            // outshines the disc it lies around, and one exposed as the disc is a fiftieth of it, too faint to show. None.
+            const corona = sunUp;
+            const view = {
+                observerHeightM: heightM,
+                inverseViewProjection,
+                projectionDistance,
+                ...(!corona && { corona: false as const }),
+            };
             const march = lab.timer.writes("march");
             if (pass.voxel) {
                 const exposedBy = 1 / (1.2 * 2 ** light.ev100);
