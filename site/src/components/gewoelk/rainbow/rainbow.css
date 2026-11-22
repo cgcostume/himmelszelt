@@ -102,9 +102,31 @@
     aspect-ratio: 4 / 3;
     border-radius: var(--radius-button);
 }
+/* The Sun in the side view is dragged: a press on it does not scroll the page, one elsewhere does. */
+.bowplace-panel > svg[data-panel="side"] {
+    touch-action: pan-y;
+    user-select: none;
+}
+.bowplace-sun {
+    cursor: grab;
+    touch-action: none;
+}
+.dragging > .bowplace-sun {
+    cursor: grabbing;
+}
+.bowplace-grab {
+    fill: transparent;
+}
 .bowplace-sunlight {
     stroke: var(--text);
     stroke-width: 1.2;
+}
+/* The sunlight on the drops, thinner than the line to the eye. */
+.bowplace-to-drop {
+    stroke-width: 0.9;
+}
+.bowplace-hit {
+    fill: var(--text);
 }
 .bowplace-hidden {
     fill: none;

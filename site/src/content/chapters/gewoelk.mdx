@@ -278,13 +278,13 @@ white <Term of="Fogbow">fogbow</Term>, 2° farther in.
 
 Where a bow stands is geometry alone. The antisolar point lies as far under the horizon as the Sun stands over it, so
 the primary bow's top is 42° less the Sun's elevation up, which is `bowTop`: half a circle at sunset, a low arc in the
-afternoon, and nothing once the Sun is higher than 42° (<Fig id="bow-place" />). That is why rainbows belong to
-mornings and evenings. The rest of the circle lies under the horizon, and only an observer with rain beneath, on a
-mountain or in a plane, has drops there to see it in.
+afternoon, and nothing once the Sun is higher than 42° (<Fig id="bow-place" />). Drag the Sun up, and both bows sink
+into the ground, the primary gone with the Sun 42° up and the secondary at 51°. That is why rainbows belong to mornings
+and evenings: on June 21 in Potsdam the Sun is too high for a primary bow from 9:46 to 16:33 local time. The rest of
+the circle lies under the horizon, and only an observer with rain beneath, on a mountain or in a plane, has drops there
+to see it in.
 
 <BowPlace />
-
-<Controls />
 
 For a renderer all of this is one lookup per view ray. `antisolarAngle` is the ray's angle from the antisolar point,
 the table at 180° less it gives red, green and blue per steradian, and times the Sun's illuminance and the rain's
