@@ -3,10 +3,18 @@
  * using this package's passes. `noise` and `params` are binding-free; the `.comp.wgsl` passes declare their bindings
  * at group 0 and take their output from `cloudOutput(format)` at group 1. Every identifier is prefixed `gw`/`GW_`.
  *
+ * `noise` holds reisszeug's hashes and noise, the repository's shared shader math, inlined at build time under the
+ * prefix `gw`, with this package's cell patterns.
+ *
  * `camera` and `aerial` are dunstkreis' and `tonemap` and `whitebalance` helldunkel's, bundled at build time: one source, nothing else to
  * install. `airLookup` is dunstkreis' too, what `sunlight` reads its transmittance table with.
  */
 import { atmosphere, common, lut, sampling } from "@himmelszelt/dunstkreis/wgsl";
+import rzHash from "../../../../reisszeug/hash.wgsl";
+import rzNoise from "../../../../reisszeug/noise.wgsl";
+import rzPhase from "../../../../reisszeug/phase.wgsl";
+import { prefixed } from "../../../../reisszeug/prefixed.js";
+import cells from "./cells.wgsl";
 import cloudmap from "./cloudmap.comp.wgsl";
 import clouds from "./clouds.comp.wgsl";
 import compose from "./compose.comp.wgsl";
@@ -22,8 +30,7 @@ import layerread from "./layerread.wgsl";
 import layers from "./layers.comp.wgsl";
 import light from "./light.comp.wgsl";
 import morph from "./morph.comp.wgsl";
-import noise from "./noise.wgsl";
-import params from "./params.wgsl";
+import paramsSource from "./params.wgsl";
 import rainbow from "./rainbow.wgsl";
 import sheet from "./sheet.wgsl";
 import sunlight from "./sunlight.comp.wgsl";
@@ -50,12 +57,18 @@ export {
     layers,
     light,
     morph,
-    noise,
-    params,
     rainbow,
     sheet,
     sunlight,
     voxel,
 };
+
+/** The noise, reisszeug's hashes and noises under the prefix `gw`, with the cell patterns the maps are drawn from and
+ *  the jitter a march starts its rays by: `gwPerlin`, `gwPerlin2`, `gwFbm`, `gwAlligator`, `gwCurl`, `gwBumps`. */
+/** What every pass reads, binding-free: the parameters' structs and the geometry, with reisszeug's phase functions under
+ *  the prefix `gw`. */
+export const params = [prefixed(rzPhase, "gw"), paramsSource].join("\n");
+
+export const noise = [prefixed(rzHash, "gw"), prefixed(rzNoise, "gw"), cells].join("\n");
 
 export const airLookup = [atmosphere, common, lut, sampling].join("\n");

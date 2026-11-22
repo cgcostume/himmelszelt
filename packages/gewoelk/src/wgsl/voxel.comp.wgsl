@@ -1,6 +1,6 @@
 // The cloudscape voxelized from its cloud map, and its signed distance field by jump flooding, into one texture of
 // modeling data, as Nubis3's NVDFs hold it: the dimensional profile, the detail type, the density scale, and the
-// distance outside, in `GW_SDF_RANGE` km over 8 bits, rounded down so a step never overshoots. Requires `noise.wgsl`
+// distance outside, in `GW_SDF_RANGE` km over 8 bits, rounded down so a step never overshoots. Requires `wgsl.noise`
 // and `params.wgsl`.
 //
 // A voxel is cloud where its height lies within the column the map's value spans: bottoms dip below the base level by

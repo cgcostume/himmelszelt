@@ -2,10 +2,12 @@ import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { expect, test } from "@playwright/test";
 import { cloudOutput } from "../src/wgsl/output.js";
-import { compileWgsl, gpuDevice } from "./gpu.js";
+import { compileWgsl, composedSource, gpuDevice } from "./gpu.js";
 
 /** A shader by name, this package's or dunstkreis' camera, which it bundles. */
 function wgslSource(name: string): string {
+    const composed = composedSource(name);
+    if (composed) return composed;
     const owner = name === "camera" ? "../../dunstkreis/src/wgsl" : "../src/wgsl";
     const read = (file: string) => readFileSync(new URL(`${owner}/${file}`, import.meta.url), "utf8");
     try {

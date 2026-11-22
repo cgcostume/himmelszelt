@@ -2,7 +2,7 @@
 // target, which may be smaller than the frame; the sheets are left to the compose pass, at the frame's. It is marched
 // as Nubis3 marches its voxel clouds: steps the signed distance long outside the clouds and adaptive inside,
 // the density up-rezzed from the dimensional profile by the detail noise, the light summed per voxel beforehand.
-// Requires `noise.wgsl`, `params.wgsl`, `camera.wgsl`, `aerial.wgsl`, `sheet.wgsl`, `layerread.wgsl` and the output binding.
+// Requires `wgsl.noise`, `params.wgsl`, `camera.wgsl`, `aerial.wgsl`, `sheet.wgsl`, `layerread.wgsl` and the output binding.
 
 @group(0) @binding(0) var<uniform> gwParams: GwParams;
 @group(0) @binding(1) var gwMap: texture_2d_array<f32>;

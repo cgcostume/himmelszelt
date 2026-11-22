@@ -1,4 +1,5 @@
 import { wgsl } from "@himmelszelt/dunstkreis";
+import { blueNoiseTexture } from "@himmelszelt/helldunkel";
 import { find } from "../dom";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
@@ -57,6 +58,7 @@ struct Params {
 @group(0) @binding(4) var lutSampler: sampler;
 @group(0) @binding(5) var output: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(6) var<storage, read_write> samples: array<Sample>;
+@group(0) @binding(7) var blueNoise: texture_2d<f32>;
 
 // One direction after every stage, for the plots: its four wavelengths in cd/m², linear RGB in gamut with the lowest
 // channel the matrix gave in w, the exposed light, tone mapped, and the code values over 1, quantized without dither.
@@ -140,13 +142,6 @@ fn quantized(mapped: vec3f, offset: f32) -> vec3f {
     return floor(mapped * steps + offset) / steps;
 }
 
-fn noise(p: vec2u) -> f32 {
-    var h = p.x * 1664525u + p.y * 1013904223u;
-    h = (h ^ (h >> 16u)) * 2246822519u;
-    h = h ^ (h >> 13u);
-    return f32(h & 0xffffu) / 65535.0;
-}
-
 // What panel \`panel\` shows of light at the four wavelengths, in sRGB encoded values. Panel 0 shows wavelength \`band\`.
 fn shown(spectral: vec4f, panel: u32, band: u32, pixel: vec2u) -> vec3f {
     if (panel == 0u) {
@@ -167,7 +162,7 @@ fn shown(spectral: vec4f, panel: u32, band: u32, pixel: vec2u) -> vec3f {
     if (panel == 3u) {
         return mapped;
     }
-    return quantized(mapped, select(0.5, noise(pixel), params.dither == 1u));
+    return quantized(select(mapped, hdDitherBlue(mapped, pixel, params.levels - 1.0, blueNoise), params.dither == 1u), 0.5);
 }
 
 fn stagesOf(spectral: vec4f) -> Sample {
@@ -323,6 +318,7 @@ if (gpu.device) {
         layout: "auto",
         compute: { module, entryPoint: "slice" },
     });
+    const blueNoise = blueNoiseTexture(device).createView();
     const paramsBuffer = device.createBuffer({
         size: PARAMS_SIZE,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -387,7 +383,7 @@ if (gpu.device) {
         const texture = context.getCurrentTexture();
         const bindGroup = device.createBindGroup({
             layout: pipeline.getBindGroupLayout(0),
-            entries: [...shared, { binding: 5, resource: texture.createView() }],
+            entries: [...shared, { binding: 5, resource: texture.createView() }, { binding: 7, resource: blueNoise }],
         });
         const sliceGroup = device.createBindGroup({
             layout: slicePipeline.getBindGroupLayout(0),

@@ -175,13 +175,6 @@ fn up(@builtin(global_invocation_id) id: vec3u) {
     textureStore(destination, id.xy, textureLoad(level, id.xy, 0) + below);
 }
 
-fn noise(p: vec2u) -> f32 {
-    var h = p.x * 1664525u + p.y * 1013904223u;
-    h = (h ^ (h >> 16u)) * 2246822519u;
-    h = h ^ (h >> 13u);
-    return f32(h & 0xffffu) / 65535.0;
-}
-
 @compute @workgroup_size(8, 8, 1)
 fn composite(@builtin(global_invocation_id) id: vec3u) {
     let size = textureDimensions(output);
@@ -201,7 +194,7 @@ fn composite(@builtin(global_invocation_id) id: vec3u) {
         disc = disc * (1.0 - params.glow);
     }
     let mapped = mix(hdToneMapNeutral(sky), hdToneMapNeutral(sky + disc), share);
-    let encoded = mapped + (noise(id.xy) - 0.5) / 255.0;
+    let encoded = hdDither(mapped, id.xy, 255.0);
     textureStore(output, id.xy, vec4f(clamp(encoded, vec3f(0.0), vec3f(1.0)), 1.0));
 }
 `;

@@ -1,5 +1,5 @@
 // The cloud map: the thesis' two-dimensional field, its value read as a height, from which the cloudscape is voxelized
-// and a sheet is read directly. One layer of the map array per model. Requires `noise.wgsl` and `params.wgsl`.
+// and a sheet is read directly. One layer of the map array per model. Requires `wgsl.noise` and `params.wgsl`.
 //
 // Octaves of gradient noise, summed as osgHimmel's HighCloudLayerGeode did, then shaped: what lies below 1 - coverage
 // is sky, the rest stretched to [0, 1] and raised to 1 - sharpness, so the edges harden as sharpness grows. The green

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { reisszeugSource } from "../../../reisszeug/source.js";
+
 /** The shared test device, Dawn through the `webgpu` package, as in dunstkreis' tests: opt-in, `pnpm test:gpu`. */
 let devicePromise: Promise<GPUDevice | null> | undefined;
 // Held for the life of the process: collected, it takes the device with it.
@@ -20,4 +23,13 @@ export async function compileWgsl(device: GPUDevice, code: string): Promise<stri
     const module = device.createShaderModule({ code });
     const info = await module.getCompilationInfo();
     return info.messages.filter((m) => m.type === "error").map((m) => `${m.lineNum}: ${m.message}`);
+}
+
+/** A fragment `wgsl` composes with reisszeug's chunks, as the package does, by name; undefined for a file of its own. */
+export function composedSource(name: string): string | undefined {
+    const own = (file: string) => readFileSync(new URL(`../src/wgsl/${file}`, import.meta.url), "utf8");
+    if (name === "noise")
+        return [reisszeugSource("hash", "gw"), reisszeugSource("noise", "gw"), own("cells.wgsl")].join("\n");
+    if (name === "params") return [reisszeugSource("phase", "gw"), own("params.wgsl")].join("\n");
+    return undefined;
 }

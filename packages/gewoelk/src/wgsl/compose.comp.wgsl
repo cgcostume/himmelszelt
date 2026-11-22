@@ -1,7 +1,7 @@
 // The clouds over the background: the cloudscape's layer, premultiplied luminance and transmittance, at whatever size
 // it was rendered, read bilinearly over the target, over the sheets, read here at the target's full size for their
 // fine strands, over the background in cd/m² where there is one, then white balanced, exposed and tone mapped like
-// dunstkreis' sky, or left linear, with the corona of corona.wgsl where they are thin. Requires `noise.wgsl`,
+// dunstkreis' sky, or left linear, with the corona of corona.wgsl where they are thin. Requires `wgsl.noise`,
 // `params.wgsl`, `camera.wgsl`, `aerial.wgsl`, `sheet.wgsl`, `corona.wgsl`, `whitebalance.wgsl`, `tonemap.wgsl` and the
 // output binding.
 

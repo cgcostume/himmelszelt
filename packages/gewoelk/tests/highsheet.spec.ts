@@ -4,14 +4,14 @@ import { expect, test } from "@playwright/test";
 import { DEFAULT_LAYERED_PARAMS } from "../src/layers.js";
 import { DEFAULT_CLOUD_PARAMS, paramsData, sunlightData } from "../src/params.js";
 import { cloudOutput } from "../src/wgsl/output.js";
-import { compileWgsl, gpuDevice } from "./gpu.js";
+import { compileWgsl, composedSource, gpuDevice } from "./gpu.js";
 
-const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
+const source = (path: string) => composedSource(path) ?? readFileSync(new URL(path, import.meta.url), "utf8");
 
 // Each shader with exactly the fragments its header names, so none grows a dependency it does not declare.
 const PASSES: Record<string, readonly string[]> = {
-    highmap: ["../src/wgsl/noise.wgsl", "../src/wgsl/highmap.comp.wgsl"],
-    highsheet: ["../src/wgsl/params.wgsl", "../../dunstkreis/src/wgsl/camera.wgsl", "../src/wgsl/highsheet.comp.wgsl"],
+    highmap: ["noise", "../src/wgsl/highmap.comp.wgsl"],
+    highsheet: ["params", "../../dunstkreis/src/wgsl/camera.wgsl", "../src/wgsl/highsheet.comp.wgsl"],
 };
 const OUTPUTS: Record<string, string> = { highsheet: cloudOutput("rgba16float") };
 

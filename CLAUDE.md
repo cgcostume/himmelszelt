@@ -20,6 +20,7 @@ and is to be deleted by the user.
 
 ```
 packages/<name>/   one directory per published @himmelszelt/* package
+reisszeug/         shader math two or more packages need, inlined into each at build time, never published
 site/              sternwarte: the single website (Astro), private, never published to npm
 osghimmel/         read-only reference clone, gitignored
 ```
@@ -59,6 +60,10 @@ sun/moon direction vector + time as plain inputs. Whoever embeds it computes tha
 they like. Keep this decoupling for every future module too. One exception, at build time only: a package may bundle a small
 piece another owns, as a dev dependency inlined into its `dist` (dunstkreis: helldunkel's tone curves and EV100 math,
 rundbild's cube map layout, through their `/wgsl` entries; gewoelk: dunstkreis' camera rays and helldunkel's tone curves). One source, and npm users still install one package.
+Generic math with no natural owner that a second package needs (hashes, noise, turbulence, phase functions, a workgroup's
+sum) moves to `reisszeug/` instead: plain files, no package, imported by relative path and inlined by each build. Its
+identifiers are prefixed `rz`/`Rz`/`RZ_`, and each package renames them to its own with `prefixed(chunk, "gw")`; see
+`reisszeug/README.md`.
 
 **Directions are ENU** (x east, y north, z up, right-handed) in every package: sternzeit's
 `horizontalToDirection` and `moon.sunDirection`, dunstkreis' `sunDirection` input and view rays. Azimuths are

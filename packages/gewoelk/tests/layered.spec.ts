@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { cloudOutput } from "../src/wgsl/output.js";
-import { compileWgsl, gpuDevice } from "./gpu.js";
+import { compileWgsl, composedSource, gpuDevice } from "./gpu.js";
 
 const fragment = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 
@@ -12,7 +12,7 @@ test("the layered composition compiles from its declared fragments", async () =>
     const helldunkel = "../../helldunkel/src/wgsl";
     const code = [
         cloudOutput("rgba8unorm"),
-        fragment("../src/wgsl/params.wgsl"),
+        composedSource("params") ?? "",
         fragment("../../dunstkreis/src/wgsl/camera.wgsl"),
         fragment("../src/wgsl/corona.wgsl"),
         fragment(`${helldunkel}/whitebalance.wgsl`),

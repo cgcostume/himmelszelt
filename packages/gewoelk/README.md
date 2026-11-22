@@ -161,6 +161,11 @@ levels of the detail noise, clouds casting shadows on the ground, and contrails,
   multiple scattering.
 - K. Perlin, "Improving Noise" (SIGGRAPH 2002): the cloud map's noise.
 - SideFX, [Alligator noise](https://www.sidefx.com/docs/hdk/alligator_2alligator_8_c-example.html), the HDK's example.
+- M. Jarzynski, M. Olano, "Hash Functions for GPU Rendering" (JCGT, 2020): pcg3d and pcg4d, a cell's numbers; and
+  C. Wellons, [lowbias32](https://nullprogram.com/blog/2018/07/31/), the corners' hash.
+- I. Quílez, [gradient noise derivatives](https://iquilezles.org/articles/gradientnoise/): the curl field's slopes.
+- J. Jimenez, "Next Generation Post Processing in Call of Duty: Advanced Warfare" (SIGGRAPH course 2014): the
+  interleaved gradient noise a march is jittered by.
 - D. Müller (now Limberger), "Photorealistisches Rendering atmosphärischer Effekte in geovirtuellen 3D-Umgebungen in
   Echtzeit" (master's thesis, HPI, 2012): the cloud map and the offset that flattens the bottoms.
 
@@ -168,3 +173,6 @@ levels of the detail noise, clouds casting shadows on the ground, and contrails,
 
 Part of the [himmelszelt monorepo](https://github.com/cgcostume/himmelszelt); run `pnpm build`, `pnpm typecheck`,
 `pnpm test` and `pnpm test:gpu` from the repository root or here.
+
+`research/noise` times the noise and the passes that bake from it under Dawn, A/B against an earlier commit, and
+renders both side by side: see its README.

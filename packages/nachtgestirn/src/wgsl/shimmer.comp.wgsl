@@ -2,7 +2,7 @@
 // turbulence and its colors spread by the air's dispersion. A pass of its own over the Moon alone, linear, from the
 // layer pass (`NG_LAYER`): each pixel reads red, green and blue where the air moved them from, then finishes the pixel
 // as the Moon pass would, over the background, exposed and tone mapped. The ground and the sky behind the Moon stay
-// put. Requires `moon.comp.wgsl` with all it requires, and the output binding from `moonOutput` for the target's format.
+// put. Requires `moon.comp.wgsl` with all it requires, reisszeug's `turbulence.wgsl` under the prefix `ng`, and the output binding from `moonOutput` for the target's format.
 
 // The layer read between its texels, clamped at its edges.
 @group(0) @binding(10) var ngLayerSampler: sampler;
@@ -16,43 +16,7 @@
 // about a hundredth of the refraction, so near the horizon each color shows a little higher than the one redder than
 // it, and a point's red and blue images lie apart by more than the turbulence's cells: its colored rims flicker each on
 // its own, as a star low in the sky flashes in colors. All of it given per disc, from the air between the observer and
-// the Moon.
-// The turbulence: Kolmogorov's, eight octaves of waves, each half the size, from `cell` up to the outer scale, some
-// 128 lens widths, its tilt as the size to the sixth, blown across the sky by the wind and changing as it goes; `rms`
-// the tilt along each axis, in radians on the sky. A camera resolves only waves of `resolved` and longer, and no wave
-// moving the image by more than NG_FOLD of its own wavelength: an octave's three waves together steeper than one would
-// fold the image over itself into hairs and noise. What the pixels cannot follow, the finer waves and the steep ones'
-// excess, they average into a blur instead, as each pixel gathers light moved about within it: its variance, in square
-// radians, the third returned. `parts` weighs the three largest octaves, which move patches of the image as a whole,
-// and the five smaller, which make it boil; its third the wind's drift across the sky, in radians a second.
-// A wave at most this share of its wavelength: a slope of a quarter each, three to an octave.
-const NG_FOLD: f32 = 0.04;
-const NG_OCTAVES: u32 = 8u;
-// sqrt(2 / sum of the octaves' squared weights): three waves of each, 2^((7 - octave) / 6).
-const NG_TURBULENCE_NORM: f32 = 0.18;
-fn ngTurbulence(onSky: vec2f, time: f32, cell: f32, resolved: f32, rms: f32, parts: vec3f) -> vec3f {
-    var moved = vec2f(0.0);
-    var blur = 0.0;
-    let blown = onSky - vec2f(0.8, 0.6) * parts.z * time;
-    for (var i = 0u; i < 3u * NG_OCTAVES; i = i + 1u) {
-        let octave = f32(i / 3u);
-        let size = cell * exp2(f32(NG_OCTAVES - 1u) - octave);
-        let weight = select(parts.y, parts.x, octave < 3.0);
-        let full = rms * NG_TURBULENCE_NORM * pow(size / cell, 1.0 / 6.0) * weight;
-        let amplitude = select(0.0, min(full, size * NG_FOLD * weight), size >= resolved);
-        // Never below none: fused into one multiply-add, the difference of the equal squares can come out a hair under
-        // zero, and its root at the end a NaN that sends every pixel's taps to the same texel.
-        blur = blur + 0.5 * max(full * full - amplitude * amplitude, 0.0);
-        if (amplitude > 0.0) {
-            let angle = f32(i) * 2.399963 + 0.4;
-            let across = vec2f(cos(angle), sin(angle));
-            let drift = time * (3.0 + 1.25 * octave + 0.37 * f32(i));
-            let phase = dot(blown, across) * (6.2831853 / size) + f32(i) * 1.7 + drift;
-            moved = moved + amplitude * vec2f(sin(phase), cos(phase * 0.93 + f32(i)));
-        }
-    }
-    return vec3f(moved, blur);
-}
+// the Moon, and wandered by `ngTurbulence`, reisszeug's.
 
 // Red's, green's and blue's rays for a pixel's ray, moved by the turbulence and spread apart towards the zenith, and the
 // blur of what the pixels cannot follow, its rms.

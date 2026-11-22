@@ -1,6 +1,6 @@
 // The detail noise the dimensional profile is eroded with, as Nubis3's: four channels of a tiling 3D texture, curly
 // alligator noise at a low and a high frequency for wisps, alligator noise at both for billows, made once on the GPU.
-// Requires `noise.wgsl`.
+// Requires `wgsl.noise`.
 
 @group(0) @binding(0) var gwDetailOut: texture_storage_3d<rgba8unorm, write>;
 

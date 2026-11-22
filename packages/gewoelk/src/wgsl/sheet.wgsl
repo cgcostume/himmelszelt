@@ -1,6 +1,6 @@
 // What the passes share along a pixel's ray: its direction, layers of cloud to composite front to back, the ground
 // beneath a point, the sun's light aloft, and the sheets of high cloud, read once each where the ray crosses their
-// sphere, cheap enough for every pixel of the frame. Requires `noise.wgsl`, `params.wgsl`, and dunstkreis'
+// sphere, cheap enough for every pixel of the frame. Requires `wgsl.noise`, `params.wgsl`, and dunstkreis'
 // `camera.wgsl` and `aerial.wgsl`, and of the pass `gwParams`, `gwMap`, `gwVolumeSampler`, `gwSunlight`, `gwAerialLuminance`, `gwAerialTransmittance`,
 // `gwClampSampler`, `gwLight` and `gwDeck`.
 

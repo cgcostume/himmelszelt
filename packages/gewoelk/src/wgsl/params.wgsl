@@ -166,11 +166,6 @@ struct GwModel {
 
 const GW_PI: f32 = 3.141592653589793;
 
-fn gwHenyeyGreenstein(cosTheta: f32, g: f32) -> f32 {
-    let g2 = g * g;
-    return (1.0 - g2) / (4.0 * GW_PI * pow(max(1.0 + g2 - 2.0 * g * cosTheta, 1e-4), 1.5));
-}
-
 // What a cloud of optical depth `tau` lets through, scattered and not, of light falling on it: the two-stream
 // approximation's 1 / (1 + 3/4 (1 - g) tau) for a forward lobe of asymmetry `g`, which the octaves of scattering
 // fall far short of in thick cloud.

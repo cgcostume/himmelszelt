@@ -5,3 +5,6 @@ playwright-report/
 osghimmel/
 .claude/settings.local.json
 .astro/
+packages/gewoelk/research/noise/out/
+# Declarations TypeScript 7's tsgo writes beside reisszeug's sources while a package's build makes its own (outside its root)
+reisszeug/*.d.ts

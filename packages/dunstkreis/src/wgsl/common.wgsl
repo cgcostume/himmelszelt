@@ -215,12 +215,6 @@ fn dkPhaseRayleigh(nu: f32) -> f32 {
     return 3.0 / (16.0 * DK_PI) * (1.0 + nu * nu);
 }
 
-// Henyey and Greenstein's phase function, per steradian, 1 over the sphere: the aureole's narrow forward lobe.
-fn dkPhaseHenyeyGreenstein(g: f32, nu: f32) -> f32 {
-    let g2 = g * g;
-    return (1.0 - g2) / (4.0 * DK_PI * pow(max(1.0 + g2 - 2.0 * g * nu, 1e-7), 1.5));
-}
-
 // Mie phase function, Cornette-Shanks rather than plain Henyey-Greenstein, as Hillaire's. Strongly forward-biased,
 // which is what puts the bright glow around the sun.
 fn dkPhaseMie(a: DkAtmosphere, nu: f32) -> f32 {

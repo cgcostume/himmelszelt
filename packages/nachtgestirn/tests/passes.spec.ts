@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { DEFAULT_ATMOSPHERE_MODEL, lightThroughAir } from "@himmelszelt/dunstkreis";
 import { MOON_WHITE, SUN_WHITE, whiteBalance } from "@himmelszelt/helldunkel";
 import { expect, test } from "@playwright/test";
+import { reisszeugSource } from "../../../reisszeug/source.js";
 import { MOON_COLOR, PARAMS_SIZE, paramsData, TABLES_SIZE, tablesData } from "../dist/index.js";
 import {
     moonOrientation,
@@ -16,6 +17,13 @@ import { compileWgsl, gpuDevice } from "./gpu.js";
 
 /** A shader by name, this package's or one of the fragments it bundles from the packages that own them. */
 function wgslSource(name: string): string {
+    // Fragments composed with reisszeug's chunks, as `wgsl` composes them.
+    const shared = { noise: ["hash", "noise"], shimmer: ["turbulence"] }[name];
+    if (shared)
+        return [
+            ...shared.map((chunk) => reisszeugSource(chunk, "ng")),
+            readFileSync(new URL(`../src/wgsl/${name}.comp.wgsl`, import.meta.url), "utf8"),
+        ].join("\n");
     const helldunkel = "../../helldunkel/src/wgsl";
     const owner =
         {

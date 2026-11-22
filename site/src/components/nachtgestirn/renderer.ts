@@ -416,6 +416,9 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     let maps: MoonMaps | null = null;
     // The pair bound, and the one on its way or bound.
     let mapsBound = "";
+    // How often a pass finished what it makes only once asked, the roughness' noise or the shimmer: a tile drawn before
+    // is stale then, though its frame is the same.
+    let readied = 0;
     let mapsWanted = "";
     let mapsSet = "";
     let background: GPUTexture | null = null;
@@ -488,7 +491,10 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
             ...(softShadowsFrom === undefined ? {} : { softShadowsFrom }),
             ...(shadowsFrom === undefined ? {} : { shadowsFrom }),
             filter,
-            onReady: requestRender,
+            onReady: () => {
+                readied++;
+                requestRender();
+            },
         }).then((pass) => {
             if (!moonBuilding.delete(key)) return pass.destroy();
             moonPasses.set(key, pass);
@@ -768,8 +774,9 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
     }
 
     return {
-        /** What the drawings depend on besides the frame: the maps bound, seen or whole, and the roughness maps loaded. */
-        bound: () => `${mapsBound} ${mapsSet} ${roughnessLoaded.size}`,
+        /** What the drawings depend on besides the frame: the maps bound, seen or whole, the roughness maps loaded, and what
+         *  the passes made since. */
+        bound: () => `${mapsBound} ${mapsSet} ${roughnessLoaded.size} ${readied}`,
         /** Draws `frame` into `target`; null while a pass is still being made, which calls `requestRender` when done. */
         draw(target: GPUTexture, frame: MoonFrame) {
             if (!frame.compare) return render(target, frame, false);

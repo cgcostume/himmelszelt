@@ -8,6 +8,7 @@
  * baseline there. Run them when touching WGSL.
  */
 import { readFileSync } from "node:fs";
+import { reisszeugSource } from "../../../reisszeug/source.js";
 
 /**
  * Reads a shader by name from `src/wgsl/`, a compute pass by its `.comp.wgsl`. The tests load the files directly rather
@@ -15,6 +16,13 @@ import { readFileSync } from "node:fs";
  * test runner has no equivalent. Same bytes either way, so this still tests the shipped shader.
  */
 export function wgslSource(name: string): string {
+    // Fragments composed with reisszeug's chunks, as `wgsl` composes them.
+    const shared = { common: ["phase"], shimmer: ["turbulence"] }[name];
+    if (shared)
+        return [
+            ...shared.map((chunk) => reisszeugSource(chunk, "dk")),
+            readFileSync(new URL(`../src/wgsl/${name}.wgsl`, import.meta.url), "utf8"),
+        ].join("\n");
     // Fragments shared with the packages that own them.
     const owner =
         {

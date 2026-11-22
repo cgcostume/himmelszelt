@@ -9,19 +9,30 @@
  * `camera` is dunstkreis' and `tonemap`, `vision` and `whitebalance` helldunkel's, bundled at build time: one source,
  * nothing else to install.
  */
+
+import rzHash from "../../../../reisszeug/hash.wgsl";
+import rzNoise from "../../../../reisszeug/noise.wgsl";
+import { prefixed } from "../../../../reisszeug/prefixed.js";
+import rzTurbulence from "../../../../reisszeug/turbulence.wgsl";
 import bc1 from "./bc1.comp.wgsl";
 import hapke1963 from "./hapke1963.wgsl";
 import mips from "./mips.comp.wgsl";
 import moon from "./moon.comp.wgsl";
-import noise from "./noise.comp.wgsl";
+import noiseComp from "./noise.comp.wgsl";
 import params from "./params.wgsl";
 import reflectance from "./reflectance.wgsl";
 import relief from "./relief.comp.wgsl";
 import shadow from "./shadow.comp.wgsl";
-import shimmer from "./shimmer.comp.wgsl";
+import shimmerSource from "./shimmer.comp.wgsl";
 import surface from "./surface.wgsl";
 
 export { camera } from "@himmelszelt/dunstkreis/wgsl";
 export { tonemap, vision, whitebalance } from "@himmelszelt/helldunkel/wgsl";
 export { moonOutput } from "./output.js";
-export { bc1, hapke1963, mips, moon, noise, params, reflectance, relief, shadow, shimmer, surface };
+export { bc1, hapke1963, mips, moon, params, reflectance, relief, shadow, surface };
+
+/** The roughness' noise pass, with reisszeug's hashes and noise under the prefix `ng`, which it is made from. */
+export const noise = [prefixed(rzHash, "ng"), prefixed(rzNoise, "ng"), noiseComp].join("\n");
+
+/** The shimmer, with reisszeug's turbulence under the prefix `ng`, which it wanders an image by. */
+export const shimmer = [prefixed(rzTurbulence, "ng"), shimmerSource].join("\n");

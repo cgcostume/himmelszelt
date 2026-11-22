@@ -3,7 +3,7 @@
 // with striations, ribs across a band, and trails combed out of all of it along the wind. Red holds the puffs as a
 // height, not a density: the sheet eats billows out of it and softens what is left, pixel by pixel, so both move for
 // free. Green is the veil, alpha the billows' noise, and blue a broad field, read again at a larger scale and another
-// angle for the patches and bands the sheet comes in, so the tile's repetition hides. Requires `noise.wgsl`.
+// angle for the patches and bands the sheet comes in, so the tile's repetition hides. Requires `wgsl.noise`.
 
 // What the map is made from: a change of any of it is a new bake. Sizes in km.
 struct GwHighModel {

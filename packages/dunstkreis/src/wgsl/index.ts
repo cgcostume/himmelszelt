@@ -20,13 +20,16 @@
  * Every identifier is prefixed `dk` (or `DK_` for constants) so several `@himmelszelt/*` fragments can share one
  * shader module.
  */
+import rzPhase from "../../../../reisszeug/phase.wgsl";
+import { prefixed } from "../../../../reisszeug/prefixed.js";
+import rzTurbulence from "../../../../reisszeug/turbulence.wgsl";
 import aerial from "./aerial.wgsl";
 import aerialapply from "./aerialapply.comp.wgsl";
 import aerialvolume from "./aerialvolume.comp.wgsl";
 import air from "./air.wgsl";
 import atmosphere from "./atmosphere.wgsl";
 import camera from "./camera.wgsl";
-import common from "./common.wgsl";
+import commonSource from "./common.wgsl";
 import exposure from "./exposure.comp.wgsl";
 import features from "./features.wgsl";
 import frame from "./frame.wgsl";
@@ -38,7 +41,7 @@ import quality from "./quality.wgsl";
 import raymarch from "./raymarch.wgsl";
 import sampling from "./sampling.wgsl";
 import seeing from "./seeing.wgsl";
-import shimmer from "./shimmer.wgsl";
+import shimmerSource from "./shimmer.wgsl";
 import shimmerlayer from "./shimmerlayer.comp.wgsl";
 import sky from "./sky.comp.wgsl";
 import skyview from "./skyview.comp.wgsl";
@@ -62,7 +65,6 @@ export {
     air,
     atmosphere,
     camera,
-    common,
     exposure,
     features,
     frame,
@@ -74,7 +76,6 @@ export {
     raymarch,
     sampling,
     seeing,
-    shimmer,
     shimmerlayer,
     sky,
     skyview,
@@ -83,8 +84,14 @@ export {
     transmittance,
 };
 
+/** The atmosphere's shared functions, with reisszeug's phase functions under the prefix `dk`. */
+export const common = [prefixed(rzPhase, "dk"), commonSource].join("\n");
+
 /** The composable pieces, in the order WGSL needs them declared. No bindings, no entry points. */
 export const scattering = [atmosphere, common, lut, sampling, raymarch].join("\n");
 
 /** `scattering` plus the sample counts, which the passes below additionally need. */
 export const scatteringWithQuality = [quality, scattering].join("\n");
+
+/** The shimmer, with reisszeug's turbulence under the prefix `dk`, which it wanders an image by. */
+export const shimmer = [prefixed(rzTurbulence, "dk"), shimmerSource].join("\n");

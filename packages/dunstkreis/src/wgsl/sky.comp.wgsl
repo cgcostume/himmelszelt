@@ -293,7 +293,8 @@ fn dkAureoleOf(view: vec3f, light: vec3f, apparent: vec3f) -> vec3f {
     let a = dkAtmosphere;
     let h = max(dkParams.observerAltitude, 0.0);
     let column = dkRaymarchAerosol(a, dkTransmittanceLut, dkLutSampler, h, view, light);
-    let phase = dkPhaseHenyeyGreenstein(DK_AUREOLE_G, dot(view, apparent));
+    // Henyey and Greenstein's phase function, reisszeug's: the aureole's narrow forward lobe.
+    let phase = dkHenyeyGreenstein(dot(view, apparent), DK_AUREOLE_G);
     let fade = 1.0 - smoothstep(reach.x, reach.y, angle);
     return dkToRgb(a, column * a.solarIlluminance) * (DK_AUREOLE_SHARE * phase * fade);
 }

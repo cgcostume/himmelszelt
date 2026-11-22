@@ -2,7 +2,7 @@
 // march: heaps or a deck from the thesis' field, towers one per lattice cell, or a front drawn with its leading edge at
 // the left and its back at the right. Red holds how tall a column of cloud is, as a share of the layer's depth, green
 // the skirt a tall tower's anvil spreads over, blue how far a front shades what lies under it, and alpha how steep the
-// columns' tops are, per km. One layer of the map array per layer of cloud. Requires `noise.wgsl`.
+// columns' tops are, per km. One layer of the map array per layer of cloud. Requires `wgsl.noise`.
 
 // What a map is made from: a change of any of it is a new bake.
 struct GwLayerModel {

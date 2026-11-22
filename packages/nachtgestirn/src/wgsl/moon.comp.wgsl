@@ -187,7 +187,7 @@ fn ngAlbedoAt(point: vec3f, footprint: NgFootprint) -> vec3f {
 // scaled into 8-bit snorm by NG_NOISE_RANGE. Between its texels it is interpolated linearly, a tap instead of eight
 // hashed corners, smoother than the analytic gradient but alike in what the roughness needs of it: its statistics.
 const NG_NOISE_TEXELS: f32 = 4.0;
-const NG_NOISE_RANGE: f32 = 2.26;
+const NG_NOISE_RANGE: f32 = 2.66;
 
 fn ngNoiseGradient(p: vec3f) -> vec3f {
     let size = f32(textureDimensions(ngNoise).x);
@@ -196,7 +196,7 @@ fn ngNoiseGradient(p: vec3f) -> vec3f {
 
 // The RMS of one component of the noise's gradient as read, measured over many points: what makes it a slope of a given
 // RMS.
-const NG_NOISE_SLOPE_RMS: f32 = 0.436;
+const NG_NOISE_SLOPE_RMS: f32 = 0.612;
 // At most this many octaves below the relief's texels, each half the last: 64 times finer, 21 m at the 4K maps.
 const NG_ROUGHNESS_OCTAVES: i32 = 6;
 // Half the slopes LOLA's statistics give: the noise is Gaussian and casts no shadows, where the ground's roughness lies

@@ -4,7 +4,7 @@
 // march that samples towards the sun. Written as the voxel march writes its cloudscape: light in cd/m², premultiplied,
 // with what the layers let through of what lies behind, their shadow on the ground in it where a ray ends there.
 // Under the deep layer's tall columns rain falls, and where the sun reaches it, it sends back the bows of `rainbow.wgsl`.
-// Requires `noise.wgsl`, `params.wgsl`, dunstkreis' `camera.wgsl`, `rainbow.wgsl`, `layerread.wgsl`, `godrays.comp.wgsl` and the output
+// Requires `wgsl.noise`, `params.wgsl`, dunstkreis' `camera.wgsl`, `rainbow.wgsl`, `layerread.wgsl`, `godrays.comp.wgsl` and the output
 // binding.
 // With GW_LAYER_ADAPTIVE it strides by the maps' max pyramids, which `layerpyramid.comp.wgsl` fills. It also writes how
 // far away what each pixel shows is, for whoever composes the layers with something else by depth.

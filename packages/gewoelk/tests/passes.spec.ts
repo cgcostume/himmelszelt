@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { cloudOutput } from "../src/wgsl/output.js";
-import { compileWgsl, gpuDevice } from "./gpu.js";
+import { compileWgsl, composedSource, gpuDevice } from "./gpu.js";
 
 /** A shader by name, this package's or one of the fragments it bundles from the packages that own them. */
 function wgslSource(name: string): string {
+    const composed = composedSource(name);
+    if (composed) return composed;
     const dunstkreis = "../../dunstkreis/src/wgsl";
     const owners: Record<string, string> = {
         camera: dunstkreis,
