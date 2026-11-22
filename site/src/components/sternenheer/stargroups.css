@@ -6,6 +6,14 @@
     justify-content: flex-end;
     pointer-events: none;
 }
+/* The catalog's radios alone in their group, or sharing it with the figure's own switches (the slot "catalog"). */
+.catalog-wrap {
+    display: contents;
+}
+.pick-joined {
+    display: flex;
+    gap: 4px;
+}
 .pick-group > .view-icon:disabled {
     opacity: 0.35;
     cursor: not-allowed;

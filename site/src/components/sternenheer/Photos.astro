@@ -30,9 +30,10 @@ const first = PHOTOS[0];
             <span class="photo-note" data-field="note"></span>
             <div class="fig-bar">
                 <span class="fig-bar-start">
-                    <StarGroups offsets={[]} />
+                    <StarGroups offsets={[]}>
+                        <button slot="catalog" type="button" class="view-icon" data-field="milkyway" aria-pressed="true" title="The Milky Way, from NASA's Deep Star Maps, at the light the calibration gives it" aria-label="Milky Way"><Icon name="milkyWay" /></button>
+                    </StarGroups>
                     <span class="view-buttons">
-                        <button type="button" class="view-icon" data-field="milkyway" aria-pressed="true" title="The Milky Way, from NASA's Deep Star Maps, at the light the calibration gives it" aria-label="Milky Way"><Icon name="milkyWay" /></button>
                         <button type="button" class="view-toggle" data-field="air" aria-pressed="true" title="The air: dunstkreis' sky behind the stars, lit by the Moon where it is up, and every star lifted, dimmed and reddened; off, the stars from space, over black">air</button>
                         <button type="button" class="view-toggle" data-field="glare" aria-pressed="true" title="The halo around a star too bright for its pixel: the light beyond display white spread around it, falling with the cube of the distance">glare</button>
                     </span>

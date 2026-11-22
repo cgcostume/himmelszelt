@@ -5,7 +5,8 @@ import "./stargroups.css";
 
 /**
  * The stars figures' overlay groups (see stargroups.ts): the star catalog, each including the ones before it, and the
- * light of the Milky Way and of the stars, off or brighter by stops. Each a radio group: one tab stop, arrows pick.
+ * light of the Milky Way and of the stars, off or brighter by stops. Each a radio group: one tab stop, arrows pick. The
+ * slot "catalog" joins switches of the figure's own to the catalog's group, outside its radios.
  */
 interface Props {
     /** The catalog picked at first, or null for a figure that offers no choice of catalog. */
@@ -18,6 +19,7 @@ interface Props {
 }
 const { catalog = "hipparcos", offsets = ["milkyWay", "stars"], steps = ["off", "0", "2", "4"] } = Astro.props;
 const { fetches = true } = Astro.props;
+const joined = Astro.slots.has("catalog");
 
 const CATALOGS = [
     {
@@ -55,10 +57,13 @@ const stepIcon = (icon: string, pick: string) =>
 
 <span class="star-groups">
     {catalog && (
-        <span class="view-buttons pick-group" role="radiogroup" aria-label="Star catalog" data-group="catalog">
-            {CATALOGS.map((c) => (
-                <button type="button" class="view-icon" data-pick={c.pick} aria-pressed={c.pick === catalog ? "true" : "false"} tabindex={c.pick === catalog ? 0 : -1} title={c.title} aria-label={c.label}><Icon name={c.icon} /></button>
-            ))}
+        <span class={joined ? "view-buttons" : "catalog-wrap"}>
+            <span class:list={["pick-group", joined ? "pick-joined" : "view-buttons"]} role="radiogroup" aria-label="Star catalog" data-group="catalog">
+                {CATALOGS.map((c) => (
+                    <button type="button" class="view-icon" data-pick={c.pick} aria-pressed={c.pick === catalog ? "true" : "false"} tabindex={c.pick === catalog ? 0 : -1} title={c.title} aria-label={c.label}><Icon name={c.icon} /></button>
+                ))}
+            </span>
+            <slot name="catalog" />
         </span>
     )}
     {offsets.map((name) => (
