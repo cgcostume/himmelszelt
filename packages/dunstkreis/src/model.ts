@@ -66,8 +66,8 @@ export interface AtmosphereModel {
     solarIlluminance: number;
     /**
      * The ground's albedo in linear sRGB, not sRGB encoded: the share of the light it receives that it reflects,
-     * diffusely. It lights the air from below and shows as the ground itself, lit by the sun and the sky. 0.3 by default,
-     * the Earth's average; Bruneton's and Hillaire's work used 0.1, fresh snow reflects 0.8 or more. Spread over the
+     * diffusely. It lights the air from below and shows as the ground itself, lit by the sun and the sky. 0.15 by default,
+     * land without snow; Bruneton's and Hillaire's work used 0.1, fresh snow reflects 0.8 or more. Spread over the
      * four wavelengths by `reflectanceAt`.
      */
     groundAlbedo: readonly [number, number, number];
@@ -111,8 +111,9 @@ function earthAt(wavelengths: Spectral, colorConversion: AtmosphereModel["colorC
         solarSpectrum: at(solarIrradianceAt),
         // The solar constant, 1361 W/m² (Kopp & Lean 2011), times sunlight's luminous efficacy of about 94 lm/W.
         solarIlluminance: 128_000,
-        // The Earth's average, rather than the 0.1 of Bruneton's and Hillaire's work, which is dark soil or forest.
-        groundAlbedo: [0.3, 0.3, 0.3],
+        // Land without snow, about the average of the Earth's surface: its 0.3 as a planet counts the clouds in. Bruneton
+        // and Hillaire use 0.1, which is dark soil or forest.
+        groundAlbedo: [0.15, 0.15, 0.15],
         rayleigh: {
             scaleHeightKm: 8,
             // Bruneton's λ⁻⁴ fit; 5.8e-3, 1.35e-2 and 3.31e-2 at 680, 550 and 440 nm, Riley et al.'s.

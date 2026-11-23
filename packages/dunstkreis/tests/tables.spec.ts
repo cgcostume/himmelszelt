@@ -59,9 +59,9 @@ test("the tables, the sky-view table, the meter and a few pixels of sky hold the
     near(texel(transmittance, 200, 32), [0.1637, 0.082092, 0.063538, 0.013603], 0.01);
     // The multiple scattering as stored, log2 plus 12: the sun at the horizon and overhead on the ground, and half way up.
     const multiScattering = await readTexture(device, luts.multiScattering);
-    near(texel(multiScattering, 64, 0), [3.2383, 3.0293, 3.3184, 3.0664], 0.01);
-    near(texel(multiScattering, 127, 0), [7.8203, 7.8711, 8.0234, 8.1797], 0.01);
-    near(texel(multiScattering, 64, 32), [3.8262, 3.6113, 4.3359, 4.7266], 0.01);
+    near(texel(multiScattering, 64, 0), [3.2227, 3.0215, 3.3164, 3.0664], 0.01);
+    near(texel(multiScattering, 127, 0), [7, 7.0977, 7.332, 7.5742], 0.01);
+    near(texel(multiScattering, 64, 32), [3.8105, 3.6035, 4.3359, 4.7266], 0.01);
 
     // Exposed by ev100, not metered, so the pixels below are of a known exposure; the meter runs and is read either way.
     // Without the aureole, which takes a share of the aerosols' forward lobe out of the table: the values are of the
@@ -79,13 +79,13 @@ test("the tables, the sky-view table, the meter and a few pixels of sky hold the
     const skyView = await readTexture(device, pass.skyViewTexture);
     const sky = (x: number, y: number) => texel(skyView, x, y).map((v) => v / pass.skyViewScale);
     // Towards the sun just above the horizon, away from it, and the ground just below it.
-    near(sky(10, 127), [37152, 24656, 11952, 3026], 0.01);
-    near(sky(100, 200), [617.5, 575, 650.5, 663.5], 0.01);
-    near(sky(64, 128), [1073, 1025, 1104, 939.5], 0.01);
-    expect(await pass.meteredEV100()).toBeCloseTo(12.8977, 1);
+    near(sky(10, 127), [37056, 24576, 11904, 3016], 0.01);
+    near(sky(100, 200), [307.75, 286.75, 324.75, 332], 0.01);
+    near(sky(64, 128), [785.5, 766, 837, 711.5], 0.01);
+    expect(await pass.meteredEV100()).toBeCloseTo(12.8891, 1);
     near(await pass.sunIlluminance(), [40391, 17550, 2147.6], 0.01);
     // The sky alone on the ground, bluer than the low Sun.
-    near(await pass.skyIrradiance(), [1822.1, 2469.9, 3434.4], 0.01);
+    near(await pass.skyIrradiance(), [1804.5, 2456.7, 3429.8], 0.01);
 
     // The exposed sky itself, linear: a pixel of sky to the left, one near the zenith, the ground below the horizon.
     const target = device.createTexture({
@@ -97,13 +97,13 @@ test("the tables, the sky-view table, the meter and a few pixels of sky hold the
     pass.encode(encoder, target);
     device.queue.submit([encoder.finish()]);
     const image = await readTexture(device, target);
-    near(texel(image, 100, 540).slice(0, 3), [0.44019, 0.48828, 0.40039], 0.01);
-    near(texel(image, 960, 100).slice(0, 3), [0.076538, 0.11462, 0.18274], 0.01);
-    near(texel(image, 960, 1000).slice(0, 3), [0.076416, 0.065796, 0.068909], 0.01);
+    near(texel(image, 100, 540).slice(0, 3), [0.43652, 0.48608, 0.3999], 0.01);
+    near(texel(image, 960, 100).slice(0, 3), [0.075623, 0.11389, 0.1825], 0.01);
+    near(texel(image, 960, 1000).slice(0, 3), [0.038116, 0.032867, 0.034485], 0.01);
 
     // From space the meter raymarches: the lit planet, and the sun's light with nothing in the way.
     pass.update({ ...params, observerHeightM: 300_000 });
-    expect(await pass.meteredEV100()).toBeCloseTo(12.4406, 1);
+    expect(await pass.meteredEV100()).toBeCloseTo(12.3397, 1);
     near(await pass.sunIlluminance(), [139650, 125070, 122740], 0.01);
 
     target.destroy();

@@ -41,7 +41,7 @@ export const SUNLIGHT = 128000;
 // The whole sky's light on a cloud: between the zenith's blue and the horizon's pale, and half of it gray.
 export const OVERHEAD: Rgb = [0.39, 0.45, 0.6];
 export const PALE: Rgb = [0.42, 0.58, 0.85];
-export const GROUND_ALBEDO = 0.25;
+export const GROUND_ALBEDO = 0.15;
 const smoothstep = (a: number, b: number, x: number) => {
     const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
     return t * t * (3 - 2 * t);

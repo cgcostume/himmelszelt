@@ -93,7 +93,7 @@ const PHI: f32 = 1.61803398874989;
 const IPHI: f32 = 0.61803398874989;
 const FAR: f32 = 1e9;
 // The atmosphere's ground albedo: the shadows taken out of its ground assume the same.
-const GROUND_ALBEDO: f32 = 0.3;
+const GROUND_ALBEDO: f32 = 0.15;
 // Circumradius of every solid: a meter across.
 const SOLID_RADIUS: f32 = 0.5;
 

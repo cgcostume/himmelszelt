@@ -202,8 +202,8 @@ camera sees the moonlit sky as the day's, only dimmer; the eye does not, its rod
 
 ## The ground
 
-Below the horizon the sky-view table shows the ground, in its albedo `groundAlbedo` (linear RGB, 0.3 by default, the
-Earth's average, where Bruneton and Hillaire used 0.1), lit by the Sun and by the sky: after the table's upper half is
+Below the horizon the sky-view table shows the ground, in its albedo `groundAlbedo` (linear RGB, 0.15 by default, land
+without snow, where Bruneton and Hillaire used 0.1), lit by the Sun and by the sky: after the table's upper half is
 built, the sky's irradiance on the ground is integrated over it texel by texel, each texel's luminance times the
 cosine-weighted solid angle it covers, and the lower half is built with it. `groundLight: false` on `createSkyPass`
 leaves the Sun alone, a dispatch cheaper per rebuild. The sky is read from the observer's altitude, which is close

@@ -22,7 +22,7 @@ test("the osgHimmel preset reproduces the original's t_modelCfg defaults", () =>
     // Three wavelengths taken as R, G and B, the fourth repeating the third.
     expect(m.wavelengths).toEqual([680, 550, 440, 440]);
     expect(m.colorConversion).toBe("samples");
-    expect(m.groundAlbedo).toEqual([0.3, 0.3, 0.3]);
+    expect(m.groundAlbedo).toEqual([0.15, 0.15, 0.15]);
     expect(m.rayleigh.scaleHeightKm).toBe(8);
     expect(m.rayleigh.beta).toEqual([5.8e-3, 1.35e-2, 3.31e-2, 3.31e-2]);
     expect(m.mie.scaleHeightKm).toBe(6);
