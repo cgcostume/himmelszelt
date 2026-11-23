@@ -151,7 +151,12 @@ const GROUPS: Record<Designed, [name: string, sliders: LabSlider[]][]> = {
         ["waves", all.CIRRUS_RIPPLES],
         ["veil", all.CIRRUS_VEIL],
         ["light", only(all.CIRRUS_LIGHT, "c.relief", "c.forwardG")],
-        ["contrail", all.CONTRAIL.map((s): LabSlider => (s[0] === "contrail.depth" ? [s[0], s[1], s[2], s[3], s[4], 0, s[6]] : s))],
+        [
+            "contrail",
+            all.CONTRAIL.map(
+                (s): LabSlider => (s[0] === "contrail.depth" ? [s[0], s[1], s[2], s[3], s[4], 0, s[6]] : s),
+            ),
+        ],
     ],
 };
 const starting = (sliders: LabSlider[], param: string, value: number) =>
