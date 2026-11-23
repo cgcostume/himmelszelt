@@ -217,10 +217,11 @@ export function colorIndexFigure(root: HTMLElement) {
         const rows: Formula[] = ["ballesteros", "jensen"];
         const stripH = BAND_HEIGHT;
         const rowH = 20;
-        const thumb = 9;
+        // The cursor's middle at either end of the slider (global.css).
+        const thumb = 3;
         const left = thumb;
         const right = width - thumb;
-        const top = 18;
+        const top = 24;
         const height = top + rowH + stripH + 4;
         band.setAttribute("viewBox", `0 0 ${width} ${height}`);
         band.style.height = `${height}px`;
@@ -241,7 +242,7 @@ export function colorIndexFigure(root: HTMLElement) {
         });
         const kelvin = kelvinText(starColor(bv, "ballesteros").kelvin);
         // Centered over the tick, out past the strips at their ends, where the row is empty.
-        svg += `<text x="${f(mx)}" y="${top - 9}" class="figure-note">${escapeText(kelvin)}</text>`;
+        svg += `<text x="${f(mx)}" y="${top - 11}" class="figure-note">${escapeText(kelvin)}</text>`;
         band.innerHTML = svg;
     }
 

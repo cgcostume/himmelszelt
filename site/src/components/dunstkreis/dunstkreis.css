@@ -526,8 +526,8 @@
 .sky-options {
     --sky-leader: color-mix(in oklab, var(--muted), transparent 65%);
     position: absolute;
-    top: calc(var(--fig-band) + 4px);
-    right: 0;
+    top: calc(var(--bar-inset) + var(--fig-band) + 4px);
+    right: var(--bar-inset);
     z-index: 5;
     display: grid;
     gap: 12px;
@@ -549,11 +549,63 @@
 .sky-group {
     display: grid;
 }
+.sky-options:has(> .sky-group) {
+    gap: 4px;
+}
+.sky-group[open]:not(:last-child) {
+    margin-bottom: 8px;
+}
+/* Each group folds behind its name, a plus or a minus before it as in the rail, the name in the rows' names' column. */
 .sky-group-name {
+    display: flex;
     color: var(--muted);
     font-weight: inherit;
     letter-spacing: 0.06em;
     text-transform: uppercase;
+    cursor: pointer;
+    list-style: none;
+}
+.sky-group-name::-webkit-details-marker {
+    display: none;
+}
+.sky-group-name::before {
+    content: "+";
+    flex: none;
+    width: calc(1ch + 0.6em);
+    letter-spacing: 0;
+}
+.sky-group[open] > .sky-group-name::before {
+    content: "\2212";
+}
+.sky-group-name:hover {
+    color: var(--text);
+}
+.sky-group-name:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+/* Folded, what is chosen in it after its name, quieter, on one line that never widens the panel. */
+.sky-group-values {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    padding-left: 1ch;
+    contain: inline-size;
+    color: color-mix(in oklab, var(--muted), transparent 45%);
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.sky-group[open] .sky-group-values {
+    display: none;
+}
+/* A folded group's rows still lay out, out of sight and out of reach, so the panel keeps its width as groups fold. */
+.sky-group:not([open])::details-content {
+    content-visibility: visible;
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
 }
 /* Every option a row of a listing, a corner before it as in a directory tree: its name, a dim dotted leader, and at
    its right end the options as words in blocks, a switch's square, or a slider with its value. */

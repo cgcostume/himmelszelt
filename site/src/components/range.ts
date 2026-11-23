@@ -64,8 +64,8 @@ function clamp(input: HTMLInputElement) {
     return true;
 }
 
-// The scale's marks, notched into the bar as 2 px gaps of ground, all but its ends: one gradient a slider, built anew
-// only when its marks change.
+// The scale's marks, notched into the bar as 2 px holes, all but its ends: the fill and the hairline as gradients that
+// leave them out, built anew only when the marks change; the value moves within them by the CSS variables alone.
 const MARKS =
     ":scope > .figure-slider-scale > .figure-slider-mark:not(.slider-metered), :scope > .sky-height-scale > *";
 const SCALE = ".figure-slider-scale, .sky-height-scale";
@@ -77,12 +77,28 @@ function notch(input: HTMLInputElement) {
         )
         .filter((share) => share > 0 && share < 1)
         .sort((a, b) => a - b);
-    if (!shares.length) return input.style.removeProperty("--range-notches");
-    const stops = shares.map((share) => {
-        const at = `3px + ${share} * (100% - 6px)`;
-        return `transparent 0 calc(${at} - 1px), var(--range-gap) 0 calc(${at} + 1px)`;
-    });
-    input.style.setProperty("--range-notches", `linear-gradient(90deg, ${stops.join(", ")}, transparent 0)`);
+    if (!shares.length) {
+        input.style.removeProperty("--range-fill");
+        return input.style.removeProperty("--range-line");
+    }
+    const at = shares.map((share) => `3px + ${share} * (100% - 6px)`);
+    const fill = at.map(
+        (n) =>
+            `var(--range-ink) 0 min(calc(${n} - 1px), var(--range-xe)), transparent 0 min(calc(${n} + 1px), var(--range-xe))`,
+    );
+    const start = "max(var(--range-l), var(--range-xs))";
+    const line = at.map(
+        (n) =>
+            `var(--line) 0 min(max(calc(${n} - 1px), ${start}), var(--range-h)), transparent 0 min(max(calc(${n} + 1px), ${start}), var(--range-h))`,
+    );
+    input.style.setProperty(
+        "--range-fill",
+        `linear-gradient(90deg, transparent var(--range-l), ${fill.join(", ")}, var(--range-ink) 0 var(--range-xe), transparent 0)`,
+    );
+    input.style.setProperty(
+        "--range-line",
+        `linear-gradient(90deg, transparent ${start}, ${line.join(", ")}, var(--line) 0 var(--range-h), transparent 0)`,
+    );
 }
 const marksChanged = new MutationObserver((records) => {
     const inputs = new Set<HTMLInputElement>();

@@ -1,12 +1,16 @@
 ---
-/** A named group of a view's options, its name in a column of its own, its switches wrapping beside it. */
+/**
+ * A named group of a view's options, its name in a column of its own, its switches wrapping beside it. It folds behind
+ * its name, folded at first; option-groups.ts remembers it per figure and group, the inline script in Base.astro sets it
+ * before the first paint.
+ */
 interface Props {
     name: string;
 }
 const { name } = Astro.props;
 ---
 
-<div class="sky-group">
-    <span class="sky-group-name">{name}</span>
+<details class="sky-group" data-fold={name}>
+    <summary class="sky-group-name">{name}<span class="sky-group-values" aria-hidden="true"></span></summary>
     <span class="sky-group-items"><slot /></span>
-</div>
+</details>

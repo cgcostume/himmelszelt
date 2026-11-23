@@ -91,6 +91,33 @@ const colors = Array.from({ length: CYANOMETER_STEPS }, (_, step) => stepColor(s
                 <slot />
             </main>
         </div>
+        {/* Each group of a figure's options as the reader left it, per figure and group, set before the first paint and
+            kept on every fold (see OptionGroup.astro); folded where never opened. */}
+        <script is:inline>
+            try {
+                const KEY = "sternwarte:options";
+                const keyOf = (fold) => {
+                    const host = fold.closest("figure[id]");
+                    const name = fold.dataset.fold;
+                    const same = [...(host ?? document).querySelectorAll("details[data-fold]")].filter((f) => f.dataset.fold === name);
+                    const n = same.indexOf(fold);
+                    return `${location.pathname}#${host?.id ?? ""}/${name}${n > 0 ? `/${n}` : ""}`;
+                };
+                const folds = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+                for (const fold of document.querySelectorAll("details.sky-group[data-fold]")) fold.open = folds[keyOf(fold)] === true;
+                document.addEventListener("toggle", (event) => {
+                    const fold = event.target;
+                    if (!(fold instanceof HTMLDetailsElement) || !fold.matches(".sky-group[data-fold]")) return;
+                    try {
+                        const stored = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+                        const key = keyOf(fold);
+                        if (fold.open) stored[key] = true;
+                        else delete stored[key];
+                        localStorage.setItem(KEY, JSON.stringify(stored));
+                    } catch {}
+                }, true);
+            } catch {}
+        </script>
         <footer class="site-footer">
             <span>
                 <a href={`${base}/#about`}>himmelszelt</a>, small TypeScript + WebGPU libraries for rendering the sky, is
@@ -118,6 +145,8 @@ const colors = Array.from({ length: CYANOMETER_STEPS }, (_, step) => stepColor(s
             if (document.querySelector('input[type="range"]')) import("../components/range");
             // The squares of the switches in the figures' options listings (see switches.ts).
             if (document.querySelector(".sky-options")) import("../components/switches");
+            // What a folded group of a figure's options has chosen, after its name (see option-groups.ts).
+            if (document.querySelector("details.sky-group")) import("../components/option-groups");
             // A long radio group as one value that drops its options down (see combo.ts).
             if (document.querySelector(".steps[data-combo]")) import("../components/combo");
 

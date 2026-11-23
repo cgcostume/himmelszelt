@@ -35,6 +35,8 @@
        the view and the icons are centered, the same band along its foot, and the inset of text from a view's sides. */
     --fig-band: 28px;
     --fig-inset: 12px;
+    /* How far a figure's button strips stand in from its edges. */
+    --bar-inset: 4px;
     /* A hairline in whole device pixels: one at 100%, 125%, 150% and 175%, two at 200% and 250%. */
     --hair: 1px;
 }
@@ -904,9 +906,16 @@ input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
-/* Every slider turns with the mouse wheel, over itself and its label (see range.js): a cursor of an arrow up, a circle
-   and an arrow down says so. */
+/* Every slider moves with a drag and the mouse wheel, over itself and its label (see range.ts): a cursor of an arrow
+   either way along it and a circle between says so, left and right, or up and down on an upright one. */
 :root {
+    --cursor-wheel:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><g fill='white' stroke='black' stroke-width='1.2' stroke-linejoin='round'><path d='M1.5 12 7.5 7V17Z'/><path d='M22.5 12 16.5 7V17Z'/><circle cx='12' cy='12' r='2.6'/></g></svg>")
+        12 12,
+        ew-resize;
+}
+input[type="range"][data-vertical],
+label:has(> input[type="range"][data-vertical]) {
     --cursor-wheel:
         url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><g fill='white' stroke='black' stroke-width='1.2' stroke-linejoin='round'><path d='M12 1.5 17 7.5H7Z'/><path d='M12 22.5 17 16.5H7Z'/><circle cx='12' cy='12' r='2.6'/></g></svg>")
         12 12,
@@ -926,24 +935,41 @@ label:has(> input[type="range"]:not(:disabled)) {
 }
 /* Sliders, the native input in CSS alone: a 4 px track of layered gradients, a 1 px hairline over the allowed range, the
    part up to the value 3 px thick, notched by 2 px gaps at the scale's marks, and outside the allowed range the dim dotted
-   leader. The cursor is 2 px wide and 12 px high, standing 4 px out either side, with a 2 px gap of ground left and right.
+   leader. The cursor is 2 px wide and 12 px high, standing 4 px out either side, with a 2 px gap left and right. Gaps and
+   notches are holes, so over a picture the picture shows through them.
    range.ts sets the shares (--range-v, --range-lo, --range-hi) and the notches; a share lies at 3 px + share × (100% − 6 px),
    under the thumb's middle, and on the minus axis of the text beside it as the leaders. */
 input[type="range"] {
     --range-ink: var(--muted);
     --range-cursor: var(--text);
-    --range-gap: var(--page-bg, var(--bg));
+    --range-gap: transparent;
     --range-leader: color-mix(in oklab, var(--muted), transparent 65%);
-    --range-l: calc(3px + var(--range-lo, 0) * (100% - 6px));
-    --range-h: calc(3px + var(--range-hi, 1) * (100% - 6px));
+    /* The allowed range; without a limit the bar runs out to the input's end, with one it stops under the thumb's middle. */
+    --range-l: calc(min(3px, var(--range-lo, 0) * 1e5px) + var(--range-lo, 0) * (100% - 6px));
+    --range-h: calc(100% - min(3px, (1 - var(--range-hi, 1)) * 1e5px) - (1 - var(--range-hi, 1)) * (100% - 6px));
     --range-x: calc(3px + var(--range-v, 0) * (100% - 6px));
+    /* Where the fill ends and the hairline starts again, either side of the cursor and its gaps. */
+    --range-xe: calc(var(--range-x) - 3px);
+    --range-xs: calc(var(--range-x) + 3px);
+    --range-dots: repeating-linear-gradient(90deg, var(--range-leader) 0 1px, transparent 1px 3px);
     --range-track:
-        var(--range-notches, none) 0 0 / 100% 100% no-repeat,
-        linear-gradient(90deg, transparent var(--range-l), var(--range-ink) 0 var(--range-x), transparent 0) center / 100%
-        3px no-repeat,
-        linear-gradient(90deg, transparent var(--range-l), var(--line) 0 var(--range-h), transparent 0) center / 100% 1px
-        no-repeat,
-        repeating-linear-gradient(90deg, var(--range-leader) 0 1px, transparent 1px 3px) center / 100% 1px no-repeat;
+        var(
+            --range-fill,
+            linear-gradient(90deg, transparent var(--range-l), var(--range-ink) 0 var(--range-xe), transparent 0)
+        )
+        center / 100% 3px no-repeat,
+        var(
+            --range-line,
+            linear-gradient(
+                90deg,
+                transparent max(var(--range-l), var(--range-xs)),
+                var(--line) 0 var(--range-h),
+                transparent 0
+            )
+        )
+        center / 100% 1px no-repeat,
+        var(--range-dots) 0 50% / min(calc(var(--range-l) - 3px), var(--range-xe)) 1px no-repeat,
+        var(--range-dots) 100% 50% / calc(100% - 3px - max(var(--range-h), var(--range-xs))) 1px no-repeat;
     appearance: none;
     height: 20px;
     padding: 0;
@@ -972,7 +998,7 @@ input[type="range"]::-webkit-slider-thumb {
     border: 0 solid var(--range-gap);
     border-width: 0 2px;
     border-radius: 0;
-    background: var(--range-cursor);
+    background: var(--range-cursor) content-box;
 }
 input[type="range"]::-moz-range-thumb {
     box-sizing: content-box;
@@ -981,7 +1007,7 @@ input[type="range"]::-moz-range-thumb {
     border: 0 solid var(--range-gap);
     border-width: 0 2px;
     border-radius: 0;
-    background: var(--range-cursor);
+    background: var(--range-cursor) content-box;
 }
 input[type="range"]:focus-visible {
     outline: none;

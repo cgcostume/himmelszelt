@@ -33,8 +33,8 @@
 }
 :where([data-actions], [data-export]) > .fig-actions {
     position: absolute;
-    top: 0;
-    right: 0;
+    top: var(--bar-inset);
+    right: var(--bar-inset);
     z-index: 5;
 }
 /* In a row of controls above a plot, at its end, as high in the row's flow as the segmented controls beside it. */
@@ -58,9 +58,8 @@
 }
 
 /* A group of buttons over a figure (see SkyFrame.astro), in the page's own theme even over one that stays dark: a square
-   strip in the page's ground, a notch cut out of the view rather than a thing on it, over a drawing on the page's ground
-   no ground at all. Every button carries 2 px of that ground to its left and under it, so the group is one ground and
-   the 2 px between groups show the picture. Hovered, a button is a block in the line's tone; pressed, a tinted one. */
+   strip a little in from the edges, the picture behind it blurred under a light veil of the page's ground, the 2 px
+   between groups showing it sharp. Hovered or pressed, a button is a tinted block; pressed, its icon in the accent. */
 .view-buttons {
     --bg: var(--overlay-solid);
     --surface: var(--overlay-surface);
@@ -73,26 +72,14 @@
     gap: 0;
     padding: 0;
     border-radius: 0;
-    background: none;
+    background: color-mix(in oklab, var(--bg) 33%, transparent);
+    backdrop-filter: blur(16px);
     pointer-events: auto;
 }
 .view-buttons > :is(button, a, label, .view-toggle, .view-icon) {
-    box-sizing: content-box;
-    border-left: 2px solid var(--bg);
-    border-bottom: 2px solid var(--bg);
+    border: 0;
     border-radius: 0;
-    background-color: var(--bg);
-    background-clip: padding-box;
-}
-/* A strip along a view's foot (a bar under the view, full screen) takes its ground above its buttons instead. */
-.view-buttons:is(.fig-foot, .view-buttons-foot) > :is(button, a, label, .view-toggle, .view-icon) {
-    border-top: 2px solid var(--bg);
-    border-bottom: 0;
-}
-/* A strip at a view's left takes its ground to the right of its buttons, so it sits flush in the corner too. */
-:is(.fig-bar-start, .scene-bar, .fig-bar) > .view-buttons:not(.fig-actions) > * {
-    border-right: 2px solid var(--bg);
-    border-left: 0;
+    background-color: transparent;
 }
 /* A figure's readout, right under its view, in the reading column. */
 .view-status {
@@ -116,7 +103,7 @@
     border: 0;
     border-radius: 0;
     background: none;
-    color: var(--muted);
+    color: var(--text);
     transition: color 0.15s;
 }
 .view-icon[hidden] {
@@ -188,7 +175,7 @@
         transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
 .view-icon:hover {
-    --plate: var(--overlay-hover);
+    --plate: var(--overlay-tint);
     color: var(--text);
 }
 .view-icon[aria-pressed="true"] {
@@ -217,7 +204,7 @@
         color 0.15s;
 }
 .view-toggle:hover:enabled {
-    background: var(--line);
+    background: var(--overlay-tint);
     color: var(--text);
 }
 /* Pressed stays pressed under the pointer, only a deeper tint: the hover never hides the state it is about to change. */
@@ -239,7 +226,8 @@
     --icon-size: 14;
 }
 .view-buttons > .view-toggle:not(:hover, [aria-pressed="true"]) {
-    background-color: var(--bg);
+    background-color: transparent;
+    color: var(--text);
 }
 /* The supersampling switch's "MSAA" runs on from its "4×", across the switch's gap (see Rays.astro). */
 .rays-long {
@@ -532,6 +520,7 @@
     left: 0;
     right: 0;
     z-index: 5;
+    padding: var(--bar-inset) var(--bar-inset) 0;
     display: flex;
     gap: 2px;
     align-items: flex-start;
@@ -919,6 +908,7 @@ figure[id] {
     display: flex;
     gap: 2px;
     align-items: flex-start;
+    padding: var(--bar-inset) var(--bar-inset) 0;
     color: var(--text);
     pointer-events: none;
 }
