@@ -6,6 +6,7 @@ import Choice from "../../dunstkreis/Choice.astro";
 import Hdr from "../../dunstkreis/Hdr.astro";
 import OptionGroup from "../../dunstkreis/OptionGroup.astro";
 import SkyFrame from "../../dunstkreis/SkyFrame.astro";
+import Quality from "../Quality.astro";
 import LabSliders from "./LabSliders.astro";
 import {
     CLEARING,
@@ -66,28 +67,6 @@ const choice = (name: string, label: string, title: string, options: string[][],
     options,
     checked,
 });
-const SCALE = choice(
-    "scale",
-    "Render scale",
-    "The share of the frame's pixels the clouds are marched at",
-    [
-        ["1", "full"],
-        ["0.5", "half"],
-        ["0.25", "quarter"],
-    ],
-    "0.5",
-);
-const STEPS = choice(
-    "steps",
-    "Steps",
-    "Steps a ray takes at most",
-    [
-        ["64", "64"],
-        ["128", "128"],
-        ["256", "256"],
-    ],
-    "128",
-);
 const VIEW = choice(
     "view",
     "View",
@@ -118,7 +97,7 @@ const SPEED = choice(
         <div class="sky-compass" data-field="compassLabels"></div>
         <Fragment slot="options">
             <OptionGroup name="weather">
-                <Choice figure={id} {...PRESET} />
+                <Choice figure={id} {...PRESET} heading="preset" combo />
                 <button type="button" class="view-toggle" data-copy title="Copies every slider as a preset, to paste into the figure's list">copy</button>
             </OptionGroup>
             <OptionGroup name="low · 2.5D">
@@ -127,7 +106,7 @@ const SPEED = choice(
             </OptionGroup>
             <OptionGroup name="deep · 2.5D">
                 <button type="button" class="view-toggle" data-field="l1.enabled" aria-pressed="true" title="The deep layer, from near the ground to the top of the weather">deep</button>
-                <Choice figure={id} {...kinds(1, [TOWERS, FRONTS], "2")} />
+                <Choice figure={id} {...kinds(1, [TOWERS, FRONTS], "2")} heading="kind" />
                 <LabSliders sliders={FORMATION_DEEP} />
                 <LabSliders sliders={FORMATION_ANVIL} />
                 <LabSliders sliders={FORMATION_FRONT} />
@@ -138,16 +117,15 @@ const SPEED = choice(
             </OptionGroup>
             <OptionGroup name="time">
                 <button type="button" class="view-toggle" data-field="animate" aria-pressed="false" title="Runs the figure's clock: the layers drift, the front comes on and the maps change, baked again every frame">animate</button>
-                <Choice figure={id} {...SPEED} />
+                <Choice figure={id} {...SPEED} heading="speed" />
                 <LabSliders sliders={FORMATION_TIME} />
             </OptionGroup>
             <OptionGroup name="light">
                 <LabSliders sliders={FORMATION_LIGHT} />
             </OptionGroup>
+            <Quality figure={id} reads="march" dials={["sampling"]} combo />
             <OptionGroup name="render">
-                <Choice figure={id} {...SCALE} />
-                <Choice figure={id} {...STEPS} />
-                <Choice figure={id} {...VIEW} />
+                <Choice figure={id} {...VIEW} heading="view" />
                 <button type="button" class="view-toggle" data-field="textures.on" aria-pressed="true" title="The textures the figure renders from, down the left of the view: hover one for what it is for">textures</button>
                 <button type="button" class="view-toggle" data-field="ground.grid" aria-pressed="true" title="A grid on the ground, for orientation, speed and height: thin lines every 10 km, 1 km, 100 m and on down to 1 mm, each level showing once its cells are a few pixels across">grid</button>
                 <LabSliders sliders={FORMATION_MARCH} />

@@ -9,7 +9,7 @@ import {
 } from "@himmelszelt/sternenheer";
 import { fromDate, julianEphemerisDay, stars } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
-import { configureCanvas, gpuDevice, SDR, gpu as shared } from "../dunstkreis/atmosphere";
+import { configureCanvas, display, gpuDevice, onDisplay, SDR, gpu as shared } from "../dunstkreis/atmosphere";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
 import { drawSvg, splitLine } from "../sternzeit/figure";
@@ -116,7 +116,7 @@ export function starredFigure(root: HTMLElement) {
             requestRender();
         });
     }
-    const options = { format: SDR, toneMap: "neutral", dither: true } as const;
+    const options = () => ({ format: SDR, toneMap: display.toneCurve, dither: true }) as const;
     // The drawn side's passes, made again with the deep stars once they are first picked, and with the 8K map once the
     // view needs it and it is there; the pass before draws until then.
     let loaded: [StarCatalog, PackedStars | null, MilkyWay | null] | null = null;
@@ -128,10 +128,10 @@ export function starredFigure(root: HTMLElement) {
         if (!loaded) return;
         const [catalog, faintStars, large] = loaded;
         const milkyWay = needsSharp && sharp ? sharp : large;
-        const key = `${needsSharp && sharp ? "8k" : "4k"} ${deepStars ? "deep" : ""}`;
+        const key = `${needsSharp && sharp ? "8k" : "4k"} ${deepStars ? "deep" : ""} ${display.toneCurve}`;
         if (pair.made === key || pair.making === key) return;
         pair.making = key;
-        createStarsPass(device, { ...options, catalog, faintStars, deepStars, milkyWay, capacity: 256 }).then(
+        createStarsPass(device, { ...options(), catalog, faintStars, deepStars, milkyWay, capacity: 256 }).then(
             (pass) => {
                 if (pair.making !== key) return pass.destroy();
                 pair.drawn?.destroy();
@@ -151,10 +151,10 @@ export function starredFigure(root: HTMLElement) {
         const milkyWay = backdropMaps.get(map);
         if (!loaded || !milkyWay) return backdropOnce(map);
         const [catalog, faintStars] = loaded;
-        const key = `${map} ${deepStars ? "deep" : "plain"}`;
+        const key = `${map} ${deepStars ? "deep" : "plain"} ${display.toneCurve}`;
         if (state.made === key || state.making === key) return;
         state.making = key;
-        createStarsPass(device, { ...options, catalog, faintStars, deepStars, milkyWay, capacity: 256 }).then(
+        createStarsPass(device, { ...options(), catalog, faintStars, deepStars, milkyWay, capacity: 256 }).then(
             (pass) => {
                 if (state.making !== key) return pass.destroy();
                 pair.backdrop?.destroy();
@@ -225,6 +225,7 @@ export function starredFigure(root: HTMLElement) {
         }
     }
     const requestRender = onDemand(render, root);
+    onDisplay(requestRender);
 
     // The line between the two, and what a texel of the maps spans.
     function drawMarks() {

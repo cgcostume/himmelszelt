@@ -1,9 +1,12 @@
 ---
 import SkyRule from "./SkyRule.astro";
 
-// The chapter's h2, with the rule above it.
+// The chapter's h2, with the rule above it and a line over it with the section's number and the chapter's name.
 const { id } = Astro.props;
+const index = (Astro.locals.sections ?? []).findIndex((section) => section.id === id);
+const chapter = Astro.locals.chapter ?? "";
 ---
 
 <SkyRule id={id} />
+{index >= 0 && <p class="section-number" aria-hidden="true">{String(index + 1).padStart(2, "0")} {chapter}</p>}
 <h2 id={id}><slot /></h2>

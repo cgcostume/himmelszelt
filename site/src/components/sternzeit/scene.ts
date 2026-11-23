@@ -3,6 +3,7 @@ import * as precise from "@himmelszelt/sternzeit";
 import Zdog from "zdog";
 import { find } from "../dom";
 import { onDemand } from "../frame";
+import { leader } from "../inset";
 import {
     COMPASS,
     drawSvg,
@@ -707,6 +708,7 @@ function frame() {
     // At the axis' end, so the arrow runs along the axis and stops short of it like the others do at their dots.
     annotate("eclipticAxis", vScale(truePole, AXIS_OVERHANG));
     annotateRings(sunPos);
+    leadToBodies(sunPos, moonPos);
     // The line styles are classes (see global.css), set once each shape has an SVG element, i.e. after its first
     // render. Dotted for the fixed references, long dashes for the Sun's orbit, which deserves a style of its own among
     // them, and short dashes for the observer's two circles. radiusLine and longitudeNutationLine are answers, so solid.
@@ -780,7 +782,20 @@ function annotate(name: string, point: Zdog.VectorOptions) {
     // Arrowed labels keep to the circle, or stand further out when their marker lies beyond it.
     const circle = Math.max(EARTH_R * zoom + ANNOTATION_GAP_PX, length * zoom + ANNOTATION_GAP_PX / 2);
     const reach = arrow ? circle : length * zoom + POLE_LABEL_GAP_PX + extent;
-    const [lx, ly] = [cx + ux * reach, cy + uy * reach];
+    let [lx, ly] = [cx + ux * reach, cy + uy * reach];
+    // The ecliptic axis' label ends where it would otherwise be centered, clear of the N and the turn arrow; where that
+    // meets the observer's label, it stays centered a line and a half above it, its arrow clear of the observer's.
+    if (name === "eclipticAxis") {
+        const other = annotations.observer?.label;
+        const gap = (label.offsetHeight + (other?.offsetHeight ?? 0)) / 2;
+        const left = lx - label.offsetWidth / 2;
+        const meets =
+            other &&
+            Math.abs(left - other.offsetLeft) < (label.offsetWidth + other.offsetWidth) / 2 &&
+            Math.abs(ly - other.offsetTop) < gap;
+        if (other && meets) ly = Math.min(ly, other.offsetTop - gap - label.offsetHeight / 2);
+        else lx = left;
+    }
     label.style.left = `${lx}px`;
     label.style.top = `${ly}px`;
     if (!arrow) return;
@@ -799,6 +814,35 @@ function annotate(name: string, point: Zdog.VectorOptions) {
     arrow.setAttribute("d", `M ${sx} ${sy} L ${tx} ${ty}`);
     const [hx, hy] = [tx - dx * 7, ty - dy * 7];
     head?.setAttribute("points", `${tx},${ty} ${hx - dy * 3.5},${hy + dx * 3.5} ${hx + dy * 3.5},${hy - dx * 3.5}`);
+}
+
+// From each locked panel a leader to the body it is locked on, while the panels float over the scene.
+const leaders = [...document.querySelectorAll<SVGPathElement>("#scene .inset-leader")];
+const lockedPanels = [...document.querySelectorAll<HTMLElement>("#scene .altaz-panel > svg")];
+const BODY_GAP_PX = SUN_SYMBOL.radius + SUN_SYMBOL.gap + SUN_SYMBOL.length + 4;
+function leadToBodies(...bodies: Point[]) {
+    const scene = stageEl.getBoundingClientRect();
+    bodies.forEach((body, i) => {
+        const panel = lockedPanels[i]?.getBoundingClientRect();
+        const path = leaders[i];
+        if (!path || !panel) return;
+        if (panel.top >= scene.bottom) {
+            path.setAttribute("d", "");
+            return;
+        }
+        const p = new Vector(body).rotate(illustration.rotate);
+        const point: [number, number] = [
+            stageWidth / 2 + p.x * illustration.zoom,
+            stageHeight / 2 + p.y * illustration.zoom,
+        ];
+        const box = {
+            left: panel.left - scene.left,
+            top: panel.top - scene.top,
+            right: panel.right - scene.left,
+            bottom: panel.bottom - scene.top,
+        };
+        leader(path, box, point, BODY_GAP_PX);
+    });
 }
 
 // "ecliptic" and "celestial equator": each a label on its great circle's upper branch on screen, the ecliptic's right of

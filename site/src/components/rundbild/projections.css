@@ -1,6 +1,17 @@
-/* The projections figure: the sky seen from inside, the texture as stored in its bottom right corner, texel by texel. */
+/* The projections figures: the HDRI seen from inside, the texture as stored in its bottom right corner, texel by texel. */
 .projections-view {
     container-type: size;
+    aspect-ratio: 16 / 9;
+    max-height: 80vh;
+    width: 100%;
+    background: oklch(0 0 0);
+}
+/* Filling the view and the inset, not in the HDRI view's 2:1. */
+.hdri-view.projections-view canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
 }
 /* In the projection's own shape, at most a third of the view high and seven tenths of it wide. */
 .projections-inset {
@@ -8,7 +19,7 @@
     width: min(70cqw, 36cqh * var(--aspect));
     aspect-ratio: var(--aspect);
 }
-.sky-view .projections-inset canvas {
+.projections-inset canvas {
     cursor: default;
     image-rendering: pixelated;
 }
@@ -24,28 +35,21 @@
     font-family: var(--font-mono);
     font-size: var(--text-small);
     line-height: 1;
-    text-shadow:
-        0 0 3px oklch(0 0 0),
-        0 0 6px oklch(0 0 0);
 }
 .projections-inset .projections-marks span {
-    font-size: 0.7rem;
+    font-size: var(--text-tiny);
 }
 /* Full screen, a little smaller: the sky has the room. */
-.sky-stage:fullscreen .projections-inset {
+.env-frame:fullscreen .projections-inset {
     width: min(50cqw, 26cqh * var(--aspect));
 }
-/* Over the view's foot, in the middle, clear of the height on the left and the texture on the right. */
+/* Over the view's foot, in the middle, clear of the texture on the right. */
 .projections-legend {
     position: absolute;
-    bottom: calc(0.6rem + var(--sky-foot, 0px));
+    bottom: 0;
     left: 50%;
     z-index: 4;
     transform: translateX(-50%);
-    padding: 0.25rem 0.5rem;
-    border-radius: var(--radius-small);
-    background: var(--surface);
-    white-space: nowrap;
     display: flex;
     gap: 0.6rem;
     align-items: center;
@@ -75,4 +79,27 @@
         #b2182b,
         #67001f
     );
+}
+/* The error's colors, as the shader interpolates them: matplotlib's magma, by the logarithm from a thousandth to all. */
+.projections-magma {
+    background: linear-gradient(
+        to right,
+        #000004,
+        #140e36,
+        #3b0f70,
+        #641a80,
+        #8c2981,
+        #b73779,
+        #de4968,
+        #f7705c,
+        #fe9f6d,
+        #fecf92,
+        #fcfdbf
+    );
+}
+/* The image's author bottom left, clear of the texture as stored. */
+[data-projections] .env-author {
+    right: auto;
+    left: 8px;
+    max-width: calc(50% - 12rem);
 }

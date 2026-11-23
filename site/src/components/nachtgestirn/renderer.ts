@@ -356,6 +356,8 @@ export interface MoonFrame {
     airOnDisc?: boolean;
     /** Null to meter: the Moon's lit part, or the sky around it where that is brighter. */
     ev100: number | null;
+    /** Stops added to the metered exposure, +1 twice as bright; 0 by default. */
+    exposureCompensation?: number;
     albedo: boolean;
     relief: boolean;
     shadows: boolean;
@@ -667,7 +669,9 @@ export function createMoonRenderer(device: GPUDevice, requestRender: () => void)
               : Number.NEGATIVE_INFINITY;
         const metered = Math.log2(2 ** disc + 2 ** behind);
         // Held to the slider's range: below the horizon the air lets nothing through, and the meter would run away.
-        const ev100 = frame.ev100 ?? Math.min(Math.max(Math.round(metered * 10) / 10, -6), 20);
+        const ev100 =
+            frame.ev100 ??
+            Math.min(Math.max(Math.round(metered * 10) / 10, -6), 20) - (frame.exposureCompensation ?? 0);
 
         const started = performance.now();
         const view = {

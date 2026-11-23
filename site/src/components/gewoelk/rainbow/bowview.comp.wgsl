@@ -13,6 +13,8 @@ struct BowView {
     // The projection, in pixels: where the horizon's point straight ahead lies, and how far from it a direction 90° off.
     ahead: vec2f,
     quarter: f32,
+    // The page's tone curve: 1 Neutral, 2 AgX, 3 ACES, 4 none.
+    curve: u32,
 }
 
 @group(0) @binding(0) var<uniform> bow: BowView;
@@ -60,6 +62,13 @@ fn bowView(@builtin(global_invocation_id) id: vec3u) {
             light = light + bowLight(bowRay(vec2f(id.xy) + (vec2f(f32(i), f32(j)) + 0.5) / f32(BOW_SAMPLES)));
         }
     }
-    let color = hdToneMapNeutral(light / f32(BOW_SAMPLES * BOW_SAMPLES) * bow.exposure);
+    let exposed = light / f32(BOW_SAMPLES * BOW_SAMPLES) * bow.exposure;
+    var color = hdToneMapNeutral(exposed);
+    switch bow.curve {
+        case 2u: { color = hdToneMapAgx(exposed); }
+        case 3u: { color = hdToneMapAces(exposed); }
+        case 4u: { color = hdToneMapClip(exposed); }
+        default: {}
+    }
     textureStore(bowCanvas, vec2i(id.xy), vec4f(hdDither(color, id.xy, 255.0), 1.0));
 }

@@ -40,7 +40,7 @@ const locked = lockedOnly || (Astro.props.locked ?? textured !== "on");
                     <button type="button" class="view-icon" data-field="opticalLibration" aria-pressed="true" title="The tilt of the Moon's axis against its orbit and its uneven speed along it let us see a little around its edges" aria-label="Optical libration"><Icon name="libration" /></button>
                     <button type="button" class="view-icon" data-field="textured" aria-pressed={textured === "on" ? "true" : "false"} title="The Moon as nachtgestirn renders it, NASA's maps under Hapke's law over dunstkreis' sky, in place of the diagram's disc. Rendered with WebGPU" aria-label="Textured Moon"><Icon name="moonMap" /></button>
                     <CopyInfo />
-                    <button type="button" class="view-icon" data-field="annotations" aria-pressed="true" title="The annotations over the Moon: its grid, its sizes at apogee and perigee, the tilt, the arrow to the Sun and the readouts" aria-label="Annotations"><Icon name="labels" /></button>
+                    <button type="button" class="view-icon" data-field="annotations" aria-pressed="true" data-setting="labels" title="The annotations over the Moon: its grid, its sizes at apogee and perigee, the tilt, the arrow to the Sun and the readouts" aria-label="Annotations"><Icon name="labels" /></button>
                 </span>
                 {parallax && (
                     <span class="view-buttons">

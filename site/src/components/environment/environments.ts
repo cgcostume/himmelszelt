@@ -1,3 +1,4 @@
+import { barSvg, progressBar } from "../dither";
 import {
     catalog,
     DEFAULT_HDRI,
@@ -17,7 +18,7 @@ const KEY = "himmelszelt-hdri";
 const boxes = [...document.querySelectorAll<HTMLElement>("[data-environments]")];
 const field = <T extends HTMLElement = HTMLElement>(box: HTMLElement, name: string) =>
     box.querySelector(`[data-field="${name}"]`) as T;
-// The rail's box (see RailHdri.astro) has no search, categories or file of its own.
+// What a box may leave out.
 const optional = <T extends HTMLElement = HTMLElement>(box: HTMLElement, name: string) =>
     box.querySelector<T>(`[data-field="${name}"]`);
 
@@ -38,6 +39,9 @@ function refresh() {
             thumb.setAttribute("aria-busy", String(busy));
             thumb.toggleAttribute("data-progress", busy && pending.total > 0);
             (thumb as HTMLElement).style.setProperty("--progress", String(share));
+            if (busy) ditheredLoading(thumb)(share);
+            const percent = thumb.querySelector(".env-percent");
+            if (percent) percent.textContent = busy ? `${Math.round(share * 100)}%` : "";
         }
         for (const button of field(box, "gallery").querySelectorAll<HTMLElement>("[data-resolution]")) {
             const item = button.closest<HTMLElement>(".environments-item");
@@ -76,25 +80,47 @@ const status = (text: string) => {
     }
 };
 
+// The bar dithered (see dither.ts): made on the first load, as the bar has no width before it shows.
+const dithered = new WeakMap<Element, (share: number) => void>();
+function ditheredLoading(thumb: Element) {
+    let set = dithered.get(thumb);
+    if (!set) {
+        const svg = barSvg("env-bar");
+        thumb.querySelector(".env-loading > span:first-child")?.replaceWith(svg);
+        set = progressBar(svg, 8);
+        dithered.set(thumb, set);
+    }
+    return set;
+}
+
 function loadingBar() {
     const bar = Object.assign(document.createElement("span"), { className: "env-loading" });
-    bar.append(document.createElement("span"));
+    bar.append(
+        document.createElement("span"),
+        Object.assign(document.createElement("span"), { className: "env-percent" }),
+    );
     return bar;
 }
 
-const RESOLUTIONS: Resolution[] = ["1k", "2k", "4k", "8k"];
+// 1K stays the first load on a small or saving connection (see hdri.ts), but is not offered: nobody picks it.
+const RESOLUTIONS: Resolution[] = ["2k", "4k", "8k"];
 let entries: Entry[] = [];
-let category = "skies";
 let search = "";
 
-/** Every box's gallery: the most downloaded of what the category and the search leave. */
+/**
+ * Every box's gallery: the 24 most downloaded by day outdoors, the first visit's image leading whatever its downloads;
+ * searched, the 24 most downloaded of everything the words find, rooms and nights too.
+ */
 function fill() {
-    // Where nothing is searched, the first visit's image leads, whatever its downloads.
-    const lead = category === "skies" && !search ? entries.filter(({ id }) => id === DEFAULT_HDRI) : [];
-    const shown = [...lead, ...filtered(entries, category, search, 16).filter((entry) => !lead.includes(entry))].slice(
-        0,
-        16,
-    );
+    const lead = search ? [] : entries.filter(({ id }) => id === DEFAULT_HDRI);
+    const shown = search
+        ? filtered(entries, "all", search, 24)
+        : [
+              ...lead,
+              ...entries
+                  .filter(({ categories }) => !["indoor", "studio", "night"].some((name) => categories.includes(name)))
+                  .filter((entry) => !lead.includes(entry)),
+          ].slice(0, 24);
     for (const box of boxes) {
         const thumbs = shown.map((entry) => {
             const thumb = document.createElement("button");
@@ -125,12 +151,9 @@ function fill() {
         });
         field(box, "gallery").replaceChildren(...thumbs);
         const input = optional<HTMLInputElement>(box, "search");
-        if (input) input.value = search;
-        for (const radio of box.querySelectorAll<HTMLInputElement>("[data-category]")) {
-            radio.checked = radio.value === category;
-        }
+        if (input && input.value !== search) input.value = search;
     }
-    status(shown.length === 0 ? "Nothing there: try another category or word." : "");
+    status(shown.length === 0 ? "Nothing there: try another word." : "");
     refresh();
 }
 
@@ -143,12 +166,6 @@ for (const box of boxes) {
         search = (event.target as HTMLInputElement).value;
         fill();
     });
-    for (const radio of box.querySelectorAll<HTMLInputElement>("[data-category]")) {
-        radio.addEventListener("change", () => {
-            category = radio.value;
-            fill();
-        });
-    }
     optional<HTMLInputElement>(box, "file")?.addEventListener("change", (event) => {
         const file = (event.target as HTMLInputElement).files?.[0];
         if (file) openFile(file);
@@ -182,7 +199,7 @@ catalog()
         const first =
             all.find(({ id }) => id === stored) ??
             all.find(({ id }) => id === DEFAULT_HDRI) ??
-            filtered(all, category, "")[0];
+            filtered(all, "skies", "")[0];
         if (first) choose(first);
     })
     .catch(() => {

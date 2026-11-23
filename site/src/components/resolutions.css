@@ -34,7 +34,7 @@
 .env-progress {
     display: block;
     overflow: hidden;
-    border-radius: 1px;
+    border-radius: 0;
     background: color-mix(in oklab, var(--overlay-ink), transparent 80%);
     grid-column: 1 / -1;
     height: 0;

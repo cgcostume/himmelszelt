@@ -33,5 +33,5 @@ fn voxelTone(@builtin(global_invocation_id) id: vec3u) {
         return;
     }
     let composed = textureLoad(voxelFrom, vec2i(id.xy), 0).rgb;
-    textureStore(voxelTo, vec2i(id.xy), vec4f(hdToneMapNeutralHdr(composed * voxelFrame.dimmed, V.headroom), 1.0));
+    textureStore(voxelTo, vec2i(id.xy), vec4f(labToneMap(composed * voxelFrame.dimmed, V.curve, V.headroom), 1.0));
 }

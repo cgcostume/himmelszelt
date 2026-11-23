@@ -3,6 +3,7 @@ import * as precise from "@himmelszelt/sternzeit";
 import Zdog from "zdog";
 import { find } from "../dom";
 import { onDemand } from "../frame";
+import { leader } from "../inset";
 import {
     ARROWHEAD_PX,
     alongVerticalCircle,
@@ -480,16 +481,22 @@ function renderAnalemma() {
 // Where the analemma panel covers the scene, in scene coordinates: the compass labels that fall behind it are left
 // out, since the horizon they belong to is hidden there and they would read as floating free. Measured on resize
 // only, not per frame.
-let panelBox: { left: number; top: number; right: number; bottom: number } | null = null;
+type Box = { left: number; top: number; right: number; bottom: number };
+let panelBox: Box | null = null;
+// The analemma's frame alone, without its caption, where the leader to the Sun starts; none where it stands below.
+let frameBox: Box | null = null;
+const sunLeader = find<SVGPathElement>(".dome-leader > path", frameEl);
 function measurePanel() {
     const scene = frameEl.getBoundingClientRect();
-    const box = analemmaPanel.getBoundingClientRect();
-    panelBox = {
+    const within = (box: DOMRect) => ({
         left: box.left - scene.left,
         top: box.top - scene.top,
         right: box.right - scene.left,
         bottom: box.bottom - scene.top,
-    };
+    });
+    panelBox = within(analemmaPanel.getBoundingClientRect());
+    const svgBox = analemmaSvg.getBoundingClientRect();
+    frameBox = svgBox.top < scene.bottom && svgBox.left > scene.left ? within(svgBox) : null;
 }
 
 function placeCompass() {
@@ -506,6 +513,10 @@ function placeCompass() {
         label.style.visibility = covered ? "hidden" : "visible";
         label.style.opacity = p.z < 0 ? "0.45" : "1";
     }
+    const sun = new Vector(bodyPoints.sun).rotate(rotation);
+    const sunAt: [number, number] = [stageWidth / 2 + sun.x * zoom, stageHeight / 2 + centerShiftPx + sun.y * zoom];
+    if (frameBox) leader(sunLeader, frameBox, sunAt, SUN_SYMBOL.radius + SUN_SYMBOL.gap + SUN_SYMBOL.length + 4);
+    else sunLeader.setAttribute("d", "");
     for (const { label, point } of enuLabels) {
         const p = new Vector(point).rotate(rotation);
         const reach = Math.hypot(p.x, p.y) || 1;

@@ -7,6 +7,7 @@ import Hdr from "../dunstkreis/Hdr.astro";
 import OptionGroup from "../dunstkreis/OptionGroup.astro";
 import SkyFrame from "../dunstkreis/SkyFrame.astro";
 import Try from "../Try.astro";
+import Quality from "./Quality.astro";
 
 /**
  * The clouds figure: dunstkreis' sky in cd/m² behind gewoelk's clouds, composed and tone mapped by the cloud pass, in
@@ -153,31 +154,6 @@ const HIGH = {
     ],
     checked: "puffsAndVeil",
 };
-// Two of gewoelk's dials of quality, `cloudQuality`'s: each a level of four.
-const REACH = {
-    name: "reach",
-    label: "Reach",
-    title: "How far the clouds are seen: sets the clearing's sliders",
-    options: [
-        ["low", "low", "Clouds out to 40 km"],
-        ["medium", "medium", "Clouds out to 150 km"],
-        ["high", "high", "Clouds to the horizon"],
-        ["ultra", "ultra", "Clouds to the horizon"],
-    ],
-    checked: "medium",
-};
-const SAMPLING = {
-    name: "sampling",
-    label: "Sampling",
-    title: "How finely the clouds are marched and stored: the share of the frame, a ray's steps, the voxels and the noise",
-    options: [
-        ["low", "low", "A third of the frame, 128 steps, 128 x 128 x 32 voxels"],
-        ["medium", "medium", "Half the frame, 256 steps, 256 x 256 x 64 voxels"],
-        ["high", "high", "The whole frame, 256 steps, 256 x 256 x 64 voxels"],
-        ["ultra", "ultra", "The whole frame, 512 steps, 384 x 384 x 96 voxels"],
-    ],
-    checked: "medium",
-};
 const WEATHER = {
     name: "weather",
     label: "Weather",
@@ -206,6 +182,7 @@ const WEATHER = {
 const AIR = {
     name: "air",
     label: "Air",
+    heading: "air",
     title: "The air in front of the clouds: dunstkreis' aerial perspective volume, or a blend into the sky behind, as for a baked background",
     options: [
         ["volume", "in-scattering"],
@@ -216,6 +193,7 @@ const AIR = {
 // The lab's choices and sliders: how the cloudscape changes, how fast, and how much of a keyframe a frame may build.
 const MODE = {
     name: "mode",
+    heading: "change",
     label: "Change",
     title: "How a change of the clouds' shape or of the Sun reaches the volumes: rebuilt at once in the frame that asks, or built ahead as a keyframe, a few steps a frame, and blended in",
     options: [
@@ -226,6 +204,7 @@ const MODE = {
 };
 const SPEED = {
     name: "speed",
+    heading: "speed",
     label: "Speed",
     title: "How fast the lab's clock runs while it animates: the wind, the change of shape and the billows follow it",
     options: [
@@ -238,6 +217,7 @@ const SPEED = {
 };
 const BUDGET = {
     name: "budget",
+    heading: "per frame",
     label: "Steps per frame",
     title: "How many of a keyframe's steps a frame may run: fewer spread its cost over more frames",
     options: [
@@ -251,6 +231,7 @@ const BUDGET = {
 const GRID = {
     name: "grid",
     label: "Voxels across",
+    heading: "voxels",
     title: "Voxels east and north over the cloudscape's extent: four times the voxels and the memory per doubling",
     options: [
         ["128", "128"],
@@ -301,7 +282,7 @@ const LAB: LabSlider[] = [
                 </OptionGroup>
             )}
             <OptionGroup name="weather">
-                <Choice figure={id} {...WEATHER} />
+                <Choice figure={id} {...WEATHER} heading="preset" combo />
             </OptionGroup>
             <OptionGroup name="cloudscape · 3D">
                 <button type="button" class="view-toggle" data-field="cloudscape.enabled" aria-pressed="true" title="The low clouds, a voxel volume marched by its distance field: 3D, any shape its grid can hold">low clouds</button>
@@ -312,7 +293,7 @@ const LAB: LabSlider[] = [
             </OptionGroup>
             <OptionGroup name="sheet · 2D">
                 <button type="button" class="view-toggle" data-field="sheet.enabled" aria-pressed="true" title="A thin sheet of high cloud from a baked map, read once where a ray crosses it: 2D">high cloud</button>
-                <Choice figure={id} {...HIGH} />
+                <Choice figure={id} {...HIGH} heading="kind" combo />
                 {SHEET.map(([param, label, min, max, step, value, title]) => (
                     <label class="sky-ev clouds-slider" title={title}>{label} <input data-param={param} type="range" min={min} max={max} step={step} value={value} /> <output /></label>
                 ))}
@@ -322,12 +303,7 @@ const LAB: LabSlider[] = [
                 <button type="button" class="view-toggle" data-field="light.multi" aria-pressed="true" title="The orders of scattering after the first, as octaves: each a share of the one before, through less cloud, with a wider lobe">multiple</button>
                 <button type="button" class="view-toggle" data-field="light.ambient" aria-pressed="true" title="The sky's light from above and the ground's from below, fading with depth">ambient</button>
             </OptionGroup>
-            <OptionGroup name="reach">
-                <Choice figure={id} {...REACH} />
-            </OptionGroup>
-            <OptionGroup name="sampling">
-                <Choice figure={id} {...SAMPLING} />
-            </OptionGroup>
+            <Quality figure={id} reads="voxel" dials={["reach", "sampling"]} combo />
             <OptionGroup name="render">
                 {lab && <Choice figure={id} {...GRID} />}
                 <Choice figure={id} {...AIR} />

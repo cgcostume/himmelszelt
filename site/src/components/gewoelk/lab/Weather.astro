@@ -7,6 +7,7 @@ import Hdr from "../../dunstkreis/Hdr.astro";
 import OptionGroup from "../../dunstkreis/OptionGroup.astro";
 import SkyFrame from "../../dunstkreis/SkyFrame.astro";
 import StarGroups from "../../sternenheer/StarGroups.astro";
+import Quality from "../Quality.astro";
 import LabSliders from "./LabSliders.astro";
 import type { LabSlider } from "./sliders";
 import * as all from "./sliders";
@@ -95,43 +96,6 @@ const choice = (name: string, label: string, title: string, options: string[][],
     options,
     checked,
 });
-// gewoelk's three dials of quality, `cloudQuality`'s: each a level of four.
-const REACH = choice(
-    "reach",
-    "Reach",
-    "How far the clouds are seen: sets the clearing and the march's reach",
-    [
-        ["low", "low", "Clouds out to 40 km"],
-        ["medium", "medium", "Clouds out to 120 km"],
-        ["high", "high", "Clouds to the horizon, marched 200 km"],
-        ["ultra", "ultra", "Clouds to the horizon, marched 320 km"],
-    ],
-    "medium",
-);
-const SAMPLING = choice(
-    "sampling",
-    "Sampling",
-    "How finely the clouds are marched and stored: the share of the frame, a ray's steps and the maps' sizes",
-    [
-        ["low", "low", "A third of the frame, 64 steps, maps of 256 and 512"],
-        ["medium", "medium", "Half the frame, 128 steps, maps of 512 and 1024"],
-        ["high", "high", "The whole frame, 256 steps, maps of 1024 and 2048"],
-        ["ultra", "ultra", "The whole frame, 384 steps, maps of 2048"],
-    ],
-    "medium",
-);
-const MOTION = choice(
-    "motion",
-    "Motion",
-    "How the clouds' shape changes while the clock runs: drift and billows are free at every level",
-    [
-        ["low", "low", "No change of shape"],
-        ["medium", "medium", "The maps baked every 2 s"],
-        ["high", "high", "The maps baked every half second"],
-        ["ultra", "ultra", "The maps baked every frame"],
-    ],
-    "medium",
-);
 const SPEED = choice(
     "speed",
     "Speed",
@@ -155,13 +119,11 @@ const SPEED = choice(
         </Fragment>
         <Fragment slot="options">
             <OptionGroup name="weather">
-                <Choice figure={id} {...WEATHERS} />
+                <Choice figure={id} {...WEATHERS} heading="preset" combo />
+                <span class="own-row"><span class="own-name">yours</span><span class="own-weathers" data-field="ownWeathers"></span></span>
             </OptionGroup>
             <OptionGroup name="a kind for each place">
-                {PLACES.map(([place, label, title, model]) => <label class="composer-place" title={title}>{label} <select data-place={place} aria-label={title}></select> <span class="cloud-model">{model}</span></label>)}
-            </OptionGroup>
-            <OptionGroup name="your weathers">
-                <span class="own-weathers" data-field="ownWeathers"></span>
+                {PLACES.map(([place, label, title, model]) => <label class="composer-place" title={title}>{label} <span class="composer-kind"><select data-place={place} aria-label={title}></select><span class="combo-caret" aria-hidden="true" /></span> <span class="cloud-model">{model}</span></label>)}
             </OptionGroup>
             <OptionGroup name="clearing">
                 <LabSliders sliders={CLEARING} />
@@ -172,17 +134,9 @@ const SPEED = choice(
             </OptionGroup>
             <OptionGroup name="time">
                 <button type="button" class="view-toggle" data-field="animate" aria-pressed="false" title="Runs the figure's clock: the layers drift, the billows creep and the maps change, baked again every frame">animate</button>
-                <Choice figure={id} {...SPEED} />
+                <Choice figure={id} {...SPEED} heading="speed" />
             </OptionGroup>
-            <OptionGroup name="reach">
-                <Choice figure={id} {...REACH} />
-            </OptionGroup>
-            <OptionGroup name="sampling">
-                <Choice figure={id} {...SAMPLING} />
-            </OptionGroup>
-            <OptionGroup name="motion">
-                <Choice figure={id} {...MOTION} />
-            </OptionGroup>
+            <Quality figure={id} reads="layered" dials={["reach", "sampling", "motion"]} combo />
             <OptionGroup name="render">
                 <button type="button" class="view-toggle" data-field="rays.on" aria-pressed="false" title="God rays: the shafts of sunlight and of the clouds' shade in the air, from a table of the layers' shade made with every march. Clearest towards a low Sun in hazy air">god rays</button>
                 <button type="button" class="view-toggle" data-field="noise.blue" aria-pressed="false" title="Jitters the rays by blue noise, the same every frame, not by interleaved gradient noise: grain without a lattice where a few steps decide what a ray sees">blue noise</button>

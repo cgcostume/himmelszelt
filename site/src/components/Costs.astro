@@ -17,7 +17,7 @@ export interface CostsLine {
     label: string;
     note?: string;
     values: (number | string | undefined)[];
-    /** A case to compare against, beyond what the defaults draw: hatched, the defaults solid. */
+    /** A case to compare against, beyond what the defaults draw: dithered and a touch lower, the defaults solid. */
     reference?: boolean;
 }
 interface Props {
@@ -76,3 +76,9 @@ const grid = (c: number) => `--grid: ${(100 * (axes[c]?.step ?? 1)) / (axes[c]?.
     </div>
     <figcaption class="figure-caption"><slot /></figcaption>
 </figure>
+
+<script>
+    import { ditherBars } from "./costs-dither";
+
+    for (const root of document.querySelectorAll<HTMLElement>(".costs-figure")) ditherBars(root);
+</script>

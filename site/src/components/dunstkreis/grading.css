@@ -12,18 +12,12 @@
 /* At the right, over noon's sky, so the night's stars stay clear. */
 .grading-row {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 0;
+    right: var(--fig-inset);
     z-index: 4;
 }
 .grading-row-styled {
-    top: calc(50% + 8px);
-}
-@media (max-width: 40rem) {
-    .grading-tiles > .grading-row {
-        font-size: var(--text-small);
-        padding: 1px 6px;
-    }
+    top: 50%;
 }
 .grading-lanes {
     margin-top: 0.5rem;

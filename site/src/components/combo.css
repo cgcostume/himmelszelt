@@ -1,0 +1,127 @@
+/* A radio group as a combo (see combo.ts): the chosen option alone, as the chosen block of a row of steps with a caret
+   after it, and under it, on demand, the options as rows of a square list on the ground, edged by a line. */
+.steps[data-combo] {
+    --combo-tint: color-mix(in oklab, var(--accent) 22%, var(--surface));
+    align-items: center;
+}
+.combo-button {
+    display: inline-flex;
+    order: 1;
+    align-items: center;
+    gap: 0.5ch;
+    height: auto;
+    margin: 0;
+    padding: 0.15rem 0.45rem;
+    border: var(--border);
+    border-radius: 0;
+    background: var(--combo-tint);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    font-weight: inherit;
+    line-height: 1.4;
+    white-space: nowrap;
+    cursor: pointer;
+}
+/* In a figure's options listing and in the rail, a ledger's value: no edge, its word where the row's last one stood. */
+:is(.sky-options, .rail) .combo-button {
+    margin-right: -0.3rem;
+    padding: 0 0.3rem;
+    border: 0;
+    line-height: 20px;
+}
+.combo-button:hover:enabled,
+.steps[data-combo].combo-open > .combo-button {
+    background: var(--line);
+    color: var(--text);
+}
+.combo-button:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+.combo-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+/* The accent's chevron turned down, and up while the list is open. */
+.combo-caret::before {
+    content: "\203A";
+    display: inline-block;
+    transform: rotate(90deg);
+}
+.steps[data-combo].combo-open .combo-caret::before {
+    transform: rotate(-90deg);
+}
+/* Placed by combo.ts, in the top layer: fixed to the screen, so no panel's overflow cuts it. */
+.steps[data-combo] > .combo-list {
+    position: fixed;
+    inset: auto;
+    max-width: calc(100vw - 16px);
+    margin: 0;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    line-height: 20px;
+    overflow: hidden auto;
+    overscroll-behavior: contain;
+    scroll-padding-block: 2px;
+    scrollbar-width: thin;
+}
+.steps[data-combo] > .combo-list:popover-open {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.steps[data-combo] > .combo-list > label {
+    display: block;
+    margin: 0;
+}
+.steps[data-combo] > .combo-list > label[hidden] {
+    display: none;
+}
+/* Flush right, each word where the chosen one stands on the button, the caret's room kept after it. */
+.steps[data-combo] > .combo-list > label > span {
+    display: block;
+    margin: 0;
+    padding: 0 calc(0.45rem + 1.5ch) 0 0.6rem;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--muted);
+    font-size: inherit;
+    line-height: 20px;
+    text-align: right;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.steps[data-combo] > .combo-list > label:hover > span {
+    background: var(--line);
+    color: var(--text);
+}
+.steps[data-combo] > .combo-list > label:has(:checked) > span {
+    background: var(--combo-tint);
+    color: var(--accent);
+}
+.steps[data-combo] > .combo-list > label:has(:disabled) > span {
+    opacity: 0.45;
+    cursor: default;
+}
+.steps[data-combo] > .combo-list > label:has(:focus-visible) > span {
+    outline: 1px solid var(--accent);
+    outline-offset: -1px;
+}
+:is(.sky-options, .rail) .steps[data-combo] > .combo-list > label > span {
+    padding-right: calc(0.3rem + 1.5ch);
+}
+/* A row without a name has its value in the names' column: the list's words start there too. */
+.steps[data-combo]:not(:has(> .steps-heading)) > .combo-list > label > span {
+    padding: 0 0.6rem 0 0.45rem;
+    text-align: left;
+}
+:is(.sky-options, .rail) .steps[data-combo]:not(:has(> .steps-heading)) > .combo-list > label > span {
+    padding-left: 0.3rem;
+}

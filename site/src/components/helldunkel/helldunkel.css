@@ -63,7 +63,7 @@
     stroke: #1c1c1c;
     stroke-width: 3px;
     paint-order: stroke;
-    font-size: 13px;
+    font-size: var(--text-small);
     font-weight: 350;
     pointer-events: none;
 }
@@ -80,7 +80,7 @@
     aspect-ratio: 1;
     border: 1px solid white;
     border-radius: 50%;
-    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.5);
+    outline: 1px solid rgb(0 0 0 / 0.5);
     transform: translate(-50%, -50%);
     pointer-events: none;
 }
@@ -156,7 +156,7 @@
     display: flex;
     align-items: flex-end;
     margin: 0;
-    padding: 0 0 8px 8px;
+    padding: 0 0 0 var(--fig-inset);
 }
 .curves-plot {
     position: relative;
@@ -212,11 +212,11 @@
 }
 .tone-tile figcaption {
     position: absolute;
-    left: 8px;
-    bottom: 8px;
+    left: var(--fig-inset);
+    bottom: 0;
     margin: 0;
 }
 /* The lower tiles' names above the image's credit, which runs across them. */
 .tone-tile:nth-of-type(n + 3) figcaption {
-    bottom: 42px;
+    bottom: var(--fig-band);
 }

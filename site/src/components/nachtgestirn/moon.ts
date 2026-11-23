@@ -17,6 +17,7 @@ import { flightIn } from "../dunstkreis/flight";
 import { type Basis, cameraBasis, lookAround, project } from "../dunstkreis/skycamera";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
+import { exposureCompensation, onSetting, settings } from "../settings";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
 import { gpuMissing } from "../webgpu";
@@ -151,12 +152,13 @@ export function moonFigure(root: HTMLElement) {
             projectionDistance: basis.d,
             pixelRatio: dpr,
             grid: marks() === 2,
-            ground: air.flown,
+            ground: settings.groundGrid ? air.flown : null,
             discPixels: ((angularDiameter * DEG) / camera.fov) * height,
             maps: "auto",
             air: true,
             airOnDisc: pressed("airDisc"),
             ev100: pressed("auto") ? null : evOfSlider(),
+            exposureCompensation: exposureCompensation(),
             albedo: true,
             relief: true,
             shadows: true,
@@ -213,6 +215,7 @@ export function moonFigure(root: HTMLElement) {
             requestRender();
         });
         onChange(requestRender);
+        onSetting(["exposure", "groundGrid"], requestRender);
         onTables(requestRender);
         onUmbraTable(requestRender);
         new ResizeObserver(requestRender).observe(canvas);

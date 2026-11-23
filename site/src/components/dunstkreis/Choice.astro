@@ -1,7 +1,8 @@
 ---
 /**
  * A row of buttons of which one is chosen, over a figure: a radio group styled as steps, named `${figure}-${name}`. Each
- * option is a value, its text and, optionally, a title of its own.
+ * option is a value, its text and, optionally, a title of its own. With `combo`, for a row too long to read at a glance,
+ * the chosen one alone shows and the options drop down in a list (see combo.ts).
  */
 interface Props {
     figure?: string;
@@ -12,18 +13,38 @@ interface Props {
     title: string;
     options: string[][];
     checked: string;
+    combo?: boolean;
 }
-const { figure = "lighting", name, label, heading, title, options, checked } = Astro.props;
+const { figure = "lighting", name, label, heading, title, options, checked, combo = false } = Astro.props;
+const chosen = options.find(([value]) => value === checked)?.[1] ?? "";
 ---
 
-<span class="steps" role="radiogroup" aria-label={label} title={title}>
-    {heading && <span class="steps-heading" aria-hidden="true">{heading}</span>}
-    {
-        options.map(([value, text, optionTitle]) => (
-            <label title={optionTitle}>
-                <input type="radio" name={`${figure}-${name}`} value={value} checked={value === checked} />
-                <span>{text}</span>
-            </label>
-        ))
-    }
-</span>
+{
+    combo ? (
+        <span class="steps" data-combo title={title}>
+            {heading && <span class="steps-heading" aria-hidden="true">{heading}</span>}
+            <button type="button" class="combo-button" aria-expanded="false" aria-label={`${label}: ${chosen}`}>
+                <span class="combo-value">{chosen}</span>
+                <span class="combo-caret" aria-hidden="true" />
+            </button>
+            <span class="combo-list" popover="auto" role="radiogroup" aria-label={label}>
+                {options.map(([value, text, optionTitle]) => (
+                    <label title={optionTitle}>
+                        <input type="radio" name={`${figure}-${name}`} value={value} checked={value === checked} />
+                        <span>{text}</span>
+                    </label>
+                ))}
+            </span>
+        </span>
+    ) : (
+        <span class="steps" role="radiogroup" aria-label={label} title={title}>
+            {heading && <span class="steps-heading" aria-hidden="true">{heading}</span>}
+            {options.map(([value, text, optionTitle]) => (
+                <label title={optionTitle}>
+                    <input type="radio" name={`${figure}-${name}`} value={value} checked={value === checked} />
+                    <span>{text}</span>
+                </label>
+            ))}
+        </span>
+    )
+}

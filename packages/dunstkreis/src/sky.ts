@@ -83,6 +83,11 @@ export interface SkyPassOptions {
      */
     veil?: number;
     /**
+     * Whether the Moon has the veil too, with `moonlight`; true by default. It is exposed as the sky is: a renderer that
+     * draws the Moon's disc darker than that, as an eye adapted to it sees it, turns it off, or it glows inside the disc.
+     */
+    moonVeil?: boolean;
+    /**
      * The Sun's corona and chromosphere around its disc, with `sunDisc`: Baumbach's corona, five millionths of the
      * disc's luminance at the limb, and the thin pink shell under it, behind the air, the ground and the Moon as the
      * disc is. Lost in the sky by day and, above the air, in a lens's veil, some forty times brighter at the limb, as
@@ -263,6 +268,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
         sunDisc = true,
         aureole,
         veil = LENS_VEIL,
+        moonVeil = true,
         solarCorona = true,
         limbDarkening = true,
         discAlpha = false,
@@ -647,7 +653,7 @@ export async function createSkyPass(device: GPUDevice, options: SkyPassOptions):
             // The veil by how far the Sun is out of the frame, and by the Moon likewise.
             sky[42] = inFrame(params.inverseViewProjection, params.projectionDistance, apparent.direction);
             sky[43] =
-                moonShare > 0 && veil > 0
+                moonShare > 0 && veil > 0 && moonVeil
                     ? inFrame(params.inverseViewProjection, params.projectionDistance, apparentMoon.direction)
                     : 0;
             // The keys' tint after the white balance, its rows scaled: without one, the matrix as it is.

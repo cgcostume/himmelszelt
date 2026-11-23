@@ -145,14 +145,18 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
     let width = 0.6 * params.dpr;
     let onEdge = abs(stop - params.black) < perPixel || abs(stop - params.white) < perPixel;
     let onMean = abs(stop - params.mean) < perPixel * 0.75 * params.dpr;
+    // Cells of whole device pixels, two by two as a camera's sensor: red, green, blue and one left dark.
+    let cellPx = u32(max(1.0, round(params.dpr)));
     for (var y = 0u; y < size.y; y = y + 1u) {
+        let cell = vec2u(id.x, y) / cellPx;
+        let slot = (cell.x & 1u) + 2u * (cell.y & 1u);
         // Under the plot, the scale on the plot's own gray, its baseline between them.
         var color = select(vec3f(0.11), vec3f(0.32), abs(f32(y) + 0.5 - plot) < 0.5 * params.dpr);
         if (f32(y) < plot) {
             let up = plot - f32(y) - 0.5;
             color = select(vec3f(0.035), vec3f(0.11), inside);
-            // What clips, striped as the image is: red to white, blue to black.
-            if (!inside && fract((f32(id.x) + f32(y)) / (10.0 * params.dpr)) < 0.3) {
+            // What clips, dithered: red to white, blue to black.
+            if (!inside && ((cell.x + cell.y) & 1u) == 0u) {
                 color = select(vec3f(0.03, 0.09, 0.26), vec3f(0.3, 0.03, 0.09), stop > params.white);
             }
             // Behind it all, the whole image, however little of it the meter weighs.
@@ -160,10 +164,12 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
                 color = color + vec3f(0.07);
             }
             color = color + vec3f(0.16 * stroke(up, referenceCurve, width));
+            // Each channel's area on its own cells, interleaved, so where they overlap they mix as a screen's do.
+            let own = vec3f(f32(slot == 0u), f32(slot == 1u), f32(slot == 2u)) * 4.0;
             let light = vec3f(
-                fill(up, rgb.r, plot) + 1.2 * stroke(up, curves[0], width),
-                fill(up, rgb.g, plot) + 1.2 * stroke(up, curves[1], width),
-                fill(up, rgb.b, plot) + 1.2 * stroke(up, curves[2], width),
+                own.r * fill(up, rgb.r, plot) + 1.2 * stroke(up, curves[0], width),
+                own.g * fill(up, rgb.g, plot) + 1.2 * stroke(up, curves[1], width),
+                own.b * fill(up, rgb.b, plot) + 1.2 * stroke(up, curves[2], width),
             );
             color = color + (1.0 - exp(-1.9 * light));
             if (onEdge) {

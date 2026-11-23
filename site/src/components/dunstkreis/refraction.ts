@@ -11,7 +11,7 @@ import { find } from "../dom";
 import { onDemand } from "../frame";
 import { COMPASS } from "../sternzeit/figure";
 import { gpuMissing } from "../webgpu";
-import { configureCanvas, gpu, gpuDevice, onTables, quality, SDR, tables } from "./atmosphere";
+import { configureCanvas, display, gpu, gpuDevice, onDisplay, onTables, quality, SDR, tables } from "./atmosphere";
 
 // The Sun rising over the planet's rim from the space station, rendered next to a photograph of it: a fixed moment and
 // place, not the page's, with the Sun 0.6 degrees below the rim, where the air squeezes it most.
@@ -115,6 +115,7 @@ function drawOverlay(b: Basis, width: number, height: number) {
 // the sixteen under it, then summed back up with a tent filter, so every level adds a blur twice as wide as the one
 // before. Mixed into the sky by a small share, it moves light rather than adding it; then tone mapped and dithered.
 const GLOW = 0.002;
+const CURVES = { neutral: 1, agx: 2, aces: 3, clip: 4 };
 const GLOW_LEVELS = 8;
 const glowSource = `
 ${wgsl.tonemap}
@@ -122,6 +123,7 @@ ${wgsl.tonemap}
 struct Params {
     glow: f32,
     levels: f32,
+    curve: f32,
 }
 @group(0) @binding(0) var source: texture_2d<f32>;
 @group(0) @binding(1) var linear: sampler;
@@ -175,6 +177,15 @@ fn up(@builtin(global_invocation_id) id: vec3u) {
     textureStore(destination, id.xy, textureLoad(level, id.xy, 0) + below);
 }
 
+fn curved(exposed: vec3f) -> vec3f {
+    switch u32(params.curve) {
+        case 2u: { return hdToneMapAgx(exposed); }
+        case 3u: { return hdToneMapAces(exposed); }
+        case 4u: { return hdToneMapClip(exposed); }
+        default: { return hdToneMapNeutral(exposed); }
+    }
+}
+
 @compute @workgroup_size(8, 8, 1)
 fn composite(@builtin(global_invocation_id) id: vec3u) {
     let size = textureDimensions(output);
@@ -193,7 +204,7 @@ fn composite(@builtin(global_invocation_id) id: vec3u) {
         sky = mix(sky, glow, params.glow);
         disc = disc * (1.0 - params.glow);
     }
-    let mapped = mix(hdToneMapNeutral(sky), hdToneMapNeutral(sky + disc), share);
+    let mapped = mix(curved(sky), curved(sky + disc), share);
     let encoded = hdDither(mapped, id.xy, 255.0);
     textureStore(output, id.xy, vec4f(clamp(encoded, vec3f(0.0), vec3f(1.0)), 1.0));
 }
@@ -246,7 +257,7 @@ function glowResources(width: number, height: number) {
 function encodeGlow(encoder: GPUCommandEncoder, target: GPUTexture) {
     const device = gpuDevice();
     const { pipelines, sampler, params, sky, clear, levels, sums } = glowResources(target.width, target.height);
-    device.queue.writeBuffer(params, 0, new Float32Array([GLOW, levels.length, 0, 0]));
+    device.queue.writeBuffer(params, 0, new Float32Array([GLOW, levels.length, CURVES[display.toneCurve], 0]));
     const dispatch = (pipeline: GPUComputePipeline, entries: [number, GPUBindingResource][], size: GPUTexture) => {
         const pass = encoder.beginComputePass();
         pass.setPipeline(pipeline);
@@ -417,6 +428,7 @@ if (gpu.device) {
         { passive: false },
     );
     onTables(draw);
+    onDisplay(draw);
     new ResizeObserver(draw).observe(canvas);
     draw();
 } else {

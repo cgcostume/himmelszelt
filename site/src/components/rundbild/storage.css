@@ -1,21 +1,18 @@
-/* The storage figure (Storage.astro): the stacked memory needs the room, the three values beside it are short. */
+/* The storage figure (Storage.astro): fixed shares, so that no column moves as the values change with the sliders. */
 .storage-figure .budget-grid {
-    grid-template-columns: max-content 3fr 0.6fr 0.8fr;
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 3fr) minmax(0, 0.6fr) minmax(0, 0.8fr);
 }
-/* A family of several variants: its name a small heading across the grid, over a row per variant. */
-.storage-figure .storage-family {
-    grid-column: 1 / -1;
-    padding: 0.5rem 0 0;
-    border-top: var(--border);
-    color: var(--muted);
-    font-size: var(--text-meta);
+.storage-figure .budget-value,
+.storage-figure .budget-defaults-note {
+    font-variant-numeric: tabular-nums;
 }
-/* Its variants under it, indented. */
-.storage-figure .storage-variant {
-    padding-left: 0.75rem;
+/* A line between the families of several variants, and before the projections the chapter only mentions, dimmed. */
+.storage-figure .storage-break {
+    border-top: 1px solid var(--muted);
 }
-.storage-figure .storage-first {
-    border-top: 0;
+/* Their content only, so that the line before them stays as bright as the others. */
+.storage-figure .storage-dim > * {
+    opacity: 0.45;
 }
 /* On a phone, the family's name and its memory each across, the two values side by side under them. */
 @media (max-width: 48rem) {
@@ -38,4 +35,16 @@
 /* Every head on one line. */
 .storage-figure .budget-head {
     white-space: nowrap;
+}
+/* The formats not chosen: a slim bar each, unlabeled, in the same place as when chosen. */
+.storage-figure .storage-other {
+    height: 2px;
+}
+.storage-figure .storage-other > .budget-bar {
+    border-radius: 0;
+    box-shadow: none;
+}
+/* The reference's slim bars filled, too thin for its stripes. */
+.storage-figure .storage-other > .budget-reference {
+    background: var(--budget-fill);
 }

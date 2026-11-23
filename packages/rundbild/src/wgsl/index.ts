@@ -1,10 +1,11 @@
 /**
  * The WGSL layer, exported as plain strings. `cube` and `panorama` are binding-free, how the two lay out directions, for
- * whoever samples or writes such a map, and `ground` too, for an image's ground on a plane, its horizon lifted and the mip levels where either stretches it; `irradiance` and `panoramaPass` are the passes, with bindings of their own.
+ * whoever samples or writes such a map, and `ground` too, for an image's ground on a plane, its horizon lifted and the mip levels where either stretches it; `irradiance`, `panoramaPass` and `bc6h` are the passes, with bindings of their own.
  *
  * Every identifier is prefixed `rb` (or `RB_` for constants) so several `@himmelszelt/*` fragments can share one
  * shader module.
  */
+import bc6h from "./bc6h.comp.wgsl";
 import cube from "./cube.wgsl";
 import environment from "./environment.comp.wgsl";
 import ground from "./ground.wgsl";
@@ -15,7 +16,7 @@ import spiral from "./spiral.wgsl";
 
 export { workgroupSum } from "./reduce.js";
 
-export { cube, environment, ground, irradiance, panorama, panoramaPass, spiral };
+export { bc6h, cube, environment, ground, irradiance, panorama, panoramaPass, spiral };
 
 /** The panorama pass' output binding, which has to spell out the target's format. */
 export const panoramaOutput = (format: GPUTextureFormat) =>

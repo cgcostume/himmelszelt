@@ -176,7 +176,15 @@ It spreads `samples` lookups over every texel, which smooth the horizon and the 
 
 <Projections />
 
-<Controls />
+Each map loses something against the HDRI it was made from (<Fig id="projection-errors" />). An equirectangular of 1K
+holds a sixteenth of a 4K HDRI's texels, one of 2K a quarter, and blurs whatever is finer: at 1K a cube map's texel spans
+0.22° in the middle of a face, under half the Moon's width, where the HDRI's spans 0.09° at its horizon. The format it is
+kept in rounds off more. Half floats keep all of the file's 8 bits a channel, with 3 to spare. rg11b10ufloat keeps 6
+bits for red and green and 5 for blue, so a texel may be off by 0.8% in the first two and 1.6% in the third.
+rgb9e5ufloat gives the three channels one exponent: the brightest keeps 9 bits, one at a quarter of it 7. BC6H keeps a
+few colors for a block of 4 by 4 and, for each texel, a mix between them.
+
+<Projections errors />
 
 ## From one to the other
 
@@ -302,6 +310,10 @@ a scale each first.
 
 <Planned what="section" title="The horizon band" plan="from the thesis, with the horizon band of osgHimmel.">
     The hard edge of a hemisphere's map, and the band that hides it.
+</Planned>
+
+<Planned what="section" title="A sky of your own" plan="dunstkreis' sky, sternenheer's stars and nachtgestirn's Moon baked into a cubified hemicube.">
+    Not every sky comes as an HDRI: one rendered live, laid into the same maps, lights and shows like a captured one.
 </Planned>
 
 ## What it costs

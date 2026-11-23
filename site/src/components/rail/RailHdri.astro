@@ -5,7 +5,7 @@ import Icon from "../Icon.astro";
 /**
  * The HDRI in the rail (see Rail.astro), the same choice as the boxes under the figures: the most downloaded skies as
  * a gallery of three a row, two rows in view and the rest scrolled to, each with its resolutions over it on hover, and
- * a button that copies its link; without categories, search or a file of one's own, which the boxes keep.
+ * a button that copies its link, a search under it and a file of one's own, chosen or dropped on the group.
  */
 ---
 
@@ -18,9 +18,13 @@ import Icon from "../Icon.astro";
         </button>
     </summary>
     <div class="environments-gallery rail-gallery" data-field="gallery" role="group" aria-label="HDRIs"></div>
+    <input type="search" class="rail-search" data-field="search" placeholder="Search Poly Haven" aria-label="Search Poly Haven's HDRIs by name, category or tag" />
     <p class="rail-why" data-field="status"></p>
     <p class="rail-credit">
         From <a href="https://polyhaven.com/hdris">Poly Haven</a>, <a href="https://polyhaven.com/license">CC0</a>, thank you.
+    </p>
+    <p class="environments-own">
+        <label class="environments-action">your own .hdr<input type="file" accept=".hdr" data-field="file" hidden /></label>
     </p>
 </details>
 

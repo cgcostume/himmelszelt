@@ -6,7 +6,7 @@ import { save } from "../dunstkreis/download";
 import { figureInfo } from "../figure-info";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
-import { drawSvg, selenographic, splitLine, svgText, toScreen, visibleRuns } from "../sternzeit/figure";
+import { drawSvg, selenographic, svgText, toScreen, visibleRuns } from "../sternzeit/figure";
 import { linkedSearch } from "../sternzeit/state";
 import { noGpu } from "./laws";
 import { PHOTOS, type Photo } from "./photo-options";
@@ -222,18 +222,32 @@ export function photoFigure(root: HTMLElement) {
         return `<g class="photo-grid">${svg}<circle cx="${f(c)}" cy="${f(cy)}" r="2" class="moon-center"/></g>`;
     }
 
-    // The split line and the up mark, over both, and the grid where asked for.
+    // The gap of the split and the grid where asked for, over both.
     let shown: MoonAt | null = null;
     function drawMarks(p: Photo, w: number, h: number) {
         const at = Number(slider.value) / 100;
         const [c, cy, r] = [w / 2, h / 2, DISC * Math.min(w, h)];
-        let svg = shown && grid.getAttribute("aria-pressed") === "true" ? gridOf(shown, p, c, cy, r) : "";
-        // The split line, but not at either end, where one side shows alone; a slider's thumb on it to drag.
-        svg += at > 0 && at < 1 ? splitLine(at * w, 0, h, cy, "photo-split-line") : "";
+        paintRange(slider);
+        [gap.left, gap.width] = gapAt(at * w);
+        canvas.style.clipPath = `inset(0 0 0 ${gap.left + gap.width / 2}px)`;
+        // The split a gap cut through the view, but not at either end, where one side shows alone.
+        const cut =
+            at > 0 && at < 1
+                ? `<rect x="${gap.left}" y="0" width="${gap.width}" height="${h}" class="split-gap"/>`
+                : "";
+        const svg = (shown && grid.getAttribute("aria-pressed") === "true" ? gridOf(shown, p, c, cy, r) : "") + cut;
         marks.setAttribute("viewBox", `0 0 ${w} ${h}`);
         drawSvg(marks, svg, 1);
-        canvas.style.clipPath = `inset(0 0 0 ${at * 100}%)`;
-        paintRange(slider);
+    }
+
+    // The gap where the slider's cursor stands, 2 px wide, its left in CSS pixels from the stage's left: the cursor's
+    // middle lies 3 px + share × (width − 6 px) along the slider (global.css). Before the slider is laid out, around `x`.
+    const gap = { left: 0, width: 2 };
+    function gapAt(x: number): [number, number] {
+        const from = pair.getBoundingClientRect().left;
+        const box = slider.getBoundingClientRect();
+        if (!box.width) return [x - 1, 2];
+        return [box.left + 3 + (Number(slider.value) / 100) * (box.width - 6) - 1 - from, 2];
     }
 
     let drawn = false;
@@ -378,6 +392,11 @@ export function photoFigure(root: HTMLElement) {
         context.restore();
         context.drawImage(marksImage, 0, 0, w, h);
         URL.revokeObjectURL(marksImage.src);
+        const rect = marks.querySelector(".split-gap");
+        if (rect) {
+            context.fillStyle = getComputedStyle(rect).fill;
+            context.fillRect(gap.left, 0, gap.width, h);
+        }
         const name = p.label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
         out.toBlob((blob) => save(blob, `himmelszelt-${root.id}-${name}.png`), "image/png");
     }

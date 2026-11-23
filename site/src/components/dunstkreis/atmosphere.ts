@@ -11,6 +11,7 @@ import { createIrradiancePass } from "@himmelszelt/rundbild";
 import type { Direction } from "@himmelszelt/sternzeit";
 import { watchView } from "../frame";
 import type { ToneCurve } from "../scene/scene";
+import { onSetting, setSetting, settings } from "../settings";
 import { gpu, gpuDevice, gpuFailed } from "../webgpu";
 
 /**
@@ -35,34 +36,23 @@ export const quality = {
 
 const events = new EventTarget();
 
-// The headroom is the viewer's, remembered across pages and visits; 4 until one is chosen, which an HDR display shows.
-const HEADROOM_KEY = "himmelszelt-headroom";
-const HEADROOMS = [1, 2, 4, 8];
-function storedHeadroom() {
-    try {
-        const stored = Number(localStorage.getItem(HEADROOM_KEY));
-        if (HEADROOMS.includes(stored)) return stored;
-    } catch {}
-    return 4;
-}
-
 /**
- * How the page's figures show the sky on a display, shared by all: the tone curve, "neutral", "agx", "aces" or "clip",
- * and the headroom chosen for an HDR display, how many times SDR white it may show.
+ * How the page's figures show the sky on a display, shared by all and kept across pages and visits (see settings.ts):
+ * the tone curve, "neutral", "agx", "aces" or "clip", and the headroom chosen for an HDR display, how many times SDR
+ * white it may show.
  */
-// The tone curve likewise, "neutral" until one is chosen.
-const TONE_KEY = "himmelszelt-tone-curve";
-const TONE_CURVES: ToneCurve[] = ["clip", "neutral", "agx", "aces"];
-function storedToneCurve(): ToneCurve {
-    try {
-        const stored = localStorage.getItem(TONE_KEY) as ToneCurve | null;
-        if (stored && TONE_CURVES.includes(stored)) return stored;
-    } catch {}
-    return "neutral";
-}
-export const display = { toneCurve: storedToneCurve(), headroom: storedHeadroom() };
-export const onDisplay = (listener: (current: typeof display) => void) =>
+export const display = {
+    get toneCurve(): ToneCurve {
+        return settings.toneCurve;
+    },
+    get headroom() {
+        return settings.headroom;
+    },
+};
+export const onDisplay = (listener: (current: typeof display) => void) => {
     events.addEventListener("display", () => listener(display));
+    onSetting(["toneCurve", "headroom"], () => listener(display));
+};
 
 // A figure writes its canvas by a compute pass: rgba8unorm, which storage textures take everywhere, or on an HDR display
 // rgba16float, extended sRGB, whose values above 1 show brighter than SDR white.
@@ -137,15 +127,8 @@ export function bindHdr(note: HTMLElement, choice: Element) {
     };
     show();
     onDisplay(show);
-    for (const input of choice.querySelectorAll("input")) {
-        input.addEventListener("change", () => {
-            display.headroom = Number(input.value);
-            try {
-                localStorage.setItem(HEADROOM_KEY, input.value);
-            } catch {}
-            events.dispatchEvent(new Event("display"));
-        });
-    }
+    for (const input of choice.querySelectorAll("input"))
+        input.addEventListener("change", () => setSetting("headroom", Number(input.value)));
 }
 
 /** Tone curve radios, `name="…"` inputs of the curves' values: choosing one switches every figure. */
@@ -156,13 +139,7 @@ export function bindToneCurveChoice(choices: Iterable<HTMLInputElement>) {
     });
     for (const input of inputs) {
         input.checked = input.value === display.toneCurve;
-        input.addEventListener("change", () => {
-            display.toneCurve = input.value as ToneCurve;
-            try {
-                localStorage.setItem(TONE_KEY, input.value);
-            } catch {}
-            events.dispatchEvent(new Event("display"));
-        });
+        input.addEventListener("change", () => setSetting("toneCurve", input.value as ToneCurve));
     }
 }
 

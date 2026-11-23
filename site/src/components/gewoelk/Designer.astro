@@ -10,6 +10,7 @@ import { type Designed, KIND_VALUE, kindsOf, placeOf, VOXEL_KINDS } from "./lab/
 import LabSliders from "./lab/LabSliders.astro";
 import type { LabSlider } from "./lab/sliders";
 import * as all from "./lab/sliders";
+import Quality from "./Quality.astro";
 
 /**
  * A designer for one place of gewoelk's layered sky: a patch of the cloud alone under a real sky, seen from a camera
@@ -130,6 +131,10 @@ const PRESET = {
     checked: DESIGNS[place].checked,
 };
 
+// The kinds as blocks only where they fit the column comfortably beside the row's name (the front's two), in a list to
+// drop down everywhere else.
+const COMBO = PRESET.options.reduce((n, [, text]) => n + (text?.length ?? 0) + 1, 0) > 20;
+
 const only = (sliders: LabSlider[], ...params: string[]) => sliders.filter(([param]) => params.includes(param));
 const without = (sliders: LabSlider[], ...params: string[]) => sliders.filter(([param]) => !params.includes(param));
 // The deep layer's maps do not read the sharpness: its slider is held with the hidden ones.
@@ -192,50 +197,6 @@ const KIND = choice(
         [KIND_VALUE.front, "front"],
     ],
     KIND_VALUE[place === "front" ? "front" : "towers"],
-);
-const SCALE = choice(
-    "scale",
-    "Render scale",
-    "The share of the frame's pixels the clouds are marched at",
-    [
-        ["1", "full"],
-        ["0.5", "half"],
-        ["0.25", "quarter"],
-    ],
-    "1",
-);
-const STEPS = choice(
-    "steps",
-    "Steps",
-    "Steps a ray takes at most",
-    [
-        ["64", "64"],
-        ["128", "128"],
-        ["256", "256"],
-    ],
-    "128",
-);
-const VOXEL_STEPS = choice(
-    "steps",
-    "Steps",
-    "Steps a ray takes at most",
-    [
-        ["128", "128"],
-        ["256", "256"],
-        ["512", "512"],
-    ],
-    "256",
-);
-const SIZE = choice(
-    "size",
-    "Map size",
-    "Texels across the baked map",
-    [
-        ["1024", "1024"],
-        ["2048", "2048"],
-        ["4096", "4096"],
-    ],
-    "2048",
 );
 // Which of gewoelk's models renders the designed cloud, as its mark in the view and what it means.
 const MODEL = {
@@ -311,19 +272,16 @@ const SPEEDS = [
         </div>
         <div class="designer-assets sky-options">
             <OptionGroup name="kind">
-                <Choice figure={id} {...PRESET} />
-            </OptionGroup>
-            <OptionGroup name="yours">
-                <span class="own-kinds" data-field="own"></span>
+                <Choice figure={id} {...PRESET} heading="library" combo={COMBO} />
+                <span class="own-row"><span class="own-name">yours</span><span class="own-kinds" data-field="own"></span></span>
                 <button type="button" class="view-toggle" data-copy-kind title="Copies the numbers as they stand, as a kind of cloud for the library's CLOUD_TYPES">copy</button>
             </OptionGroup>
             {GROUPS[place].map(([name, sliders]) => <OptionGroup name={name}><LabSliders sliders={sliders} /></OptionGroup>)}
             <OptionGroup name="wind and change">
                 <LabSliders sliders={TIME} />
             </OptionGroup>
+            {layered ? <Quality figure={id} reads={marched ? "march" : "sheet"} dials={["sampling", "motion"]} /> : <Quality figure={id} reads="march" dials={["sampling"]} checked={{ sampling: "high" }} />}
             <OptionGroup name="render">
-                <Choice figure={id} {...SCALE} />
-                {!layered ? <Choice figure={id} {...VOXEL_STEPS} /> : marched ? <Choice figure={id} {...STEPS} /> : <Choice figure={id} {...SIZE} />}
                 <button type="button" class="view-toggle" data-field="ground.grid" aria-pressed="true" title="A grid on the ground under the patch: thin lines every 10 km, 1 km, 100 m and on down, each level showing once its cells are a few pixels across">grid</button>
             </OptionGroup>
             <OptionGroup name="HDR (× SDR white)">

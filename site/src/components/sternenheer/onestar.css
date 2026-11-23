@@ -1,7 +1,7 @@
 /* One star from its row to its pixels: the star picked, then the stages as a strip, six across where the page is wide,
    three or two where it is not, each a picture, its numbers and its function. */
 .onestar-figure.wide > :is(.fig-controls, .onestar-pick) {
-    max-width: calc(var(--measure) - 3rem);
+    max-width: var(--measure);
     margin-inline: auto;
 }
 .onestar-strip {
@@ -127,7 +127,7 @@
     gap: 0.2em;
     width: 100%;
     font-family: var(--font-mono);
-    font-size: 0.72rem;
+    font-size: var(--text-tiny);
     line-height: 1.25;
     word-break: break-all;
     background: none;
@@ -154,7 +154,7 @@
 .onestar-fn {
     align-self: flex-start;
     max-width: 100%;
-    font-size: 0.72rem;
+    font-size: var(--text-tiny);
     overflow-wrap: break-word;
 }
 /* The pixels: on the dark of the sky in either theme, each pixel a square, the profile under them. */

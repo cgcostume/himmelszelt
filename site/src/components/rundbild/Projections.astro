@@ -1,18 +1,28 @@
 ---
 import Choice from "../dunstkreis/Choice.astro";
-import Try from "../Try.astro";
-import "../dunstkreis/dunstkreis.css";
 import OptionGroup from "../dunstkreis/OptionGroup.astro";
-import SkyFrame from "../dunstkreis/SkyFrame.astro";
+import EnvironmentFrame from "../environment/EnvironmentFrame.astro";
+import "../environment/environments.css";
+import "../helldunkel/helldunkel.css";
 import "./projections.css";
 
+/**
+ * The chosen HDRI in six projections, seen from inside with the texture as stored in the corner. Without `errors`, how
+ * densely each packs its texels; with it, what each loses against the HDRI itself, in each format a texel is kept in.
+ */
+interface Props {
+    errors?: boolean;
+}
+const { errors = false } = Astro.props;
+const figure = errors ? "projection-errors" : "projections";
+
 const PROJECTION = {
-    figure: "projections",
+    figure,
     name: "projection",
     label: "Projection",
     title: "How the sphere of directions is laid out on the texture",
     options: [
-        ["cube", "cube map", "Six perspective views, the sides of a cube, as createCubePass writes them"],
+        ["cube", "cube map", "Six perspective views, the sides of a cube"],
         ["cubified", "cubified", "Texels spread evenly over the sphere, as osgHimmel's CubeMappedHimmel did"],
         ["equirectangular", "equirectangular", "Azimuth across, zenith angle down, 2:1, as HDRIs are shared"],
         ["octahedral", "octahedral", "The sphere onto an octahedron, unfolded into a square, the zenith in the middle"],
@@ -23,25 +33,35 @@ const PROJECTION = {
             "The whole sphere as a mirror ball shows it, equal in area, the nadir all round the rim",
         ],
     ],
-    checked: "cube",
+    checked: errors ? "equirectangular" : "cube",
 };
+const SIZES = [
+    ["xs", "XS", "About 400 texels"],
+    ["s", "S", "About 1,600 texels"],
+    ["m", "M", "About 6,400 texels"],
+    ["l", "L", "About 25,600 texels"],
+];
 const SIZE = {
-    figure: "projections",
+    figure,
     name: "budget",
     label: "Size",
-    title: "XS to L about as many texels in each projection, to compare them; HD and UHD the sizes maps commonly come in",
-    options: [
-        ["xs", "XS", "About 400 texels"],
-        ["s", "S", "About 1,600 texels"],
-        ["m", "M", "About 6,400 texels"],
-        ["l", "L", "About 25,600 texels"],
-        ["hd", "HD", "Faces of 1024 for a cube map, 2048 across for the others"],
-        ["uhd", "UHD", "Faces of 2048 for a cube map, 4096 across for the others"],
-    ],
-    checked: "xs",
+    title: errors
+        ? "1K and 2K: faces of 512 and 1024 for a cube map, 1024 and 2048 across for the others, a sixteenth and a quarter of a 4K HDRI's texels"
+        : "XS to L about as many texels in each projection, to compare them; HD and UHD the sizes maps commonly come in",
+    options: errors
+        ? [
+              ["k1", "1K", "Faces of 512 for a cube map, 1024 across for the others"],
+              ["hd", "2K", "Faces of 1024 for a cube map, 2048 across for the others"],
+          ]
+        : [
+              ...SIZES,
+              ["hd", "HD", "Faces of 1024 for a cube map, 2048 across for the others"],
+              ["uhd", "UHD", "Faces of 2048 for a cube map, 4096 across for the others"],
+          ],
+    checked: errors ? "k1" : "xs",
 };
 const FILTER = {
-    figure: "projections",
+    figure,
     name: "filter",
     label: "Filter",
     title: "Texel by texel, bilinear by the hardware's sampler as a renderer reads it, or bicubic",
@@ -54,50 +74,107 @@ const FILTER = {
             "Catmull-Rom over 4 by 4 texels, by hand in the shader: smooth where texels meet and across the cube's edges, where bilinear bends",
         ],
     ],
-    checked: "nearest",
+    checked: errors ? "linear" : "nearest",
+};
+const FORMAT = {
+    figure,
+    name: "format",
+    label: "Format",
+    title: "How a texel is kept: what each format rounds away, on top of what the projection loses",
+    options: [
+        ["rgba16float", "rgba16float", "8 bytes a texel, half floats, as the HDRI is held: nothing more is lost"],
+        ["rg11b10ufloat", "rg11b10ufloat", "4 bytes a texel, 6 bits of mantissa for red and green, 5 for blue"],
+        ["rgb9e5ufloat", "rgb9e5ufloat", "4 bytes a texel, 9 bits each and an exponent shared by the three"],
+        ["bc6h-rgb-ufloat", "BC6H", "1 byte a texel, 16 bytes a block of 4 by 4, encoded on the GPU after Narkowicz"],
+    ],
+    checked: "rgba16float",
 };
 ---
 
-<figure class="fig scene-frame wide" id="projections">
-    <SkyFrame viewClass="projections-view" panel="inside" locked={false} lockTitle="Look towards the Sun's true direction; dragging lets go" compassTitle="The compass directions on the horizon, the zenith and the nadir">
-        <canvas aria-label="The sky's texels seen from inside, looking around"></canvas>
-        <div class="projections-marks" aria-hidden="true"></div>
-        <div class="fig-inset projections-inset" data-panel="flat">
-            <canvas aria-label="The same texture as stored"></canvas>
+<figure class="fig scene-frame wide" id={figure} data-projections={errors ? "error" : "density"} data-needs-hdri data-loading>
+    <EnvironmentFrame fullscreen exposure ownView="Drag to look around, scroll to zoom. Rendered with WebGPU.">
+        <div class="hdri-view as-seen projections-view" data-panel="inside">
+            <canvas aria-label="The HDRI's texels seen from inside, looking around"></canvas>
             <div class="projections-marks" aria-hidden="true"></div>
+            <div class="fig-inset projections-inset" data-panel="flat">
+                <canvas aria-label="The same texture as stored"></canvas>
+                <div class="projections-marks" aria-hidden="true"></div>
+            </div>
+            {
+                errors ? (
+                    <p class="projections-legend note">
+                        <span>0.1%</span>
+                        <span class="projections-ramp projections-magma" aria-hidden="true" />
+                        <span>100% off the HDRI</span>
+                    </p>
+                ) : (
+                    <p class="projections-legend note" hidden>
+                        <span>4 times sparser</span>
+                        <span class="projections-ramp" aria-hidden="true" />
+                        <span>4 times denser</span>
+                    </p>
+                )
+            }
         </div>
-        <p class="projections-legend note" hidden>
-            <span>4 times sparser</span><span class="projections-ramp" aria-hidden="true"></span><span>4 times denser</span>
-        </p>
         <Fragment slot="options">
             <OptionGroup name="projection">
-                <Choice {...PROJECTION} />
+                <Choice {...PROJECTION} combo />
             </OptionGroup>
             <OptionGroup name="size">
-                <Choice {...SIZE} />
+                <Choice {...SIZE} combo />
             </OptionGroup>
+            {
+                errors && (
+                    <OptionGroup name="format">
+                        <Choice {...FORMAT} combo />
+                    </OptionGroup>
+                )
+            }
             <OptionGroup name="filtering">
-                <Choice {...FILTER} />
+                <Choice {...FILTER} combo />
             </OptionGroup>
             <OptionGroup name="shown">
-                <button type="button" class="view-toggle" data-field="sunDisc" aria-pressed="true" title="Draw the Sun's disc over the view from inside, pixel by pixel, as the sky figure does: never stored in the texture, where it would be one bright texel">sun disc</button>
-                <button type="button" class="view-toggle" data-field="edges" aria-pressed="true" title="Outline every texel in the view from inside">texel edges</button>
+                <button type="button" class="view-toggle" data-field="marks" aria-pressed="true" data-setting="marks" title="The compass directions, the zenith and the nadir">compass</button>
+                <button type="button" class="view-toggle" data-field="edges" aria-pressed={errors ? "false" : "true"} title="Outline every texel in the view from inside">texel edges</button>
                 <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="Dither the 8-bit output by a step of noise, against banding in the sky's smooth gradients">dither</button>
-                <button type="button" class="view-toggle" data-field="density" aria-pressed="false" title="Color every direction by how densely the projection packs its texels there, against the same texels spread evenly over what it covers">density</button>
+                {
+                    errors && (
+                        <button type="button" class="view-toggle" data-field="original" aria-pressed="false" title="Show the HDRI itself, the reference the errors are measured against, in place of the map">HDRI</button>
+                    )
+                }
+                {
+                    errors ? (
+                        <button type="button" class="view-toggle" data-field="shade" aria-pressed="true" title="Color every direction by how far the map's value lies from the HDRI's, relative, in the channel off the most">error</button>
+                    ) : (
+                        <button type="button" class="view-toggle" data-field="shade" aria-pressed="false" title="Color every direction by how densely the projection packs its texels there, against the same texels spread evenly over what it covers">density</button>
+                    )
+                }
             </OptionGroup>
         </Fragment>
-    </SkyFrame>
+    </EnvironmentFrame>
     <p class="view-status"><span data-field="info"></span> <span data-field="timing"></span></p>
     <div class="lut-call" data-field="call"></div>
     <figcaption class="figure-caption">
-        One sky in six projections from XS to UHD, seen from inside and in the corner as stored, a cube's faces north to
-        west, then zenith and nadir. The density against an even spread in ColorBrewer's RdBu: blue sparse, red dense.
-        <Try label="Midnight sun" set="date=2026-06-21T22:46:00Z&lat=69.65&lon=18.96&h=1" fig="projections">
-            the low Sun split between the equirectangular's edges, whole in the fisheye.
-        </Try>
+        {
+            errors ? (
+                <Fragment>
+                    The chosen HDRI in the same projections at 1K and 2K, against the HDRI itself:
+                    how far each direction's value lies from the HDRI's, in the channel off the most, on matplotlib's magma from a
+                    thousandth, darkest, to all of it, palest. Kept in four formats, half floats as the HDRI is held, the others
+                    rounding off more, BC6H encoded on the GPU after Narkowicz.
+                </Fragment>
+            ) : (
+                <Fragment>
+                    The chosen HDRI in six projections from XS to UHD, seen from inside and in the corner as stored, a cube's faces
+                    north to west, then zenith and nadir. The density against an even spread in ColorBrewer's RdBu: blue sparse,
+                    red dense.
+                </Fragment>
+            )
+        }
     </figcaption>
 </figure>
 
 <script>
+    import "../inset";
     import "./projections";
 </script>

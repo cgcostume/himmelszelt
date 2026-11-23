@@ -1,8 +1,8 @@
 /* What it costs, as every chapter shows it: bars per size across panels, each with its own axis (see the Budget
    figures of nachtgestirn and sternenheer, and nachtgestirn's configurator). */
-/* The cost figure: per disc size a row of bars across three panels, each with its own axis; the defaults solid, what
-   the reader gets, everything on hatched, the reference, as the site hatches what matters less; the memory stacked by
-   what holds it. Labeled cards on a phone. */
+/* The cost figure: per disc size a row of bars across three panels, each with its own axis; the defaults solid and
+   taller, what the reader gets, everything on dithered and a touch lower under them, the reference, as the site dithers
+   what matters less; the memory stacked by what holds it. Labeled cards on a phone. */
 .budget-figure {
     --budget-0: oklch(0.66 0.12 245);
     --budget-1: oklch(0.67 0.14 70);
@@ -59,7 +59,7 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
     padding: 0.4rem 0;
     border-top: var(--border);
     background: repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px var(--grid));
@@ -68,7 +68,11 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    height: 0.75rem;
+    height: 12px;
+}
+/* A reference's line a touch lower than the defaults'. */
+:where(.budget-line):has(> .budget-reference) {
+    height: 10px;
 }
 .budget-bar {
     flex: none;
@@ -91,10 +95,20 @@
 .budget-part-3 {
     background: var(--budget-3);
 }
-/* The reference hatched in its own color: stripes over the panel's background, so the color stays the part's. */
+/* The reference dithered in its own color over the panel's background, so the color stays the part's, muted: a checker
+   of device pixels drawn by costs-dither.ts. */
 .budget-reference {
-    background: repeating-linear-gradient(135deg, var(--budget-fill, var(--budget-ink)) 0 2px, transparent 2px 4.5px);
-    box-shadow: inset 0 0 0 1px var(--budget-fill, var(--budget-ink));
+    --budget-fill: var(--budget-ink);
+    position: relative;
+    background: none;
+}
+.budget-dither {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
 }
 .budget-reference.budget-part-0 {
     --budget-fill: var(--budget-0);
@@ -105,10 +119,13 @@
 .budget-reference.budget-part-2 {
     --budget-fill: var(--budget-2);
 }
+.budget-reference.budget-part-3 {
+    --budget-fill: var(--budget-3);
+}
 .budget-value {
     margin-left: 0.3rem;
     font-family: var(--font-mono);
-    font-size: 0.7rem;
+    font-size: var(--text-tiny);
     color: var(--muted);
     white-space: nowrap;
 }
@@ -117,7 +134,7 @@
     height: 1.2rem;
     border-top: var(--border);
     font-family: var(--font-mono);
-    font-size: 0.7rem;
+    font-size: var(--text-tiny);
 }
 .budget-axis > span {
     position: absolute;
@@ -150,19 +167,38 @@
     }
     .budget-cell::before {
         content: attr(data-label);
-        font-size: 0.7rem;
+        font-size: var(--text-tiny);
         color: var(--muted);
     }
+}
+/* This GPU's time, measured, as a mark in blue across the defaults' bar and the reference's, within their heights. */
+.budget-pair {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.budget-gpu {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background: var(--budget-0);
+}
+.budget-gpu-label {
+    color: var(--budget-0);
 }
 /* What BC1 saves of the color map: its outline alone, at the bar's end. */
 .budget-bar.budget-saved,
 .budget-swatch.budget-saved {
     background: none;
-    box-shadow: inset 0 0 0 1px var(--budget-0);
+    outline: 1px solid var(--budget-0);
+    outline-offset: -1px;
 }
 /* What the defaults draw a disc with, under its size. */
 .budget-defaults-note {
-    font-size: 0.7rem;
+    font-size: var(--text-tiny);
 }
 /* Copy at the top right (see figure-actions.ts), the legend centered clear of it. */
 .budget-figure:has(> .fig-actions) > .budget-legend {

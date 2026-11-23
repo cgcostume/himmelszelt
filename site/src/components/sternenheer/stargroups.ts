@@ -1,4 +1,5 @@
 import { HIPPARCOS, TYCHO } from "@himmelszelt/sternenheer";
+import { follow, settings } from "../settings";
 
 /** The pick of `group` in `root`, a `data-pick` of StarGroups.astro. */
 export const picked = (root: HTMLElement, group: string) =>
@@ -70,6 +71,23 @@ export function bindStarGroups(root: HTMLElement, onPick: () => void, needsCatal
     document.addEventListener("pointerdown", (event) => {
         if (!groups.some((group) => group.contains(event.target as Node))) close();
     });
+
+    // The catalog and the Milky Way follow the page's settings, a pick here a local override (see settings.ts).
+    for (const group of groups) {
+        const name = group.dataset.group;
+        if (name !== "catalog" && name !== "milkyWay") continue;
+        const buttons = buttonsOf(group);
+        const read = () => buttons.find((b) => b.getAttribute("aria-pressed") === "true")?.dataset.pick ?? "";
+        const initial = read();
+        const lit = initial === "off" ? "0" : initial;
+        const want = () =>
+            name === "catalog" ? settings.catalog : !settings.milkyWay ? "off" : read() === "off" ? lit : read();
+        const write = (value: string) => {
+            const button = buttons.find((b) => b.dataset.pick === value);
+            if (button && !button.disabled) pick(group, button);
+        };
+        follow(group, name, want, read, write);
+    }
 
     if (!needsCatalogs) return;
     made ??= Promise.all([present(HIPPARCOS.compact), present(TYCHO.compact)]).then(([hipparcos, tycho]) => ({

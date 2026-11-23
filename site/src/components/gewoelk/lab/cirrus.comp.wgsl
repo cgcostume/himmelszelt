@@ -250,13 +250,13 @@ fn cirrusSky(@builtin(global_invocation_id) id: vec3u) {
     if (C.viewMode > 0.5) {
         let p = (vec2f(id.xy) - 0.5 * vec2f(size)) / f32(size.y) * C.tile;
         let d = cirrusDensity(vec2f(p.x, -p.y) + V.flown, log2(max(C.tile / f32(size.y) / (C.tile / C.mapSize), 1.0)));
-        textureStore(labCanvas, vec2i(id.xy), labDisplay(mix(vec3f(700.0, 1700.0, 4600.0), vec3f(16000.0), d), V.exposure, V.headroom));
+        textureStore(labCanvas, vec2i(id.xy), labDisplay(mix(vec3f(700.0, 1700.0, 4600.0), vec3f(16000.0), d), V.exposure, V.headroom, V.curve));
         return;
     }
     let v = labRay(V, vec2f(id.xy) + 0.5, size);
     let sky = labSkyFrom(V, v, sun) * (1.0 + V.gridStrength * labGrid(V, vec2f(id.xy) + 0.5, size));
     let sheet = cirrusSheet(v);
-    textureStore(labCanvas, vec2i(id.xy), labDisplay(sky * sheet.a + sheet.rgb, V.exposure, V.headroom));
+    textureStore(labCanvas, vec2i(id.xy), labDisplay(sky * sheet.a + sheet.rgb, V.exposure, V.headroom, V.curve));
 }
 
 // The sheet alone, for a figure that composes it over a sky of its own.

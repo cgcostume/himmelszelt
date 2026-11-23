@@ -23,6 +23,8 @@
 @group(0) @binding(14) var<uniform> gwLayered: GwLayered;
 @group(0) @binding(15) var gwLayerMaps: texture_2d_array<f32>;
 @group(0) @binding(16) var gwLayerSampler: sampler;
+// The deep layer as its own march wrote it, at its own size: its light and what it lets through.
+@group(0) @binding(17) var gwDeepLight: texture_2d<f32>;
 // How far away what a pixel shows is, for a composition that orders the cloudscape with other clouds: x the distances
 // in km summed by their shares of the pixel, y those shares, so that their quotient, the mean distance, can be read
 // between pixels.
@@ -31,7 +33,9 @@
 // How far forwards the droplets of a deep layer scatter, for what light it lets through to what lies under it, and how
 // much of the sky's light on a cloud a deep layer overhead takes with the sun's.
 const GW_DEEP_FORWARD: f32 = 0.85;
-const GW_DEEP_SKY: f32 = 0.7;
+const GW_DEEP_SKY: f32 = 0.9;
+// A front's column values between which the cloudscape under it goes, from all of it to none.
+const GW_FRONT_CLOSES: vec2f = vec2f(0.05, 0.3);
 
 // What the deep layer lets through of the sun's light on its way to `p`, all of it without one: by its column where
 // that way crosses its base, as the layered model shades the air. A sun at the horizon counts as one a little up.
@@ -62,6 +66,20 @@ fn gwDeepOutside(p: vec3f) -> f32 {
     let h = (altitude - l.base) / l.depth;
     let inside = min(h - span.x, span.y - h) * l.depth * step(1e-3, value);
     return 1.0 - clamp(inside / clamp(0.1 * l.depth, 0.15, 0.6), 0.0, 1.0);
+}
+
+// How much of the cloudscape's coverage a front leaves over `p`, all of it without one: none under its closed cloud,
+// where its own march draws the ragged base, and a cloud of the cloudscape below would show against it lit as under an
+// open sky. The clouds shrink along their domes as its columns fill, as towards a clearing.
+fn gwFrontLeaves(p: vec3f) -> f32 {
+    let l = gwLayered.layer[GW_LAYER_DEEP];
+    if (l.enabled == 0u || l.kind != 3u) {
+        return 1.0;
+    }
+    let near = gwLayerGround(p);
+    let thinned = gwLayerCleared(near);
+    let value = (gwLayerColumn(GW_LAYER_DEEP, near + gwLayered.observer).r - thinned) / max(1.0 - thinned, 1e-3);
+    return 1.0 - smoothstep(GW_FRONT_CLOSES.x, GW_FRONT_CLOSES.y, value);
 }
 
 // What the march met along a ray: the distances of its steps, each by its share of the pixel, and those shares.
@@ -235,7 +253,7 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
         var step = max(sdf, adaptive);
         within = within && sdf < 0.0;
         if (sdf < 0.0) {
-            let thinning = gwThinning(x, left);
+            let thinning = gwThinning(x, left * gwFrontLeaves(p));
             var sample = gwDensity(m, x, thinning, t);
             if (sample.full > 1e-4) {
                 sample.full = sample.full * gwDeepOutside(p);
@@ -312,8 +330,8 @@ fn gwCloudscape(o: vec3f, v: vec3f, sun: vec3f, t0: f32, t1: f32, jitter: f32, u
                 // it. Not dimmed by the profile as well, as Nubis3's is: that counted the depth twice, and drew the
                 // walls between sky-lit tops and ground-lit bases as dark bands.
                 let fromSky = gwParams.skyIrradiance * open.r * mix(1.0, passed, GW_DEEP_SKY);
-                // The ground's light from below, dimmed where the deck shades the ground.
-                let fromGround = gwParams.groundIrradiance * groundShade * open.g;
+                // The ground's light from below, dimmed where the deck shades the ground, and a deep layer overhead.
+                let fromGround = gwParams.groundIrradiance * groundShade * open.g * passed;
                 let ambient = (fromSky + fromGround) / (2.0 * GW_PI);
                 let sigmaT = extinction * sample.full;
                 let sigmaS = sigmaT * volume.albedo;
@@ -367,8 +385,14 @@ fn gwClouds(@builtin(global_invocation_id) id: vec3u) {
                 let at = min(vec2u((vec2f(id.xy) + 0.5) / vec2f(size) * vec2f(full)), full - 1u);
                 behind = textureLoad(gwBackground, at, 0).rgb;
             }
-            let sky = gwAirLight(o, v, behind, GW_BACKGROUND);
+            var sky = gwAirLight(o, v, behind, GW_BACKGROUND);
             let uv = (vec2f(id.xy) + 0.5) / vec2f(size);
+            // A far cloud fades into what lies behind it: a deep layer over the sky, where one covers it, or the sky
+            // the layer hides would shine in front of it.
+            if (gwLayered.layer[GW_LAYER_DEEP].enabled != 0u) {
+                let deep = textureSampleLevel(gwDeepLight, gwClampSampler, uv, 0.0);
+                sky = deep.rgb + deep.a * sky;
+            }
             result = gwCloudscape(o, v, sun, shell.near, t1, gwJitter(id.xy, gwParams.frame), uv, sky);
         }
     }

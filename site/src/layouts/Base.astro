@@ -4,6 +4,7 @@ import Cyanometer from "../components/Cyanometer.astro";
 import { CYANOMETER_STEPS, DEFAULT_STEPS, LIGHT_FROM_STEP, STORAGE_KEY, stepColor } from "../lib/cyanometer";
 import "../styles/global.css";
 import "../components/figure.css";
+import "../components/combo.css";
 import "../styles/icons.css";
 import Icon from "../components/Icon.astro";
 
@@ -113,6 +114,12 @@ const colors = Array.from({ length: CYANOMETER_STEPS }, (_, step) => stepColor(s
 
             // Every figure's download, Copy and full screen at its top right (see figure-actions.ts).
             if (document.querySelector("[data-actions], [data-export]")) import("../components/figure-actions");
+            // Every slider drawn as a dithered bar over its native input (see range.ts).
+            if (document.querySelector('input[type="range"]')) import("../components/range");
+            // The squares of the switches in the figures' options listings (see switches.ts).
+            if (document.querySelector(".sky-options")) import("../components/switches");
+            // A long radio group as one value that drops its options down (see combo.ts).
+            if (document.querySelector(".steps[data-combo]")) import("../components/combo");
 
             const addCopy = (pre: HTMLPreElement) => {
                 if (pre.parentElement?.classList.contains("code-block")) return;

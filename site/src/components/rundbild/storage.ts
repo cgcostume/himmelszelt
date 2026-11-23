@@ -1,14 +1,24 @@
 import { MiB } from "../costs";
+import { ditherBars } from "../costs-dither";
 import { find } from "../dom";
 import { paintRange, snapMark } from "../range";
-import { type Cost, costOf, type Format, type Scenario, STORAGES, type Storage, upperHalf } from "./storage-math";
+import {
+    type Cost,
+    costOf,
+    FORMATS,
+    type Format,
+    type Scenario,
+    STORAGES,
+    type Storage,
+    upperHalf,
+} from "./storage-math";
 
 const root = find("#storage");
 const grid = find("[data-field=grid]", root);
 const width = find<HTMLInputElement>("[data-field=width]", root);
 const count = find<HTMLInputElement>("[data-field=count]", root);
 
-/** The families, a row per variant under the name of a family of several. */
+/** The families, a row per variant, a line between families. */
 const FAMILIES: [string, Storage[]][] = [
     ["equirectangular", ["equirectangular", "upperEquirectangular"]],
     ["cube map", ["cube", "hemicube", "cubified", "cubifiedHemicube"]],
@@ -16,9 +26,11 @@ const FAMILIES: [string, Storage[]][] = [
     ["fisheye", ["fisheye"]],
     ["sphere map", ["sphere"]],
 ];
+/** The projections the chapter only mentions, dimmed; octahedral stays, the light probes' map. */
+const DIMMED = new Set<Storage>(["fisheye", "sphere"]);
 const VARIANT_NAMES: Partial<Record<Storage, string>> = {
-    equirectangular: "whole",
-    upperEquirectangular: "upper half",
+    equirectangular: "equirectangular",
+    upperEquirectangular: "upper equirectangular",
     cube: "cube",
     hemicube: "hemicube",
     cubified: "cubified",
@@ -71,7 +83,12 @@ function render() {
     const s = scenario();
     const costs = new Map(STORAGES.map((storage) => [storage, costOf(storage, s)]));
     const reference = costs.get("equirectangular")?.total ?? 1;
-    const largest = Math.max(...[...costs.values()].map((c) => c.total));
+    // Every format's bars at one scale, the largest of all, so that choosing another moves none of them.
+    const formats = Object.keys(FORMATS) as Format[];
+    const each = new Map(
+        STORAGES.map((storage) => [storage, formats.map((format) => costOf(storage, { ...s, format }))]),
+    );
+    const largest = Math.max(...[...each.values()].flat().map((c) => c.total));
     const heads = ["GPU memory, first level / with mips", "spread", "not needed"];
     const cells: HTMLElement[] = [
         span(""),
@@ -80,32 +97,40 @@ function render() {
         ),
     ];
     const maps = s.count > 1 ? `${s.count.toLocaleString("en-US")} × ` : "";
-    for (const [family, variants] of FAMILIES) {
-        // A family of several: its name a heading over a row per variant.
-        if (variants.length > 1) cells.push(span("storage-family note", family));
+    for (const [f, [family, variants]] of FAMILIES.entries()) {
         for (const [v, storage] of variants.entries()) {
             const c = costs.get(storage) as Cost;
             const name = variants.length > 1 ? (VARIANT_NAMES[storage] ?? family) : family;
             const half = upperHalf(storage) && variants.length === 1 ? ", upper half" : "";
             const sizes = `${maps}${c.label}${half}, ${c.levels} levels`;
-            const first = variants.length > 1 && v === 0 ? " storage-first" : "";
-            const label = span(`budget-size${first}${variants.length > 1 ? " storage-variant" : ""}`);
+            const dim = DIMMED.has(storage);
+            const line = v === 0 && f > 0 && !(dim && DIMMED.has(FAMILIES[f - 1]?.[1][0] as Storage));
+            const row = `${line ? " storage-break" : ""}${dim ? " storage-dim" : ""}`;
+            const label = span(`budget-size${row}`);
             label.append(span("", name), span("budget-defaults-note note", sizes));
             const columns = heads.map((head) => {
-                const cell = span(`budget-cell${first}`);
+                const cell = span(`budget-cell${row}`);
                 cell.dataset.label = head;
                 return cell;
             });
-            const line = span("budget-line", "", `${name}: ${bytes(c.base)} and ${bytes(c.total)} with mips`);
-            const hatched = storage === "equirectangular" ? " budget-reference" : "";
-            for (const [i, b] of [c.base, c.total - c.base].entries()) {
-                const bar = span(`budget-bar budget-part-${i}${hatched}`);
-                bar.style.width = `${(50 * b) / largest}%`;
-                line.append(bar);
+            // A slim bar for every format, the chosen one thick and with its numbers, each in its place.
+            for (const [f, other] of (each.get(storage) as Cost[]).entries()) {
+                const chosen = formats[f] === s.format;
+                const title = `${name}, ${formats[f]}: ${bytes(other.base)} and ${bytes(other.total)} with mips`;
+                const bars = span(`budget-line${chosen ? "" : " storage-other"}`, "", title);
+                for (const [i, b] of [other.base, other.total - other.base].entries()) {
+                    const bar = span(
+                        `budget-bar budget-part-${i}${storage === "equirectangular" ? " budget-reference" : ""}`,
+                    );
+                    bar.style.width = `${(50 * b) / largest}%`;
+                    bars.append(bar);
+                }
+                if (chosen) {
+                    const relative = storage === "equirectangular" ? "" : `, ${percent(c.total / reference - 1)}`;
+                    bars.append(span("budget-value", `${pair(c.base, c.total)}${relative}`));
+                }
+                columns[0]?.append(bars);
             }
-            const relative = storage === "equirectangular" ? "" : `, ${percent(c.total / reference - 1)}`;
-            line.append(span("budget-value", `${pair(c.base, c.total)}${relative}`));
-            columns[0]?.append(line);
             for (const [i, text] of [spread(c.spread), `${Math.round(c.wasted * 100)}%`].entries()) {
                 const inner = span("budget-line", "", `${name}: ${text} (${heads[i + 1]})`);
                 inner.append(span("budget-value costs-none", text));
@@ -115,6 +140,7 @@ function render() {
         }
     }
     grid.replaceChildren(...cells);
+    ditherBars(root);
     const reading = find("[data-field=widthValue]", root);
     reading.textContent = String(Math.round(s.width));
     reading.title = `${(360 / s.width).toFixed(3)}° a texel at the equirectangular's horizon`;

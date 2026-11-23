@@ -20,6 +20,10 @@ export { createCubeFromPanoramaPass, createEnvironmentBlendPass, mixCoefficients
 export type { IrradiancePass, IrradiancePassOptions } from "./ibl.js";
 export { createIrradiancePass } from "./ibl.js";
 
+// HDR images compressed to BC6H on the GPU.
+export type { Bc6hEncodeOptions, Bc6hPass, Bc6hPassOptions } from "./bc6h.js";
+export { createBc6hPass } from "./bc6h.js";
+
 // Radiance HDR files.
 export type { RgbeImage } from "./rgbe.js";
 export { decodeRgbe, encodeRgbe } from "./rgbe.js";

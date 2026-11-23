@@ -8,7 +8,7 @@ import "./environments.css";
 /**
  * The frame every figure showing the HDRI shares, its bar the same on all and their switches one for the page: the map as
  * stored or the view from inside, what clips, and the file's resolution; at its end the figure's actions (see
- * figure-actions.ts): PNG, Copy and full screen.
+ * figure-actions.ts): PNG, Copy and full screen. A figure's own switches go in its start (slot "start").
  */
 interface Props {
     /** Whether the figure offers full screen. */
@@ -47,6 +47,7 @@ const RESOLUTIONS = [
             <button type="button" class="view-icon" data-env="clipped" aria-pressed="false" title="Stripe what clips: red to white, blue to black" aria-label="Clipped"><Icon name="clipped" /></button>
         </span>
         </Fragment>)}
+        <slot name="start" />
         <Resolutions options={RESOLUTIONS} chosen="1k" />
         <span class="fig-hint footnote" data-env="hint"></span>
         </span>

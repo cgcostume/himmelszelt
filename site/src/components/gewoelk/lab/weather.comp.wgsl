@@ -26,5 +26,5 @@ fn weatherCompose(@builtin(global_invocation_id) id: vec3u) {
     if (skyFrame.ground < 1.0 && labSphere(o, v, V.planetRadius).x > 0.0) {
         behind = behind * skyFrame.ground;
     }
-    textureStore(skyCanvas, vec2i(id.xy), vec4f(hdToneMapNeutralHdr((behind * clouds.a + clouds.rgb) * skyFrame.dimmed, V.headroom), 1.0));
+    textureStore(skyCanvas, vec2i(id.xy), vec4f(labToneMap((behind * clouds.a + clouds.rgb) * skyFrame.dimmed, V.curve, V.headroom), 1.0));
 }

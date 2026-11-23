@@ -17,7 +17,7 @@
 }
 .starpicker-strip > button {
     align-items: center;
-    font-size: 0.75rem;
+    font-size: var(--text-small);
     white-space: nowrap;
 }
 .starpicker-strip > button:focus-visible {
@@ -31,13 +31,10 @@
     margin: 4px 0 6px;
     border-radius: 50%;
     background: currentColor;
-    box-shadow: 0 0 6px 2px currentColor;
 }
 .starpicker-strip > [aria-checked="true"] > .starpicker-dot {
-    box-shadow:
-        0 0 6px 2px currentColor,
-        0 0 0 5px var(--bg),
-        0 0 0 6px var(--accent);
+    outline: 1px solid var(--accent);
+    outline-offset: 5px;
 }
 /* One row, even when empty, so a pick never moves the page; the ellipsis only on the narrowest phones. */
 .starpicker > .starpicker-status.view-status {

@@ -36,7 +36,6 @@
     height: 7px;
     border: 1px solid oklch(1 0 0 / 0.7);
     border-radius: 50%;
-    box-shadow: 0 0 2px oklch(0 0 0 / 0.6);
     content: "";
     transform: translate(-50%, -50%);
     pointer-events: none;
@@ -318,9 +317,6 @@
 .lookup-observer {
     position: absolute;
     transform: translate(calc(-100% - 0.7rem), -50%);
-    text-shadow:
-        0 0 3px var(--bg),
-        0 0 6px var(--bg);
     font-size: var(--text-small);
     line-height: 1.3;
     color: var(--text);
@@ -335,9 +331,6 @@
     line-height: 1;
     color: var(--muted);
     white-space: nowrap;
-    text-shadow:
-        0 0 3px var(--bg),
-        0 0 6px var(--bg);
 }
 .lookup-controls {
     margin: 0.5rem 0 0 var(--content-inset);
@@ -345,12 +338,10 @@
 /* What the picked ray is, at the scene's foot, lined up with its credit line at the top. */
 .lookup-info {
     position: absolute;
-    bottom: 0.5rem;
-    left: var(--content-inset);
+    bottom: 0;
+    left: var(--fig-inset);
     right: calc(38cqh + 3rem);
     margin: 0;
-    font-size: var(--text-small);
-    pointer-events: none;
 }
 /* The scene is a size container, which scopes counters to it: the letters count from here. */
 .lookup-panel {
@@ -468,14 +459,14 @@
 .sky-marks[data-level="2"] .grid-part {
     opacity: 1;
 }
-/* The observer's height up the left edge, as a y axis: a bare rail filled in the accent below the value, plain above
-   it, the value itself the thumb, a decade a mark beside it. The slider is a horizontal one turned upright, its own thumb
-   hidden under the value. */
+/* The observer's height up the left edge, as a y axis: the slim bar of every slider, turned upright,
+   notched at each decade, the decades named beside it in the mono and the value among them, on no plate. The slider is
+   a horizontal one turned upright, its thumb as narrow as the drawn cursor. */
 .sky-height {
     position: absolute;
-    top: 60px;
+    top: calc(2 * var(--fig-band));
     bottom: calc(1rem + var(--sky-foot, 0px));
-    left: 26px;
+    left: calc(var(--fig-inset) - 3px);
     z-index: 4;
     display: flex;
     font-size: var(--text-small);
@@ -483,7 +474,7 @@
 .sky-height-rail {
     position: relative;
     flex: 1;
-    width: 18px;
+    width: 20px;
     container-type: size;
 }
 .sky-height input {
@@ -494,189 +485,249 @@
     margin: 0;
     transform: translate(-50%, -50%) rotate(-90deg);
 }
-.sky-height input::-webkit-slider-runnable-track,
-.sky-time:where(.sky-stage:fullscreen > *) input::-webkit-slider-runnable-track {
-    height: 3px;
-    border-radius: 2px;
-    background:
-        linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) 3px no-repeat,
-        var(--overlay-surface);
-}
-.sky-height input::-moz-range-track,
-.sky-time:where(.sky-stage:fullscreen > *) input::-moz-range-track {
-    height: 3px;
-    border-radius: 2px;
-    background:
-        linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) 3px no-repeat,
-        var(--overlay-surface);
-}
-.sky-height input::-webkit-slider-thumb,
-.sky-time:where(.sky-stage:fullscreen > *) input::-webkit-slider-thumb {
-    opacity: 0;
-}
-.sky-height input::-moz-range-thumb,
-.sky-time:where(.sky-stage:fullscreen > *) input::-moz-range-thumb {
-    opacity: 0;
-}
-/* The value, a capsule in the accent as the rail's filled part, centred on the rail at the thumb; clicks go through it. */
-.sky-height output,
-.sky-time:where(.sky-stage:fullscreen > *) output {
+/* The value beside the cursor, in the text's color, in the accent while the slider is held; clicks go through it. */
+.sky-height output {
     position: absolute;
+    bottom: calc(3px + var(--at, 0) * (100% - 6px));
+    left: calc(100% + 5px);
     z-index: 1;
-    padding: 2px 8px;
-    border-radius: var(--radius-button);
-    background: var(--accent);
-    color: var(--bg);
-    font: 500 var(--text-small) / 1.2 var(--font-mono);
+    transform: translateY(50%);
+    color: var(--text);
+    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
+    line-height: 14px;
     white-space: nowrap;
     pointer-events: none;
 }
-.sky-height output {
-    bottom: calc(9px + var(--at, 0) * (100% - 18px));
-    left: 50%;
-    transform: translate(-50%, 50%);
+.sky-height:is(:hover, :focus-within) output {
+    color: var(--accent);
 }
 .sky-height-scale {
     position: absolute;
-    inset: 9px auto 9px calc(100% + 4px);
-    color: var(--render-ink);
+    inset: 3px auto 3px calc(100% + 5px);
+    color: var(--muted);
     font-family: var(--font-mono);
-    line-height: 1;
-    text-shadow:
-        0 0 3px var(--render-shade),
-        0 0 6px var(--render-shade);
+    line-height: 14px;
     pointer-events: none;
 }
 .sky-height-mark {
     position: absolute;
     bottom: calc(var(--at) * 100%);
-    left: 0.3rem;
+    left: 0;
     transform: translateY(50%);
     white-space: nowrap;
 }
+/* The unnamed decades are the bar's notches alone. */
 .sky-height-tick {
-    width: 4px;
-    height: 1px;
-    background: currentColor;
-    box-shadow: 0 0 2px var(--render-shade);
+    display: none;
 }
-/* The view's further options, in named groups, over its right side under the buttons, on the same glass; folded away by
-   one of them, kept narrow. A group's items are indented under its name. A switch has a ring before it, a dot in it while
-   on; a choice of several is a row of tabs, the chosen one underlined in the accent. */
+/* The view's further options, in named groups, over its right side under the buttons, flush with them; folded away by
+   one of them, kept narrow. A listing in the mono, square, each group's name in capitals over its rows. */
 .sky-options {
+    --sky-leader: color-mix(in oklab, var(--muted), transparent 65%);
     position: absolute;
-    top: 52px;
-    right: 6px;
+    top: calc(var(--fig-band) + 4px);
+    right: 0;
     z-index: 5;
     display: grid;
-    gap: 0.6rem;
-    max-width: min(19rem, calc(100% - 6rem));
-    max-height: calc(100% - 60px - var(--sky-foot, 0px));
-    overflow: auto;
-    padding: 0.6rem 0.75rem 0.75rem;
-    border-radius: var(--radius-group);
+    gap: 12px;
+    width: max-content;
+    max-width: min(28rem, calc(100% - 2 * var(--fig-inset)));
+    max-height: calc(100% - var(--fig-band) - 8px - var(--sky-foot, 0px));
+    overflow: hidden auto;
+    scrollbar-width: thin;
+    padding: 6px 12px 8px;
+    border-radius: 0;
     background: var(--overlay-surface);
+    font-family: var(--font-mono);
     font-size: var(--text-small);
+    line-height: 20px;
 }
 .sky-options[hidden] {
     display: none;
 }
 .sky-group {
     display: grid;
-    gap: 0.3rem;
 }
-.sky-group-name,
-.sky-options .steps-heading {
+.sky-group-name {
     color: var(--muted);
-    font-family: inherit;
-    font-weight: 500;
+    font-weight: inherit;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
-/* A group's switches, or the options of its choice, side by side, wrapping in the narrow panel. */
+/* Every option a row of a listing, a corner before it as in a directory tree: its name, a dim dotted leader, and at
+   its right end the options as words in blocks, a switch's square, or a slider with its value. */
 .sky-group-items {
     display: flex;
-    flex-wrap: wrap;
-    gap: 2px 4px;
-    align-items: center;
-    padding-left: 0.75rem;
-}
-/* Switches, though, one a row. */
-.sky-group-items:has(> .view-toggle) {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+}
+.sky-group-items > * {
+    display: flex;
+    align-items: center;
+    min-height: 24px;
+}
+.sky-group-items > [hidden] {
+    display: none;
+}
+.sky-group-items > *::before {
+    content: "\2514";
+    flex: none;
+    order: -2;
+    margin-right: 0.6em;
+    color: var(--line);
 }
 .sky-group-items label {
-    display: flex;
     gap: 0.4rem;
-    align-items: center;
 }
+.sky-group-items > label::before {
+    margin-right: calc(0.6em - 0.4rem);
+}
+/* An action, a button without a state, as a plain word; a switch, one with a state, as its name and a square at the end
+   of its leader, filled in the accent while on, hollow while off. */
 .sky-options .view-toggle {
-    display: inline-flex;
-    gap: 5px;
-    align-items: center;
+    gap: 0;
     height: auto;
-    padding: 3px 9px 3px 5px;
-    border: 0;
-    border-radius: var(--radius-button);
-    background: none;
-    color: var(--muted);
-    transition:
-        background 0.15s,
-        color 0.15s;
-}
-.sky-options .view-toggle::before {
-    content: "";
-    flex: none;
-    width: 12px;
-    height: 12px;
-    box-sizing: border-box;
-    border: 1.2px solid currentColor;
-    border-radius: 50%;
-    background: radial-gradient(circle, var(--accent) 2.4px, transparent 2.9px) center / 0 0 no-repeat;
-    transition: background-size 0.2s cubic-bezier(0.3, 1.6, 0.5, 1);
-}
-.sky-options .view-toggle:hover {
-    background: var(--overlay-hover);
-    color: var(--text);
-}
-.sky-options .view-toggle[aria-pressed="true"] {
-    color: var(--text);
-}
-.sky-options .view-toggle[aria-pressed="true"]::before {
-    border-color: var(--accent);
-    background-size: 100% 100%;
-}
-.sky-options .steps {
-    align-items: center;
-}
-.sky-options .steps-heading {
-    margin: 0 0.2rem 0 0.4rem;
     padding: 0;
-    border: 0;
-    background: none;
-    opacity: 1;
-}
-.sky-options .steps label span {
-    margin: 0;
-    padding: 3px 7px;
     border: 0;
     border-radius: 0;
     background: none;
     color: var(--muted);
-    box-shadow: inset 0 -1px 0 color-mix(in oklab, var(--text) 18%, transparent);
-    transition:
-        color 0.15s,
-        box-shadow 0.15s;
+    font: inherit;
+    text-align: left;
+}
+.sky-options .view-toggle:hover:enabled {
+    background: none;
+    color: var(--text);
+}
+.sky-options .view-toggle[aria-pressed] {
+    --switch-edge: var(--muted);
+    --switch-fill: var(--overlay-surface);
+}
+.sky-options .view-toggle[aria-pressed]::after {
+    content: "";
+    flex: 1;
+    min-width: 1.5rem;
+    height: 0;
+    margin: 0 0.4rem 0 0.5rem;
+    border-bottom: 1px dotted var(--sky-leader);
+}
+/* The square, an SVG placed on whole device pixels and drawn there (see switches.ts). */
+.switch-square {
+    position: relative;
+    flex: none;
+    order: 2;
+    width: 8px;
+    height: 8px;
+    overflow: visible;
+}
+.sky-options .view-toggle[aria-pressed]:hover:enabled {
+    --switch-edge: var(--text);
+}
+.sky-options .view-toggle[aria-pressed="true"],
+.sky-options .view-toggle[aria-pressed="true"]:hover:enabled {
+    --switch-edge: var(--accent);
+    --switch-fill: var(--accent);
+    background: none;
+    color: var(--text);
+}
+/* A choice: its name, the leader, its options flush right as plain words 2 px apart, the chosen one in a tinted block. */
+.sky-options .steps {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 2px;
+}
+.sky-options .steps::after {
+    content: "";
+    flex: 1;
+    min-width: 0.4rem;
+    height: 0;
+    margin: 0 calc(0.5rem - 2px) 0 calc(0.5rem - 2px);
+    border-bottom: 1px dotted var(--sky-leader);
+}
+/* A choice without a name: no leader, its options from the names' column on, left aligned, wrapping under each other;
+   the corner hangs in the row's padding, so a wrapped line starts at that column too. */
+.sky-options .steps:not(:has(> .steps-heading)) {
+    justify-content: flex-start;
+}
+.sky-group-items > .steps:not(:has(> .steps-heading)) {
+    position: relative;
+    padding-left: calc(1ch + 0.6em - 0.3rem);
+}
+.sky-group-items > .steps:not(:has(> .steps-heading))::before {
+    position: absolute;
+    top: 2px;
+    left: 0;
+}
+/* A named one's corner less the 2 px between its options, so its name starts in the names' column too. */
+.sky-options .steps:has(> .steps-heading)::before {
+    margin-right: calc(0.6em - 2px);
+}
+.sky-options .steps:not(:has(> .steps-heading))::after {
+    display: none;
+}
+/* Its words, not their blocks, in the names' column; nested in a row of its own, the first moves back by hand. */
+.sky-group-items > * > .steps:not(:has(> .steps-heading)) label:first-of-type {
+    margin-left: -0.3rem;
+}
+.sky-options .steps-heading {
+    order: -1;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    line-height: inherit;
+    opacity: 1;
+}
+.sky-options .steps label {
+    order: 1;
+}
+.sky-options .steps label:last-child {
+    margin-right: -0.3rem;
+}
+.sky-options .steps label span,
+.sky-options .steps label:is(:first-child, :last-child) span {
+    margin: 0;
+    padding: 0 0.3rem;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--muted);
+    font-size: inherit;
+    line-height: 20px;
+    white-space: nowrap;
 }
 .sky-options .steps label:hover span {
+    background: var(--line);
     color: var(--text);
 }
 .sky-options .steps label:has(:checked) span {
+    background: color-mix(in oklab, var(--accent) 22%, var(--overlay-surface));
     color: var(--accent);
-    box-shadow: inset 0 -2px 0 var(--accent);
 }
 .sky-ev input {
     width: 7rem;
+}
+/* A slider in a row: its name, the leader, and the slider with its value flush right, as a switch's square stands. */
+.sky-group-items > label:has(> input[type="range"])::after {
+    content: "";
+    flex: 1;
+    order: 1;
+    min-width: 0.4rem;
+    height: 0;
+    border-bottom: 1px dotted var(--sky-leader);
+}
+.sky-group-items > label > input[type="range"] {
+    order: 2;
+    flex: none;
+    width: 7rem;
+}
+.sky-group-items > label > output {
+    order: 3;
+    min-width: 4ch;
+    text-align: right;
 }
 .sky-ev output {
     font-family: var(--font-mono);
@@ -685,12 +736,12 @@
 }
 /* The time slider under the view, as wide as the text. */
 .sky-stage > .figure-slider {
-    width: calc(var(--measure) - 3rem);
+    width: var(--measure);
     max-width: 100%;
     margin-inline: auto;
 }
 /* Full screen, the view fills the screen, whatever its aspect, and the time slider lies bare over its foot as the height
-   does up its side: the value the thumb, the marks on a halo. */
+   does up its side: the slim bar, its value after it, its marks under it. */
 .sky-stage:fullscreen {
     --sky-foot: 3.5rem;
     background: oklch(0 0 0);
@@ -714,17 +765,13 @@
 .sky-stage:fullscreen > .sky-time > .note {
     display: none;
 }
-.sky-stage:fullscreen > .sky-time .figure-slider-scale {
-    color: var(--render-ink);
-    text-shadow:
-        0 0 3px var(--render-shade),
-        0 0 6px var(--render-shade);
+/* The time's value 12 px after its bar, in the text's color, and the scale under the bar muted, on no plate. */
+.sky-stage:fullscreen > .sky-time output {
+    min-width: 7ch;
+    color: var(--text);
 }
-.sky-time:where(.sky-stage:fullscreen > *) output {
-    top: 9px;
-    left: calc(9px + var(--at, 0.5) * (100% - 18px));
-    min-width: 0;
-    transform: translate(-50%, -50%);
+.sky-stage:fullscreen > .sky-time:is(:hover, :focus-within) output {
+    color: var(--accent);
 }
 /* From light to pixels: the five panels in one canvas, each stage's name, note and control in a row under it. */
 .stages-view canvas {
@@ -765,7 +812,7 @@
     color: inherit;
     background: transparent;
     border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
-    border-radius: 4px;
+    border-radius: 0;
     padding: 0.1rem 0.25rem;
     max-width: 11rem;
 }

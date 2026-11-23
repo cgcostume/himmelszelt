@@ -1,5 +1,6 @@
 import { moonEV100 } from "@himmelszelt/nachtgestirn";
 import { showCode } from "../code";
+import { ditherBars } from "../costs-dither";
 import { find } from "../dom";
 import { display, onDisplay, onTables, gpu as shared, tables } from "../dunstkreis/atmosphere";
 import { figureInfo } from "../figure-info";
@@ -199,6 +200,7 @@ export function configuratorFigure(root: HTMLElement) {
     const code = find("[data-field=code]", root);
     let shownCode = "";
     const costsEl = find("[data-field=costs]", root);
+    ditherBars(root);
     const measureButton = find<HTMLButtonElement>("[data-field=measure]", root);
     const requestRender = onDemand(render, root);
     const tiles = createTiles(canvas, requestRender);
@@ -255,6 +257,16 @@ export function configuratorFigure(root: HTMLElement) {
             .filter(([, v]) => v > 0)
             .map(([name, v, i]) => bar(v, 600, `budget-part-${i}`, `${name}: ${fmt(v)} MiB`))
             .join("");
+        // A time's bar and its value, which clears this GPU's mark across both bars.
+        const share = (ms: number) => ((100 * ms) / msAxis).toFixed(3);
+        const time = (ms: number, cls: string, title: string, more = "") => {
+            const past =
+                measured && measured.ms > ms
+                    ? ` style="margin-left: calc(${share(measured.ms - ms)}% + 0.3rem + 1px)"`
+                    : "";
+            const label = `<span class="config-label">${near[0].toLocaleString("en-US")} px${more}</span>`;
+            return `<span class="budget-line">${bar(ms, msAxis, cls, title)}<span class="budget-value"${past}>${fmt(ms)} ${label}</span></span>`;
+        };
         // Each row's last grid line, at its end, named with its value.
         const end = (value: number) => `<span class="config-cost-end">${value}</span>`;
         costsEl.innerHTML = [
@@ -265,18 +277,21 @@ export function configuratorFigure(root: HTMLElement) {
             `<span class="budget-cell" style="--grid: ${100 / 6}%">${line(parts, fmt(total))}</span>`,
             end(600),
             `<span class="config-cost-name note">time a frame, ms</span>`,
-            `<span class="budget-cell" style="--grid: ${((100 * msStep) / msAxis).toFixed(3)}%">${[
-                line(bar(near[1], msAxis, "", "the defaults"), fmt(near[1]), `${near[0].toLocaleString("en-US")} px`),
-                line(
-                    bar(near[2], msAxis, "budget-reference", "everything on"),
-                    fmt(near[2]),
-                    `${near[0].toLocaleString("en-US")} px`,
+            `<span class="budget-cell" style="--grid: ${((100 * msStep) / msAxis).toFixed(3)}%"><span class="budget-pair">${[
+                time(
+                    near[1],
+                    "",
+                    "the defaults",
+                    measured ? `, <span class="budget-gpu-label">this GPU ${fmt(measured.ms)}</span>` : "",
                 ),
-                // This GPU's line held empty until measured, so the measure changes no layout.
-                line(bar(measured?.ms ?? 0, msAxis, "budget-part-0", "this GPU"), measured ? fmt(measured.ms) : "–"),
-            ].join("")}</span>`,
+                time(near[2], "budget-reference", "everything on"),
+                measured
+                    ? `<i class="budget-gpu" style="left: ${share(measured.ms)}%" title="this GPU: ${fmt(measured.ms)} ms"></i>`
+                    : "",
+            ].join("")}</span></span>`,
             end(Number(msAxis.toFixed(2))),
         ].join("");
+        ditherBars(costsEl);
     }
 
     // The preview: the disc at its size, one pixel to a pixel, the view drifting to the terminator's middle as it grows.

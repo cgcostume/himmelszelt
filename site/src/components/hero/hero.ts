@@ -1,13 +1,12 @@
 import {
     type CloudPass,
-    cloudQuality,
     createCloudPass,
     createLayeredCloudPass,
     DEFAULT_CLOUD_PARAMS,
     DEFAULT_CLOUDSCAPE,
     type LayeredCloudPass,
     layeredSky,
-    type QualityLevel,
+    type ResolvedQuality,
     WEATHER,
     type WeatherName,
 } from "@himmelszelt/gewoelk";
@@ -94,8 +93,8 @@ type Clouds = { key: string; voxel: CloudPass | null; layered: LayeredCloudPass 
 /**
  * The landing page's figure on `root`, a `figure[data-hero]`: everything the libraries draw at once, at the page's moment
  * and place. dunstkreis' sky, sternenheer's stars, nachtgestirn's Moon, and over them gewoelk's clouds, by its voxel
- * model or its layered one, with the sheet of high cloud, contrails and the rain's bows. One dial sets gewoelk's quality,
- * and the catalogs and the Moon's maps follow the zoom.
+ * model or its layered one, with the sheet of high cloud, contrails and the rain's bows. gewoelk's quality is set dial by
+ * dial, and the catalogs and the Moon's maps follow the zoom.
  */
 export async function heroFigure(root: HTMLElement) {
     let draw: (lab: Lab) => void = () => {};
@@ -203,13 +202,45 @@ export async function heroFigure(root: HTMLElement) {
     // The pass of the chosen model and quality: the one before keeps drawing until it is made, and is destroyed then.
     let made: Clouds | null = null;
     let making = "";
-    const level = () => (lab.choice("quality") || "medium") as QualityLevel;
+    // gewoelk's quality dial by dial, as `cloudQuality` gives it for a level: each number from a control of its own.
+    const dial = (name: string, preset: number) => (lab.choice(name) === "" ? preset : Number(lab.choice(name)));
+    const dials = (): ResolvedQuality & { godRays: boolean } => {
+        const [grid, map, clearingKm] = [dial("grid", 256), dial("map", 512), dial("clearAt", 150)];
+        const [changes, everyS] = [lab.choice("change") !== "off", Number(lab.choice("change")) || 0];
+        const scale = dial("scale", 0.5) < 0.4 ? 1 / 3 : dial("scale", 0.5);
+        return {
+            voxel: {
+                ...{
+                    scale,
+                    maxSteps: dial("steps", 256),
+                    nearLightSamples: dial("light", 2),
+                    nearDetailKm: dial("near", 0),
+                },
+                ...{
+                    grid: { size: grid, layers: grid / 4 },
+                    detailSize: dial("noise", 128),
+                    mapSize: Math.min(map, 1024),
+                },
+                keyframes: false,
+            },
+            layered: { scale, maxSteps: dial("steps", 256), mapSize: map, highMapSize: dial("highMap", 1024) },
+            march: { reachKm: dial("reach", 160) },
+            clearing: { clearingKm, clearingFromKm: clearingKm > 0 ? Math.min(dial("clearFrom", 40), clearingKm) : 0 },
+            ...{ evolves: changes, stepsPerFrame: 0, evolutionEveryS: everyS, godRays: lab.pressed("godRays.on") },
+        };
+    };
     const clouds = () => {
         const model = lab.choice("model") || "voxel";
-        const key = `${model} ${level()}`;
+        const quality = dials();
+        // What a pass is made with: any of it changed, and a new one is made.
+        const key = JSON.stringify([
+            model,
+            model === "voxel" ? quality.voxel : quality.layered,
+            quality.layered.highMapSize,
+            quality.godRays,
+        ]);
         if (made?.key === key || making === key) return made;
         making = key;
-        const quality = cloudQuality(level());
         // The voxels are rebuilt in the frame that changes them, not by keyframes.
         const creating: Promise<Clouds> =
             model === "voxel"
@@ -226,7 +257,7 @@ export async function heroFigure(root: HTMLElement) {
                       toneMap: false,
                       background: false,
                       quality: quality.layered,
-                      godRays: level() === "high" || level() === "ultra",
+                      godRays: quality.godRays,
                   }).then((layered) => ({ key, voxel: null, layered }));
         creating.then((next) => {
             const superseded = making !== key;
@@ -296,7 +327,7 @@ export async function heroFigure(root: HTMLElement) {
             frontOf = name;
             frontSince = timeS;
         }
-        const quality = cloudQuality(level());
+        const quality = dials();
         const windTo = (WIND.from + 180) * DEG;
         const wind = [Math.sin(windTo) * WIND.speed, Math.cos(windTo) * WIND.speed] as const;
         const contrails = lab.pressed("contrails.on") ? routeTrails(timeS, { ...TRAILS, wind }) : [];
@@ -421,7 +452,7 @@ export async function heroFigure(root: HTMLElement) {
                         cloudscape: {
                             ...cloudscape,
                             wind: [wind[0], wind[1]],
-                            evolution: quality.evolves && !quality.voxel.keyframes ? EVOLUTION : 0,
+                            evolution: quality.evolves && quality.evolutionEveryS === 0 ? EVOLUTION : 0,
                             driftOffsetKm: [-lab.flown.east, -lab.flown.north],
                             ...quality.clearing,
                         },

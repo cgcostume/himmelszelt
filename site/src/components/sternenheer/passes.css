@@ -7,14 +7,14 @@
 .passes-graph > svg {
     display: block;
     width: 100%;
-    font-size: 0.75rem;
+    font-size: var(--text-small);
     overflow: visible;
 }
 .passes-canvas {
     position: absolute;
     display: block;
     background: #000;
-    border-radius: 2px;
+    border-radius: 0;
 }
 /* The tiles as the squares they are, not blurred into each other. */
 .passes-blocky {

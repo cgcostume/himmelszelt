@@ -31,7 +31,11 @@
         box-sizing: border-box;
     }
     /* The header across the whole window, the brand over the rail; the footer under the content's column. */
+    /* Its height a whole number of device pixels at 125%, 150% and 175% too, so the rail under it, a scrolling layer of
+       its own, starts on a device pixel and its dithered bars stay sharp before it sticks. */
     :root:has(.rail) .site-header {
+        box-sizing: border-box;
+        height: 60px;
         max-width: none;
         padding-left: 1.25rem;
     }
@@ -58,12 +62,10 @@
     }
     /* Their duplicates in the text and the figures give way to the rail's. */
     :root:has(.rail) main :is(.toc, .moment:not([data-environments])),
-    :root:has(.rail [data-environments]) main :is([data-environments], .env-frame .env-resolutions) {
+    :root:has(.rail [data-environments]) main .env-frame .env-resolutions {
         display: none;
     }
-    :root:has(.rail:not([data-local~="display"]))
-        main
-        :is(.sky-group:has([data-hdr], input[name$="-tone"]), [data-hdr]) {
+    :root:has(.rail [data-group="display"]) main :is(.sky-group:has([data-hdr], input[name$="-tone"]), [data-hdr]) {
         display: none;
     }
 }
@@ -134,8 +136,8 @@
 .rail-tree li:has(a[aria-current])::before {
     color: var(--accent);
 }
-/* How far through the chapter, as a bar of dithered pixels: a sparse pattern for what is still to read, a dense one for
-   what is read, and the share in digits beside it. */
+/* How far through the chapter, as a slim bar of dithered pixels: a sparse pattern for what is still to read, a dense one
+   for what is read, and the share in digits beside it. */
 .rail-progress {
     display: flex;
     align-items: center;
@@ -143,21 +145,15 @@
     /* The same gap above as below, with the contents folded too; open, the list's margin above collapses into it. */
     margin: 0.5rem 0;
     font-family: var(--font-mono);
+    line-height: 20px;
     color: var(--muted);
 }
+/* The bar is drawn by dither.ts, as high as whole cells of the dither come to near 8 px. */
 .rail-bar {
-    position: relative;
+    display: block;
     flex: 1;
-    height: 0.9rem;
-    background: repeating-conic-gradient(var(--line) 0 25%, transparent 0 50%) 0 0 / 2px 2px;
-}
-.rail-fill {
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 0;
-    background:
-        repeating-conic-gradient(var(--text) 0 25%, transparent 0 50%) 0 0 / 2px 2px,
-        color-mix(in oklab, var(--text) 30%, transparent);
+    min-width: 0;
+    height: 8px;
 }
 .rail-percent {
     min-width: 4ch;
@@ -166,6 +162,7 @@
 /* The reading time informs only, as the groups' summaries do. */
 .rail-read {
     margin: 0;
+    font-family: var(--font-mono);
     color: var(--rail-quiet);
 }
 .rail {
@@ -174,6 +171,13 @@
     /* The width inside the rail's padding, which the gallery's rows are sized by. */
     --rail-indent: calc(1.2 * var(--text-small));
     --rail-inner: calc(var(--rail-width, 20rem) - 2rem - var(--rail-indent));
+    /* The chosen option's block, and the dim dotted line that leads from a name to its value. */
+    --rail-tint: color-mix(in oklab, var(--accent) 22%, var(--surface));
+    --rail-leader: 1px dotted color-mix(in oklab, var(--muted), transparent 65%);
+    /* Roboto Mono draws its minus 0.3595em over the baseline, and a line's baseline lies 0.3885em under its middle: a
+       leader centered in its row moves down by the difference; measured in the browser, the buttons' and fields' text sits
+       0.07em higher in its box than that, which the leader follows. */
+    --rail-leader-drop: calc(0.3885em - 0.3595em - 0.07em);
 }
 .rail details > summary {
     cursor: pointer;
@@ -196,12 +200,17 @@
     display: inline;
 }
 .rail-group[open] > summary {
-    margin-bottom: 0.6rem;
+    margin-bottom: 0.5rem;
 }
-/* What is chosen, under the group's name, so it reads while the group is folded. */
-.rail-group > summary > .note {
+/* What is chosen, under the group's name, on one line, so it reads while the group is folded. */
+.rail summary > .note {
     display: block;
+    overflow: hidden;
     padding-left: 1.2em;
+    font-family: var(--font-mono);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--rail-quiet);
 }
 .rail-group,
 .rail-set {
@@ -213,47 +222,127 @@
 }
 .rail-why {
     margin: 0.4rem 0 0;
-    color: var(--muted);
+    color: var(--rail-quiet);
 }
 .rail-why:empty {
     display: none;
 }
+
+/* Every setting a row of a ledger, in the mono of the contents: its name at the left, a dim dotted leader, its value or
+   its options flush right. Rows 24 px high on 20 px lines, in whole pixels, so text and leaders share pixel rows. */
+.rail .rail-row,
+.rail .input-grid > * {
+    min-height: 24px;
+    line-height: 20px;
+}
 .rail-row {
-    display: grid;
-    grid-template-columns: 2.5rem 1fr;
-    align-items: baseline;
-    gap: 0.5rem;
-    margin-bottom: 0.4rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    font-family: var(--font-mono);
 }
 .rail-name {
+    display: flex;
+    flex: 1;
+    align-items: center;
     color: var(--muted);
 }
-.rail-hdr {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+.rail-name::after,
+.rail .steps-heading::after,
+.rail .stepper::before,
+.rail .input-grid-subrow::before {
+    content: "";
+    position: relative;
+    top: var(--rail-leader-drop);
+    flex: 1;
+    min-width: 0.4rem;
+    height: 0;
+    margin: 0 0.5rem;
+    border-bottom: var(--rail-leader);
 }
+/* The options: plain words 2 px apart, the chosen one in a tinted block, a hovered one on the line's tone. */
 .rail .steps {
     flex-wrap: nowrap;
+    gap: 2px;
+    margin-right: -0.3rem;
 }
-/* The HDRI gallery: three a row, two rows in view, the rest scrolled to a row at a time. */
+.rail .steps label span,
+.rail .steps label:is(:first-child, :last-child) span {
+    margin: 0;
+    padding: 0 0.3rem;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    line-height: 20px;
+    color: var(--muted);
+}
+.rail .steps label:hover span {
+    color: var(--text);
+    background: var(--line);
+}
+.rail .steps label:has(:checked) span {
+    color: var(--accent);
+    background: var(--rail-tint);
+}
+/* The headroom says only where it cannot be had, in brackets after its name (see rail.ts): no row of its own. */
+.rail-hdr > .note {
+    display: none;
+}
+/* A choice that carries its own name, the headroom's (Hdr.astro): its name, the leader and its options as in any row;
+   where the headroom cannot be had, in brackets after the name (see rail.ts). */
+.rail-row > [data-hdr="choice"],
+.rail .steps:has(> .steps-heading) {
+    display: flex;
+    flex: 1;
+    align-items: center;
+}
+.rail .steps-heading {
+    display: flex;
+    flex: 1;
+    order: -1;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    line-height: 20px;
+}
+.rail-state {
+    white-space: pre;
+    color: var(--rail-quiet);
+}
+
+/* The HDRI gallery: three a row, 2 px apart, two rows in view, the rest scrolled to a row at a time. */
 .rail-gallery {
     grid-template-columns: repeat(3, 1fr);
-    max-height: calc(2 * ((var(--rail-inner) - 8px) / 3 + 6px) + 4px);
+    gap: 2px;
+    max-height: calc(2 * (var(--rail-inner) - 4px) / 3 + 2px);
     margin: 0;
     overflow-y: auto;
     scroll-snap-type: y mandatory;
-    scrollbar-width: thin;
+    scrollbar-width: none;
 }
 .rail-gallery > * {
     scroll-snap-align: start;
 }
+/* As wide as the gallery, which starts after the group's plus or minus (see environments.css for the rest). */
+.rail input.rail-search[type="search"] {
+    width: calc(100% - var(--rail-indent));
+}
+/* A file of one's own, read as the boxes in the text read it, or dropped on the group. */
+.rail .environments-own {
+    margin-top: 0.4rem;
+}
 .rail-credit {
     margin: 0.4rem 0 0;
-    color: var(--muted);
+    color: var(--rail-quiet);
 }
-/* The moment and place, the same set of controls as under the figures in its compact form (Controls.astro): no rule
-   down the left, the summary as the group's name, each field on one line with its short name, its steps under it. */
+
+/* The moment and place, the same set of controls as under the figures in its compact form (Controls.astro), as rows of
+   the ledger: the summary as the group's name, each field's value flush right between a quiet minus and plus, its steps
+   in the row under it. */
 .rail .moment {
     margin: 0;
     padding: 0;
@@ -275,67 +364,145 @@
 }
 .rail .moment summary > .note {
     flex-basis: 100%;
-    padding-left: 1.2em;
 }
 .rail .moment[open] .input-grid {
     grid-template-columns: max-content minmax(0, 1fr);
-    gap: 0.3rem 0.5rem;
-    margin: 0.6rem 0 0 var(--rail-indent);
+    gap: 0;
+    align-items: center;
+    margin: 0.5rem 0 0 var(--rail-indent);
+    font-family: var(--font-mono);
 }
 .rail .input-grid > label,
 .rail .input-grid > .note {
-    justify-self: start;
+    position: relative;
+    /* The row's full height, so the name sits on the same line as the value beside it. */
+    line-height: 24px;
+    justify-self: stretch;
+    font-size: var(--text-small);
+    color: var(--muted);
 }
-/* The steps need no name: they sit right under the field they step. */
+/* A field's steps are named "step", quieter than the field, as are their options. */
 .rail .input-grid > .note:has(+ .input-grid-subrow [data-field$="Step"]) {
-    visibility: hidden;
+    text-transform: lowercase;
+    color: var(--rail-quiet);
 }
-.rail .stepper {
-    grid-column: 2;
-    flex-wrap: nowrap;
+.rail .input-grid-subrow:has([data-field$="Step"]) .steps label:not(:has(:checked)):not(:hover) span {
+    color: var(--rail-quiet);
 }
+.rail [data-field="location"] {
+    display: none;
+}
+.rail .stepper,
 .rail .input-grid-subrow {
     grid-column: 2;
-    gap: 0.5rem;
-}
-.rail .moment input {
+    /* Centered, not on the baseline, so the leader meets the options' minus axis as it does a field's. */
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0;
     font-size: var(--text-small);
 }
-.rail .moment input[data-field="jd"] {
-    width: 14ch;
-}
-.rail .moment input.latlong {
-    width: 15ch;
-}
+/* What acts on its own, now, play and the locator, right after the field's name; the leader then runs to the value. */
 .rail .stepper > button[data-field] {
-    margin-left: 0.3rem;
+    order: -2;
+    margin: 0 0 0 0.6rem;
 }
-.rail .stepper button[data-field="animate"] {
+.rail .stepper::before {
+    order: -1;
+}
+.rail .stepper > button,
+.rail .moment input {
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    font-size: var(--text-small);
+    line-height: 20px;
+}
+.rail .stepper > button {
+    color: var(--rail-quiet);
+}
+.rail .stepper > button:hover,
+.rail .stepper > button[aria-pressed="true"] {
+    color: var(--text);
+}
+.rail .stepper > button[aria-pressed="true"] {
+    color: var(--accent);
+}
+.rail .stepper > button[data-step] {
+    width: 1.2rem;
+}
+.rail .stepper > button[data-step="1"] {
+    margin-right: -0.35rem;
+}
+.rail .stepper > button[data-field="geolocate"],
+.rail .stepper > button[data-field="animate"] {
     display: grid;
+    width: auto;
     place-items: center;
-    padding: 0 0.45rem;
 }
 .rail .stepper svg {
     --icon-size: 12;
 }
-/* The steps step back: plain text without boxes, faint until the pointer or the keyboard comes to them, the chosen one
-   in the accent, tucked under the field they step. */
-.rail .input-grid-subrow:has([data-field$="Step"]) {
-    margin-top: -0.2rem;
-    opacity: 0.55;
-    transition: opacity 0.15s;
+/* The value as plain text, as wide as its digits where the browser can size a field so; underlined in the accent while
+   typed into, on a line that is always there, so nothing moves. */
+.rail .moment input,
+.rail .moment input[data-field="jd"],
+.rail .moment input.latlong {
+    width: auto;
+    field-sizing: content;
+    min-width: 2ch;
+    max-width: 15ch;
+    margin: 0;
+    border-bottom: 1px solid transparent;
+    color: var(--text);
+    text-align: right;
 }
-.rail .input-grid-subrow:has([data-field$="Step"]):is(:hover, :focus-within) {
-    opacity: 1;
+/* The day's fraction to as many digits as fit beside now and play. */
+.rail .moment input[data-field="jd"] {
+    max-width: 13ch;
 }
-.rail .input-grid-subrow:has([data-field$="Step"]) .steps label span {
-    padding: 0 0.3rem;
-    border-color: transparent;
-    background: none;
+@supports not (field-sizing: content) {
+    .rail .moment input,
+    .rail .moment input.latlong {
+        width: 15ch;
+    }
+    .rail .moment input[data-field="jd"] {
+        width: 13ch;
+    }
 }
-.rail .input-grid-subrow:has([data-field$="Step"]) .steps label:first-child span {
-    padding-left: 0;
+.rail .moment input:focus-visible {
+    outline: none;
+    border-bottom-color: var(--accent);
+    color: var(--accent);
 }
+/* What belongs together, the date with its clock, the place, the height: each a cluster with a dim bracket down its left,
+   in the column of the group's plus and minus, and a gap between clusters. */
+.rail .input-grid > label::before,
+.rail .input-grid > .note::before {
+    content: "";
+    position: absolute;
+    left: calc(0.3em - var(--rail-indent));
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--line);
+}
+.rail .input-grid > :is(label[for$="-jd"], label[for$="-latitude"], label[for$="-height"])::before {
+    top: 4px;
+}
+.rail
+    .input-grid
+    > .note:has(
+        + .input-grid-subrow :is([data-field="timeZone"], [data-field="latlongStep"], [data-field="heightStep"])
+    )::before {
+    bottom: 4px;
+}
+.rail .input-grid > :is(label[for$="-latitude"], label[for$="-height"]),
+.rail .input-grid > :is(label[for$="-latitude"], label[for$="-height"]) + .stepper {
+    margin-top: 12px;
+}
+
 /* The copy buttons in the summaries, vertically on the middle of the group's name, shown on hover as under the figures. */
 .rail summary {
     position: relative;
@@ -347,10 +514,24 @@
     transform: translateY(-50%);
 }
 .rail-group:hover .icon-button,
+.rail .moment:hover .icon-button,
 .rail .icon-button[data-copied] {
     opacity: 1;
 }
+/* Square, as the buttons over the figures: a block in the line's tone under the pointer, a tinted one once copied. */
+.rail summary .icon-button {
+    width: 20px;
+    height: 20px;
+    border: 0;
+    border-radius: 0;
+    background: none;
+}
+.rail summary .icon-button:hover {
+    background: var(--line);
+    color: var(--text);
+}
 .rail .icon-button[data-copied] {
+    background: var(--rail-tint);
     color: var(--accent);
 }
 /* Whatever a group holds starts where the text of its name does, after the plus or minus. */
@@ -360,16 +541,35 @@
 .rail summary:focus:not(:focus-visible) {
     outline: none;
 }
-/* Narrower steppers' buttons in the rail, so the fields hold all their digits beside now and play. */
-.rail .stepper > button[data-step],
-.rail .stepper > button[data-field="geolocate"] {
-    width: 1.5rem;
+
+/* A setting as a slider, the exposure compensation: its bar where the leader would run, its notches
+   every stop, its value flush right. */
+.rail-slider .rail-name {
+    flex: 0 0 auto;
 }
-.rail .stepper button[data-field="live"] {
-    padding: 0.15rem 0.4rem;
+.rail-slider .rail-name::after {
+    display: none;
 }
-.rail summary > .note,
-.rail .rail-hdr .note,
-.rail-why {
-    color: var(--rail-quiet);
+.rail-slider .figure-slider-rail {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    margin: 0 0.5rem;
+}
+.rail .rail-slider input[type="range"] {
+    width: 100%;
+    margin: 0;
+}
+.rail-slider .figure-slider-scale {
+    position: absolute;
+    visibility: hidden;
+}
+.rail-slider output {
+    min-width: 7ch;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+.rail-row[data-muted] {
+    opacity: 0.4;
 }

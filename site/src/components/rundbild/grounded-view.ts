@@ -5,7 +5,7 @@ import {
     type IrradiancePass,
     wgsl,
 } from "@himmelszelt/rundbild";
-import { configureCanvas, displayOutput, gpu, gpuDevice, SDR } from "../dunstkreis/atmosphere";
+import { configureCanvas, display, displayOutput, gpu, gpuDevice, SDR } from "../dunstkreis/atmosphere";
 import { hdri, onHdri } from "../environment/hdri";
 import { onDemand } from "../frame";
 import { type Camera, cameraFrame, createScene } from "../scene/scene";
@@ -340,6 +340,7 @@ export function createGroundedView(canvas: HTMLCanvasElement, view: () => Ground
             solids,
             dither: format === SDR,
             headroom,
+            toneCurve: display.toneCurve,
         });
         device.queue.submit([encoder.finish()]);
     }

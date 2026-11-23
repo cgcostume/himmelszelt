@@ -147,7 +147,7 @@
     table-layout: auto;
     border-collapse: collapse;
     font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: var(--text-small);
     color: var(--muted);
 }
 .wavelengths-matrix th,

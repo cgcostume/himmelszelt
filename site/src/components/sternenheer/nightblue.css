@@ -22,9 +22,8 @@
     stroke: var(--accent);
     stroke-width: 2;
 }
-/* The chosen luminance over the colors: ink with a halo of the page, legible on blue and on orange in either theme. */
+/* The chosen luminance over the colors, in the ink. */
 .nightblue-cursor {
     stroke: var(--text);
     stroke-width: 1.5;
-    filter: drop-shadow(0 0 1px var(--bg));
 }

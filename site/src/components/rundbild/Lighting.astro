@@ -85,18 +85,18 @@ const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
         <div class="sky-compass" data-field="compassLabels"></div>
         <Fragment slot="options">
             <OptionGroup name="background">
-                <Choice {...group("background")} />
+                <Choice {...group("background")} combo />
                 <button type="button" class="view-toggle" data-field="sunDisc" aria-pressed="true" title="Draw the Sun's disc in the background">sun disc</button>
                 <button type="button" class="view-toggle" data-field="aureole" aria-pressed="true" title="The aureole, the air's glow of a few degrees around the Sun: a share of the aerosols' scattering in a narrow forward lobe, added per pixel behind the solids. Off, Bruneton's one lobe alone. The sky map behind keeps the page's">aureole</button>
             </OptionGroup>
             <OptionGroup name="light">
                 <button type="button" class="view-toggle" data-field="sunLight" aria-pressed="true" title="Light the solids by the Sun directly, with its shadows">sunlight</button>
                 <button type="button" class="view-toggle" data-field="skyLight" aria-pressed="true" title="Light the solids by the sky, image-based, from the nine coefficients of the sky map">sky light</button>
-                <Choice {...group("veil")} />
-                <Choice {...group("bloom")} />
+                <Choice {...group("veil")} combo />
+                <Choice {...group("bloom")} combo />
             </OptionGroup>
             <OptionGroup name="samples per pixel">
-                {SAMPLING.map((choice) => <Choice {...choice} />)}
+                {SAMPLING.map((choice) => <Choice {...choice} combo />)}
             </OptionGroup>
             <OptionGroup name="sky map">
                 <button type="button" class="view-toggle" data-cubify aria-pressed="false" title="The sky map as the environment figure builds it: cubified, its texels spread evenly over the sphere, sampled through the inverse mapping. The same switch as there">cubified</button>
@@ -106,7 +106,7 @@ const SAMPLING = [group("shadows"), group("occlusion"), group("godrays")];
                 <button type="button" class="view-toggle" data-field="rotate" aria-pressed="false" title="Turn the solids slowly, and send them round the sphere on slightly tilted orbits">rotate</button>
             </OptionGroup>
             <OptionGroup name="HDR (× SDR white)">
-                <Hdr figure="lighting" />
+                <Hdr figure="lighting" combo />
             </OptionGroup>
             <OptionGroup name="display">
                 <button type="button" class="view-toggle" data-field="dither" aria-pressed="true" title="Dither the 8-bit output by a step of blue noise, against banding in smooth gradients">dither</button>

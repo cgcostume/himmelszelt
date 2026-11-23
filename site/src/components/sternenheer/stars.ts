@@ -17,6 +17,7 @@ import { flightIn } from "../dunstkreis/flight";
 import { type Basis, cameraBasis, lookAround, project } from "../dunstkreis/skycamera";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
+import { exposureCompensation, onSetting, settings } from "../settings";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
 import { gpuMissing } from "../webgpu";
@@ -155,6 +156,7 @@ export function starsFigure(root: HTMLElement) {
             projectionDistance: basis.d,
             pixelRatio: dpr,
             ev100: pressed("auto") ? null : evOfSlider(),
+            exposureCompensation: exposureCompensation(),
             stars: offsetOf(root, "stars").light > 0,
             faintStars: picked(root, "catalog") !== "yale",
             deepStars: picked(root, "catalog") === "tycho",
@@ -172,7 +174,7 @@ export function starsFigure(root: HTMLElement) {
             moon: pressed("moon"),
             constellations: pressed("lines") ? chosenConstellations() : [],
             grid: marks() === 2,
-            ground: air.flown,
+            ground: settings.groundGrid ? air.flown : null,
             whiteBalance: skyWhite(sky.sunDirection),
         });
         if (!drawn) return;
@@ -221,6 +223,7 @@ export function starsFigure(root: HTMLElement) {
             requestRender();
         });
         onChange(requestRender);
+        onSetting(["exposure", "groundGrid"], requestRender);
         onTables(requestRender);
         new ResizeObserver(requestRender).observe(canvas);
         for (const name of ["exposure"]) {

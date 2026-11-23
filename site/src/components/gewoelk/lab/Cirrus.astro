@@ -6,6 +6,7 @@ import Choice from "../../dunstkreis/Choice.astro";
 import Hdr from "../../dunstkreis/Hdr.astro";
 import OptionGroup from "../../dunstkreis/OptionGroup.astro";
 import SkyFrame from "../../dunstkreis/SkyFrame.astro";
+import Quality from "../Quality.astro";
 import LabSliders from "./LabSliders.astro";
 import {
     CIRRUS_CELLS,
@@ -52,17 +53,6 @@ const PRESET = {
     ],
     checked: "mackerel",
 };
-const SIZE = {
-    name: "size",
-    label: "Map size",
-    title: "Texels across the baked map",
-    options: [
-        ["1024", "1024"],
-        ["2048", "2048"],
-        ["4096", "4096"],
-    ],
-    checked: "2048",
-};
 const VIEW = {
     name: "view",
     label: "View",
@@ -93,7 +83,7 @@ const SPEED = {
         <div class="sky-compass" data-field="compassLabels"></div>
         <Fragment slot="options">
             <OptionGroup name="sky">
-                <Choice figure={id} {...PRESET} />
+                <Choice figure={id} {...PRESET} heading="preset" combo />
                 <button type="button" class="view-toggle" data-copy title="Copies every slider as a preset, to paste into the figure's list">copy</button>
             </OptionGroup>
             <OptionGroup name="sheet · 2D"><LabSliders sliders={SHEET} /><LabSliders sliders={CLEARING} /></OptionGroup>
@@ -103,15 +93,15 @@ const SPEED = {
             <OptionGroup name="veil"><LabSliders sliders={CIRRUS_VEIL} /></OptionGroup>
             <OptionGroup name="time">
                 <button type="button" class="view-toggle" data-field="animate" aria-pressed="false" title="Runs the figure's clock: the sheet drifts with its wind and its billows creep, which costs nothing, and it changes with its phase, for which the map is baked again every frame; set change to 0 to see the free part alone">animate</button>
-                <Choice figure={id} {...SPEED} />
+                <Choice figure={id} {...SPEED} heading="speed" />
                 <LabSliders sliders={CIRRUS_TIME} />
             </OptionGroup>
             <OptionGroup name="light">
                 <LabSliders sliders={CIRRUS_LIGHT} />
             </OptionGroup>
+            <Quality figure={id} reads="sheet" dials={["sampling"]} checked={{ sampling: "high" }} combo />
             <OptionGroup name="render">
-                <Choice figure={id} {...SIZE} />
-                <Choice figure={id} {...VIEW} />
+                <Choice figure={id} {...VIEW} heading="view" />
                 <button type="button" class="view-toggle" data-field="textures.on" aria-pressed="true" title="The textures the figure renders from, down the left of the view: hover one for what it is for">textures</button>
                 <button type="button" class="view-toggle" data-field="ground.grid" aria-pressed="true" title="A grid on the ground, for orientation, speed and height: thin lines every 10 km, 1 km, 100 m and on down to 1 mm, each level showing once its cells are a few pixels across">grid</button>
             </OptionGroup>

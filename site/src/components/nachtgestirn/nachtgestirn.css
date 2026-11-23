@@ -446,19 +446,17 @@
 }
 .tycho-names {
     position: absolute;
-    right: calc(6px + 0.25rem);
-    bottom: calc(6px + 0.25rem);
-    left: calc(6px + 0.25rem);
+    right: var(--fig-inset);
+    bottom: 0;
+    left: var(--fig-inset);
     display: flex;
-    align-items: flex-end;
+    gap: var(--fig-inset);
     justify-content: space-between;
+    height: var(--fig-band);
     pointer-events: none;
 }
-/* As far up from the foot as in from the side: a square in each corner, the names' boxes tight round their text. */
 .tycho-names > .fig-hint {
-    height: auto;
     padding: 0;
-    line-height: 1;
 }
 .tycho-steepest {
     stroke: var(--muted);
@@ -653,11 +651,9 @@
 /* The disc's size at the preview's foot, over the canvas. */
 .config-disc-note {
     position: absolute;
-    left: 10px;
-    bottom: 8px;
-    color: rgb(255 255 255 / 0.7);
-    font-family: var(--font-mono);
-    pointer-events: none;
+    right: var(--fig-inset);
+    bottom: 0;
+    left: var(--fig-inset);
 }
 .config-main {
     display: grid;
@@ -750,7 +746,7 @@
     border-top: var(--border);
     color: var(--muted);
     font-family: var(--font-mono);
-    font-size: 0.7rem;
+    font-size: var(--text-tiny);
 }
 .config-cost-name {
     display: flex;

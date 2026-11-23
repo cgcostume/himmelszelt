@@ -505,7 +505,7 @@ fn formCompose(@builtin(global_invocation_id) id: vec3u) {
             color = mix(color, tint, 1.0 - exp(-0.15 * tau));
         }
         let ring = abs(length(g - V.flown) - 0.012 * F.mapKm) < 0.003 * F.mapKm;
-        textureStore(formCanvas, vec2i(id.xy), labDisplay(select(color, vec3f(20000.0, 6000.0, 2000.0), ring), V.exposure, V.headroom));
+        textureStore(formCanvas, vec2i(id.xy), labDisplay(select(color, vec3f(20000.0, 6000.0, 2000.0), ring), V.exposure, V.headroom, V.curve));
         return;
     }
     let uv = (vec2f(id.xy) + 0.5) / vec2f(size);
@@ -519,5 +519,5 @@ fn formCompose(@builtin(global_invocation_id) id: vec3u) {
     }
     let v = labRay(V, vec2f(id.xy) + 0.5, size);
     let ground = 1.0 + V.gridStrength * labGrid(V, vec2f(id.xy) + 0.5, size);
-    textureStore(formCanvas, vec2i(id.xy), labDisplay(labSkyFrom(V, v, sun) * ground * clouds.a + clouds.rgb, V.exposure, V.headroom));
+    textureStore(formCanvas, vec2i(id.xy), labDisplay(labSkyFrom(V, v, sun) * ground * clouds.a + clouds.rgb, V.exposure, V.headroom, V.curve));
 }

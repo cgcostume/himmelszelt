@@ -1,3 +1,4 @@
+import { sampled } from "../quality";
 import { SHOW, type Shown, texturePanel } from "../textures";
 import shader from "./cirrus.comp.wgsl";
 import { createLab, floatStruct, type Lab, labPipeline, NOISE, type Presets } from "./lab";
@@ -152,7 +153,7 @@ export async function cirrusPasses(lab: Lab) {
         },
         /** The sliders into the uniform, and the map baked again where they changed it. */
         bake(encoder: GPUCommandEncoder) {
-            const size = Number(lab.choice("size")) || 2048;
+            const size = sampled(lab.choice("sampling")).layered.highMapSize;
             if (map?.size !== size) {
                 for (const texture of map?.textures ?? []) texture.destroy();
                 map = createMap(size);

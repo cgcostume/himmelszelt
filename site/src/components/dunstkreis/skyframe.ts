@@ -1,5 +1,6 @@
 import { find } from "../dom";
 import { paintRange } from "../range";
+import { follow, settings } from "../settings";
 import { offsetSliders } from "../sternzeit/offset";
 import { onChange, state, update } from "../sternzeit/state";
 
@@ -84,18 +85,33 @@ export function skyFrames() {
         frame.addEventListener("skyheight", sync);
         sync();
 
-        // The marks step through their states, off, the compass, the compass with the grid, before the figure hears the click.
+        // The marks step through their states, off, the compass, the compass with the grid, before the figure hears the
+        // click; they follow the page's setting (see settings.ts), which sets them by a click that does not step them.
         const marks = field("marks");
         const titles: string[] = JSON.parse(marks.dataset.titles ?? "[]");
-        marks.addEventListener(
-            "click",
-            () => {
-                const level = (Number(marks.dataset.level) + 1) % Number(marks.dataset.levels);
-                marks.dataset.level = String(level);
-                marks.setAttribute("aria-pressed", String(level > 0));
-                marks.title = titles[level] ?? "";
+        const levels = Number(marks.dataset.levels);
+        const initial = Number(marks.dataset.level);
+        const show = (level: number) => {
+            marks.dataset.level = String(level);
+            marks.setAttribute("aria-pressed", String(level > 0));
+            marks.title = titles[level] ?? "";
+        };
+        let setting = false;
+        marks.addEventListener("click", () => setting || show((Number(marks.dataset.level) + 1) % levels), {
+            capture: true,
+        });
+        const LEVELS = { auto: initial, off: 0, compass: 1, grid: 2 };
+        follow(
+            marks,
+            "marks",
+            () => Math.min(LEVELS[settings.marks], levels - 1),
+            () => Number(marks.dataset.level),
+            (level) => {
+                show(level);
+                setting = true;
+                marks.click();
+                setting = false;
             },
-            { capture: true },
         );
 
         const options = frame.querySelector('[data-field="options"]');

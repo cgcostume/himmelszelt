@@ -1,5 +1,6 @@
 import { bowDirection, bowRadius, bowTop } from "@himmelszelt/gewoelk";
 import { find } from "../../dom";
+import { onDisplay } from "../../dunstkreis/atmosphere";
 import { onDemand } from "../../frame";
 import { paintRange } from "../../range";
 import { drawSvg, LABEL_GAP as GAP, SUN_SYMBOL, sunGlow, sunRays, svgText } from "../../sternzeit/figure";
@@ -222,6 +223,7 @@ function render() {
 
 const requestRender = onDemand(render, root);
 const rendered = createBowView(renderedEl, SKY, requestRender);
+onDisplay(requestRender);
 slider.addEventListener("input", () => {
     elevation = Number(slider.value);
     requestRender();

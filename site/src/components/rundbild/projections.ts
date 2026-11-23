@@ -1,30 +1,26 @@
-import type { SkyCubePass, SkyPass } from "@himmelszelt/dunstkreis";
-import { wgsl } from "@himmelszelt/dunstkreis";
-import { createPanoramaPass, type PanoramaPass, wgsl as rundbild } from "@himmelszelt/rundbild";
+import { exposureFromEV100, wgsl as helldunkel } from "@himmelszelt/helldunkel";
+import {
+    type Bc6hPass,
+    type CubeFromPanoramaPass,
+    createBc6hPass,
+    createCubeFromPanoramaPass,
+    createPanoramaPass,
+    type PanoramaPass,
+    wgsl as rundbild,
+} from "@himmelszelt/rundbild";
 import { showCode } from "../code";
 import { find } from "../dom";
-import {
-    configureCanvas,
-    currentSky,
-    display,
-    displayOutput,
-    gpu,
-    gpuDevice,
-    onDisplay,
-    onSkyView,
-    SDR,
-    type Sky,
-} from "../dunstkreis/atmosphere";
+import { configureCanvas, display, displayOutput, gpu, gpuDevice, onDisplay, SDR } from "../dunstkreis/atmosphere";
 import { cameraBasis, lookAround, project, type SkyCamera, type Vec3 } from "../dunstkreis/skycamera";
+import { hdri, onHdri } from "../environment/hdri";
 import { onDemand } from "../frame";
 import { gpuMissing } from "../webgpu";
-import { skyWhite } from "../white";
 
 /**
- * The sky in six ways of storing it, in textures of the sizes below, shown texel by texel, bilinearly or bicubically:
- * as stored, and from inside, looking around.
- * Over both, the texels' edges, and how densely each projection packs its texels against an even spread of the same
- * texels over what it covers.
+ * The chosen HDRI in six ways of storing it, in textures of the sizes below, shown texel by texel, bilinearly or
+ * bicubically: as stored, and from inside, looking around. Two figures: one shades how densely each projection packs its
+ * texels against an even spread of the same texels; the other how far each lies from the HDRI it was made from, kept in
+ * one of four formats.
  */
 
 type Projection = "cube" | "cubified" | "equirectangular" | "octahedral" | "fisheye" | "sphere";
@@ -33,17 +29,18 @@ const PROJECTIONS: Projection[] = ["cube", "cubified", "equirectangular", "octah
 
 /**
  * The sizes, in two tiers. XS to L compare the projections: about as many texels in each, 400, 1,600, 6,400 and
- * 25,600. HD and UHD are what maps commonly come in: faces of 1024 and 2048 for a cube map, 2048 and 4096 across for
- * the others.
+ * 25,600. 1K, HD and UHD are what maps commonly come in: faces of 512, 1024 and 2048 for a cube map, 1024, 2048 and 4096
+ * across for the others.
  */
-type Size = "xs" | "s" | "m" | "l" | "hd" | "uhd";
-const LEVEL: Record<Size, number> = { xs: 0, s: 1, m: 2, l: 3, hd: 0, uhd: 0 };
-const large = (size: Size) => size === "hd" || size === "uhd";
+type Size = "xs" | "s" | "m" | "l" | "k1" | "hd" | "uhd";
+const LEVEL: Record<Size, number> = { xs: 0, s: 1, m: 2, l: 3, k1: 0, hd: 0, uhd: 0 };
+const ACROSS: Partial<Record<Size, number>> = { k1: 1024, hd: 2048, uhd: 4096 };
+const large = (size: Size) => ACROSS[size] !== undefined;
 
 /** Each projection's texture at a size: width and height, six layers for a cube map. */
 function sizeOf(projection: Projection, size: Size): [number, number] {
-    if (large(size)) {
-        const across = size === "uhd" ? 4096 : 2048;
+    const across = ACROSS[size];
+    if (across) {
         if (projection === "cube" || projection === "cubified") return [across / 2, across / 2];
         if (projection === "equirectangular") return [across, across / 2];
         return [across, across];
@@ -61,6 +58,7 @@ function sizeOf(projection: Projection, size: Size): [number, number] {
     return [width << level, height << level];
 }
 const layers = (projection: Projection) => (projection === "cube" || projection === "cubified" ? 6 : 1);
+const isCube = (projection: Projection) => layers(projection) === 6;
 /** The shown shape: a cube map's six faces side by side, a flat panorama as stored. */
 const ASPECT: Record<Projection, number> = {
     cube: 6,
@@ -71,15 +69,17 @@ const ASPECT: Record<Projection, number> = {
     sphere: 1,
 };
 
+/** The formats a texel is kept in, in the shader's numbering for the two rounded by hand. */
+type Format = "rgba16float" | "rg11b10ufloat" | "rgb9e5ufloat" | "bc6h-rgb-ufloat";
+const ROUNDED: Partial<Record<Format, number>> = { rg11b10ufloat: 1, rgb9e5ufloat: 2 };
+
 // The display: the chart a direction falls into, its texel, the texel's edges by the chart's screen-space derivatives,
-// and the texels per steradian by the chart's derivatives on the sphere, against those of an even spread.
+// the texels per steradian by the chart's derivatives on the sphere, against those of an even spread, and how far the
+// texture's value lies from the HDRI's.
 const SOURCE = /* wgsl */ `
-${wgsl.cube}
+${rundbild.cube}
 ${rundbild.panorama}
-${wgsl.tonemap}
-${wgsl.whitebalance}
-${wgsl.sun}
-${wgsl.grid}
+${helldunkel.tonemap}
 struct Params {
     // The view's right, up and forward.
     rotation: mat3x3f,
@@ -89,7 +89,8 @@ struct Params {
     // 0 as stored, 1 the view from inside.
     inside: u32,
     edges: u32,
-    density: u32,
+    // 0 the picture, 1 the density, 2 the error against the HDRI.
+    shade: u32,
     // An even spread's texels per steradian over what the projection covers.
     texelsPerSr: f32,
     // The view's image plane, half as wide as tx and half as high as ty, and the general perspective's d, as the sky
@@ -101,27 +102,19 @@ struct Params {
     curve: u32,
     ty: f32,
     d: f32,
-    // The sky figure's grid over both views, the Sun's disc's radius in radians and its true direction for its symbol.
-    grid: u32,
-    pixelRatio: f32,
-    sunAngularRadius: f32,
-    sunDirection: vec3f,
+    // The page's exposure, helldunkel's exposureFromEV100.
+    exposure: f32,
     dither: u32,
-    // The Sun's disc, drawn over the view from inside pixel by pixel, never stored: where it shows, bent by the air,
-    // and its illuminance in the texture's units, times the sky's scale.
-    apparentSun: vec3f,
-    sunDisc: u32,
-    sunIlluminance: vec3f,
-    // The site's white for the moment, helldunkel's \`whiteBalance\`, on the light as it is exposed.
-    whiteBalance: mat3x3f,
     // How many times SDR white the canvas may show: 1 for SDR, more on an HDR display, into which Neutral and none go.
     headroom: f32,
+    // Whether to show the HDRI itself instead of the texture, the reference the errors are measured against.
+    original: u32,
 }
 
 @group(0) @binding(0) var<uniform> params: Params;
 @group(0) @binding(1) var source: texture_2d_array<f32>;
-// The mean log2 luminance over the upper hemisphere, metered first.
-@group(0) @binding(2) var<storage, read_write> metered: f32;
+// The HDRI the texture was made from, equirectangular, what its errors are measured against.
+@group(0) @binding(2) var reference: texture_2d<f32>;
 @group(0) @binding(3) var output: texture_storage_2d<OUTPUT_FORMAT, write>;
 // The same texture again for the sampler: as a cube for a cube map, its first layer for the others.
 @group(0) @binding(4) var cubeSource: texture_cube<f32>;
@@ -384,6 +377,38 @@ fn bicubic(here: Chart) -> vec4f {
     return vec4f(exp2(clamp(sum, low, high)), 1.0);
 }
 
+// matplotlib's magma, from black where the texture holds the HDRI to within a thousandth to pale yellow where it is off
+// by all of it, by the logarithm, interpolated between eleven stops.
+const MAGMA = array<vec3f, 11>(
+    vec3f(0.001, 0.000, 0.014),
+    vec3f(0.078, 0.054, 0.212),
+    vec3f(0.232, 0.060, 0.438),
+    vec3f(0.390, 0.100, 0.502),
+    vec3f(0.550, 0.161, 0.506),
+    vec3f(0.716, 0.215, 0.475),
+    vec3f(0.868, 0.288, 0.409),
+    vec3f(0.967, 0.439, 0.360),
+    vec3f(0.994, 0.624, 0.427),
+    vec3f(0.996, 0.812, 0.573),
+    vec3f(0.987, 0.991, 0.750),
+);
+
+fn errorColor(error: f32) -> vec3f {
+    let t = clamp(log2(max(error, 1e-9)) / log2(1000.0) + 1.0, 0.0, 1.0) * 10.0;
+    let i = min(u32(t), 9u);
+    var stops = MAGMA;
+    return mix(stops[i], stops[i + 1u], t - f32(i));
+}
+
+// How far a value lies from the HDRI's at d: in the channel off the most, relative to that channel, but at least to a
+// tenth of the brightest, so that a channel near black in a colored texel does not count for more than it shows.
+fn errorAt(value: vec3f, d: vec3f) -> f32 {
+    let truth = textureSampleLevel(reference, linearSampler, rbEquirectangularUv(d, 0.0), 0.0).rgb;
+    let least = max(max(truth.r, max(truth.g, truth.b)) * 0.1, 1e-12);
+    let off = abs(value - truth) / max(truth, vec3f(least));
+    return max(off.r, max(off.g, off.b));
+}
+
 // Whether the view from inside shows d: its general perspective, as skycamera.ts projects, within the image plane.
 fn inView(d: vec3f) -> bool {
     let forward = params.rotation[2];
@@ -416,17 +441,6 @@ fn framed(color: vec3f, position: vec2f, d: vec3f, covered: bool) -> vec3f {
     return select(color * 0.4, color, seen);
 }
 
-// How strongly the sky figure's grid covers a pixel, by the directions the neighboring pixels show; in the view from
-// inside only.
-fn gridCoverage(position: vec2f, d: vec3f) -> f32 {
-    if (params.grid == 0u || params.inside == 0u) {
-        return 0.0;
-    }
-    let right = directionAt(position + vec2f(1.0, 0.0)).xyz;
-    let below = directionAt(position + vec2f(0.0, 1.0)).xyz;
-    return dkGridCoverage(d, right, below, params.sunDirection, params.sunAngularRadius, params.pixelRatio, 0.0);
-}
-
 // Written out, dithered by Jimenez's interleaved gradient noise, an 8-bit step, triangular: no texture to bind.
 fn put(p: vec2u, color: vec3f) {
     var c = color;
@@ -437,41 +451,8 @@ fn put(p: vec2u, color: vec3f) {
     textureStore(output, vec2i(p), vec4f(clamp(c, vec3f(0.0), top), 1.0));
 }
 
-const THREADS: u32 = 256u;
-const METER_SAMPLES: u32 = 4096u;
-
-var<workgroup> sums: array<f32, THREADS>;
-
-// The exposure, metered like a camera over the sky above the horizon at evenly spread directions, by a Fibonacci
-// spiral: the same for every projection, whichever directions its texels crowd, and without the sky figure's range,
-// so that the night shows as on a long exposure. In the texture's own units, scaled or not.
-@compute @workgroup_size(THREADS)
-fn meter(@builtin(local_invocation_index) index: u32) {
-    var sum = 0.0;
-    for (var i = index; i < METER_SAMPLES; i = i + THREADS) {
-        let z = (f32(i) + 0.5) / f32(METER_SAMPLES);
-        let azimuth = f32(i) * 2.399963229728653;
-        let r = sqrt(max(1.0 - z * z, 0.0));
-        let here = chart(vec3f(r * sin(azimuth), r * cos(azimuth), z));
-        let texel = clamp(vec2i(floor(here.texel)), vec2i(0), vec2i(params.size) - 1);
-        sum = sum + log2(max(dot(textureLoad(source, texel, here.layer, 0).rgb, LUMINANCE), 1e-30));
-    }
-    sums[index] = sum;
-    workgroupBarrier();
-    for (var stride = THREADS / 2u; stride > 0u; stride = stride / 2u) {
-        if (index < stride) {
-            sums[index] = sums[index] + sums[index + stride];
-        }
-        workgroupBarrier();
-    }
-    if (index == 0u) {
-        metered = sums[0] / f32(METER_SAMPLES);
-    }
-}
-
-// Exposed so that the metered mean lands where an EV100 meter puts it, 1/9.6 of saturation, as in the sky figure.
 fn toneMap(c: vec3f) -> vec3f {
-    let exposed = hdWhiteBalance(c, params.whiteBalance) / (9.6 * exp2(metered));
+    let exposed = c * params.exposure;
     switch params.curve {
         case 1u: { return hdToneMapAgx(exposed); }
         case 2u: { return hdToneMapAces(exposed); }
@@ -497,7 +478,7 @@ fn display(@builtin(global_invocation_id) id: vec3u) {
     let d = at.xyz;
     let axis = majorAxis(d);
     // Outside what the projection covers: below the fisheye's horizon its corner texel, the ground, whichever filter,
-    // and beyond the circles as stored, what their rims hold; shown without edges or density.
+    // and beyond the circles as stored, what their rims hold; shown without edges or shading.
     let here = chartAt(position, axis);
     var stored: vec4f;
     if (params.projection == 4u && params.inside != 0u && !here.covered) {
@@ -515,23 +496,21 @@ fn display(@builtin(global_invocation_id) id: vec3u) {
     } else {
         stored = textureSampleLevel(flatSource, linearSampler, here.texel / vec2f(params.size), 0.0);
     }
-    var luminance = stored.rgb;
-    if (params.sunDisc != 0u && params.inside != 0u) {
-        let right = directionAt(position + vec2f(1.0, 0.0)).xyz;
-        let below = directionAt(position + vec2f(0.0, 1.0)).xyz;
-        let sun = params.apparentSun;
-        luminance += dkSunDiscPixel(d, right, below, sun, params.sunAngularRadius, params.sunIlluminance);
-    }
-    var color = toneMap(luminance);
-    // The grid over everything, the texel edges under it, so its lines run on unbroken across them.
-    let grid = gridCoverage(position, d);
-    if (!here.covered) {
-        put(id.xy, framed(mix(color, vec3f(1.0), grid / DK_GRID_FAINT), position, d, false));
+    if (params.original != 0u) {
+        let truth = textureSampleLevel(reference, linearSampler, rbEquirectangularUv(d, 0.0), 0.0).rgb;
+        put(id.xy, framed(toneMap(truth), position, d, true));
         return;
     }
-    if (params.density != 0u) {
+    var color = toneMap(stored.rgb);
+    if (!here.covered) {
+        put(id.xy, framed(color, position, d, false));
+        return;
+    }
+    if (params.shade == 1u) {
         let q = texelsPerSr(d) / params.texelsPerSr;
         color = densityColor(q) * (0.35 + 0.65 * dot(color, LUMINANCE));
+    } else if (params.shade == 2u) {
+        color = errorColor(errorAt(stored.rgb, d));
     }
     // The texture as stored stays as it is: edges in the view from inside only.
     if (params.edges != 0u && params.inside != 0u) {
@@ -551,27 +530,57 @@ fn display(@builtin(global_invocation_id) id: vec3u) {
         if (besideX.w == 0.0 || besideY.w == 0.0 || ((params.inside == 0u || !isCube()) && max(length(dx), length(dy)) > seam)) {
             edge = 1.0;
         }
-        edge = edge * (1.0 - smoothstep(0.125, 0.25, max(footprint.x, footprint.y))) * (1.0 - min(grid * 10.0, 1.0));
+        edge = edge * (1.0 - smoothstep(0.125, 0.25, max(footprint.x, footprint.y)));
         color = mix(color, vec3f(0.0), edge / 3.0);
     }
-    put(id.xy, framed(mix(color, vec3f(1.0), grid / DK_GRID_FAINT), position, d, true));
+    put(id.xy, framed(color, position, d, true));
 }
 `;
 
-const root = find("#projections");
-const field = <T extends HTMLElement = HTMLElement>(name: string) => find<T>(`[data-field="${name}"]`, root);
-const stage = (name: string) => find(`[data-panel="${name}"]`, root);
-const canvasOf = (name: string) => find<HTMLCanvasElement>("canvas", stage(name));
-const chosen = (name: string, fallback: string) =>
-    root.querySelector<HTMLInputElement>(`input[name="projections-${name}"]:checked`)?.value ?? fallback;
-const chosenSize = () => chosen("budget", "xs") as Size;
-const pressed = (name: string) => field(name).getAttribute("aria-pressed") === "true";
-// Off, the compass, or the compass with the grid (see skyframe.ts).
-const markLevel = () => Number(field("marks").dataset.level);
+// What a format keeps of a texel, rounded as the GPU would store it: rg11b10ufloat's 6 and 5 bits of mantissa and
+// rgb9e5ufloat's shared exponent, after the GL extensions that define them; or copied, as a BC6H texture's decoded texels.
+const ROUNDING = /* wgsl */ `
+override ROUNDED: u32 = 0u;
+@group(0) @binding(0) var input: texture_2d_array<f32>;
+@group(0) @binding(1) var output: texture_storage_2d_array<rgba16float, write>;
 
-const DEG = Math.PI / 180;
-// Looking south, a little above the horizon, 100° across the view's height, as the sky figure's camera measures it.
-const camera: SkyCamera = { yaw: 180 * DEG, pitch: 25 * DEG, fov: 100 * DEG };
+// An unsigned float of 5 bits of exponent, biased by 15, and the given bits of mantissa, rounded to the nearest.
+fn ufloat(v: f32, bits: f32) -> f32 {
+    let top = (2.0 - exp2(-bits)) * 32768.0;
+    let x = clamp(v, 0.0, top);
+    let step = exp2(max(floor(log2(max(x, 1e-30))), -14.0) - bits);
+    return min(round(x / step) * step, top);
+}
+
+fn rgb9e5(v: vec3f) -> vec3f {
+    let c = clamp(v, vec3f(0.0), vec3f(65408.0));
+    let largest = max(c.r, max(c.g, c.b));
+    if (largest <= 0.0) {
+        return vec3f(0.0);
+    }
+    var exponent = max(-16.0, floor(log2(largest))) + 1.0;
+    if (floor(largest / exp2(exponent - 9.0) + 0.5) >= 512.0) {
+        exponent = exponent + 1.0;
+    }
+    let scale = exp2(exponent - 9.0);
+    return floor(c / scale + 0.5) * scale;
+}
+
+@compute @workgroup_size(8, 8, 1)
+fn keep(@builtin(global_invocation_id) id: vec3u) {
+    let size = textureDimensions(output);
+    if (id.x >= size.x || id.y >= size.y) {
+        return;
+    }
+    var value = textureLoad(input, id.xy, id.z, 0);
+    if (ROUNDED == 1u) {
+        value = vec4f(ufloat(value.r, 6.0), ufloat(value.g, 6.0), ufloat(value.b, 5.0), 1.0);
+    } else if (ROUNDED == 2u) {
+        value = vec4f(rgb9e5(value.rgb), 1.0);
+    }
+    textureStore(output, id.xy, id.z, value);
+}
+`;
 
 const cross = (a: Vec3, b: Vec3): Vec3 => [
     a[1] * b[2] - a[2] * b[1],
@@ -757,168 +766,56 @@ const VIEW_MARKS: [string, Vec3][] = [
     ["nadir", [0, 0, -1]],
 ];
 
-function placeMarks(panel: string, marks: Mark[]) {
-    const holder = find(".projections-marks", stage(panel));
-    holder.replaceChildren(
-        ...marks.map(([text, x, y]) => {
-            const span = document.createElement("span");
-            span.textContent = text;
-            // Within the panel, by half a mark at the edges.
-            span.style.left = `${Math.min(Math.max(x, 0.03), 0.97) * 100}%`;
-            span.style.top = `${Math.min(Math.max(y, 0.06), 0.94) * 100}%`;
-            return span;
-        }),
-    );
-}
+const DEG = Math.PI / 180;
+/** The cube map every texture is made from, a level of it, 1024 a face with all its mip levels. */
+const CHAIN_FACE = 1024;
+/** The cube map a panorama of this width is laid out from: a power of two, about twice as fine. */
+const sourceFace = (width: number) => Math.min(2048, Math.max(16, 2 ** Math.ceil(Math.log2(width / 2))));
 
-function showMarks(projection: Projection) {
-    placeMarks("flat", FLAT_MARKS[projection]);
-    // Projected as the shader projects, kept where they fall within the view.
-    const canvas = canvasOf("inside");
-    const [width, height] = [canvas.clientWidth || 1, canvas.clientHeight || 1];
-    const basis = cameraBasis(camera, width / height);
-    const marks: Mark[] = [];
-    for (const [text, d] of markLevel() >= 1 ? VIEW_MARKS : []) {
-        const at = project(d, basis, width, height);
-        if (at && at.x > 0 && at.x < width && at.y > 0 && at.y < height)
-            marks.push([text, at.x / width, at.y / height]);
-    }
-    placeMarks("inside", marks);
-}
-
-/** The cube map a panorama of this width is laid out from: finer than its texels, up to faces of 2048. */
-const sourceFace = (width: number) => Math.min(2048, Math.max(256, width / 2));
-
-// The calls that compute the shown texture, at most 80 columns.
+// The calls that make the shown texture from the HDRI, at most 80 columns.
 function call(projection: Projection, [width, height]: [number, number]) {
-    const usage = "    usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,";
-    const format = '    format: "rgba16float",';
-    if (layers(projection) === 6) {
-        return [
-            "const texture = device.createTexture({",
-            `    size: [${width}, ${height}, 6],`,
-            format,
-            usage,
-            "});",
-            "const pass = await sky.createCubePass({",
-            ...(projection === "cubified" ? ["    cubify: true,"] : []),
-            format,
-            "    samples: 8,",
-            "    scaled: true, // half floats hold the night as finely as the day",
-            "});",
-            "pass.encode(encoder, texture);",
-            "const scale = sky.skyViewScale; // read now: cd/m² = texel / scale",
-        ].join("\n");
-    }
-    const face = sourceFace(width);
+    const face = isCube(projection) ? width : sourceFace(width);
+    const lines = [
+        "// The HDRI into a cube map of 1024 with every mip level, each the mean of",
+        "// four texels of the one above, for a level as coarse as the map.",
+        "const chain = device.createTexture({",
+        "    size: [1024, 1024, 6],",
+        "    mipLevelCount: 11,",
+        '    format: "rgba16float",',
+        "    usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING |",
+        "        GPUTextureUsage.COPY_SRC,",
+        "});",
+        "const toCube = await createCubeFromPanoramaPass(device, {",
+        ...(projection === "cubified" ? ["    cubify: true,"] : []),
+        "    samples: 16,",
+        "});",
+        "toCube.encode(encoder, hdri, chain);",
+        "encoder.copyTextureToTexture(",
+        `    { texture: chain, mipLevel: ${Math.log2(CHAIN_FACE / face)} },`,
+        `    { texture: ${isCube(projection) ? "texture" : "cube"} },`,
+        `    [${face}, ${face}, 6],`,
+        ");",
+    ];
+    if (isCube(projection)) return lines.join("\n");
     return [
-        "const cube = device.createTexture({",
-        `    size: [${face}, ${face}, 6],`,
-        format,
-        usage,
-        "});",
-        "const texture = device.createTexture({",
-        `    size: [${width}, ${height}],`,
-        format,
-        usage,
-        "});",
-        `const cubePass = await sky.createCubePass({`,
-        format,
-        "    scaled: true, // half floats hold the night as finely as the day",
-        "});",
+        ...lines,
         "const pass = await createPanoramaPass(device, {",
         `    projection: "${projection}",`,
-        format,
+        '    format: "rgba16float",',
         "    samples: 8,",
         "});",
-        "cubePass.encode(encoder, cube);",
-        "const scale = sky.skyViewScale; // read now: cd/m² = texel / scale",
-        "pass.encode(encoder, cube, texture);",
+        `pass.encode(encoder, cube, texture); // ${width} × ${height}`,
     ].join("\n");
 }
 
-type Panel = { context: GPUCanvasContext; params: GPUBuffer };
-let panels: Record<"flat" | "inside", Panel> | null = null;
-let pipelines: { meter: GPUComputePipeline; display: GPUComputePipeline; layout: GPUBindGroupLayout } | null = null;
-let metering: GPUBuffer | null = null;
-let sampler: GPUSampler | null = null;
-let noCube: GPUTexture | null = null;
-// Params: a mat3x3f, twelve scalars, three vec3f with a scalar after each, the white's mat3x3f and the headroom, padded.
-const PARAMS_SIZE = 224;
-// The canvases' format, SDR or on an HDR display HDR, which the display pipeline is made for.
-let format = SDR;
-
-function setUp() {
-    const device = gpuDevice();
-    format = displayOutput().format;
-    const layout = device.createBindGroupLayout({
-        entries: [
-            { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: "uniform" } },
-            {
-                binding: 1,
-                visibility: GPUShaderStage.COMPUTE,
-                texture: { sampleType: "unfilterable-float", viewDimension: "2d-array" },
-            },
-            { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
-            {
-                binding: 3,
-                visibility: GPUShaderStage.COMPUTE,
-                storageTexture: { format, viewDimension: "2d" },
-            },
-            { binding: 4, visibility: GPUShaderStage.COMPUTE, texture: { viewDimension: "cube" } },
-            { binding: 5, visibility: GPUShaderStage.COMPUTE, texture: { viewDimension: "2d" } },
-            { binding: 6, visibility: GPUShaderStage.COMPUTE, sampler: { type: "filtering" } },
-        ],
-    });
-    const code = SOURCE.replace("OUTPUT_FORMAT", format);
-    const module = device.createShaderModule({ label: "sternwarte:projections", code });
-    const pipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [layout] });
-    const create = (entryPoint: string) =>
-        device.createComputePipeline({
-            label: `sternwarte:projections:${entryPoint}`,
-            layout: pipelineLayout,
-            compute: { module, entryPoint },
-        });
-    pipelines = { meter: create("meter"), display: create("display"), layout };
-    metering = device.createBuffer({ size: 4, usage: GPUBufferUsage.STORAGE });
-    const panel = (name: string): Panel => {
-        const context = canvasOf(name).getContext("webgpu");
-        if (!context) throw new Error("No WebGPU canvas context");
-        configureCanvas(context, format);
-        return {
-            context,
-            params: device.createBuffer({ size: PARAMS_SIZE, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
-        };
-    };
-    panels = { flat: panel("flat"), inside: panel("inside") };
-    sampler = device.createSampler({
-        magFilter: "linear",
-        minFilter: "linear",
-        addressModeU: "repeat",
-        addressModeV: "clamp-to-edge",
-    });
-    // A panorama has no cube to bind.
-    noCube = device.createTexture({
-        size: [1, 1, 6],
-        format: "rgba16float",
-        usage: GPUTextureUsage.TEXTURE_BINDING,
-    });
-}
-
-// The cube passes made for a sky pass, and the panorama passes, one per projection.
-const cubePasses = new WeakMap<SkyPass, Map<string, Promise<SkyCubePass>>>();
-function cubePassFor(sky: SkyPass, cubify: boolean, samples: number) {
-    let made = cubePasses.get(sky);
-    if (!made) {
-        made = new Map();
-        cubePasses.set(sky, made);
-    }
+// Made once for the page and shared by both figures: the passes, and the chains of the HDRI shown.
+const toCubePasses = new Map<string, Promise<CubeFromPanoramaPass>>();
+function toCubePass(cubify: boolean, samples: number) {
     const key = `${cubify},${samples}`;
-    let pass = made.get(key);
+    let pass = toCubePasses.get(key);
     if (!pass) {
-        // Scaled by the sky's power of two, so that half floats hold the night as finely as the day.
-        pass = sky.createCubePass({ format: "rgba16float", samples, cubify, scaled: true });
-        made.set(key, pass);
+        pass = createCubeFromPanoramaPass(gpuDevice(), { cubify, samples });
+        toCubePasses.set(key, pass);
     }
     return pass;
 }
@@ -931,176 +828,392 @@ function panoramaPassFor(projection: Exclude<Projection, "cube" | "cubified">) {
     }
     return pass;
 }
+const chains = new Map<boolean, { of: GPUTexture; texture: GPUTexture }>();
+async function chainFor(of: GPUTexture, cubify: boolean) {
+    const kept = chains.get(cubify);
+    if (kept?.of === of) return kept.texture;
+    kept?.texture.destroy();
+    const device = gpuDevice();
+    const texture = device.createTexture({
+        label: `sternwarte:projections:chain${cubify ? ":cubified" : ""}`,
+        size: [CHAIN_FACE, CHAIN_FACE, 6],
+        mipLevelCount: Math.log2(CHAIN_FACE) + 1,
+        format: "rgba16float",
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
+        textureBindingViewDimension: "cube",
+    });
+    const pass = await toCubePass(cubify, 16);
+    const encoder = device.createCommandEncoder({ label: "sternwarte:projections:chain" });
+    pass.encode(encoder, of, texture);
+    device.queue.submit([encoder.finish()]);
+    chains.set(cubify, { of, texture });
+    return texture;
+}
+let roundings: Map<number, GPUComputePipeline> | null = null;
+function rounding(kind: number) {
+    const device = gpuDevice();
+    roundings ??= new Map();
+    let pipeline = roundings.get(kind);
+    if (!pipeline) {
+        const module = device.createShaderModule({ label: "sternwarte:projections:rounding", code: ROUNDING });
+        pipeline = device.createComputePipeline({
+            label: `sternwarte:projections:rounding${kind}`,
+            layout: "auto",
+            compute: { module, entryPoint: "keep", constants: { ROUNDED: kind } },
+        });
+        roundings.set(kind, pipeline);
+    }
+    return pipeline;
+}
+let bc6h: Promise<Bc6hPass> | null = null;
+const bc6hPass = () => {
+    bc6h ??= createBc6hPass(gpuDevice());
+    return bc6h;
+};
+/** Whether the device decodes BC6H, and so offers it. */
+const hasBc6h = () => gpuDevice().features.has("texture-compression-bc");
 
-let built: { texture: GPUTexture; projection: Projection; sky: Sky; scale: number } | null = null;
-let building = false;
-// The sunlight where the observer is, in lux, for the disc, read back once per sky.
-let sunIlluminance: number[] = [0, 0, 0];
-let litBy: Sky | null = null;
-
-async function build(sky: Sky, projection: Projection, size: Size) {
-    building = true;
+/** The texture shown: the HDRI in a projection at a size, kept in a format. */
+async function make(of: GPUTexture, projection: Projection, size: Size, format: Format) {
     const [width, height] = sizeOf(projection, size);
     const device = gpuDevice();
-    const isCube = projection === "cube" || projection === "cubified";
-    const cubePass = await cubePassFor(sky.pass, projection === "cubified", isCube ? 8 : 1);
-    const panoramaPass = isCube ? null : await panoramaPassFor(projection);
-    const texture = device.createTexture({
+    const usage =
+        GPUTextureUsage.STORAGE_BINDING |
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.COPY_SRC;
+    const made = device.createTexture({
         label: `sternwarte:projections:${projection}`,
         size: [width, height, layers(projection)],
         format: "rgba16float",
-        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+        usage,
     });
     const encoder = device.createCommandEncoder({ label: "sternwarte:projections" });
-    const source =
-        panoramaPass &&
-        device.createTexture({
-            label: "sternwarte:projections:source",
-            size: [sourceFace(width), sourceFace(width), 6],
+    const doomed: GPUTexture[] = [];
+    // A level of the chain, or, finer than it, a cube map of its own, straight from the HDRI.
+    const cubeOf = async (face: number, cubify: boolean, into?: GPUTexture) => {
+        const target =
+            into ??
+            device.createTexture({
+                label: "sternwarte:projections:source",
+                size: [face, face, 6],
+                format: "rgba16float",
+                usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+                textureBindingViewDimension: "cube",
+            });
+        if (!into) doomed.push(target);
+        if (face > CHAIN_FACE) {
+            (await toCubePass(cubify, 4)).encode(encoder, of, target);
+        } else {
+            const chain = await chainFor(of, cubify);
+            encoder.copyTextureToTexture(
+                { texture: chain, mipLevel: Math.log2(CHAIN_FACE / face) },
+                { texture: target },
+                [face, face, 6],
+            );
+        }
+        return target;
+    };
+    if (isCube(projection)) {
+        await cubeOf(width, projection === "cubified", made);
+    } else {
+        const cube = await cubeOf(sourceFace(width), false);
+        (await panoramaPassFor(projection as Exclude<Projection, "cube" | "cubified">)).encode(encoder, cube, made);
+    }
+    let texture = made;
+    if (format !== "rgba16float") {
+        texture = device.createTexture({
+            label: `sternwarte:projections:${projection}:${format}`,
+            size: [width, height, layers(projection)],
             format: "rgba16float",
             usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
-            textureBindingViewDimension: "cube",
         });
-    cubePass.encode(encoder, source ?? texture);
-    if (panoramaPass && source) panoramaPass.encode(encoder, source, texture);
-    device.queue.submit([encoder.finish()]);
-    source?.destroy();
-    // Only the chosen map at the chosen size is computed, again whenever the sky moves: how long it takes, as the sky
-    // figure tells its own, from the submit until the GPU is done.
-    const submitted = performance.now();
-    device.queue.onSubmittedWorkDone().then(() => {
-        const ms = performance.now() - submitted;
-        field("timing").textContent = `· computed in ${ms < 10 ? ms.toFixed(1) : Math.round(ms)}\u202fms`;
-    });
-    built?.texture.destroy();
-    // The scale it was written with, read now, before the sky moves on.
-    built = { texture, projection, sky, scale: sky.pass.skyViewScale };
-    building = false;
-    requestDraw();
-}
-
-function draw() {
-    const sky = currentSky();
-    if (!sky) return;
-    const projection = chosen("projection", "cube") as Projection;
-    const size = chosenSize();
-    const [wanted] = sizeOf(projection, size);
-    if (!built || built.sky !== sky || built.projection !== projection || built.texture.width !== wanted) {
-        if (!building) build(sky, projection, size);
-        return;
-    }
-    if (litBy !== sky) {
-        litBy = sky;
-        sky.pass.sunIlluminance().then((lux) => {
-            sunIlluminance = [...lux];
-            requestDraw();
-        });
-    }
-    // Locked, the view looks where the Sun truly is.
-    if (pressed("lock")) {
-        const [x, y, z] = sky.sunDirection;
-        camera.yaw = Math.atan2(x, y);
-        camera.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, Math.asin(z)));
-    }
-    // The page's HDR choice: pipelines and canvases made anew for the other format.
-    const output = displayOutput();
-    if (!pipelines || !panels || !sampler || !noCube || !metering || output.format !== format) setUp();
-    if (!pipelines || !panels || !sampler || !noCube || !metering) return;
-    // Dithered by an 8-bit step, which a float canvas does not need.
-    field<HTMLButtonElement>("dither").disabled = format !== SDR;
-    const device = gpuDevice();
-    const { texture, scale } = built;
-    const encoder = device.createCommandEncoder({ label: "sternwarte:projections" });
-    let first = true;
-    for (const name of ["flat", "inside"] as const) {
-        const { context, params } = panels[name];
-        const canvas = canvasOf(name);
-        const dpr = window.devicePixelRatio || 1;
-        const width = Math.max(1, Math.round(canvas.clientWidth * dpr));
-        const height = Math.max(1, Math.round(canvas.clientHeight * dpr));
-        if (canvas.width !== width || canvas.height !== height) Object.assign(canvas, { width, height });
-        const data = new ArrayBuffer(PARAMS_SIZE);
-        const floats = new Float32Array(data);
-        const uints = new Uint32Array(data);
-        // The view from inside's own shape for both, so that the stored texture outlines what it shows.
-        const inside = canvasOf("inside");
-        const { r, u, f, tx, ty, d } = cameraBasis(camera, inside.clientWidth / Math.max(inside.clientHeight, 1));
-        floats.set([...r, 0, ...u, 0, ...f, 0]);
-        uints.set([texture.width, texture.height, PROJECTIONS.indexOf(projection), name === "inside" ? 1 : 0], 12);
-        uints.set([pressed("edges") ? 1 : 0, pressed("density") ? 1 : 0], 16);
-        floats[18] = evenTexelsPerSr(projection, size);
-        floats[19] = tx;
-        floats[22] = ty;
-        floats[23] = d;
-        uints[20] = ["nearest", "linear", "cubic"].indexOf(chosen("filter", "nearest"));
-        uints[21] = ["neutral", "agx", "aces", "clip"].indexOf(display.toneCurve);
-        uints[24] = markLevel() === 2 ? 1 : 0;
-        floats[25] = dpr;
-        floats[26] = (sky.sunAngularDiameter / 2) * DEG;
-        floats.set(sky.sunDirection, 28);
-        uints[31] = pressed("dither") && format === SDR ? 1 : 0;
-        floats.set(sky.apparentSun, 32);
-        uints[35] = pressed("sunDisc") ? 1 : 0;
-        floats.set(
-            sunIlluminance.map((lux) => lux * scale),
-            36,
-        );
-        const balance = skyWhite(sky.sunDirection);
-        for (let col = 0; col < 3; col++) floats.set(balance.slice(col * 3, col * 3 + 3), 40 + col * 4);
-        floats[52] = format === SDR ? 1 : output.headroom;
-        device.queue.writeBuffer(params, 0, data);
-        const bindGroup = device.createBindGroup({
-            layout: pipelines.layout,
-            entries: [
-                { binding: 0, resource: { buffer: params } },
-                { binding: 1, resource: texture.createView({ dimension: "2d-array" }) },
-                { binding: 2, resource: { buffer: metering } },
-                { binding: 3, resource: context.getCurrentTexture().createView() },
-                {
-                    binding: 4,
-                    resource: (layers(projection) === 6 ? texture : noCube).createView({ dimension: "cube" }),
-                },
-                { binding: 5, resource: texture.createView({ dimension: "2d", arrayLayerCount: 1 }) },
-                { binding: 6, resource: sampler },
-            ],
-        });
-        const pass = encoder.beginComputePass({ label: `sternwarte:projections:${name}` });
-        // Metered once, through the projection itself, before either view is drawn.
-        if (first) {
-            pass.setPipeline(pipelines.meter);
-            pass.setBindGroup(0, bindGroup);
-            pass.dispatchWorkgroups(1);
-            first = false;
+        doomed.push(made);
+        let from = made;
+        if (format === "bc6h-rgb-ufloat") {
+            // Encoded into blocks, a texture of whole blocks, and decoded by the hardware as it reads them.
+            from = device.createTexture({
+                label: "sternwarte:projections:bc6h",
+                size: [Math.ceil(width / 4) * 4, Math.ceil(height / 4) * 4, layers(projection)],
+                format: "bc6h-rgb-ufloat",
+                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+            });
+            doomed.push(from);
+            const pass = await bc6hPass();
+            for (let layer = 0; layer < layers(projection); ++layer) pass.encode(encoder, made, from, { layer });
         }
-        pass.setPipeline(pipelines.display);
-        pass.setBindGroup(0, bindGroup);
-        pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
+        const pipeline = rounding(ROUNDED[format] ?? 0);
+        const pass = encoder.beginComputePass({ label: "sternwarte:projections:rounding" });
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(
+            0,
+            device.createBindGroup({
+                layout: pipeline.getBindGroupLayout(0),
+                entries: [
+                    { binding: 0, resource: from.createView({ dimension: "2d-array" }) },
+                    { binding: 1, resource: texture.createView({ dimension: "2d-array" }) },
+                ],
+            }),
+        );
+        pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8), layers(projection));
         pass.end();
     }
     device.queue.submit([encoder.finish()]);
-    showMarks(projection);
+    for (const texture of doomed) texture.destroy();
+    return texture;
 }
 
-function describe() {
-    const projection = chosen("projection", "cube") as Projection;
-    const dimensions = sizeOf(projection, chosenSize());
-    stage("flat").style.setProperty("--aspect", String(ASPECT[projection]));
-    find(".projections-legend", root).hidden = !pressed("density");
-    const { texels, above, sampled, ratio } = statsOf(projection, chosenSize());
-    const shape = layers(projection) === 6 ? `6 faces of ${dimensions[0]}²` : `${dimensions[0]} × ${dimensions[1]}`;
-    const count = (n: number) => (n < 1e6 ? n.toLocaleString("en") : `${(n / 1e6).toFixed(1)} million`);
-    field("info").textContent =
-        `${shape}, ${count(texels)} texels, ${sampled ? "about " : ""}${count(above)} of them above the horizon; ` +
-        `the largest covers ${ratio.toFixed(2)} times the solid angle of the smallest`;
-    showCode(field("call"), call(projection, dimensions));
+// Params: a mat3x3f and sixteen scalars.
+const PARAMS_SIZE = 112;
+type Panel = { context: GPUCanvasContext; params: GPUBuffer };
+// The display pipelines, one per canvas format.
+const displays = new Map<GPUTextureFormat, { pipeline: GPUComputePipeline; layout: GPUBindGroupLayout }>();
+function displayFor(format: GPUTextureFormat) {
+    let made = displays.get(format);
+    if (made) return made;
+    const device = gpuDevice();
+    const layout = device.createBindGroupLayout({
+        entries: [
+            { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: "uniform" } },
+            {
+                binding: 1,
+                visibility: GPUShaderStage.COMPUTE,
+                texture: { sampleType: "unfilterable-float", viewDimension: "2d-array" },
+            },
+            { binding: 2, visibility: GPUShaderStage.COMPUTE, texture: { viewDimension: "2d" } },
+            { binding: 3, visibility: GPUShaderStage.COMPUTE, storageTexture: { format, viewDimension: "2d" } },
+            { binding: 4, visibility: GPUShaderStage.COMPUTE, texture: { viewDimension: "cube" } },
+            { binding: 5, visibility: GPUShaderStage.COMPUTE, texture: { viewDimension: "2d" } },
+            { binding: 6, visibility: GPUShaderStage.COMPUTE, sampler: { type: "filtering" } },
+        ],
+    });
+    const module = device.createShaderModule({
+        label: "sternwarte:projections",
+        code: SOURCE.replace("OUTPUT_FORMAT", format),
+    });
+    const pipeline = device.createComputePipeline({
+        label: "sternwarte:projections:display",
+        layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
+        compute: { module, entryPoint: "display" },
+    });
+    made = { pipeline, layout };
+    displays.set(format, made);
+    return made;
+}
+let shared: { sampler: GPUSampler; noCube: GPUTexture } | null = null;
+function sharedResources() {
+    const device = gpuDevice();
+    shared ??= {
+        sampler: device.createSampler({
+            magFilter: "linear",
+            minFilter: "linear",
+            addressModeU: "repeat",
+            addressModeV: "clamp-to-edge",
+        }),
+        // A panorama has no cube to bind.
+        noCube: device.createTexture({
+            size: [1, 1, 6],
+            format: "rgba16float",
+            usage: GPUTextureUsage.TEXTURE_BINDING,
+        }),
+    };
+    return shared;
 }
 
-const requestDraw = onDemand(draw, root);
+function mount(root: HTMLElement) {
+    const errors = root.dataset.projections === "error";
+    const field = <T extends HTMLElement = HTMLElement>(name: string) => find<T>(`[data-field="${name}"]`, root);
+    const stage = (name: string) => find(`[data-panel="${name}"]`, root);
+    const canvasOf = (name: string) => find<HTMLCanvasElement>("canvas", stage(name));
+    const chosen = (name: string, fallback: string) =>
+        root.querySelector<HTMLInputElement>(`input[name="${root.id}-${name}"]:checked`)?.value ?? fallback;
+    const chosenProjection = () => chosen("projection", "cube") as Projection;
+    const chosenSize = () => chosen("budget", "xs") as Size;
+    const chosenFormat = () => (errors ? chosen("format", "rgba16float") : "rgba16float") as Format;
+    const pressed = (name: string) => field(name).getAttribute("aria-pressed") === "true";
+    // Looking south, a little above the horizon, 100° across the view's height, as the sky figure's camera measures it.
+    const camera: SkyCamera = { yaw: 180 * DEG, pitch: 25 * DEG, fov: 100 * DEG };
 
-if (gpu.error) {
-    gpuMissing(find(".projections-view", root));
-} else {
-    onSkyView(requestDraw);
+    function placeMarks(panel: string, marks: Mark[]) {
+        const holder = find(".projections-marks", stage(panel));
+        holder.replaceChildren(
+            ...marks.map(([text, x, y]) => {
+                const span = document.createElement("span");
+                span.textContent = text;
+                // Within the panel, by half a mark at the edges.
+                span.style.left = `${Math.min(Math.max(x, 0.03), 0.97) * 100}%`;
+                span.style.top = `${Math.min(Math.max(y, 0.06), 0.94) * 100}%`;
+                return span;
+            }),
+        );
+    }
+    function showMarks(projection: Projection) {
+        const on = pressed("marks");
+        placeMarks("flat", on ? FLAT_MARKS[projection] : []);
+        // Projected as the shader projects, kept where they fall within the view.
+        const canvas = canvasOf("inside");
+        const [width, height] = [canvas.clientWidth || 1, canvas.clientHeight || 1];
+        const basis = cameraBasis(camera, width / height);
+        const marks: Mark[] = [];
+        for (const [text, d] of on ? VIEW_MARKS : []) {
+            const at = project(d, basis, width, height);
+            if (at && at.x > 0 && at.x < width && at.y > 0 && at.y < height)
+                marks.push([text, at.x / width, at.y / height]);
+        }
+        placeMarks("inside", marks);
+    }
+
+    let panels: Record<"flat" | "inside", Panel> | null = null;
+    let format: GPUTextureFormat = SDR;
+    function setUp() {
+        const device = gpuDevice();
+        format = displayOutput().format;
+        const panel = (name: string): Panel => {
+            const context = canvasOf(name).getContext("webgpu");
+            if (!context) throw new Error("No WebGPU canvas context");
+            configureCanvas(context, format);
+            return {
+                context,
+                params: device.createBuffer({
+                    size: PARAMS_SIZE,
+                    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+                }),
+            };
+        };
+        panels = { flat: panel("flat"), inside: panel("inside") };
+    }
+
+    let built: { texture: GPUTexture; of: GPUTexture; key: string } | null = null;
+    let building = false;
+    const keyOf = () => `${chosenProjection()},${sizeOf(chosenProjection(), chosenSize())},${chosenFormat()}`;
+
+    async function build(of: GPUTexture) {
+        building = true;
+        const key = keyOf();
+        const [projection, size, kept] = [chosenProjection(), chosenSize(), chosenFormat()];
+        const device = gpuDevice();
+        try {
+            const texture = await make(of, projection, size, kept);
+            // Only the chosen map at the chosen size is computed: how long it takes, from the submit until the GPU is done.
+            const submitted = performance.now();
+            device.queue.onSubmittedWorkDone().then(() => {
+                const ms = performance.now() - submitted;
+                field("timing").textContent = `· computed in ${ms < 10 ? ms.toFixed(1) : Math.round(ms)} ms`;
+            });
+            built?.texture.destroy();
+            built = { texture, of, key };
+        } finally {
+            building = false;
+        }
+        requestDraw();
+    }
+
+    function draw() {
+        const of = hdri.texture;
+        if (!of) return;
+        const projection = chosenProjection();
+        const size = chosenSize();
+        if (!built || built.of !== of || built.key !== keyOf()) {
+            if (!building) build(of);
+            return;
+        }
+        // The page's HDR choice: canvases made anew for the other format.
+        const output = displayOutput();
+        if (!panels || output.format !== format) setUp();
+        if (!panels) return;
+        const { pipeline, layout } = displayFor(format);
+        const { sampler, noCube } = sharedResources();
+        // Dithered by an 8-bit step, which a float canvas does not need.
+        field<HTMLButtonElement>("dither").disabled = format !== SDR;
+        const device = gpuDevice();
+        const { texture } = built;
+        const encoder = device.createCommandEncoder({ label: "sternwarte:projections" });
+        const inside = canvasOf("inside");
+        const { r, u, f, tx, ty, d } = cameraBasis(camera, inside.clientWidth / Math.max(inside.clientHeight, 1));
+        for (const name of ["flat", "inside"] as const) {
+            const { context, params } = panels[name];
+            const canvas = canvasOf(name);
+            const dpr = window.devicePixelRatio || 1;
+            const width = Math.max(1, Math.round(canvas.clientWidth * dpr));
+            const height = Math.max(1, Math.round(canvas.clientHeight * dpr));
+            if (canvas.width !== width || canvas.height !== height) Object.assign(canvas, { width, height });
+            const data = new ArrayBuffer(PARAMS_SIZE);
+            const floats = new Float32Array(data);
+            const uints = new Uint32Array(data);
+            // The view from inside's own shape for both, so that the stored texture outlines what it shows.
+            floats.set([...r, 0, ...u, 0, ...f, 0]);
+            uints.set([texture.width, texture.height, PROJECTIONS.indexOf(projection), name === "inside" ? 1 : 0], 12);
+            uints[16] = pressed("edges") ? 1 : 0;
+            uints[17] = pressed("shade") ? (errors ? 2 : 1) : 0;
+            floats[18] = evenTexelsPerSr(projection, size);
+            floats[19] = tx;
+            uints[20] = ["nearest", "linear", "cubic"].indexOf(chosen("filter", "nearest"));
+            uints[21] = ["neutral", "agx", "aces", "clip"].indexOf(display.toneCurve);
+            floats[22] = ty;
+            floats[23] = d;
+            floats[24] = exposureFromEV100(hdri.ev100);
+            uints[25] = pressed("dither") && format === SDR ? 1 : 0;
+            floats[26] = format === SDR ? 1 : output.headroom;
+            uints[27] = errors && pressed("original") ? 1 : 0;
+            device.queue.writeBuffer(params, 0, data);
+            const bindGroup = device.createBindGroup({
+                layout,
+                entries: [
+                    { binding: 0, resource: { buffer: params } },
+                    { binding: 1, resource: texture.createView({ dimension: "2d-array" }) },
+                    { binding: 2, resource: of.createView() },
+                    { binding: 3, resource: context.getCurrentTexture().createView() },
+                    {
+                        binding: 4,
+                        resource: (isCube(projection) ? texture : noCube).createView({ dimension: "cube" }),
+                    },
+                    { binding: 5, resource: texture.createView({ dimension: "2d", arrayLayerCount: 1 }) },
+                    { binding: 6, resource: sampler },
+                ],
+            });
+            const pass = encoder.beginComputePass({ label: `sternwarte:projections:${name}` });
+            pass.setPipeline(pipeline);
+            pass.setBindGroup(0, bindGroup);
+            pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
+            pass.end();
+        }
+        device.queue.submit([encoder.finish()]);
+        showMarks(projection);
+    }
+
+    function describe() {
+        const projection = chosenProjection();
+        const dimensions = sizeOf(projection, chosenSize());
+        stage("flat").style.setProperty("--aspect", String(ASPECT[projection]));
+        find(".projections-legend", root).hidden = !pressed("shade") || (errors && pressed("original"));
+        const { texels, above, sampled, ratio } = statsOf(projection, chosenSize());
+        const shape = isCube(projection) ? `6 faces of ${dimensions[0]}²` : `${dimensions[0]} × ${dimensions[1]}`;
+        const count = (n: number) => (n < 1e6 ? n.toLocaleString("en") : `${(n / 1e6).toFixed(1)} million`);
+        field("info").textContent =
+            `${shape}, ${count(texels)} texels, ${sampled ? "about " : ""}${count(above)} of them above the horizon; ` +
+            `the largest covers ${ratio.toFixed(2)} times the solid angle of the smallest` +
+            (errors && hdri.width ? `; measured against the HDRI, ${hdri.width} × ${hdri.height}` : "");
+        showCode(field("call"), call(projection, dimensions));
+    }
+
+    const requestDraw = onDemand(draw, root);
+    if (gpu.error) {
+        gpuMissing(find(".projections-view", root));
+        return;
+    }
+    if (errors && !hasBc6h()) {
+        const input = root.querySelector<HTMLInputElement>(`input[name="${root.id}-format"][value="bc6h-rgb-ufloat"]`);
+        if (input) {
+            input.disabled = true;
+            input
+                .closest("label")
+                ?.setAttribute("title", "This GPU does not decode BC6H: WebGPU's texture-compression-bc");
+        }
+    }
+    onHdri(() => {
+        describe();
+        requestDraw();
+    });
     onDisplay(requestDraw);
     for (const input of root.querySelectorAll<HTMLInputElement>("input[type=radio]")) {
         input.addEventListener("change", () => {
@@ -1108,19 +1221,17 @@ if (gpu.error) {
             requestDraw();
         });
     }
-    for (const name of ["edges", "density", "lock", "dither", "sunDisc"]) {
+    for (const name of ["edges", "shade", "dither", "marks", ...(errors ? ["original"] : [])]) {
         field(name).addEventListener("click", () => {
             field(name).setAttribute("aria-pressed", String(!pressed(name)));
             describe();
             requestDraw();
         });
     }
-    field("marks").addEventListener("click", requestDraw);
     for (const name of ["flat", "inside"]) new ResizeObserver(requestDraw).observe(canvasOf(name));
-    lookAround(canvasOf("inside"), camera, {
-        onChange: requestDraw,
-        onDrag: () => field("lock").setAttribute("aria-pressed", "false"),
-    });
+    lookAround(canvasOf("inside"), camera, { onChange: requestDraw });
     describe();
     requestDraw();
 }
+
+for (const root of document.querySelectorAll<HTMLElement>("[data-projections]")) mount(root);

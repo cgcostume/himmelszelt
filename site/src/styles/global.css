@@ -8,17 +8,21 @@
     /* The page's text sizes besides body (1rem), lead, h2 and h1: one small size, 13 pixels, for everything that is
        not running text, captions and labels inside figures alike, tables, controls, tooltips and the fine print. The two
        names stay, so a size of its own can come back for either. */
-    --text-small: 0.8125rem;
+    --text-small: 0.75rem;
+    /* The one size below it: scale labels, credits, the marks on a thumbnail; not something to read at length. */
+    --text-tiny: 0.6875rem;
     --text-meta: var(--text-small);
     --wide: 1140px;
     /* The width the page's content has: the viewport's, less the rail beside it where there is one (see rail.css). */
     --rail-space: 0px;
     --page-width: calc(100vw - var(--rail-space));
-    /* Corners: a canvas or panel, a group of controls, one control; and the smallest, for marks at the size of text. */
+    /* Corners: a canvas or panel, a group of controls, one control; and the smallest, for marks at the size of text.
+       Figures and code blocks are square (see figure, .fig below). */
     --radius-canvas: 16px;
     --radius-group: 10px;
     --radius-button: 8px;
     --radius-small: 4px;
+    --radius-chip: 4px;
     --font-mono: "Roboto Mono", ui-monospace, monospace;
     /* The figures' line styles, in screen pixels at any zoom: dots for fixed references, dashes for construction
        lines, long dashes for orbits, and the Sun symbol's dotted rays. */
@@ -27,6 +31,44 @@
     --line-long-dashes: 4 8;
     --sun-stroke: 1.7px;
     --sun-dots: 0.1 5.2;
+    /* A figure's shared lines: a band along the top of every view as high as its toolbar's buttons, where the text over
+       the view and the icons are centered, the same band along its foot, and the inset of text from a view's sides. */
+    --fig-band: 28px;
+    --fig-inset: 12px;
+    /* A hairline in whole device pixels: one at 100%, 125%, 150% and 175%, two at 200% and 250%. */
+    --hair: 1px;
+}
+@media (1.2dppx <= resolution <= 1.3dppx) {
+    :root {
+        --hair: 0.8px;
+    }
+}
+@media (1.45dppx <= resolution <= 1.55dppx) {
+    :root {
+        --hair: 0.6667px;
+    }
+}
+@media (1.7dppx <= resolution <= 1.8dppx) {
+    :root {
+        --hair: 0.5715px;
+    }
+}
+@media (2.2dppx <= resolution <= 2.3dppx) {
+    :root {
+        --hair: 0.8889px;
+    }
+}
+@media (2.45dppx <= resolution <= 2.55dppx) {
+    :root {
+        --hair: 0.8px;
+    }
+}
+/* Everything in a figure is square: its views, canvases, panels, insets, frames and controls. */
+:where(figure, .fig) {
+    --radius-canvas: 0px;
+    --radius-group: 0px;
+    --radius-button: 0px;
+    --radius-small: 0px;
 }
 /* The dark theme, and wherever a figure shows the sky as it is seen rather than a diagram of it (.as-seen), on either
    page: a lit Moon is light and the Sun bright in both. */
@@ -238,8 +280,10 @@ h2 {
     border-radius: 50%;
     translate: -50% 50%;
     color: color-mix(in oklab, var(--text) calc(min(1, var(--y) * 1.6) * 100%), var(--golden-hour));
+    box-sizing: content-box;
+    border: 4px solid var(--bg);
     background: currentColor;
-    box-shadow: 0 0 0 4px var(--bg);
+    background-clip: padding-box;
 }
 /* SUN in SkyRule.astro is half of this. */
 .sky-sun.current {
@@ -410,7 +454,7 @@ a.sky-sun:focus-visible {
 /* nachtgestirn's rule (see moonrule.ts): the other markers are Moons in their phase, the current one is its scene. */
 .sky-sun.moon {
     background: none;
-    box-shadow: none;
+    border-color: transparent;
     color: var(--muted);
 }
 .sky-sun.moon:not(.current) {
@@ -490,6 +534,24 @@ a.sky-sun.moon:focus-visible {
     /* A jump to a section lands on its rule: the rule's height and the space below it, and room above it for the
        scenes reaching over its top. */
     scroll-margin-top: calc(2.5rem + 2.5rem + 2.5rem);
+}
+/* The section's number and the chapter's name in a small line over its heading, "02 STERNZEIT", in the mono of the
+   page's labels: the rule 20 px closer than to a heading alone, the line 10 px above the heading. */
+.sky-rule:has(+ .section-number) {
+    margin-bottom: calc(2.5rem - 20px);
+}
+.section-number {
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    line-height: 20px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.section-number + h2 {
+    margin-top: 0;
+    scroll-margin-top: calc(2.5rem + 2.5rem + 2.5rem - 20px + 30px);
 }
 /* The package scope is the same on every chapter: the name after it is what the page is about. */
 h1 .scope {
@@ -746,17 +808,18 @@ pre {
     font-size: var(--text-meta);
     background: var(--code);
     border: var(--border);
-    border-radius: var(--radius-small);
+    border-radius: var(--radius-chip);
     padding: 0.1rem 0.35rem;
 }
 /* More room below than a paragraph's 1em: a paragraph's line-height already adds air under its last line, a box doesn't.
    A size smaller than inline code: a block is read line by line, and more of each line fits. Lines never wrap, as the
    indentation is the code's structure: where 80 columns do not fit, on a phone, the block scrolls sideways. */
 pre {
-    font-size: var(--text-small);
     margin: 1rem 0 1.75rem;
-    padding: 0.75rem 1rem;
-    border-radius: var(--radius-canvas);
+    padding: 10px 16px;
+    border-radius: 0;
+    font-size: var(--text-small);
+    line-height: 20px;
     overflow-x: auto;
 }
 pre code {
@@ -765,18 +828,20 @@ pre code {
     border: 0;
     padding: 0;
 }
-/* Highlighted in the page's theme: Shiki writes the colors of both as variables (see astro.config.mjs and code.ts). */
-.astro-code,
-.astro-code span {
-    color: var(--shiki-dark);
-    font-style: var(--shiki-dark-font-style);
-    font-weight: var(--shiki-dark-font-weight);
-}
-:root[data-theme="light"] .astro-code,
-:root[data-theme="light"] .astro-code span {
-    color: var(--shiki-light);
-    font-style: var(--shiki-light-font-style);
-    font-weight: var(--shiki-light-font-weight);
+/* Highlighted in the page's own colors, whichever theme (see astro.config.mjs and code.ts): keywords in the accent,
+   strings in the golden hour, comments quiet, punctuation muted, everything else the text. */
+.astro-code {
+    --shiki-foreground: var(--text);
+    --shiki-token-keyword: var(--accent);
+    --shiki-token-link: var(--accent);
+    --shiki-token-string: var(--golden-hour);
+    --shiki-token-string-expression: var(--golden-hour);
+    --shiki-token-comment: color-mix(in oklab, var(--muted), transparent 30%);
+    --shiki-token-punctuation: var(--muted);
+    --shiki-token-constant: var(--text);
+    --shiki-token-function: var(--text);
+    --shiki-token-parameter: var(--text);
+    color: var(--shiki-foreground);
 }
 /* Line numbers, quiet, from CSS alone: not part of the text, so neither selected nor copied with it. */
 pre code {
@@ -839,9 +904,6 @@ input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
-/* Sliders: the part left of the thumb a 3px rail in the accent, the rest a 1px line, both with round outer ends. The
-   thumb is a plain disc ringed in the background color, which reads as a gap between the two rails. --range-fill, from
-   range.js, is how far along the value is; the rail ends under the thumb's center, which never reaches the edges. */
 /* Every slider turns with the mouse wheel, over itself and its label (see range.js): a cursor of an arrow up, a circle
    and an arrow down says so. */
 :root {
@@ -862,85 +924,103 @@ input[type="range"]:not(:disabled),
 label:has(> input[type="range"]:not(:disabled)) {
     cursor: var(--cursor-wheel);
 }
+/* Sliders, the native input in CSS alone: a 4 px track of layered gradients, a 1 px hairline over the allowed range, the
+   part up to the value 3 px thick, notched by 2 px gaps at the scale's marks, and outside the allowed range the dim dotted
+   leader. The cursor is 2 px wide and 12 px high, standing 4 px out either side, with a 2 px gap of ground left and right.
+   range.ts sets the shares (--range-v, --range-lo, --range-hi) and the notches; a share lies at 3 px + share × (100% − 6 px),
+   under the thumb's middle, and on the minus axis of the text beside it as the leaders. */
 input[type="range"] {
-    --range-thumb: 18px;
-    --range-gap: var(--bg);
-    --range-left: calc(var(--range-fill, 0.5) * (100% - var(--range-thumb)) + var(--range-thumb) / 2);
+    --range-ink: var(--muted);
+    --range-cursor: var(--text);
+    --range-gap: var(--page-bg, var(--bg));
+    --range-leader: color-mix(in oklab, var(--muted), transparent 65%);
+    --range-l: calc(3px + var(--range-lo, 0) * (100% - 6px));
+    --range-h: calc(3px + var(--range-hi, 1) * (100% - 6px));
+    --range-x: calc(3px + var(--range-v, 0) * (100% - 6px));
+    --range-track:
+        var(--range-notches, none) 0 0 / 100% 100% no-repeat,
+        linear-gradient(90deg, transparent var(--range-l), var(--range-ink) 0 var(--range-x), transparent 0) center / 100%
+        3px no-repeat,
+        linear-gradient(90deg, transparent var(--range-l), var(--line) 0 var(--range-h), transparent 0) center / 100% 1px
+        no-repeat,
+        repeating-linear-gradient(90deg, var(--range-leader) 0 1px, transparent 1px 3px) center / 100% 1px no-repeat;
     appearance: none;
-    height: var(--range-thumb);
+    height: 20px;
     padding: 0;
     border: 0;
     border-radius: 0;
     background: transparent;
 }
-/* The rail's two thicknesses in whole device pixels (see range.ts): at 150%, 3 px are 4.5 of them, which Firefox draws
-   as 4 or 5 depending on where the slider sits on the page. */
 input[type="range"]::-webkit-slider-runnable-track {
-    height: var(--rail, 3px);
-    border-radius: calc(var(--rail, 3px) / 2);
-    background:
-        linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) var(--rail, 3px) no-repeat,
-        linear-gradient(var(--line), var(--line)) right center / 100% var(--rail-thin, 1px) no-repeat;
+    height: 4px;
+    border: 0;
+    border-radius: 0;
+    background: var(--range-track);
 }
 input[type="range"]::-moz-range-track {
-    height: var(--rail, 3px);
-    border-radius: calc(var(--rail, 3px) / 2);
-    background:
-        linear-gradient(var(--accent), var(--accent)) left center / var(--range-left) var(--rail, 3px) no-repeat,
-        linear-gradient(var(--line), var(--line)) right center / 100% var(--rail-thin, 1px) no-repeat;
+    height: 4px;
+    border: 0;
+    border-radius: 0;
+    background: var(--range-track);
 }
 input[type="range"]::-webkit-slider-thumb {
     appearance: none;
-    box-sizing: border-box;
-    width: var(--range-thumb);
-    height: var(--range-thumb);
-    margin-top: calc((3px - var(--range-thumb)) / 2);
-    border: 3px solid var(--range-gap);
-    border-radius: 50%;
-    background: var(--accent);
+    box-sizing: content-box;
+    width: 2px;
+    height: 12px;
+    margin-top: -4px;
+    border: 0 solid var(--range-gap);
+    border-width: 0 2px;
+    border-radius: 0;
+    background: var(--range-cursor);
 }
 input[type="range"]::-moz-range-thumb {
-    box-sizing: border-box;
-    width: var(--range-thumb);
-    height: var(--range-thumb);
-    border: 3px solid var(--range-gap);
-    border-radius: 50%;
-    background: var(--accent);
-}
-/* The one-time hint that a slider can be dragged (see range.ts): the thumb rings out three times, or once, held, for
-   a reader who prefers less motion. */
-@keyframes slider-hint {
-    0% {
-        box-shadow: 0 0 0 0 var(--accent);
-    }
-    100% {
-        box-shadow: 0 0 0 6px transparent;
-    }
-}
-input[type="range"].slider-hint::-webkit-slider-thumb {
-    animation: slider-hint 0.9s ease-out 3;
-}
-input[type="range"].slider-hint::-moz-range-thumb {
-    animation: slider-hint 0.9s ease-out 3;
-}
-@keyframes slider-hint-still {
-    0%,
-    100% {
-        box-shadow: 0 0 0 4px var(--accent);
-    }
-}
-@media (prefers-reduced-motion: reduce) {
-    input[type="range"].slider-hint::-webkit-slider-thumb {
-        animation: slider-hint-still 2.5s 1;
-    }
-    input[type="range"].slider-hint::-moz-range-thumb {
-        animation: slider-hint-still 2.5s 1;
-    }
+    box-sizing: content-box;
+    width: 2px;
+    height: 12px;
+    border: 0 solid var(--range-gap);
+    border-width: 0 2px;
+    border-radius: 0;
+    background: var(--range-cursor);
 }
 input[type="range"]:focus-visible {
     outline: none;
 }
-/* Focus tints the gap around the thumb rather than drawing a ring of its own: the thumb keeps its size and shape. */
+/* Taken hold of, hovered or focused, in the accent; pushed against a limit, the cursor flashes in it (range.ts). */
+label:hover input[type="range"],
+input[type="range"]:is(:hover, :active, :focus-visible) {
+    --range-ink: var(--accent);
+    --range-cursor: var(--accent);
+}
+input[type="range"][data-stop] {
+    --range-cursor: var(--accent);
+}
+input[type="range"]:disabled {
+    opacity: 0.4;
+}
+/* The one-time hint that it can be dragged (see range.ts): the cursor blinks in the accent, or holds it, still. */
+@keyframes slider-hint {
+    50% {
+        background: var(--accent);
+    }
+}
+input[type="range"].slider-hint::-webkit-slider-thumb {
+    animation: slider-hint 0.9s steps(1) 3;
+}
+input[type="range"].slider-hint::-moz-range-thumb {
+    animation: slider-hint 0.9s steps(1) 3;
+}
+@media (prefers-reduced-motion: reduce) {
+    input[type="range"].slider-hint {
+        --range-cursor: var(--accent);
+    }
+    input[type="range"].slider-hint::-webkit-slider-thumb {
+        animation: none;
+    }
+    input[type="range"].slider-hint::-moz-range-thumb {
+        animation: none;
+    }
+}
 /* The thumb is dragged, so it takes the hand; the wheel cursor is for the rail and the label around it. */
 input[type="range"]:not(:disabled)::-webkit-slider-container,
 input[type="range"]:not(:disabled)::-webkit-slider-runnable-track {
@@ -960,12 +1040,6 @@ input[type="range"]:not(:disabled):active::-webkit-slider-thumb {
 }
 input[type="range"]:not(:disabled):active::-moz-range-thumb {
     cursor: grabbing;
-}
-input[type="range"]:focus-visible::-webkit-slider-thumb {
-    border-color: color-mix(in srgb, var(--accent) 40%, var(--range-gap));
-}
-input[type="range"]:focus-visible::-moz-range-thumb {
-    border-color: color-mix(in srgb, var(--accent) 40%, var(--range-gap));
 }
 /* Breaks out of the reading column to the full site width, for scenes, controls and tables that need the room. */
 .wide {
@@ -1000,7 +1074,6 @@ input[type="range"]:focus-visible::-moz-range-thumb {
     background: var(--surface);
     border: var(--border);
     border-radius: var(--radius-group);
-    box-shadow: 0 8px 24px var(--shadow);
     color: var(--text);
     font-size: var(--text-meta);
     font-style: normal;
@@ -1030,12 +1103,12 @@ input[type="range"]:focus-visible::-moz-range-thumb {
     aspect-ratio: 1;
     border-radius: var(--radius-small);
 }
-/* The one size below --text-small: a credit, not something to read. */
+/* A credit, not something to read: the tiny size. */
 .term-image-credit {
     display: block;
     margin-top: 0.2rem;
     color: var(--muted);
-    font-size: 0.6875rem;
+    font-size: var(--text-tiny);
     line-height: 1.3;
 }
 @media (max-width: 40rem) {
@@ -1061,6 +1134,10 @@ input[type="range"]:focus-visible::-moz-range-thumb {
    page's small size and the Sun symbol its weight, however large the figure is drawn. */
 svg text {
     font-size: calc(var(--text-small) * var(--units-per-px, 1));
+}
+/* A figure's annotations, its labels and scales, in the mono of the page's labels, as small as its captions. */
+.fig :is(svg text, .scene-annotation, .dome-compass-label, .frame-labels, .orbit-labels, .crater-label) {
+    font-family: var(--font-mono);
 }
 /* Zdog draws in scene units and bakes its zoom into the viewBox: strokes and dashes stay in screen pixels instead. */
 .zdog path {
@@ -1106,10 +1183,15 @@ figure > .figure-caption {
 .tiles-labels:has(> *):not(:has(> :not(:empty))) {
     display: none;
 }
+/* Its number as a label before the text, "FIG. 3", in the mono of the page's labels and in the accent. */
 .figure-caption::before {
     counter-increment: figure;
-    content: "Figure\a0" counter(figure) ". ";
+    content: "Fig.\a0" counter(figure);
+    margin-right: 0.8ch;
     color: var(--accent);
+    font-family: var(--font-mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 /* A fold drawn like the moment and place: a rule down the left and a line saying what is inside. */
 .fold {
@@ -1243,22 +1325,34 @@ figure[id],
 .code-block > pre {
     margin: 0;
 }
-/* 8px in from the block's 16px corner, as a figure's buttons sit, so the two corners share a center. */
+/* Square in the block's corner, as a figure's toolbar sits in its view's: the page's ground, 2 px of it left and under
+   the button. Hovered, a block in the line's tone; copied, the tint of a pressed button. */
 .code-copy {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 0;
+    right: 0;
     display: grid;
     place-items: center;
-    width: 1.65rem;
-    padding: 0.2rem 0;
+    box-sizing: content-box;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-left: 2px solid var(--bg);
+    border-bottom: 2px solid var(--bg);
+    border-radius: 0;
     color: var(--muted);
-    background: var(--surface);
+    background: var(--bg);
+    background-clip: padding-box;
     opacity: 0;
     transition: opacity 0.15s;
 }
-.code-copy:hover,
+.code-copy:hover {
+    background-color: var(--line);
+    color: var(--text);
+}
 .code-copy[data-copied] {
+    background-color: var(--overlay-tint);
     color: var(--accent);
 }
 .code-block:hover > .code-copy,
@@ -1287,7 +1381,6 @@ dialog.cyanometer {
     color: var(--text);
     border: var(--border);
     border-radius: var(--radius-group);
-    box-shadow: 0 8px 24px var(--shadow);
     font-size: var(--text-meta);
     text-align: left;
 }

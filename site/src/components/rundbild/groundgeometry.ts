@@ -1,6 +1,7 @@
 import Zdog from "zdog";
 import { find } from "../dom";
 import { onDemand } from "../frame";
+import { cameraFrame } from "../scene/scene";
 import { themeColor, themeColors } from "../sternzeit/figure";
 import { bendDistance, bendPoint, groundedBend, groundedMeets } from "./ground-math";
 import { setGroundSurface } from "./ground-state";
@@ -383,13 +384,16 @@ function frame() {
 // The HDRI from the diagram's camera, without the solids, looking level the way it does: the scene's camera orbits a
 // point a meter ahead of it.
 const hdriCanvas = find<HTMLCanvasElement>('[data-field="canvas"]', root);
-const requestHdri = createGroundedView(hdriCanvas, () => {
-    const p = parameters();
+function hdriCamera(p: Parameters) {
     const [rho, up] = cameraAt(p);
     const [east, north] = [Math.sin(heading * DEG), Math.cos(heading * DEG)];
     const center: [number, number, number] = [(rho + 1) * east, (rho + 1) * north, up];
+    return { yaw: (heading + 180) * DEG, pitch: 0, distance: 1, fov: FOV, center };
+}
+const requestHdri = createGroundedView(hdriCanvas, () => {
+    const p = parameters();
     return {
-        camera: { yaw: (heading + 180) * DEG, pitch: 0, distance: 1, fov: FOV, center },
+        camera: hdriCamera(p),
         height: p.height,
         lift: p.lift,
         reach: p.reach,
@@ -400,6 +404,79 @@ const requestHdri = createGroundedView(hdriCanvas, () => {
         solids: false,
     };
 });
+
+// The diagram's horizon, the image's, where the bend meets the dome and the reach, drawn over the image from its camera.
+const annotations = find<SVGSVGElement>('[data-field="annotations"]', root);
+const annotate = field("annotate");
+const SVG = "http://www.w3.org/2000/svg";
+function drawAnnotations() {
+    const on = annotate.getAttribute("aria-pressed") === "true";
+    annotations.style.display = on ? "" : "none";
+    if (!on) return;
+    annotations.replaceChildren();
+    const [width, height] = [hdriCanvas.clientWidth, hdriCanvas.clientHeight];
+    annotations.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    const p = parameters();
+    const camera = hdriCamera(p);
+    const { eye, forward, right, up } = cameraFrame(camera);
+    const ty = Math.tan(camera.fov / 2);
+    const tx = (ty * width) / height;
+    const dot = (a: readonly number[], b: readonly number[]) => a.reduce((sum, x, i) => sum + x * (b[i] ?? 0), 0);
+    // A point in meters, east, north and up from under the capture point, on the canvas, or null behind the camera.
+    const project = (e: number, n: number, u: number) => {
+        const d = [e - eye[0], n - eye[1], u - eye[2]];
+        const z = dot(d, forward);
+        if (z < 1e-3) return null;
+        return [((1 + dot(d, right) / (z * tx)) * width) / 2, ((1 - dot(d, up) / (z * ty)) * height) / 2] as const;
+    };
+    const add = (tag: string, attributes: Record<string, string>, text?: string) => {
+        const element = document.createElementNS(SVG, tag);
+        for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value);
+        if (text) element.textContent = text;
+        annotations.append(element);
+    };
+    // A ring around the capture point, `rho` out and `z` up, its label near where it crosses the view's middle: above
+    // the line or below it, at the first spot that clears the labels placed before.
+    const placed: [number, number, number, number][] = [];
+    const ring = (rho: number, z: number, name: string, cls = "", dash: string | null = null, below = false) => {
+        const point = (azimuth: number) => project(rho * Math.sin(azimuth * DEG), rho * Math.cos(azimuth * DEG), z);
+        let d = "";
+        let pen = false;
+        for (let k = 0; k <= 360; k++) {
+            const at = point(k);
+            if (at) d += `${pen ? "L" : "M"}${at[0].toFixed(1)} ${at[1].toFixed(1)}`;
+            pen = at !== null;
+        }
+        if (d) add("path", { d, class: [cls, dash ?? ""].join(" ").trim() });
+        const half = name.length * 3.7 + 2;
+        for (const offset of [0, -14, 14, -28, 28]) {
+            const at = point(heading + offset);
+            if (!at) continue;
+            for (const under of below ? [true, false] : [false, true]) {
+                const box: [number, number, number, number] = [at[0] - half, at[0] + half, 0, 0];
+                [box[2], box[3]] = under ? [at[1] + 3, at[1] + 16] : [at[1] - 17, at[1] - 4];
+                const clear = !placed.some((b) => box[0] < b[1] && b[0] < box[1] && box[2] < b[3] && b[2] < box[3]);
+                if (!clear || box[0] < 4 || box[1] > width - 4 || box[2] < 4 || box[3] > height - 4) continue;
+                placed.push(box);
+                add("text", { x: at[0].toFixed(1), y: String(box[3] - 3), class: cls }, name);
+                return;
+            }
+        }
+    };
+    const rho = p.domed ? p.radius : 1e6;
+    ring(rho, p.height, "horizon");
+    if (p.lift !== 0) {
+        const [r, z] = onSurface(p, p.lift * DEG);
+        ring(Math.min(r, 1e6), z, `image horizon ${degrees(p.lift)}`, "lifted", DASHED, p.lift < 0);
+    }
+    if (p.domed && !p.bend.corner) ring(p.bend.end[0] * p.height, p.bend.end[1] * p.height, "bend", "", DOTTED, true);
+    if (p.reach < FAR) ring(p.reach, 0, `reach ${meters(p.reach)}`, "", DOTTED, true);
+}
+annotate.addEventListener("click", () => {
+    annotate.setAttribute("aria-pressed", String(annotate.getAttribute("aria-pressed") !== "true"));
+    drawAnnotations();
+});
+new ResizeObserver(drawAnnotations).observe(hdriCanvas);
 
 const requestFrame = onDemand(frame, stage);
 const requestDiagram = onDemand(() => {
@@ -414,6 +491,7 @@ const publish = () => {
 const requestUpdate = () => {
     requestDiagram();
     requestHdri?.();
+    drawAnnotations();
 };
 
 for (const name of ["height", "lift", "reach", "soft", "radius"]) {

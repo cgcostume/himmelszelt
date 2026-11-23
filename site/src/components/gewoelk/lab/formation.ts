@@ -1,4 +1,5 @@
 import { wgsl as gewoelk } from "@himmelszelt/gewoelk";
+import { sampled } from "../quality";
 import { SHOW, type Shown, texturePanel } from "../textures";
 import shader from "./formation.comp.wgsl";
 import { createLab, floatStruct, type Lab, labPipeline, NOISE, type Presets } from "./lab";
@@ -151,7 +152,7 @@ export async function formationPasses(lab: Lab) {
         /** The sliders into the uniforms, the maps baked again where they changed, and the layers marched for a frame
          *  `width` by `height` pixels. */
         march(encoder: GPUCommandEncoder, width: number, height: number) {
-            const scale = Number(lab.choice("scale")) || 0.5;
+            const { scale, maxSteps } = sampled(lab.choice("sampling")).layered;
             const w = Math.max(1, Math.round(width * scale));
             const h = Math.max(1, Math.round(height * scale));
             rays = `${w} x ${h} rays`;
@@ -182,7 +183,7 @@ export async function formationPasses(lab: Lab) {
                     noiseKm: lab.value("noiseKm"),
                     reachKm: lab.value("reachKm"),
                     stepKm: lab.value("stepKm"),
-                    steps: Number(lab.choice("steps")) || 128,
+                    steps: maxSteps,
                     stepGrowth: lab.value("stepGrowth"),
                     multiple: lab.value("multiple"),
                     ambient: lab.value("ambient"),

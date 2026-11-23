@@ -7,13 +7,16 @@ import Choice from "./Choice.astro";
  */
 interface Props {
     figure: string;
+    /** As a combo, where its blocks would widen a narrow options panel. */
+    combo?: boolean;
 }
-const { figure } = Astro.props;
+const { figure, combo = false } = Astro.props;
 
 // The browser does not tell how far the display can go, so the headroom is chosen, the same for every figure.
 const HEADROOM = {
     name: "headroom",
     label: "HDR headroom",
+    heading: "HDR",
     title: "How many times brighter than SDR white the image may show: Neutral and none compress or cut off there instead of at white. AgX and ACES are fits to SDR and stay within it. The browser does not tell how far the display goes, so pick what looks right. Switches every figure",
     options: [
         ["1", "off", "SDR, as on any display: white is as bright as it gets"],
@@ -26,4 +29,4 @@ const HEADROOM = {
 ---
 
 <span class="note sky-hdr" data-hdr="note" hidden></span>
-<span data-hdr="choice"><Choice figure={figure} {...HEADROOM} /></span>
+<span data-hdr="choice"><Choice figure={figure} {...HEADROOM} combo={combo} /></span>

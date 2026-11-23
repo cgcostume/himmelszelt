@@ -41,7 +41,7 @@ import {
     MILKY_WAY_MAPS,
 } from "@himmelszelt/sternenheer";
 import { find } from "../dom";
-import { gpu, onTables, quality, tables } from "../dunstkreis/atmosphere";
+import { display, gpu, onDisplay, onTables, quality, tables } from "../dunstkreis/atmosphere";
 import { cameraBasis } from "../dunstkreis/skycamera";
 import { onDemand } from "../frame";
 import { paintRange } from "../range";
@@ -163,7 +163,7 @@ export function passesFigure(root: HTMLElement) {
     let deep: DeepStars | null | "loading" = null;
     let pass: { key: string; pass: StarsPass } | null = null;
     let sky: { luts: AtmosphereLUTs; pass: SkyPass } | null = null;
-    let moon: MoonPass | null = null;
+    let moon: { curve: string; pass: MoonPass } | null = null;
     let busy = false;
     let again = false;
 
@@ -175,13 +175,13 @@ export function passesFigure(root: HTMLElement) {
         if (!data || !device) return null;
         const catalog = picked(root, "catalog");
         const wantsDeep = catalog === "tycho" && deep !== null && deep !== "loading";
-        const key = `${tileSize()} ${capacity()} ${catalog} ${wantsDeep} ${moonOn}`;
+        const key = `${tileSize()} ${capacity()} ${catalog} ${wantsDeep} ${moonOn} ${display.toneCurve}`;
         if (pass?.key === key) return pass.pass;
         pass?.pass.destroy();
         pass = null;
         const made = await createStarsPass(device, {
             format: moonOn ? "rgba32float" : "rgba8unorm",
-            ...(moonOn ? { toneMap: false, dither: false } : { dither: true }),
+            ...(moonOn ? { toneMap: false, dither: false } : { toneMap: display.toneCurve, dither: true }),
             catalog: data.catalog,
             faintStars: catalog !== "yale" ? data.faint : null,
             deepStars: wantsDeep ? (deep as DeepStars) : null,
@@ -213,17 +213,21 @@ export function passesFigure(root: HTMLElement) {
     }
 
     async function moonFor() {
-        if (moon || !moonMaps) return moon;
-        moon = await createMoonPass(device as GPUDevice, {
+        const curve = display.toneCurve;
+        if (moon?.curve === curve || !moonMaps) return moon?.pass ?? null;
+        moon?.pass.destroy();
+        moon = null;
+        const made = await createMoonPass(device as GPUDevice, {
             format: "rgba8unorm",
-            toneMap: "neutral",
+            toneMap: curve,
             dither: true,
             background: true,
             maps: moonMaps,
             darkAdapted: false,
             samples: 4,
         });
-        return moon;
+        moon = { curve, pass: made };
+        return made;
     }
 
     async function draw() {
@@ -448,5 +452,6 @@ export function passesFigure(root: HTMLElement) {
     bindStarGroups(root, request);
     onChange(request);
     onTables(request);
+    onDisplay(request);
     request();
 }

@@ -42,7 +42,7 @@ const OUTPUTS = [
         </div>
         <Fragment slot="options">
             <OptionGroup name="metering">
-                <Choice figure="range" name="metering" label="How the meter weighs the image" title="What the meter counts" options={METERINGS} checked="average" />
+                <Choice figure="range" name="metering" label="How the meter weighs the image" title="What the meter counts" options={METERINGS} checked="average" combo />
             </OptionGroup>
             <OptionGroup name="counted">
                 <Choice figure="range" name="size" label="How many texels the meter counts" title="How many texels across the meter counts" options={SIZES} checked="2048" />
@@ -61,11 +61,13 @@ const OUTPUTS = [
     <p class="note" data-field="info"></p>
     <figcaption class="figure-caption">
         How much of the image lies at each brightness, in stops across and by the root of its share of the sphere up: the
-        curves what the meter weighs, the white line their luminance, the gray the whole image. The lit band is what the
-        output holds, dashed the meter's reading, the stripes clip, and the circle over the view is the meter's.
+        curves what the meter weighs, red, green and blue each on its own pixels, the white line their luminance, the gray
+        the whole image. The lit band is what the output holds, dashed the meter's reading, dithered what clips, and the
+        circle over the view is the meter's.
     </figcaption>
 </figure>
 
 <script>
+    import "../inset";
     import "./range";
 </script>

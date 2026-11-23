@@ -74,8 +74,10 @@
 #scene.labels-off :is(.scene-annotation:not(.pole-label), .scene-annotations) {
     visibility: hidden;
 }
-/* The two alt-az panels float on top of #stage, straddling its vertical middle; between them it is click-through. */
+/* The two alt-az panels float on top of #stage, straddling its vertical middle; between them it is click-through. The
+   scene's size containment scopes counters, so the panels' letters count from here. */
 .altaz-panels {
+    counter-reset: subfigure;
     position: absolute;
     inset: 0;
     pointer-events: none;
@@ -107,6 +109,10 @@
     border: var(--border);
     border-radius: var(--radius-canvas);
     background: var(--bg);
+}
+/* Laid over a scene, framed by the dim dotted leader line that also leads to the body it shows (see inset.ts). */
+:is(.altaz-panel, .analemma-panel) > svg {
+    border: 1px dotted var(--fig-leader);
 }
 /* The one panel sized by its box rather than by its own shape: it fills the height its scene gives it. */
 .altaz-panel > svg {
@@ -235,10 +241,15 @@ g.eclipse-corona {
 .dome-layer[data-layer="ground"] {
     opacity: 0.8;
 }
-.dome-compass {
+.dome-compass,
+.dome-leader {
     position: absolute;
     inset: 0;
     pointer-events: none;
+}
+.dome-leader {
+    width: 100%;
+    height: 100%;
 }
 /* `left` and `top` are set by dayarc.js, projecting each direction's point just outside the horizon ring. */
 .dome-compass-label {
@@ -501,9 +512,9 @@ g.eclipse-corona {
     visibility: hidden;
 }
 /* The big scenes have no panel frame to hang the actions off, so they line up with the figure's own content instead:
-   top right in the gutter the credit line and the caption use, or just short of the panels floating there. */
+   at the top in the band of the credit line, right in the gutter the caption uses, or just short of the panels there. */
 :where(#scene, .dome-scene, .orbit-scene, .frame-scene) > .fig-actions {
-    top: 0.5rem;
+    top: 0;
     right: var(--content-inset);
 }
 #scene {
@@ -1069,13 +1080,6 @@ span.daylight-day {
     position: absolute;
     inset: 0;
     pointer-events: none;
-}
-/* The angles and labels float over lines, so a halo in the page's background keeps them legible. */
-.frame-label {
-    text-shadow:
-        0 0 3px var(--bg),
-        0 0 3px var(--bg),
-        0 0 3px var(--bg);
 }
 .frame-labels .frame-axis {
     color: var(--text);

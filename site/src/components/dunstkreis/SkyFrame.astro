@@ -86,10 +86,10 @@ const named: Record<number, string> = { 0: "1 m", 3: "1 km", 5: "100 km" }
                     {refraction && <button type="button" class="view-icon" data-field="refraction" aria-pressed="true" title="Refraction: the light traced through the air, bending, the Sun lifted and squeezed low over the horizon. Switches it for the whole page, recomputing every table and cube map" aria-label="Refraction"><Icon name="refraction" /></button>}
                     <button type="button" class="view-icon sky-marks" data-field="marks" data-levels={grid ? 3 : 2} data-level={marks} data-titles={JSON.stringify(marksTitles)} aria-pressed={marks > 0 ? "true" : "false"} title={marksTitles[marks]} aria-label="Compass and grid"><Icon name="marks" /></button>
                 </span>
+                <slot name="bar" />
                 <span class="fig-hint footnote">{hint}</span>
             </span>
             <span class="fig-bar-end">
-            <slot name="bar" />
             {fly && <span class="view-buttons"><button type="button" class="view-icon" data-field="fly" aria-pressed="false" title="Fly, or F over the view: the mouse is captured and turns the view, W A S D move, E up and Q down, at a speed of the height over the ground per second, Shift faster, over a grid on the ground. F lands" aria-label="Fly"><Icon name="fly" /></button></span>}
             <span class="view-buttons fig-actions">
                 {!ownPlay && <button type="button" class="view-icon" data-field="play" aria-pressed="false" title="Play: the moment runs on, an hour in 10 seconds, half a day in 2 minutes" aria-label="Play"><Icon name="play" /></button>}
@@ -102,7 +102,7 @@ const named: Record<number, string> = { 0: "1 m", 3: "1 km", 5: "100 km" }
         </div>
         <label class="sky-height" data-height title="The observer's height, from eye level to the space station's orbit: drag, or turn the mouse wheel">
             <span class="sky-height-rail">
-                <input type="range" data-field="height" min="0" max="1000" step="10" aria-label="The observer's height" />
+                <input type="range" data-field="height" data-vertical min="0" max="1000" step="10" aria-label="The observer's height" />
                 <span class="sky-height-scale" aria-hidden="true">
                     {decades.map(({ decade, at }) => <span class:list={["sky-height-mark", { "sky-height-tick": !named[decade] }]} style={at}>{named[decade]}</span>)}
                 </span>

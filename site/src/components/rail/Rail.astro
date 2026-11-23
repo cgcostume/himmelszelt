@@ -21,8 +21,29 @@ const { chapter, sections, minutes } = Astro.props;
 const entries = [...sections, { slug: "references", text: "References" }];
 
 // What a chapter is about stays in its figures, where the text explains it, and the rail mutes it there.
-const LOCAL: Record<string, string[]> = { helldunkel: ["display"] };
+const LOCAL: Record<string, string[]> = { helldunkel: ["display"], sternenheer: ["stars"] };
 const local = LOCAL[chapter] ?? [];
+// The settings each chapter's figures read, by the names in settings.ts, fixed here so that the rail never changes on
+// the page: a group shows with these of its rows, and not at all without one or where the chapter keeps it. Keep it in
+// step with the figures the chapter's MDX imports.
+const SKY = ["toneCurve", "headroom", "exposure", "marks", "groundGrid"];
+const NEEDS: Record<string, string[]> = {
+    sternzeit: ["labels"],
+    helldunkel: SKY,
+    rundbild: SKY,
+    dunstkreis: SKY,
+    nachtgestirn: [...SKY, "labels"],
+    sternenheer: [...SKY, "labels"],
+    gewoelk: ["toneCurve", "headroom", "milkyWay", "marks"],
+};
+const GROUPS: Record<string, string[]> = {
+    display: ["toneCurve", "headroom", "exposure"],
+    quality: ["quality", "detail"],
+    stars: ["catalog", "milkyWay"],
+    annotations: ["marks", "groundGrid", "labels"],
+};
+const needs = (name: string) => (NEEDS[chapter] ?? []).includes(name);
+const shown = (group: string) => !local.includes(group) && GROUPS[group].some(needs);
 
 const TONE = {
     name: "tone",
@@ -36,6 +57,96 @@ const TONE = {
     ],
     checked: "neutral",
 };
+// The settings below as rows of radios (see settings.ts), each option a setting's value as JSON, but for plain words.
+const LEVELS = (what: string) => [
+    ["auto", "auto", `As each figure chooses ${what}`],
+    ["low", "low"],
+    ["medium", "medium"],
+    ["high", "high"],
+];
+const QUALITY = [
+    {
+        name: "quality",
+        row: "Preset",
+        label: "Quality preset",
+        title: "How much each figure spends on a frame, rays, samples and sizes, each mapped to steps of its own: auto lets each figure choose by the screen and its size",
+        options: LEVELS("by the screen and its size"),
+        checked: "auto",
+    },
+    {
+        name: "detail",
+        row: "Maps",
+        label: "Texture detail",
+        title: "The size of the maps fetched: the Moon's 512, 1K or 4K, the HDRIs' and the Milky Way's 2K, 4K or 8K. Auto fetches what the view's pixels need",
+        options: LEVELS("what the view's pixels need"),
+        checked: "auto",
+    },
+];
+const STARS = [
+    {
+        name: "catalog",
+        row: "Catalog",
+        label: "Star catalog",
+        title: "The stars drawn, each catalog with the ones before it: the Yale Bright Star Catalogue's 9,093, Hipparcos' 108,883 more, Tycho-2's 2.4 million more (14 MB, fetched when first picked)",
+        options: [
+            ["yale", "Yale"],
+            ["hipparcos", "Hipparcos"],
+            ["tycho", "Tycho-2"],
+        ],
+        checked: "hipparcos",
+    },
+    {
+        name: "milkyWay",
+        row: "Milky Way",
+        label: "Milky Way",
+        title: "NASA's Milky Way behind the stars, at its calibrated light",
+        options: [
+            ["true", "on"],
+            ["false", "off"],
+        ],
+        checked: "true",
+    },
+];
+const ANNOTATIONS = [
+    {
+        name: "marks",
+        row: "Marks",
+        label: "Marks over the skies",
+        title: "The marks over every sky: the compass directions, and the grid of altitudes and azimuths with the Sun's symbol where a view has one. Auto as each figure starts",
+        options: [
+            ["auto", "auto", "As each figure starts"],
+            ["off", "off"],
+            ["compass", "compass"],
+            ["grid", "grid"],
+        ],
+        checked: "auto",
+    },
+    {
+        name: "groundGrid",
+        row: "Ground grid",
+        label: "Ground grid",
+        title: "The grid on the ground while flying, every 10 km, 1 km, 100 m and on down, for orientation, speed and height",
+        options: [
+            ["true", "on"],
+            ["false", "off"],
+        ],
+        checked: "true",
+    },
+    {
+        name: "labels",
+        row: "Labels",
+        label: "Annotations",
+        title: "The annotations the figures write over their views: names, edges, readouts. Auto as each figure starts",
+        options: [
+            ["auto", "auto", "As each figure starts"],
+            ["on", "on"],
+            ["off", "off"],
+        ],
+        checked: "auto",
+    },
+];
+// The exposure compensation's notches, every stop from −2 to +2 on a scale of −3 to +3.
+const STOPS = [-2, -1, 0, 1, 2].map((stop) => `left: ${((stop + 3) / 6) * 100}%`);
 ---
 
 <aside class="rail" aria-label="Contents and settings" data-local={local.join(" ")}>
@@ -55,10 +166,10 @@ const TONE = {
             </ol>
         </details>
         <p class="rail-progress" aria-hidden="true">
-            <span class="rail-bar"><span class="rail-fill"></span></span>
+            <svg class="rail-bar"></svg>
             <span class="rail-percent">00%</span>
         </p>
-        <p class="rail-read">{minutes} min read</p>
+        <p class="rail-read">{minutes}&#8239;min read</p>
     </nav>
 
     <section class="rail-set" data-group="moment">
@@ -66,30 +177,76 @@ const TONE = {
         <p class="rail-why"></p>
     </section>
 
-    {chapter === "rundbild" && <RailHdri />}
+    {["rundbild", "helldunkel"].includes(chapter) && <RailHdri />}
 
-    <details class="rail-group" data-group="display" open>
+    {shown("display") && <details class="rail-group" data-group="display" open>
         <summary>
             <span class="rail-label">Display</span>
             <span class="note" data-field="summary"></span>
         </summary>
-        <div class="rail-row">
-            <span class="rail-name">tone</span>
+        {needs("toneCurve") && <div class="rail-row">
+            <span class="rail-name">Tone</span>
             <Choice figure="rail" {...TONE} />
-        </div>
-        <div class="rail-row">
-            <span class="rail-name">HDR</span>
-            <span class="rail-hdr"><Hdr figure="rail" /></span>
-        </div>
-    </details>
+        </div>}
+        {needs("headroom") && <div class="rail-row rail-hdr">
+            <Hdr figure="rail" />
+        </div>}
+        {needs("exposure") && <div class="rail-row rail-slider" data-setting="exposure" title="Stops added to each figure's metered exposure, brighter to the right; a figure exposed by hand keeps its own. Double-click for none">
+            <span class="rail-name">Exposure</span>
+            <span class="figure-slider-rail">
+                <input type="range" min="-3" max="3" step="0.1" value="0" aria-label="Exposure compensation, in stops" />
+                <span class="figure-slider-scale" aria-hidden="true">{STOPS.map((left) => <span class="figure-slider-mark" style={left} />)}</span>
+            </span>
+            <output>0.0&#8239;EV</output>
+        </div>}
+    </details>}
+    {
+        [
+            { group: "quality", title: "Quality", rows: QUALITY },
+            { group: "stars", title: "Stars", rows: STARS },
+            { group: "annotations", title: "Annotations", rows: ANNOTATIONS },
+        ]
+            .filter(({ group }) => shown(group))
+            .map(({ group, title, rows }) => (
+            <details class="rail-group" data-group={group} open>
+                <summary>
+                    <span class="rail-label">{title}</span>
+                    <span class="note" data-field="summary" />
+                </summary>
+                {rows.filter(({ name }) => needs(name)).map(({ row, ...choice }) => (
+                    <div class="rail-row" data-setting={choice.name}>
+                        <span class="rail-name">{row}</span>
+                        <Choice figure="rail" {...choice} />
+                    </div>
+                ))}
+            </details>
+        ))
+    }
 </aside>
-{/* Each group as the reader left it, folded or open, set before the first paint so that nothing moves (see rail.ts). */}
-<script is:inline>
+{/* Each group as the reader left it, folded or open, and each setting as chosen, set before the first paint so that
+    nothing moves (see rail.ts and settings.ts, whose keys an earlier version kept the display's under). */}
+<script is:inline define:vars={{ prefix: "sternwarte:", legacy: { toneCurve: "himmelszelt-tone-curve", headroom: "himmelszelt-headroom" } }}>
     try {
-        const folds = JSON.parse(localStorage.getItem("sternwarte:rail") ?? "{}");
+        const folds = JSON.parse(localStorage.getItem(`${prefix}rail`) ?? "{}");
         for (const fold of document.querySelectorAll(".rail details")) {
             const name = fold.closest("[data-group]")?.dataset.group;
             if (name in folds) fold.open = folds[name];
+        }
+        const value = (name) => {
+            const text = localStorage.getItem(prefix + name);
+            return text === null ? (localStorage.getItem(legacy[name]) ?? null) : String(JSON.parse(text));
+        };
+        for (const [name, radios] of [["toneCurve", "rail-tone"], ["headroom", "rail-headroom"]]) {
+            const chosen = value(name);
+            const radio = chosen && document.querySelector(`.rail input[name="${radios}"][value="${chosen}"]`);
+            if (radio) radio.checked = true;
+        }
+        for (const row of document.querySelectorAll(".rail [data-setting]")) {
+            const chosen = value(row.dataset.setting);
+            if (chosen === null) continue;
+            const input = row.querySelector(`input[type="range"], input[value="${chosen}"]`);
+            if (input?.type === "range") input.value = chosen;
+            else if (input) input.checked = true;
         }
     } catch {}
 </script>

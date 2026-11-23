@@ -1,39 +1,51 @@
+/* The HDRI boxes, in the text (Environments.astro) and in the rail (RailHdri.astro), in the rail's mono and quiet grays. */
+.environments {
+    --env-quiet: color-mix(in oklab, var(--muted), transparent 45%);
+    --env-tint: color-mix(in oklab, var(--accent) 22%, var(--surface));
+    --env-leader: 1px dotted color-mix(in oklab, var(--muted), transparent 65%);
+}
+/* Square thumbnails 2 px apart, the chosen one framed in the accent inside its square, so nothing moves. */
 .environments-gallery {
     display: grid;
     grid-template-columns: repeat(8, 1fr);
-    gap: 4px;
-    margin: 0.75rem 0 0.5rem;
+    gap: 2px;
+    margin: 0.75rem 0 0;
 }
 .environments-thumb {
-    display: flex;
+    display: block;
     height: auto;
-    flex-direction: column;
-    gap: 2px;
     min-width: 0;
-    padding: 2px;
-    border: 1px solid transparent;
-    border-radius: var(--radius-small);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
     background: none;
     color: inherit;
-    font-size: var(--text-small);
-    line-height: 1.2;
-    text-align: left;
     cursor: pointer;
 }
 .environments-thumb[aria-pressed="true"] {
-    border-color: var(--accent);
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
 }
 .environments-thumb img {
     display: block;
     width: 100%;
     aspect-ratio: 1;
     object-fit: cover;
-    /* Concentric with the button's corner, its padding in. */
-    border-radius: calc(var(--radius-small) - 2px);
 }
+/* In the text on a phone, four a row and three rows in view, the rest scrolled to a row at a time. */
 @media (max-width: 40rem) {
-    .environments-gallery {
+    main .environments {
+        container-type: inline-size;
+    }
+    main .environments-gallery {
         grid-template-columns: repeat(4, 1fr);
+        max-height: calc(3 * (100cqw - 6px) / 4 + 4px);
+        overflow-y: auto;
+        scroll-snap-type: y mandatory;
+        scrollbar-width: none;
+    }
+    main .environments-gallery > * {
+        scroll-snap-align: start;
     }
 }
 .environments-button {
@@ -53,20 +65,75 @@
     border-color: var(--accent);
     color: var(--accent);
 }
+/* Poly Haven searched by name, category or tag: a line to type on, under the gallery, a dotted leader its rule. */
+.environments input[type="search"] {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    height: 24px;
+    margin-top: 4px;
+    appearance: none;
+    padding: 0;
+    border: 0;
+    border-bottom: var(--env-leader);
+    border-radius: 0;
+    background: none;
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    line-height: 20px;
+    color: var(--text);
+}
+.environments input[type="search"]::-webkit-search-cancel-button {
+    display: none;
+    -webkit-appearance: none;
+}
+.environments input[type="search"]::placeholder {
+    color: var(--env-quiet);
+}
+.environments input[type="search"]:focus-visible {
+    outline: none;
+    border-bottom: 1px solid var(--accent);
+}
+/* A file of one's own, as an action in mono after a quiet chevron; the drop hint, the status and the thanks quieter. */
+.environments-own {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.75rem;
+    margin: 0.5rem 0 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    line-height: 20px;
+    color: var(--env-quiet);
+}
+.environments-action {
+    color: var(--muted);
+    cursor: pointer;
+}
+.environments-action::before {
+    content: "\203a\00a0";
+    color: var(--env-quiet);
+}
+.environments-action:hover,
+.environments-action:focus-within {
+    color: var(--accent);
+}
+.environments-status {
+    margin: 0.25rem 0 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    color: var(--env-quiet);
+}
+.environments-status:empty {
+    display: none;
+}
 .environments-thanks {
     margin: 0.75rem 0 0.25rem;
-}
-.environments input[type="search"] {
-    flex: 1 1 10rem;
-    min-width: 0;
-    height: 28px;
-    padding: 0 0.5rem;
-    border: 1px solid color-mix(in oklab, var(--text), transparent 70%);
-    border-radius: var(--radius-small);
-    background: none;
-    color: inherit;
-    font: inherit;
     font-size: var(--text-small);
+    color: var(--env-quiet);
+}
+.environments-thanks a {
+    color: var(--muted);
 }
 /* The bar over every figure showing the HDRI. */
 .env-stage {
@@ -85,26 +152,17 @@
     touch-action: none;
 }
 /* Who made the image, in its corner. */
+/* In the view's foot band, at its right (see figure.css for how text on a view looks). */
 .env-author {
     position: absolute;
     z-index: 1;
-    right: 8px;
-    bottom: 8px;
-    max-width: calc(100% - 16px);
-    padding: 3px 10px;
-    overflow: hidden;
-    border-radius: var(--radius-button);
-    background: var(--overlay-surface);
-    color: var(--overlay-ink);
-    font-size: var(--text-small);
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    right: var(--fig-inset);
+    bottom: 0;
+    max-width: calc(100% - 2 * var(--fig-inset));
+    height: var(--fig-band);
 }
 .env-author:empty {
     display: none;
-}
-.env-author a {
-    color: inherit;
 }
 .env-frame:fullscreen {
     display: flex;
@@ -142,49 +200,38 @@
     height: 100%;
     aspect-ratio: auto;
 }
-.env-frame .fig-hint {
-    pointer-events: auto;
-    /* Straight on the image, as the marks drawn onto a render are: light, lifted off clouds by a dark halo, on either
-       page and full screen. */
-    color: var(--render-ink);
-    text-shadow:
-        0 0 3px var(--render-shade),
-        0 0 6px var(--render-shade);
-}
-.env-loading {
-    display: none;
-    height: 2px;
-    overflow: hidden;
-    border-radius: 1px;
-    background: color-mix(in oklab, var(--overlay-ink), transparent 80%);
-}
-.env-loading > span {
-    display: block;
-    height: 100%;
-    width: calc(var(--progress, 0) * 100%);
-    background: var(--overlay-ink);
-}
-.environments-thumb[data-progress] .env-loading {
-    display: block;
-}
-.environments-thumb .env-loading {
-    position: absolute;
-    z-index: 1;
-    background: color-mix(in oklab, white, transparent 65%);
-}
-.environments-thumb .env-loading > span {
-    background: white;
-}
-/* On a thumbnail, within its square. */
-.environments-thumb .env-loading {
-    /* From the padding box, the image 2 px into it. */
-    left: 8px;
-    top: calc(100cqw - 6px);
-    width: calc(100cqw - 12px);
-}
+/* While one loads, from the click on: a dithered bar (see dither.ts) with its share on a plate along the top, inset. */
 .environments-thumb {
     position: relative;
-    container-type: inline-size;
+}
+.env-loading {
+    position: absolute;
+    z-index: 1;
+    top: 4px;
+    left: 4px;
+    right: 4px;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 5px;
+    background: color-mix(in oklab, var(--bg), transparent 15%);
+}
+.environments-thumb:is([data-progress], [aria-busy="true"]) .env-loading {
+    display: flex;
+}
+.env-loading > .env-bar {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    height: 8px;
+}
+.env-loading > .env-percent {
+    font-family: var(--font-mono);
+    font-size: var(--text-tiny);
+    /* Trimmed to the digits' height, so they center on the bar as "2K" does in its button. */
+    line-height: 1;
+    text-box: trim-both cap alphabetic;
+    color: var(--text);
 }
 .env-frame .hdri-view,
 .env-frame .tone-tiles {
@@ -196,17 +243,17 @@
 .env-frame:fullscreen .tone-tiles {
     border-radius: 0;
 }
-/* A thumbnail's resolutions, small over the top of its image, on hover or focus, the one shown in the accent: one click
-   loads the image at that resolution. Where nothing hovers, the chosen image keeps them. */
+/* A thumbnail's resolutions as square blocks over the top of its image, on hover or focus, the one shown tinted: one click
+   loads the image at that resolution. Where nothing hovers, the chosen image keeps them; while it loads, the bar does. */
 .environments-item {
     position: relative;
     min-width: 0;
 }
 .environments-res {
     position: absolute;
-    top: 6px;
-    left: 6px;
-    right: 6px;
+    top: 4px;
+    left: 4px;
+    right: 4px;
     display: flex;
     gap: 2px;
     opacity: 0;
@@ -223,25 +270,33 @@
         pointer-events: auto;
     }
 }
+.environments-item:has(> [aria-busy="true"]) .environments-res {
+    opacity: 0;
+    pointer-events: none;
+}
 .environments-res button {
     flex: 1;
     min-width: 0;
     height: auto;
-    padding: 1px 0;
     border: 0;
-    border-radius: var(--radius-small);
-    background: color-mix(in oklab, var(--overlay-solid), transparent 15%);
-    color: var(--overlay-quiet);
+    border-radius: 0;
+    background: color-mix(in oklab, var(--bg), transparent 15%);
+    color: var(--muted);
     font-family: var(--font-mono);
-    font-size: 10px;
-    line-height: 1.4;
+    font-size: var(--text-tiny);
+    /* The box trimmed to the capitals and the baseline, so "2K" sits in its middle, as much room above as below. */
+    padding: 4px 0;
+    line-height: 1;
+    text-box: trim-both cap alphabetic;
     cursor: pointer;
 }
 .environments-res button:hover {
-    color: var(--overlay-ink);
+    background: var(--line);
+    color: var(--text);
 }
 .environments-res button[aria-pressed="true"] {
-    color: var(--overlay-accent);
+    background: var(--env-tint);
+    color: var(--accent);
 }
 .environments-item > .environments-thumb {
     width: 100%;

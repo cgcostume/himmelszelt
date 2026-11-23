@@ -12,6 +12,7 @@ import { fromJulianDay, julianEphemerisDay, sun } from "@himmelszelt/sternzeit";
 import { find } from "../dom";
 import { onDemand, watchView } from "../frame";
 import { paintRange } from "../range";
+import { settings as chosen, exposureCompensation, onSetting } from "../settings";
 import { COMPASS } from "../sternzeit/figure";
 import { momentAndPlace, momentStamp, onChange, state } from "../sternzeit/state";
 import { gpuMissing } from "../webgpu";
@@ -228,7 +229,7 @@ export function skyFigure(root: HTMLElement) {
         const astronomyMs = performance.now() - started;
 
         const debugGrid = marks() === 2;
-        // Every sky follows the page's headroom; only the figure with every option chooses the tone curve, the others Neutral.
+        // Every sky follows the page's display choices; only the figure with every option has controls for them.
         const { format, headroom } = displayOutput();
         // Half floats need no dither: their steps are far finer than 8 bits'.
         const dither = pressed("dither") && format === SDR;
@@ -248,7 +249,7 @@ export function skyFigure(root: HTMLElement) {
             camera.pitch = Math.max(-89 * DEG, Math.min(89 * DEG, Math.asin(sunDirection[2])));
         }
         const skyStarted = performance.now();
-        const toneMap = full ? display.toneCurve : "neutral";
+        const toneMap = display.toneCurve;
         const settings: SkyPassOptions = {
             luts: table.luts,
             debugGrid,
@@ -278,6 +279,7 @@ export function skyFigure(root: HTMLElement) {
             projectionDistance: basis.d,
             pixelRatio: dpr,
             ev100: evOfSlider(),
+            exposureCompensation: exposureCompensation(),
             autoExposureKeys: pressed("ramp") ? PHOTO_RAMP : [],
             whiteBalance: skyWhite(sunDirection),
         });
@@ -295,13 +297,16 @@ export function skyFigure(root: HTMLElement) {
         placeCompass(basis, canvas.clientWidth, canvas.clientHeight);
         const encoder = gpu.device.createCommandEncoder();
         const target = gpu.context.getCurrentTexture();
-        // The sky into a texture like the canvas', and from there with the grid on the ground onto the canvas.
-        groundPass ??= createGroundGridPass(gpu.device);
-        const drawn = groundPass.skyFor(target);
-        pass.encode(encoder, drawn);
-        const view = { inverseViewProjection: inverseViewProjection(basis), projectionDistance: basis.d };
-        const radiusKm = table.luts.model.planet.groundRadiusKm;
-        groundPass.encode(encoder, drawn, { ...view, heightM: air.height(), radiusKm, flown: air.flown }, target);
+        // The sky into a texture like the canvas', and from there with the grid on the ground onto the canvas; without
+        // the grid, as the page's setting may have it, straight onto the canvas.
+        if (chosen.groundGrid) {
+            groundPass ??= createGroundGridPass(gpu.device);
+            const drawn = groundPass.skyFor(target);
+            pass.encode(encoder, drawn);
+            const view = { inverseViewProjection: inverseViewProjection(basis), projectionDistance: basis.d };
+            const radiusKm = table.luts.model.planet.groundRadiusKm;
+            groundPass.encode(encoder, drawn, { ...view, heightM: air.height(), radiusKm, flown: air.flown }, target);
+        } else pass.encode(encoder, target);
         gpu.device.queue.submit([encoder.finish()]);
         const submitted = performance.now();
         showTiming(astronomyMs, submitted - skyStarted, submitted);
@@ -347,6 +352,7 @@ export function skyFigure(root: HTMLElement) {
             bindHdr(find('[data-hdr="note"]', root), find('[data-hdr="choice"]', root));
         }
         onDisplay(requestRender);
+        onSetting(["exposure", "groundGrid"], requestRender);
         onChange(requestRender);
         onTables(() => {
             maybe("refraction")?.setAttribute("aria-pressed", String(quality.refraction));

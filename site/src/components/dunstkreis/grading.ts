@@ -21,6 +21,7 @@ import { gpuMissing } from "../webgpu";
 import { skyWhite } from "../white";
 import {
     configureCanvas,
+    display,
     displayOutput,
     gpu,
     gpuDevice,
@@ -340,13 +341,19 @@ function drawTiles() {
             requestRender();
         });
     }
-    const nextStarsKey = [format, headroom, catalog ? "stars" : "", milkyWay ? "milky way" : ""].join();
+    const nextStarsKey = [
+        format,
+        headroom,
+        display.toneCurve,
+        catalog ? "stars" : "",
+        milkyWay ? "milky way" : "",
+    ].join();
     if (!starsPass || starsKey !== nextStarsKey) {
         if (starsBuilding === nextStarsKey) return;
         starsBuilding = nextStarsKey;
         createStarsPass(device, {
             format,
-            toneMap: "neutral",
+            toneMap: display.toneCurve,
             headroom,
             dither: format === SDR,
             catalog,

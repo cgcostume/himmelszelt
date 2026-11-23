@@ -69,6 +69,9 @@ async function acquire(): Promise<Gpu> {
         const requirements = skyRequirements({ format: "rgba8unorm" }, adapter);
         // Timestamps around a pass, for the figures that show what a pass costs, where the GPU gives them.
         if (adapter.features.has("timestamp-query")) requirements.requiredFeatures.push("timestamp-query");
+        // BC6H textures, decoded by the hardware, for the figure that compares what each format loses.
+        if (adapter.features.has("texture-compression-bc"))
+            requirements.requiredFeatures.push("texture-compression-bc");
         // As large a texture as the GPU takes, up to 16384, for the largest maps and environments.
         requirements.requiredLimits.maxTextureDimension2D = Math.max(
             requirements.requiredLimits.maxTextureDimension2D ?? 8192,

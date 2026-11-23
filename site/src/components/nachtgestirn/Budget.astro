@@ -219,8 +219,11 @@ const loading = (maps: Maps, variant: Variant) => {
 </figure>
 
 <script>
+    import { ditherBars } from "../costs-dither";
+
     // The switch between the seen maps and the whole ones: each bar's width, value and title as the variant has it.
     for (const root of document.querySelectorAll<HTMLElement>("figure[data-moon-budget]")) {
+        ditherBars(root);
         const buttons = [...root.querySelectorAll<HTMLButtonElement>("[data-variant]")];
         const show = (variant: string) => {
             for (const b of buttons) b.setAttribute("aria-pressed", String(b.dataset.variant === variant));

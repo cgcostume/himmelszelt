@@ -25,8 +25,10 @@ const { id = "maps" } = Astro.props;
                 <button type="button" class="view-toggle" data-map="heights" aria-pressed="false" title="The heights, as gray from the lowest ground to the highest">heights</button>
                 <button type="button" class="view-toggle" data-map="roughness" aria-pressed="false" title="The roughness, the median slope over 57 m as gray, from flat to 15° and steeper, which the pass adds below the texels where a pixel is finer">roughness</button>
             </span>
+            <span class="view-buttons">
+                <button type="button" class="view-icon" data-field="annotations" aria-pressed="false" data-setting="labels" title="The annotations over the map, over the hatching of the moment: the edge of what Earth ever sees, the diurnal libration included, and past it the 2° margin and the 4° feather into the mean color, no height and no slope" aria-label="Annotations"><Icon name="labels" /></button>
+            </span>
             <span class="view-buttons fig-actions">
-                <button type="button" class="view-icon" data-field="annotations" aria-pressed="false" title="The annotations over the map, over the hatching of the moment: the edge of what Earth ever sees, the diurnal libration included, and past it the 2° margin and the 4° feather into the mean color, no height and no slope" aria-label="Annotations"><Icon name="labels" /></button>
                 <button type="button" class="view-icon" data-field="download" title="Download the map shown, with what Earth sees or the annotations, as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
                 <CopyInfo />
             </span>

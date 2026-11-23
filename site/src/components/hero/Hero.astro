@@ -65,18 +65,110 @@ const MODEL = {
     ],
     checked: "voxel",
 };
-const QUALITY = {
-    name: "quality",
-    label: "Quality",
-    title: "gewoelk's three dials of quality at one level: how far the clouds reach, how finely they are marched and stored, and how their shape changes",
-    options: [
-        ["low", "low", "Clouds out to 40 km, a third of the frame, no change of shape"],
-        ["medium", "medium", "Clouds out to 150 km, half the frame"],
-        ["high", "high", "Clouds to the horizon, the whole frame"],
-        ["ultra", "ultra", "Clouds to the horizon, the whole frame, the finest volumes and maps"],
-    ],
-    checked: "medium",
-};
+// gewoelk's cost, dial by dial: what its quality levels set together, each on its own here.
+const dial = (name: string, label: string, title: string, checked: string, options: string[][]) => ({
+    ...{ name, label, heading: label, title, checked, options },
+});
+const DIALS = [
+    dial(
+        "clearAt",
+        "clear at",
+        "The distance at which the last cloud is gone, for a clear horizon: clouds repeat less visibly and cost less far off",
+        "150",
+        [
+            ["40", "40 km"],
+            ["80", "80 km"],
+            ["150", "150 km"],
+            ["300", "300 km"],
+            ["0", "never", "Clouds all the way to the horizon"],
+        ],
+    ),
+    dial(
+        "clearFrom",
+        "clear from",
+        "The distance from which the clouds thin out towards where they are gone: at most that distance",
+        "40",
+        [
+            ["10", "10 km"],
+            ["20", "20 km"],
+            ["40", "40 km"],
+            ["80", "80 km"],
+            ["150", "150 km"],
+        ],
+    ),
+    dial("reach", "march", "How far the layered model's rays are marched through its layers", "160", [
+        ["60", "60 km"],
+        ["160", "160 km"],
+        ["200", "200 km"],
+        ["320", "320 km"],
+    ]),
+    dial("scale", "frame", "The share of the frame's width and height the clouds are marched at", "0.5", [
+        ["0.3333", "1/3", "A ninth of the pixels"],
+        ["0.5", "1/2", "A quarter of the pixels"],
+        ["1", "1", "Every pixel"],
+    ]),
+    dial("steps", "steps", "The most steps a ray takes through the clouds", "256", [
+        ["64", "64"],
+        ["128", "128"],
+        ["256", "256"],
+        ["384", "384"],
+        ["512", "512"],
+    ]),
+    dial("grid", "voxels", "The voxel volume's size: its cells across and up. Remade when changed", "256", [
+        ["128", "128 × 32"],
+        ["256", "256 × 64"],
+        ["384", "384 × 96"],
+    ]),
+    dial(
+        "noise",
+        "detail noise",
+        "The size of the 3D noise that carves the clouds' detail, in the voxel model",
+        "128",
+        [
+            ["64", "64"],
+            ["128", "128"],
+        ],
+    ),
+    dial("map", "cloud map", "The size of the maps the clouds stand on: at most 1024 in the voxel model", "512", [
+        ["256", "256"],
+        ["512", "512"],
+        ["1024", "1024"],
+        ["2048", "2048"],
+    ]),
+    dial("highMap", "sheet map", "The size of the high sheet's map", "1024", [
+        ["512", "512"],
+        ["1024", "1024"],
+        ["2048", "2048"],
+    ]),
+    dial(
+        "light",
+        "light samples",
+        "Detailed samples towards the Sun at every step in a cloud, in the voxel model",
+        "2",
+        [
+            ["1", "1"],
+            ["2", "2"],
+            ["3", "3"],
+        ],
+    ),
+    dial("near", "near detail", "How far from the eye a second, finer noise is read, in the voxel model", "0", [
+        ["0", "off"],
+        ["2", "2 km"],
+        ["4", "4 km"],
+    ]),
+    dial(
+        "change",
+        "change",
+        "How often the clouds' shape changes while the figure plays: they drift and billow either way",
+        "2",
+        [
+            ["off", "off", "No change of shape"],
+            ["2", "2 s", "The layers' maps baked every 2 s; the voxels keep their shape"],
+            ["0.5", "0.5 s", "The layers' maps baked every 0.5 s; the voxels keep their shape"],
+            ["0", "frame", "Every frame: the layers' maps baked and the voxels rebuilt"],
+        ],
+    ),
+];
 ---
 
 <figure class="fig scene-frame" id={id} data-hero>
@@ -96,19 +188,20 @@ const QUALITY = {
         </Fragment>
         <Fragment slot="options">
             <OptionGroup name="weather">
-                <Choice figure={id} {...WEATHER} />
+                <Choice figure={id} {...WEATHER} combo />
             </OptionGroup>
             <OptionGroup name="clouds">
                 <Choice figure={id} {...MODEL} />
                 <button type="button" class="view-toggle" data-field="contrails.on" aria-pressed="true" title="Contrails behind aircraft on eight invented routes over the place, at the high sheet's altitude: play to see them fly">contrails</button>
             </OptionGroup>
-            <OptionGroup name="quality">
-                <Choice figure={id} {...QUALITY} />
+            <OptionGroup name="performance">
+                {DIALS.map((d) => <Choice figure={id} {...d} combo />)}
+                <button type="button" class="view-toggle" data-field="godRays.on" aria-pressed="false" title="Shafts of light under the clouds, in the layered model: a pass of its own">god rays</button>
                 <button type="button" class="view-toggle" data-field="smooth.on" aria-pressed="true" title="Antialiasing: the Moon's disc by four rays a pixel, and the layered clouds brought to the frame's size by a box of three texels. The passes are compute passes, which have no MSAA: each smooths its own edges">antialiasing</button>
                 <button type="button" class="view-toggle" data-field="ground.grid" aria-pressed="true" title="A grid on the ground, for orientation, speed and height: thin lines every 10 km, 1 km, 100 m and on down, each level showing once its cells are a few pixels across">ground grid</button>
             </OptionGroup>
             <OptionGroup name="HDR (× SDR white)">
-                <Hdr figure={id} />
+                <Hdr figure={id} combo />
             </OptionGroup>
         </Fragment>
     </SkyFrame>

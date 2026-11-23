@@ -3,6 +3,7 @@ import { HDR, onTables, tables } from "../../dunstkreis/atmosphere";
 import { createStarsRenderer, type FrameLight, skyAt } from "../../sternenheer/renderer";
 import { bindStarGroups, offsetOf } from "../../sternenheer/stargroups";
 import { state } from "../../sternzeit/state";
+import { sampled } from "../quality";
 import { SHOW, type Shown, texturePanel } from "../textures";
 import { designerHeight, designerKinds, designerOrbit, designerSwap, designerTime, PATCH } from "./designer";
 import { voxelFrom, voxelPreset, voxelPresets, voxelSource } from "./kinds";
@@ -73,9 +74,12 @@ export async function voxelFigure(root: HTMLElement) {
     let darker = 0;
     bindStarGroups(root, () => lab.request(), false);
 
-    // The pass of the chosen share of the frame and steps, made when first asked for.
+    // The pass of the chosen sampling's march, made when first asked for: its grid is the designer's own.
     const passes = new Map<string, CloudPass | Promise<CloudPass>>();
-    const quality = () => ({ scale: Number(lab.choice("scale")) || 0.5, maxSteps: Number(lab.choice("steps")) || 256 });
+    const quality = () => {
+        const { scale = 1, maxSteps, nearLightSamples, nearDetailKm } = sampled(lab.choice("sampling")).voxel;
+        return { scale, maxSteps, nearLightSamples, nearDetailKm };
+    };
     const clouds = () => {
         const chosen = quality();
         const key = JSON.stringify(chosen);

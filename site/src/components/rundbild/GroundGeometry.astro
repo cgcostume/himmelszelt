@@ -1,8 +1,10 @@
 ---
 import EnvironmentFrame from "../environment/EnvironmentFrame.astro";
+import Icon from "../Icon.astro";
 import "../environment/environments.css";
 import "../helldunkel/helldunkel.css";
 import "../sternzeit/sternzeit.css";
+import "./groundgeometry.css";
 
 // The sliders of the grounded figure, with its ranges, but a dome of some 15 m rather than one without end, the reach at
 // its far end, the bend's circle, and how high up the dome the bend climbs.
@@ -77,7 +79,11 @@ const SLIDERS = [
         </figure>
         <figure class="fig-tile">
             <EnvironmentFrame fullscreen exposure={false} ownView="Drag to turn the camera. Raytraced with WebGPU.">
-                <div class="hdri-view as-seen"><canvas data-field="canvas" style="aspect-ratio: 4 / 3" aria-label="The chosen HDRI laid on that surface, as the diagram's camera sees it"></canvas></div>
+                <div class="hdri-view as-seen">
+                    <canvas data-field="canvas" style="aspect-ratio: 4 / 3" aria-label="The chosen HDRI laid on that surface, as the diagram's camera sees it"></canvas>
+                    <svg class="ground-annotations" data-field="annotations" aria-hidden="true" style="display: none"></svg>
+                </div>
+                <span class="view-buttons" slot="start"><button type="button" class="view-icon" data-field="annotate" aria-pressed="false" title="The surface's lines from the diagram over the image: the dome's horizon, the image's lifted horizon, where the bend meets the dome, and the reach" aria-label="Annotations"><Icon name="labels" /></button></span>
             </EnvironmentFrame>
             <figcaption><span class="subfigure-title">the image</span> on it, from the camera</figcaption>
         </figure>
@@ -97,7 +103,7 @@ const SLIDERS = [
     <figcaption class="figure-caption">
         The surface an image is laid on: (a) flat out to the reach, a dome for the sky, and between them a bend touching
         both, up to where the image's horizon meets the dome at most. Where a ray from the camera (accent) lands, the image is looked up from the capture point
-        (dashed); a lifted horizon shows as a dashed ring. (b) The chosen image on it, as that camera sees it.
+        (dashed); a lifted horizon shows as a dashed ring. (b) The chosen image on it, as that camera sees it, the surface's lines over it on request.
     </figcaption>
 </figure>
 

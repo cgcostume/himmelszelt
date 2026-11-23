@@ -19,15 +19,15 @@ const { id = "eclipse-row" } = Astro.props;
         <div class="fig-bar">
             <span class="fig-bar-start">
                 <span class="view-buttons">
-                    <button type="button" class="view-icon" data-field="annotations" aria-pressed="true" title="The annotations over the Moon: the edges of the umbra and of the penumbra" aria-label="Annotations"><Icon name="labels" /></button>
+                    <button type="button" class="view-icon" data-field="annotations" aria-pressed="true" data-setting="labels" title="The annotations over the Moon: the edges of the umbra and of the penumbra" aria-label="Annotations"><Icon name="labels" /></button>
                 </span>
-                <span class="fig-hint footnote">Rendered with WebGPU</span>
-            </span>
-            <span class="fig-bar-end">
                 <span class="view-buttons">
                     <Rays />
                     <button type="button" class="view-icon" data-field="metered" aria-pressed="true" title="Meter the big Moon and each disc of the row on its own, rather than all at the uneclipsed Moon's exposure, where the umbra's red is barely there" aria-label="Metered"><Icon name="meter" /></button>
                 </span>
+                <span class="fig-hint footnote">Rendered with WebGPU</span>
+            </span>
+            <span class="fig-bar-end">
                 <span class="view-buttons fig-actions"></span>
             </span>
         </div>

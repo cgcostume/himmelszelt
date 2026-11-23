@@ -5,6 +5,7 @@ import { find } from "../../dom";
 import {
     bindHdr,
     configureCanvas,
+    display,
     displayOutput,
     gpuDevice,
     HDR,
@@ -27,7 +28,8 @@ import view from "./view.wgsl";
  */
 
 const DEG = Math.PI / 180;
-const VIEW_SIZE = 192;
+const VIEW_SIZE = 208;
+const CURVES = { neutral: 1, agx: 2, aces: 3, clip: 4 };
 
 /** `LabView` packed, as view.wgsl reads it. */
 export function viewData(view: {
@@ -59,6 +61,7 @@ export function viewData(view: {
         [view.grid ? GROUND_GRID_STRENGTH : 0, view.lightScale ?? 1, view.skyLuminance ?? 0, view.headroom ?? 1],
         44,
     );
+    new Uint32Array(data.buffer)[48] = CURVES[display.toneCurve];
     return data;
 }
 /** What every research pass starts with: camera rays, tone curves, phase functions, the ground's grid, the view. */

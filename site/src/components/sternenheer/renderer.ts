@@ -187,6 +187,8 @@ export interface StarsFrame {
     pixelRatio: number;
     /** Null to meter: the sky where it is brighter than the stars' own light, else the Milky Way. */
     ev100: number | null;
+    /** Stops added to the metered exposure, +1 twice as bright, at once rather than followed; 0 by default. */
+    exposureCompensation?: number;
     stars: boolean;
     /** The Hipparcos stars besides the bright star catalog's. */
     faintStars: boolean;
@@ -356,6 +358,8 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             groundLight: quality.groundLight,
             dither: false,
             ...(veil ? {} : { veil: 0 }),
+            // The Moon's disc is drawn as the eye sees it, darker than the night is exposed: no veil over it.
+            moonVeil: false,
         }).then((pass) => {
             if (skyBuilding !== building) return pass.destroy();
             sky?.pass.destroy();
@@ -527,7 +531,7 @@ export function createStarsRenderer(device: GPUDevice, requestRender: () => void
             const following = adapted ? adaptEV100(adapted.ev100, goal, seconds, ADAPTATION) : goal;
             adapted = { ev100: following, at: now };
             const adapting = frame.ev100 === null && Math.abs(following - goal) > 0.01;
-            const ev100 = frame.ev100 ?? following;
+            const ev100 = frame.ev100 ?? following - (frame.exposureCompensation ?? 0);
 
             const started = performance.now();
             const view = {

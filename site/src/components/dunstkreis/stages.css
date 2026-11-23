@@ -65,7 +65,7 @@
 @media (max-width: 520px) {
     .stages-control .view-toggle {
         padding-inline: 3px;
-        font-size: 11px;
+        font-size: var(--text-tiny);
     }
     .stages-wide {
         display: none;

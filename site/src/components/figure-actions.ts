@@ -12,6 +12,9 @@ import { momentAndPlace, momentStamp } from "./sternzeit/state";
 
 const COPY_TITLE = "Copy this view: a link to it, its caption and every setting it shows, as JSON";
 const DOWNLOADS = "[data-field=png], [data-field=download], [data-action=svg], [data-action=png]";
+const FLY = "[data-field=fly]";
+const PLAY = "[data-field=play], [data-field=animate]";
+const OPTIONS = "[data-field=options]";
 const FULL_SCREEN = "[data-field=fullscreen], [data-env=fullscreen], [data-field=full-screen]";
 
 function button(name: string, title: string, label = title) {
@@ -46,10 +49,10 @@ function groupOf(host: HTMLElement, figure: HTMLElement) {
     return group;
 }
 
-/** Downloads, then Copy, then full screen, at the group's end, in that order. Two downloads side by side each say
- *  their format in a word, the last of their title, as one icon twice would not tell them apart. */
+/** Fly, play, options, downloads, Copy, full screen, at the group's end, in that order on every figure. Two downloads
+ *  side by side each say their format in a word, the last of their title, as one icon twice would not tell them apart. */
 function order(group: HTMLElement) {
-    for (const selector of [DOWNLOADS, "[data-field=copyInfo]", FULL_SCREEN])
+    for (const selector of [FLY, PLAY, OPTIONS, DOWNLOADS, "[data-field=copyInfo]", FULL_SCREEN])
         for (const element of group.querySelectorAll<HTMLElement>(`:scope > :is(${selector})`)) group.append(element);
     const downloads = [...group.querySelectorAll<HTMLElement>(`:scope > :is(${DOWNLOADS})`)];
     if (downloads.length < 2) return;

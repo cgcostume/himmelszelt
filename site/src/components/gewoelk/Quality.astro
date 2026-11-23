@@ -1,0 +1,21 @@
+---
+import type { QualityLevel } from "@himmelszelt/gewoelk";
+import Choice from "../dunstkreis/Choice.astro";
+import OptionGroup from "../dunstkreis/OptionGroup.astro";
+import { DIALS, type Dial, dial, type Reads } from "./quality";
+
+/** A figure's group of gewoelk's dials of quality (see quality.ts): those it reads, always in the same order. */
+interface Props {
+    figure: string;
+    reads: Reads;
+    dials: Dial[];
+    checked?: Partial<Record<Dial, QualityLevel>>;
+    /** Every dial as a combo, where four blocks would widen the figure's options panel. */
+    combo?: boolean;
+}
+const { figure, reads, dials, checked = {}, combo = false } = Astro.props;
+---
+
+<OptionGroup name="quality">
+    {DIALS.filter((name) => dials.includes(name)).map((name) => <Choice figure={figure} {...dial(name, reads, checked[name])} combo={combo} />)}
+</OptionGroup>

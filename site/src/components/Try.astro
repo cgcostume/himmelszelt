@@ -1,6 +1,4 @@
 ---
-import Icon from "./Icon.astro";
-
 /**
  * One experiment at the end of a figure's caption: a link that sets the moment and the place (see state.ts), named by
  * `label`, and what the figure then shows, in the slot. `set` is the link's query without the "?", `fig` the figure's
@@ -15,22 +13,23 @@ const { label, set, fig } = Astro.props;
 ---
 
 <span class="figure-try"
-    ><Icon name="bulb" /><a href={`?${set}#${fig}`}>{label}</a>: <slot /></span
+    ><b class="figure-try-label">Try</b><a href={`?${set}#${fig}`}>{label}</a>: <slot /></span
 >
 
 <style>
-    /* On a line of its own under the caption, in the text's color rather than the caption's muted one, behind a bulb in
-       the Sun's low gold. */
+    /* On a line of its own under the caption, in the text's color rather than the caption's muted one, behind a label
+       in the mono of the figure's number, in the Sun's low gold. */
     .figure-try {
         display: block;
         margin-top: 0.4em;
         color: var(--text);
     }
-    /* 1.1 em of the caption's 13 pixels. */
-    .figure-try > :global(.icon) {
-        --icon-size: 14.3;
-        margin-right: 0.3em;
-        vertical-align: -0.2em;
-        stroke: var(--golden-hour);
+    .figure-try-label {
+        margin-right: 0.8ch;
+        color: var(--golden-hour);
+        font-family: var(--font-mono);
+        font-weight: inherit;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
     }
 </style>

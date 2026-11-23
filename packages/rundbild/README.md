@@ -45,6 +45,14 @@ nine real spherical harmonics up to order 2 (Ramamoorthi & Hanrahan 2001), in a 
 and writes an irradiance cube map from them, 32x32 per face. An rgba32float source is read through a nearest sampler
 unless the device has "float32-filterable".
 
+## Compression
+
+`await createBc6hPass(device, { quality })`, then `encode(encoder, source, target, { layer, level })`, compresses an
+rgba16float or rgba32float image to bc6h-rgb-ufloat on the GPU, after Narkowicz's real-time encoder (MIT): mode 11 with
+`quality: "fast"`, and by default also the best of the 32 two-line partitions in modes 2 and 6. Negative light becomes 0.
+The device needs "texture-compression-bc", and the target, which the caller makes with `COPY_DST`, a size rounded up to a
+multiple of 4. A cube map is encoded face by face, `layer` 0 to 5.
+
 ## Files
 
 `encodeRgbe(pixels, width, height)` gives the bytes of a Radiance HDR file, `decodeRgbe(bytes)` the pixels of one.

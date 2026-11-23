@@ -29,6 +29,8 @@ struct LabView {
     skyLuminance: f32,
     // How many times SDR white the display may show: 1, or more on an HDR display.
     headroom: f32,
+    // The page's tone curve: 1 Neutral, 2 AgX, 3 ACES, 4 none.
+    curve: u32,
 }
 
 const LAB_PI: f32 = 3.141592653589793;
@@ -127,8 +129,17 @@ fn labAirFrom(view: LabView, v: vec3f, sun: vec3f) -> vec3f {
     return labSkyOver(select(v, level, v.z < horizon), sun, horizon);
 }
 
-// Exposed and tone mapped for the canvas, as the site's other figures: helldunkel's Neutral, towards `headroom` times
-// SDR white.
-fn labDisplay(luminance: vec3f, exposure: f32, headroom: f32) -> vec4f {
-    return vec4f(hdToneMapNeutralHdr(luminance * exposure, headroom), 1.0);
+// Through the page's tone curve, as the site's other figures: Neutral and none towards `headroom` times SDR white.
+fn labToneMap(exposed: vec3f, curve: u32, headroom: f32) -> vec3f {
+    switch curve {
+        case 2u: { return hdToneMapAgx(exposed); }
+        case 3u: { return hdToneMapAces(exposed); }
+        case 4u: { return hdToneMapClipHdr(exposed, headroom); }
+        default: { return hdToneMapNeutralHdr(exposed, headroom); }
+    }
+}
+
+// Exposed and tone mapped for the canvas.
+fn labDisplay(luminance: vec3f, exposure: f32, headroom: f32, curve: u32) -> vec4f {
+    return vec4f(labToneMap(luminance * exposure, curve, headroom), 1.0);
 }

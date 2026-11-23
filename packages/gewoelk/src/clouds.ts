@@ -646,6 +646,7 @@ export async function createCloudPass(device: GPUDevice, options: CloudPassOptio
                 { binding: 10, resource: transmittance },
                 { binding: 11, resource: clampSampler },
                 { binding: 13, resource: detailSampler },
+                { binding: 17, resource: far.createView() },
             ]),
             bindGroup(composePipeline, [
                 { binding: 0, resource: { buffer: params } },

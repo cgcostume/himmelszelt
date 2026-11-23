@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import mdx from "@astrojs/mdx";
 import { defineConfig } from "astro/config";
+import { createCssVariablesTheme } from "shiki/core";
 
 const source = (path) => fileURLToPath(new URL(`../packages/${path}`, import.meta.url));
 
@@ -18,9 +19,8 @@ export default defineConfig({
     integrations: [mdx()],
     markdown: {
         shikiConfig: {
-            // Both themes as CSS variables, which global.css picks from by the page's theme.
-            themes: { light: "github-light", dark: "github-dark" },
-            defaultColor: false,
+            // Every kind of token a CSS variable, which global.css sets from the page's own colors, in either theme.
+            theme: createCssVariablesTheme({ name: "sternwarte" }),
             // Drops the theme's inline background, so code blocks take the site's own (see pre in global.css).
             transformers: [
                 {
@@ -38,13 +38,7 @@ export default defineConfig({
         plugins: [wgsl],
         // Shiki's pieces for the code built in the page (code.ts), bundled up front: found late, a dev server serves 504s.
         optimizeDeps: {
-            include: [
-                "shiki/core",
-                "shiki/engine/javascript",
-                "shiki/langs/typescript.mjs",
-                "shiki/themes/github-light.mjs",
-                "shiki/themes/github-dark.mjs",
-            ],
+            include: ["shiki/core", "shiki/engine/javascript", "shiki/langs/typescript.mjs"],
         },
         // The site always shows the libraries' current source, no package build needed in between.
         resolve: {

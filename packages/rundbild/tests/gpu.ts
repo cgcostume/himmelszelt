@@ -44,7 +44,9 @@ export function gpuDevice(): Promise<GPUDevice | null> {
         const adapter = await instance.requestAdapter();
         if (!adapter) return null;
 
-        return adapter.requestDevice();
+        // BC6H for the encoder's tests, where the adapter has it.
+        const bc: GPUFeatureName = "texture-compression-bc";
+        return adapter.requestDevice({ requiredFeatures: adapter.features.has(bc) ? [bc] : [] });
     })();
 
     return devicePromise;

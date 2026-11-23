@@ -8,13 +8,13 @@
     margin: 1.5rem 0;
     /* How far the reading column is inset from this figure's edge: zero while the figure is as wide as the text, and
        half the difference once it breaks out. Everything in the figure that is read as text lines up with it. */
-    --content-inset: max(0px, calc((100% - var(--measure) + 3rem) / 2));
+    --content-inset: max(0px, calc((100% - var(--measure)) / 2));
 }
 .fig.wide {
     margin-left: calc(50% - var(--wide-width) / 2);
 }
 .fig.wide > :is(.figure-caption, .view-status, .figure-slider, .lut-call) {
-    width: calc(var(--measure) - 3rem);
+    width: var(--measure);
     max-width: 100%;
     margin-inline: auto;
     padding-inline: 0;
@@ -33,8 +33,8 @@
 }
 :where([data-actions], [data-export]) > .fig-actions {
     position: absolute;
-    top: 6px;
-    right: 6px;
+    top: 0;
+    right: 0;
     z-index: 5;
 }
 /* In a row of controls above a plot, at its end, as high in the row's flow as the segmented controls beside it. */
@@ -57,7 +57,10 @@
     }
 }
 
-/* A group of icon buttons over a figure (see SkyFrame.astro), in the page's own theme even over one that stays dark. */
+/* A group of buttons over a figure (see SkyFrame.astro), in the page's own theme even over one that stays dark: a square
+   strip in the page's ground, a notch cut out of the view rather than a thing on it, over a drawing on the page's ground
+   no ground at all. Every button carries 2 px of that ground to its left and under it, so the group is one ground and
+   the 2 px between groups show the picture. Hovered, a button is a block in the line's tone; pressed, a tinted one. */
 .view-buttons {
     --bg: var(--overlay-solid);
     --surface: var(--overlay-surface);
@@ -67,11 +70,29 @@
     --accent: var(--overlay-accent);
     display: flex;
     flex: none;
-    gap: 4px;
-    padding: 4px;
-    border-radius: var(--radius-group);
-    background: var(--overlay-surface);
+    gap: 0;
+    padding: 0;
+    border-radius: 0;
+    background: none;
     pointer-events: auto;
+}
+.view-buttons > :is(button, a, label, .view-toggle, .view-icon) {
+    box-sizing: content-box;
+    border-left: 2px solid var(--bg);
+    border-bottom: 2px solid var(--bg);
+    border-radius: 0;
+    background-color: var(--bg);
+    background-clip: padding-box;
+}
+/* A strip along a view's foot (a bar under the view, full screen) takes its ground above its buttons instead. */
+.view-buttons:is(.fig-foot, .view-buttons-foot) > :is(button, a, label, .view-toggle, .view-icon) {
+    border-top: 2px solid var(--bg);
+    border-bottom: 0;
+}
+/* A strip at a view's left takes its ground to the right of its buttons, so it sits flush in the corner too. */
+:is(.fig-bar-start, .scene-bar, .fig-bar) > .view-buttons:not(.fig-actions) > * {
+    border-right: 2px solid var(--bg);
+    border-left: 0;
 }
 /* A figure's readout, right under its view, in the reading column. */
 .view-status {
@@ -89,25 +110,22 @@
     isolation: isolate;
     display: grid;
     place-items: center;
-    width: 28px;
-    height: 28px;
+    width: var(--fig-band);
+    height: var(--fig-band);
     padding: 0;
     border: 0;
-    border-radius: var(--radius-button);
+    border-radius: 0;
     background: none;
-    color: var(--text);
+    color: var(--muted);
     transition: color 0.15s;
 }
 .view-icon[hidden] {
     display: none;
 }
-/* A name laid over a canvas, such as a tile's or a strip's: 8px in from a corner of the canvas' 16px radius. */
+/* A name laid over a canvas, such as a tile's or a strip's, as every text on a view (see below), in a corner's band. */
 .overlay-label {
-    padding: 2px 10px;
-    border-radius: var(--radius-button);
-    background: var(--overlay-solid);
-    color: var(--overlay-ink);
-    font-size: 0.9375rem;
+    display: block;
+    height: var(--fig-band);
 }
 /* A plot or a picture inset into a stage's bottom right corner, framed by a hairline, dark on either theme; over a sky
    view, clear of the time slider that full screen puts at its foot. Without specificity, so the inset's own rules win. */
@@ -118,8 +136,31 @@
     z-index: 1;
     overflow: hidden;
     border-radius: var(--radius-button);
-    box-shadow: 0 0 0 1px oklch(1 0 0 / 0.25);
     background: #000;
+    /* Its edge dithered on whole device pixels (see inset.ts), in the muted of the dark it stays in. */
+    --inset-edge: oklch(0.626 0.027 266);
+}
+.inset-edge {
+    position: absolute;
+    z-index: 2;
+    overflow: visible;
+    pointer-events: none;
+}
+/* A panel laid over a drawing: framed by the dim dotted leader line, which also leads from the frame to the point the
+   panel shows (see inset.ts). */
+.fig {
+    --fig-leader: color-mix(in oklab, var(--muted), transparent 50%);
+}
+.inset-drawn {
+    border: 1px dotted var(--fig-leader);
+    border-radius: 0;
+    background: var(--bg);
+}
+.inset-leader {
+    fill: none;
+    stroke: var(--fig-leader);
+    stroke-width: 1;
+    stroke-dasharray: 1 2;
 }
 /* Once a view is copied, a word under its button says so, for a moment. */
 .copy-info[data-copied]::after {
@@ -148,17 +189,15 @@
 }
 .view-icon:hover {
     --plate: var(--overlay-hover);
-}
-.view-icon:active::before {
-    transform: scale(0.82);
-    transition-duration: 0.08s;
+    color: var(--text);
 }
 .view-icon[aria-pressed="true"] {
     --plate: var(--overlay-tint);
     color: var(--accent);
 }
-.view-icon[aria-pressed="true"]:hover {
-    --plate: color-mix(in oklab, var(--accent) 34%, var(--surface));
+.view-icon:disabled,
+.view-toggle:disabled {
+    opacity: 0.4;
 }
 /* Text buttons, with or without an icon before or after the word, at the small text's size: a view's switch, a step,
    a month. Within a group the group is their ground. */
@@ -166,10 +205,10 @@
     display: inline-flex;
     gap: 4px;
     align-items: center;
-    height: 28px;
-    padding: 0 6px;
+    height: var(--fig-band);
+    padding: 0 8px;
     border: 0;
-    border-radius: var(--radius-button);
+    border-radius: 0;
     background: var(--surface);
     color: var(--muted);
     font-size: var(--text-small);
@@ -187,7 +226,7 @@
     color: var(--accent);
 }
 .view-toggle[aria-pressed="true"]:hover:enabled {
-    background: color-mix(in oklab, var(--accent) 34%, var(--surface));
+    background: var(--overlay-tint);
     color: var(--accent);
 }
 /* The size said again, over a figure's own rule for the drawings it holds. */
@@ -200,7 +239,7 @@
     --icon-size: 14;
 }
 .view-buttons > .view-toggle:not(:hover, [aria-pressed="true"]) {
-    background: none;
+    background-color: var(--bg);
 }
 /* The supersampling switch's "MSAA" runs on from its "4×", across the switch's gap (see Rays.astro). */
 .rays-long {
@@ -231,7 +270,7 @@
 /* Nothing but an icon: square. */
 .button-square {
     justify-content: center;
-    width: 28px;
+    width: var(--fig-band);
     padding: 0;
 }
 /* The step sizes as one segmented row of radio buttons, sharing their edges like the stepper does; it wraps rather
@@ -312,7 +351,7 @@
     align-items: flex-start;
     margin-top: 0.5rem;
     font-size: var(--text-meta);
-    line-height: 18px;
+    line-height: 20px;
 }
 /* A second slider stands off the first and its scale. */
 .figure-slider + .figure-slider {
@@ -331,7 +370,8 @@
     display: block;
     height: 1em;
     margin-top: -0.1rem;
-    margin-inline: calc(18px / 2);
+    /* 3 px in from either end, where the thumb's middle stops and the notches are (see global.css). */
+    margin-inline: 3px;
     line-height: 1;
     color: var(--muted);
     font-family: var(--font-mono);
@@ -443,41 +483,66 @@
 .fig-controls > .figure-slider {
     margin: 0;
 }
+/* Text on a view, at its top or its foot: muted, on no plate and with no shadow, also where a bright render makes it
+   hard to read; one line in the view's band, cut short with an ellipsis. Never selected nor in the way of a drag on
+   the view: only its links take the pointer, in the same tone, underlined under it. */
+:is(
+    .vis-credit,
+    .fig-hint,
+    .env-author,
+    .photo-note,
+    .lookup-info,
+    .config-disc-note,
+    .overlay-label,
+    .projections-legend
+) {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: var(--text-small);
+    line-height: var(--fig-band);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-shadow: none;
+    opacity: 1;
+    pointer-events: none;
+    user-select: none;
+}
+:is(.vis-credit, .fig-hint, .env-author, .photo-note, .lookup-info, .config-disc-note, .overlay-label) a {
+    color: inherit;
+    pointer-events: auto;
+}
+:is(.vis-credit, .fig-hint, .env-author, .photo-note, .lookup-info, .config-disc-note, .overlay-label) a:hover {
+    text-decoration: underline;
+}
 /* At the top of the scene it belongs to, not the bottom, where it would read as a caption of whatever panel floats
    over the scene's lower half. */
 .vis-credit {
     position: absolute;
-    top: 0.5rem;
-    left: var(--content-inset);
+    top: 0;
+    right: var(--fig-inset);
+    left: var(--fig-inset);
+    height: var(--fig-band);
     margin: 0;
     padding: 0;
-    color: var(--muted);
-    opacity: 0.7;
-    pointer-events: none;
-}
-.vis-credit a {
-    color: inherit;
-    pointer-events: auto;
 }
 /* A scene's switches in the top left corner, the credit line after them. The bar lets a drag through to the scene. */
 .scene-bar {
     position: absolute;
-    top: 0.5rem;
-    left: var(--content-inset);
+    top: 0;
+    left: 0;
+    right: 0;
     z-index: 5;
     display: flex;
-    gap: 0.5rem;
-    align-items: center;
+    gap: 2px;
+    align-items: flex-start;
     pointer-events: none;
 }
 .scene-bar > .vis-credit {
     position: static;
+    min-width: 0;
+    padding-left: calc(var(--fig-inset) - 2px);
 }
 @media (max-width: 48rem) {
-    .vis-credit,
-    .scene-bar {
-        left: 0;
-    }
     .scene-bar {
         right: 2.5rem;
         flex-wrap: wrap;
@@ -621,7 +686,9 @@ figure[id] {
 }
 .subfigure-title::before {
     counter-increment: subfigure;
-    content: "(" counter(subfigure, lower-alpha) ") ";
+    content: "(" counter(subfigure, lower-alpha) ")";
+    margin-right: 0.8ch;
+    font-family: var(--font-mono);
 }
 /* The panel proper, without the caption below it: what floats over the figure is placed against this. */
 .eclipse-panel {
@@ -845,12 +912,12 @@ figure[id] {
     --accent: var(--overlay-accent);
     --border: 1px solid var(--line);
     position: absolute;
-    top: 6px;
-    right: 6px;
-    left: 6px;
+    top: 0;
+    right: 0;
+    left: 0;
     z-index: 5;
     display: flex;
-    gap: 6px;
+    gap: 2px;
     align-items: flex-start;
     color: var(--text);
     pointer-events: none;
@@ -858,7 +925,7 @@ figure[id] {
 .fig-bar-start,
 .fig-bar-end {
     display: flex;
-    gap: 6px;
+    gap: 2px;
     align-items: flex-start;
 }
 .fig-bar-start {
@@ -873,22 +940,12 @@ figure[id] {
 /* After the switches, how to use the stage and what renders it: muted, on no plate, cut short where the bar is narrow. */
 .fig-hint {
     min-width: 0;
-    height: 36px;
-    padding: 0 0.25rem;
-    overflow: hidden;
-    color: var(--muted);
-    line-height: 36px;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    opacity: 0.7;
+    height: var(--fig-band);
+    padding: 0 0 0 calc(var(--fig-inset) - 2px);
 }
-/* Alone, without switches before it, as far from the top as from the side: the box trimmed to the capitals and the
-   baseline, so the gap above the letters is the one beside them. */
+/* Alone, without switches before it, the view's inset from its side. */
 .fig-bar-start > .fig-hint:only-child {
-    height: auto;
-    padding: 4px;
-    line-height: 1;
-    text-box: trim-both cap alphabetic;
+    padding-left: var(--fig-inset);
 }
 /* Where the switches do not fit in one row, they take a second, and the hint makes way. */
 @media (max-width: 40rem) {
@@ -990,21 +1047,16 @@ figure[id] {
 /* The moment, the place and what nachtgestirn computed for them, muted along the stage's foot. */
 .photo-note {
     position: absolute;
-    right: 10px;
-    bottom: 8px;
-    left: 10px;
+    right: var(--fig-inset);
+    bottom: 0;
+    left: var(--fig-inset);
     z-index: 5;
-    color: var(--muted);
-    opacity: 0.7;
-    font-size: 0.75rem;
-    line-height: 1.35;
+    height: var(--fig-band);
     text-align: right;
-    text-wrap: pretty;
-    pointer-events: none;
 }
 .photo-marks .photo-north {
     fill: rgb(255 255 255 / 0.85);
-    font-size: 11px;
+    font-size: var(--text-tiny);
     paint-order: stroke;
     stroke: rgb(0 0 0 / 0.7);
     stroke-width: 3px;
@@ -1041,23 +1093,53 @@ figure[id] {
     height: 100%;
     aspect-ratio: auto;
 }
-/* Its thumbnails size themselves by the gallery's width, which a centered column would otherwise shrink to nothing. */
-/* The photographs to compare as tabs under the figure, without names: the chosen one rises into the bar over them,
-   which credits it, its corners into the bar rounded out, and the bar's own corner square where the tab joins it there;
-   in full screen under the stage, as wide as the tabs need. */
+/* The split between two pictures a gap 2 px wide cut through the view, in the page's ground at rest and in the accent while
+   it is moved (see photo.ts, which places it where the slider's cursor stands). */
+.split-gap {
+    fill: var(--page-bg, var(--bg));
+    shape-rendering: crispEdges;
+}
+:is(.photo-compare:active, .photo-full:has(.split-drawn :is(input:hover, input:focus-visible))) .split-gap {
+    fill: var(--accent);
+}
+/* Its slider right under the view, as wide, the cursor's top 2 px below it (the cursor stands 4 px out of a bar centered
+   in a row 20 px high), the two ends named under it. */
+.split-drawn {
+    position: relative;
+    display: block;
+    margin-top: -2px;
+    cursor: pointer;
+}
+.split-drawn input {
+    display: block;
+    width: 100%;
+    margin: 0;
+}
+.split-ends {
+    display: flex;
+    justify-content: space-between;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-tiny);
+    line-height: 1;
+}
+.photo-full:fullscreen {
+    --page-bg: #000;
+}
+.photo-full:fullscreen > .split-drawn {
+    align-self: stretch;
+}
+/* The photographs to compare as a strip of square thumbnails 2 px apart under a muted credit line for the chosen one,
+   which is framed in the accent inside its square, so nothing moves; in full screen as wide as the thumbnails need. */
 .photo-picker {
-    --tab: color-mix(in oklab, var(--surface), var(--line) 70%);
-    margin: 0.5rem 0;
+    margin: 0.75rem 0 0.5rem;
 }
 .photo-full:fullscreen > :is(.photo-picker, .figure-slider) {
     width: min(calc(100% - 2rem), calc(var(--count) * 7rem));
     flex: none;
 }
 .photo-credit {
-    margin: 0;
-    padding: 0.4rem 0.75rem;
-    border-radius: var(--radius-button);
-    background: var(--tab);
+    margin: 0 0 0.25rem;
     color: var(--muted);
     font-size: var(--text-small);
     line-height: 1.4;
@@ -1068,84 +1150,35 @@ figure[id] {
 .photo-credit-name {
     color: var(--text);
 }
-.photo-picker:has(.photo-tab:first-child[aria-pressed="true"]) .photo-credit {
-    border-bottom-left-radius: 0;
-}
-.photo-picker:has(.photo-tab:last-child[aria-pressed="true"]) .photo-credit {
-    border-bottom-right-radius: 0;
-}
 .photo-tabs {
     display: grid;
     grid-template-columns: repeat(var(--count), 1fr);
-    align-items: start;
-    gap: 4px;
+    gap: 2px;
 }
 .photo-tab {
-    position: relative;
     display: block;
     min-width: 0;
     height: auto;
-    margin-top: 6px;
-    padding: 4px;
-    border: none;
-    border-radius: 0 0 var(--radius-button) var(--radius-button);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
     background: none;
     cursor: pointer;
-    filter: brightness(0.7) saturate(0.6);
-    transition: filter 0.15s;
 }
 .photo-full .photo-tabs .photo-tab > img {
     display: block;
     width: 100%;
     aspect-ratio: 1;
     object-fit: cover;
-    /* Concentric with the tab's corner, its padding in. */
-    border-radius: calc(var(--radius-button) - 4px);
-}
-.photo-tab:hover,
-.photo-tab:focus-visible {
-    filter: none;
+    border-radius: 0;
 }
 .photo-tab:focus-visible {
-    outline: none;
-}
-.photo-tab:focus-visible:not([aria-pressed="true"]) img {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--text);
     outline-offset: -2px;
 }
 .photo-tab[aria-pressed="true"] {
-    margin-top: 0;
-    padding-top: 10px;
-    background: var(--tab);
-    filter: none;
-}
-.photo-tab[aria-pressed="true"]::before,
-.photo-tab[aria-pressed="true"]::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    width: var(--radius-button);
-    height: var(--radius-button);
-}
-.photo-tab[aria-pressed="true"]::before {
-    right: 100%;
-    background: radial-gradient(
-        circle at 0 100%,
-        transparent calc(var(--radius-button) - 0.5px),
-        var(--tab) var(--radius-button)
-    );
-}
-.photo-tab[aria-pressed="true"]::after {
-    left: 100%;
-    background: radial-gradient(
-        circle at 100% 100%,
-        transparent calc(var(--radius-button) - 0.5px),
-        var(--tab) var(--radius-button)
-    );
-}
-.photo-tab:first-child::before,
-.photo-tab:last-child::after {
-    display: none;
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
 }
 /* Tables of numbers, in a figure or the text: monospace, the values right-aligned, every other row on the surface. */
 table {
@@ -1209,4 +1242,19 @@ tbody tr:hover {
     counter-increment: table;
     content: "Table\a0" counter(table) ". ";
     color: var(--accent);
+}
+/* A control set apart, for this figure alone, from the page's setting it follows (see settings.ts): a small square in
+   the accent at its top right corner. */
+[data-override] {
+    position: relative;
+}
+[data-override]::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 4px;
+    height: 4px;
+    background: var(--accent);
+    pointer-events: none;
 }

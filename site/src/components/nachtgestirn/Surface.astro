@@ -22,10 +22,10 @@ const { id = "surface" } = Astro.props;
             <span class="fig-bar-start">
                 <Resolutions options={WHOLE_RESOLUTIONS} chosen="4k" />
                 <span class="view-buttons"><button type="button" class="view-toggle" data-field="albedo" aria-pressed="true" title="NASA's color map of the Moon; off, a uniform surface of the Moon's albedo, so the relief and its shadows show alone">albedo</button></span>
+                <span class="view-buttons"><Rays /></span>
                 <span class="fig-hint footnote">Rendered with WebGPU</span>
             </span>
             <span class="fig-bar-end">
-                <span class="view-buttons"><Rays /></span>
                 <span class="view-buttons fig-actions">
                     <button type="button" class="view-toggle" data-field="download" title="Download the disc and its close-ups as PNG" aria-label="Download as PNG">png</button>
                     <CopyInfo />

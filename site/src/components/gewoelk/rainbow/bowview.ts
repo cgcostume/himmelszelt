@@ -1,6 +1,6 @@
 import { airTransmittance, DEFAULT_ATMOSPHERE_MODEL } from "@himmelszelt/dunstkreis";
 import { rainbowTable, rainDropRadius, rainExtinction, wgsl } from "@himmelszelt/gewoelk";
-import { configureCanvas, SDR } from "../../dunstkreis/atmosphere";
+import { configureCanvas, display, SDR } from "../../dunstkreis/atmosphere";
 import { gpu, gpuFailed, gpuMissing } from "../../webgpu";
 import shader from "./bowview.comp.wgsl";
 
@@ -16,6 +16,7 @@ const EYE_M = 2;
 // steradian, to a bright color, under a red Sun too.
 const EXPOSED = 6;
 const MOST_PIXELS = 2048;
+const CURVES = { neutral: 1, agx: 2, aces: 3, clip: 4 };
 
 /** The diagram's projection: the horizon's height as a share of the panel's, and the degrees to either side of its middle. */
 export interface BowProjection {
@@ -76,16 +77,14 @@ export function createBowView(canvas: HTMLCanvasElement, projection: BowProjecti
             const exposure = EXPOSED / Math.max(r, g, b, 1e-6);
             const sun = [0, -Math.cos(elevation * DEG), Math.sin(elevation * DEG)];
             const quarter = width / (2 * Math.tan((projection.halfWidth / 2) * DEG));
-            device.queue.writeBuffer(
-                uniforms,
-                0,
-                new Float32Array([
-                    ...sun,
-                    rainExtinction(RAIN_RATE),
-                    ...[r, g, b, exposure],
-                    ...[width / 2, projection.horizon * height, quarter, 0],
-                ]),
-            );
+            const data = new Float32Array([
+                ...sun,
+                rainExtinction(RAIN_RATE),
+                ...[r, g, b, exposure],
+                ...[width / 2, projection.horizon * height, quarter, 0],
+            ]);
+            new Uint32Array(data.buffer)[11] = CURVES[display.toneCurve];
+            device.queue.writeBuffer(uniforms, 0, data);
             const encoder = device.createCommandEncoder();
             const pass = encoder.beginComputePass({ label: "sternwarte:bowView" });
             pass.setPipeline(pipeline);

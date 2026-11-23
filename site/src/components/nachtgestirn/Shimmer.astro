@@ -25,10 +25,10 @@ const { id = "shimmer" } = Astro.props;
                         <button type="button" class="view-toggle" data-part="boiling" aria-pressed="true" title="The smaller cells, which make the image boil within those patches">boiling</button>
                         <button type="button" class="view-toggle" data-part="colors" aria-pressed="true" title="The air's dispersion: it bends blue more than red, so the blue image stands higher, more the lower the Moon">colors</button>
                     </span>
+                    <span class="view-buttons"><Rays /></span>
                     <span class="fig-hint footnote">Rendered with WebGPU</span>
                 </span>
                 <span class="view-buttons fig-actions">
-                    <Rays />
                     <button type="button" class="view-icon" data-field="play" aria-pressed="true" title="Let the air drift on, or hold it" aria-label="Pause"><Icon name="play" /></button>
                     <button type="button" class="view-icon" data-field="download" title="Download the close-up and the air from the side as PNG" aria-label="Download as PNG"><Icon name="download" /></button>
                     <CopyInfo />

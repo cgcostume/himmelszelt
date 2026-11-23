@@ -9,7 +9,7 @@ import TimeSlider from "./TimeSlider.astro";
 <figure class="fig scene-frame wide" id="armillary-sphere">
     <div id="scene" data-export="armillary-sphere">
         <div class="scene-bar">
-            <span class="view-buttons"><button type="button" class="view-icon" data-field="labels" aria-pressed="true" title="Show or hide the annotations" aria-label="Annotations"><Icon name="labels" /></button></span>
+            <span class="view-buttons"><button type="button" class="view-icon" data-field="labels" aria-pressed="true" data-setting="labels" title="Show or hide the annotations" aria-label="Annotations"><Icon name="labels" /></button></span>
             <p class="vis-credit footnote">
                 Drag to rotate. Visualized with <a href="https://zzz.dog/" target="_blank" rel="noopener">Zdog</a>.
             </p>
@@ -23,6 +23,10 @@ import TimeSlider from "./TimeSlider.astro";
             <path class="annotation-arrow" data-annotation="eclipticAxis"></path>
             <polygon class="annotation-arrowhead" data-annotation="eclipticAxis"></polygon>
         </svg>
+        <svg class="scene-annotations scene-leaders" aria-hidden="true">
+            <path class="inset-leader" data-leader="sun"></path>
+            <path class="inset-leader" data-leader="moon"></path>
+        </svg>
         <span class="scene-annotation" data-annotation="observer" data-export-text>observer</span>
         <span class="scene-annotation" data-annotation="ecliptic" data-export-text>ecliptic</span>
         <span class="scene-annotation" data-annotation="celestialEquator" data-export-text>celestial equator</span>
@@ -32,11 +36,11 @@ import TimeSlider from "./TimeSlider.astro";
         <span class="scene-annotation" data-annotation="eclipticAxis" data-export-text>ecliptic axis</span>
         <div class="altaz-panels">
             <div class="altaz-panel altaz-panel-sun" data-export="sun-locked">
-                <svg id="sunView" aria-hidden="true"></svg>
+                <svg id="sunView" class="inset-drawn" aria-hidden="true"></svg>
                 <span class="altaz-caption"><span class="subfigure-title">sun-locked</span>: the observer's sky</span>
             </div>
             <div class="altaz-panel altaz-panel-moon" data-export="moon-locked">
-                <svg id="moonView" aria-hidden="true"></svg>
+                <svg id="moonView" class="inset-drawn" aria-hidden="true"></svg>
                 <span class="altaz-caption"><span class="subfigure-title">moon-locked</span>: the observer's sky</span>
             </div>
         </div>

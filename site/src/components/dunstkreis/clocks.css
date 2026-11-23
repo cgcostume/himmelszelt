@@ -26,7 +26,7 @@
 .clocks-box text {
     fill: var(--muted);
     opacity: 0.6;
-    font-size: 0.75rem;
+    font-size: var(--text-small);
 }
 .clocks-box.active text {
     opacity: 1;
